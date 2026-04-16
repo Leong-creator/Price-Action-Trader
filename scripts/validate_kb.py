@@ -8,6 +8,21 @@ import sys
 from pathlib import Path
 
 
+ALLOWED_TYPES = {
+    "concept",
+    "setup",
+    "rule",
+    "indicator",
+    "market-regime",
+    "risk",
+    "source",
+    "glossary",
+    "case-study",
+}
+ALLOWED_STATUS = {"draft", "active", "experimental", "superseded"}
+ALLOWED_CONFIDENCE = {"low", "medium", "high"}
+ALLOWED_DIRECTION = {"long", "short", "both", "neutral"}
+
 REQUIRED_FIELDS = [
     "title",
     "type",
@@ -22,6 +37,29 @@ SETUP_REQUIRED_FIELDS = [
     "signal_bar",
     "entry_trigger",
     "stop_rule",
+    "invalidation",
+]
+
+LIST_FIELDS = [
+    "market",
+    "timeframes",
+    "source_refs",
+    "tags",
+    "applicability",
+    "not_applicable",
+    "contradictions",
+    "missing_visuals",
+    "open_questions",
+    "pa_context",
+    "market_cycle",
+    "higher_timeframe_context",
+    "bar_by_bar_notes",
+    "signal_bar",
+    "entry_trigger",
+    "entry_bar",
+    "stop_rule",
+    "target_rule",
+    "trade_management",
     "invalidation",
 ]
 
@@ -76,7 +114,58 @@ def parse_frontmatter(text: str):
 
 
 def is_missing(value: object) -> bool:
-    return value is None or value == ""
+    return value is None or value == "" or value == []
+
+
+def is_non_empty_string(value: object) -> bool:
+    return isinstance(value, str) and value.strip() != ""
+
+
+def validate_enum(path: Path, frontmatter: dict[str, object], errors: list[str]) -> None:
+    page_type = frontmatter.get("type")
+    if page_type not in ALLOWED_TYPES:
+        errors.append(f"{path}: invalid 'type' value '{page_type}'")
+
+    status = frontmatter.get("status")
+    if status not in ALLOWED_STATUS:
+        errors.append(f"{path}: invalid 'status' value '{status}'")
+
+    confidence = frontmatter.get("confidence")
+    if confidence not in ALLOWED_CONFIDENCE:
+        errors.append(f"{path}: invalid 'confidence' value '{confidence}'")
+
+    direction = frontmatter.get("direction", "")
+    if direction not in ("", *sorted(ALLOWED_DIRECTION)):
+        errors.append(f"{path}: invalid 'direction' value '{direction}'")
+
+
+def validate_list_fields(path: Path, frontmatter: dict[str, object], errors: list[str]) -> None:
+    for field in LIST_FIELDS:
+        value = frontmatter.get(field, [])
+        if value == "":
+            continue
+        if not isinstance(value, list):
+            errors.append(f"{path}: field '{field}' must be a list")
+
+
+def validate_scalar_fields(path: Path, frontmatter: dict[str, object], errors: list[str]) -> None:
+    last_reviewed = frontmatter.get("last_reviewed")
+    if last_reviewed is not None and not is_non_empty_string(last_reviewed):
+        errors.append(f"{path}: field 'last_reviewed' must be a non-empty string")
+
+    measured_move = frontmatter.get("measured_move")
+    if measured_move not in ("", None) and not isinstance(measured_move, bool):
+        errors.append(f"{path}: field 'measured_move' must be boolean when provided")
+
+    risk_reward_min = frontmatter.get("risk_reward_min")
+    if risk_reward_min not in ("", None):
+        if isinstance(risk_reward_min, bool):
+            errors.append(f"{path}: field 'risk_reward_min' must be numeric when provided")
+        elif isinstance(risk_reward_min, str):
+            try:
+                float(risk_reward_min)
+            except ValueError:
+                errors.append(f"{path}: field 'risk_reward_min' must be numeric when provided")
 
 
 def validate_file(path: Path) -> list[str]:
@@ -88,6 +177,10 @@ def validate_file(path: Path) -> list[str]:
     for field in REQUIRED_FIELDS:
         if field not in frontmatter or is_missing(frontmatter[field]):
             errors.append(f"{path}: missing required field '{field}'")
+
+    validate_enum(path, frontmatter, errors)
+    validate_list_fields(path, frontmatter, errors)
+    validate_scalar_fields(path, frontmatter, errors)
 
     if frontmatter.get("type") == "setup":
         for field in SETUP_REQUIRED_FIELDS:

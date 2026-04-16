@@ -8,6 +8,22 @@ import json
 from pathlib import Path
 
 
+INDEX_FIELDS = [
+    "path",
+    "title",
+    "type",
+    "status",
+    "confidence",
+    "market",
+    "timeframes",
+    "direction",
+    "source_refs",
+    "pa_context",
+    "tags",
+    "open_questions",
+]
+
+
 def parse_scalar(raw: str):
     value = raw.strip()
     if value == "":
@@ -85,26 +101,26 @@ def main() -> int:
         frontmatter = parse_frontmatter(path.read_text(encoding="utf-8"))
         if frontmatter is None:
             continue
-        index.append(
-            {
-                "path": (
-                    path.relative_to(repo_root).as_posix()
-                    if path.is_relative_to(repo_root)
-                    else path.as_posix()
-                ),
-                "title": frontmatter.get("title", ""),
-                "type": frontmatter.get("type", ""),
-                "status": frontmatter.get("status", ""),
-                "confidence": frontmatter.get("confidence", ""),
-                "market": ensure_list(frontmatter.get("market")),
-                "timeframes": ensure_list(frontmatter.get("timeframes")),
-                "direction": frontmatter.get("direction", ""),
-                "source_refs": ensure_list(frontmatter.get("source_refs")),
-                "pa_context": ensure_list(frontmatter.get("pa_context")),
-                "tags": ensure_list(frontmatter.get("tags")),
-                "open_questions": ensure_list(frontmatter.get("open_questions")),
-            }
+        relative_path = (
+            path.relative_to(repo_root).as_posix()
+            if path.is_relative_to(repo_root)
+            else path.as_posix()
         )
+        record = {
+            "path": relative_path,
+            "title": frontmatter.get("title", ""),
+            "type": frontmatter.get("type", ""),
+            "status": frontmatter.get("status", ""),
+            "confidence": frontmatter.get("confidence", ""),
+            "market": ensure_list(frontmatter.get("market")),
+            "timeframes": ensure_list(frontmatter.get("timeframes")),
+            "direction": frontmatter.get("direction", ""),
+            "source_refs": ensure_list(frontmatter.get("source_refs")),
+            "pa_context": ensure_list(frontmatter.get("pa_context")),
+            "tags": ensure_list(frontmatter.get("tags")),
+            "open_questions": ensure_list(frontmatter.get("open_questions")),
+        }
+        index.append({field: record[field] for field in INDEX_FIELDS})
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
