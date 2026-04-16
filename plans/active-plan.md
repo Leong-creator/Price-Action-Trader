@@ -5,7 +5,8 @@
 - 本计划用于替换初始化模板，并驱动后续全部实施。
 - 当前已接受基线为 M0 基础设施初始化，基线提交为 `96259ad`。
 - M1 已完成知识库 schema、KB 校验、wiki index、资料投放流程的最小闭环。
-- 当前活动分支即将切换到 `feature/m2-data-schema-replay`，用于启动 M2。
+- M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
+- 当前活动分支将从 `feature/m2-data-schema-replay` 切换到 `feature/m3-pa-signal-prototype`，用于启动 M3。
 
 ## 2. 执行总原则
 
@@ -115,7 +116,7 @@
 ## 9. M2 测试数据、OHLCV schema、CSV/JSON 回放 adapter
 
 - 分支：`feature/m2-data-schema-replay`
-- 当前状态：进行中
+- 当前状态：已完成
 - 目标：建立可供策略、回测和 QA 复用的本地数据最小闭环，优先围绕 `tests/test_data/` 和用户导出文件，不引入外部付费或浏览器依赖。
 - 交付内容：
   - 明确 OHLCV 与新闻 JSON schema。
@@ -146,10 +147,16 @@
   - 样本过少导致回放接口设计偏差
 - 回退点：
   - 若 M2 失败，保留 M1 产物不动，废弃 `feature/m2-data-schema-replay`
+- 实际完成摘要：
+  - 已新增 `src/data/schema.py`，固定 OHLCV、新闻事件、ValidationError、CleanedRecord 等最小稳定契约。
+  - 已新增本地 CSV/JSON loader 与 deterministic replay，统一消费 schema 契约。
+  - 已建立 `tests/unit/test_data_pipeline.py`，覆盖正向样本、重复键、非法 market、非法 severity、非法 timezone、aware timestamp 归一化和统一类型输出。
+  - reviewer 与 qa 已通过，确认核心数据路径未引入浏览器或第三方 SDK。
 
 ## 10. M3 PA context、setup、signal 输出原型
 
 - 分支：`feature/m3-pa-signal-prototype`
+- 当前状态：进行中
 - 目标：在不接入实盘的前提下，用规则化、可解释、可追溯的方式产出最小交易信号原型。
 - 交付内容：
   - 建立 PA context、setup、signal 的内部表示。
@@ -330,12 +337,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 2：测试数据、OHLCV schema、CSV/JSON 回放。
-- 当前 milestone：M2：测试数据、OHLCV schema、CSV/JSON 回放 adapter。
+- 当前阶段：阶段 3：PA context、setup、signal 输出原型。
+- 当前 milestone：M3：PA context、setup、signal 输出原型。
 - 当前下一步：
-  - 从 `feature/m2-data-schema-replay` 启动 M2
-  - 优先统一 OHLCV / 新闻 schema、读取接口与 deterministic replay 契约
-  - 完成数据样本、异常路径、回放验证后，再进入 M3
+  - 从 `feature/m3-pa-signal-prototype` 启动 M3
+  - 优先定义可解释 signal 对象、PA context / setup 表达与知识库引用边界
+  - 基于 M1 wiki 页面和 M2 replay 数据建立最小 signal 原型与验证样本
 
 ## 18. 假设
 

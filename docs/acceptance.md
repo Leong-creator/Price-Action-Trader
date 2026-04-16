@@ -33,3 +33,25 @@
   - 至少包含 `concept`、`setup`、`source` 三类代表性页面的临时样本路径。
 - `knowledge/wiki/index.md` 满足当前 frontmatter 契约，且可被校验脚本和索引脚本处理。
 - M1 不修改 raw 层资料，不接入外部 API，不进入策略、回测、模拟盘或实盘开发。
+
+## 阶段 2：测试数据、OHLCV schema、CSV/JSON 回放
+
+完成条件：
+
+- `src/data/schema.py` 固定 OHLCV、新闻事件、ValidationError、CleanedRecord 的最小稳定契约。
+- 本地 CSV/JSON loader 与 replay 必须直接消费 schema 契约，而不是维护并行私有类型。
+- OHLCV 至少校验：
+  - timestamp 可解析。
+  - timezone 有效。
+  - high/low/open/close 基本关系。
+  - 非法价格与非法 volume。
+  - 同一 symbol/timeframe/timestamp 重复。
+  - 非法 market。
+- 新闻样本至少校验：
+  - 最小字段齐全。
+  - timestamp 与 timezone 上下文有效。
+  - 非法 market。
+  - 非法 severity。
+- `python -m unittest discover -s tests/unit -p 'test_data_pipeline.py' -v` 通过。
+- replay 输出必须能暴露稳定的 bar identity_key，并与 schema 契约保持一致。
+- M2 不接入外部行情 API，不引入浏览器自动化，不进入策略、回测统计、模拟盘或实盘开发。

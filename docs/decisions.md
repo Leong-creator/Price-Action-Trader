@@ -19,3 +19,8 @@
 
 - 日期：2026-04-17
 - 结论：M1 冻结了 wiki frontmatter 基础字段、setup 额外必填字段、KB 校验约束与 wiki index 最小输出字段，后续 M2/M3 不得随意破坏兼容性。
+
+## D-0005 M2 数据契约冻结
+
+- 日期：2026-04-17
+- 结论：M2 冻结了 `src/data/schema.py` 中的 OHLCV、新闻事件、ValidationError、CleanedRecord 最小契约，以及 loader/replay 对这些契约的直接消费方式；后续 M3/M4 不得重新发明并行数据结构。

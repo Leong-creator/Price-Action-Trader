@@ -5,20 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Sequence
 
-from .loaders import NewsEvent, PriceBar
+from .schema import NewsEvent, OhlcvRow
 
 
 @dataclass(frozen=True, slots=True)
 class ReplayStep:
     index: int
-    bar: PriceBar
+    bar: OhlcvRow
     news_events: tuple[NewsEvent, ...]
 
 
 class DeterministicReplay(Iterator[ReplayStep]):
     """Stable iterator over bars with timestamp-scoped news events."""
 
-    def __init__(self, bars: Sequence[PriceBar], news_events: Sequence[NewsEvent] | None = None) -> None:
+    def __init__(self, bars: Sequence[OhlcvRow], news_events: Sequence[NewsEvent] | None = None) -> None:
         self._bars = tuple(sorted(bars, key=lambda bar: (bar.timestamp, bar.symbol, bar.timeframe)))
         self._events_by_ts = _group_news_by_timestamp(news_events or ())
         self._cursor = 0
@@ -62,7 +62,7 @@ class DeterministicReplay(Iterator[ReplayStep]):
 
 
 def build_replay(
-    bars: Iterable[PriceBar], news_events: Iterable[NewsEvent] | None = None
+    bars: Iterable[OhlcvRow], news_events: Iterable[NewsEvent] | None = None
 ) -> DeterministicReplay:
     return DeterministicReplay(tuple(bars), tuple(news_events or ()))
 
@@ -72,4 +72,3 @@ def _group_news_by_timestamp(events: Sequence[NewsEvent]) -> dict[object, tuple[
     for event in sorted(events, key=lambda item: (item.timestamp, item.symbol, item.source)):
         grouped.setdefault(event.timestamp, []).append(event)
     return {timestamp: tuple(items) for timestamp, items in grouped.items()}
-

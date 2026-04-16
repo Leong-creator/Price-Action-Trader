@@ -72,7 +72,6 @@ class OhlcvRow(DataRecord):
     def identity_key(self) -> tuple[str, ...]:
         return (
             self.symbol,
-            self.market,
             self.timeframe,
             self.timestamp.isoformat(),
         )
