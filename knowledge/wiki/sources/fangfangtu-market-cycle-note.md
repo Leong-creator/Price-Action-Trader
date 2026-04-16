@@ -7,12 +7,12 @@ market: ["US", "HK"]
 timeframes: []
 direction: neutral
 source_refs: ["raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf"]
-applicability: ["作为 market cycle 相关 wiki 页面和后续抽取任务的来源登记页"]
+applicability: ["作为 market cycle 相关 wiki 页面、M3 research-only context 引用和后续抽取任务的来源登记页"]
 not_applicable: ["当前未完成逐页抽取，不能替代原始资料本身"]
 contradictions: []
 missing_visuals: ["原始 PDF 尚未拆分页面截图"]
 open_questions: ["需要补充作者信息、输出时间、章节结构和逐页定位"]
-tags: ["m1-sample", "source", "fangfangtu", "market-cycle"]
+tags: ["m1-sample", "source", "fangfangtu", "market-cycle", "research-only"]
 pa_context: []
 market_cycle: []
 higher_timeframe_context: []
@@ -38,6 +38,11 @@ last_reviewed: 2026-04-17
 - 来源类型：用户提供的原始笔记 PDF。
 - 当前状态：仅完成来源登记，尚未做逐页抽取或结构化转写。
 - 使用方式：后续所有引用该资料的 wiki 页面都应把本页或原始路径写入 `source_refs`。
+
+## Research-only Assumptions
+
+- 当前只确认该 PDF 是 market cycle 相关来源，不确认其中任何具体规则细节。
+- 若 M3 需要消费 market cycle 引用，只能通过本来源页追溯，不得把来源登记页本身当成规则页。
 
 ## 待后续补充
 

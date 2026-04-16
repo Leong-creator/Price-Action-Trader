@@ -26,7 +26,7 @@ trade_management: []
 measured_move: false
 invalidation: []
 risk_reward_min:
-last_reviewed: 2026-04-16
+last_reviewed: 2026-04-17
 ---
 
 # Knowledge Wiki Index
@@ -40,3 +40,8 @@ last_reviewed: 2026-04-16
   `knowledge/schema/` 中的契约一致。
 - `scripts/validate_kb.py` 与 `scripts/build_kb_index.py` 必须能处理仅有本页的
   wiki，以及完全空的临时 wiki 目录。
+
+## M3 说明
+
+- 当前已新增面向 M3 的 `research-only` 引用页与最小结构化索引。
+- 所有 M3 知识引用必须保留 `low confidence`、`source_refs` 和 assumptions，不得把占位页升级成已验证交易规则。

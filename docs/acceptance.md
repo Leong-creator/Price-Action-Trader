@@ -55,3 +55,38 @@
 - `python -m unittest discover -s tests/unit -p 'test_data_pipeline.py' -v` 通过。
 - replay 输出必须能暴露稳定的 bar identity_key，并与 schema 契约保持一致。
 - M2 不接入外部行情 API，不引入浏览器自动化，不进入策略、回测统计、模拟盘或实盘开发。
+
+## 阶段 3：PA context、setup、signal 输出原型
+
+完成条件：
+
+- `src/strategy/` 已冻结最小 `PAContextSnapshot`、`SetupCandidate`、`Signal` 结构化对象。
+- strategy 层只消费 M2 的 `OhlcvRow`、`NewsEvent`、`DeterministicReplay` 契约，不直接读取 CSV/JSON。
+- 已建立 research-only 的最小知识引用层，并保留直接回链到 wiki concept/setup/rule 页面与 source/raw 的 `source_refs`。
+- 信号输出至少包含：
+  - `signal_id`
+  - `symbol`
+  - `market`
+  - `timeframe`
+  - `direction`
+  - `setup_type`
+  - `pa_context`
+  - `entry_trigger`
+  - `stop_rule`
+  - `target_rule`
+  - `invalidation`
+  - `confidence`
+  - `source_refs`
+  - `explanation`
+  - `risk_notes`
+- `python -m unittest tests/unit/test_strategy_signal_pipeline.py -v` 通过，并至少覆盖：
+  - 无信号路径。
+  - 单信号路径。
+  - `signal_id` 与 `source_refs` 稳定性。
+  - placeholder knowledge 导致的低置信度与风险提示。
+  - news 只进入 `risk_notes`，不污染主信号字段。
+  - 缺失 `source_refs` 的早失败路径。
+  - invalidation 的最小阻断行为。
+  - 多信号顺序稳定性与 `signal_id` 唯一性。
+- `python scripts/validate_kb.py` 与 `python scripts/build_kb_index.py` 继续通过。
+- M3 不接入外部行情 API，不进入回测成交撮合、模拟执行、正式券商 API、实盘或自动下单开发。

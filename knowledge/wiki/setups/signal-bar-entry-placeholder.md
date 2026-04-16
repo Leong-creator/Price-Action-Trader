@@ -6,13 +6,13 @@ confidence: low
 market: ["US", "HK"]
 timeframes: ["5m", "15m", "1h"]
 direction: both
-source_refs: ["raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf"]
-applicability: ["用于 M1 校验 setup 页 frontmatter、索引字段和后续资料抽取流程"]
-not_applicable: ["未完成原始资料抽取前，不用于自动信号、回测或执行"]
+source_refs: ["wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md", "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf"]
+applicability: ["用于 M1 校验 setup 页 frontmatter、索引字段、M3 research-only setup 引用和后续资料抽取流程"]
+not_applicable: ["未完成原始资料抽取前，不用于自动信号、回测或执行", "不作为已验证的 signal bar entry 规则"]
 contradictions: []
 missing_visuals: ["缺少原始图表截图与逐页转录定位"]
 open_questions: ["需要确认 signal bar 形态要求、entry trigger、stop rule、target rule 和 invalidation"]
-tags: ["m1-sample", "setup", "signal-bar", "entry"]
+tags: ["m1-sample", "setup", "signal-bar", "entry", "research-only"]
 pa_context: ["待从原始笔记确认趋势或震荡下的适用上下文"]
 market_cycle: ["pending-source-confirmation"]
 higher_timeframe_context: ["待确认 higher timeframe 方向一致性与过滤条件"]
@@ -38,6 +38,12 @@ last_reviewed: 2026-04-17
 - 原始来源是 `knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf`。
 - 当前内容只建立结构化字段和待抽取事项，不把任何具体入场条件写成已验证规则。
 - 本页后续应在原始资料抽取完成后补充 signal bar、entry、stop、target 和 invalidation 的准确定义。
+
+## Research-only Assumptions
+
+- `signal-bar-entry-placeholder` 目前只是 M3 的 setup 占位标识，不代表原始资料已经确认该 setup 的精确定义。
+- `entry_trigger`、`stop_rule`、`target_rule` 和 `invalidation` 中的“待确认”文本只能作为缺口提示，不能被策略代码解释为触发逻辑。
+- 在 raw 资料未完成抽取前，本页只用于 signal 字段边界和 source_refs 追溯，不得直接生成自动化交易结论。
 
 ## 待后续补充
 

@@ -6,7 +6,8 @@
 - 当前已接受基线为 M0 基础设施初始化，基线提交为 `96259ad`。
 - M1 已完成知识库 schema、KB 校验、wiki index、资料投放流程的最小闭环。
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
-- 当前活动分支将从 `feature/m2-data-schema-replay` 切换到 `feature/m3-pa-signal-prototype`，用于启动 M3。
+- M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
+- 当前活动分支将从 `feature/m3-pa-signal-prototype` 切换到 `feature/m4-backtest-report`，用于启动 M4。
 
 ## 2. 执行总原则
 
@@ -156,7 +157,7 @@
 ## 10. M3 PA context、setup、signal 输出原型
 
 - 分支：`feature/m3-pa-signal-prototype`
-- 当前状态：进行中
+- 当前状态：已完成
 - 目标：在不接入实盘的前提下，用规则化、可解释、可追溯的方式产出最小交易信号原型。
 - 交付内容：
   - 建立 PA context、setup、signal 的内部表示。
@@ -183,6 +184,11 @@
   - 过早把知识库抽象成黑箱规则
   - 信号字段缺少解释性
 - 回退点：回退到 M2 已验收检查点
+- 实际完成摘要：
+  - 已新增 `knowledge/wiki/rules/m3-research-reference-pack.md` 与 `knowledge/wiki/rules/m3_signal_reference_index.json`，形成 research-only 的最小知识引用层。
+  - 已新增 `src/strategy/` 最小 contracts / knowledge / context / signal 原型，且 strategy 层只消费 M2 的 `OhlcvRow`、`NewsEvent` 与 `DeterministicReplay` 契约。
+  - 已建立 `tests/unit/test_strategy_signal_pipeline.py`，覆盖无信号、单信号、traceability、placeholder 低置信度、news 只作风险说明、缺失 `source_refs` 早失败、invalidation、多信号稳定性。
+  - reviewer 与 qa 已通过，确认信号字段完整、来源可追溯、research-only 边界清晰，且未越界到 execution / risk / broker / 外部 API。
 
 ## 11. M4 最小回测引擎与报告
 

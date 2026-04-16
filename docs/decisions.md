@@ -24,3 +24,8 @@
 
 - 日期：2026-04-17
 - 结论：M2 冻结了 `src/data/schema.py` 中的 OHLCV、新闻事件、ValidationError、CleanedRecord 最小契约，以及 loader/replay 对这些契约的直接消费方式；后续 M3/M4 不得重新发明并行数据结构。
+
+## D-0006 M3 信号原型契约冻结
+
+- 日期：2026-04-17
+- 结论：M3 冻结了 `src/strategy/` 中 research-only 的 `PAContextSnapshot`、`SetupCandidate`、`Signal` 最小契约，以及直接回链到 wiki concept/setup/rule 页面与 source/raw 的 traceability 要求；后续 M4/M5 必须消费该结构化 signal，而不是重新回退到自由文本或并行对象。
