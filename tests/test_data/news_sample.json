@@ -1,0 +1,12 @@
+[
+  {
+    "symbol": "SAMPLE",
+    "market": "US",
+    "timestamp": "2026-01-05T09:00:00-05:00",
+    "source": "synthetic-test-fixture",
+    "event_type": "earnings_related_volatility",
+    "headline": "Synthetic sample event for testing only",
+    "severity": "medium",
+    "notes": "用于测试新闻过滤结构，不代表真实新闻。"
+  }
+]
