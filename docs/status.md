@@ -2,11 +2,11 @@
 
 ## 当前阶段
 
-- 阶段 4：纸面交易 / 模拟执行与风控闭环（进行中）
+- 阶段 5：纸面交易 / 模拟执行与风控闭环（已完成）
 
 ## 当前 milestone
 
-- M5：纸面交易 / 模拟执行与风控闭环（进行中）
+- M5：纸面交易 / 模拟执行与风控闭环（已完成）
 
 ## 当前分支
 
@@ -36,6 +36,9 @@
 - M4 已新增 `src/backtest/` 最小 contracts / engine / reporting 基线
 - M4 已覆盖零交易、单交易、多交易、same-bar stop/target、end_of_data、news 不改收益、profit_factor 空值路径
 - M4 已通过 reviewer / qa 正式复审，确认回测层只消费本地 replay / bars 与结构化 signal，未越界到 execution / risk / broker / 外部 API
+- M5 已新增 `src/risk/` 最小 contracts / engine 与 `src/execution/` 最小 paper adapter / state / logging
+- M5 已覆盖 allow、risk_block、market_closed、duplicate_signal、loss-streak halt、manual recovery、config_error、invalid_request、mismatched / stale / direction-mismatch risk decision
+- M5 已通过 reviewer / qa 正式复审，确认风控先于执行、paper-only 边界清晰、close-path 审计日志可复盘，未越界到真实 broker / live execution
 
 ## 当前阻塞
 
@@ -43,6 +46,6 @@
 
 ## 下一步
 
-- 从 `feature/m5-papertrading-risk` 启动 M5
-- 先读取 `src/execution/AGENTS.override.md` 与 `src/risk/AGENTS.override.md`，锁定 paper-only 边界
-- 优先实现信号 -> 风控 -> 建议订单 -> 模拟成交 -> 持仓状态 的最小闭环，并保持默认模式为 paper/simulated
+- 从 `feature/m5-papertrading-risk` 的已验收检查点切出 `feature/m6-news-review-integration`
+- 读取 `src/news/AGENTS.md`，锁定新闻仅作过滤 / 解释 / 风险提示的边界
+- 启动 M6：新闻事件过滤与复盘整合，保持不接真实 broker / live execution

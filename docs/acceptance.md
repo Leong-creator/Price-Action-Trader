@@ -115,3 +115,46 @@
 - 收益类统计只基于 closed trades；`end_of_data` / unfinished trade 不得混入 closed-trade 收益统计。
 - `python -m unittest tests/unit/test_strategy_signal_pipeline.py -v` 与 `python -m unittest discover -s tests/unit -p 'test_data_pipeline.py' -v` 继续通过。
 - M4 不接入外部行情 API，不进入模拟执行、正式券商 API、实盘或自动下单开发。
+
+## 阶段 5：纸面交易、模拟执行与风控闭环
+
+完成条件：
+
+- `src/risk/` 已冻结最小 `RiskConfig`、`PositionSnapshot`、`TradingPauseState`、`SessionRiskState`、`RiskEvent`、`RiskDecision` 契约。
+- `src/execution/` 已冻结最小 `ExecutionRequest`、`SuggestedOrder`、`FillEvent`、`PaperPosition`、`ExecutionLogEntry`、`ExecutionResult`、`PositionCloseResult` 契约。
+- 执行层默认只支持 `paper/simulated`，不得出现真实 broker 凭证、真实账户连接、真实下单路径或 live 默认语义。
+- 风控层至少覆盖：
+  - 单笔最大风险
+  - 总仓位限制
+  - 标的集中度限制
+  - 日内最大亏损
+  - 连续亏损暂停
+  - 熔断/暂停状态
+  - 恢复交易条件
+- `PaperBrokerAdapter.submit(...)` 必须在 simulated fill 之前阻断以下路径：
+  - risk_block
+  - config_error
+  - invalid_request
+  - market_closed
+  - duplicate_signal
+  - stale / mismatched risk decision
+- close-path 审计日志至少保留：
+  - `signal_id`
+  - `symbol`
+  - `source_refs`
+  - `quantity`
+  - `entry_price`
+  - `exit_price`
+  - `realized_pnl`
+- `python -m unittest tests/unit/test_paper_execution_pipeline.py -v` 通过，并至少覆盖：
+  - allow 路径
+  - 风控拦截路径
+  - 模拟成交路径
+  - 市场关闭路径
+  - 重复信号路径
+  - 连续亏损熔断路径
+  - 恢复交易条件路径
+  - config_error / invalid_request 路径
+  - mismatched / stale risk decision 路径
+- `python -m unittest discover -s tests/unit -v` 继续通过。
+- M5 不接入外部行情 API，不进入正式券商 API、实盘或自动下单开发。

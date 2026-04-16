@@ -34,3 +34,8 @@
 
 - 日期：2026-04-17
 - 结论：M4 冻结了 `src/backtest/` 中的最小交易记录、统计摘要和报告输出，以及 deterministic baseline 假设：next-bar-open entry、signal-bar extremum stop、fixed 2R target、same-bar stop-first、unfinished trade 不进入 closed-trade 收益统计；后续 M5 不得绕开这些结构化输出。
+
+## D-0008 M5 纸面执行与风控契约冻结
+
+- 日期：2026-04-17
+- 结论：M5 冻结了 `src/risk/` 与 `src/execution/` 的 paper-only 最小契约、request-binding 校验、重复信号阻断、市场关闭阻断、连续亏损熔断与恢复条件、以及可复盘的 close-path 审计字段；后续 M6 不得绕过这些结构化接口或回退到未绑定的执行语义。

@@ -8,7 +8,7 @@
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
 - M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
 - M4 已完成最小回测引擎与报告的 deterministic baseline。
-- 当前活动分支将切换到 `feature/m5-papertrading-risk`，用于启动 M5。
+- 当前活动分支正在使用 `feature/m5-papertrading-risk`，用于完成 M5 收尾并切出 M6。
 
 ## 2. 执行总原则
 
@@ -230,7 +230,7 @@
 ## 12. M5 纸面交易、模拟执行与风控闭环
 
 - 分支：`feature/m5-papertrading-risk`
-- 当前状态：进行中
+- 当前状态：已完成
 - 目标：在完全不触碰真实账户的前提下，完成信号 → 风控 → 建议订单 → 模拟成交 → 持仓状态 → 日志 的闭环。
 - 交付内容：
   - `PaperBrokerAdapter` 最小实现。
@@ -266,6 +266,12 @@
 - 回退点：
   - M5 未通过不得合入
   - 若已合入，必须整体 revert M5 合并提交
+- 实际完成摘要：
+  - 已新增 `src/risk/` 最小 contracts / engine，固定 `RiskConfig`、`SessionRiskState`、`RiskDecision` 与 paper-only 风控状态流转。
+  - 已新增 `src/execution/` 最小 contracts / paper adapter / state / logging，形成 signal -> risk decision -> suggested order -> simulated fill -> position state -> close-path audit log 的最小闭环。
+  - 已补 request-binding 校验，显式阻断 stale / mismatched risk decision、duplicate signal、market closed、config_error、invalid_request 与风险超限路径。
+  - 已建立 `tests/unit/test_paper_execution_pipeline.py`，覆盖 allow、risk_block、market_closed、duplicate_signal、loss-streak halt、manual recovery、config_error、invalid_request、mismatched / stale / direction-mismatch risk decision。
+  - reviewer 与 qa 已通过，确认 paper-only 边界清晰、close-path 审计日志可复盘，且未越界到真实 broker / live execution。
 
 ## 13. M6 新闻事件过滤与复盘整合
 
@@ -351,12 +357,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 4：纸面交易 / 模拟执行与风控闭环。
-- 当前 milestone：M5：纸面交易 / 模拟执行与风控闭环。
+- 当前阶段：阶段 5：M5 已完成，准备切换到 M6。
+- 当前 milestone：M5：纸面交易 / 模拟执行与风控闭环（已完成）。
 - 当前下一步：
-  - 从 `feature/m5-papertrading-risk` 启动 M5
-  - 优先实现 signal -> risk gate -> suggested order -> simulated fill -> position state 的最小闭环
-  - 默认模式固定为 paper / simulated，不触碰真实账户、正式券商 API 或实盘开关
+  - 从 `feature/m5-papertrading-risk` 的已验收检查点切出 `feature/m6-news-review-integration`
+  - 读取 `src/news/AGENTS.md`，锁定新闻仅作过滤 / 解释 / 风险提示的边界
+  - 在不触碰真实 broker / live execution 的前提下启动 M6
 
 ## 18. 假设
 
