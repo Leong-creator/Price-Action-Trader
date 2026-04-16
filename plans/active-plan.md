@@ -7,7 +7,7 @@
 - M1 已完成知识库 schema、KB 校验、wiki index、资料投放流程的最小闭环。
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
 - M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
-- 当前活动分支将从 `feature/m3-pa-signal-prototype` 切换到 `feature/m4-backtest-report`，用于启动 M4。
+- 当前活动分支已切换到 `feature/m4-backtest-report`，用于启动 M4。
 
 ## 2. 执行总原则
 
@@ -193,6 +193,7 @@
 ## 11. M4 最小回测引擎与报告
 
 - 分支：`feature/m4-backtest-report`
+- 当前状态：进行中
 - 目标：基于静态 OHLCV 与 M3 信号，生成可复现的最小回测结果与报告，不伪造收益结论。
 - 交付内容：
   - 最小 trade lifecycle、交易记录、胜率、盈亏比、期望值、最大回撤、交易频率、滑点敏感性统计。

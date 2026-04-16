@@ -2,15 +2,15 @@
 
 ## 当前阶段
 
-- 阶段 2：数据 schema、CSV 回放、PA 信号原型（已完成）
+- 阶段 3：最小回测引擎与报告（进行中）
 
 ## 当前 milestone
 
-- M3：PA context、setup、signal 输出原型（已完成）
+- M4：最小回测引擎与报告（进行中）
 
 ## 当前分支
 
-- `feature/m3-pa-signal-prototype`
+- `feature/m4-backtest-report`
 
 ## 已完成
 
