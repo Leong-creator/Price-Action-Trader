@@ -7,7 +7,8 @@
 - M1 已完成知识库 schema、KB 校验、wiki index、资料投放流程的最小闭环。
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
 - M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
-- 当前活动分支已切换到 `feature/m4-backtest-report`，用于启动 M4。
+- M4 已完成最小回测引擎与报告的 deterministic baseline。
+- 当前活动分支将切换到 `feature/m5-papertrading-risk`，用于启动 M5。
 
 ## 2. 执行总原则
 
@@ -193,7 +194,7 @@
 ## 11. M4 最小回测引擎与报告
 
 - 分支：`feature/m4-backtest-report`
-- 当前状态：进行中
+- 当前状态：已完成
 - 目标：基于静态 OHLCV 与 M3 信号，生成可复现的最小回测结果与报告，不伪造收益结论。
 - 交付内容：
   - 最小 trade lifecycle、交易记录、胜率、盈亏比、期望值、最大回撤、交易频率、滑点敏感性统计。
@@ -220,10 +221,16 @@
   - 信号与成交假设耦合过深
   - 回测统计口径不一致
 - 回退点：回退到 M3 已验收检查点
+- 实际完成摘要：
+  - 已新增 `src/backtest/` 最小 contracts / engine / reporting，回测层只消费本地 bars / replay 与结构化 signal。
+  - 已建立 `tests/unit/test_backtest_pipeline.py`，覆盖零交易、单交易、多交易、same-bar stop/target、end_of_data、news 不改收益、profit_factor 空值路径。
+  - 已固定 deterministic baseline：next-bar-open entry、signal-bar extremum stop、固定 2R target、same-bar stop-first。
+  - reviewer 与 qa 已通过，确认回测层未越界到 execution / risk / broker / 外部 API，且数据不足路径不会伪装成确定性收益统计。
 
 ## 12. M5 纸面交易、模拟执行与风控闭环
 
 - 分支：`feature/m5-papertrading-risk`
+- 当前状态：进行中
 - 目标：在完全不触碰真实账户的前提下，完成信号 → 风控 → 建议订单 → 模拟成交 → 持仓状态 → 日志 的闭环。
 - 交付内容：
   - `PaperBrokerAdapter` 最小实现。
@@ -344,12 +351,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 3：PA context、setup、signal 输出原型。
-- 当前 milestone：M3：PA context、setup、signal 输出原型。
+- 当前阶段：阶段 4：纸面交易 / 模拟执行与风控闭环。
+- 当前 milestone：M5：纸面交易 / 模拟执行与风控闭环。
 - 当前下一步：
-  - 从 `feature/m3-pa-signal-prototype` 启动 M3
-  - 优先定义可解释 signal 对象、PA context / setup 表达与知识库引用边界
-  - 基于 M1 wiki 页面和 M2 replay 数据建立最小 signal 原型与验证样本
+  - 从 `feature/m5-papertrading-risk` 启动 M5
+  - 优先实现 signal -> risk gate -> suggested order -> simulated fill -> position state 的最小闭环
+  - 默认模式固定为 paper / simulated，不触碰真实账户、正式券商 API 或实盘开关
 
 ## 18. 假设
 

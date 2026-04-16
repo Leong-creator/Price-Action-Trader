@@ -29,3 +29,8 @@
 
 - 日期：2026-04-17
 - 结论：M3 冻结了 `src/strategy/` 中 research-only 的 `PAContextSnapshot`、`SetupCandidate`、`Signal` 最小契约，以及直接回链到 wiki concept/setup/rule 页面与 source/raw 的 traceability 要求；后续 M4/M5 必须消费该结构化 signal，而不是重新回退到自由文本或并行对象。
+
+## D-0007 M4 回测基线契约冻结
+
+- 日期：2026-04-17
+- 结论：M4 冻结了 `src/backtest/` 中的最小交易记录、统计摘要和报告输出，以及 deterministic baseline 假设：next-bar-open entry、signal-bar extremum stop、fixed 2R target、same-bar stop-first、unfinished trade 不进入 closed-trade 收益统计；后续 M5 不得绕开这些结构化输出。

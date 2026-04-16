@@ -2,15 +2,15 @@
 
 ## 当前阶段
 
-- 阶段 3：最小回测引擎与报告（进行中）
+- 阶段 4：纸面交易 / 模拟执行与风控闭环（进行中）
 
 ## 当前 milestone
 
-- M4：最小回测引擎与报告（进行中）
+- M5：纸面交易 / 模拟执行与风控闭环（进行中）
 
 ## 当前分支
 
-- `feature/m4-backtest-report`
+- `feature/m5-papertrading-risk`
 
 ## 已完成
 
@@ -33,6 +33,9 @@
 - M3 已新增 `src/strategy/` 最小 contracts / knowledge / context / signal 原型
 - M3 单测已覆盖无信号、单信号、traceability、placeholder 低置信度、news 风险附着、缺失 source_refs 早失败、invalidation、双信号稳定性
 - M3 已通过 reviewer / qa 正式复审，确认 strategy 仅消费 M2 数据契约，未越界到 execution / risk / broker / 外部 API
+- M4 已新增 `src/backtest/` 最小 contracts / engine / reporting 基线
+- M4 已覆盖零交易、单交易、多交易、same-bar stop/target、end_of_data、news 不改收益、profit_factor 空值路径
+- M4 已通过 reviewer / qa 正式复审，确认回测层只消费本地 replay / bars 与结构化 signal，未越界到 execution / risk / broker / 外部 API
 
 ## 当前阻塞
 
@@ -40,6 +43,6 @@
 
 ## 下一步
 
-- 从 `feature/m4-backtest-report` 启动 M4
-- 优先实现消费结构化 signal 的最小回测引擎与结果摘要
-- 先覆盖零交易、单交易、多交易、止损/目标命中与数据不足提示，再扩展统计口径
+- 从 `feature/m5-papertrading-risk` 启动 M5
+- 先读取 `src/execution/AGENTS.override.md` 与 `src/risk/AGENTS.override.md`，锁定 paper-only 边界
+- 优先实现信号 -> 风控 -> 建议订单 -> 模拟成交 -> 持仓状态 的最小闭环，并保持默认模式为 paper/simulated

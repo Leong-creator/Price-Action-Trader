@@ -90,3 +90,28 @@
   - 多信号顺序稳定性与 `signal_id` 唯一性。
 - `python scripts/validate_kb.py` 与 `python scripts/build_kb_index.py` 继续通过。
 - M3 不接入外部行情 API，不进入回测成交撮合、模拟执行、正式券商 API、实盘或自动下单开发。
+
+## 阶段 4：最小回测引擎与报告
+
+完成条件：
+
+- `src/backtest/` 已冻结最小 `TradeRecord`、`BacktestStats`、`BacktestReport` 结构化输出。
+- 回测层只消费本地 `OhlcvRow` / `DeterministicReplay` 与 M3 的结构化 `Signal`，不直接读取 CSV/JSON。
+- 已固定 deterministic baseline 假设，并在报告中显式注明：
+  - next-bar-open entry
+  - signal-bar extremum stop
+  - fixed 2R target
+  - same-bar stop-first
+  - no slippage / fees / leverage / position sizing
+- `python -m unittest tests/unit/test_backtest_pipeline.py -v` 通过，并至少覆盖：
+  - 零交易路径。
+  - 单交易目标命中。
+  - 单交易止损命中。
+  - 多交易 deterministic 行为。
+  - same-bar stop/target 优先级。
+  - end_of_data / 数据不足路径。
+  - news 不改收益统计。
+  - gross_loss == 0 时 `profit_factor` 不给出伪确定性哨兵值。
+- 收益类统计只基于 closed trades；`end_of_data` / unfinished trade 不得混入 closed-trade 收益统计。
+- `python -m unittest tests/unit/test_strategy_signal_pipeline.py -v` 与 `python -m unittest discover -s tests/unit -p 'test_data_pipeline.py' -v` 继续通过。
+- M4 不接入外部行情 API，不进入模拟执行、正式券商 API、实盘或自动下单开发。
