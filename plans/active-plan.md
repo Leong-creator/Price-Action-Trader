@@ -4,8 +4,8 @@
 
 - 本计划用于替换初始化模板，并驱动后续全部实施。
 - 当前已接受基线为 M0 基础设施初始化，基线提交为 `96259ad`。
-- 当前只完成计划定稿与状态同步，不开始正式编码。
-- 当前活动分支为 `feature/m1-kb-ingestion-index`，用于启动 M1。
+- M1 已完成知识库 schema、KB 校验、wiki index、资料投放流程的最小闭环。
+- 当前活动分支即将切换到 `feature/m2-data-schema-replay`，用于启动 M2。
 
 ## 2. 执行总原则
 
@@ -72,6 +72,7 @@
 ## 8. M1 知识库 schema、KB 校验、wiki index、资料投放流程
 
 - 分支：`feature/m1-kb-ingestion-index`
+- 当前状态：已完成
 - 目标：把 `knowledge/raw/` → `knowledge/wiki/` → `knowledge/wiki_index.json` 的基础流转做成可重复执行、可校验、可回退的最小闭环。
 - 交付内容：
   - 统一 `knowledge/schema/*` 与 KB 脚本的字段契约。
@@ -105,10 +106,16 @@
 - 回退点：
   - 若 M1 未通过，直接废弃 `feature/m1-kb-ingestion-index`
   - 若已合并，回退到 M0 基线
+- 实际完成摘要：
+  - 已补齐 `concept`、`setup`、`source` 三类代表性 wiki 页面。
+  - 已统一 `knowledge/schema/*`、frontmatter 模板、`validate_kb.py`、`build_kb_index.py` 的契约。
+  - 已补充 M1 验收条目，并完成空目录、当前 wiki、代表性样本与负向校验。
+  - reviewer 与 qa 已通过。
 
 ## 9. M2 测试数据、OHLCV schema、CSV/JSON 回放 adapter
 
 - 分支：`feature/m2-data-schema-replay`
+- 当前状态：进行中
 - 目标：建立可供策略、回测和 QA 复用的本地数据最小闭环，优先围绕 `tests/test_data/` 和用户导出文件，不引入外部付费或浏览器依赖。
 - 交付内容：
   - 明确 OHLCV 与新闻 JSON schema。
@@ -323,12 +330,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 1：知识库 ingestion、schema、wiki index、KB 校验。
-- 当前 milestone：M1：知识库 schema、KB 校验、wiki index、资料投放流程。
+- 当前阶段：阶段 2：测试数据、OHLCV schema、CSV/JSON 回放。
+- 当前 milestone：M2：测试数据、OHLCV schema、CSV/JSON 回放 adapter。
 - 当前下一步：
-  - 从 `feature/m1-kb-ingestion-index` 启动 M1
-  - 优先校准 KB schema、frontmatter、validate/index 脚本与资料投放流程
-  - M1 通过后进入 M2 的测试数据与数据 schema / CSV-JSON 回放
+  - 从 `feature/m2-data-schema-replay` 启动 M2
+  - 优先统一 OHLCV / 新闻 schema、读取接口与 deterministic replay 契约
+  - 完成数据样本、异常路径、回放验证后，再进入 M3
 
 ## 18. 假设
 

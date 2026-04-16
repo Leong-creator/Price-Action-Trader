@@ -2,15 +2,15 @@
 
 ## 当前阶段
 
-- 阶段 1：知识库 ingestion、schema、wiki index、KB 校验
+- 阶段 2：测试数据、OHLCV schema、CSV/JSON 回放
 
 ## 当前 milestone
 
-- M1：知识库 schema、KB 校验、wiki index、资料投放流程
+- M2：测试数据、OHLCV schema、CSV/JSON 回放 adapter
 
 ## 当前分支
 
-- `feature/m1-kb-ingestion-index`
+- `feature/m2-data-schema-replay`
 
 ## 已完成
 
@@ -22,6 +22,9 @@
 - KB 校验与索引脚本写入
 - GitHub 登录与推送链路打通
 - 正式 `plans/active-plan.md` 已写入
+- M1 代表性 wiki 页面已补齐（concept / setup / source）
+- M1 schema、frontmatter、KB validate、wiki index 契约已对齐
+- M1 验收条目已补齐并通过 reviewer / qa
 
 ## 当前阻塞
 
@@ -29,6 +32,6 @@
 
 ## 下一步
 
-- 从 `feature/m1-kb-ingestion-index` 启动 M1
-- 优先校准 KB schema、frontmatter、validate/index 脚本与资料投放流程
-- M1 通过后进入 M2 的测试数据与数据 schema / CSV-JSON 回放
+- 从 `feature/m2-data-schema-replay` 启动 M2
+- 优先统一 OHLCV / 新闻 schema、读取接口与 deterministic replay 契约
+- 完成测试样本、异常路径与回放验证后，再进入 M3
