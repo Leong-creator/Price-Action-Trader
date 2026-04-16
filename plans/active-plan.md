@@ -8,7 +8,7 @@
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
 - M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
 - M4 已完成最小回测引擎与报告的 deterministic baseline。
-- 当前活动分支正在使用 `feature/m5-papertrading-risk`，用于完成 M5 收尾并切出 M6。
+- 当前活动分支已切换到 `feature/m6-news-review-integration`，用于启动 M6。
 
 ## 2. 执行总原则
 
@@ -276,6 +276,7 @@
 ## 13. M6 新闻事件过滤与复盘整合
 
 - 分支：`feature/m6-news-review-integration`
+- 当前状态：进行中
 - 目标：把新闻/事件样本纳入解释和风险过滤链路，同时把 KB 规则引用、价格行为解释和结果统计纳入统一复盘输出。
 - 交付内容：
   - 新闻只作为过滤、解释或风险提示因子。
@@ -357,12 +358,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 5：M5 已完成，准备切换到 M6。
-- 当前 milestone：M5：纸面交易 / 模拟执行与风控闭环（已完成）。
+- 当前阶段：阶段 6：新闻事件过滤与复盘整合。
+- 当前 milestone：M6：新闻事件过滤与复盘整合（进行中）。
 - 当前下一步：
-  - 从 `feature/m5-papertrading-risk` 的已验收检查点切出 `feature/m6-news-review-integration`
-  - 读取 `src/news/AGENTS.md`，锁定新闻仅作过滤 / 解释 / 风险提示的边界
-  - 在不触碰真实 broker / live execution 的前提下启动 M6
+  - 先完成新闻仅作过滤 / 解释 / 风险提示的最小 contract，不让新闻直接转成执行信号
+  - 把新闻上下文、KB 引用、PA 解释与回测 / 模拟结果整合进统一复盘输出
+  - 保持 paper-only 边界，不触碰真实 broker / live execution
 
 ## 18. 假设
 

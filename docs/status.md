@@ -2,15 +2,15 @@
 
 ## 当前阶段
 
-- 阶段 5：纸面交易 / 模拟执行与风控闭环（已完成）
+- 阶段 6：新闻事件过滤与复盘整合（进行中）
 
 ## 当前 milestone
 
-- M5：纸面交易 / 模拟执行与风控闭环（已完成）
+- M6：新闻事件过滤与复盘整合（进行中）
 
 ## 当前分支
 
-- `feature/m5-papertrading-risk`
+- `feature/m6-news-review-integration`
 
 ## 已完成
 
@@ -46,6 +46,6 @@
 
 ## 下一步
 
-- 从 `feature/m5-papertrading-risk` 的已验收检查点切出 `feature/m6-news-review-integration`
-- 读取 `src/news/AGENTS.md`，锁定新闻仅作过滤 / 解释 / 风险提示的边界
-- 启动 M6：新闻事件过滤与复盘整合，保持不接真实 broker / live execution
+- 先完成新闻仅作过滤 / 解释 / 风险提示的最小 contract，不让新闻直接转成执行信号
+- 把新闻上下文、KB 引用、PA 解释与回测 / 模拟结果整合进统一复盘输出
+- 保持 paper-only 边界，不接真实 broker / live execution
