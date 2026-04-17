@@ -219,7 +219,7 @@
 
 ## 阶段 8：可靠性验证
 
-### M8A：测试基线、文档与门禁落盘
+### M8A：测试骨架与验收门禁落盘
 
 完成条件：
 
@@ -228,6 +228,11 @@
 - `docs/roadmap.md` 已同步 `M8` 在 `M7` 之后、任何 broker / live 重新评估之前的位置。
 - `docs/decisions.md` 已新增 “完成 M8 前，不重新评估 broker / live” 的冻结决策。
 - 若新增 `docs/testing-reliability.md` 与 `docs/eval-rubric.md`，内容只能是计划、门禁、评分与人工抽检准则，不得包含测试实现细节。
+- `docs/test-dataset-curation.md` 已说明允许的数据层级、最小元数据、脱敏与离线边界。
+- `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 均存在且带 discoverable README/占位说明。
+- `scripts/run_reliability_suite.py` 可通过 `python -m py_compile`。
+- `python scripts/run_reliability_suite.py --list` 能列出当前 suite 入口。
+- `python scripts/run_reliability_suite.py` 在没有真实历史样本、且 M8B/M8C/M8D 目录还没有测试文件时也能安全运行，并显式输出 skipped / deferred，而不是伪造通过。
 - reviewer 必须确认 `M8` 被定义为可靠性验证阶段，而不是功能扩展或 broker 延续阶段。
 - qa 必须确认所有门禁文档都继续保留 `paper / simulated` 与 `no-go` 边界。
 

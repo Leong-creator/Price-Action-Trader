@@ -360,7 +360,7 @@
 
 - 分支：`integration/m8-reliability-validation`
 - 当前状态：进行中
-- 当前子阶段：M8A：测试基线、文档与门禁落盘（已完成）
+- 当前子阶段：M8A：测试骨架与验收门禁落盘（已完成）
 - 目标：以行为可靠性而不是功能扩展为首目标，验证 M0-M7 既有交付物在知识约束、研究链可复现性、paper-only 安全性和真实输入下的保守稳定性。
 - 总边界：
   - 默认运行边界仍为 `paper / simulated`
@@ -375,7 +375,7 @@
   - 实时只读输入：shadow / paper 观察路径
   - 明确不进入 P4 broker / live
 
-### M8A：测试基线、文档与门禁落盘
+### M8A：测试骨架与验收门禁落盘
 
 - 当前状态：已完成
 - 目标：
@@ -384,14 +384,24 @@
   - 将当前阶段切换写入 `docs/status.md`
   - 在 `docs/roadmap.md`、`docs/decisions.md` 中冻结 M8 位置与门禁
   - 新增 `docs/testing-reliability.md` 与 `docs/eval-rubric.md`
+  - 落盘 `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 的 discoverable 骨架
+  - 新增 `docs/test-dataset-curation.md`
+  - 新增 `scripts/run_reliability_suite.py`，提供当前可靠性相关 suite 的本地统一入口
 - 交付物类型：
   - 主线文档
   - 验收门禁
   - 评分规则
   - 阶段 runbook 总纲
+  - 测试目录骨架
+  - 数据集整理规范
+  - 本地 suite 运行入口
 - 验证方式：
   - reviewer 审查 M8 是否被定义为 M7 之后的当前下一阶段，而不是 broker 后续开发
   - qa 核对 `docs/status.md`、`docs/roadmap.md`、`docs/acceptance.md`、`docs/decisions.md` 是否同步
+  - `python -m py_compile scripts/run_reliability_suite.py`
+  - `python scripts/run_reliability_suite.py --list`
+  - `python scripts/run_reliability_suite.py`
+  - `python -m unittest discover -s tests/unit -v`
   - reviewer 与 qa 都把 “无越权到 broker/live” 作为硬门禁
 - 验收条件：
   - `plans/active-plan.md` 已新增 M8 与 M8A/M8B/M8C/M8D
@@ -400,9 +410,13 @@
   - `docs/roadmap.md` 已同步 M8 在 M7 之后的位置
   - `docs/decisions.md` 已新增 “先 M8、后 broker/live” 的冻结决策
   - `docs/testing-reliability.md` 与 `docs/eval-rubric.md` 只包含计划与门禁，不含实现细节
+  - `docs/test-dataset-curation.md` 已说明可接受数据层级、样本元数据、脱敏与离线边界
+  - `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 均已可发现且带 README/占位说明
+  - `scripts/run_reliability_suite.py` 在无真实历史样本、无 M8B/M8C/M8D 测试文件时可安全运行，并显式输出 skipped / deferred 提示
 - 可并行子任务：
   - `planner` 负责冻结主线与阶段切换
   - `researcher` 负责核对附件与现有 SoT 的一致性
+  - `implementer` 负责骨架目录、README、数据集规范与 suite 入口落盘
   - `reviewer` 负责高风险边界审查
   - `qa` 负责门禁完整性复核
 - 依赖：
@@ -410,10 +424,16 @@
   - 当前分析基线固定为 `feature/m7-broker-api-assessment`
 - 风险：
   - 把 M8 写成收益优化或 broker 延续阶段
-  - 在门禁文档中混入测试实现细节
+  - 在门禁文档或脚手架中混入 M8B/M8C/M8D 的具体实现细节
   - 未同步 `docs/roadmap.md` 导致 SoT 再次分叉
+  - 在无真实历史样本时误报“真实稳健性已通过”
 - 回退点：
   - 若 M8A 文档越界，整体回退 `integration/m8-reliability-validation` 上的文档改动，回到 `feature/m7-broker-api-assessment`
+- 实际完成摘要：
+  - 已补齐 `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 的 README 骨架。
+  - 已新增 `docs/test-dataset-curation.md`，冻结 M8 可接受数据层级、最小元数据、脱敏与离线边界。
+  - 已新增 `scripts/run_reliability_suite.py`，默认运行当前稳定存在的 baseline unit suites，并对空目录或缺真实历史样本显式 skipped / deferred。
+  - 已验证新增骨架不会破坏 `python -m unittest discover -s tests/unit -v`。
 
 ### M8B：知识库对齐测试
 
@@ -537,7 +557,7 @@
 - M5 重点测允许交易、风险拦截、模拟成交、重复信号、市场关闭、连续亏损熔断和恢复条件。
 - M6 重点测新闻仅作过滤/解释、不直接下单、复盘字段完整和 KB 引用可追溯。
 - M7 重点测门禁清单完整性、审批前置条件和“无真实接入”边界。
-- M8A 重点测主线文档、验收门禁、状态切换与冻结决策是否同步，且无 broker/live 越界表述。
+- M8A 重点测主线文档、验收门禁、状态切换、测试骨架与 suite 入口是否同步，且无 broker/live 越界表述。
 - M8B 重点测知识库对齐、`source_refs` 真实性、`not_applicable` 约束、冲突显式化与资料不足时的保守 `no-trade`。
 - M8C 重点测无 future leakage、同输入 deterministic、risk-before-fill、audit / review traceability 与 forbidden paths。
 - M8D 重点测真实历史数据与实时只读输入下仍保持 shadow / paper、保守稳定、可解释，且不进入真实 broker / live execution。
@@ -545,9 +565,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8A：测试基线、文档与门禁落盘（已完成）。
+- 当前 milestone：M8A：测试骨架与验收门禁落盘（已完成）。
 - 当前下一步：
   - 从 `integration/m8-reliability-validation` 继续推进 M8，优先启动 M8B：知识库对齐测试
+  - 以 `tests/golden_cases/`、`docs/test-dataset-curation.md` 与 `scripts/run_reliability_suite.py` 为骨架入口补 M8B 的 knowledge-alignment 用例
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

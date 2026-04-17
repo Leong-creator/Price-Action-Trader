@@ -28,11 +28,11 @@
 
 ## 4. 子阶段主线
 
-### M8A：测试基线、文档与门禁落盘
+### M8A：测试骨架与验收门禁落盘
 
-- 目标：冻结 `active-plan / acceptance / status / roadmap / decisions`
-- 交付物：门禁文档、评分文档、阶段 runbook 总纲
-- 本阶段不创建测试实现代码、脚本、目录骨架
+- 目标：冻结 `active-plan / acceptance / status / roadmap / decisions`，并补齐后续 M8B/M8C/M8D 可复用的最小测试骨架
+- 交付物：门禁文档、评分文档、阶段 runbook 总纲、测试目录骨架、数据集整理规范、统一 suite 入口
+- 本阶段允许创建目录、README、占位文档与本地运行脚本，但不进入 M8B/M8C/M8D 的真实测试实现
 
 ### M8B：知识库对齐测试
 

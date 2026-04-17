@@ -29,6 +29,13 @@
 
 ## 4. 子阶段关注点
 
+### M8A
+
+- `plans/active-plan.md`、`docs/status.md` 与 `docs/acceptance.md` 的 M8A 状态同步
+- `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 的目录 discoverability
+- `scripts/run_reliability_suite.py` 的 skipped / deferred 语义清晰，不伪造真实历史结果
+- 不引入外部网络、真实 broker、真实账户或 live execution 路径
+
 ### M8B
 
 - `source_refs` 真实性
