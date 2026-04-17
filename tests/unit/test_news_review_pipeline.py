@@ -126,12 +126,13 @@ class NewsReviewPipelineTests(unittest.TestCase):
         item = report.items[0]
         self.assertEqual(item.trade_outcome.status, "closed_trade")
         self.assertEqual(item.trade_outcome.pnl_r, Decimal("2.0000"))
-        self.assertEqual(item.kb_source_refs, signal.source_refs)
+        self.assertEqual(item.kb_source_refs, signal.actual_source_refs)
+        self.assertEqual(item.kb_bundle_support_refs, signal.bundle_support_refs)
         self.assertEqual(item.kb_trace, signal.knowledge_trace)
         self.assertEqual(item.news_outcome, "caution")
         self.assertTrue(item.news_source_refs)
         self.assertEqual(item.news_review_notes[0].kind, "risk_hint")
-        self.assertIn(signal.source_refs[0], report.source_refs)
+        self.assertIn(signal.actual_source_refs[0], report.source_refs)
         self.assertIn(item.kb_trace[0].source_ref, report.source_refs)
         self.assertIn(item.news_source_refs[0], report.source_refs)
 
@@ -273,6 +274,8 @@ class NewsReviewPipelineTests(unittest.TestCase):
                 "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
                 "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
             ),
+            actual_source_refs=("wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",),
+            bundle_support_refs=("wiki:knowledge/wiki/rules/m3-research-reference-pack.md",),
             explanation="research-only paper signal",
             risk_notes=("research-only placeholder",),
             knowledge_trace=(

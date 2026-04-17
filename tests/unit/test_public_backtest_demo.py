@@ -177,6 +177,10 @@ class PublicBacktestDemoTests(unittest.TestCase):
             self.assertEqual(trace_payload["boundary"], "paper/simulated")
             if trace_payload["executed_trades"]:
                 self.assertIn("match_reason", trace_payload["executed_trades"][0]["knowledge_trace"][0])
+                self.assertIn("visible_trace", trace_payload["executed_trades"][0])
+                self.assertIn("debug_trace", trace_payload["executed_trades"][0])
+                self.assertIn("actual_source_refs", trace_payload["executed_trades"][0])
+                self.assertIn("bundle_support_refs", trace_payload["executed_trades"][0])
             self.assertIn("knowledge_trace_coverage", summary_payload)
             self.assertIn("no_trade_wait_summary", summary_payload)
             self.assertEqual(summary_payload["splits"][0]["name"], "unit_split")
@@ -209,7 +213,10 @@ class PublicBacktestDemoTests(unittest.TestCase):
             payload = json.loads(output_path.read_text(encoding="utf-8"))
 
         self.assertEqual(len(payload["executed_trades"][0]["knowledge_trace"]), 5)
+        self.assertEqual(payload["executed_trades"][0]["knowledge_trace"], payload["executed_trades"][0]["visible_trace"])
         self.assertEqual(len(payload["blocked_signals"][0]["knowledge_trace"]), 5)
+        self.assertTrue(payload["executed_trades"][0]["bundle_support_refs"])
+        self.assertTrue(payload["executed_trades"][0]["debug_trace"])
         self.assertEqual(payload["boundary"], "paper/simulated")
 
     def test_markdown_report_limits_trace_summary_to_three_items(self) -> None:
@@ -300,6 +307,10 @@ class PublicBacktestDemoTests(unittest.TestCase):
                 "trace_nonempty_pct": "100.0000",
                 "curated_signal_pct": "100.0000",
                 "statement_signal_pct": "100.0000",
+                "actual_hit_source_family_presence": {"curated_concept": 1, "al_brooks_ppt": 1},
+                "actual_hit_source_family_item_counts": {"curated_concept": 1, "al_brooks_ppt": 2},
+                "bundle_support_family_presence": {"curated_rule": 1},
+                "bundle_support_family_item_counts": {"curated_rule": 1},
                 "source_family_signal_presence": {"curated_concept": 1, "al_brooks_ppt": 1},
                 "curated_vs_statement": {"curated_item_pct": "60.0000", "statement_item_pct": "40.0000"},
             },
@@ -359,6 +370,8 @@ class PublicBacktestDemoTests(unittest.TestCase):
             pa_context="trading-range",
             regime_summary="recent closes are compressed into a narrow range",
             source_refs=("wiki:knowledge/wiki/concepts/market-cycle-overview.md",),
+            actual_source_refs=(),
+            bundle_support_refs=("wiki:knowledge/wiki/concepts/market-cycle-overview.md",),
             signal_id=signal.signal_id,
             reason_codes=("context_not_trend",),
         )
@@ -373,6 +386,11 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertEqual(payload["boundary"], "paper/simulated")
         self.assertEqual(payload["reason_code"], "context_not_trend")
         self.assertEqual(payload["action"], "wait")
+        self.assertEqual(payload["actual_source_refs"], [])
+        self.assertEqual(
+            payload["bundle_support_refs"],
+            ["wiki:knowledge/wiki/concepts/market-cycle-overview.md"],
+        )
 
     def test_trace_coverage_uses_capped_trace_not_raw_statement_population(self) -> None:
         signal = self._signal_with_trace(trace_count=5)
@@ -399,23 +417,54 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertEqual(coverage["overall"]["total_signals"], 1)
         self.assertEqual(coverage["overall"]["curated_signals"], 1)
         self.assertEqual(coverage["overall"]["statement_signals"], 1)
+        self.assertEqual(coverage["overall"]["actual_hit_source_family_presence"]["al_brooks_ppt"], 1)
+        self.assertEqual(coverage["overall"]["bundle_support_family_presence"]["curated_rule"], 1)
         self.assertLessEqual(
             coverage["overall"]["curated_vs_statement"]["statement_item_count"],
             len(signal.knowledge_trace),
         )
 
     def _signal_with_trace(self, *, trace_count: int) -> MODULE.Signal:
-        trace = tuple(
-            KnowledgeAtomHit(
-                atom_id=f"atom-trace-{index}",
-                atom_type="statement" if index >= 3 else ("concept", "setup", "rule")[index],
-                source_ref=f"wiki:knowledge/wiki/sources/unit-source-{index}.md",
-                raw_locator={"locator_kind": "page_block", "page_no": 1, "block_index": index},
-                match_reason="unit_trace",
-                applicability_state="matched" if index < 3 else "supporting",
+        trace: list[KnowledgeAtomHit] = []
+        if trace_count >= 1:
+            trace.append(
+                KnowledgeAtomHit(
+                    atom_id="atom-trace-0",
+                    atom_type="concept",
+                    source_ref="wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+                    raw_locator={"locator_kind": "page_block", "page_no": 1, "block_index": 0},
+                    match_reason="unit_trace",
+                    applicability_state="matched",
+                )
             )
-            for index in range(trace_count)
-        )
+        if trace_count >= 2:
+            trace.append(
+                KnowledgeAtomHit(
+                    atom_id="atom-trace-1",
+                    atom_type="setup",
+                    source_ref="wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+                    raw_locator={"locator_kind": "page_block", "page_no": 1, "block_index": 1},
+                    match_reason="unit_trace",
+                    applicability_state="matched",
+                )
+            )
+        for index in range(2, trace_count):
+            trace.append(
+                KnowledgeAtomHit(
+                    atom_id=f"atom-trace-{index}",
+                    atom_type="statement",
+                    source_ref="wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+                    raw_locator={
+                        "locator_kind": "page_block",
+                        "page_no": 1,
+                        "block_index": 2,
+                        "fragment_index": index - 2,
+                    },
+                    match_reason="unit_trace",
+                    applicability_state="supporting",
+                )
+            )
+        trace = tuple(trace)
         return MODULE.Signal(
             signal_id="sig-trace",
             symbol="SAMPLE",
@@ -429,10 +478,27 @@ class PublicBacktestDemoTests(unittest.TestCase):
             target_rule="2R target",
             invalidation="close back below prior high",
             confidence="low",
-            source_refs=tuple(hit.source_ref for hit in trace),
+            source_refs=tuple(
+                dict.fromkeys(
+                    [*(hit.source_ref for hit in trace), "wiki:knowledge/wiki/rules/m3-research-reference-pack.md"]
+                )
+            ),
+            actual_source_refs=tuple(hit.source_ref for hit in trace),
+            bundle_support_refs=("wiki:knowledge/wiki/rules/m3-research-reference-pack.md",),
             explanation="unit trace explanation",
             risk_notes=("research-only placeholder",),
             knowledge_trace=trace,
+            knowledge_debug_trace=(
+                KnowledgeAtomHit(
+                    atom_id="rule-support-1",
+                    atom_type="rule",
+                    source_ref="wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+                    raw_locator={"locator_kind": "bundle_support_summary", "label": "bundle_support[3 sources/42 chunks]"},
+                    match_reason="bundle_rule_support",
+                    applicability_state="supporting",
+                    reference_tier="bundle_support",
+                ),
+            ),
         )
 
     def _executed_trade(self, signal: MODULE.Signal) -> MODULE.ExecutedTradeRecord:

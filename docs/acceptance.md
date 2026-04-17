@@ -486,6 +486,41 @@
   - 已保持 trigger 逻辑不变
   - 已保持未进入期权、broker、live、real-money
 
+### Knowledge Reference Repair Track / 阶段 A：Trace Fidelity & Reference Honesty Repair
+
+完成条件：
+
+- 只允许修复 trace fidelity / reference honesty，不得进入阶段 B 的 curated promotion。
+- `actual hit refs` 与 `bundle support refs` 必须显式分层；默认 user-facing `report.md`、`summary.json`、`knowledge_trace_coverage.json`、`no_trade_wait.jsonl` 只以 actual hit 为默认展示语义。
+- broad support refs 不得继续以 actual evidence 身份进入 visible `knowledge_trace`。
+- `m3-research-reference-pack` 不得继续在 visible trace / summary 中以巨型 `chunk_set[...]` 形式出现；若仍需保留，只能进入 debug/support 层或 bundle support summary。
+- `applicability_state` 必须只表达 signal-level 语义；治理性 `not_applicable` / maturity warning 不得继续污染 visible trace，可单独进入 `governance_notes` 或等价字段。
+- `knowledge_trace_coverage.json` 必须至少区分：
+  - `actual_hit_source_family_presence`
+  - `actual_hit_source_family_item_counts`
+  - `bundle_support_family_presence`
+  - `bundle_support_family_item_counts`
+- transcript / Brooks 若只是 bundle support，不得在 actual hit coverage 中伪装成真实命中。
+- 必须至少通过：
+  - `tests/reliability/test_strategy_atom_trace.py`
+  - `tests/reliability/test_knowledge_trace_fidelity.py`
+  - `tests/unit/test_strategy_signal_pipeline.py`
+  - `tests/unit/test_public_backtest_demo.py`
+  - `tests/unit/test_news_review_pipeline.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- 必须保持：
+  - trigger 逻辑不变
+  - `statement` / `source_note` / `contradiction` / `open_question` 不进入 trigger
+  - `knowledge/raw` 不变
+  - 继续保持 `paper / simulated`
+- 当前完成事实：
+  - 已把 `Signal`、`ReviewItem`、`knowledge_trace.json`、`summary.json`、`no_trade_wait.jsonl` 的引用语义拆成 actual hit 与 bundle support 两层。
+  - 已把 broad support 类型的 `m3-research-reference-pack` 从 visible trace 中降级到 debug/support 层。
+  - 已修复 signal-level `applicability_state` 误用治理性 `not_applicable` 的问题，治理提示现通过 `governance_notes` 保留。
+  - 已修复 `knowledge_trace_coverage.json` 的 family 统计，让 transcript / Brooks 能明确显示为 support 还是 actual hit。
+  - 本轮未做 curated promotion；transcript / Brooks 仍未被提升为新的 curated actual trace claim。
+
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 完成条件：

@@ -54,6 +54,8 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
         self.assertTrue(all(item.action in {"wait", "no-trade"} for item in records))
         self.assertTrue(all(item.reason_code for item in records))
         self.assertTrue(all(item.source_refs for item in records))
+        self.assertTrue(all(item.actual_source_refs == () for item in records))
+        self.assertTrue(all(item.bundle_support_refs for item in records))
 
     def test_window_summary_captures_signals_and_no_trade_wait(self) -> None:
         signal = _build_signal("sig-window")
@@ -77,6 +79,8 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
                 pa_context="trading-range",
                 regime_summary="range",
                 source_refs=("wiki:knowledge/wiki/concepts/market-cycle-overview.md",),
+                actual_source_refs=(),
+                bundle_support_refs=("wiki:knowledge/wiki/concepts/market-cycle-overview.md",),
             ),
         )
         windows = (
@@ -116,7 +120,11 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
         self.assertEqual(coverage["overall"]["total_signals"], 1)
         self.assertEqual(coverage["overall"]["curated_signals"], 1)
         self.assertEqual(
-            coverage["overall"]["source_family_signal_presence"]["al_brooks_ppt"],
+            coverage["overall"]["actual_hit_source_family_presence"]["al_brooks_ppt"],
+            1,
+        )
+        self.assertEqual(
+            coverage["overall"]["bundle_support_family_presence"]["curated_rule"],
             1,
         )
 
@@ -161,10 +169,27 @@ def _build_signal(signal_id: str) -> MODULE.Signal:
         target_rule="2R target",
         invalidation="close back below prior high",
         confidence="low",
-        source_refs=tuple(hit.source_ref for hit in trace),
+        source_refs=tuple(
+            dict.fromkeys(
+                [*(hit.source_ref for hit in trace), "wiki:knowledge/wiki/rules/m3-research-reference-pack.md"]
+            )
+        ),
+        actual_source_refs=tuple(hit.source_ref for hit in trace),
+        bundle_support_refs=("wiki:knowledge/wiki/rules/m3-research-reference-pack.md",),
         explanation="unit explanation",
         risk_notes=("research-only placeholder",),
         knowledge_trace=trace,
+        knowledge_debug_trace=(
+            KnowledgeAtomHit(
+                atom_id="rule-support-1",
+                atom_type="rule",
+                source_ref="wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+                raw_locator={"locator_kind": "bundle_support_summary", "label": "bundle_support[1 sources/12 chunks]"},
+                match_reason="bundle_rule_support",
+                applicability_state="supporting",
+                reference_tier="bundle_support",
+            ),
+        ),
     )
 
 

@@ -104,3 +104,8 @@
 
 - 日期：2026-04-17
 - 结论：`M8C.2` 只允许在 `paper / simulated` 边界内完成单标的 intraday pilot。当前冻结范围为 `SPY / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`，验证目标是 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee 最小模型、`no-trade / wait` 结构化输出，以及 intraday 下的 `knowledge_trace` 稳定表现。`statement`、`source_note`、`contradiction`、`open_question` 仍只进入 trace，不得进入 trigger；Brooks statement 数量不得成为 confidence、权重或排序代理。当前 `M8C.2` 已通过 merge gate 合并进 `main`；仍未进入期权、broker、live、real-money。
+
+## D-0022 Knowledge Reference Repair / 阶段 A 诚实引用边界冻结
+
+- 日期：2026-04-18
+- 结论：Knowledge Reference Repair 的阶段 A 只允许修复 trace fidelity / reference honesty，不允许做 curated promotion。自本决策起，user-facing `actual hit refs` 与 `bundle support refs` 必须显式分层；broad support refs（包括 `m3-research-reference-pack` 这类 registry / bundle support）不得继续以 visible actual evidence 身份进入 `knowledge_trace`、`report.md` 或 `summary.json`。signal-level `applicability_state` 只表达场景级匹配语义，frontmatter 中的治理性 `not_applicable` / maturity warning 只能通过 `governance_notes` 或等价字段保留，不得继续污染 visible trace。`knowledge_trace_coverage.json` 必须区分 `actual_hit_*` 与 `bundle_support_*` 家族统计，从而诚实表达 transcript / Brooks 当前是 support 还是 actual hit。阶段 A 不改 trigger，不让 `statement` / `source_note` / `contradiction` / `open_question` 进入 trigger，不改 `knowledge/raw`，并继续保持 `paper / simulated`。阶段 B 只有在阶段 A 整合进 `main` 后，才允许讨论最小 curated promotion。

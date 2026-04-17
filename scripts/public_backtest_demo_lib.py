@@ -23,6 +23,7 @@ from src.data import DataValidationError, OhlcvRow, build_replay, load_ohlcv_csv
 from src.execution import ExecutionRequest, PaperBrokerAdapter, PaperPosition
 from src.risk import PositionSnapshot, RiskConfig, SessionRiskState, evaluate_order_request
 from src.strategy import (
+    KnowledgeAtomHit,
     Signal,
     build_context_snapshot,
     generate_signals,
@@ -191,6 +192,8 @@ class NoTradeWaitRecord:
     pa_context: str
     regime_summary: str
     source_refs: tuple[str, ...]
+    actual_source_refs: tuple[str, ...] = ()
+    bundle_support_refs: tuple[str, ...] = ()
     signal_id: str | None = None
     reason_codes: tuple[str, ...] = ()
 
@@ -581,6 +584,8 @@ def build_no_trade_wait_records(
                 pa_context=signal.pa_context,
                 regime_summary="signal generated but paper risk gate blocked execution",
                 source_refs=signal.source_refs,
+                actual_source_refs=signal.actual_source_refs,
+                bundle_support_refs=signal.bundle_support_refs,
                 signal_id=signal.signal_id,
                 reason_codes=item.reason_codes,
             )
@@ -751,6 +756,8 @@ def write_no_trade_wait_jsonl(path: Path, records: tuple[NoTradeWaitRecord, ...]
                 "pa_context": item.pa_context,
                 "regime_summary": item.regime_summary,
                 "source_refs": list(item.source_refs),
+                "actual_source_refs": list(item.actual_source_refs),
+                "bundle_support_refs": list(item.bundle_support_refs),
                 "signal_id": item.signal_id,
                 "reason_codes": list(item.reason_codes),
                 "boundary": "paper/simulated",
@@ -1070,6 +1077,8 @@ def _audit_symbol_wait_sites(result: SymbolBacktestResult) -> tuple[NoTradeWaitR
         reason_code = "insufficient_evidence"
         reason_detail = "bars did not satisfy the placeholder setup body/range/invalidation requirements"
         source_refs = context.source_refs
+        actual_source_refs: tuple[str, ...] = ()
+        bundle_support_refs = source_refs
         if context.market_cycle != "trend":
             reason_code = "context_not_trend"
             reason_detail = context.regime_summary
@@ -1079,6 +1088,7 @@ def _audit_symbol_wait_sites(result: SymbolBacktestResult) -> tuple[NoTradeWaitR
                 f"same-direction placeholder candidate ({active_direction}) was suppressed to keep one active direction"
             )
             source_refs = unsuppressed_candidate.source_refs
+            bundle_support_refs = source_refs
         records.append(
             NoTradeWaitRecord(
                 symbol=result.instrument.symbol,
@@ -1092,6 +1102,8 @@ def _audit_symbol_wait_sites(result: SymbolBacktestResult) -> tuple[NoTradeWaitR
                 pa_context=context.market_cycle,
                 regime_summary=context.regime_summary,
                 source_refs=source_refs,
+                actual_source_refs=actual_source_refs,
+                bundle_support_refs=bundle_support_refs,
             )
         )
         if _context_resets_active_direction(context, active_direction):
@@ -1117,8 +1129,10 @@ def _context_resets_active_direction(
 
 def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
     trace_item_counts = Counter()
-    source_family_presence = Counter()
-    source_family_item_counts = Counter()
+    actual_hit_source_family_presence = Counter()
+    actual_hit_source_family_item_counts = Counter()
+    bundle_support_family_presence = Counter()
+    bundle_support_family_item_counts = Counter()
     curated_signals = 0
     statement_signals = 0
     supporting_signals = 0
@@ -1136,10 +1150,15 @@ def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
         for hit in signal.knowledge_trace:
             trace_item_counts[hit.atom_type] += 1
             family = infer_source_family(hit.source_ref)
-            source_family_item_counts[family] += 1
+            actual_hit_source_family_item_counts[family] += 1
             families_for_signal.add(family)
         for family in families_for_signal:
-            source_family_presence[family] += 1
+            actual_hit_source_family_presence[family] += 1
+        bundle_families_for_signal = {infer_source_family(ref) for ref in signal.bundle_support_refs}
+        for family in bundle_families_for_signal:
+            bundle_support_family_presence[family] += 1
+        for ref in signal.bundle_support_refs:
+            bundle_support_family_item_counts[infer_source_family(ref)] += 1
 
     total_signals = len(signals)
     curated_item_count = sum(trace_item_counts[item] for item in CURATED_TRACE_TYPES)
@@ -1156,8 +1175,12 @@ def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
         "supporting_signals": supporting_signals,
         "supporting_signal_pct": _string_decimal(_safe_pct(supporting_signals, total_signals)),
         "trace_item_counts": dict(sorted(trace_item_counts.items())),
-        "source_family_signal_presence": dict(sorted(source_family_presence.items())),
-        "source_family_item_counts": dict(sorted(source_family_item_counts.items())),
+        "source_family_signal_presence": dict(sorted(actual_hit_source_family_presence.items())),
+        "source_family_item_counts": dict(sorted(actual_hit_source_family_item_counts.items())),
+        "actual_hit_source_family_presence": dict(sorted(actual_hit_source_family_presence.items())),
+        "actual_hit_source_family_item_counts": dict(sorted(actual_hit_source_family_item_counts.items())),
+        "bundle_support_family_presence": dict(sorted(bundle_support_family_presence.items())),
+        "bundle_support_family_item_counts": dict(sorted(bundle_support_family_item_counts.items())),
         "curated_vs_statement": {
             "curated_item_count": curated_item_count,
             "statement_item_count": statement_item_count,
@@ -1197,6 +1220,14 @@ def infer_source_family(source_ref: str) -> str:
         return by_source_page[source_ref]
     if source_ref in by_raw_ref:
         return by_raw_ref[source_ref]
+    if source_ref.startswith("wiki:knowledge/wiki/sources/"):
+        lowered = source_ref.lower()
+        if "al-brooks" in lowered:
+            return "al_brooks_ppt"
+        if "fangfangtu" in lowered and "transcript" in lowered:
+            return "fangfangtu_transcript"
+        if "fangfangtu" in lowered:
+            return "fangfangtu_notes"
     if source_ref.startswith("wiki:knowledge/wiki/concepts/"):
         return "curated_concept"
     if source_ref.startswith("wiki:knowledge/wiki/setups/"):
@@ -1225,7 +1256,12 @@ def write_knowledge_trace_json(
                 "signal_id": item.signal.signal_id,
                 "entry_timestamp": item.trade.entry_timestamp.isoformat(),
                 "exit_timestamp": item.trade.exit_timestamp.isoformat(),
-                "knowledge_trace": _knowledge_trace_payload(item.signal),
+                "actual_source_refs": list(item.signal.actual_source_refs),
+                "bundle_support_refs": list(item.signal.bundle_support_refs),
+                "legacy_source_refs": list(item.signal.source_refs),
+                "knowledge_trace": _knowledge_trace_payload(item.signal.knowledge_trace),
+                "visible_trace": _knowledge_trace_payload(item.signal.knowledge_trace),
+                "debug_trace": _knowledge_trace_payload(item.signal.knowledge_debug_trace),
             }
             for item in paper_outcome.executed_trades
         ],
@@ -1235,7 +1271,12 @@ def write_knowledge_trace_json(
                 "signal_id": item.signal.signal_id,
                 "entry_timestamp": item.entry_timestamp.isoformat(),
                 "reason_codes": list(item.reason_codes),
-                "knowledge_trace": _knowledge_trace_payload(item.signal),
+                "actual_source_refs": list(item.signal.actual_source_refs),
+                "bundle_support_refs": list(item.signal.bundle_support_refs),
+                "legacy_source_refs": list(item.signal.source_refs),
+                "knowledge_trace": _knowledge_trace_payload(item.signal.knowledge_trace),
+                "visible_trace": _knowledge_trace_payload(item.signal.knowledge_trace),
+                "debug_trace": _knowledge_trace_payload(item.signal.knowledge_debug_trace),
             }
             for item in paper_outcome.blocked_signals
         ],
@@ -1264,7 +1305,9 @@ def write_trades_csv(path: Path, trades: tuple[ExecutedTradeRecord, ...]) -> Non
                 "entry_trigger",
                 "stop_rule",
                 "target_rule",
-                "source_refs",
+                "actual_source_refs",
+                "bundle_support_refs",
+                "legacy_source_refs",
                 "explanation",
             ),
         )
@@ -1288,7 +1331,9 @@ def write_trades_csv(path: Path, trades: tuple[ExecutedTradeRecord, ...]) -> Non
                     "entry_trigger": item.signal.entry_trigger,
                     "stop_rule": item.signal.stop_rule,
                     "target_rule": item.signal.target_rule,
-                    "source_refs": " | ".join(item.signal.source_refs),
+                    "actual_source_refs": " | ".join(item.signal.actual_source_refs),
+                    "bundle_support_refs": " | ".join(item.signal.bundle_support_refs),
+                    "legacy_source_refs": " | ".join(item.signal.source_refs),
                     "explanation": item.signal.explanation,
                 }
             )
@@ -1390,7 +1435,8 @@ def write_markdown_report(
             "",
             f"- 发出信号总数：{trace_coverage['total_signals']}；trace 非空占比：{trace_coverage['trace_nonempty_pct']}%",
             f"- 含 curated trace 的信号占比：{trace_coverage['curated_signal_pct']}%；含 statement 补充证据的信号占比：{trace_coverage['statement_signal_pct']}%",
-            f"- source family 分布审计（按受控 trace 的信号存在计数）：{_format_counter(trace_coverage['source_family_signal_presence'])}",
+            f"- actual hit family 分布（按 visible trace 的信号存在计数）：{_format_counter(trace_coverage['actual_hit_source_family_presence'])}",
+            f"- bundle support family 分布（按补充来源存在计数）：{_format_counter(trace_coverage['bundle_support_family_presence'])}",
             f"- curated vs statement 命中占比（按受控 trace item 计）：curated={trace_coverage['curated_vs_statement']['curated_item_pct']}%， statement={trace_coverage['curated_vs_statement']['statement_item_pct']}%",
             "",
             "## 7. no-trade / wait 摘要",
@@ -1441,6 +1487,8 @@ def write_markdown_report(
                     f"  进场原因：{item['explanation']}",
                     f"  出场原因：{humanize_exit_reason(item['exit_reason'])}",
                     f"  setup/context：`{item['setup_type']}` / `{item['pa_context']}`",
+                    f"  actual refs：{' | '.join(item['source_refs']) if item['source_refs'] else '当前没有 actual hit refs'}",
+                    f"  bundle support：{' | '.join(item['bundle_support_refs']) if item['bundle_support_refs'] else '当前没有 bundle support refs'}",
                     f"  trace 摘要：{_format_trace_summary(item['knowledge_trace_summary'])}",
                     f"  risk_notes：{' | '.join(item['risk_notes']) if item['risk_notes'] else '当前版本无额外风控注释'}",
                 ]
@@ -1495,15 +1543,17 @@ def trade_to_summary_row(item: ExecutedTradeRecord) -> dict[str, Any]:
         "setup_type": item.signal.setup_type,
         "pa_context": item.signal.pa_context,
         "explanation": item.signal.explanation,
-        "source_refs": list(item.signal.source_refs),
+        "source_refs": list(item.signal.actual_source_refs),
+        "bundle_support_refs": list(item.signal.bundle_support_refs),
+        "legacy_source_refs": list(item.signal.source_refs),
         "knowledge_trace_summary": list(summarize_knowledge_trace(item.signal.knowledge_trace)),
         "risk_notes": list(item.signal.risk_notes),
     }
 
 
-def _knowledge_trace_payload(signal: Signal) -> list[dict[str, Any]]:
+def _knowledge_trace_payload(trace: tuple[KnowledgeAtomHit, ...]) -> list[dict[str, Any]]:
     payload: list[dict[str, Any]] = []
-    for hit in signal.knowledge_trace:
+    for hit in trace:
         payload.append(
             {
                 "atom_id": hit.atom_id,
@@ -1513,6 +1563,8 @@ def _knowledge_trace_payload(signal: Signal) -> list[dict[str, Any]]:
                 "match_reason": hit.match_reason,
                 "applicability_state": hit.applicability_state,
                 "conflict_refs": list(hit.conflict_refs),
+                "reference_tier": hit.reference_tier,
+                "governance_notes": list(hit.governance_notes),
             }
         )
     return payload

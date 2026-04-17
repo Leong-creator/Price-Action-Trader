@@ -47,7 +47,13 @@ def build_review_report(
         dict.fromkeys(
             ref
             for item in items
-            for ref in (*item.kb_source_refs, *item.news_source_refs, *item.trade_outcome.evidence_refs)
+            for ref in (
+                *item.kb_source_refs,
+                *item.kb_actual_source_refs,
+                *item.kb_bundle_support_refs,
+                *item.news_source_refs,
+                *item.trade_outcome.evidence_refs,
+            )
         )
     )
     generated_at = generated_at or datetime.now(UTC)
@@ -132,7 +138,7 @@ def _build_review_item(
         timeframe=signal.timeframe,
         direction=signal.direction,
         setup_type=signal.setup_type,
-        kb_source_refs=signal.source_refs,
+        kb_source_refs=signal.actual_source_refs,
         pa_explanation=signal.explanation,
         risk_notes=signal.risk_notes,
         news_outcome=decision.outcome,
@@ -146,6 +152,9 @@ def _build_review_item(
         trade_outcome=trade_outcome,
         improvement_notes=improvement_notes,
         kb_trace=signal.knowledge_trace,
+        kb_actual_source_refs=signal.actual_source_refs,
+        kb_bundle_support_refs=signal.bundle_support_refs,
+        kb_debug_trace=signal.knowledge_debug_trace,
     )
 
 

@@ -112,6 +112,50 @@
 
 并且即使如此，本项目仍保持 `paper / simulated`，未扩写 broker/live。
 
+## Knowledge Reference Repair / 阶段 A
+
+阶段 A 只修三类问题：
+
+- actual hit refs 与 bundle support refs 被混在同一默认展示语义里
+- visible trace 把 broad support / registry refs 误当成实际命中证据
+- signal-level `applicability_state` 被治理性 `not_applicable` / maturity warning 污染
+
+阶段 A 之后，trace 相关层次固定为：
+
+### 1. Actual hit refs
+
+- 来源：visible `knowledge_trace`
+- 用途：用户报告、`summary.json`、coverage 主指标、`no_trade_wait` 默认展示
+- 约束：只允许展示实际命中的 concept / setup / statement 等 evidence hit；不得把 broad support ref 冒充成 actual hit
+
+### 2. Bundle support refs
+
+- 来源：reference pack、source registry、debug/support trace
+- 用途：machine-readable 支撑性来源、调试、bundle provenance
+- 约束：可以落盘，但默认不应在 user-facing 报告中被当成实际命中证据
+
+### 3. Visible trace
+
+- 只展示 actual evidence hit
+- 保持 curated-first、statement 仅作补充证据、source family 限量与多样性控制
+- `m3-research-reference-pack` 这类 broad support rule 在无窄化 evidence 前不得默认进入 visible trace
+
+### 4. Debug / support trace
+
+- 用于保留 bundle support provenance、governance notes 与 machine-readable 调试信息
+- 可以保留广义 support 信息，但不等于 signal 级实际命中
+
+### 5. Governance notes
+
+- 用于承载“未完成抽取前不作为可执行规则”“当前仍为 research-only”等治理/成熟度语义
+- 不得继续直接映射成 signal-level `applicability_state=not_applicable`
+
+阶段 A 完成后：
+
+- transcript / Brooks 已明确作为 bundle support 可见
+- 但它们尚未因为阶段 A 自动变成新的 curated actual trace claim
+- 若要让 transcript / Brooks 在 actual trace 中真实出现，必须进入后续的最小 curated promotion（阶段 B）
+
 ## 熔断条件
 
 命中任一条件即停在 `M8B.2a`：

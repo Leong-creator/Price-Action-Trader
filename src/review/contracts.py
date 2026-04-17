@@ -43,6 +43,9 @@ class ReviewItem:
     trade_outcome: ReviewTradeOutcome
     improvement_notes: tuple[str, ...]
     kb_trace: tuple[KnowledgeAtomHit, ...] = ()
+    kb_actual_source_refs: tuple[str, ...] = ()
+    kb_bundle_support_refs: tuple[str, ...] = ()
+    kb_debug_trace: tuple[KnowledgeAtomHit, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

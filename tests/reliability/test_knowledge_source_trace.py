@@ -36,8 +36,12 @@ class KnowledgeSourceTraceTests(unittest.TestCase):
 
         self.assertIn(TRANSCRIPT_SOURCE_PAGE, signal.source_refs)
         self.assertIn(BROOKS_SOURCE_PAGE, signal.source_refs)
-        self.assertIn(TRANSCRIPT_SOURCE_PAGE, signal.explanation)
-        self.assertIn(BROOKS_SOURCE_PAGE, signal.explanation)
+        self.assertIn(TRANSCRIPT_SOURCE_PAGE, signal.bundle_support_refs)
+        self.assertIn(BROOKS_SOURCE_PAGE, signal.bundle_support_refs)
+        self.assertNotIn(TRANSCRIPT_SOURCE_PAGE, signal.actual_source_refs)
+        self.assertNotIn(BROOKS_SOURCE_PAGE, signal.actual_source_refs)
+        self.assertNotIn(TRANSCRIPT_SOURCE_PAGE, signal.explanation)
+        self.assertNotIn(BROOKS_SOURCE_PAGE, signal.explanation)
 
     def test_unwired_bundle_does_not_fabricate_transcript_or_brooks_refs(self) -> None:
         temp_rule_pack = self._write_temp_rule_pack()

@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8C.2：单标的日内试点（已完成并整合进 `main`）
+- 当前子阶段：Knowledge Reference Repair Track / 阶段 A：Trace Fidelity & Reference Honesty Repair（已完成并整合进 `main`）
 
 ## 当前分支
 
@@ -145,6 +145,13 @@
     - source family 失衡保护继续生效，Brooks statement 数量不影响 trigger 或权重
   - 当前示例 run `m8c2_intraday_pilot_spy_15m` 在 `SPY / 15m / 2026-03-30 ~ 2026-04-16` 条件下输出：总收益率 `0.0832%`、最大回撤 `0.9789%`、交易 `25` 笔、blocked signals `8`、`no_trade_wait` `285`；仍明确保持 `paper / simulated`。
   - 已新增 `tests/unit/test_intraday_pilot.py` 与 `tests/reliability/test_intraday_pilot_validation.py`，并通过现有 `tests/reliability` / `tests/unit` / public demo smoke 回归。
+- Knowledge Reference Repair / 阶段 A 已完成：
+  - 已把 user-facing `actual hit refs` 与 `bundle support refs` 分层：`Signal`、`knowledge_trace.json`、`summary.json`、`no_trade_wait.jsonl` 现已显式区分 visible actual evidence 与补充性 support refs。
+  - 已修复 `knowledge_trace` 可见层语义：broad registry/support 类型的 `m3-research-reference-pack` 不再默认作为 visible trace 命中展示，改为仅进入 debug/support 层与 bundle support refs。
+  - 已修复 `applicability_state` 的治理/信号语义混淆：frontmatter 中的治理性 `not_applicable` 不再直接污染 signal-level applicability，改为通过 `governance_notes` 保留。
+  - 已修复 `knowledge_trace_coverage.json`：现已区分 `actual_hit_source_family_presence/item_counts` 与 `bundle_support_family_presence/item_counts`，从而明确 transcript / Brooks 是 support 还是 actual hit。
+  - 已重跑并落盘 `reports/backtests/m8c2_intraday_pilot_spy_15m/` 与 `reports/backtests/smoke_public_demo_regression/`，确认报告与 JSON 默认只展示 actual hit refs；bundle support refs 单独落盘。
+  - 本轮未做 curated promotion，transcript / Brooks 仍未被提升为新的 curated actual trace claim；当前只修 trace fidelity / reference honesty。
 
 ## 当前阻塞
 
@@ -153,8 +160,8 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live；`M8C.2` 已整合进 `main`，当前仍不进入期权、broker、live 或 real-money。
-- 若后续继续扩大 intraday 范围，也只能从最新稳定基线 `main` 单独开分支，并继续保持 `paper / simulated` 与单一验证目标。
+- 当前下一步不是扩 broker/live；Knowledge Reference Repair / 阶段 A 已整合进 `main`，当前仍不进入期权、broker、live 或 real-money。
+- 若继续该修复轨道，只允许从最新稳定基线 `main` 单独开分支进入阶段 B：Curated Promotion Minimal Set；在阶段 B 之前不改 trigger、不做 curated promotion 以外的策略扩写。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
