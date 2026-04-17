@@ -181,6 +181,9 @@ class PublicBacktestDemoTests(unittest.TestCase):
                 self.assertIn("debug_trace", trace_payload["executed_trades"][0])
                 self.assertIn("actual_source_refs", trace_payload["executed_trades"][0])
                 self.assertIn("bundle_support_refs", trace_payload["executed_trades"][0])
+                self.assertIn("evidence_refs", trace_payload["executed_trades"][0]["knowledge_trace"][0])
+                self.assertIn("evidence_locator_summary", trace_payload["executed_trades"][0]["knowledge_trace"][0])
+                self.assertIn("field_mappings", trace_payload["executed_trades"][0]["knowledge_trace"][0])
             self.assertIn("knowledge_trace_coverage", summary_payload)
             self.assertIn("no_trade_wait_summary", summary_payload)
             self.assertEqual(summary_payload["splits"][0]["name"], "unit_split")
@@ -217,6 +220,8 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertEqual(len(payload["blocked_signals"][0]["knowledge_trace"]), 5)
         self.assertTrue(payload["executed_trades"][0]["bundle_support_refs"])
         self.assertTrue(payload["executed_trades"][0]["debug_trace"])
+        self.assertIn("evidence_refs", payload["executed_trades"][0]["knowledge_trace"][0])
+        self.assertIn("field_mappings", payload["executed_trades"][0]["knowledge_trace"][0])
         self.assertEqual(payload["boundary"], "paper/simulated")
 
     def test_markdown_report_limits_trace_summary_to_three_items(self) -> None:
@@ -309,6 +314,8 @@ class PublicBacktestDemoTests(unittest.TestCase):
                 "statement_signal_pct": "100.0000",
                 "actual_hit_source_family_presence": {"curated_concept": 1, "al_brooks_ppt": 1},
                 "actual_hit_source_family_item_counts": {"curated_concept": 1, "al_brooks_ppt": 2},
+                "actual_evidence_source_family_presence": {"curated_concept": 1, "al_brooks_ppt": 1},
+                "actual_evidence_source_family_item_counts": {"curated_concept": 1, "al_brooks_ppt": 2},
                 "bundle_support_family_presence": {"curated_rule": 1},
                 "bundle_support_family_item_counts": {"curated_rule": 1},
                 "source_family_signal_presence": {"curated_concept": 1, "al_brooks_ppt": 1},
@@ -418,6 +425,7 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertEqual(coverage["overall"]["curated_signals"], 1)
         self.assertEqual(coverage["overall"]["statement_signals"], 1)
         self.assertEqual(coverage["overall"]["actual_hit_source_family_presence"]["al_brooks_ppt"], 1)
+        self.assertEqual(coverage["overall"]["actual_evidence_source_family_presence"]["al_brooks_ppt"], 1)
         self.assertEqual(coverage["overall"]["bundle_support_family_presence"]["curated_rule"], 1)
         self.assertLessEqual(
             coverage["overall"]["curated_vs_statement"]["statement_item_count"],

@@ -20,7 +20,9 @@ from src.strategy import (
 
 TRANSCRIPT_SOURCE_PAGE = "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
 BROOKS_SOURCE_PAGE = "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+BROOKS_FILE_SOURCE_PAGE = "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
 RULE_PACK_PAGE = "wiki:knowledge/wiki/rules/m3-research-reference-pack.md"
+PROMOTED_RULE_PAGE = "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md"
 
 
 class KnowledgeSourceTraceTests(unittest.TestCase):
@@ -36,6 +38,9 @@ class KnowledgeSourceTraceTests(unittest.TestCase):
 
         self.assertIn(TRANSCRIPT_SOURCE_PAGE, signal.source_refs)
         self.assertIn(BROOKS_SOURCE_PAGE, signal.source_refs)
+        evidence_refs = {ref for hit in signal.knowledge_trace for ref in hit.evidence_refs}
+        self.assertIn(TRANSCRIPT_SOURCE_PAGE, evidence_refs)
+        self.assertIn(BROOKS_FILE_SOURCE_PAGE, evidence_refs)
         self.assertIn(TRANSCRIPT_SOURCE_PAGE, signal.bundle_support_refs)
         self.assertIn(BROOKS_SOURCE_PAGE, signal.bundle_support_refs)
         self.assertNotIn(TRANSCRIPT_SOURCE_PAGE, signal.actual_source_refs)
@@ -53,10 +58,10 @@ class KnowledgeSourceTraceTests(unittest.TestCase):
 
         signal = generate_signals(build_replay(self._trend_bars()), knowledge=bundle)[0]
 
-        self.assertNotIn(TRANSCRIPT_SOURCE_PAGE, signal.source_refs)
-        self.assertNotIn(BROOKS_SOURCE_PAGE, signal.source_refs)
-        self.assertNotIn(TRANSCRIPT_SOURCE_PAGE, signal.explanation)
-        self.assertNotIn(BROOKS_SOURCE_PAGE, signal.explanation)
+        self.assertNotIn(PROMOTED_RULE_PAGE, signal.actual_source_refs)
+        self.assertFalse(any(hit.atom_type == "rule" for hit in signal.knowledge_trace))
+        self.assertIn(TRANSCRIPT_SOURCE_PAGE, signal.source_refs)
+        self.assertIn(BROOKS_FILE_SOURCE_PAGE, signal.source_refs)
 
     def _write_temp_rule_pack(self) -> Path:
         temp_dir = Path(tempfile.mkdtemp(prefix="pat-knowledge-trace-"))

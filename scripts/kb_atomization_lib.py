@@ -48,12 +48,14 @@ KEY_CURATED_PAGE_REFS = (
     "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
     "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
     "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+    "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
 )
 
 DEFAULT_SOURCE_OUTPUT = INDICES_ROOT / "source_manifest.json"
 DEFAULT_CHUNK_OUTPUT = INDICES_ROOT / "chunk_manifest.jsonl"
 DEFAULT_ATOM_OUTPUT = INDICES_ROOT / "knowledge_atoms.jsonl"
 DEFAULT_CALLABLE_OUTPUT = INDICES_ROOT / "knowledge_callable_index.json"
+DEFAULT_CURATED_PROMOTION_MAP = INDICES_ROOT / "curated_promotion_map.json"
 
 _NOISE_PREFIXES = (
     "专题系列",
@@ -558,6 +560,36 @@ def body_summary(body: str) -> str:
     return ""
 
 
+def locator_brief(raw_locator: dict[str, Any]) -> str:
+    locator_kind = raw_locator.get("locator_kind", "unknown")
+    if locator_kind == "page_block":
+        page_no = raw_locator.get("page_no", "?")
+        block_index = raw_locator.get("block_index", "?")
+        fragment_index = raw_locator.get("fragment_index")
+        suffix = f"#f{fragment_index}" if fragment_index is not None else ""
+        return f"p{page_no}b{block_index}{suffix}"
+    if locator_kind == "chunk_set":
+        return f"chunk_set[{raw_locator.get('member_count', '?')}]"
+    return locator_kind
+
+
+def load_curated_promotion_map(path: Path | None = None) -> dict[str, Any]:
+    map_path = path or DEFAULT_CURATED_PROMOTION_MAP
+    if not map_path.exists():
+        return {"schema_version": "missing", "generated_at": "1970-01-01T00:00:00Z", "promotions": []}
+    return load_json(map_path)
+
+
+def promotion_entries_by_page(curated_promotion_map: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for entry in curated_promotion_map.get("promotions", []):
+        page_ref = str(entry.get("page_ref", "")).strip()
+        if not page_ref:
+            continue
+        grouped.setdefault(page_ref, []).append(entry)
+    return grouped
+
+
 def source_ids_for_reference(
     reference: str,
     *,
@@ -604,6 +636,99 @@ def build_chunk_set_locator(chunks: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def resolve_promotion_evidence(
+    *,
+    promotion_entry: dict[str, Any],
+    source_manifest: dict[str, Any],
+    parsed_by_source: dict[str, list[dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], list[str], list[str], list[str]]:
+    source_page_to_record = {
+        record["source_page_ref"]: record for record in source_manifest["sources"]
+    }
+    chunks: list[dict[str, Any]] = []
+    evidence_refs: list[str] = []
+    evidence_locator_summary: list[str] = []
+    field_mappings: list[str] = []
+    seen_chunks: set[str] = set()
+    seen_refs: set[str] = set()
+    seen_summaries: set[str] = set()
+    seen_fields: set[str] = set()
+
+    for mapping in promotion_entry.get("field_mappings", []):
+        field_name = str(mapping.get("field", "")).strip()
+        if field_name and field_name not in seen_fields:
+            seen_fields.add(field_name)
+            field_mappings.append(field_name)
+        for evidence in mapping.get("evidence", []):
+            source_ref = str(evidence.get("source_ref", "")).strip()
+            raw_locator = dict(evidence.get("raw_locator", {}))
+            if not source_ref or not raw_locator:
+                continue
+            record = source_page_to_record.get(source_ref)
+            if record is None:
+                raise ValueError(
+                    f"curated promotion evidence source is not registered: {promotion_entry.get('claim_id')} -> {source_ref}"
+                )
+            source_id = record["source_id"]
+            chunk = next(
+                (
+                    candidate
+                    for candidate in parsed_by_source.get(source_id, [])
+                    if candidate["raw_locator"]["page_no"] == raw_locator.get("page_no")
+                    and candidate["raw_locator"]["block_index"] == raw_locator.get("block_index")
+                ),
+                None,
+            )
+            if chunk is None:
+                raise ValueError(
+                    "curated promotion evidence locator does not resolve to a parsed chunk: "
+                    f"{promotion_entry.get('claim_id')} -> {source_ref} @ {raw_locator}"
+                )
+            if chunk["chunk_id"] not in seen_chunks:
+                seen_chunks.add(chunk["chunk_id"])
+                chunks.append(chunk)
+            if source_ref not in seen_refs:
+                seen_refs.add(source_ref)
+                evidence_refs.append(source_ref)
+            summary = f"{record['source_family']}@{locator_brief(raw_locator)}"
+            if summary not in seen_summaries:
+                seen_summaries.add(summary)
+                evidence_locator_summary.append(summary)
+
+    chunks.sort(
+        key=lambda item: (
+            item["source_id"],
+            item["raw_locator"]["page_no"],
+            item["raw_locator"]["block_index"],
+        )
+    )
+    return chunks, evidence_refs, evidence_locator_summary, field_mappings
+
+
+def build_curated_subset_locator(
+    chunks: list[dict[str, Any]],
+    *,
+    promotion_entry: dict[str, Any],
+) -> dict[str, Any]:
+    members: list[dict[str, Any]] = []
+    for chunk in chunks:
+        members.append(
+            {
+                "source_id": chunk["source_id"],
+                "page_no": chunk["raw_locator"]["page_no"],
+                "block_index": chunk["raw_locator"]["block_index"],
+            }
+        )
+
+    return {
+        "locator_kind": "chunk_set",
+        "member_count": len(chunks),
+        "member_locators": members[:20],
+        "complete_via_evidence_chunk_ids": True,
+        "promotion_claim_id": promotion_entry.get("claim_id"),
+    }
+
+
 def _base_atom(
     *,
     atom_type: str,
@@ -626,8 +751,13 @@ def _base_atom(
     reviewed_at: str,
     last_updated: str,
     identity_seed: str,
+    evidence_refs: list[str] | None = None,
+    evidence_locator_summary: list[str] | None = None,
+    field_mappings: list[str] | None = None,
+    claim_id: str | None = None,
+    promotion_theme: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    atom = {
         "atom_id": f"atom--{short_sha1(identity_seed, length=16)}",
         "atom_type": atom_type,
         "content": content,
@@ -649,6 +779,17 @@ def _base_atom(
         "reviewed_at": reviewed_at,
         "last_updated": last_updated,
     }
+    if evidence_refs is not None:
+        atom["evidence_refs"] = evidence_refs
+    if evidence_locator_summary is not None:
+        atom["evidence_locator_summary"] = evidence_locator_summary
+    if field_mappings is not None:
+        atom["field_mappings"] = field_mappings
+    if claim_id is not None:
+        atom["claim_id"] = claim_id
+    if promotion_theme is not None:
+        atom["promotion_theme"] = promotion_theme
+    return atom
 
 
 def qualifies_statement(fragment: str) -> bool:
@@ -781,11 +922,14 @@ def extract_statement_fragments(chunk_text: str) -> list[str]:
 def build_knowledge_atoms(
     source_manifest: dict[str, Any],
     chunks: list[dict[str, Any]],
+    curated_promotion_map: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     atoms: list[dict[str, Any]] = []
     by_source_id, by_raw_ref = source_record_maps(source_manifest)
     parsed_by_source = parsed_chunks_by_source(chunks)
     source_page_cache: dict[str, tuple[dict[str, Any], str]] = {}
+    promotion_map = curated_promotion_map or load_curated_promotion_map()
+    promotion_entries = promotion_entries_by_page(promotion_map)
 
     def source_page_frontmatter(page_reference: str) -> tuple[dict[str, Any], str]:
         if page_reference not in source_page_cache:
@@ -914,6 +1058,161 @@ def build_knowledge_atoms(
         if page_path is None:
             raise ValueError(f"invalid curated page ref: {page_ref}")
         frontmatter, body = frontmatter_and_body(page_path)
+        page_promotions = promotion_entries.get(page_ref, [])
+        reviewed_at = str(frontmatter.get("last_reviewed", ""))
+        last_updated = deterministic_generated_at([page_path])
+        if page_promotions:
+            for promotion in page_promotions:
+                evidence_chunks, evidence_refs, evidence_locator_summary, field_mappings = resolve_promotion_evidence(
+                    promotion_entry=promotion,
+                    source_manifest=source_manifest,
+                    parsed_by_source=parsed_by_source,
+                )
+                evidence_chunk_ids = [chunk["chunk_id"] for chunk in evidence_chunks]
+                raw_locator = build_curated_subset_locator(
+                    evidence_chunks,
+                    promotion_entry=promotion,
+                )
+                source_ids = sorted({chunk["source_id"] for chunk in evidence_chunks})
+                callable_tags = ["curated_callable", "explanation_only", "review_only"]
+                callable_tags.extend(list_frontmatter(promotion.get("callable_tags")))
+                for source_id in source_ids:
+                    callable_tags.append(f"source_family:{by_source_id[source_id]['source_family']}")
+                content = str(promotion.get("claim_summary", "")).strip() or body_summary(body) or str(frontmatter.get("title", ""))
+                atoms.append(
+                    _base_atom(
+                        atom_type=str(promotion.get("atom_type") or frontmatter.get("type", "")),
+                        content=content,
+                        status=str(frontmatter.get("status", "draft")),
+                        confidence=str(frontmatter.get("confidence", "low")),
+                        market=list_frontmatter(frontmatter.get("market")),
+                        timeframes=list_frontmatter(frontmatter.get("timeframes")),
+                        pa_context=list_frontmatter(frontmatter.get("pa_context")),
+                        signal_bar=list_frontmatter(frontmatter.get("signal_bar")),
+                        entry_bar=list_frontmatter(frontmatter.get("entry_bar")),
+                        applicability=list_frontmatter(frontmatter.get("applicability")),
+                        not_applicable=list_frontmatter(frontmatter.get("not_applicable")),
+                        contradictions=[str(item.get("content", item)) for item in promotion.get("contradictions", [])],
+                        derived_from={
+                            "page_ref": page_ref,
+                            "claim_id": str(promotion.get("claim_id", "")),
+                            "theme_id": str(promotion.get("theme_id", "")),
+                            "promotion_map": str(DEFAULT_CURATED_PROMOTION_MAP.relative_to(PROJECT_ROOT)),
+                        },
+                        source_ref=page_ref,
+                        raw_locator=raw_locator,
+                        evidence_chunk_ids=evidence_chunk_ids,
+                        callable_tags=sorted(set(callable_tags)),
+                        reviewed_at=reviewed_at,
+                        last_updated=last_updated,
+                        identity_seed=(
+                            f"curated-promotion|{page_ref}|{promotion.get('claim_id')}|"
+                            f"{content}|{','.join(evidence_chunk_ids)}"
+                        ),
+                        evidence_refs=evidence_refs,
+                        evidence_locator_summary=evidence_locator_summary,
+                        field_mappings=field_mappings,
+                        claim_id=str(promotion.get("claim_id", "")),
+                        promotion_theme=str(promotion.get("theme_id", "")),
+                    )
+                )
+
+                for question in promotion.get("open_questions", []):
+                    question_chunks, _, question_summaries, _ = resolve_promotion_evidence(
+                        promotion_entry={
+                            "claim_id": promotion.get("claim_id"),
+                            "field_mappings": [{"field": "open_question", "evidence": question.get("evidence", [])}],
+                        },
+                        source_manifest=source_manifest,
+                        parsed_by_source=parsed_by_source,
+                    )
+                    question_chunk_ids = [chunk["chunk_id"] for chunk in question_chunks]
+                    atoms.append(
+                        _base_atom(
+                            atom_type="open_question",
+                            content=str(question.get("content", "")).strip(),
+                            status=str(frontmatter.get("status", "draft")),
+                            confidence=str(frontmatter.get("confidence", "low")),
+                            market=list_frontmatter(frontmatter.get("market")),
+                            timeframes=list_frontmatter(frontmatter.get("timeframes")),
+                            pa_context=list_frontmatter(frontmatter.get("pa_context")),
+                            signal_bar=list_frontmatter(frontmatter.get("signal_bar")),
+                            entry_bar=list_frontmatter(frontmatter.get("entry_bar")),
+                            applicability=list_frontmatter(frontmatter.get("applicability")),
+                            not_applicable=list_frontmatter(frontmatter.get("not_applicable")),
+                            contradictions=[],
+                            derived_from={
+                                "page_ref": page_ref,
+                                "field": "open_question",
+                                "claim_id": str(promotion.get("claim_id", "")),
+                            },
+                            source_ref=page_ref,
+                            raw_locator=build_curated_subset_locator(question_chunks, promotion_entry=promotion),
+                            evidence_chunk_ids=question_chunk_ids,
+                            callable_tags=sorted(set(callable_tags)),
+                            reviewed_at=reviewed_at,
+                            last_updated=last_updated,
+                            identity_seed=(
+                                f"open_question|{page_ref}|{promotion.get('claim_id')}|"
+                                f"{question.get('content', '')}|{','.join(question_chunk_ids)}"
+                            ),
+                            evidence_refs=evidence_refs,
+                            evidence_locator_summary=question_summaries,
+                            field_mappings=["open_question"],
+                            claim_id=str(promotion.get("claim_id", "")),
+                            promotion_theme=str(promotion.get("theme_id", "")),
+                        )
+                    )
+
+                for contradiction in promotion.get("contradictions", []):
+                    contradiction_chunks, _, contradiction_summaries, _ = resolve_promotion_evidence(
+                        promotion_entry={
+                            "claim_id": promotion.get("claim_id"),
+                            "field_mappings": [{"field": "contradiction", "evidence": contradiction.get("evidence", [])}],
+                        },
+                        source_manifest=source_manifest,
+                        parsed_by_source=parsed_by_source,
+                    )
+                    contradiction_chunk_ids = [chunk["chunk_id"] for chunk in contradiction_chunks]
+                    atoms.append(
+                        _base_atom(
+                            atom_type="contradiction",
+                            content=str(contradiction.get("content", "")).strip(),
+                            status=str(frontmatter.get("status", "draft")),
+                            confidence=str(frontmatter.get("confidence", "low")),
+                            market=list_frontmatter(frontmatter.get("market")),
+                            timeframes=list_frontmatter(frontmatter.get("timeframes")),
+                            pa_context=list_frontmatter(frontmatter.get("pa_context")),
+                            signal_bar=list_frontmatter(frontmatter.get("signal_bar")),
+                            entry_bar=list_frontmatter(frontmatter.get("entry_bar")),
+                            applicability=list_frontmatter(frontmatter.get("applicability")),
+                            not_applicable=list_frontmatter(frontmatter.get("not_applicable")),
+                            contradictions=[],
+                            derived_from={
+                                "page_ref": page_ref,
+                                "field": "contradiction",
+                                "claim_id": str(promotion.get("claim_id", "")),
+                            },
+                            source_ref=page_ref,
+                            raw_locator=build_curated_subset_locator(contradiction_chunks, promotion_entry=promotion),
+                            evidence_chunk_ids=contradiction_chunk_ids,
+                            callable_tags=sorted(set(callable_tags)),
+                            reviewed_at=reviewed_at,
+                            last_updated=last_updated,
+                            identity_seed=(
+                                f"contradiction|{page_ref}|{promotion.get('claim_id')}|"
+                                f"{contradiction.get('content', '')}|{','.join(contradiction_chunk_ids)}"
+                            ),
+                            evidence_refs=evidence_refs,
+                            evidence_locator_summary=contradiction_summaries,
+                            field_mappings=["contradiction"],
+                            claim_id=str(promotion.get("claim_id", "")),
+                            promotion_theme=str(promotion.get("theme_id", "")),
+                        )
+                    )
+
+            continue
+
         source_ids: set[str] = set()
         for reference in list_frontmatter(frontmatter.get("source_refs")):
             source_ids.update(source_ids_for_reference(reference, raw_ref_map=by_raw_ref))
@@ -934,8 +1233,6 @@ def build_knowledge_atoms(
             callable_tags.append(f"source_family:{by_source_id[source_id]['source_family']}")
 
         content = body_summary(body) or str(frontmatter.get("title", ""))
-        reviewed_at = str(frontmatter.get("last_reviewed", ""))
-        last_updated = deterministic_generated_at([page_path])
         atoms.append(
             _base_atom(
                 atom_type=str(frontmatter.get("type", "")),
@@ -1158,6 +1455,15 @@ def validate_knowledge_atoms(
             seen_curated_refs.add(str(atom.get("source_ref")))
             if not evidence_ids:
                 errors.append(f"curated atom missing evidence: {atom.get('atom_id')}")
+        if "promoted_curated" in atom.get("callable_tags", []):
+            if not atom.get("evidence_refs"):
+                errors.append(f"promoted curated atom missing evidence_refs: {atom.get('atom_id')}")
+            if not atom.get("evidence_locator_summary"):
+                errors.append(f"promoted curated atom missing evidence_locator_summary: {atom.get('atom_id')}")
+            if not atom.get("field_mappings"):
+                errors.append(f"promoted curated atom missing field_mappings: {atom.get('atom_id')}")
+            if not atom.get("claim_id"):
+                errors.append(f"promoted curated atom missing claim_id: {atom.get('atom_id')}")
 
     for required_ref in KEY_CURATED_PAGE_REFS:
         if required_ref not in seen_curated_refs:

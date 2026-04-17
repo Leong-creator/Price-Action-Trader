@@ -43,6 +43,7 @@
   - `knowledge/wiki/concepts/market-cycle-overview.md`
   - `knowledge/wiki/setups/signal-bar-entry-placeholder.md`
   - `knowledge/wiki/rules/m3-research-reference-pack.md`
+  - `knowledge/wiki/rules/trend-vs-range-filter-minimal.md`
 - 这些 atom 必须绑定真实 `evidence_chunk_ids` 和 `raw_locator`
 - 当前可调用方式：可作为结构化 knowledge layer 的 curated callable 被查询和审计
 - 当前不能做的事：本轮不新增 strategy 接线，不改变 trigger 逻辑
@@ -155,6 +156,59 @@
 - transcript / Brooks 已明确作为 bundle support 可见
 - 但它们尚未因为阶段 A 自动变成新的 curated actual trace claim
 - 若要让 transcript / Brooks 在 actual trace 中真实出现，必须进入后续的最小 curated promotion（阶段 B）
+
+## Knowledge Reference Repair / 阶段 B
+
+阶段 B 只做最小 curated promotion，不做全量升级，不改 trigger。
+
+当前已完成的 promotion 主题：
+
+- `market cycle / context`
+- `signal bar / entry`
+- `trend vs range filter`
+
+阶段 B 之后，引用与证据的层次固定为：
+
+### 1. Source-level callable
+
+- 仍只代表来源登记与可追溯性
+- 不因为阶段 B 自动变成 trigger 输入
+
+### 2. Statement-level callable
+
+- 仍是 evidence-backed 的最小知识点
+- 当前可进入 query / filter / actual trace 的补充证据层
+- 仍不得进入 trigger
+
+### 3. Curated promoted callable
+
+- 载体：evidence-backed 的 curated concept/setup/rule 页与 `knowledge/indices/curated_promotion_map.json`
+- 当前已进入 actual visible trace
+- 每条 promoted curated claim 都必须保留：
+  - `claim_id`
+  - `field_mappings`
+  - `evidence_refs`
+  - `evidence_locator_summary`
+  - `evidence_chunk_ids`
+
+### 4. Executable strategy rule
+
+- 仍只限当前既有 trigger 路径
+- 阶段 B 不把 promoted curated claim、statement、source_note、contradiction、open_question 升格为 trigger
+
+阶段 B 完成后，用户在报告与 JSON 中应看到的变化：
+
+- visible actual trace 不再只是 `placeholder concept/setup + generic support`
+- transcript / Brooks 现在会通过 promoted curated claim 的 `evidence_refs` 与 `evidence_locator_summary` 真实出现
+- report.md 只显示精简 evidence 摘要
+- `knowledge_trace.json` 保留 machine-readable 全量 evidence chain
+
+当前仍停留在 source / statement 层、尚未进入 trigger 的内容：
+
+- transcript / Brooks 的绝大多数 statement
+- source registry / bundle support refs
+- `contradiction` / `open_question`
+- 所有仍为 `draft / low confidence / research-only` 的 promoted curated claim
 
 ## 熔断条件
 

@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：Knowledge Reference Repair Track / 阶段 A：Trace Fidelity & Reference Honesty Repair（已完成并整合进 `main`）
+- 当前子阶段：Knowledge Reference Repair Track / 阶段 B：Curated Promotion Minimal Set（已完成并整合进 `main`）
 
 ## 当前分支
 
@@ -152,6 +152,15 @@
   - 已修复 `knowledge_trace_coverage.json`：现已区分 `actual_hit_source_family_presence/item_counts` 与 `bundle_support_family_presence/item_counts`，从而明确 transcript / Brooks 是 support 还是 actual hit。
   - 已重跑并落盘 `reports/backtests/m8c2_intraday_pilot_spy_15m/` 与 `reports/backtests/smoke_public_demo_regression/`，确认报告与 JSON 默认只展示 actual hit refs；bundle support refs 单独落盘。
   - 本轮未做 curated promotion，transcript / Brooks 仍未被提升为新的 curated actual trace claim；当前只修 trace fidelity / reference honesty。
+- Knowledge Reference Repair / 阶段 B 已完成：
+  - 已按最小范围完成 3 个主题的 curated promotion：`market cycle / context`、`signal bar / entry`、`trend vs range filter`。
+  - 已新增 machine-readable 证据映射：`knowledge/indices/curated_promotion_map.json`，把 transcript / Brooks / FangFangTu 笔记的证据映射到 `pa_context`、`higher_timeframe_context`、`signal_bar`、`entry_trigger`、`invalidation` 等字段。
+  - 已把 transcript / Brooks 的最小 evidence-backed promotion 接入 curated 层：当前 `market-cycle-overview`、`signal-bar-entry-placeholder`、`trend-vs-range-filter-minimal` 的 visible actual trace 会携带 `evidence_refs`、`evidence_locator_summary`、`field_mappings`、`claim_id`、`promotion_theme`。
+  - 已新增 `trend-vs-range-filter-minimal.md` 作为最小 curated rule 页；现有 concept/setup 页已补充最小 evidence-backed promotion，但仍保持 `draft + low confidence + research-only`。
+  - transcript / Brooks 当前已能通过 promoted curated evidence 真实进入 actual visible trace；它们不再只停留在 bundle support refs。
+  - `open_question` 已随 promotion 保留；当前未发现足够证据支撑的 transcript / Brooks 矛盾条目，因此未伪造 `contradiction`。
+  - trigger 逻辑未改变；`statement` / `source_note` / `contradiction` / `open_question` 仍未进入 trigger。
+  - 已重跑并落盘 `reports/backtests/m8c2_intraday_pilot_spy_15m/`，当前报告与 `knowledge_trace.json` 已展示 promoted curated evidence 的精简摘要与 machine-readable 证据链。
 
 ## 当前阻塞
 
@@ -160,8 +169,8 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live；Knowledge Reference Repair / 阶段 A 已整合进 `main`，当前仍不进入期权、broker、live 或 real-money。
-- 若继续该修复轨道，只允许从最新稳定基线 `main` 单独开分支进入阶段 B：Curated Promotion Minimal Set；在阶段 B 之前不改 trigger、不做 curated promotion 以外的策略扩写。
+- 当前下一步不是扩 broker/live；Knowledge Reference Repair / 阶段 B 已整合进 `main`，当前仍不进入期权、broker、live 或 real-money。
+- 若继续当前验证主线，优先在 `paper / simulated` 边界内重跑或扩展现有 validation（例如复跑 `SPY 15m` 或扩第二个高流动性标的），验证 promoted curated evidence 在更多窗口与标的上的表现；不进入新的 trigger 扩写。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。

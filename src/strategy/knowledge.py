@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONCEPT_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "concepts" / "market-cycle-overview.md"
 DEFAULT_SETUP_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "setups" / "signal-bar-entry-placeholder.md"
 DEFAULT_RULE_PACK_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "m3-research-reference-pack.md"
+DEFAULT_PROMOTED_RULE_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "trend-vs-range-filter-minimal.md"
 DEFAULT_NEWS_RULE_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "m6-news-review-evidence-pack.md"
 DEFAULT_RULE_PACK_REF = "wiki:knowledge/wiki/rules/m3-research-reference-pack.md"
 
@@ -103,7 +104,7 @@ def load_alignment_knowledge() -> StrategyKnowledgeBundle:
     return load_strategy_knowledge(
         DEFAULT_CONCEPT_PATH,
         DEFAULT_SETUP_PATH,
-        supporting_paths=(DEFAULT_RULE_PACK_PATH,),
+        supporting_paths=(DEFAULT_PROMOTED_RULE_PATH, DEFAULT_RULE_PACK_PATH),
     )
 
 
