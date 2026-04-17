@@ -8,6 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.backtest import BacktestReport, BacktestStats
+from src.strategy.contracts import KnowledgeAtomHit
+
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "scripts" / "public_backtest_demo_lib.py"
@@ -139,8 +142,245 @@ class PublicBacktestDemoTests(unittest.TestCase):
             self.assertTrue((output_dir / "summary.json").exists())
             self.assertTrue((output_dir / "report.md").exists())
             self.assertTrue((output_dir / "trades.csv").exists())
+            self.assertTrue((output_dir / "knowledge_trace.json").exists())
             self.assertTrue((output_dir / "equity_curve.png").exists())
             self.assertEqual(outcome["summary"]["boundary"], "paper/simulated")
+            report_text = (output_dir / "report.md").read_text(encoding="utf-8")
+            trace_payload = json.loads((output_dir / "knowledge_trace.json").read_text(encoding="utf-8"))
+            self.assertIn("trace 摘要：", report_text)
+            self.assertNotIn("\"match_reason\"", report_text)
+            self.assertEqual(trace_payload["boundary"], "paper/simulated")
+            self.assertTrue(trace_payload["executed_trades"])
+            self.assertIn("match_reason", trace_payload["executed_trades"][0]["knowledge_trace"][0])
+
+    def test_write_knowledge_trace_json_keeps_full_trace_and_blocked_paths(self) -> None:
+        signal = self._signal_with_trace(trace_count=5)
+        executed = self._executed_trade(signal)
+        blocked = MODULE.BlockedSignalRecord(
+            instrument=executed.instrument,
+            signal=signal,
+            entry_timestamp=executed.trade.entry_timestamp,
+            reason_codes=("risk_block",),
+            message="blocked before fill",
+        )
+        paper_outcome = MODULE.PaperDemoOutcome(
+            executed_trades=(executed,),
+            blocked_signals=(blocked,),
+            equity_points=((MODULE.datetime.now(MODULE.UTC).isoformat(), 10000.0),),
+            ending_equity=MODULE.Decimal("10000"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "knowledge_trace.json"
+            MODULE.write_knowledge_trace_json(
+                output_path,
+                run_id="unit_trace",
+                paper_outcome=paper_outcome,
+            )
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(len(payload["executed_trades"][0]["knowledge_trace"]), 5)
+        self.assertEqual(len(payload["blocked_signals"][0]["knowledge_trace"]), 5)
+        self.assertEqual(payload["boundary"], "paper/simulated")
+
+    def test_markdown_report_limits_trace_summary_to_three_items(self) -> None:
+        signal = self._signal_with_trace(trace_count=5)
+        executed = self._executed_trade(signal)
+        summary_row = MODULE.trade_to_summary_row(executed)
+        report = self._backtest_report(signal.signal_id)
+        result = MODULE.SymbolBacktestResult(
+            instrument=executed.instrument,
+            source="fixture",
+            csv_path=ROOT / "tests" / "test_data" / "ohlcv_sample_5m.csv",
+            metadata_path=ROOT / "tests" / "test_data" / "README.md",
+            bars_count=5,
+            signals=(signal,),
+            backtest_report=report,
+        )
+        summary = {
+            "title": "Unit Trace Report",
+            "symbols": [executed.instrument.symbol],
+            "time_range": {"start": "2026-01-05", "end": "2026-01-05", "interval": "5m"},
+            "data_source": ["fixture"],
+            "cache_dir": "/tmp/cache",
+            "report_dir": "/tmp/report",
+            "cash_note": "unit test",
+            "core_results": {
+                "total_pnl": "20.0000",
+                "total_return_pct": "0.2000",
+                "max_drawdown": "0.0000",
+                "max_drawdown_pct": "0.0000",
+                "trade_count": 1,
+                "blocked_signals": 0,
+                "win_rate_pct": "100.0000",
+                "profit_factor": "N/A",
+            },
+            "per_symbol": [
+                {
+                    "symbol": executed.instrument.symbol,
+                    "source": "fixture",
+                    "bars": 5,
+                    "signals": 1,
+                    "baseline_trades": 1,
+                    "executed_trades": 1,
+                    "blocked_signals": 0,
+                    "pnl_cash": "20.0000",
+                    "win_rate_pct": "100.0000",
+                }
+            ],
+            "best_trades": [summary_row],
+            "worst_trades": [summary_row],
+            "blocked_examples": [],
+            "limitations": ["unit test"],
+        }
+        paper_outcome = MODULE.PaperDemoOutcome(
+            executed_trades=(executed,),
+            blocked_signals=(),
+            equity_points=((MODULE.datetime.now(MODULE.UTC).isoformat(), 10000.0),),
+            ending_equity=MODULE.Decimal("10000"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_path = Path(temp_dir) / "report.md"
+            MODULE.write_markdown_report(
+                report_path,
+                summary=summary,
+                symbol_results=(result,),
+                paper_outcome=paper_outcome,
+            )
+            report_text = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("atom-trace-0", report_text)
+        self.assertIn("atom-trace-1", report_text)
+        self.assertIn("atom-trace-2", report_text)
+        self.assertNotIn("atom-trace-3", report_text)
+        self.assertNotIn("atom-trace-4", report_text)
+
+    def _signal_with_trace(self, *, trace_count: int) -> MODULE.Signal:
+        trace = tuple(
+            KnowledgeAtomHit(
+                atom_id=f"atom-trace-{index}",
+                atom_type="statement" if index >= 3 else ("concept", "setup", "rule")[index],
+                source_ref=f"wiki:knowledge/wiki/sources/unit-source-{index}.md",
+                raw_locator={"locator_kind": "page_block", "page_no": 1, "block_index": index},
+                match_reason="unit_trace",
+                applicability_state="matched" if index < 3 else "supporting",
+            )
+            for index in range(trace_count)
+        )
+        return MODULE.Signal(
+            signal_id="sig-trace",
+            symbol="SAMPLE",
+            market="US",
+            timeframe="5m",
+            direction="long",
+            setup_type="signal_bar_entry_placeholder",
+            pa_context="trend",
+            entry_trigger="placeholder entry",
+            stop_rule="signal-bar low",
+            target_rule="2R target",
+            invalidation="close back below prior high",
+            confidence="low",
+            source_refs=tuple(hit.source_ref for hit in trace),
+            explanation="unit trace explanation",
+            risk_notes=("research-only placeholder",),
+            knowledge_trace=trace,
+        )
+
+    def _executed_trade(self, signal: MODULE.Signal) -> MODULE.ExecutedTradeRecord:
+        instrument = MODULE.InstrumentConfig(
+            ticker="SAMPLE",
+            symbol="SAMPLE",
+            label="Sample",
+            market="US",
+            timezone="America/New_York",
+            demo_role="smoke",
+        )
+        trade = MODULE.TradeRecord(
+            signal_id=signal.signal_id,
+            symbol=signal.symbol,
+            market=signal.market,
+            timeframe=signal.timeframe,
+            direction=signal.direction,
+            setup_type=signal.setup_type,
+            signal_bar_index=2,
+            signal_bar_timestamp=MODULE.datetime.now(MODULE.UTC),
+            entry_bar_index=3,
+            entry_timestamp=MODULE.datetime.now(MODULE.UTC),
+            entry_price=MODULE.Decimal("100"),
+            stop_price=MODULE.Decimal("99"),
+            target_price=MODULE.Decimal("102"),
+            exit_bar_index=4,
+            exit_timestamp=MODULE.datetime.now(MODULE.UTC),
+            exit_price=MODULE.Decimal("102"),
+            exit_reason="target_hit",
+            risk_per_share=MODULE.Decimal("1"),
+            pnl_per_share=MODULE.Decimal("2"),
+            pnl_r=MODULE.Decimal("2"),
+            bars_held=1,
+            source_refs=signal.source_refs,
+            explanation=signal.explanation,
+            risk_notes=signal.risk_notes,
+        )
+        return MODULE.ExecutedTradeRecord(
+            instrument=instrument,
+            signal=signal,
+            trade=trade,
+            quantity=MODULE.Decimal("10"),
+            pnl_cash=MODULE.Decimal("20"),
+            equity_after_close=MODULE.Decimal("10020"),
+        )
+
+    def _backtest_report(self, signal_id: str) -> BacktestReport:
+        trade = self._executed_trade(self._signal_with_trace(trace_count=3)).trade
+        trade = MODULE.TradeRecord(
+            signal_id=signal_id,
+            symbol=trade.symbol,
+            market=trade.market,
+            timeframe=trade.timeframe,
+            direction=trade.direction,
+            setup_type=trade.setup_type,
+            signal_bar_index=trade.signal_bar_index,
+            signal_bar_timestamp=trade.signal_bar_timestamp,
+            entry_bar_index=trade.entry_bar_index,
+            entry_timestamp=trade.entry_timestamp,
+            entry_price=trade.entry_price,
+            stop_price=trade.stop_price,
+            target_price=trade.target_price,
+            exit_bar_index=trade.exit_bar_index,
+            exit_timestamp=trade.exit_timestamp,
+            exit_price=trade.exit_price,
+            exit_reason=trade.exit_reason,
+            risk_per_share=trade.risk_per_share,
+            pnl_per_share=trade.pnl_per_share,
+            pnl_r=trade.pnl_r,
+            bars_held=trade.bars_held,
+            source_refs=trade.source_refs,
+            explanation=trade.explanation,
+            risk_notes=trade.risk_notes,
+        )
+        return BacktestReport(
+            trades=(trade,),
+            stats=BacktestStats(
+                total_signals=1,
+                trade_count=1,
+                closed_trade_count=1,
+                win_count=1,
+                loss_count=0,
+                win_rate=MODULE.Decimal("1.0000"),
+                average_win_r=MODULE.Decimal("2.0000"),
+                average_loss_r=MODULE.Decimal("0.0000"),
+                expectancy_r=MODULE.Decimal("2.0000"),
+                total_pnl_r=MODULE.Decimal("2.0000"),
+                profit_factor=None,
+                max_drawdown_r=MODULE.Decimal("0.0000"),
+                trades_per_100_bars=MODULE.Decimal("20.0000"),
+                slippage_sensitivity=(),
+            ),
+            summary="unit",
+            warnings=(),
+            assumptions=(),
+        )
 
 
 if __name__ == "__main__":

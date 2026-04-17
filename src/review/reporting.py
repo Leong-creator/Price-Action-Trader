@@ -145,6 +145,7 @@ def _build_review_item(
         target_rule=signal.target_rule,
         trade_outcome=trade_outcome,
         improvement_notes=improvement_notes,
+        kb_trace=signal.knowledge_trace,
     )
 
 

@@ -9,6 +9,12 @@ from src.data.schema import NewsEvent, OhlcvRow
 from .context import build_context_snapshot
 from .contracts import PAContextSnapshot, SetupCandidate, Signal
 from .knowledge import StrategyKnowledgeBundle, load_default_knowledge
+from .knowledge_access import (
+    CallableKnowledgeAccess,
+    aggregate_legacy_source_refs,
+    load_default_knowledge_access,
+    render_trace_summary,
+)
 
 
 SETUP_TYPE = "signal_bar_entry_placeholder"
@@ -18,8 +24,10 @@ def generate_signals(
     replay: DeterministicReplay | Iterable[ReplayStep],
     *,
     knowledge: StrategyKnowledgeBundle | None = None,
+    knowledge_access: CallableKnowledgeAccess | None = None,
 ) -> tuple[Signal, ...]:
     active_knowledge = knowledge or load_default_knowledge()
+    active_knowledge_access = knowledge_access or load_default_knowledge_access()
     active_knowledge.validate()
 
     steps = replay.snapshot() if isinstance(replay, DeterministicReplay) else tuple(replay)
@@ -41,7 +49,13 @@ def generate_signals(
             if _context_resets_direction(context, active_direction):
                 active_direction = None
             continue
-        signal = _build_signal(step, context, candidate, active_knowledge)
+        signal = _build_signal(
+            step,
+            context,
+            candidate,
+            active_knowledge,
+            active_knowledge_access,
+        )
         signals.append(_attach_news_risk(signal, step.news_events))
         active_direction = candidate.direction
 
@@ -112,6 +126,7 @@ def _build_signal(
     context: PAContextSnapshot,
     candidate: SetupCandidate,
     knowledge: StrategyKnowledgeBundle,
+    knowledge_access: CallableKnowledgeAccess,
 ) -> Signal:
     setup_page = knowledge.setup_page
     risk_notes = [
@@ -119,6 +134,14 @@ def _build_signal(
     ]
     if setup_page.is_placeholder or knowledge.concept_page.is_placeholder:
         risk_notes.append("knowledge page is draft/placeholder, so confidence is intentionally low")
+    knowledge_trace = knowledge_access.resolve_trace(
+        knowledge=knowledge,
+        market=step.bar.market,
+        timeframe=step.bar.timeframe,
+        pa_context=context.market_cycle,
+    )
+    legacy_source_refs = aggregate_legacy_source_refs(candidate.source_refs, knowledge_trace)
+    trace_summary = render_trace_summary(knowledge_trace)
 
     return Signal(
         signal_id=_build_signal_id(step.bar, candidate.direction),
@@ -133,11 +156,13 @@ def _build_signal(
         target_rule=candidate.target_rule,
         invalidation=candidate.invalidation,
         confidence=candidate.confidence,
-        source_refs=candidate.source_refs,
+        source_refs=legacy_source_refs,
         explanation=(
-            f"{candidate.explanation}; knowledge refs: {', '.join(candidate.source_refs)}"
+            f"{candidate.explanation}; knowledge refs: {', '.join(legacy_source_refs)}; "
+            f"knowledge trace: {trace_summary}"
         ),
         risk_notes=tuple(risk_notes),
+        knowledge_trace=knowledge_trace,
     )
 
 
@@ -163,6 +188,7 @@ def _attach_news_risk(signal: Signal, news_events: Sequence[NewsEvent]) -> Signa
         source_refs=signal.source_refs,
         explanation=signal.explanation,
         risk_notes=signal.risk_notes + (f"news context only: {news_summary}",),
+        knowledge_trace=signal.knowledge_trace,
     )
 
 
