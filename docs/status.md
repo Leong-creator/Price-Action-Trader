@@ -11,7 +11,7 @@
 
 ## 当前分支
 
-- `integration/m8d-shadow-paper-validation`
+- `feature/m8-user-backtest-demo`
 
 ## 已完成
 
@@ -68,6 +68,11 @@
 - M8D 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`
 - M8D 已补齐 `docs/test-dataset-curation.md` 的 small/large dataset、realtime recording 与受控标签规范，并更新 `reports/reliability/README.md` 的报告最小字段
 - M8D 当前已具备：manifest 校验、shadow/paper dry-run、报告 traceability、无样本 deferred 语义；尚未实际运行用户真实历史样本或录制型实时样本
+- 已新增 `scripts/download_public_history.py`，支持优先使用 Alpha Vantage（若环境已有 key）、否则回退到 `yfinance` 下载公共历史数据并缓存为本地 CSV
+- 已新增 `scripts/run_public_backtest_demo.py` 与 `scripts/run_public_backtest_demo.sh`，可在本地缓存基础上直接生成用户可读的历史回测演示报告
+- 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示范围为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`
+- 已完成一轮公共历史数据演示回测：`yfinance` 下载的本地缓存已落在 `local_data/public_history/`，示例 run `demo_public_2024h1` 生成于 `reports/backtests/demo_public_2024h1/`
+- 该示例 run 在当前 demo 风控参数下输出：总收益率 `1.9923%`、最大回撤 `1.5157%`、交易 `16` 笔、胜率 `43.75%`；仍明确保持 `paper / simulated`
 
 ## 当前阻塞
 
@@ -76,7 +81,7 @@
 
 ## 下一步
 
-- 继续留在 M8D，但下一步不是扩 broker，而是等待用户提供 approved local manifests
-- 一旦用户提供真实历史 CSV/JSON 或录制型实时样本，应直接用 `python scripts/run_shadow_session.py --manifest ... --mode shadow|paper` 执行本地验证
+- 当前下一步不是扩 broker，而是继续用更完整的真实历史 CSV/JSON 或用户录制样本扩展回测演示与 shadow/paper 验证
+- 若用户需要更真实的测试，应优先补更长时间窗口、更多 regime 样本、或按 `docs/user-backtest-guide.md` 提供自己的历史 CSV
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API

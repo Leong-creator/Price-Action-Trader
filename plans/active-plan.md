@@ -558,7 +558,11 @@
   - 已新增 repo-safe 小样本 manifest：`tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`。
   - 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`。
   - 已补齐 `docs/test-dataset-curation.md` 与 `reports/reliability/README.md`，固定 small/large dataset 约定、受控标签与报告最小字段。
-  - 当前真实历史样本与实时源的实际运行仍为 deferred，等待用户提供 approved local manifests；本轮不伪造真实行情结果。
+  - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通公共历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
+  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`。
+  - 已完成一轮公共历史数据演示回测：使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`。
+  - 该示例 run 在当前 demo 风控参数下录得 `1.9923%` 总收益率、`1.5157%` 最大回撤、`16` 笔交易、`43.75%` 胜率；仍明确保持 `paper / simulated`，不代表实盘能力。
+  - 当前更完整的真实历史样本、用户自有 CSV、录制型实时样本与 shadow/paper 延展验证仍可继续扩展，但本轮没有引入真实 broker、真实账户或 live execution。
 
 ## 16. 公共接口冻结点
 
@@ -588,8 +592,8 @@
 - 当前阶段：阶段 8：可靠性验证（进行中）。
 - 当前 milestone：M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架（进行中）。
 - 当前下一步：
-  - 本轮已完成 `M8D` 框架、manifest、runbook 与最小可靠性测试，当前开发分支为 `integration/m8d-shadow-paper-validation`
-  - 下一步是用用户提供的 approved local manifests 实际喂入真实历史 CSV/JSON 或录制型实时样本，执行 shadow/paper 验证
+  - 本轮已完成公共历史数据下载缓存、用户可读回测演示与本地报告输出，当前开发分支为 `feature/m8-user-backtest-demo`
+  - 下一步若要更真实，应优先扩展更长时间窗口、更多 regime、用户自有历史 CSV/JSON，或补历史 news 时间线；不是继续 broker/live
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

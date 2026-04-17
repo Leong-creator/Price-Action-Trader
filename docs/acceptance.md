@@ -287,3 +287,12 @@
 - repo-safe 小样本 manifest 必须存在，并能证明 M8D 框架可运行但不等于真实历史验证已完成。
 - `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py` 与 `tests/reliability/test_dataset_manifest_contract.py` 必须通过。
 - `reports/reliability/README.md` 必须明确报告不是盈利证明，并保留 dataset/session/traceability 最小字段要求。
+- `scripts/download_public_history.py` 必须支持：优先使用 Alpha Vantage（仅当环境已提供 key），否则回退到 `yfinance`，并将结果缓存为本地 CSV，而不是每次回测都临时联网抓取。
+- 公共历史数据缓存目录必须落在本地不跟踪目录，并且缓存文件能继续通过 `src/data/` 的 schema 校验与重复加载。
+- `scripts/run_public_backtest_demo.py` 或等价一键入口必须能基于缓存数据生成：
+  - `report.md`
+  - `trades.csv`
+  - `summary.json`
+  - `equity_curve.png`
+- 用户可读报告必须明确：测试标的、时间范围、数据来源、总收益/总盈亏、最大回撤、交易笔数、胜率、盈亏比、代表性交易解释与局限。
+- 该 public-history demo 仍只属于研究/演示能力，不得被写成真实 broker、真实账户、live execution 或实盘能力证明。

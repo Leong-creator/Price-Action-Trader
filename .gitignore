@@ -2,6 +2,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
+.venv/
 .DS_Store
 logs/*
+local_data/
+reports/backtests/*
+!reports/backtests/README.md
 knowledge/wiki_index.json

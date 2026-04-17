@@ -59,3 +59,8 @@
 
 - 日期：2026-04-17
 - 结论：对于低/中风险阶段，验收通过、相关测试全绿、文档同步完成、且无未解决 blocker 后，合并到稳定基线分支是最后一个必做动作，不得拖到整个项目结束后再统一合并。`src/execution/`、`src/risk/`、`src/broker/` 及任何 `live / real-money / real-account` 路径属于高风险模块，只能自动准备合并材料，不得自动最终合并，必须等待用户明确批准。当前 `M8B` 已通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进 `feature/m7-broker-api-assessment`；`M8C` 尚未开始。
+
+## D-0013 用户可读历史回测演示边界冻结
+
+- 日期：2026-04-17
+- 结论：为提供用户可直接理解的真实历史数据回测演示，优先使用公共、低成本、无需 broker 权限的数据源，并将下载结果缓存为本地 CSV。若环境无 Alpha Vantage key，则允许回退到 `yfinance` 作为 research-only fallback。该演示链路只服务于历史研究与 `paper / simulated` 报告输出，不代表 broker/live/real-money 能力。
