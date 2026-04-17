@@ -8,7 +8,11 @@
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
 - M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
 - M4 已完成最小回测引擎与报告的 deterministic baseline。
-- 当前活动分支已切换到 `feature/m7-broker-api-assessment`，用于启动 M7。
+- M5 已完成 paper-only 的模拟执行与风控闭环。
+- M6 已完成新闻过滤与复盘整合，且保持新闻只作辅助因子。
+- M7 已完成正式券商 API readiness assessment，当前冻结结论为 `no-go`。
+- 当前分析基线固定为 `feature/m7-broker-api-assessment`。
+- 当前实施分支已切换到 `integration/m8-reliability-validation`，用于启动 M8A。
 
 ## 2. 执行总原则
 
@@ -31,6 +35,7 @@
   - `feature/m5-papertrading-risk`
   - `feature/m6-news-review-integration`
   - `feature/m7-broker-api-assessment`
+  - `integration/m8-reliability-validation`
 - 并行写代码时优先使用独立 branch 或 worktree。
 - 涉及 `src/execution/`、`src/risk/`、`src/broker/`、凭证、实盘开关的改动必须单独分支、单独测试、单独复核。
 
@@ -56,9 +61,10 @@
 
 ## 6. Milestone 顺序
 
-- M0 已完成 → M1 知识库 schema / KB 校验 / wiki index / 资料投放流程 → M2 测试数据 / 数据 schema / CSV-JSON 回放 → M3 PA context / setup / signal 原型 → M4 最小回测与报告 → M5 纸面交易 / 模拟执行 / 风控闭环 → M6 新闻过滤与复盘整合 → M7 正式券商 API 接入评估。
+- M0 已完成 → M1 知识库 schema / KB 校验 / wiki index / 资料投放流程 → M2 测试数据 / 数据 schema / CSV-JSON 回放 → M3 PA context / setup / signal 原型 → M4 最小回测与报告 → M5 纸面交易 / 模拟执行 / 风控闭环 → M6 新闻过滤与复盘整合 → M7 正式券商 API 接入评估 → M8 可靠性验证。
 - 第一实施波次固定为：M1 完成后进入 M2。
 - 不得把浏览器自动化、正式券商 API、真实账户、实盘自动下单前置到 M1 或 M2。
+- 在完成 M8 可靠性验证前，不重新评估真实 broker、真实账户、live execution 或付费 API。
 
 ## 7. M0 基础设施与规范基线
 
@@ -350,7 +356,170 @@
   - reviewer 与 qa 已通过，确认 M7 仍停留在 readiness assessment，不含真实 broker SDK、外部网络调用、真实账户联通或 live execution 路径。
   - 当前阶段最终结论为 `no-go`；在用户明确批准外部权限、真实账户、付费服务或下一阶段评估前，系统继续停留在 paper / simulated。
 
-## 15. 公共接口冻结点
+## 15. M8 可靠性验证
+
+- 分支：`integration/m8-reliability-validation`
+- 当前状态：进行中
+- 当前子阶段：M8A：测试基线、文档与门禁落盘（已完成）
+- 目标：以行为可靠性而不是功能扩展为首目标，验证 M0-M7 既有交付物在知识约束、研究链可复现性、paper-only 安全性和真实输入下的保守稳定性。
+- 总边界：
+  - 默认运行边界仍为 `paper / simulated`
+  - 不接真实资金
+  - 不启用实盘自动下单
+  - 不重开真实 broker、真实账户、live execution、付费 API 或浏览器生产化讨论
+  - M8 完成前，不重新评估 broker / live
+- 可接受输入边界：
+  - P0：静态测试样本
+  - P1：用户导出的真实历史 CSV/JSON
+  - P2：免费公共数据源的本地快照
+  - 实时只读输入：shadow / paper 观察路径
+  - 明确不进入 P4 broker / live
+
+### M8A：测试基线、文档与门禁落盘
+
+- 当前状态：已完成
+- 目标：
+  - 将 M8 正式写入 `plans/active-plan.md`
+  - 将 M8 验收条件写入 `docs/acceptance.md`
+  - 将当前阶段切换写入 `docs/status.md`
+  - 在 `docs/roadmap.md`、`docs/decisions.md` 中冻结 M8 位置与门禁
+  - 新增 `docs/testing-reliability.md` 与 `docs/eval-rubric.md`
+- 交付物类型：
+  - 主线文档
+  - 验收门禁
+  - 评分规则
+  - 阶段 runbook 总纲
+- 验证方式：
+  - reviewer 审查 M8 是否被定义为 M7 之后的当前下一阶段，而不是 broker 后续开发
+  - qa 核对 `docs/status.md`、`docs/roadmap.md`、`docs/acceptance.md`、`docs/decisions.md` 是否同步
+  - reviewer 与 qa 都把 “无越权到 broker/live” 作为硬门禁
+- 验收条件：
+  - `plans/active-plan.md` 已新增 M8 与 M8A/M8B/M8C/M8D
+  - `docs/acceptance.md` 已新增阶段 8 验收
+  - `docs/status.md` 已把下一步切到 M8，而不是继续 broker
+  - `docs/roadmap.md` 已同步 M8 在 M7 之后的位置
+  - `docs/decisions.md` 已新增 “先 M8、后 broker/live” 的冻结决策
+  - `docs/testing-reliability.md` 与 `docs/eval-rubric.md` 只包含计划与门禁，不含实现细节
+- 可并行子任务：
+  - `planner` 负责冻结主线与阶段切换
+  - `researcher` 负责核对附件与现有 SoT 的一致性
+  - `reviewer` 负责高风险边界审查
+  - `qa` 负责门禁完整性复核
+- 依赖：
+  - M7 已完成且当前结论为 `no-go`
+  - 当前分析基线固定为 `feature/m7-broker-api-assessment`
+- 风险：
+  - 把 M8 写成收益优化或 broker 延续阶段
+  - 在门禁文档中混入测试实现细节
+  - 未同步 `docs/roadmap.md` 导致 SoT 再次分叉
+- 回退点：
+  - 若 M8A 文档越界，整体回退 `integration/m8-reliability-validation` 上的文档改动，回到 `feature/m7-broker-api-assessment`
+
+### M8B：知识库对齐测试
+
+- 当前状态：待启动
+- 目标：
+  - 定义 golden-case 主线
+  - 验证输出是否严格受知识库约束，而不是“看起来像遵守”
+- 交付物类型：
+  - KB alignment 测试计划
+  - golden-case 输入约束
+  - reviewer / qa 审查清单
+- 验证方式：
+  - 重点围绕 `source_refs` 真实性、适用性 / 不适用性、冲突显式化、资料不足时保守 `no-trade / wait`
+  - reviewer 核对知识页引用边界
+  - qa 核对保守输出与冲突场景要求
+- 验收条件：
+  - 明确要求 `source_refs` 必须真实存在
+  - 明确禁止 hallucinated refs
+  - 明确禁止越过 `not_applicable`
+  - 冲突场景必须显式提示冲突
+  - 资料不足时允许且鼓励 `no-trade / wait`
+  - 整个子阶段不得引入新的策略规则扩展
+- 可并行子任务：
+  - `kb_curator` 负责 golden-case 引用边界
+  - `researcher` 负责梳理知识冲突与资料不足场景
+  - `qa` 负责 KB consistency 硬门禁清单
+- 依赖：
+  - M8A 已完成
+  - M1/M3/M6 的知识与信号契约保持冻结
+- 风险：
+  - 将“知识不足”误写成必须给方向
+  - 把冲突知识页简化成单一路径
+  - 用实现细节代替门禁要求
+- 回退点：
+  - 如门禁定义越界或放宽边界，回退到 M8A 检查点
+
+### M8C：离线端到端可靠性测试
+
+- 当前状态：待启动
+- 目标：
+  - 围绕当前最小闭环定义离线集成可靠性红线
+  - 固化无 future leakage、可复现、风险先于成交、审计与复盘可追溯
+- 交付物类型：
+  - offline E2E 测试总纲
+  - 红线清单
+  - forbidden path 清单
+- 验证方式：
+  - 以现有 `data -> strategy -> backtest -> risk -> execution -> news -> review` 最小闭环为对象
+  - reviewer 审查 forbidden path 与 leak path 定义
+  - qa 核对 determinism、future leakage、audit traceability 门禁
+- 验收条件：
+  - 明确禁止 future leakage
+  - 明确要求相同输入必须 deterministic
+  - 明确要求 `risk_block` 永远早于 simulated fill
+  - 明确要求 review / audit 字段可追溯
+  - 明确 forbidden paths，不得越过到 broker/live
+- 可并行子任务：
+  - `researcher` 负责现有闭环输入输出依赖梳理
+  - `planner` 负责红线优先级与阶段排序
+  - `qa` 负责离线可靠性验收条目
+- 依赖：
+  - M8B 已冻结 KB alignment 门禁
+  - M2/M4/M5/M6 的既有契约保持冻结
+- 风险：
+  - 只测收益，不测行为正确性
+  - future leakage 定义模糊
+  - 将 paper-only 执行红线降级为质量项
+- 回退点：
+  - 如离线可靠性门禁表述模糊，回退到 M8B 检查点
+
+### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+
+- 当前状态：待启动
+- 目标：
+  - 在真实输入条件下验证系统仍然保守、稳定、可解释
+  - 只建立 shadow / paper 验证框架，不进入真实 broker
+- 交付物类型：
+  - 真实历史数据验证计划
+  - shadow / paper 验证 runbook 需求
+  - 报告与人工抽检门禁
+- 验证方式：
+  - 允许真实历史 CSV/JSON、本地快照、实时只读输入
+  - 明确仍为 shadow / paper，不连接真实 broker、不启用 live
+  - reviewer 审查真实输入边界是否干净
+  - qa 核对 shadow / paper 与 no-go 结论是否一致
+- 验收条件：
+  - 明确真实历史数据与实时只读输入的范围
+  - 明确禁止真实 broker、真实账户、live execution
+  - 明确要求输出仍为 shadow / paper 结果
+  - 明确要求真实输入下仍保守 `wait / no-trade`，而不是强行给结论
+  - 明确任何 broker/live 重新评估都排在 M8 完成之后
+- 可并行子任务：
+  - `researcher` 负责输入源与 regime 范围定义
+  - `planner` 负责 shadow / paper 阶段门禁
+  - `qa` 负责真实输入下的保守性与报告门禁
+- 依赖：
+  - M8C 已完成离线可靠性门禁定义
+  - 当前数据源优先级仍以 `docs/data-sources.md` 为准
+- 风险：
+  - 用“实时验证”模糊掉 shadow / paper 边界
+  - 将真实输入测试误解成真实 broker 恢复
+  - 在未完成 M8 前重开 live 讨论
+- 回退点：
+  - 如出现任何真实 broker / live 暗示，整体回退到 M8C 检查点
+
+## 16. 公共接口冻结点
 
 - KB 层在 M1 后冻结 frontmatter 主字段与 setup 专属字段，`source_refs`、`missing_visuals`、`open_questions`、`pa_context` 等字段视为稳定约束。
 - 数据层在 M2 后冻结 OHLCV 输入字段、新闻 JSON 最小字段、回放输出的 deterministic bar 序列结构。
@@ -358,7 +527,7 @@
 - 回测层在 M4 后冻结交易记录和核心统计字段，供复盘与模拟统一消费。
 - 执行与风控层在 M5 仅允许 paper/simulated contract，真实 broker contract 只能在 M7 评估中定义，不落真实实现。
 
-## 16. 总体验证策略
+## 17. 总体验证策略
 
 - 所有 milestone 都必须包含最小可重复验证命令、代表性样本、失败路径和空输入路径。
 - M1 重点测 frontmatter 缺失、setup 特殊字段、空 wiki、索引字段一致性。
@@ -368,17 +537,21 @@
 - M5 重点测允许交易、风险拦截、模拟成交、重复信号、市场关闭、连续亏损熔断和恢复条件。
 - M6 重点测新闻仅作过滤/解释、不直接下单、复盘字段完整和 KB 引用可追溯。
 - M7 重点测门禁清单完整性、审批前置条件和“无真实接入”边界。
+- M8A 重点测主线文档、验收门禁、状态切换与冻结决策是否同步，且无 broker/live 越界表述。
+- M8B 重点测知识库对齐、`source_refs` 真实性、`not_applicable` 约束、冲突显式化与资料不足时的保守 `no-trade`。
+- M8C 重点测无 future leakage、同输入 deterministic、risk-before-fill、audit / review traceability 与 forbidden paths。
+- M8D 重点测真实历史数据与实时只读输入下仍保持 shadow / paper、保守稳定、可解释，且不进入真实 broker / live execution。
 
-## 17. 当前阶段与下一步
+## 18. 当前阶段与下一步
 
-- 当前阶段：阶段 7：正式券商 API 接入评估（已完成）。
-- 当前 milestone：M7：正式券商 API 接入评估（已完成）。
+- 当前阶段：阶段 8：可靠性验证（进行中）。
+- 当前 milestone：M8A：测试基线、文档与门禁落盘（已完成）。
 - 当前下一步：
-  - 保持当前 `no-go` 结论，继续停留在 paper / simulated
-  - 除非用户明确批准外部权限、真实账户、付费服务或下一阶段评估，否则不进入任何真实 broker 接入实现
-  - 若未来获批，必须从当前 M7 检查点重新评估后续阶段，而不是直接启用 live execution
+  - 从 `integration/m8-reliability-validation` 继续推进 M8，优先启动 M8B：知识库对齐测试
+  - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
+  - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 
-## 18. 假设
+## 19. 假设
 
 - 当前仓库基础设施已满足 M0 验收，且 GitHub push 工作流已打通。
 - `python` 命令已可用，因此验证命令统一写为 `python ...`。

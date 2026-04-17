@@ -216,3 +216,52 @@
 - reviewer 必须确认 M7 产物仍是 assessment-only，不含真实接入实现。
 - qa 必须确认 readiness dossier、approval checklist、go/no-go 条件与 rollback boundary 完整。
 - M7 不接入真实 broker、不接入真实账户、不启用 live execution、不引入付费服务前置条件。
+
+## 阶段 8：可靠性验证
+
+### M8A：测试基线、文档与门禁落盘
+
+完成条件：
+
+- `plans/active-plan.md` 已新增 `M8` 与 `M8A / M8B / M8C / M8D`。
+- `docs/status.md` 已把当前下一步切换为进入 `M8`，而不是继续 broker。
+- `docs/roadmap.md` 已同步 `M8` 在 `M7` 之后、任何 broker / live 重新评估之前的位置。
+- `docs/decisions.md` 已新增 “完成 M8 前，不重新评估 broker / live” 的冻结决策。
+- 若新增 `docs/testing-reliability.md` 与 `docs/eval-rubric.md`，内容只能是计划、门禁、评分与人工抽检准则，不得包含测试实现细节。
+- reviewer 必须确认 `M8` 被定义为可靠性验证阶段，而不是功能扩展或 broker 延续阶段。
+- qa 必须确认所有门禁文档都继续保留 `paper / simulated` 与 `no-go` 边界。
+
+### M8B：知识库对齐测试
+
+完成条件：
+
+- `M8B` 明确把知识库一致性定义为硬门禁，而不是质量建议项。
+- 明确要求 `source_refs` 必须真实存在，不得 hallucinated refs。
+- 明确要求不得越过 `not_applicable` 或等价的禁用条件。
+- 明确要求知识冲突场景必须显式输出冲突，而不是伪装成单一路径。
+- 明确要求资料不足时允许且鼓励 `no-trade / wait`。
+- reviewer 与 qa 都必须把 “无伪造知识引用、无忽略不适用条件、无强行给方向” 作为强制审查项。
+- M8B 不得通过新增规则或放宽适用边界来“修复”测试结果。
+
+### M8C：离线端到端可靠性测试
+
+完成条件：
+
+- 明确要求无 future leakage。
+- 明确要求同一输入必须 deterministic。
+- 明确要求 `risk_block` 永远先于 simulated fill。
+- 明确要求 audit / review 字段完整且可追溯。
+- 明确要求 forbidden paths 被列为硬门禁。
+- reviewer 必须确认离线可靠性定义没有越权到 broker / live。
+- qa 必须确认 determinism、future leakage、risk-before-fill 与 traceability 都是硬门禁而非可选质量项。
+
+### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+
+完成条件：
+
+- 允许的真实输入只包括：用户导出的真实历史 CSV/JSON、免费公共数据源的本地快照、实时只读输入。
+- 明确要求所有输出仍然停留在 `shadow / paper`，不得进入真实 broker、真实账户或 live execution。
+- 明确要求真实输入下系统仍然保守、稳定、可解释，资料不足时仍允许 `wait / no-trade`。
+- 明确要求任何 broker / live 的重新评估都排在 `M8` 完成之后。
+- reviewer 与 qa 都必须把 “无越权到 broker/live” 作为强制审查项。
+- M8D 不引入付费服务前置条件，不把浏览器自动化写成生产执行链路。
