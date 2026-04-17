@@ -158,3 +158,30 @@
   - mismatched / stale risk decision 路径
 - `python -m unittest discover -s tests/unit -v` 继续通过。
 - M5 不接入外部行情 API，不进入正式券商 API、实盘或自动下单开发。
+
+## 阶段 6：新闻事件过滤与复盘整合
+
+完成条件：
+
+- `src/news/` 已冻结最小 `NewsMatch`、`NewsReviewNote`、`NewsFilterDecision` 与 `evaluate_news_context(...)` 契约。
+- `src/review/` 已冻结最小 `ReviewTradeOutcome`、`ReviewItem`、`ReviewReport` 与 `build_review_report(...)` 契约。
+- 新闻只能作为 filter / explanation / risk_hint 辅助因子，不得直接改写 `Signal` 主字段，不得直接转成 order / execution 语义。
+- news filtering 必须显式要求 `reference_timestamp` 或等价的可验证参考时点；未来事件不得穿透到当前 signal 的过滤结果。
+- review 输出至少保留：
+  - KB `source_refs`
+  - PA explanation
+  - `news_outcome`
+  - `news_review_notes`
+  - `news_source_refs`
+  - trade / execution evidence refs
+  - improvement notes
+- `python -m unittest tests/unit/test_news_review_pipeline.py -v` 通过，并至少覆盖：
+  - 无新闻路径
+  - caution 路径
+  - block 路径
+  - future-event leakage 防回归
+  - 缺失 `reference_timestamp` 的明确失败路径
+  - filter / explanation / risk_hint 三类角色在 review 中的结构化透传
+  - 新闻不改写 signal 主字段
+- `python scripts/validate_kb.py`、`python scripts/build_kb_index.py --output /tmp/price-action-trader-m6-kb-index.json` 与 `python -m unittest discover -s tests/unit -v` 继续通过。
+- M6 不接入真实 broker、真实账户、正式券商 API 或 live execution，不把新闻模块升级成主信号源。

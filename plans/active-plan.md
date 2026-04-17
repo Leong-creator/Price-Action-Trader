@@ -8,7 +8,7 @@
 - M2 已完成测试数据、OHLCV schema、CSV/JSON 回放的最小闭环。
 - M3 已完成 PA context、setup、signal 输出的 research-only 最小闭环。
 - M4 已完成最小回测引擎与报告的 deterministic baseline。
-- 当前活动分支已切换到 `feature/m6-news-review-integration`，用于启动 M6。
+- 当前活动分支已切换到 `feature/m7-broker-api-assessment`，用于启动 M7。
 
 ## 2. 执行总原则
 
@@ -276,7 +276,7 @@
 ## 13. M6 新闻事件过滤与复盘整合
 
 - 分支：`feature/m6-news-review-integration`
-- 当前状态：进行中
+- 当前状态：已完成
 - 目标：把新闻/事件样本纳入解释和风险过滤链路，同时把 KB 规则引用、价格行为解释和结果统计纳入统一复盘输出。
 - 交付内容：
   - 新闻只作为过滤、解释或风险提示因子。
@@ -302,10 +302,17 @@
   - 新闻模块越权成为主信号源
   - 复盘字段和回测字段分叉
 - 回退点：回退到 M5 已验收检查点
+- 实际完成摘要：
+  - 已新增 `src/news/` 最小 `NewsMatch`、`NewsReviewNote`、`NewsFilterDecision` 与 `evaluate_news_context(...)`，固定新闻只作 filter / explanation / risk hint 的 research-only 辅助语义。
+  - 已新增 `src/review/` 最小 `ReviewTradeOutcome`、`ReviewItem`、`ReviewReport` 与 `build_review_report(...)`，把 KB `source_refs`、PA explanation、news review notes、回测结果与执行阻断证据整合进统一复盘输出。
+  - 已新增 `knowledge/wiki/rules/m6-news-review-evidence-pack.md`，并同步 `knowledge/wiki/index.md` 与 `knowledge/wiki/log.md`，登记 M6 的知识证据包与开放问题。
+  - 已建立 `tests/unit/test_news_review_pipeline.py`，覆盖无新闻、caution、block、future-event leakage、防止缺失 `reference_timestamp`、review 中 filter / explanation / risk_hint 结构化透传、以及新闻不改写 signal 主字段。
+  - reviewer 与 qa 已通过，确认新闻未越界到 signal / order / execution，future-event leakage 已关闭，且复盘输出保留结构化 `news_review_notes` 与可追溯的 `source_refs`。
 
 ## 14. M7 正式券商 API 接入评估
 
 - 分支：`feature/m7-broker-api-assessment`
+- 当前状态：进行中
 - 目标：只做 readiness assessment，不做真实接入、不做真实下单、不做真实账户联通。
 - 交付内容：
   - `FormalBrokerAdapter` 接口草案
@@ -358,12 +365,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 6：新闻事件过滤与复盘整合。
-- 当前 milestone：M6：新闻事件过滤与复盘整合（进行中）。
+- 当前阶段：阶段 7：正式券商 API 接入评估。
+- 当前 milestone：M7：正式券商 API 接入评估（进行中）。
 - 当前下一步：
-  - 先完成新闻仅作过滤 / 解释 / 风险提示的最小 contract，不让新闻直接转成执行信号
-  - 把新闻上下文、KB 引用、PA 解释与回测 / 模拟结果整合进统一复盘输出
-  - 保持 paper-only 边界，不触碰真实 broker / live execution
+  - 从 `feature/m7-broker-api-assessment` 启动 readiness assessment，先限定评估边界与交付物
+  - 产出 `FormalBrokerAdapter` 接口草案、凭证隔离要求、模拟验证前置条件、测试策略与人工审批清单
+  - 保持 assessment-only 边界，不实现真实 broker 调用链、不接真实账户、不启用 live execution
 
 ## 18. 假设
 

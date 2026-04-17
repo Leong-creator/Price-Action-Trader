@@ -39,3 +39,8 @@
 
 - 日期：2026-04-17
 - 结论：M5 冻结了 `src/risk/` 与 `src/execution/` 的 paper-only 最小契约、request-binding 校验、重复信号阻断、市场关闭阻断、连续亏损熔断与恢复条件、以及可复盘的 close-path 审计字段；后续 M6 不得绕过这些结构化接口或回退到未绑定的执行语义。
+
+## D-0009 M6 新闻过滤与复盘契约冻结
+
+- 日期：2026-04-17
+- 结论：M6 冻结了 `src/news/` 与 `src/review/` 的最小契约，要求新闻只能作为 filter / explanation / risk_hint 辅助因子；`evaluate_news_context(...)` 必须显式接收可验证的 `reference_timestamp` 以阻断 future-event leakage；`ReviewItem` 必须保留结构化 `news_review_notes` 与可追溯 `source_refs`；后续 M7 不得把这些评估输出误接成真实下单或 live execution 语义。

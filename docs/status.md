@@ -2,15 +2,15 @@
 
 ## 当前阶段
 
-- 阶段 6：新闻事件过滤与复盘整合（进行中）
+- 阶段 7：正式券商 API 接入评估（进行中）
 
 ## 当前 milestone
 
-- M6：新闻事件过滤与复盘整合（进行中）
+- M7：正式券商 API 接入评估（进行中）
 
 ## 当前分支
 
-- `feature/m6-news-review-integration`
+- `feature/m7-broker-api-assessment`
 
 ## 已完成
 
@@ -39,6 +39,10 @@
 - M5 已新增 `src/risk/` 最小 contracts / engine 与 `src/execution/` 最小 paper adapter / state / logging
 - M5 已覆盖 allow、risk_block、market_closed、duplicate_signal、loss-streak halt、manual recovery、config_error、invalid_request、mismatched / stale / direction-mismatch risk decision
 - M5 已通过 reviewer / qa 正式复审，确认风控先于执行、paper-only 边界清晰、close-path 审计日志可复盘，未越界到真实 broker / live execution
+- M6 已新增 `src/news/` 最小 contracts / filtering 与 `src/review/` 最小 contracts / reporting
+- M6 已补 `knowledge/wiki/rules/m6-news-review-evidence-pack.md`，并同步 `knowledge/wiki/index.md` 与 `knowledge/wiki/log.md`
+- M6 已覆盖无新闻、caution、block、future-event leakage、防止缺失 reference timestamp、review 中 filter / explanation / risk_hint 角色透传、以及新闻不改写 signal 主字段
+- M6 已通过 reviewer / qa 正式复审，确认新闻仍只作 filter / explanation / risk_hint，未越界到 signal / order / execution，且复盘输出保留结构化 `news_review_notes`
 
 ## 当前阻塞
 
@@ -46,6 +50,6 @@
 
 ## 下一步
 
-- 先完成新闻仅作过滤 / 解释 / 风险提示的最小 contract，不让新闻直接转成执行信号
-- 把新闻上下文、KB 引用、PA 解释与回测 / 模拟结果整合进统一复盘输出
-- 保持 paper-only 边界，不接真实 broker / live execution
+- 从 `feature/m7-broker-api-assessment` 启动 M7 readiness assessment
+- 先产出 `FormalBrokerAdapter` 接口草案、凭证隔离要求、模拟验证前置条件、测试策略与人工审批清单
+- 保持 assessment-only 边界，不实现真实 broker 调用链、不接真实账户、不启用 live execution

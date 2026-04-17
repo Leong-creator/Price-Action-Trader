@@ -45,3 +45,9 @@ last_reviewed: 2026-04-17
 
 - 当前已新增面向 M3 的 `research-only` 引用页与最小结构化索引。
 - 所有 M3 知识引用必须保留 `low confidence`、`source_refs` 和 assumptions，不得把占位页升级成已验证交易规则。
+
+## M6 说明
+
+- 当前已新增 `knowledge/wiki/rules/m6-news-review-evidence-pack.md`，作为 M6 新闻过滤与复盘整合的最小 evidence pack。
+- M6 中新闻只允许作为 `filter`、`explanation` 或 `risk hint`，不得升级为主信号源、订单触发器或执行指令。
+- M6 evidence pack 只复用现有 wiki/source 页面；若后续需要新增新闻来源页或事件样本登记，必须先补来源追溯再扩展规则页。
