@@ -447,7 +447,7 @@
 启动前提：
 
 - `M8C.1` 已通过验收并整合进稳定基线。
-- 当前 `M8C.2` 为实现与验收候选；只有在 feature 分支通过 reviewer / qa 并 merge 回 `main` 后，才计入稳定基线事实。
+- `M8C.2` 已在 feature 分支通过 reviewer / qa，并通过 merge commit 合入 `main`；当前已计入稳定基线事实。
 
 完成条件：
 
