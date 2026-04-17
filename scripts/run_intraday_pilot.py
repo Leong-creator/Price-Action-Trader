@@ -15,7 +15,7 @@ from scripts.intraday_pilot_lib import create_intraday_pilot_run, load_intraday_
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run a single-symbol intraday paper/simulated pilot on cached SPY 15m data."
+        description="Run a single-symbol intraday paper/simulated pilot on cached intraday data."
     )
     parser.add_argument(
         "--config",

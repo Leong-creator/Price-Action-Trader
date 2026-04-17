@@ -114,3 +114,8 @@
 
 - 日期：2026-04-18
 - 结论：Knowledge Reference Repair 的阶段 B 只允许做最小 curated promotion，不允许重做 atomization 基础层，也不允许改 trigger。当前冻结的 promotion 主题只有 3 个：`market cycle / context`、`signal bar / entry`、`trend vs range filter`。所有 promotion 都必须基于真实字段级 evidence mapping，且保持 `draft / low confidence / research-only` 边界。transcript / Brooks 可以通过 promoted curated claim 进入 actual visible trace，但 `statement` / `source_note` / `contradiction` / `open_question` 仍不得进入 trigger，不得因为 Brooks statement 数量更多而影响 trigger、confidence 或排序。当前阶段 B 已整合进 `main`；trigger 逻辑未改变，系统仍保持 `paper / simulated`，且仍未进入 broker / live / real-money。
+
+## D-0024 M8C.2 第二标的日内验证边界冻结
+
+- 日期：2026-04-18
+- 结论：在首轮 `SPY / 15m` intraday pilot 完成后，允许在不改 trigger 的前提下扩一个第二高流动性标的做同边界验证。当前冻结的第二标的扩展为 `NVDA / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`。该扩展继续只验证 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee、`no-trade / wait` 与 `knowledge_trace` 的跨标的一致性；`statement`、`source_note`、`contradiction`、`open_question` 仍不得进入 trigger，Brooks statement 数量也不得成为 confidence、权重或排序代理。当前第二标的扩展已整合进 `main`；仍未进入期权、broker、live、real-money。

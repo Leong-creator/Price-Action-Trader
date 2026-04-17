@@ -214,6 +214,8 @@ def create_intraday_pilot_run(
         session_results,
         paper_outcome,
         session_audits,
+        instrument=config.instrument,
+        timeframe=config.interval,
         timezone_name=config.session.timezone,
     )
     session_summary = build_session_summary(
@@ -678,6 +680,8 @@ def build_intraday_no_trade_wait_records(
     paper_outcome: PaperDemoOutcome,
     session_audits: tuple[SessionAudit, ...],
     *,
+    instrument: InstrumentConfig,
+    timeframe: str,
     timezone_name: str,
 ) -> tuple[NoTradeWaitRecord, ...]:
     records = list(build_no_trade_wait_records(session_results, paper_outcome))
@@ -697,9 +701,9 @@ def build_intraday_no_trade_wait_records(
         detail = ", ".join(detail_parts) or "session did not satisfy the intraday quality gate"
         records.append(
             NoTradeWaitRecord(
-                symbol="SPY",
-                market="US",
-                timeframe="15m",
+                symbol=instrument.symbol,
+                market=instrument.market,
+                timeframe=timeframe,
                 timestamp=session_end,
                 action="wait",
                 reason_code=reason_code,
@@ -901,7 +905,7 @@ def build_intraday_summary_payload(
         "session_summary_overview": session_summary["sessions"],
         "limitations": [
             "当前仍处于 paper / simulated 边界，不代表 broker/live/real-money 能力。",
-            "当前 intraday pilot 只覆盖 SPY 15m regular session，不包含期权、不包含多标的并发。",
+            f"当前 intraday pilot 只覆盖 {config.instrument.symbol} {config.interval} regular session，不包含期权、不包含多标的并发。",
             "statement / source_note 仍只进入 knowledge_trace，不参与 trigger。",
             "当前滑点/手续费模型是最小可配置研究模型，不是实盘成交真实性证明。",
         ],
