@@ -11,7 +11,7 @@
 
 ## 当前分支
 
-- `feature/m7-broker-api-assessment`
+- `main`
 
 ## 已完成
 
@@ -129,7 +129,8 @@
 ## 下一步
 
 - 当前下一步不是扩 broker/live；`M8C.1` 已整合进稳定基线，`M8C.2` 尚未开始。
-- `M8C.2` 尚未开始；若继续，只允许从最新稳定基线单独开分支进入单标的 intraday pilot。
+- `M8C.2` 尚未开始；若继续，只允许从最新稳定基线 `main` 单独开分支进入单标的 intraday pilot。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
-- 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界。
+- 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
+- `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前也仍未进入期权验证。

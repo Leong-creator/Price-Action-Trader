@@ -11,7 +11,8 @@
 - M5 已完成 paper-only 的模拟执行与风控闭环。
 - M6 已完成新闻过滤与复盘整合，且保持新闻只作辅助因子。
 - M7 已完成正式券商 API readiness assessment，当前冻结结论为 `no-go`。
-- 当前分析基线固定为 `feature/m7-broker-api-assessment`。
+- 当前分析基线固定为 `main`。
+- `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
 - M8 的基础离线可靠性红线与 shadow/paper 框架已完成并冻结，作为后续验证主线的前置基线。
 - `M8C` 当前已切换为 `Long-Horizon & Intraday Paper Validation`：
@@ -42,6 +43,9 @@
   - `feature/m6-news-review-integration`
   - `feature/m7-broker-api-assessment`
   - `integration/m8-reliability-validation`
+- 当前与后续所有新的 `feature/*`、`fix/*`、`docs/*`、`test/*`、`integration/*` 分支都从 `main` 切出。
+- 低/中风险阶段验收通过后的默认合并目标是 `main`。
+- `feature/m7-broker-api-assessment` 仅保留为历史阶段基线/里程碑分支，不再作为未来默认长期合并目标。
 - 并行写代码时优先使用独立 branch 或 worktree。
 - 涉及 `src/execution/`、`src/risk/`、`src/broker/`、凭证、实盘开关的改动必须单独分支、单独测试、单独复核。
 
@@ -427,14 +431,14 @@
   - `qa` 负责门禁完整性复核
 - 依赖：
   - M7 已完成且当前结论为 `no-go`
-  - 当前分析基线固定为 `feature/m7-broker-api-assessment`
+  - 当前分析基线固定为 `main`
 - 风险：
   - 把 M8 写成收益优化或 broker 延续阶段
   - 在门禁文档或脚手架中混入 M8B/M8C/M8D 的具体实现细节
   - 未同步 `docs/roadmap.md` 导致 SoT 再次分叉
   - 在无真实历史样本时误报“真实稳健性已通过”
 - 回退点：
-  - 若 M8A 文档越界，整体回退 `integration/m8-reliability-validation` 上的文档改动，回到 `feature/m7-broker-api-assessment`
+  - 若 M8A 文档越界，整体回退 `integration/m8-reliability-validation` 上的文档改动，回到当时的稳定基线提交；该历史基线分支仍保留为 `feature/m7-broker-api-assessment`
 - 实际完成摘要：
   - 已补齐 `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 的 README 骨架。
   - 已新增 `docs/test-dataset-curation.md`，冻结 M8 可接受数据层级、最小元数据、脱敏与离线边界。
@@ -733,7 +737,7 @@
 - 当前下一步：
   - 本轮已把 daily public history demo 扩展为长周期、多阶段、可解释的验证套件，并已整合进稳定基线 `feature/m7-broker-api-assessment`。
   - `M8C.2` 尚未开始。
-  - 下一步若继续推进，只允许从最新稳定基线单独开分支进入 `M8C.2`；仍不进入期权、broker/live。
+  - 下一步若继续推进，只允许从最新稳定基线 `main` 单独开分支进入 `M8C.2`；仍不进入期权、broker/live。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 
