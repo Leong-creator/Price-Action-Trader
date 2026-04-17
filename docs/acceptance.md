@@ -254,6 +254,74 @@
   - M8B.1 已定位 transcript / Brooks PPT 缺席根因：此前只有 raw 文件，没有对应 `source` 页和 rule-pack 接线，且默认 strategy bundle 未加载 active rule pack；现已补齐最小 traceability 接线，但仍不把这些来源包装成已抽取完成的正式规则。
   - M8C 已在 `integration/m8c-offline-reliability` 完成实现与验证，且仍保持 `paper / simulated` 与 `no-go` 边界。
 
+### M8B.2a：Knowledge Atomization 基础层
+
+完成条件：
+
+- `M8B.2` 已在 `plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md`、`docs/decisions.md` 与 `docs/knowledge-atomization.md` 中拆成 `2a / 2b`。
+- 当前轮次明确只执行 `2a`，不得提前进入 `2b`。
+- 已新增：
+  - `knowledge/schema/source-registry-schema.md`
+  - `knowledge/schema/chunk-registry-schema.md`
+  - `knowledge/schema/knowledge-atom-schema.md`
+  - `knowledge/schema/callable-access-contract.md`
+  - `knowledge/indices/source_manifest.json`
+  - `knowledge/indices/chunk_manifest.jsonl`
+  - `knowledge/indices/knowledge_atoms.jsonl`
+  - `knowledge/indices/knowledge_callable_index.json`
+  - `scripts/build_source_manifest.py`
+  - `scripts/build_chunk_registry.py`
+  - `scripts/build_knowledge_atoms.py`
+  - `scripts/build_callable_index.py`
+  - `scripts/validate_kb_coverage.py`
+  - `scripts/validate_knowledge_atoms.py`
+- 10 个 in-scope source 都必须存在 machine-readable source record。
+- `:Zone.Identifier` 必须被过滤并进入 `coverage_summary.filtered_files`，不得被误判为 source。
+- 每个 source 都要么可解析进 chunk/atom，要么明确进入 `blocked / partial` 并写明原因。
+- `statement` atom 必须存在，并且每条都具备：
+  - `atom_id`
+  - `atom_type=statement`
+  - `source_ref`
+  - `raw_locator`
+  - `evidence_chunk_ids`
+  - `status`
+  - `confidence`
+  - `callable_tags`
+- `statement` 默认是 callable 中间层，不得被标记成 executable strategy rule，不得默认带 `strategy_candidate`。
+- 无证据时不得产出 `statement`。
+- transcript / Brooks / 全部方方土笔记都必须在 callable index 层可检索。
+- 关键 curated atoms 必须形成 evidence-backed atom：
+  - `market-cycle-overview`
+  - `signal-bar-entry-placeholder`
+  - `m3-research-reference-pack`
+- 若满足以下任一条件，必须熔断并停在 `2a`：
+  - `blocked >= 4`
+  - 关键 curated atoms 无法 evidence-backed
+  - `statement` 抽取无法稳定回溯证据
+- `python -m unittest discover -s tests/reliability -v` 必须通过。
+- 必须至少包含并通过：
+  - `tests/reliability/test_kb_coverage.py`
+  - `tests/reliability/test_knowledge_atoms.py`
+  - `tests/reliability/test_callable_access.py`
+- 本轮不得修改 strategy / explanation / review / report 接线，不得修改 trigger 逻辑，不得触碰 broker/live/real-money/real-account。
+- 当前完成事实：
+  - `source_manifest.json` 当前结果为 `parsed=9 / partial=1 / blocked=0`
+  - 当前 partial source 为 `方方土视频笔记 - 楔形.pdf`
+  - 当前未触发熔断
+  - 关键 curated atoms 已形成 evidence-backed atom
+  - `statement` 已落盘并满足 evidence-backed / non-executable / non-trigger 约束
+
+### M8B.2b：Callable 接入 Strategy / Explanation / Review / Report
+
+启动前提：
+
+- `M8B.2a` 全部测试通过
+- 未触发熔断
+- reviewer 通过
+- qa 通过
+
+在满足以上条件前，不得启动 `2b`。
+
 ### M8C：离线端到端可靠性测试
 
 完成条件：

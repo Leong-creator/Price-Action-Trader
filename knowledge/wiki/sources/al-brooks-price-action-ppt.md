@@ -37,6 +37,10 @@ last_reviewed: 2026-04-17
 
 - 当前只完成来源登记，不补写未经核验的 PPT 内容。
 - 当前只允许把本页作为 `source_refs` 的可追溯节点，不允许把它当成已验证规则页。
+- `M8B.2a` 已新增两份 per-file 来源页：
+  - `knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md`
+  - `knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md`
+- 本页继续保留为 family overview，不再作为两份 raw 文件各自唯一的 `source_page_ref`。
 
 ## 待后续补充
 

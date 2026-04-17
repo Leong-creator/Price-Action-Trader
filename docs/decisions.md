@@ -69,3 +69,8 @@
 
 - 日期：2026-04-17
 - 结论：raw 层 transcript / PPT 只有在对应 `knowledge/wiki/sources/*.md` 登记页存在、wiki index 收录、active rule pack 明确接入、且默认 strategy knowledge bundle 真正加载该 rule pack 后，才允许出现在 `signal.source_refs` / `signal.explanation` 中。只有 raw 文件而未完成结构化接线时，strategy 不得编造其引用；完成最小接线后，这些来源仍只代表“已登记且可追溯”，不代表其内容已被抽取成正式规则。
+
+## D-0015 M8B.2 两阶段知识原子化门禁冻结
+
+- 日期：2026-04-17
+- 结论：`M8B.2` 拆分为 `M8B.2a` 与 `M8B.2b`。`M8B.2a` 只允许建设 source registry、chunk registry、knowledge atom schema、builders/validators 与 callable index；`M8B.2b` 只有在 `2a` 全部测试通过、未触发熔断、且 reviewer / qa 通过后，才允许接 strategy / explanation / review / report。`statement` 是中间层 callable atom，默认 `draft`，不是 executable rule，不得参与 trigger 判定。若 10 个 in-scope source 中 `blocked >= 4`、关键 curated atoms 无法形成稳定 evidence-backed atom、或 `statement` 抽取无法稳定回溯证据，则必须停在 `M8B.2a`，不得进入 `2b`。

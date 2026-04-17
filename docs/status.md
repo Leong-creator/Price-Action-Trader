@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架（进行中）
+- 当前子阶段：M8B.2a：Knowledge Atomization 基础层（已完成）
 
 ## 当前分支
 
-- `fix/knowledge-source-trace-m8b1`
+- `feature/m8b2-knowledge-atomization-callable-access`
 
 ## 已完成
 
@@ -75,6 +75,21 @@
 - 该示例 run 在当前 demo 风控参数下输出：总收益率 `1.9923%`、最大回撤 `1.5157%`、交易 `16` 笔、胜率 `43.75%`；仍明确保持 `paper / simulated`
 - M8B.1 已完成知识源接入诊断与最小补齐：确认 transcript / Brooks PPT 先前缺席的根因是 raw-only、无 `source` 页、未入 active rule pack，且默认 strategy bundle 未读取 rule pack；现已新增真实存在文件的 `source` 页、补齐 rule-pack/index 接线，并让默认 signal 链能带出这些 `source` 页引用
 - M8B.1 已新增 `docs/knowledge-source-trace.md` 与 `tests/reliability/test_knowledge_source_trace.py`，验证“已接线的 transcript/PPT 来源能进入 `source_refs`，未接线时不会被编造”
+- M8B.2 已拆成两个子阶段：
+  - `M8B.2a`：Source Registry + Chunk Registry + Knowledge Atom Schema + Builders/Validators + Callable Index
+  - `M8B.2b`：仅在 `2a` 全部测试通过、未触发熔断且 reviewer / qa 通过后，才允许接 strategy / explanation / review / report
+- M8B.2 本轮明确只执行 `2a`；`statement` 是中间层 callable atom，不是 executable rule，不得参与 trigger 判定
+- M8B.2a 已完成：
+  - 已新增 `knowledge/schema/source-registry-schema.md`、`chunk-registry-schema.md`、`knowledge-atom-schema.md`、`callable-access-contract.md`
+  - 已新增 `knowledge/indices/source_manifest.json`、`chunk_manifest.jsonl`、`knowledge_atoms.jsonl`、`knowledge_callable_index.json`
+  - 已新增 `scripts/build_source_manifest.py`、`build_chunk_registry.py`、`build_knowledge_atoms.py`、`build_callable_index.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`
+  - 已补齐 5 份方方土笔记 source page 与 2 份 Brooks PPT per-file source page
+  - 当前 source coverage 结果为 `parsed=9 / partial=1 / blocked=0`，未触发 `blocked >= 4` 熔断
+  - 当前 partial source 为 `方方土视频笔记 - 楔形.pdf`，原因为 `1 page(s) produced no stable text`
+  - 已落盘 `statement` atom，当前原子统计为：`statement=14075`、`source_note=5492`、`open_question=24`、`concept=1`、`setup=1`、`rule=1`
+  - 关键 curated atoms 已形成 evidence-backed atom：`market-cycle-overview`、`signal-bar-entry-placeholder`、`m3-research-reference-pack`
+  - 已新增 `tests/reliability/test_kb_coverage.py`、`test_knowledge_atoms.py`、`test_callable_access.py`
+  - 已通过 `tests/reliability` 39 项与 `tests/unit` 60 项回归
 
 ## 当前阻塞
 
@@ -83,8 +98,7 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker，而是继续用更完整的真实历史 CSV/JSON 或用户录制样本扩展回测演示与 shadow/paper 验证
-- 若要让 transcript / Brooks PPT 更深地进入决策字段，下一步最小动作应是把这些来源结构化抽取为可核验的 concept / setup / rule 页面，而不是直接放宽 strategy 边界
-- 若用户需要更真实的测试，应优先补更长时间窗口、更多 regime 样本、或按 `docs/user-backtest-guide.md` 提供自己的历史 CSV
-- 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界
-- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API
+- 当前下一步不是自动启动 `M8B.2b`，而是保持 `2b` 未开始状态；只有在 `2a` 全部测试通过、未触发熔断且 reviewer / qa 通过后，才允许进入 `M8B.2b`。
+- 当前 `M8B.2a` 已满足进入 `2b` 的技术前提，但本轮严格停在 `2a`。
+- 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界。
+- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API。
