@@ -1,0 +1,57 @@
+{
+  "boundary": "paper/simulated",
+  "bucket_type": "split",
+  "windows": [
+    {
+      "name": "full_range",
+      "label": "完整验证区间",
+      "bucket_type": "split",
+      "start": "2024-01-02",
+      "end": "2024-06-28",
+      "signal_count": 35,
+      "executed_trades": 16,
+      "blocked_signals": 19,
+      "no_trade_wait": 350,
+      "pnl_cash": "498.0720",
+      "win_rate_pct": "43.7500",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 269,
+        "duplicate_direction_suppressed": 9,
+        "insufficient_evidence": 53,
+        "risk_blocked_before_fill": 19
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 13,
+          "executed_trades": 6,
+          "blocked_signals": 7,
+          "no_trade_wait": 116,
+          "pnl_cash": "593.1220"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 11,
+          "executed_trades": 5,
+          "blocked_signals": 6,
+          "no_trade_wait": 117,
+          "pnl_cash": "92.9000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 11,
+          "executed_trades": 5,
+          "blocked_signals": 6,
+          "no_trade_wait": 117,
+          "pnl_cash": "-187.9500"
+        }
+      ]
+    }
+  ]
+}

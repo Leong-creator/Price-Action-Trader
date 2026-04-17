@@ -1,0 +1,213 @@
+{
+  "boundary": "paper/simulated",
+  "overall": {
+    "total_signals": 35,
+    "signals_with_trace": 35,
+    "trace_nonempty_pct": "100.0000",
+    "curated_signals": 35,
+    "curated_signal_pct": "100.0000",
+    "statement_signals": 35,
+    "statement_signal_pct": "100.0000",
+    "supporting_signals": 0,
+    "supporting_signal_pct": "0.0000",
+    "trace_item_counts": {
+      "concept": 35,
+      "rule": 35,
+      "setup": 35,
+      "statement": 35
+    },
+    "source_family_signal_presence": {
+      "curated_concept": 35,
+      "curated_rule": 35,
+      "curated_setup": 35,
+      "fangfangtu_notes": 35
+    },
+    "source_family_item_counts": {
+      "curated_concept": 35,
+      "curated_rule": 35,
+      "curated_setup": 35,
+      "fangfangtu_notes": 35
+    },
+    "actual_hit_source_family_presence": {
+      "curated_concept": 35,
+      "curated_rule": 35,
+      "curated_setup": 35,
+      "fangfangtu_notes": 35
+    },
+    "actual_hit_source_family_item_counts": {
+      "curated_concept": 35,
+      "curated_rule": 35,
+      "curated_setup": 35,
+      "fangfangtu_notes": 35
+    },
+    "actual_evidence_source_family_presence": {
+      "al_brooks_ppt": 35,
+      "fangfangtu_notes": 35,
+      "fangfangtu_transcript": 35
+    },
+    "actual_evidence_source_family_item_counts": {
+      "al_brooks_ppt": 105,
+      "fangfangtu_notes": 140,
+      "fangfangtu_transcript": 70
+    },
+    "bundle_support_family_presence": {
+      "al_brooks_ppt": 35,
+      "curated_rule": 35,
+      "fangfangtu_notes": 35,
+      "fangfangtu_transcript": 35
+    },
+    "bundle_support_family_item_counts": {
+      "al_brooks_ppt": 70,
+      "curated_rule": 35,
+      "fangfangtu_notes": 105,
+      "fangfangtu_transcript": 35
+    },
+    "curated_vs_statement": {
+      "curated_item_count": 105,
+      "statement_item_count": 35,
+      "supporting_item_count": 0,
+      "curated_item_pct": "75.0000",
+      "statement_item_pct": "25.0000"
+    }
+  },
+  "executed": {
+    "total_signals": 16,
+    "signals_with_trace": 16,
+    "trace_nonempty_pct": "100.0000",
+    "curated_signals": 16,
+    "curated_signal_pct": "100.0000",
+    "statement_signals": 16,
+    "statement_signal_pct": "100.0000",
+    "supporting_signals": 0,
+    "supporting_signal_pct": "0.0000",
+    "trace_item_counts": {
+      "concept": 16,
+      "rule": 16,
+      "setup": 16,
+      "statement": 16
+    },
+    "source_family_signal_presence": {
+      "curated_concept": 16,
+      "curated_rule": 16,
+      "curated_setup": 16,
+      "fangfangtu_notes": 16
+    },
+    "source_family_item_counts": {
+      "curated_concept": 16,
+      "curated_rule": 16,
+      "curated_setup": 16,
+      "fangfangtu_notes": 16
+    },
+    "actual_hit_source_family_presence": {
+      "curated_concept": 16,
+      "curated_rule": 16,
+      "curated_setup": 16,
+      "fangfangtu_notes": 16
+    },
+    "actual_hit_source_family_item_counts": {
+      "curated_concept": 16,
+      "curated_rule": 16,
+      "curated_setup": 16,
+      "fangfangtu_notes": 16
+    },
+    "actual_evidence_source_family_presence": {
+      "al_brooks_ppt": 16,
+      "fangfangtu_notes": 16,
+      "fangfangtu_transcript": 16
+    },
+    "actual_evidence_source_family_item_counts": {
+      "al_brooks_ppt": 48,
+      "fangfangtu_notes": 64,
+      "fangfangtu_transcript": 32
+    },
+    "bundle_support_family_presence": {
+      "al_brooks_ppt": 16,
+      "curated_rule": 16,
+      "fangfangtu_notes": 16,
+      "fangfangtu_transcript": 16
+    },
+    "bundle_support_family_item_counts": {
+      "al_brooks_ppt": 32,
+      "curated_rule": 16,
+      "fangfangtu_notes": 48,
+      "fangfangtu_transcript": 16
+    },
+    "curated_vs_statement": {
+      "curated_item_count": 48,
+      "statement_item_count": 16,
+      "supporting_item_count": 0,
+      "curated_item_pct": "75.0000",
+      "statement_item_pct": "25.0000"
+    }
+  },
+  "blocked": {
+    "total_signals": 19,
+    "signals_with_trace": 19,
+    "trace_nonempty_pct": "100.0000",
+    "curated_signals": 19,
+    "curated_signal_pct": "100.0000",
+    "statement_signals": 19,
+    "statement_signal_pct": "100.0000",
+    "supporting_signals": 0,
+    "supporting_signal_pct": "0.0000",
+    "trace_item_counts": {
+      "concept": 19,
+      "rule": 19,
+      "setup": 19,
+      "statement": 19
+    },
+    "source_family_signal_presence": {
+      "curated_concept": 19,
+      "curated_rule": 19,
+      "curated_setup": 19,
+      "fangfangtu_notes": 19
+    },
+    "source_family_item_counts": {
+      "curated_concept": 19,
+      "curated_rule": 19,
+      "curated_setup": 19,
+      "fangfangtu_notes": 19
+    },
+    "actual_hit_source_family_presence": {
+      "curated_concept": 19,
+      "curated_rule": 19,
+      "curated_setup": 19,
+      "fangfangtu_notes": 19
+    },
+    "actual_hit_source_family_item_counts": {
+      "curated_concept": 19,
+      "curated_rule": 19,
+      "curated_setup": 19,
+      "fangfangtu_notes": 19
+    },
+    "actual_evidence_source_family_presence": {
+      "al_brooks_ppt": 19,
+      "fangfangtu_notes": 19,
+      "fangfangtu_transcript": 19
+    },
+    "actual_evidence_source_family_item_counts": {
+      "al_brooks_ppt": 57,
+      "fangfangtu_notes": 76,
+      "fangfangtu_transcript": 38
+    },
+    "bundle_support_family_presence": {
+      "al_brooks_ppt": 19,
+      "curated_rule": 19,
+      "fangfangtu_notes": 19,
+      "fangfangtu_transcript": 19
+    },
+    "bundle_support_family_item_counts": {
+      "al_brooks_ppt": 38,
+      "curated_rule": 19,
+      "fangfangtu_notes": 57,
+      "fangfangtu_transcript": 19
+    },
+    "curated_vs_statement": {
+      "curated_item_count": 57,
+      "statement_item_count": 19,
+      "supporting_item_count": 0,
+      "curated_item_pct": "75.0000",
+      "statement_item_pct": "25.0000"
+    }
+  }
+}
