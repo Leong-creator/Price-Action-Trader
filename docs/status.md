@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8A：测试骨架与验收门禁落盘（已完成）
+- 当前子阶段：M8B：知识库对齐测试（已完成）
 
 ## 当前分支
 
@@ -52,6 +52,11 @@
 - M8A 已新增 `docs/test-dataset-curation.md`，冻结 M8 可接受数据层级、样本元数据、脱敏与离线边界
 - M8A 已落盘 `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 的 discoverable 骨架目录
 - M8A 已新增 `scripts/run_reliability_suite.py`，默认运行当前 baseline unit suites，并对空目录或缺真实历史样本显式 skipped / deferred
+- M8B 已新增 `src/strategy/alignment.py`，提供最小 knowledge alignment 评估入口
+- M8B 已收紧 `src/strategy/knowledge.py` 的 `source_refs` 校验：缺失或不存在的 wiki/raw refs 现在会硬失败
+- M8B 已在 `tests/golden_cases/cases/` 落盘 5 个 golden cases，覆盖 placeholder setup、news role conflict、insufficient evidence、not_applicable hard gate、missing/fake refs hard fail
+- M8B 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`
+- M8B 已验证 reliability suite 7 项通过，且原有 `tests/unit/` 57 项无回归
 
 ## 当前阻塞
 
@@ -60,7 +65,7 @@
 
 ## 下一步
 
-- 继续 M8：优先进入 M8B 知识库对齐测试，而不是继续 broker
-- 基于 `tests/golden_cases/`、`docs/test-dataset-curation.md` 与 `scripts/run_reliability_suite.py` 开始落 M8B 的 knowledge-alignment 用例与门禁验证
+- 继续 M8：优先进入 M8C 离线端到端可靠性测试，而不是继续 broker
+- 复用 `tests/reliability/`、`scripts/run_reliability_suite.py` 与 M8B 的 alignment gates，开始扩展 offline E2E 的 determinism、future leakage、risk-before-fill 与 audit/review traceability 红线
 - 在 `integration/m8-reliability-validation` 上保持 `paper / simulated` 与 `no-go` 边界
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API

@@ -38,6 +38,18 @@
 
 - 目标：验证输出是否真正遵守知识库，而不是“看起来像遵守”
 - 核心门禁：真实 `source_refs`、适用性约束、冲突显式化、资料不足时保守 `no-trade / wait`
+- 当前已落盘：
+  - `tests/golden_cases/cases/` 的最小 golden case catalog
+  - `tests/reliability/test_kb_alignment.py`
+  - `tests/reliability/test_no_hallucinated_kb_refs.py`
+  - `tests/reliability/test_no_trade_when_insufficient_evidence.py`
+- 当前已覆盖：
+  - 缺失 `source_refs` 必须 fail
+  - 引用不存在知识页必须 fail
+  - `not_applicable` 场景不得升级为 executable trade claim
+  - knowledge conflict 必须显式为 `conflict` 或降级处理
+  - 证据不足时 `wait / no-trade` 视为合格结果
+  - explanation 必须存在并回链到 setup / rule / source
 
 ### M8C：离线端到端可靠性测试
 

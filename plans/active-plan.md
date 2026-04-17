@@ -437,7 +437,7 @@
 
 ### M8B：知识库对齐测试
 
-- 当前状态：待启动
+- 当前状态：已完成
 - 目标：
   - 定义 golden-case 主线
   - 验证输出是否严格受知识库约束，而不是“看起来像遵守”
@@ -469,6 +469,12 @@
   - 用实现细节代替门禁要求
 - 回退点：
   - 如门禁定义越界或放宽边界，回退到 M8A 检查点
+- 实际完成摘要：
+  - 已新增 `src/strategy/alignment.py`，提供 M8B 的最小 knowledge alignment 评估入口。
+  - 已把 `source_refs` 真值校验收紧到 knowledge load/validate 层，缺失或不存在的 wiki/raw refs 现在会硬失败。
+  - 已在 `tests/golden_cases/cases/` 落盘 5 个最小 golden cases，覆盖 placeholder setup、news role conflict、insufficient evidence、not_applicable hard gate、missing/fake refs hard fail。
+  - 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`。
+  - 已验证 explanation 必须存在且回链到 setup/rule/source，且 `wait / no-trade` 在证据不足场景下视为合格结果。
 
 ### M8C：离线端到端可靠性测试
 
@@ -558,17 +564,17 @@
 - M6 重点测新闻仅作过滤/解释、不直接下单、复盘字段完整和 KB 引用可追溯。
 - M7 重点测门禁清单完整性、审批前置条件和“无真实接入”边界。
 - M8A 重点测主线文档、验收门禁、状态切换、测试骨架与 suite 入口是否同步，且无 broker/live 越界表述。
-- M8B 重点测知识库对齐、`source_refs` 真实性、`not_applicable` 约束、冲突显式化与资料不足时的保守 `no-trade`。
+- M8B 重点测知识库对齐、`source_refs` 真实性、`not_applicable` 约束、冲突显式化、explanation 回链与资料不足时的保守 `no-trade`。
 - M8C 重点测无 future leakage、同输入 deterministic、risk-before-fill、audit / review traceability 与 forbidden paths。
 - M8D 重点测真实历史数据与实时只读输入下仍保持 shadow / paper、保守稳定、可解释，且不进入真实 broker / live execution。
 
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8A：测试骨架与验收门禁落盘（已完成）。
+- 当前 milestone：M8B：知识库对齐测试（已完成）。
 - 当前下一步：
-  - 从 `integration/m8-reliability-validation` 继续推进 M8，优先启动 M8B：知识库对齐测试
-  - 以 `tests/golden_cases/`、`docs/test-dataset-curation.md` 与 `scripts/run_reliability_suite.py` 为骨架入口补 M8B 的 knowledge-alignment 用例
+  - 从 `integration/m8-reliability-validation` 继续推进 M8，优先启动 M8C：离线端到端可靠性测试
+  - 复用已落盘的 `tests/golden_cases/`、`tests/reliability/` 与 `src/strategy/alignment.py`，向 data -> strategy -> backtest -> risk -> execution -> news -> review 闭环扩展离线红线测试
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

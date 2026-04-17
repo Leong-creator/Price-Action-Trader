@@ -42,6 +42,8 @@
 - `not_applicable` 场景拦截
 - knowledge conflict 显式化
 - insufficient evidence 时的保守 `no-trade / wait`
+- explanation 必须带 setup / rule / source 回链
+- 缺失 `source_refs`、fake wiki ref、忽略 `not_applicable`、把 conflict 伪装成 clean signal 都直接判 fail
 
 ### M8C
 

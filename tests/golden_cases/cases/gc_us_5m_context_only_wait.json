@@ -1,0 +1,32 @@
+{
+  "case_id": "gc_us_5m_context_only_wait",
+  "market": "US",
+  "timeframe": "5m",
+  "expected_context": {
+    "market_cycle": "transition",
+    "resolution": "insufficient_evidence"
+  },
+  "allowed_setups": [],
+  "forbidden_setups": [
+    "signal_bar_entry_placeholder"
+  ],
+  "required_source_refs": [
+    "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+    "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+  ],
+  "allowed_actions": [
+    "wait",
+    "no-trade"
+  ],
+  "must_explain": [
+    "insufficient evidence",
+    "knowledge refs"
+  ],
+  "must_not_claim": [
+    "validated_entry_trigger",
+    "trend_confirmed"
+  ],
+  "knowledge_boundary": "证据不足时允许保守 wait/no-trade，不得强行给单。",
+  "confidence_floor": "low",
+  "expected_resolution": "conservative_wait"
+}

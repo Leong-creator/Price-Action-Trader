@@ -1,0 +1,37 @@
+{
+  "case_id": "gc_hk_15m_placeholder_setup_research_only",
+  "market": "HK",
+  "timeframe": "15m",
+  "expected_context": {
+    "market_cycle": "trend",
+    "resolution": "research_only_no_trade"
+  },
+  "allowed_setups": [
+    "signal_bar_entry_placeholder"
+  ],
+  "forbidden_setups": [
+    "execution_ready_signal"
+  ],
+  "required_source_refs": [
+    "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+    "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+    "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md"
+  ],
+  "allowed_actions": [
+    "no-trade"
+  ],
+  "must_explain": [
+    "setup=signal_bar_entry_placeholder",
+    "candidate explanation",
+    "not_applicable guard active",
+    "knowledge refs"
+  ],
+  "must_not_claim": [
+    "execution-ready",
+    "live-ready",
+    "confirmed_target_rule"
+  ],
+  "knowledge_boundary": "placeholder setup 只能做 research-only explanation，不得变成可执行交易结论。",
+  "confidence_floor": "low",
+  "expected_resolution": "no_trade"
+}
