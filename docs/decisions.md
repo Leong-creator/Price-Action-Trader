@@ -54,3 +54,8 @@
 
 - 日期：2026-04-17
 - 结论：在重新评估真实 broker、真实账户或 live execution 之前，必须先完成 `M8：可靠性验证`。M8 的首目标是验证知识约束一致性、研究链可复现、paper-only 执行链安全性，以及真实输入下仍然保守稳定；在 M8 完成前，系统继续停留在 `paper / simulated`，不重开 broker/live 讨论。
+
+## D-0012 阶段整合与高风险合并规则冻结
+
+- 日期：2026-04-17
+- 结论：对于低/中风险阶段，验收通过、相关测试全绿、文档同步完成、且无未解决 blocker 后，合并到稳定基线分支是最后一个必做动作，不得拖到整个项目结束后再统一合并。`src/execution/`、`src/risk/`、`src/broker/` 及任何 `live / real-money / real-account` 路径属于高风险模块，只能自动准备合并材料，不得自动最终合并，必须等待用户明确批准。当前 `M8B` 已通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进 `feature/m7-broker-api-assessment`；`M8C` 尚未开始。

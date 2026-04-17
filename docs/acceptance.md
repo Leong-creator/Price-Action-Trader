@@ -247,6 +247,10 @@
 - 明确要求资料不足时允许且鼓励 `no-trade / wait`。
 - reviewer 与 qa 都必须把 “无伪造知识引用、无忽略不适用条件、无强行给方向” 作为强制审查项。
 - M8B 不得通过新增规则或放宽适用边界来“修复”测试结果。
+- 当前整合状态：
+  - 已于 2026-04-17 通过 `tests/reliability` 7 项与 `tests/unit` 57 项验证。
+  - 已通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 合并到 `feature/m7-broker-api-assessment`。
+  - M8C 尚未开始。
 
 ### M8C：离线端到端可靠性测试
 

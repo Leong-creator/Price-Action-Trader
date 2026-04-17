@@ -11,7 +11,7 @@
 
 ## 当前分支
 
-- `integration/m8-reliability-validation`
+- `feature/m7-broker-api-assessment`
 
 ## 已完成
 
@@ -57,6 +57,7 @@
 - M8B 已在 `tests/golden_cases/cases/` 落盘 5 个 golden cases，覆盖 placeholder setup、news role conflict、insufficient evidence、not_applicable hard gate、missing/fake refs hard fail
 - M8B 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`
 - M8B 已验证 reliability suite 7 项通过，且原有 `tests/unit/` 57 项无回归
+- M8B 已于 2026-04-17 通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`
 
 ## 当前阻塞
 
@@ -65,7 +66,7 @@
 
 ## 下一步
 
-- 继续 M8：优先进入 M8C 离线端到端可靠性测试，而不是继续 broker
-- 复用 `tests/reliability/`、`scripts/run_reliability_suite.py` 与 M8B 的 alignment gates，开始扩展 offline E2E 的 determinism、future leakage、risk-before-fill 与 audit/review traceability 红线
-- 在 `integration/m8-reliability-validation` 上保持 `paper / simulated` 与 `no-go` 边界
+- M8C 尚未开始；本轮只完成 M8B 整合进稳定基线
+- 若下一轮启动 M8C，必须从最新稳定基线重新开分支，而不是继续沿用已完成的开发分支
+- 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API

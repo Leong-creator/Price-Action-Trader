@@ -12,7 +12,8 @@
 - M6 已完成新闻过滤与复盘整合，且保持新闻只作辅助因子。
 - M7 已完成正式券商 API readiness assessment，当前冻结结论为 `no-go`。
 - 当前分析基线固定为 `feature/m7-broker-api-assessment`。
-- 当前实施分支已切换到 `integration/m8-reliability-validation`，用于启动 M8A。
+- `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
+- `M8C` 尚未启动。
 
 ## 2. 执行总原则
 
@@ -475,6 +476,7 @@
   - 已在 `tests/golden_cases/cases/` 落盘 5 个最小 golden cases，覆盖 placeholder setup、news role conflict、insufficient evidence、not_applicable hard gate、missing/fake refs hard fail。
   - 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`。
   - 已验证 explanation 必须存在且回链到 setup/rule/source，且 `wait / no-trade` 在证据不足场景下视为合格结果。
+  - 已于 2026-04-17 通过 merge commit `0047100` 整合进稳定基线 `feature/m7-broker-api-assessment`。
 
 ### M8C：离线端到端可靠性测试
 
@@ -573,8 +575,8 @@
 - 当前阶段：阶段 8：可靠性验证（进行中）。
 - 当前 milestone：M8B：知识库对齐测试（已完成）。
 - 当前下一步：
-  - 从 `integration/m8-reliability-validation` 继续推进 M8，优先启动 M8C：离线端到端可靠性测试
-  - 复用已落盘的 `tests/golden_cases/`、`tests/reliability/` 与 `src/strategy/alignment.py`，向 data -> strategy -> backtest -> risk -> execution -> news -> review 闭环扩展离线红线测试
+  - 本轮已完成 `M8B` 整合，当前稳定基线为 `feature/m7-broker-api-assessment`
+  - `M8C` 尚未开始；若下一轮启动，必须从最新稳定基线重新开分支
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 
