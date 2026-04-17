@@ -213,7 +213,8 @@ def deterministic_generated_at(paths: list[Path]) -> str:
 
 
 def normalize_text(text: str) -> str:
-    text = text.replace("\x00", " ").replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", " ", text)
     text = re.sub(r"[\t\f\v]+", " ", text)
     text = re.sub(r"[ ]{2,}", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -725,6 +726,8 @@ def looks_like_low_value_statement(text: str) -> bool:
         return True
     if re.match(r"^[%+~·•-]", normalized):
         return True
+    if re.match(r"^[：:，,；;、)\]】】]", normalized):
+        return True
     if any(pattern.match(normalized) for pattern in _SECTION_HEADING_PATTERNS):
         return True
     if re.search(r"(?:\b[A-Za-z]\s+){3,}[A-Za-z]\b", normalized):
@@ -737,13 +740,17 @@ def looks_like_low_value_statement(text: str) -> bool:
             return True
     if re.match(r"^[a-z]", normalized):
         return True
-    if re.search(r"[,(/-]$", normalized):
+    if re.search(r"[,，;；(/-]$", normalized):
         return True
     if re.search(r"[:：]\s*$", normalized):
         return True
-    if normalized.endswith("?") and lowered.startswith(_QUESTION_HEADING_PREFIXES):
+    if lowered.startswith(_QUESTION_HEADING_PREFIXES):
         return True
-    if not has_cjk and re.search(r"\b(or|and|to|of|for|with|than|from|on|in|at|but)$", lowered):
+    if re.search(r"\b(?:19|20)\d{2}\b|\b\d{1,2}:\d{2}\b", normalized):
+        return True
+    if not has_cjk and re.search(r"\b\d{4}(?:\.\d{1,2})?\b", normalized):
+        return True
+    if not has_cjk and re.search(r"\b(or|and|to|of|for|with|than|from|on|in|at|but|a|an)$", lowered):
         return True
     return False
 
@@ -800,6 +807,7 @@ def build_knowledge_atoms(
             "review_only",
         ]
 
+        seen_statement_fingerprints: set[str] = set()
         for chunk in source_chunks:
             content = chunk["chunk_text"]
             atoms.append(
@@ -828,6 +836,12 @@ def build_knowledge_atoms(
             )
 
             for fragment_index, fragment in enumerate(extract_statement_fragments(content), start=1):
+                fingerprint = " ".join(
+                    re.sub(r"[^\w\s]+", " ", fragment.lower()).split()
+                )
+                if fingerprint in seen_statement_fingerprints:
+                    continue
+                seen_statement_fingerprints.add(fingerprint)
                 atoms.append(
                     _base_atom(
                         atom_type="statement",

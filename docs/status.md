@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8B.2a：Knowledge Atomization 基础层（已完成）
+- 当前子阶段：M8B.2a.1：Statement Quality Audit + Merge Gate（已完成）
 
 ## 当前分支
 
-- `feature/m8b2-knowledge-atomization-callable-access`
+- `feature/m7-broker-api-assessment`
 
 ## 已完成
 
@@ -86,10 +86,15 @@
   - 已补齐 5 份方方土笔记 source page 与 2 份 Brooks PPT per-file source page
   - 当前 source coverage 结果为 `parsed=9 / partial=1 / blocked=0`，未触发 `blocked >= 4` 熔断
   - 当前 partial source 为 `方方土视频笔记 - 楔形.pdf`，原因为 `1 page(s) produced no stable text`
-  - 已落盘 `statement` atom，当前原子统计为：`statement=14075`、`source_note=5492`、`open_question=24`、`concept=1`、`setup=1`、`rule=1`
+  - 已落盘 `statement` atom，当前原子统计为：`statement=11171`、`source_note=5492`、`open_question=24`、`concept=1`、`setup=1`、`rule=1`
   - 关键 curated atoms 已形成 evidence-backed atom：`market-cycle-overview`、`signal-bar-entry-placeholder`、`m3-research-reference-pack`
   - 已新增 `tests/reliability/test_kb_coverage.py`、`test_knowledge_atoms.py`、`test_callable_access.py`
   - 已通过 `tests/reliability` 39 项与 `tests/unit` 60 项回归
+  - M8B.2a.1 已完成 statement 质量审计与 merge gate，审计结论为 `pass_with_small_fixes`
+  - 已完成最小修复：收紧 statement 提取条件，去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片，并对同一 source 内的 statement 做保守去重
+  - 当前 statement 分布为：`al_brooks_ppt=11048`、`fangfangtu_transcript=81`、`fangfangtu_notes=42`
+  - 当前重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`
+  - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`
 
 ## 当前阻塞
 
@@ -98,7 +103,7 @@
 
 ## 下一步
 
-- 当前下一步不是自动启动 `M8B.2b`，而是保持 `2b` 未开始状态；只有在 `2a` 全部测试通过、未触发熔断且 reviewer / qa 通过后，才允许进入 `M8B.2b`。
-- 当前 `M8B.2a` 已满足进入 `2b` 的技术前提，但本轮严格停在 `2a`。
+- 当前下一步不是自动启动 `M8B.2b`，而是保持 `2b` 未开始状态；`2b` 必须从最新稳定基线重新开分支启动。
+- 当前 `M8B.2a` 已完成审计并整合进稳定基线，但本轮严格停在 `2a`，不进入 `2b`。
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界。
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API。

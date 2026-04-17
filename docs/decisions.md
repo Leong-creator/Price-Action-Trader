@@ -74,3 +74,8 @@
 
 - 日期：2026-04-17
 - 结论：`M8B.2` 拆分为 `M8B.2a` 与 `M8B.2b`。`M8B.2a` 只允许建设 source registry、chunk registry、knowledge atom schema、builders/validators 与 callable index；`M8B.2b` 只有在 `2a` 全部测试通过、未触发熔断、且 reviewer / qa 通过后，才允许接 strategy / explanation / review / report。`statement` 是中间层 callable atom，默认 `draft`，不是 executable rule，不得参与 trigger 判定。若 10 个 in-scope source 中 `blocked >= 4`、关键 curated atoms 无法形成稳定 evidence-backed atom、或 `statement` 抽取无法稳定回溯证据，则必须停在 `M8B.2a`，不得进入 `2b`。
+
+## D-0016 M8B.2a 审计与整合门禁冻结
+
+- 日期：2026-04-17
+- 结论：`M8B.2a` 在进入稳定基线前必须先经过 statement 质量审计；只有当审计结论达到 `pass` 或 `pass_with_small_fixes`、相关测试通过、文档同步完成、且无 blocker 时，才允许作为低/中风险子阶段整合进稳定基线。当前 `M8B.2a.1` 的审计结论为 `pass_with_small_fixes`：已通过最小修复去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片并做保守去重，随后通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进 `feature/m7-broker-api-assessment`。`M8B.2b` 仍未开始，且必须从最新稳定基线重新开分支。

@@ -361,9 +361,9 @@
 
 ## 15. M8 可靠性验证
 
-- 分支：`integration/m8-reliability-validation`（M8A/M8B 已完成）；当前知识原子化分支：`feature/m8b2-knowledge-atomization-callable-access`
+- 分支：`integration/m8-reliability-validation`（M8A/M8B 已完成）；`M8B.2a` 已从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`
 - 当前状态：进行中
-- 当前子阶段：M8B.2a：Knowledge Atomization 基础层（已完成）
+- 当前子阶段：M8B.2a.1：Statement Quality Audit + Merge Gate（已完成）
 - 目标：以行为可靠性而不是功能扩展为首目标，验证 M0-M7 既有交付物在知识约束、研究链可复现性、paper-only 安全性和真实输入下的保守稳定性。
 - 总边界：
   - 默认运行边界仍为 `paper / simulated`
@@ -530,10 +530,13 @@
   - 已新增 5 份方方土笔记 source page 与 2 份 Brooks PPT per-file source page；现有 `al-brooks-price-action-ppt.md` 继续保留为 family overview。
   - 已用 `pypdf` 构建 `source_manifest.json`、`chunk_manifest.jsonl`、`knowledge_atoms.jsonl` 与 `knowledge_callable_index.json`。
   - 当前 source coverage 结果为 `parsed=9 / partial=1 / blocked=0`，partial 来源是 `方方土视频笔记 - 楔形.pdf`，原因为 `1 page(s) produced no stable text`。
-  - 已落盘 `statement` callable atom，且保持 `draft`、evidence-backed、无 `strategy_candidate`；当前 atom 统计为 `statement=14075`、`source_note=5492`、`open_question=24`、`concept=1`、`setup=1`、`rule=1`。
+  - 已落盘 `statement` callable atom，且保持 `draft`、evidence-backed、无 `strategy_candidate`；当前 atom 统计为 `statement=11171`、`source_note=5492`、`open_question=24`、`concept=1`、`setup=1`、`rule=1`。
   - 关键 curated atoms `market-cycle-overview`、`signal-bar-entry-placeholder` 与 `m3-research-reference-pack` 已形成 evidence-backed atom。
   - 已通过 `python scripts/validate_kb_coverage.py`、`python scripts/validate_knowledge_atoms.py`、`python -m unittest discover -s tests/reliability -v` 与 `python -m unittest discover -s tests/unit -v`。
-  - 当前未触发熔断，且仍严格停在 `2a`，没有新增 strategy / explanation / review / report 接线。
+  - M8B.2a.1 已完成 statement 质量审计，结论为 `pass_with_small_fixes`；最小修复仅限于收紧 statement 提取条件、去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片，并对同一 source 内的明显重复做保守去重。
+  - 审计后 statement 分布为：`al_brooks_ppt=11048`、`fangfangtu_transcript=81`、`fangfangtu_notes=42`；重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`。
+  - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`。
+  - 当前未触发熔断，且仍严格停在 `2a`；`M8B.2b` 未开始，后续必须从最新稳定基线重新开分支。
 
 ### M8B.2b：Callable 接入 Strategy / Explanation / Review / Report
 

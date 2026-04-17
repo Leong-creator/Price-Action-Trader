@@ -48,8 +48,20 @@ class KnowledgeAtomTests(unittest.TestCase):
                 for content in statements
             )
         )
-        self.assertTrue(all(not content.endswith((",", "(", "/", "-")) for content in statements))
-        self.assertTrue(all(not content.lower().startswith(("what ", "why ", "when ", "where ", "who ", "how ")) or not content.endswith("?") for content in statements))
+        self.assertTrue(all(not content.endswith((",", "，", ";", "；", "(", "/", "-")) for content in statements))
+        self.assertTrue(
+            all(
+                not re.search(r"\b(?:19|20)\d{2}\b|\b\d{1,2}:\d{2}\b", content)
+                for content in statements
+            )
+        )
+        self.assertTrue(
+            all(
+                not content.lower().startswith(("what ", "why ", "when ", "where ", "who ", "how "))
+                for content in statements
+            )
+        )
+        self.assertTrue(all(not content.startswith(("：", ":", "，", ",", "；", ";")) for content in statements))
         self.assertTrue(all(not content[:1].islower() for content in statements if content and content[0].isascii()))
         self.assertTrue(all(not re.search(r"(?:\\b[A-Za-z]\\s+){3,}[A-Za-z]\\b", content) for content in statements))
 
