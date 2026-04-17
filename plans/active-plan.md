@@ -534,7 +534,7 @@
   - 关键 curated atoms `market-cycle-overview`、`signal-bar-entry-placeholder` 与 `m3-research-reference-pack` 已形成 evidence-backed atom。
   - 已通过 `python scripts/validate_kb_coverage.py`、`python scripts/validate_knowledge_atoms.py`、`python -m unittest discover -s tests/reliability -v` 与 `python -m unittest discover -s tests/unit -v`。
   - M8B.2a.1 已完成 statement 质量审计，结论为 `pass_with_small_fixes`；最小修复仅限于收紧 statement 提取条件、去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片，并对同一 source 内的明显重复做保守去重。
-  - 审计后 statement 分布为：`al_brooks_ppt=11048`、`fangfangtu_transcript=81`、`fangfangtu_notes=42`；重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`。
+  - 审计后 statement 分布为：`al_brooks_ppt=11042`、`fangfangtu_transcript=88`、`fangfangtu_notes=41`；重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`。
   - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`。
   - 当前未触发熔断，且仍严格停在 `2a`；`M8B.2b` 未开始，后续必须从最新稳定基线重新开分支。
 

@@ -92,7 +92,7 @@
   - 已通过 `tests/reliability` 39 项与 `tests/unit` 60 项回归
   - M8B.2a.1 已完成 statement 质量审计与 merge gate，审计结论为 `pass_with_small_fixes`
   - 已完成最小修复：收紧 statement 提取条件，去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片，并对同一 source 内的 statement 做保守去重
-  - 当前 statement 分布为：`al_brooks_ppt=11048`、`fangfangtu_transcript=81`、`fangfangtu_notes=42`
+  - 当前 statement 分布为：`al_brooks_ppt=11042`、`fangfangtu_transcript=88`、`fangfangtu_notes=41`
   - 当前重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`
   - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`
 

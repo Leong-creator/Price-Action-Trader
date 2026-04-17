@@ -312,7 +312,7 @@
   - `statement` 已落盘并满足 evidence-backed / non-executable / non-trigger 约束
   - M8B.2a.1 已完成 statement 质量审计，结论为 `pass_with_small_fixes`
   - 审计后的最小修复只限于：收紧 statement 提取条件、去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片、修正同一 source 内的明显重复
-  - 审计后 statement 分布为：`al_brooks_ppt=11048`、`fangfangtu_transcript=81`、`fangfangtu_notes=42`
+  - 审计后 statement 分布为：`al_brooks_ppt=11042`、`fangfangtu_transcript=88`、`fangfangtu_notes=41`
   - 审计后噪音门槛结果为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`
   - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 合并进稳定基线 `feature/m7-broker-api-assessment`
   - `M8B.2b` 仍未开始，必须从最新稳定基线重新开分支
