@@ -485,6 +485,8 @@
   - 已保持 `paper / simulated`
   - 已保持 trigger 逻辑不变
   - 已保持未进入期权、broker、live、real-money
+  - 已完成第二标的扩展验证：`NVDA / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`
+  - 第二标的扩展继续使用相同的 session / risk reset / duplicate protection / slippage / fee / `knowledge_trace` 契约，且 trigger 语义不变
 
 ### Knowledge Reference Repair Track / 阶段 A：Trace Fidelity & Reference Honesty Repair
 

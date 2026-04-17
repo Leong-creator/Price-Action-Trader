@@ -104,10 +104,86 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
             self.assertEqual(summary["session_count"], 2)
             self.assertEqual(session_quality["overall"]["complete_sessions"], 2)
             self.assertEqual(len(session_summary["sessions"]), 2)
+            self.assertIn("标的：SPY", report_text)
+            self.assertIn("当前 intraday pilot 只覆盖 SPY 15m regular session", report_text)
             self.assertIn("paper / simulated", report_text)
             self.assertIn("当前仍未进入期权、broker、live、real-money", report_text)
             self.assertIn("actual evidence family 分布", report_text)
             self.assertIn("<= ", report_text)
+
+    def test_intraday_outputs_follow_configured_symbol(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            config_path = temp_root / "intraday_nvda.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "title": "Intraday Fixture Pilot NVDA",
+                        "description": "Fixture-backed NVDA intraday pilot.",
+                        "start": "2026-01-05",
+                        "end": "2026-01-06",
+                        "interval": "15m",
+                        "cache_dir": str(temp_root / "cache"),
+                        "report_dir": str(temp_root / "reports"),
+                        "source_order": ["yfinance"],
+                        "instrument": {
+                            "ticker": "NVDA",
+                            "symbol": "NVDA",
+                            "label": "NVIDIA Corporation",
+                            "market": "US",
+                            "timezone": "America/New_York",
+                            "demo_role": "fixture"
+                        },
+                        "risk": {
+                            "starting_capital": "25000",
+                            "risk_per_trade": "100",
+                            "max_total_exposure": "25000",
+                            "max_symbol_exposure_ratio": "1.00",
+                            "max_daily_loss": "1000",
+                            "max_consecutive_losses": 4
+                        },
+                        "session": {
+                            "timezone": "America/New_York",
+                            "regular_open": "09:30",
+                            "regular_close": "16:00",
+                            "expected_bars_per_session": 26,
+                            "allow_extended_hours": False
+                        },
+                        "costs": {
+                            "slippage_bps": "2",
+                            "fee_per_order": "0"
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = MODULE.load_intraday_pilot_config(config_path)
+            cache_path = MODULE.build_intraday_cache_path(config, source="yfinance")
+            rows = build_session_rows(
+                date.fromisoformat("2026-01-05"),
+                symbol="NVDA",
+                start_price="210",
+            ) + build_session_rows(
+                date.fromisoformat("2026-01-06"),
+                symbol="NVDA",
+                start_price="218",
+            )
+            write_intraday_csv(cache_path, rows)
+            write_metadata(cache_path.with_suffix(".metadata.json"), source="fixture", row_count=len(rows))
+
+            outcome = MODULE.create_intraday_pilot_run(
+                config,
+                refresh_data=False,
+                run_id="intraday_nvda_fixture",
+            )
+            report_dir = Path(outcome["report_dir"])
+            summary = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
+            report_text = (report_dir / "report.md").read_text(encoding="utf-8")
+
+            self.assertEqual(summary["symbol"], "NVDA")
+            self.assertIn("标的：NVDA", report_text)
+            self.assertIn("当前 intraday pilot 只覆盖 NVDA 15m regular session", report_text)
 
     def test_incomplete_session_is_skipped_and_logged_as_no_trade_wait(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -125,9 +201,9 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                         "report_dir": str(temp_root / "reports"),
                         "source_order": ["yfinance"],
                         "instrument": {
-                            "ticker": "SPY",
-                            "symbol": "SPY",
-                            "label": "SPDR S&P 500 ETF",
+                            "ticker": "NVDA",
+                            "symbol": "NVDA",
+                            "label": "NVIDIA Corporation",
                             "market": "US",
                             "timezone": "America/New_York",
                             "demo_role": "fixture"
@@ -174,6 +250,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
             session_quality = json.loads((report_dir / "session_quality.json").read_text(encoding="utf-8"))
             session_summary = json.loads((report_dir / "session_summary.json").read_text(encoding="utf-8"))
             no_trade_lines = (report_dir / "no_trade_wait.jsonl").read_text(encoding="utf-8").splitlines()
+            no_trade_records = [json.loads(line) for line in no_trade_lines]
 
             self.assertEqual(session_quality["overall"]["skipped_sessions"], 1)
             skipped = [item for item in session_summary["sessions"] if not item["used_for_pilot"]]
@@ -181,6 +258,14 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
             self.assertEqual(skipped[0]["skipped_reason"], "data_gap_or_incomplete_session")
             self.assertTrue(
                 any("data_gap_or_incomplete_session" in line for line in no_trade_lines)
+            )
+            self.assertTrue(
+                any(
+                    item["symbol"] == "NVDA"
+                    and item["timeframe"] == "15m"
+                    and item["reason_code"] == "data_gap_or_incomplete_session"
+                    for item in no_trade_records
+                )
             )
 
 

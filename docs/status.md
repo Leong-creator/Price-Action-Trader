@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：Knowledge Reference Repair Track / 阶段 B：Curated Promotion Minimal Set（已完成并整合进 `main`）
+- 当前子阶段：M8C.2 第二标的日内验证扩展（已完成并整合进 `main`）
 
 ## 当前分支
 
@@ -145,6 +145,9 @@
     - source family 失衡保护继续生效，Brooks statement 数量不影响 trigger 或权重
   - 当前示例 run `m8c2_intraday_pilot_spy_15m` 在 `SPY / 15m / 2026-03-30 ~ 2026-04-16` 条件下输出：总收益率 `0.0832%`、最大回撤 `0.9789%`、交易 `25` 笔、blocked signals `8`、`no_trade_wait` `285`；仍明确保持 `paper / simulated`。
   - 已新增 `tests/unit/test_intraday_pilot.py` 与 `tests/reliability/test_intraday_pilot_validation.py`，并通过现有 `tests/reliability` / `tests/unit` / public demo smoke 回归。
+  - 已完成第二标的扩展验证：新增 `config/examples/intraday_pilot_nvda_15m.json`，并生成 `reports/backtests/m8c2_intraday_pilot_nvda_15m/`。
+  - 当前示例 run `m8c2_intraday_pilot_nvda_15m` 在 `NVDA / 15m / 2026-03-30 ~ 2026-04-16` 条件下输出：总收益率 `0.8793%`、最大回撤 `0.0000%`、交易 `2` 笔、blocked signals `27`、`no_trade_wait` `310`；仍明确保持 `paper / simulated`。
+  - 第二标的扩展未改 trigger，仍保持 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee、`no-trade / wait` 与 `knowledge_trace` 兼容边界不变。
 - Knowledge Reference Repair / 阶段 A 已完成：
   - 已把 user-facing `actual hit refs` 与 `bundle support refs` 分层：`Signal`、`knowledge_trace.json`、`summary.json`、`no_trade_wait.jsonl` 现已显式区分 visible actual evidence 与补充性 support refs。
   - 已修复 `knowledge_trace` 可见层语义：broad registry/support 类型的 `m3-research-reference-pack` 不再默认作为 visible trace 命中展示，改为仅进入 debug/support 层与 bundle support refs。
@@ -170,7 +173,7 @@
 ## 下一步
 
 - 当前下一步不是扩 broker/live；Knowledge Reference Repair / 阶段 B 已整合进 `main`，当前仍不进入期权、broker、live 或 real-money。
-- 若继续当前验证主线，优先在 `paper / simulated` 边界内重跑或扩展现有 validation（例如复跑 `SPY 15m` 或扩第二个高流动性标的），验证 promoted curated evidence 在更多窗口与标的上的表现；不进入新的 trigger 扩写。
+- 若继续当前验证主线，优先在 `paper / simulated` 边界内扩更长窗口或第三个高流动性标的，继续验证 promoted curated evidence 在更多样本上的表现；不进入新的 trigger 扩写。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
