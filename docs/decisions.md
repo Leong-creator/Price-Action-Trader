@@ -94,3 +94,8 @@
 
 - 日期：2026-04-17
 - 结论：`M8C.1` 已作为低/中风险验证子阶段通过验收，允许整合进稳定基线 `feature/m7-broker-api-assessment`。其整合只代表 long-horizon daily validation、walk-forward split、regime 摘要、structured `no_trade / wait` 与 knowledge trace coverage 已进入稳定基线；不代表 `M8C.2` 已启动，不代表进入期权，不代表 trigger 逻辑发生变化，也不代表 broker/live/real-money 边界被放宽。
+
+## D-0020 主线正规化到 main
+
+- 日期：2026-04-17
+- 结论：自当前轮次起，`main` 是唯一长期稳定基线。所有新的 `feature/*`、`fix/*`、`docs/*`、`test/*`、`integration/*` 分支都从 `main` 切出；低/中风险阶段验收通过后的默认合并目标也改为 `main`。`src/execution/`、`src/risk/`、`src/broker/` 及任何 `live / real-money / real-account` 路径仍属于高风险模块，可以自动准备合并，但未经用户明确批准不得最终合并到 `main`。`feature/m7-broker-api-assessment` 只保留为历史阶段/里程碑分支，不再作为未来默认合并目标。

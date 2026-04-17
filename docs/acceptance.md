@@ -1,5 +1,13 @@
 # 阶段验收
 
+## 分支治理补充
+
+- `main` 是唯一长期稳定基线。
+- 所有新的 `feature/*`、`fix/*`、`docs/*`、`test/*` 分支都从 `main` 切出。
+- 低/中风险阶段验收通过后，默认合并目标是 `main`。
+- `src/execution/`、`src/risk/`、`src/broker/` 及任何 `live / real-money / real-account` 路径仍属于高风险模块，只能自动准备合并，不得自动最终合并到 `main`，必须等待用户明确批准。
+- `feature/m7-broker-api-assessment` 只保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
+
 ## 阶段 0：基础设施初始化
 
 完成条件：
