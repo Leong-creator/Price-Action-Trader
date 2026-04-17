@@ -2,11 +2,11 @@
 
 ## 当前阶段
 
-- 阶段 7：正式券商 API 接入评估（进行中）
+- 阶段 7：正式券商 API 接入评估（已完成）
 
 ## 当前 milestone
 
-- M7：正式券商 API 接入评估（进行中）
+- M7：正式券商 API 接入评估（已完成）
 
 ## 当前分支
 
@@ -43,13 +43,16 @@
 - M6 已补 `knowledge/wiki/rules/m6-news-review-evidence-pack.md`，并同步 `knowledge/wiki/index.md` 与 `knowledge/wiki/log.md`
 - M6 已覆盖无新闻、caution、block、future-event leakage、防止缺失 reference timestamp、review 中 filter / explanation / risk_hint 角色透传、以及新闻不改写 signal 主字段
 - M6 已通过 reviewer / qa 正式复审，确认新闻仍只作 filter / explanation / risk_hint，未越界到 signal / order / execution，且复盘输出保留结构化 `news_review_notes`
+- M7 已新增 `src/broker/` assessment-only contract draft 与 `tests/unit/test_broker_contract_assessment.py`
+- M7 已新增 `docs/broker-readiness-assessment.md` 与 `docs/broker-approval-checklist.md`，明确 readiness 边界、approval gates、rollback boundary 与当前 `no-go` 结论
+- M7 已通过 reviewer / qa 正式复审，确认 broker 层仍停留在 contract draft / readiness artifact，未越界到真实 broker SDK、真实账户联通或 live execution
 
 ## 当前阻塞
 
-- 无
+- 若要进入 M7 之后的任何真实 broker 联通、真实账户、外部权限或付费服务阶段，需要用户明确批准
 
 ## 下一步
 
-- 从 `feature/m7-broker-api-assessment` 启动 M7 readiness assessment
-- 先产出 `FormalBrokerAdapter` 接口草案、凭证隔离要求、模拟验证前置条件、测试策略与人工审批清单
-- 保持 assessment-only 边界，不实现真实 broker 调用链、不接真实账户、不启用 live execution
+- 保持当前结论为 `no-go`，继续停留在 paper / simulated
+- 除非用户明确批准外部权限、真实账户、付费服务或下一阶段评估，否则不进入任何真实 broker 接入实现
+- 若未来获批，必须从当前 `feature/m7-broker-api-assessment` 检查点重新评估后续阶段，而不是直接启用 live execution

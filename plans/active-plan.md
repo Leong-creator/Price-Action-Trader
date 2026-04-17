@@ -312,7 +312,7 @@
 ## 14. M7 正式券商 API 接入评估
 
 - 分支：`feature/m7-broker-api-assessment`
-- 当前状态：进行中
+- 当前状态：已完成
 - 目标：只做 readiness assessment，不做真实接入、不做真实下单、不做真实账户联通。
 - 交付内容：
   - `FormalBrokerAdapter` 接口草案
@@ -343,6 +343,12 @@
   - 凭证与审批门禁不足
 - 回退点：
   - M7 仅产生评估文档与接口草案，若越界立即整体回退
+- 实际完成摘要：
+  - 已新增 `src/broker/` assessment-only contract draft，固定 `FormalBrokerAdapterDraft`、`BrokerCredentialPolicy`、`BrokerExecutionGateDependency`、`BrokerCapabilityRequirement` 与 `BrokerAssessmentEnvelope` 最小接口草案。
+  - 已新增 `docs/broker-readiness-assessment.md` 与 `docs/broker-approval-checklist.md`，明确 capability matrix、credential isolation、approval gates、rollback boundary 与当前 `no-go` 结论。
+  - 已新增 `tests/unit/test_broker_contract_assessment.py`，覆盖 contract shape、no-live invariant、risk / execution gate dependency 与无默认凭证字段。
+  - reviewer 与 qa 已通过，确认 M7 仍停留在 readiness assessment，不含真实 broker SDK、外部网络调用、真实账户联通或 live execution 路径。
+  - 当前阶段最终结论为 `no-go`；在用户明确批准外部权限、真实账户、付费服务或下一阶段评估前，系统继续停留在 paper / simulated。
 
 ## 15. 公共接口冻结点
 
@@ -365,12 +371,12 @@
 
 ## 17. 当前阶段与下一步
 
-- 当前阶段：阶段 7：正式券商 API 接入评估。
-- 当前 milestone：M7：正式券商 API 接入评估（进行中）。
+- 当前阶段：阶段 7：正式券商 API 接入评估（已完成）。
+- 当前 milestone：M7：正式券商 API 接入评估（已完成）。
 - 当前下一步：
-  - 从 `feature/m7-broker-api-assessment` 启动 readiness assessment，先限定评估边界与交付物
-  - 产出 `FormalBrokerAdapter` 接口草案、凭证隔离要求、模拟验证前置条件、测试策略与人工审批清单
-  - 保持 assessment-only 边界，不实现真实 broker 调用链、不接真实账户、不启用 live execution
+  - 保持当前 `no-go` 结论，继续停留在 paper / simulated
+  - 除非用户明确批准外部权限、真实账户、付费服务或下一阶段评估，否则不进入任何真实 broker 接入实现
+  - 若未来获批，必须从当前 M7 检查点重新评估后续阶段，而不是直接启用 live execution
 
 ## 18. 假设
 

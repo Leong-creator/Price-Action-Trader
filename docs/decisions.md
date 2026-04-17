@@ -44,3 +44,8 @@
 
 - 日期：2026-04-17
 - 结论：M6 冻结了 `src/news/` 与 `src/review/` 的最小契约，要求新闻只能作为 filter / explanation / risk_hint 辅助因子；`evaluate_news_context(...)` 必须显式接收可验证的 `reference_timestamp` 以阻断 future-event leakage；`ReviewItem` 必须保留结构化 `news_review_notes` 与可追溯 `source_refs`；后续 M7 不得把这些评估输出误接成真实下单或 live execution 语义。
+
+## D-0010 M7 Broker Readiness 评估结论冻结
+
+- 日期：2026-04-17
+- 结论：M7 冻结了 `src/broker/` 的 assessment-only contract draft 与 readiness artifact；当前明确结论为 `no-go`，系统继续停留在 paper / simulated。后续只有在用户明确批准外部权限、真实账户、付费服务或下一阶段评估后，才允许重新讨论真实 broker 接入；在此之前不得引入真实 broker SDK、外部网络调用、真实账户联通或 live execution 路径。

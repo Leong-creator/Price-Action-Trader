@@ -185,3 +185,34 @@
   - 新闻不改写 signal 主字段
 - `python scripts/validate_kb.py`、`python scripts/build_kb_index.py --output /tmp/price-action-trader-m6-kb-index.json` 与 `python -m unittest discover -s tests/unit -v` 继续通过。
 - M6 不接入真实 broker、真实账户、正式券商 API 或 live execution，不把新闻模块升级成主信号源。
+
+## 阶段 7：正式券商 API 接入评估
+
+完成条件：
+
+- `src/broker/` 若存在，只允许包含 `FormalBrokerAdapter` 的 interface-only contract draft，不得包含真实 broker SDK、HTTP client、WebSocket client、登录、下单、改单、撤单、账户同步或外部网络依赖实现。
+- `FormalBrokerAdapter` contract draft 必须显式保留以下 assessment 边界：
+  - live execution 默认禁用
+  - 只能在既有 risk / execution gate 之后讨论未来接入
+  - 不得包含默认凭证值
+  - 不得授权真实账户联通
+- `docs/broker-readiness-assessment.md` 必须覆盖：
+  - capability matrix
+  - credential isolation
+  - simulated validation prerequisites
+  - approval gates
+  - go/no-go 模板
+  - rollback boundary
+- `docs/broker-approval-checklist.md` 必须覆盖：
+  - 人工审批清单
+  - reviewer / qa 依赖
+  - no-go 时继续停留在 paper / simulated 的默认策略
+- `python -m py_compile src/broker/__init__.py src/broker/contracts.py tests/unit/test_broker_contract_assessment.py` 通过。
+- `python -m unittest tests/unit/test_broker_contract_assessment.py -v` 通过，并至少覆盖：
+  - contract shape
+  - no-live invariant
+  - risk / execution gate dependency
+  - 无默认凭证字段
+- reviewer 必须确认 M7 产物仍是 assessment-only，不含真实接入实现。
+- qa 必须确认 readiness dossier、approval checklist、go/no-go 条件与 rollback boundary 完整。
+- M7 不接入真实 broker、不接入真实账户、不启用 live execution、不引入付费服务前置条件。
