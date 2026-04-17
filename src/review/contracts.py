@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Literal
 
 from src.news.contracts import NewsReviewNote
+from src.strategy.contracts import KnowledgeAtomHit
 
 ReviewOutcomeStatus = Literal["closed_trade", "execution_blocked", "no_trade"]
 
@@ -41,6 +42,7 @@ class ReviewItem:
     target_rule: str
     trade_outcome: ReviewTradeOutcome
     improvement_notes: tuple[str, ...]
+    kb_trace: tuple[KnowledgeAtomHit, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

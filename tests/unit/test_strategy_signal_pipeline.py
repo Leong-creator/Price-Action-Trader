@@ -46,6 +46,8 @@ class StrategySignalPipelineTests(unittest.TestCase):
         self.assertTrue(signal.invalidation)
         self.assertTrue(signal.explanation)
         self.assertTrue(signal.risk_notes)
+        self.assertTrue(signal.knowledge_trace)
+        self.assertIn(signal.knowledge_trace[0].atom_type, {"concept", "setup", "rule"})
 
     def test_signal_id_and_source_refs_are_stable(self) -> None:
         replay = build_replay(self._trend_bars())
@@ -56,11 +58,13 @@ class StrategySignalPipelineTests(unittest.TestCase):
 
         self.assertEqual(first_run[0].signal_id, second_run[0].signal_id)
         self.assertEqual(first_run[0].source_refs, second_run[0].source_refs)
+        self.assertEqual(first_run[0].knowledge_trace, second_run[0].knowledge_trace)
         self.assertIn("wiki:knowledge/wiki/concepts/market-cycle-overview.md", first_run[0].source_refs)
         self.assertIn("wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md", first_run[0].source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", first_run[0].source_refs)
         self.assertIn("raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf", first_run[0].source_refs)
         self.assertIn("wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md", first_run[0].source_refs)
+        self.assertTrue(all(hit.source_ref in first_run[0].source_refs for hit in first_run[0].knowledge_trace))
 
     def test_placeholder_knowledge_forces_low_confidence_and_risk_notes(self) -> None:
         signal = generate_signals(build_replay(self._trend_bars()))[0]

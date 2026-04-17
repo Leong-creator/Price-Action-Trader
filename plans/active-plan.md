@@ -15,7 +15,7 @@
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
 - `M8C` 已在 `integration/m8c-offline-reliability` 完成离线端到端可靠性测试。
 - `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
-- `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b` 暂未启动。
+- `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
 
 ## 2. 执行总原则
 
@@ -536,20 +536,27 @@
   - M8B.2a.1 已完成 statement 质量审计，结论为 `pass_with_small_fixes`；最小修复仅限于收紧 statement 提取条件、去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片，并对同一 source 内的明显重复做保守去重。
   - 审计后 statement 分布为：`al_brooks_ppt=11042`、`fangfangtu_transcript=88`、`fangfangtu_notes=41`；重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`。
   - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`。
-  - 当前未触发熔断，且仍严格停在 `2a`；`M8B.2b` 未开始，后续必须从最新稳定基线重新开分支。
+  - 当前未触发熔断；`M8B.2a` 已先整合进稳定基线，后续 `M8B.2b` 由最新稳定基线独立分支启动。
 
 ### M8B.2b：Callable 接入 Strategy / Explanation / Review / Report
 
-- 当前状态：未开始
+- 当前状态：已完成并整合进稳定基线
 - 启动前提：
   - `M8B.2a` 全部测试通过
   - 未触发熔断
   - reviewer 通过
   - qa 通过
 - 当前约束：
-  - `2b` 未启动前，不允许新增 `knowledge_trace`
-  - 不允许改写 legacy `source_refs` 兼容逻辑
-  - 不允许改 public demo report 的 trace 呈现
+  - trigger 逻辑保持不变
+  - `statement` / `source_note` / `contradiction` / `open_question` 只进入 trace，不进入 trigger
+  - 继续保持 `paper / simulated`
+- 实际完成摘要：
+  - 已新增 `src/strategy/knowledge_access.py`，为 callable atom 提供 query、trace resolve 与 legacy `source_refs` 兼容 helper。
+  - `Signal` 已新增 `knowledge_trace`，`ReviewItem` 已新增 `kb_trace`。
+  - public demo 已新增 `knowledge_trace.json`；Markdown `report.md` 仅展示每笔最多 3 条 trace 摘要。
+  - 已实现 source family 失衡保护：curated atom 优先、statement/source-note 去重与限量、source family 多样性控制、禁止把 atom 数量当作 confidence/trigger proxy。
+  - 已通过 `tests/reliability/test_strategy_atom_trace.py`、`tests/unit/test_strategy_signal_pipeline.py`、`tests/unit/test_news_review_pipeline.py`、`tests/unit/test_public_backtest_demo.py`、`python -m unittest discover -s tests/reliability -v` 与 `python -m unittest discover -s tests/unit -v`。
+  - 已从 `feature/m8b2b-knowledge-trace-integration` 整合回稳定基线 `feature/m7-broker-api-assessment`；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 
 ### M8C：离线端到端可靠性测试
 

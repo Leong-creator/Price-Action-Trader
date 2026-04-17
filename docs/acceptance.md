@@ -259,7 +259,7 @@
 完成条件：
 
 - `M8B.2` 已在 `plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md`、`docs/decisions.md` 与 `docs/knowledge-atomization.md` 中拆成 `2a / 2b`。
-- 当前轮次明确只执行 `2a`，不得提前进入 `2b`。
+- `2a` 实施期间只允许建设 source/chunk/atom/index 基础层，不得提前进入 `2b`。
 - 已新增：
   - `knowledge/schema/source-registry-schema.md`
   - `knowledge/schema/chunk-registry-schema.md`
@@ -315,7 +315,7 @@
   - 审计后 statement 分布为：`al_brooks_ppt=11042`、`fangfangtu_transcript=88`、`fangfangtu_notes=41`
   - 审计后噪音门槛结果为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`
   - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 合并进稳定基线 `feature/m7-broker-api-assessment`
-  - `M8B.2b` 仍未开始，必须从最新稳定基线重新开分支
+  - `M8B.2a` 已先整合进稳定基线，随后 `M8B.2b` 才从最新稳定基线独立分支启动
 
 ### M8B.2b：Callable 接入 Strategy / Explanation / Review / Report
 
@@ -326,7 +326,42 @@
 - reviewer 通过
 - qa 通过
 
-在满足以上条件前，不得启动 `2b`。
+完成条件：
+
+- 已新增 `src/strategy/knowledge_access.py`，并能读取 `knowledge_atoms.jsonl` 与 `knowledge_callable_index.json`。
+- `Signal` 必须新增 `knowledge_trace`，且每个 `KnowledgeAtomHit` 至少包含：
+  - `atom_id`
+  - `atom_type`
+  - `source_ref`
+  - `raw_locator`
+  - `match_reason`
+  - `applicability_state`
+  - `conflict_refs`
+- `ReviewItem` 必须新增 `kb_trace` 或等价结构化字段。
+- legacy `source_refs` 必须保留；可新增 helper 从 `knowledge_trace` 聚合兼容 source refs，但不得移除旧字段。
+- 现有 trigger 仍只能由当前允许的 curated `concept / setup / rule` 路径驱动。
+- `statement` / `source_note` / `contradiction` / `open_question` 只能进入 trace / explanation / review / report，不得参与 trigger。
+- trace resolver 必须有 source family 失衡保护：
+  - curated atoms 优先
+  - statement 去重与限量
+  - source family 多样性控制
+  - 不得使用 statement 数量作为 confidence 或 trigger proxy
+- `reports/backtests/<run_id>/knowledge_trace.json` 必须存在，并保留 machine-readable 全量 trace。
+- Markdown `report.md` 只允许展示精简 trace 摘要；每笔代表性交易最多 3 条，不得展开完整 atom trace。
+- 必须至少通过：
+  - `tests/reliability/test_strategy_atom_trace.py`
+  - `tests/unit/test_strategy_signal_pipeline.py`
+  - `tests/unit/test_news_review_pipeline.py`
+  - `tests/unit/test_public_backtest_demo.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- 当前完成事实：
+  - `knowledge_trace` 已接入 `Signal` / `ReviewItem` / public demo machine-readable report
+  - legacy `source_refs` 与 `kb_source_refs` 仍保留
+  - 已实现 source family 失衡保护
+  - trigger 逻辑未改变
+  - `statement` 仍未进入 trigger
+  - 项目边界仍保持 `paper / simulated`
 
 ### M8C：离线端到端可靠性测试
 

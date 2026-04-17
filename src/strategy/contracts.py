@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,17 @@ class SetupCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class KnowledgeAtomHit:
+    atom_id: str
+    atom_type: str
+    source_ref: str
+    raw_locator: dict[str, Any]
+    match_reason: str
+    applicability_state: str
+    conflict_refs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class Signal:
     signal_id: str
     symbol: str
@@ -47,3 +59,4 @@ class Signal:
     source_refs: tuple[str, ...]
     explanation: str
     risk_notes: tuple[str, ...]
+    knowledge_trace: tuple[KnowledgeAtomHit, ...] = field(default_factory=tuple)

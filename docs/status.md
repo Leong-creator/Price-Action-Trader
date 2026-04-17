@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8B.2a.1：Statement Quality Audit + Merge Gate（已完成）
+- 当前子阶段：M8B.2b：Callable 接入 Strategy / Explanation / Review / Report（已完成并整合进稳定基线）
 
 ## 当前分支
 
@@ -78,7 +78,7 @@
 - M8B.2 已拆成两个子阶段：
   - `M8B.2a`：Source Registry + Chunk Registry + Knowledge Atom Schema + Builders/Validators + Callable Index
   - `M8B.2b`：仅在 `2a` 全部测试通过、未触发熔断且 reviewer / qa 通过后，才允许接 strategy / explanation / review / report
-- M8B.2 本轮明确只执行 `2a`；`statement` 是中间层 callable atom，不是 executable rule，不得参与 trigger 判定
+- M8B.2 的长期边界保持不变：`statement` 是中间层 callable atom，不是 executable rule，不得参与 trigger 判定
 - M8B.2a 已完成：
   - 已新增 `knowledge/schema/source-registry-schema.md`、`chunk-registry-schema.md`、`knowledge-atom-schema.md`、`callable-access-contract.md`
   - 已新增 `knowledge/indices/source_manifest.json`、`chunk_manifest.jsonl`、`knowledge_atoms.jsonl`、`knowledge_callable_index.json`
@@ -95,6 +95,14 @@
   - 当前 statement 分布为：`al_brooks_ppt=11042`、`fangfangtu_transcript=88`、`fangfangtu_notes=41`
   - 当前重复/噪音摘要为：`exact_dup_extra=13`、`normalized_dup_extra=16`、`trailing_open=0`、`datey=0`、`start_punct=0`
   - 已于 2026-04-17 通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进稳定基线 `feature/m7-broker-api-assessment`
+- M8B.2b 已完成：
+  - 已新增 `src/strategy/knowledge_access.py`，提供 callable atom query、curated-first trace resolver、transitional view 与 legacy `source_refs` 聚合 helper。
+  - `Signal` 已新增 `knowledge_trace`，`ReviewItem` 已新增 `kb_trace`，并保持 legacy `source_refs` / `kb_source_refs` 兼容。
+  - `knowledge_trace` 当前只接入 trace / explanation / review / report；`statement`、`source_note`、`contradiction`、`open_question` 仍不得进入 trigger。
+  - 已新增 source family 失衡保护：curated atom 优先、statement/source-note trace 去重、限量、按 source family 做多样性控制，不允许用 atom 数量当作 confidence 或 trigger 权重。
+  - public demo 已新增 machine-readable `knowledge_trace.json`，Markdown `report.md` 只展示精简 trace 摘要，每笔代表性交易最多 3 条。
+  - 已通过 `tests/reliability/test_strategy_atom_trace.py`、`tests/unit/test_strategy_signal_pipeline.py`、`tests/unit/test_news_review_pipeline.py`、`tests/unit/test_public_backtest_demo.py`、`python -m unittest discover -s tests/reliability -v`、`python -m unittest discover -s tests/unit -v`。
+  - M8B.2b 已从 `feature/m8b2b-knowledge-trace-integration` 整合回稳定基线 `feature/m7-broker-api-assessment`。
 
 ## 当前阻塞
 
@@ -103,7 +111,7 @@
 
 ## 下一步
 
-- 当前下一步不是自动启动 `M8B.2b`，而是保持 `2b` 未开始状态；`2b` 必须从最新稳定基线重新开分支启动。
-- 当前 `M8B.2a` 已完成审计并整合进稳定基线，但本轮严格停在 `2a`，不进入 `2b`。
+- 当前下一步不是扩 broker/live，而是基于最新稳定基线继续做更长周期或更细粒度的 `paper / simulated` 验证。
+- `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界。
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API。

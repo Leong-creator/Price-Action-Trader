@@ -10,7 +10,7 @@ from src.data.schema import NewsEvent
 from src.execution.contracts import ExecutionLogEntry
 from src.news import evaluate_news_context
 from src.review import build_review_report
-from src.strategy.contracts import Signal
+from src.strategy.contracts import KnowledgeAtomHit, Signal
 
 
 class NewsReviewPipelineTests(unittest.TestCase):
@@ -127,10 +127,12 @@ class NewsReviewPipelineTests(unittest.TestCase):
         self.assertEqual(item.trade_outcome.status, "closed_trade")
         self.assertEqual(item.trade_outcome.pnl_r, Decimal("2.0000"))
         self.assertEqual(item.kb_source_refs, signal.source_refs)
+        self.assertEqual(item.kb_trace, signal.knowledge_trace)
         self.assertEqual(item.news_outcome, "caution")
         self.assertTrue(item.news_source_refs)
         self.assertEqual(item.news_review_notes[0].kind, "risk_hint")
         self.assertIn(signal.source_refs[0], report.source_refs)
+        self.assertIn(item.kb_trace[0].source_ref, report.source_refs)
         self.assertIn(item.news_source_refs[0], report.source_refs)
 
     def test_review_without_trade_still_builds_item(self) -> None:
@@ -273,6 +275,16 @@ class NewsReviewPipelineTests(unittest.TestCase):
             ),
             explanation="research-only paper signal",
             risk_notes=("research-only placeholder",),
+            knowledge_trace=(
+                KnowledgeAtomHit(
+                    atom_id="atom-test-setup",
+                    atom_type="setup",
+                    source_ref="wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+                    raw_locator={"locator_kind": "page_block", "page_no": 1, "block_index": 0},
+                    match_reason="curated_setup",
+                    applicability_state="matched",
+                ),
+            ),
         )
 
     def _news(

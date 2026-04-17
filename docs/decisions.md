@@ -78,4 +78,9 @@
 ## D-0016 M8B.2a 审计与整合门禁冻结
 
 - 日期：2026-04-17
-- 结论：`M8B.2a` 在进入稳定基线前必须先经过 statement 质量审计；只有当审计结论达到 `pass` 或 `pass_with_small_fixes`、相关测试通过、文档同步完成、且无 blocker 时，才允许作为低/中风险子阶段整合进稳定基线。当前 `M8B.2a.1` 的审计结论为 `pass_with_small_fixes`：已通过最小修复去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片并做保守去重，随后通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进 `feature/m7-broker-api-assessment`。`M8B.2b` 仍未开始，且必须从最新稳定基线重新开分支。
+- 结论：`M8B.2a` 在进入稳定基线前必须先经过 statement 质量审计；只有当审计结论达到 `pass` 或 `pass_with_small_fixes`、相关测试通过、文档同步完成、且无 blocker 时，才允许作为低/中风险子阶段整合进稳定基线。当前 `M8B.2a.1` 的审计结论为 `pass_with_small_fixes`：已通过最小修复去除明显页眉页脚 / 时间轴 / 起始标点 / 未完成碎片并做保守去重，随后通过 merge commit `23755c0` 从 `feature/m8b2-knowledge-atomization-callable-access` 整合进 `feature/m7-broker-api-assessment`。后续 `M8B.2b` 已从最新稳定基线独立分支启动并整合回稳定基线。
+
+## D-0017 M8B.2b Knowledge Trace 接入门禁冻结
+
+- 日期：2026-04-17
+- 结论：`M8B.2b` 只允许把 callable atom 层接入 `Signal / Review / report` 的 trace 能力，不允许改 trigger 逻辑。`statement`、`source_note`、`contradiction`、`open_question` 只进入 `knowledge_trace` / `kb_trace` / machine-readable report，不得参与 trigger，不得因为 source family statement 数量更多而提高 confidence 或影响触发结果。legacy `source_refs` 继续保留，`knowledge_trace.json` 作为全量机器产物落盘，Markdown 报告只展示精简 trace 摘要。当前 `M8B.2b` 已整合进稳定基线，且 trigger 逻辑未改变。

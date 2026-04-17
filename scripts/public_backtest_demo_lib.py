@@ -20,7 +20,7 @@ from src.backtest import BacktestReport, TradeRecord, run_backtest
 from src.data import DataValidationError, build_replay, load_ohlcv_csv
 from src.execution import ExecutionRequest, PaperBrokerAdapter, PaperPosition
 from src.risk import PositionSnapshot, RiskConfig, SessionRiskState, evaluate_order_request
-from src.strategy import Signal, generate_signals
+from src.strategy import Signal, generate_signals, summarize_knowledge_trace
 
 try:  # pragma: no cover - optional runtime dependency
     import matplotlib.pyplot as plt
@@ -472,6 +472,11 @@ def create_backtest_run(
     )
     write_summary_json(report_dir / "summary.json", summary)
     write_trades_csv(report_dir / "trades.csv", paper_outcome.executed_trades)
+    write_knowledge_trace_json(
+        report_dir / "knowledge_trace.json",
+        run_id=resolved_run_id,
+        paper_outcome=paper_outcome,
+    )
     write_equity_curve_png(report_dir / "equity_curve.png", paper_outcome.equity_points)
     write_markdown_report(
         report_dir / "report.md",
@@ -595,6 +600,39 @@ def build_summary_payload(
 
 
 def write_summary_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def write_knowledge_trace_json(
+    path: Path,
+    *,
+    run_id: str,
+    paper_outcome: PaperDemoOutcome,
+) -> None:
+    payload = {
+        "run_id": run_id,
+        "boundary": "paper/simulated",
+        "executed_trades": [
+            {
+                "symbol": item.instrument.symbol,
+                "signal_id": item.signal.signal_id,
+                "entry_timestamp": item.trade.entry_timestamp.isoformat(),
+                "exit_timestamp": item.trade.exit_timestamp.isoformat(),
+                "knowledge_trace": _knowledge_trace_payload(item.signal),
+            }
+            for item in paper_outcome.executed_trades
+        ],
+        "blocked_signals": [
+            {
+                "symbol": item.instrument.symbol,
+                "signal_id": item.signal.signal_id,
+                "entry_timestamp": item.entry_timestamp.isoformat(),
+                "reason_codes": list(item.reason_codes),
+                "knowledge_trace": _knowledge_trace_payload(item.signal),
+            }
+            for item in paper_outcome.blocked_signals
+        ],
+    }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
@@ -749,7 +787,7 @@ def write_markdown_report(
                     f"  进场原因：{item['explanation']}",
                     f"  出场原因：{humanize_exit_reason(item['exit_reason'])}",
                     f"  setup/context：`{item['setup_type']}` / `{item['pa_context']}`",
-                    f"  source_refs：{', '.join(item['source_refs']) if item['source_refs'] else '当前版本未提供'}",
+                    f"  trace 摘要：{_format_trace_summary(item['knowledge_trace_summary'])}",
                     f"  risk_notes：{' | '.join(item['risk_notes']) if item['risk_notes'] else '当前版本无额外风控注释'}",
                 ]
             )
@@ -810,8 +848,35 @@ def trade_to_summary_row(item: ExecutedTradeRecord) -> dict[str, Any]:
         "pa_context": item.signal.pa_context,
         "explanation": item.signal.explanation,
         "source_refs": list(item.signal.source_refs),
+        "knowledge_trace_summary": list(summarize_knowledge_trace(item.signal.knowledge_trace)),
         "risk_notes": list(item.signal.risk_notes),
     }
+
+
+def _knowledge_trace_payload(signal: Signal) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for hit in signal.knowledge_trace:
+        payload.append(
+            {
+                "atom_id": hit.atom_id,
+                "atom_type": hit.atom_type,
+                "source_ref": hit.source_ref,
+                "raw_locator": dict(hit.raw_locator),
+                "match_reason": hit.match_reason,
+                "applicability_state": hit.applicability_state,
+                "conflict_refs": list(hit.conflict_refs),
+            }
+        )
+    return payload
+
+
+def _format_trace_summary(items: list[dict[str, Any]]) -> str:
+    if not items:
+        return "当前版本未提供"
+    return " | ".join(
+        f"{item['atom_type']} {item['atom_id']} @ {item['raw_locator']}"
+        for item in items[:3]
+    )
 
 
 def compute_max_drawdown(equity_points: tuple[tuple[str, float], ...]) -> tuple[Decimal, Decimal]:

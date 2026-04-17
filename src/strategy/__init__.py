@@ -1,5 +1,5 @@
 from .context import build_context_snapshot
-from .contracts import PAContextSnapshot, SetupCandidate, Signal
+from .contracts import KnowledgeAtomHit, PAContextSnapshot, SetupCandidate, Signal
 from .alignment import (
     GoldenCase,
     KBAlignmentAssessment,
@@ -22,6 +22,16 @@ from .knowledge import (
     resolve_reference_path,
     load_strategy_knowledge,
 )
+from .knowledge_access import (
+    CallableKnowledgeAccess,
+    KnowledgeAtom,
+    KnowledgeQuery,
+    KnowledgeTransitionalView,
+    aggregate_legacy_source_refs,
+    load_default_knowledge_access,
+    render_trace_summary,
+    summarize_knowledge_trace,
+)
 from .signals import SETUP_TYPE, generate_signals, identify_setup_candidate
 
 __all__ = [
@@ -32,12 +42,18 @@ __all__ = [
     "DEFAULT_RULE_PACK_PATH",
     "DEFAULT_SETUP_PATH",
     "KnowledgePage",
+    "KnowledgeAtom",
+    "KnowledgeAtomHit",
+    "KnowledgeQuery",
     "KnowledgeReferenceError",
+    "KnowledgeTransitionalView",
     "PAContextSnapshot",
     "SETUP_TYPE",
     "SetupCandidate",
     "Signal",
     "StrategyKnowledgeBundle",
+    "CallableKnowledgeAccess",
+    "aggregate_legacy_source_refs",
     "build_context_snapshot",
     "assess_kb_alignment",
     "generate_signals",
@@ -45,9 +61,12 @@ __all__ = [
     "discover_golden_cases",
     "load_alignment_knowledge",
     "load_default_knowledge",
+    "load_default_knowledge_access",
     "load_golden_case",
     "load_knowledge_page",
     "reference_exists",
+    "render_trace_summary",
     "resolve_reference_path",
     "load_strategy_knowledge",
+    "summarize_knowledge_trace",
 ]

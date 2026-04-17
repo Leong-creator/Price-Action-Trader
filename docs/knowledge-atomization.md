@@ -92,7 +92,25 @@
 - explanation / review / report 的 atom trace 接线
 - legacy `source_refs` 的兼容映射
 
-本轮 `M8B.2a` 明确不执行这些内容。
+当前已完成的 `M8B.2b` 事实：
+
+- `knowledge_trace` 已接入 `Signal`
+- `kb_trace` 已接入 `ReviewItem`
+- public demo 已新增 machine-readable `knowledge_trace.json`
+- Markdown `report.md` 只展示精简 trace 摘要，不展开完整 atom trace
+- 已实现 source family 失衡保护：curated atoms 优先，statement/source-note trace 去重、限量、按 source family 做多样性控制
+
+本轮完成后，已进入 trace 但仍未进入 trigger 的层：
+
+- source-level callable
+- statement-level callable
+- contradiction / open_question
+
+本轮完成后，仍可能进入更深决策的只有：
+
+- 当前既有的 curated executable path
+
+并且即使如此，本项目仍保持 `paper / simulated`，未扩写 broker/live。
 
 ## 熔断条件
 
