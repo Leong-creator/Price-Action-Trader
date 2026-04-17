@@ -1,0 +1,35 @@
+{
+  "case_id": "gc_us_5m_not_applicable_blocks_trade",
+  "market": "US",
+  "timeframe": "5m",
+  "expected_context": {
+    "market_cycle": "trend",
+    "resolution": "not_applicable_enforced"
+  },
+  "allowed_setups": [],
+  "forbidden_setups": [
+    "paper_orderable_signal",
+    "auto_signal"
+  ],
+  "required_source_refs": [
+    "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+    "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+    "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md"
+  ],
+  "allowed_actions": [
+    "no-trade"
+  ],
+  "must_explain": [
+    "not_applicable guard active",
+    "no executable trade claim is allowed",
+    "knowledge refs"
+  ],
+  "must_not_claim": [
+    "paper_trade_allowed",
+    "backtest_entry_allowed",
+    "execution_instruction_ready"
+  ],
+  "knowledge_boundary": "明确的 not_applicable 是硬门禁，任何绕过都应失败。",
+  "confidence_floor": "low",
+  "expected_resolution": "hard_block_to_no_trade"
+}

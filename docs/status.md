@@ -2,15 +2,16 @@
 
 ## 当前阶段
 
-- 阶段 7：正式券商 API 接入评估（已完成）
+- 阶段 8：可靠性验证（进行中）
 
 ## 当前 milestone
 
-- M7：正式券商 API 接入评估（已完成）
+- M8：可靠性验证（进行中）
+- 当前子阶段：M8B：知识库对齐测试（已完成）
 
 ## 当前分支
 
-- `feature/m7-broker-api-assessment`
+- `integration/m8-reliability-validation`
 
 ## 已完成
 
@@ -46,13 +47,25 @@
 - M7 已新增 `src/broker/` assessment-only contract draft 与 `tests/unit/test_broker_contract_assessment.py`
 - M7 已新增 `docs/broker-readiness-assessment.md` 与 `docs/broker-approval-checklist.md`，明确 readiness 边界、approval gates、rollback boundary 与当前 `no-go` 结论
 - M7 已通过 reviewer / qa 正式复审，确认 broker 层仍停留在 contract draft / readiness artifact，未越界到真实 broker SDK、真实账户联通或 live execution
+- M8A 已完成主线与门禁文档切换：`plans/active-plan.md`、`docs/acceptance.md`、`docs/status.md`、`docs/roadmap.md`、`docs/decisions.md`
+- M8A 已新增 `docs/testing-reliability.md` 与 `docs/eval-rubric.md`，冻结 M8 的测试目标、输入边界、评分维度与硬门禁
+- M8A 已新增 `docs/test-dataset-curation.md`，冻结 M8 可接受数据层级、样本元数据、脱敏与离线边界
+- M8A 已落盘 `tests/golden_cases/`、`tests/integration/`、`tests/reliability/`、`reports/reliability/` 的 discoverable 骨架目录
+- M8A 已新增 `scripts/run_reliability_suite.py`，默认运行当前 baseline unit suites，并对空目录或缺真实历史样本显式 skipped / deferred
+- M8B 已新增 `src/strategy/alignment.py`，提供最小 knowledge alignment 评估入口
+- M8B 已收紧 `src/strategy/knowledge.py` 的 `source_refs` 校验：缺失或不存在的 wiki/raw refs 现在会硬失败
+- M8B 已在 `tests/golden_cases/cases/` 落盘 5 个 golden cases，覆盖 placeholder setup、news role conflict、insufficient evidence、not_applicable hard gate、missing/fake refs hard fail
+- M8B 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`
+- M8B 已验证 reliability suite 7 项通过，且原有 `tests/unit/` 57 项无回归
 
 ## 当前阻塞
 
-- 若要进入 M7 之后的任何真实 broker 联通、真实账户、外部权限或付费服务阶段，需要用户明确批准
+- 当前无阻塞
+- 真实 broker / live 重新评估仍冻结，直到 M8 完成且用户另行批准；这不阻塞当前 M8 主线
 
 ## 下一步
 
-- 保持当前结论为 `no-go`，继续停留在 paper / simulated
-- 除非用户明确批准外部权限、真实账户、付费服务或下一阶段评估，否则不进入任何真实 broker 接入实现
-- 若未来获批，必须从当前 `feature/m7-broker-api-assessment` 检查点重新评估后续阶段，而不是直接启用 live execution
+- 继续 M8：优先进入 M8C 离线端到端可靠性测试，而不是继续 broker
+- 复用 `tests/reliability/`、`scripts/run_reliability_suite.py` 与 M8B 的 alignment gates，开始扩展 offline E2E 的 determinism、future leakage、risk-before-fill 与 audit/review traceability 红线
+- 在 `integration/m8-reliability-validation` 上保持 `paper / simulated` 与 `no-go` 边界
+- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API

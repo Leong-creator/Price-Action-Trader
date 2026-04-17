@@ -1,0 +1,36 @@
+{
+  "case_id": "gc_us_15m_news_role_conflict_must_be_explicit",
+  "market": "US",
+  "timeframe": "15m",
+  "expected_context": {
+    "market_cycle": "trend",
+    "resolution": "conflict"
+  },
+  "allowed_setups": [
+    "signal_bar_entry_placeholder"
+  ],
+  "forbidden_setups": [
+    "news_as_primary_signal",
+    "news_as_order_trigger"
+  ],
+  "required_source_refs": [
+    "wiki:knowledge/wiki/rules/m6-news-review-evidence-pack.md",
+    "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+    "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+    "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md"
+  ],
+  "allowed_actions": [
+    "conflict"
+  ],
+  "must_explain": [
+    "news role conflict",
+    "knowledge refs"
+  ],
+  "must_not_claim": [
+    "news_is_primary_signal",
+    "conflict_free_confirmed_trade"
+  ],
+  "knowledge_boundary": "news 只能是 filter/explanation/risk_hint，不能替代 setup 或 order trigger。",
+  "confidence_floor": "low",
+  "expected_resolution": "explicit_conflict"
+}

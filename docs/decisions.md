@@ -49,3 +49,8 @@
 
 - 日期：2026-04-17
 - 结论：M7 冻结了 `src/broker/` 的 assessment-only contract draft 与 readiness artifact；当前明确结论为 `no-go`，系统继续停留在 paper / simulated。后续只有在用户明确批准外部权限、真实账户、付费服务或下一阶段评估后，才允许重新讨论真实 broker 接入；在此之前不得引入真实 broker SDK、外部网络调用、真实账户联通或 live execution 路径。
+
+## D-0011 M8 可靠性验证优先级冻结
+
+- 日期：2026-04-17
+- 结论：在重新评估真实 broker、真实账户或 live execution 之前，必须先完成 `M8：可靠性验证`。M8 的首目标是验证知识约束一致性、研究链可复现、paper-only 执行链安全性，以及真实输入下仍然保守稳定；在 M8 完成前，系统继续停留在 `paper / simulated`，不重开 broker/live 讨论。
