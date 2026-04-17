@@ -30,6 +30,12 @@ OPTIONAL_SUITE_DIRS = {
     "reliability": ROOT / "tests" / "reliability",
 }
 
+OPTIONAL_SUITE_DESCRIPTIONS = {
+    "golden": "M8 golden-case catalog；无可执行测试时允许安全跳过",
+    "integration": "M8C offline E2E 集成红线；无测试样本时允许安全跳过",
+    "reliability": "M8B/M8C reliability 红线；无测试样本时允许安全跳过",
+}
+
 LOCAL_DATASET_SUFFIXES = (".csv", ".json")
 REAL_HISTORY_DATASET_DIRS = (
     ROOT / "tests" / "reliability" / "real_history",
@@ -69,7 +75,7 @@ def build_suite_specs(selected_names: list[str] | None) -> list[SuiteSpec]:
                     kind="optional",
                     location=location,
                     pattern="test_*.py",
-                    description="M8 骨架目录；无测试样本时允许安全跳过",
+                    description=OPTIONAL_SUITE_DESCRIPTIONS[name],
                 )
             )
 
@@ -140,6 +146,7 @@ def list_suites(specs: list[SuiteSpec]) -> int:
     print("  baseline    当前已存在的可靠性相关单元测试集合")
     for name, location in OPTIONAL_SUITE_DIRS.items():
         print(f"  {name:<11} {location.relative_to(ROOT)}")
+        print(f"              {OPTIONAL_SUITE_DESCRIPTIONS[name]}")
     print()
     print("Current baseline test files:")
     for pattern in BASELINE_PATTERNS:

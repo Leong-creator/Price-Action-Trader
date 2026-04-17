@@ -30,6 +30,7 @@ class ReviewItem:
     setup_type: str
     kb_source_refs: tuple[str, ...]
     pa_explanation: str
+    risk_notes: tuple[str, ...]
     news_outcome: str
     news_headlines: tuple[str, ...]
     news_source_refs: tuple[str, ...]

@@ -13,7 +13,7 @@
 - M7 已完成正式券商 API readiness assessment，当前冻结结论为 `no-go`。
 - 当前分析基线固定为 `feature/m7-broker-api-assessment`。
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
-- `M8C` 尚未启动。
+- `M8C` 已在 `integration/m8c-offline-reliability` 完成离线端到端可靠性测试，当前下一步为 M8D。
 
 ## 2. 执行总原则
 
@@ -359,9 +359,9 @@
 
 ## 15. M8 可靠性验证
 
-- 分支：`integration/m8-reliability-validation`
+- 分支：`integration/m8-reliability-validation`（M8A/M8B 已完成）；当前 M8C 分支：`integration/m8c-offline-reliability`
 - 当前状态：进行中
-- 当前子阶段：M8A：测试骨架与验收门禁落盘（已完成）
+- 当前子阶段：M8C：回测稳健性与离线端到端可靠性测试（已完成）
 - 目标：以行为可靠性而不是功能扩展为首目标，验证 M0-M7 既有交付物在知识约束、研究链可复现性、paper-only 安全性和真实输入下的保守稳定性。
 - 总边界：
   - 默认运行边界仍为 `paper / simulated`
@@ -480,7 +480,7 @@
 
 ### M8C：离线端到端可靠性测试
 
-- 当前状态：待启动
+- 当前状态：已完成
 - 目标：
   - 围绕当前最小闭环定义离线集成可靠性红线
   - 固化无 future leakage、可复现、风险先于成交、审计与复盘可追溯
@@ -511,6 +511,12 @@
   - 将 paper-only 执行红线降级为质量项
 - 回退点：
   - 如离线可靠性门禁表述模糊，回退到 M8B 检查点
+- 实际完成摘要：
+  - 已新增 `tests/integration/test_offline_e2e_pipeline.py`，覆盖 `src/data -> src/strategy -> src/backtest -> src/risk -> src/execution -> src/news -> src/review` 的离线端到端链路。
+  - 已新增 `tests/reliability/test_replay_determinism.py`、`tests/reliability/test_no_future_leakage.py`、`tests/reliability/test_audit_traceability.py`、`tests/reliability/test_forbidden_paths.py`。
+  - 已覆盖 deterministic replay 一致性、bars / news future leakage fail-fast、forbidden paths、audit / review traceability、`end_of_data`、缺 bar gap 与重复 bar 的稳健性。
+  - 已更新 `scripts/run_reliability_suite.py`，使 `integration` 与 `reliability` suites 可统一运行且继续保持 `real_historical_data=deferred`。
+  - 已通过 `tests/reliability` 18 项、`tests/integration` 4 项、`tests/unit` 57 项与统一 reliability suite 验证。
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
@@ -573,10 +579,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8B：知识库对齐测试（已完成）。
+- 当前 milestone：M8C：回测稳健性与离线端到端可靠性测试（已完成）。
 - 当前下一步：
-  - 本轮已完成 `M8B` 整合，当前稳定基线为 `feature/m7-broker-api-assessment`
-  - `M8C` 尚未开始；若下一轮启动，必须从最新稳定基线重新开分支
+  - 本轮已完成 `M8C` 的离线端到端可靠性测试，当前开发分支为 `integration/m8c-offline-reliability`
+  - 下一步才进入 `M8D`：真实历史数据稳健性 + 实时 shadow / paper 验证框架
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

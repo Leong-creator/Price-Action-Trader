@@ -52,6 +52,11 @@
 - risk-before-fill
 - audit / review traceability
 - forbidden paths
+- replay snapshot、signal 序列或 backtest 汇总在相同输入下不稳定，直接判 fail
+- bars / news 出现 future leakage，直接判 fail
+- 被 `risk_block` 或 request-binding 阻断的请求若仍进入 simulated fill，直接判 fail
+- close-path 审计字段缺失，直接判 fail
+- review 缺少 KB `source_refs`、PA explanation、risk notes 或 news traceability，直接判 fail
 
 ### M8D
 

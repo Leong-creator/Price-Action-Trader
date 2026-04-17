@@ -55,6 +55,23 @@
 
 - 目标：验证现有最小闭环的 determinism 与安全红线
 - 核心门禁：无 future leakage、同输入 deterministic、risk-before-fill、audit / review traceability、forbidden paths
+- 当前已落盘：
+  - `tests/integration/test_offline_e2e_pipeline.py`
+  - `tests/reliability/test_replay_determinism.py`
+  - `tests/reliability/test_no_future_leakage.py`
+  - `tests/reliability/test_audit_traceability.py`
+  - `tests/reliability/test_forbidden_paths.py`
+  - `scripts/run_reliability_suite.py` 已纳入 `integration` 与 `reliability` suites
+- 当前已覆盖：
+  - deterministic replay、signal 输出与 backtest 结果在同一输入下保持稳定
+  - bars / news 的 future leakage fail-fast
+  - `risk_block`、mismatched risk decision 等 forbidden paths 不得进入 simulated fill
+  - close-path audit 字段与 review 的 KB / explanation / risk / news traceability 必须完整
+  - `end_of_data`、数据不足、缺 bar gap、重复 bar 的本地静态样本稳健性
+- 当前边界说明：
+  - M8C 只使用本地静态 CSV/JSON 与极小 synthetic fixtures
+  - 不伪造真实历史结果
+  - 不进入真实 broker、真实账户或 live execution
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 

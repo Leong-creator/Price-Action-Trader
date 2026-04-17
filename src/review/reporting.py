@@ -134,6 +134,7 @@ def _build_review_item(
         setup_type=signal.setup_type,
         kb_source_refs=signal.source_refs,
         pa_explanation=signal.explanation,
+        risk_notes=signal.risk_notes,
         news_outcome=decision.outcome,
         news_headlines=decision.headline_summary,
         news_source_refs=decision.source_refs,

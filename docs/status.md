@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8B：知识库对齐测试（已完成）
+- 当前子阶段：M8C：回测稳健性与离线端到端可靠性测试（已完成）
 
 ## 当前分支
 
-- `feature/m7-broker-api-assessment`
+- `integration/m8c-offline-reliability`
 
 ## 已完成
 
@@ -58,6 +58,11 @@
 - M8B 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`
 - M8B 已验证 reliability suite 7 项通过，且原有 `tests/unit/` 57 项无回归
 - M8B 已于 2026-04-17 通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`
+- M8C 已新增 `tests/integration/test_offline_e2e_pipeline.py`，覆盖 `src/data -> src/strategy -> src/backtest -> src/risk -> src/execution -> src/news -> src/review` 的离线端到端集成链路
+- M8C 已新增 `tests/reliability/test_replay_determinism.py`、`tests/reliability/test_no_future_leakage.py`、`tests/reliability/test_audit_traceability.py`、`tests/reliability/test_forbidden_paths.py`
+- M8C 已覆盖 deterministic replay 一致性、bars / news future leakage fail-fast、forbidden paths、audit/review traceability、`end_of_data`、缺 bar gap 与重复 bar 稳健性
+- M8C 已验证 `tests/reliability` 18 项、`tests/integration` 4 项、`tests/unit` 57 项通过；`python scripts/run_reliability_suite.py` 当前合计执行 79 项本地离线测试
+- M8C 保持 `paper / simulated` 与 `no-go` 边界，未新增真实 broker、真实账户或 live execution 路径
 
 ## 当前阻塞
 
@@ -66,7 +71,7 @@
 
 ## 下一步
 
-- M8C 尚未开始；本轮只完成 M8B 整合进稳定基线
-- 若下一轮启动 M8C，必须从最新稳定基线重新开分支，而不是继续沿用已完成的开发分支
+- M8C 已完成；下一步才进入 M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+- M8D 启动前仍只允许真实历史 CSV/JSON、本地快照与实时只读输入；不得进入 broker / live
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API
