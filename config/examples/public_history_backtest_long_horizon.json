@@ -1,0 +1,99 @@
+{
+  "title": "Public History Long-Horizon Daily Validation",
+  "description": "Long-horizon walk-forward daily validation on cached public research data. Still paper/simulated only.",
+  "start": "2020-01-01",
+  "end": "2025-12-31",
+  "interval": "1d",
+  "cache_dir": "local_data/public_history",
+  "report_dir": "reports/backtests",
+  "source_order": [
+    "alpha_vantage",
+    "yfinance"
+  ],
+  "instruments": [
+    {
+      "ticker": "NVDA",
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "高贝塔成长趋势段"
+    },
+    {
+      "ticker": "TSLA",
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "高波动震荡/反复段"
+    },
+    {
+      "ticker": "SPY",
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "指数基准与相对稳态段"
+    }
+  ],
+  "risk": {
+    "starting_capital": "25000",
+    "risk_per_trade": "100",
+    "max_total_exposure": "25000",
+    "max_symbol_exposure_ratio": "1.00",
+    "max_daily_loss": "1000",
+    "max_consecutive_losses": 4
+  },
+  "splits": [
+    {
+      "name": "in_sample",
+      "label": "In-sample",
+      "start": "2020-01-01",
+      "end": "2021-12-31"
+    },
+    {
+      "name": "validation",
+      "label": "Validation",
+      "start": "2022-01-01",
+      "end": "2023-12-31"
+    },
+    {
+      "name": "out_of_sample",
+      "label": "Out-of-sample",
+      "start": "2024-01-01",
+      "end": "2025-12-31"
+    }
+  ],
+  "regimes": [
+    {
+      "name": "covid_crash_high_vol",
+      "label": "2020 高波动下跌",
+      "start": "2020-02-01",
+      "end": "2020-05-31"
+    },
+    {
+      "name": "liquidity_trend_up",
+      "label": "2020H2-2021 上升趋势",
+      "start": "2020-06-01",
+      "end": "2021-12-31"
+    },
+    {
+      "name": "macro_drawdown",
+      "label": "2022 宏观回撤",
+      "start": "2022-01-01",
+      "end": "2022-12-31"
+    },
+    {
+      "name": "recovery_rotation",
+      "label": "2023 恢复与轮动",
+      "start": "2023-01-01",
+      "end": "2023-12-31"
+    },
+    {
+      "name": "ai_momentum_and_range",
+      "label": "2024-2025 AI 动量与区间切换",
+      "start": "2024-01-01",
+      "end": "2025-12-31"
+    }
+  ]
+}

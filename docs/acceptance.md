@@ -363,7 +363,7 @@
   - `statement` 仍未进入 trigger
   - 项目边界仍保持 `paper / simulated`
 
-### M8C：离线端到端可靠性测试
+### M8 基础离线可靠性门禁
 
 完成条件：
 
@@ -381,6 +381,72 @@
 - `python scripts/run_reliability_suite.py` 必须在无真实历史样本时仍可运行，并显式保持 `real_historical_data=deferred`。
 - reviewer 必须确认离线可靠性定义没有越权到 broker / live。
 - qa 必须确认 determinism、future leakage、risk-before-fill 与 traceability 都是硬门禁而非可选质量项。
+
+### M8C：Long-Horizon & Intraday Paper Validation
+
+#### M8C.1：长周期日线验证
+
+完成条件：
+
+- 保持 daily、equity/ETF、公有历史数据缓存驱动的验证边界；不得进入 intraday、期权、broker/live/real-money。
+- 时间范围必须扩展到多个市场状态，不得只停留在 `2024H1` 单窗口。
+- 必须至少覆盖 `NVDA / TSLA / SPY` 三个 equity/ETF 标的，并提供 per-symbol breakdown。
+- 必须输出 walk-forward 风格 split 产物，至少包括：
+  - `in_sample`
+  - `validation`
+  - `out_of_sample`
+- 必须输出 regime 分层摘要，且 regime 仅用于验证分层，不得反向输入 trigger。
+- 必须新增并落盘：
+  - `summary.json`
+  - `split_summary.json`
+  - `regime_breakdown.json`
+  - `knowledge_trace_coverage.json`
+  - `no_trade_wait.jsonl`
+  - `trades.csv`
+  - `knowledge_trace.json`
+  - `report.md`
+  - `equity_curve.png`
+- 必须新增结构化 `no-trade / wait` 持久化，且最小 reason class 至少覆盖：
+  - `context_not_trend`
+  - `duplicate_direction_suppressed`
+  - `insufficient_evidence`
+  - `risk_blocked_before_fill`
+- 必须输出：
+  - total return
+  - drawdown
+  - trade count
+  - blocked signals
+  - knowledge trace 覆盖率摘要
+  - curated vs statement trace 占比摘要
+- `knowledge_trace` 与 legacy `source_refs` 必须继续兼容。
+- `statement` / `source_note` 只允许进入 trace / 报告，不得参与 trigger，不得影响 score / confidence。
+- 必须明确体现 curated atom 优先，statement 只作补充证据；不得因 Brooks statement 数量偏大而污染验证结论。
+- 必须至少通过：
+  - `tests/reliability/test_long_horizon_daily_validation.py`
+  - `tests/unit/test_public_backtest_demo.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- 当前完成事实：
+  - 已新增 `config/examples/public_history_backtest_long_horizon.json`
+  - 已把 daily public history demo 扩展到 `2020-01-01 ~ 2025-12-31`
+  - 已覆盖 `NVDA / TSLA / SPY`
+  - 已完成 walk-forward split 与 regime 摘要
+  - 已落盘 `no_trade_wait.jsonl`
+  - 已保持 `paper / simulated`，未进入期权或 intraday
+
+#### M8C.2：单标的日内试点
+
+启动前提：
+
+- `M8C.1` 已通过验收并整合进稳定基线。
+
+完成条件：
+
+- 只允许选择一个标的，优先 `SPY 15m`。
+- 必须补齐 session open/close、market hours / timezone、日内风险重置、slippage / fee 最小模型、duplicate signal protection、`no-trade / wait` 结构化输出。
+- 仍保持 `paper / simulated`，不得进入期权、broker/live/real-money。
+- `statement` / `source_note` 继续只作 trace 证据，不得进入 trigger。
+- 如实现被迫修改 `src/risk/` 或 `src/execution/` 核心语义，则停止自动合并并转高风险审批。
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 

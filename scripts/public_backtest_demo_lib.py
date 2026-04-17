@@ -5,9 +5,11 @@ import csv
 import json
 import os
 import sys
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, time
 from decimal import Decimal, ROUND_DOWN
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -17,10 +19,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.backtest import BacktestReport, TradeRecord, run_backtest
-from src.data import DataValidationError, build_replay, load_ohlcv_csv
+from src.data import DataValidationError, OhlcvRow, build_replay, load_ohlcv_csv
 from src.execution import ExecutionRequest, PaperBrokerAdapter, PaperPosition
 from src.risk import PositionSnapshot, RiskConfig, SessionRiskState, evaluate_order_request
-from src.strategy import Signal, generate_signals, summarize_knowledge_trace
+from src.strategy import (
+    Signal,
+    build_context_snapshot,
+    generate_signals,
+    identify_setup_candidate,
+    load_default_knowledge,
+    summarize_knowledge_trace,
+)
 
 try:  # pragma: no cover - optional runtime dependency
     import matplotlib.pyplot as plt
@@ -59,6 +68,8 @@ REPORT_READABILITY_NOTE = (
     "本报告仅用于公共历史数据研究演示，仍处于 paper / simulated 边界，"
     "不代表实盘能力或未来收益承诺。"
 )
+CURATED_TRACE_TYPES = frozenset({"concept", "setup", "rule"})
+SUPPORTING_TRACE_TYPES = frozenset({"source_note", "contradiction", "open_question"})
 EXIT_REASON_LABELS = {
     "target_hit": "达到固定 2R 目标",
     "stop_hit": "触及保护性止损",
@@ -107,6 +118,16 @@ class DemoConfig:
     source_order: tuple[str, ...]
     instruments: tuple[InstrumentConfig, ...]
     risk: DemoRiskSettings
+    splits: tuple["WindowConfig", ...] = ()
+    regimes: tuple["WindowConfig", ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class WindowConfig:
+    name: str
+    label: str
+    start: date
+    end: date
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +145,7 @@ class SymbolBacktestResult:
     source: str
     csv_path: Path
     metadata_path: Path
+    bars: tuple[OhlcvRow, ...]
     bars_count: int
     signals: tuple[Signal, ...]
     backtest_report: BacktestReport
@@ -156,6 +178,23 @@ class PaperDemoOutcome:
     ending_equity: Decimal
 
 
+@dataclass(frozen=True, slots=True)
+class NoTradeWaitRecord:
+    symbol: str
+    market: str
+    timeframe: str
+    timestamp: datetime
+    action: str
+    reason_code: str
+    reason_detail: str
+    decision_site: str
+    pa_context: str
+    regime_summary: str
+    source_refs: tuple[str, ...]
+    signal_id: str | None = None
+    reason_codes: tuple[str, ...] = ()
+
+
 def load_demo_config(path: str | Path) -> DemoConfig:
     config_path = _resolve_repo_path(path)
     payload = json.loads(config_path.read_text(encoding="utf-8"))
@@ -173,6 +212,8 @@ def load_demo_config(path: str | Path) -> DemoConfig:
         for item in payload["instruments"]
     )
     risk_payload = payload["risk"]
+    splits = tuple(_parse_windows(payload.get("splits", ())))
+    regimes = tuple(_parse_windows(payload.get("regimes", ())))
     return DemoConfig(
         title=payload["title"],
         description=payload.get("description", ""),
@@ -191,6 +232,8 @@ def load_demo_config(path: str | Path) -> DemoConfig:
             max_daily_loss=_decimal(risk_payload["max_daily_loss"]),
             max_consecutive_losses=int(risk_payload["max_consecutive_losses"]),
         ),
+        splits=splits,
+        regimes=regimes,
     )
 
 
@@ -313,6 +356,7 @@ def run_symbol_backtest(record: DatasetCacheRecord) -> SymbolBacktestResult:
         source=record.source,
         csv_path=record.csv_path,
         metadata_path=record.metadata_path,
+        bars=bars,
         bars_count=len(bars),
         signals=signals,
         backtest_report=backtest_report,
@@ -458,6 +502,22 @@ def create_backtest_run(
     )
     symbol_results = tuple(run_symbol_backtest(record) for record in datasets)
     paper_outcome = run_paper_demo(symbol_results, risk_settings=config.risk)
+    no_trade_wait_records = build_no_trade_wait_records(symbol_results, paper_outcome)
+    split_summary = build_window_summary(
+        windows=config.splits,
+        symbol_results=symbol_results,
+        paper_outcome=paper_outcome,
+        no_trade_wait_records=no_trade_wait_records,
+        bucket_type="split",
+    )
+    regime_breakdown = build_window_summary(
+        windows=config.regimes,
+        symbol_results=symbol_results,
+        paper_outcome=paper_outcome,
+        no_trade_wait_records=no_trade_wait_records,
+        bucket_type="regime",
+    )
+    knowledge_trace_coverage = build_knowledge_trace_coverage(symbol_results, paper_outcome)
 
     resolved_run_id = run_id or datetime.now().strftime("%Y%m%d_%H%M%S_public_demo")
     report_dir = config.report_dir / resolved_run_id
@@ -467,10 +527,18 @@ def create_backtest_run(
         config=config,
         symbol_results=symbol_results,
         paper_outcome=paper_outcome,
+        no_trade_wait_records=no_trade_wait_records,
+        split_summary=split_summary,
+        regime_breakdown=regime_breakdown,
+        knowledge_trace_coverage=knowledge_trace_coverage,
         run_id=resolved_run_id,
         report_dir=report_dir,
     )
     write_summary_json(report_dir / "summary.json", summary)
+    write_summary_json(report_dir / "split_summary.json", split_summary)
+    write_summary_json(report_dir / "regime_breakdown.json", regime_breakdown)
+    write_summary_json(report_dir / "knowledge_trace_coverage.json", knowledge_trace_coverage)
+    write_no_trade_wait_jsonl(report_dir / "no_trade_wait.jsonl", no_trade_wait_records)
     write_trades_csv(report_dir / "trades.csv", paper_outcome.executed_trades)
     write_knowledge_trace_json(
         report_dir / "knowledge_trace.json",
@@ -491,11 +559,214 @@ def create_backtest_run(
     }
 
 
+def build_no_trade_wait_records(
+    symbol_results: tuple[SymbolBacktestResult, ...],
+    paper_outcome: PaperDemoOutcome,
+) -> tuple[NoTradeWaitRecord, ...]:
+    records: list[NoTradeWaitRecord] = []
+    for result in symbol_results:
+        records.extend(_audit_symbol_wait_sites(result))
+    for item in paper_outcome.blocked_signals:
+        signal = item.signal
+        records.append(
+            NoTradeWaitRecord(
+                symbol=item.instrument.symbol,
+                market=item.instrument.market,
+                timeframe=signal.timeframe,
+                timestamp=item.entry_timestamp,
+                action="no-trade",
+                reason_code="risk_blocked_before_fill",
+                reason_detail=item.message,
+                decision_site="paper_demo_risk_gate",
+                pa_context=signal.pa_context,
+                regime_summary="signal generated but paper risk gate blocked execution",
+                source_refs=signal.source_refs,
+                signal_id=signal.signal_id,
+                reason_codes=item.reason_codes,
+            )
+        )
+    return tuple(
+        sorted(
+            records,
+            key=lambda item: (item.timestamp, item.symbol, item.reason_code, item.signal_id or ""),
+        )
+    )
+
+
+def build_window_summary(
+    *,
+    windows: tuple[WindowConfig, ...],
+    symbol_results: tuple[SymbolBacktestResult, ...],
+    paper_outcome: PaperDemoOutcome,
+    no_trade_wait_records: tuple[NoTradeWaitRecord, ...],
+    bucket_type: str,
+) -> dict[str, Any]:
+    active_windows = windows or (_fallback_validation_window(symbol_results),)
+    signal_windows: dict[str, list[str]] = defaultdict(list)
+    signal_by_id: dict[str, Signal] = {}
+    instrument_by_signal_id: dict[str, InstrumentConfig] = {}
+
+    for result in symbol_results:
+        timestamp_by_signal = {
+            trade.signal_id: trade.entry_timestamp for trade in result.backtest_report.trades
+        }
+        for signal in result.signals:
+            timestamp = timestamp_by_signal.get(signal.signal_id)
+            if timestamp is None:
+                continue
+            signal_by_id[signal.signal_id] = signal
+            instrument_by_signal_id[signal.signal_id] = result.instrument
+            signal_windows[signal.signal_id] = _matching_window_names(active_windows, timestamp)
+
+    stats = {
+        window.name: _build_window_stats(window, bucket_type=bucket_type)
+        for window in active_windows
+    }
+    unclassified = _build_window_stats(
+        WindowConfig(
+            name="unclassified",
+            label="未落入显式窗口",
+            start=min((window.start for window in active_windows), default=date.today()),
+            end=max((window.end for window in active_windows), default=date.today()),
+        ),
+        bucket_type=bucket_type,
+    )
+
+    def resolve_stats(timestamp: datetime) -> list[dict[str, Any]]:
+        names = _matching_window_names(active_windows, timestamp)
+        if not names:
+            return [unclassified]
+        return [stats[name] for name in names]
+
+    for signal_id, signal in signal_by_id.items():
+        instrument = instrument_by_signal_id[signal_id]
+        targets = [stats[name] for name in signal_windows.get(signal_id, ())] or [unclassified]
+        trace_summary = _summarize_trace_group((signal,))
+        for item in targets:
+            item["signal_count"] += 1
+            item["trace_curated_signals"] += trace_summary["curated_signals"]
+            item["trace_statement_signals"] += trace_summary["statement_signals"]
+            item["trace_supporting_signals"] += trace_summary["supporting_signals"]
+            symbol_stats = item["per_symbol"][instrument.symbol]
+            symbol_stats["signal_count"] += 1
+            symbol_stats["label"] = instrument.label
+
+    for item in paper_outcome.executed_trades:
+        for bucket in resolve_stats(item.trade.entry_timestamp):
+            bucket["executed_trades"] += 1
+            bucket["pnl_cash"] += item.pnl_cash
+            bucket["win_count"] += int(item.pnl_cash > ZERO)
+            bucket["loss_count"] += int(item.pnl_cash < ZERO)
+            symbol_stats = bucket["per_symbol"][item.instrument.symbol]
+            symbol_stats["executed_trades"] += 1
+            symbol_stats["pnl_cash"] += item.pnl_cash
+            symbol_stats["label"] = item.instrument.label
+
+    for item in paper_outcome.blocked_signals:
+        for bucket in resolve_stats(item.entry_timestamp):
+            bucket["blocked_signals"] += 1
+            symbol_stats = bucket["per_symbol"][item.instrument.symbol]
+            symbol_stats["blocked_signals"] += 1
+            symbol_stats["label"] = item.instrument.label
+
+    for item in no_trade_wait_records:
+        for bucket in resolve_stats(item.timestamp):
+            bucket["no_trade_wait"] += 1
+            bucket["reason_counts"][item.reason_code] += 1
+            symbol_stats = bucket["per_symbol"][item.symbol]
+            symbol_stats["no_trade_wait"] += 1
+
+    payload_windows = []
+    for window in (*active_windows,):
+        payload_windows.append(_finalize_window_stats(stats[window.name]))
+    if _window_stats_has_activity(unclassified):
+        payload_windows.append(_finalize_window_stats(unclassified))
+
+    return {
+        "boundary": "paper/simulated",
+        "bucket_type": bucket_type,
+        "windows": payload_windows,
+    }
+
+
+def build_knowledge_trace_coverage(
+    symbol_results: tuple[SymbolBacktestResult, ...],
+    paper_outcome: PaperDemoOutcome,
+) -> dict[str, Any]:
+    all_signals = tuple(signal for result in symbol_results for signal in result.signals)
+    executed_signals = tuple(item.signal for item in paper_outcome.executed_trades)
+    blocked_signals = tuple(item.signal for item in paper_outcome.blocked_signals)
+    return {
+        "boundary": "paper/simulated",
+        "overall": _summarize_trace_group(all_signals),
+        "executed": _summarize_trace_group(executed_signals),
+        "blocked": _summarize_trace_group(blocked_signals),
+    }
+
+
+def build_trace_summary_for_signals(
+    signals: tuple[Signal, ...],
+    *,
+    instrument_label: str,
+) -> dict[str, Any]:
+    summary = _summarize_trace_group(signals)
+    summary["label"] = instrument_label
+    return summary
+
+
+def summarize_no_trade_wait(records: tuple[NoTradeWaitRecord, ...]) -> dict[str, Any]:
+    action_counts = Counter(item.action for item in records)
+    reason_counts = Counter(item.reason_code for item in records)
+    symbol_counts = Counter(item.symbol for item in records)
+    return {
+        "total_records": len(records),
+        "actions": dict(sorted(action_counts.items())),
+        "reason_counts": dict(sorted(reason_counts.items())),
+        "symbol_counts": dict(sorted(symbol_counts.items())),
+        "examples": [
+            {
+                "symbol": item.symbol,
+                "timestamp": item.timestamp.isoformat(),
+                "action": item.action,
+                "reason_code": item.reason_code,
+                "reason_detail": item.reason_detail,
+            }
+            for item in records[:5]
+        ],
+    }
+
+
+def write_no_trade_wait_jsonl(path: Path, records: tuple[NoTradeWaitRecord, ...]) -> None:
+    with path.open("w", encoding="utf-8") as handle:
+        for item in records:
+            payload = {
+                "symbol": item.symbol,
+                "market": item.market,
+                "timeframe": item.timeframe,
+                "timestamp": item.timestamp.isoformat(),
+                "action": item.action,
+                "reason_code": item.reason_code,
+                "reason_detail": item.reason_detail,
+                "decision_site": item.decision_site,
+                "pa_context": item.pa_context,
+                "regime_summary": item.regime_summary,
+                "source_refs": list(item.source_refs),
+                "signal_id": item.signal_id,
+                "reason_codes": list(item.reason_codes),
+                "boundary": "paper/simulated",
+            }
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
 def build_summary_payload(
     *,
     config: DemoConfig,
     symbol_results: tuple[SymbolBacktestResult, ...],
     paper_outcome: PaperDemoOutcome,
+    no_trade_wait_records: tuple[NoTradeWaitRecord, ...],
+    split_summary: dict[str, Any],
+    regime_breakdown: dict[str, Any],
+    knowledge_trace_coverage: dict[str, Any],
     run_id: str,
     report_dir: Path,
 ) -> dict[str, Any]:
@@ -511,15 +782,24 @@ def build_summary_payload(
     gross_loss = abs(sum(losses, ZERO))
     profit_factor = _quantize(gross_profit / gross_loss) if gross_loss > ZERO else None
 
+    no_trade_by_symbol = defaultdict(list)
+    for item in no_trade_wait_records:
+        no_trade_by_symbol[item.symbol].append(item)
+
     per_symbol = []
     for result in symbol_results:
         executed = [item for item in closed_trades if item.instrument.symbol == result.instrument.symbol]
         blocked = [item for item in paper_outcome.blocked_signals if item.instrument.symbol == result.instrument.symbol]
+        no_trade_wait = no_trade_by_symbol[result.instrument.symbol]
         symbol_pnl = sum((item.pnl_cash for item in executed), ZERO)
         symbol_win_rate = (
             _percent(Decimal(sum(1 for item in executed if item.pnl_cash > ZERO)) / Decimal(len(executed)))
             if executed
             else ZERO
+        )
+        symbol_trace_summary = build_trace_summary_for_signals(
+            tuple(result.signals),
+            instrument_label=result.instrument.label,
         )
         per_symbol.append(
             {
@@ -532,9 +812,12 @@ def build_summary_payload(
                 "baseline_trades": len(result.backtest_report.trades),
                 "executed_trades": len(executed),
                 "blocked_signals": len(blocked),
+                "no_trade_wait": len(no_trade_wait),
                 "pnl_cash": _string_decimal(symbol_pnl),
                 "win_rate_pct": _string_decimal(symbol_win_rate),
                 "cache_csv": str(result.csv_path),
+                "trace_curated_signal_pct": symbol_trace_summary["curated_signal_pct"],
+                "trace_statement_signal_pct": symbol_trace_summary["statement_signal_pct"],
             }
         )
 
@@ -549,6 +832,7 @@ def build_summary_payload(
         }
         for item in paper_outcome.blocked_signals[:5]
     ]
+    no_trade_wait_summary = summarize_no_trade_wait(no_trade_wait_records)
 
     return {
         "run_id": run_id,
@@ -563,6 +847,8 @@ def build_summary_payload(
             "end": config.end.isoformat(),
             "interval": config.interval,
         },
+        "splits": [window_to_payload(window) for window in config.splits],
+        "regimes": [window_to_payload(window) for window in config.regimes],
         "cache_dir": str(config.cache_dir),
         "report_dir": str(report_dir),
         "risk_model": {
@@ -583,20 +869,341 @@ def build_summary_payload(
             "max_drawdown_pct": _string_decimal(max_drawdown_pct),
             "trade_count": len(closed_trades),
             "blocked_signals": len(paper_outcome.blocked_signals),
+            "no_trade_wait": len(no_trade_wait_records),
             "win_rate_pct": _string_decimal(win_rate),
             "profit_factor": _string_decimal(profit_factor) if profit_factor is not None else None,
         },
         "per_symbol": per_symbol,
+        "split_summary_overview": split_summary["windows"],
+        "regime_breakdown_overview": regime_breakdown["windows"],
+        "knowledge_trace_coverage": knowledge_trace_coverage["overall"],
+        "no_trade_wait_summary": no_trade_wait_summary,
         "best_trades": [trade_to_summary_row(item) for item in best_five],
         "worst_trades": [trade_to_summary_row(item) for item in worst_five],
         "blocked_examples": blocked_examples,
         "limitations": [
             REPORT_READABILITY_NOTE,
             "当前演示未接入历史新闻时间线，因此 news filter 不参与本轮回测结果。",
-            "当前版本未持久化结构化 no-trade / wait 决策，不强行补造未出手原因。",
-            "当前风控演示采用固定风险预算和单一历史 session，不模拟真实日内重置或实盘滑点。",
+            "当前 no-trade / wait 只持久化系统能明确解释的 decision sites，不对所有静默 bar 补造结论。",
+            "当前仍是 daily public-history validation，不模拟 intraday session reset、真实滑点或真实手续费。",
         ],
     }
+
+
+def window_to_payload(window: WindowConfig) -> dict[str, str]:
+    return {
+        "name": window.name,
+        "label": window.label,
+        "start": window.start.isoformat(),
+        "end": window.end.isoformat(),
+    }
+
+
+def _parse_windows(items: Any) -> list[WindowConfig]:
+    windows: list[WindowConfig] = []
+    for item in items or ():
+        windows.append(
+            WindowConfig(
+                name=item["name"],
+                label=item.get("label", item["name"]),
+                start=date.fromisoformat(item["start"]),
+                end=date.fromisoformat(item["end"]),
+            )
+        )
+    return windows
+
+
+def _fallback_validation_window(
+    symbol_results: tuple[SymbolBacktestResult, ...],
+) -> WindowConfig:
+    return WindowConfig(
+        name="full_range",
+        label="完整验证区间",
+        start=_min_config_date(symbol_results),
+        end=_max_config_date(symbol_results),
+    )
+
+
+def _min_config_date(symbol_results: tuple[SymbolBacktestResult, ...]) -> date:
+    return min(result.bars[0].timestamp.date() for result in symbol_results if result.bars)
+
+
+def _max_config_date(symbol_results: tuple[SymbolBacktestResult, ...]) -> date:
+    return max(result.bars[-1].timestamp.date() for result in symbol_results if result.bars)
+
+
+def _matching_window_names(
+    windows: tuple[WindowConfig, ...],
+    timestamp: datetime,
+) -> list[str]:
+    trading_date = timestamp.date()
+    return [
+        window.name
+        for window in windows
+        if window.start <= trading_date <= window.end
+    ]
+
+
+def _build_window_stats(window: WindowConfig, *, bucket_type: str) -> dict[str, Any]:
+    return {
+        "name": window.name,
+        "label": window.label,
+        "bucket_type": bucket_type,
+        "start": window.start.isoformat(),
+        "end": window.end.isoformat(),
+        "signal_count": 0,
+        "executed_trades": 0,
+        "blocked_signals": 0,
+        "no_trade_wait": 0,
+        "trace_curated_signals": 0,
+        "trace_statement_signals": 0,
+        "trace_supporting_signals": 0,
+        "pnl_cash": ZERO,
+        "win_count": 0,
+        "loss_count": 0,
+        "reason_counts": Counter(),
+        "per_symbol": defaultdict(
+            lambda: {
+                "label": "",
+                "signal_count": 0,
+                "executed_trades": 0,
+                "blocked_signals": 0,
+                "no_trade_wait": 0,
+                "pnl_cash": ZERO,
+            }
+        ),
+    }
+
+
+def _finalize_window_stats(payload: dict[str, Any]) -> dict[str, Any]:
+    executed = payload["executed_trades"]
+    win_rate = (
+        _percent(Decimal(payload["win_count"]) / Decimal(executed))
+        if executed
+        else ZERO
+    )
+    per_symbol = []
+    for symbol, item in sorted(payload["per_symbol"].items()):
+        per_symbol.append(
+            {
+                "symbol": symbol,
+                "label": item["label"],
+                "signal_count": item["signal_count"],
+                "executed_trades": item["executed_trades"],
+                "blocked_signals": item["blocked_signals"],
+                "no_trade_wait": item["no_trade_wait"],
+                "pnl_cash": _string_decimal(item["pnl_cash"]),
+            }
+        )
+    return {
+        "name": payload["name"],
+        "label": payload["label"],
+        "bucket_type": payload["bucket_type"],
+        "start": payload["start"],
+        "end": payload["end"],
+        "signal_count": payload["signal_count"],
+        "executed_trades": payload["executed_trades"],
+        "blocked_signals": payload["blocked_signals"],
+        "no_trade_wait": payload["no_trade_wait"],
+        "pnl_cash": _string_decimal(payload["pnl_cash"]),
+        "win_rate_pct": _string_decimal(win_rate),
+        "trace_curated_signal_pct": _string_decimal(
+            _safe_pct(payload["trace_curated_signals"], payload["signal_count"])
+        ),
+        "trace_statement_signal_pct": _string_decimal(
+            _safe_pct(payload["trace_statement_signals"], payload["signal_count"])
+        ),
+        "trace_supporting_signal_pct": _string_decimal(
+            _safe_pct(payload["trace_supporting_signals"], payload["signal_count"])
+        ),
+        "reason_counts": dict(sorted(payload["reason_counts"].items())),
+        "per_symbol": per_symbol,
+    }
+
+
+def _window_stats_has_activity(payload: dict[str, Any]) -> bool:
+    return any(
+        payload[key]
+        for key in ("signal_count", "executed_trades", "blocked_signals", "no_trade_wait")
+    )
+
+
+def _safe_pct(numerator: int, denominator: int) -> Decimal:
+    if denominator <= 0:
+        return ZERO
+    return _percent(Decimal(numerator) / Decimal(denominator))
+
+
+def _audit_symbol_wait_sites(result: SymbolBacktestResult) -> tuple[NoTradeWaitRecord, ...]:
+    if not result.bars:
+        return ()
+    knowledge = load_default_knowledge()
+    knowledge.validate()
+    replay = build_replay(result.bars, ())
+    history: list[OhlcvRow] = []
+    active_direction: str | None = None
+    records: list[NoTradeWaitRecord] = []
+
+    for step in replay.snapshot():
+        history.append(step.bar)
+        if len(history) < 3:
+            continue
+        context = build_context_snapshot(history, knowledge)
+        candidate = identify_setup_candidate(
+            history,
+            step,
+            context=context,
+            knowledge=knowledge,
+            previous_direction=active_direction,
+        )
+        if candidate is not None:
+            active_direction = candidate.direction
+            continue
+
+        unsuppressed_candidate = identify_setup_candidate(
+            history,
+            step,
+            context=context,
+            knowledge=knowledge,
+            previous_direction=None,
+        )
+        reason_code = "insufficient_evidence"
+        reason_detail = "bars did not satisfy the placeholder setup body/range/invalidation requirements"
+        source_refs = context.source_refs
+        if context.market_cycle != "trend":
+            reason_code = "context_not_trend"
+            reason_detail = context.regime_summary
+        elif unsuppressed_candidate is not None and active_direction == unsuppressed_candidate.direction:
+            reason_code = "duplicate_direction_suppressed"
+            reason_detail = (
+                f"same-direction placeholder candidate ({active_direction}) was suppressed to keep one active direction"
+            )
+            source_refs = unsuppressed_candidate.source_refs
+        records.append(
+            NoTradeWaitRecord(
+                symbol=result.instrument.symbol,
+                market=result.instrument.market,
+                timeframe=step.bar.timeframe,
+                timestamp=step.bar.timestamp,
+                action="wait",
+                reason_code=reason_code,
+                reason_detail=reason_detail,
+                decision_site="signal_scan",
+                pa_context=context.market_cycle,
+                regime_summary=context.regime_summary,
+                source_refs=source_refs,
+            )
+        )
+        if _context_resets_active_direction(context, active_direction):
+            active_direction = None
+
+    return tuple(records)
+
+
+def _context_resets_active_direction(
+    context: Any,
+    active_direction: str | None,
+) -> bool:
+    if active_direction is None:
+        return False
+    if context.market_cycle != "trend" or context.bar_by_bar_bias == "neutral":
+        return True
+    if active_direction == "long" and context.bar_by_bar_bias == "bearish":
+        return True
+    if active_direction == "short" and context.bar_by_bar_bias == "bullish":
+        return True
+    return False
+
+
+def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
+    trace_item_counts = Counter()
+    source_family_presence = Counter()
+    source_family_item_counts = Counter()
+    curated_signals = 0
+    statement_signals = 0
+    supporting_signals = 0
+    nonempty_signals = 0
+
+    for signal in signals:
+        if not signal.knowledge_trace:
+            continue
+        nonempty_signals += 1
+        trace_types = {hit.atom_type for hit in signal.knowledge_trace}
+        curated_signals += int(bool(trace_types & CURATED_TRACE_TYPES))
+        statement_signals += int("statement" in trace_types)
+        supporting_signals += int(bool(trace_types & SUPPORTING_TRACE_TYPES))
+        families_for_signal: set[str] = set()
+        for hit in signal.knowledge_trace:
+            trace_item_counts[hit.atom_type] += 1
+            family = infer_source_family(hit.source_ref)
+            source_family_item_counts[family] += 1
+            families_for_signal.add(family)
+        for family in families_for_signal:
+            source_family_presence[family] += 1
+
+    total_signals = len(signals)
+    curated_item_count = sum(trace_item_counts[item] for item in CURATED_TRACE_TYPES)
+    statement_item_count = trace_item_counts["statement"]
+    supporting_item_count = sum(trace_item_counts[item] for item in SUPPORTING_TRACE_TYPES)
+    return {
+        "total_signals": total_signals,
+        "signals_with_trace": nonempty_signals,
+        "trace_nonempty_pct": _string_decimal(_safe_pct(nonempty_signals, total_signals)),
+        "curated_signals": curated_signals,
+        "curated_signal_pct": _string_decimal(_safe_pct(curated_signals, total_signals)),
+        "statement_signals": statement_signals,
+        "statement_signal_pct": _string_decimal(_safe_pct(statement_signals, total_signals)),
+        "supporting_signals": supporting_signals,
+        "supporting_signal_pct": _string_decimal(_safe_pct(supporting_signals, total_signals)),
+        "trace_item_counts": dict(sorted(trace_item_counts.items())),
+        "source_family_signal_presence": dict(sorted(source_family_presence.items())),
+        "source_family_item_counts": dict(sorted(source_family_item_counts.items())),
+        "curated_vs_statement": {
+            "curated_item_count": curated_item_count,
+            "statement_item_count": statement_item_count,
+            "supporting_item_count": supporting_item_count,
+            "curated_item_pct": _string_decimal(
+                _safe_pct(curated_item_count, curated_item_count + statement_item_count + supporting_item_count)
+            ),
+            "statement_item_pct": _string_decimal(
+                _safe_pct(statement_item_count, curated_item_count + statement_item_count + supporting_item_count)
+            ),
+        },
+    }
+
+
+@lru_cache(maxsize=1)
+def _source_family_maps() -> tuple[dict[str, str], dict[str, str]]:
+    manifest_path = ROOT / "knowledge" / "indices" / "source_manifest.json"
+    if not manifest_path.exists():
+        return {}, {}
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    by_source_page = {}
+    by_raw_ref = {}
+    for record in payload.get("sources", []):
+        family = record.get("source_family", "unknown")
+        source_page_ref = record.get("source_page_ref")
+        raw_path = record.get("raw_path")
+        if source_page_ref:
+            by_source_page[source_page_ref] = family
+        if raw_path:
+            by_raw_ref[f"raw:{raw_path}"] = family
+    return by_source_page, by_raw_ref
+
+
+def infer_source_family(source_ref: str) -> str:
+    by_source_page, by_raw_ref = _source_family_maps()
+    if source_ref in by_source_page:
+        return by_source_page[source_ref]
+    if source_ref in by_raw_ref:
+        return by_raw_ref[source_ref]
+    if source_ref.startswith("wiki:knowledge/wiki/concepts/"):
+        return "curated_concept"
+    if source_ref.startswith("wiki:knowledge/wiki/setups/"):
+        return "curated_setup"
+    if source_ref.startswith("wiki:knowledge/wiki/rules/"):
+        return "curated_rule"
+    return "unknown"
 
 
 def write_summary_json(path: Path, payload: dict[str, Any]) -> None:
@@ -715,6 +1322,8 @@ def write_markdown_report(
     symbol_results: tuple[SymbolBacktestResult, ...],
     paper_outcome: PaperDemoOutcome,
 ) -> None:
+    trace_coverage = summary["knowledge_trace_coverage"]
+    no_trade_wait_summary = summary["no_trade_wait_summary"]
     lines: list[str] = [
         f"# {summary['title']}",
         "",
@@ -728,6 +1337,8 @@ def write_markdown_report(
         f"- 本地缓存目录：`{summary['cache_dir']}`",
         f"- 报告目录：`{summary['report_dir']}`",
         f"- 现金口径说明：{summary['cash_note']}",
+        f"- Walk-forward 切分：{', '.join(item['label'] for item in summary['splits']) if summary['splits'] else '完整区间'}",
+        f"- Regime 分层：{', '.join(item['label'] for item in summary['regimes']) if summary['regimes'] else '完整区间'}",
         "",
         "## 2. 核心结果",
         "",
@@ -738,16 +1349,17 @@ def write_markdown_report(
         f"- 胜率：{summary['core_results']['win_rate_pct']}%",
         f"- 盈亏比（profit factor）：{summary['core_results']['profit_factor'] or 'N/A'}",
         f"- 风控拦截信号数：{summary['core_results']['blocked_signals']}",
+        f"- no-trade / wait 结构化记录：{summary['core_results']['no_trade_wait']}",
         "",
         "## 3. 分标的摘要",
         "",
-        "| 标的 | 角色 | 数据源 | Bars | Signals | 基线 trades | 实际执行 trades | 风控拦截 | 累计盈亏 | 胜率 |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| 标的 | 角色 | 数据源 | Bars | Signals | 实际执行 | 风控拦截 | no-trade/wait | 累计盈亏 | 胜率 | curated trace | statement trace |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     role_by_symbol = {item.symbol: item.demo_role for item in (result.instrument for result in symbol_results)}
     for row in summary["per_symbol"]:
         lines.append(
-            "| {symbol} | {role} | {source} | {bars} | {signals} | {baseline_trades} | {executed_trades} | {blocked_signals} | {pnl_cash} | {win_rate_pct}% |".format(
+            "| {symbol} | {role} | {source} | {bars} | {signals} | {executed_trades} | {blocked_signals} | {no_trade_wait} | {pnl_cash} | {win_rate_pct}% | {trace_curated_signal_pct}% | {trace_statement_signal_pct}% |".format(
                 role=role_by_symbol[row["symbol"]],
                 **row,
             )
@@ -756,7 +1368,49 @@ def write_markdown_report(
     lines.extend(
         [
             "",
-            "## 4. 最好 5 笔交易",
+            "## 4. Walk-forward / Split 摘要",
+            "",
+        ]
+    )
+    lines.extend(_format_window_table(summary["split_summary_overview"]))
+
+    lines.extend(
+        [
+            "",
+            "## 5. Regime 分层摘要",
+            "",
+        ]
+    )
+    lines.extend(_format_window_table(summary["regime_breakdown_overview"]))
+
+    lines.extend(
+        [
+            "",
+            "## 6. Knowledge Trace 覆盖率摘要",
+            "",
+            f"- 发出信号总数：{trace_coverage['total_signals']}；trace 非空占比：{trace_coverage['trace_nonempty_pct']}%",
+            f"- 含 curated trace 的信号占比：{trace_coverage['curated_signal_pct']}%；含 statement 补充证据的信号占比：{trace_coverage['statement_signal_pct']}%",
+            f"- source family 分布审计（按受控 trace 的信号存在计数）：{_format_counter(trace_coverage['source_family_signal_presence'])}",
+            f"- curated vs statement 命中占比（按受控 trace item 计）：curated={trace_coverage['curated_vs_statement']['curated_item_pct']}%， statement={trace_coverage['curated_vs_statement']['statement_item_pct']}%",
+            "",
+            "## 7. no-trade / wait 摘要",
+            "",
+            f"- 结构化记录总数：{no_trade_wait_summary['total_records']}",
+            f"- action 分布：{_format_counter(no_trade_wait_summary['actions'])}",
+            f"- reason 分布：{_format_counter(no_trade_wait_summary['reason_counts'])}",
+        ]
+    )
+    if no_trade_wait_summary["examples"]:
+        lines.append("- 代表性样本：")
+        for item in no_trade_wait_summary["examples"]:
+            lines.append(
+                f"  - `{item['symbol']}` @ {item['timestamp']}: {item['action']} / {item['reason_code']} ({item['reason_detail']})"
+            )
+
+    lines.extend(
+        [
+            "",
+            "## 8. 最好 5 笔交易",
             "",
         ]
     )
@@ -765,7 +1419,7 @@ def write_markdown_report(
     lines.extend(
         [
             "",
-            "## 5. 最差 5 笔交易",
+            "## 9. 最差 5 笔交易",
             "",
         ]
     )
@@ -774,7 +1428,7 @@ def write_markdown_report(
     lines.extend(
         [
             "",
-            "## 6. 代表性交易解释",
+            "## 10. 代表性交易解释",
             "",
         ]
     )
@@ -797,7 +1451,7 @@ def write_markdown_report(
     lines.extend(
         [
             "",
-            "## 7. 风控与未执行样本",
+            "## 11. 风控与未执行样本",
             "",
         ]
     )
@@ -813,16 +1467,10 @@ def write_markdown_report(
     lines.extend(
         [
             "",
-            "## 8. 为什么没有展示 no-trade / wait 样本",
+            "## 12. 结论与局限",
             "",
-            "- 当前版本还没有把 no-trade / wait 决策持久化成结构化输出。",
-            "- 为避免补造解释，本报告不把“没有出信号的 bar”硬写成确定性 no-trade 结论。",
-            "",
-            "## 9. 结论与局限",
-            "",
-            f"- 结论：这轮 2024H1 公共历史数据演示在 `NVDA / TSLA / SPY` 上，按当前 demo 风控和历史回测口径，"
-            f"录得 {summary['core_results']['total_return_pct']}% 的总收益率；盈利主要来自 NVDA，"
-            "TSLA 拖累最明显，SPY 贡献较小但为正。",
+            f"- 结论：这轮 `{summary['time_range']['start']} ~ {summary['time_range']['end']}` 的 daily public-history validation "
+            f"在 `{', '.join(summary['symbols'])}` 上，按当前 demo 风控和历史回测口径，录得 {summary['core_results']['total_return_pct']}% 的总收益率。",
         ]
     )
     for item in summary["limitations"]:
@@ -877,6 +1525,28 @@ def _format_trace_summary(items: list[dict[str, Any]]) -> str:
         f"{item['atom_type']} {item['atom_id']} @ {item['raw_locator']}"
         for item in items[:3]
     )
+
+
+def _format_window_table(windows: list[dict[str, Any]]) -> list[str]:
+    if not windows:
+        return ["- 当前没有窗口化摘要。"]
+    lines = [
+        "| 名称 | 区间 | Signals | 实际执行 | 风控拦截 | no-trade/wait | 累计盈亏 | 胜率 | curated trace | statement trace |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for item in windows:
+        lines.append(
+            "| {label} | {start} ~ {end} | {signal_count} | {executed_trades} | {blocked_signals} | {no_trade_wait} | {pnl_cash} | {win_rate_pct}% | {trace_curated_signal_pct}% | {trace_statement_signal_pct}% |".format(
+                **item
+            )
+        )
+    return lines
+
+
+def _format_counter(counter_payload: dict[str, Any]) -> str:
+    if not counter_payload:
+        return "当前没有记录"
+    return " | ".join(f"{key}={value}" for key, value in counter_payload.items())
 
 
 def compute_max_drawdown(equity_points: tuple[tuple[str, float], ...]) -> tuple[Decimal, Decimal]:
