@@ -17,7 +17,7 @@
 - M8 的基础离线可靠性红线与 shadow/paper 框架已完成并冻结，作为后续验证主线的前置基线。
 - `M8C` 当前已切换为 `Long-Horizon & Intraday Paper Validation`：
   - `M8C.1：长周期日线验证` 已完成并整合进稳定基线
-  - `M8C.2：单标的日内试点` 尚未开始
+  - `M8C.2：单标的日内试点` 已完成实现与验收，待整合进 `main`
 - `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
 - `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
 
@@ -652,7 +652,7 @@
 
 #### M8C.2：单标的日内试点
 
-- 当前状态：未开始
+- 当前状态：已完成实现与验收，待整合进 `main`
 - 启动前提：
   - `M8C.1` 验收通过并整合进稳定基线。
   - 继续保持 `paper / simulated`，不进入期权、broker/live/real-money。
@@ -660,6 +660,30 @@
   - 默认只选一个标的，优先 `SPY 15m`。
   - 必须补 session open/close、market hours / timezone、日内风险重置、slippage / fee 最小模型、duplicate signal protection、`no-trade / wait` 结构化输出。
   - 如实现被迫修改 `src/risk/` 或 `src/execution/` 核心语义，则停止自动合并并转高风险审批。
+ - 实际完成摘要：
+   - 已新增 `config/examples/intraday_pilot_spy_15m.json`、`scripts/intraday_pilot_lib.py`、`scripts/run_intraday_pilot.py`。
+   - 已把首轮 intraday pilot 冻结为 `SPY / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`，并把数据缓存到 `local_data/public_intraday/`。
+   - 已新增结构化产物：
+     - `summary.json`
+     - `session_summary.json`
+     - `session_quality.json`
+     - `knowledge_trace.json`
+     - `knowledge_trace_coverage.json`
+     - `no_trade_wait.jsonl`
+     - `trades.csv`
+     - `report.md`
+     - `equity_curve.png`
+   - 已验证：
+     - session open/close
+     - market hours / timezone
+     - 日内风险重置
+     - duplicate signal protection
+     - slippage / fee 最小可配置模型
+     - `no-trade / wait` 结构化输出
+     - intraday 下的 `knowledge_trace` 与 legacy `source_refs` 兼容
+     - curated atom 优先、statement 仅作补充证据，且 source family 失衡保护继续生效
+   - 已保持 trigger 逻辑不变；`statement` / `source_note` / `contradiction` / `open_question` 仍未进入 trigger。
+   - 已通过新增 `tests/unit/test_intraday_pilot.py`、`tests/reliability/test_intraday_pilot_validation.py`，以及现有 `tests/reliability` / `tests/unit` / public demo smoke 回归。
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
@@ -733,11 +757,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8C.1：长周期日线验证（已完成并整合进稳定基线）。
+- 当前 milestone：M8C.2：单标的日内试点（实现与验收完成，待整合进 `main`）。
 - 当前下一步：
-  - 本轮已把 daily public history demo 扩展为长周期、多阶段、可解释的验证套件，并已整合进稳定基线 `feature/m7-broker-api-assessment`。
-  - `M8C.2` 尚未开始。
-  - 下一步若继续推进，只允许从最新稳定基线 `main` 单独开分支进入 `M8C.2`；仍不进入期权、broker/live。
+  - 本轮已完成 `SPY 15m` intraday pilot 的实现、测试与报告候选；下一步先通过 merge gate 合并进 `main`，期间仍保持 `paper / simulated`、不进入期权、broker/live。
+  - 若本轮 merge gate 通过，后续继续扩大验证范围时，只允许从最新稳定基线 `main` 单独开分支进入新的 intraday/extended validation 任务；仍不进入期权、broker/live。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

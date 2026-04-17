@@ -99,3 +99,8 @@
 
 - 日期：2026-04-17
 - 结论：自当前轮次起，`main` 是唯一长期稳定基线。所有新的 `feature/*`、`fix/*`、`docs/*`、`test/*`、`integration/*` 分支都从 `main` 切出；低/中风险阶段验收通过后的默认合并目标也改为 `main`。`src/execution/`、`src/risk/`、`src/broker/` 及任何 `live / real-money / real-account` 路径仍属于高风险模块，可以自动准备合并，但未经用户明确批准不得最终合并到 `main`。`feature/m7-broker-api-assessment` 只保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
+
+## D-0021 M8C.2 Intraday Pilot 边界冻结
+
+- 日期：2026-04-17
+- 结论：`M8C.2` 只允许在 `paper / simulated` 边界内完成单标的 intraday pilot。当前冻结范围为 `SPY / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`，验证目标是 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee 最小模型、`no-trade / wait` 结构化输出，以及 intraday 下的 `knowledge_trace` 稳定表现。`statement`、`source_note`、`contradiction`、`open_question` 仍只进入 trace，不得进入 trigger；Brooks statement 数量不得成为 confidence、权重或排序代理。当前 `M8C.2` 的实现、测试与报告候选已完成，待通过 merge gate 合并进 `main`；仍未进入期权、broker、live、real-money。

@@ -447,6 +447,7 @@
 启动前提：
 
 - `M8C.1` 已通过验收并整合进稳定基线。
+- 当前 `M8C.2` 为实现与验收候选；只有在 feature 分支通过 reviewer / qa 并 merge 回 `main` 后，才计入稳定基线事实。
 
 完成条件：
 
@@ -455,6 +456,35 @@
 - 仍保持 `paper / simulated`，不得进入期权、broker/live/real-money。
 - `statement` / `source_note` 继续只作 trace 证据，不得进入 trigger。
 - 如实现被迫修改 `src/risk/` 或 `src/execution/` 核心语义，则停止自动合并并转高风险审批。
+- 必须落盘：
+  - `summary.json`
+  - `session_summary.json`
+  - `session_quality.json`
+  - `knowledge_trace.json`
+  - `knowledge_trace_coverage.json`
+  - `no_trade_wait.jsonl`
+  - `trades.csv`
+  - `report.md`
+- Markdown 报告必须明确：
+  - 标的、周期、时间范围
+  - `paper / simulated` 边界
+  - 仍未进入期权
+  - 仍未进入 broker/live
+  - 只展示精简 trace 摘要，不展开全量 atom trace
+- 必须至少通过：
+  - `tests/unit/test_intraday_pilot.py`
+  - `tests/reliability/test_intraday_pilot_validation.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+  - public demo 必要 smoke/regression
+- 当前完成事实：
+  - 已固定首轮 intraday pilot 为 `SPY / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`
+  - 已验证 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee 最小模型、`no-trade / wait` 结构化输出
+  - 已保持 `knowledge_trace` 与 legacy `source_refs` 兼容
+  - 已保持 curated atom 优先、statement 仅作补充证据，且未让 Brooks statement 数量放大 trigger 或排序
+  - 已保持 `paper / simulated`
+  - 已保持 trigger 逻辑不变
+  - 已保持未进入期权、broker、live、real-money
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 

@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8C.1：长周期日线验证（已完成并整合进稳定基线）
+- 当前子阶段：M8C.2：单标的日内试点（实现与验收完成，待整合进 `main`）
 
 ## 当前分支
 
-- `main`
+- `feature/m8c2-intraday-pilot-spy-15m`
 
 ## 已完成
 
@@ -120,6 +120,31 @@
   - 已补齐 per-symbol breakdown、regime 摘要、blocked signals 汇总、knowledge trace 覆盖率摘要，以及 curated vs statement trace 占比摘要。
   - 当前示例 run `m8c1_long_horizon_daily_validation` 在 `2020-01-01 ~ 2025-12-31`、`NVDA / TSLA / SPY`、`1d` 条件下输出：总收益率 `-0.0915%`、最大回撤 `1.5697%`、交易 `12` 笔、blocked signals `396`、`no_trade_wait` `4486`；仍明确保持 `paper / simulated`。
   - 已通过新增 `tests/reliability/test_long_horizon_daily_validation.py`、`tests/unit/test_public_backtest_demo.py` 回归，以及现有 `tests/reliability` / `tests/unit` 套件。
+- M8C.2 已完成实现与验收候选：
+  - 已新增 `config/examples/intraday_pilot_spy_15m.json`，固定首轮 intraday pilot 为 `SPY / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`。
+  - 已新增 `scripts/intraday_pilot_lib.py` 与 `scripts/run_intraday_pilot.py`，在不改 trigger 的前提下，复用既有 replay / strategy / backtest / risk / execution / review 能力完成单标的 intraday paper validation。
+  - 已把真实 `SPY 15m` regular-session 数据缓存到 `local_data/public_intraday/`，并生成独立 run `reports/backtests/m8c2_intraday_pilot_spy_15m/`。
+  - 已落盘结构化产物：
+    - `summary.json`
+    - `session_summary.json`
+    - `session_quality.json`
+    - `knowledge_trace.json`
+    - `knowledge_trace_coverage.json`
+    - `no_trade_wait.jsonl`
+    - `trades.csv`
+    - `report.md`
+    - `equity_curve.png`
+  - 已验证的 intraday 能力包括：
+    - session open/close
+    - market hours / timezone
+    - 日内风险重置
+    - duplicate signal protection
+    - slippage / fee 最小配置模型
+    - `no-trade / wait` 结构化输出
+    - intraday 下的 `knowledge_trace` 与 legacy `source_refs` 兼容
+    - source family 失衡保护继续生效，Brooks statement 数量不影响 trigger 或权重
+  - 当前示例 run `m8c2_intraday_pilot_spy_15m` 在 `SPY / 15m / 2026-03-30 ~ 2026-04-16` 条件下输出：总收益率 `0.0832%`、最大回撤 `0.9789%`、交易 `25` 笔、blocked signals `8`、`no_trade_wait` `285`；仍明确保持 `paper / simulated`。
+  - 已新增 `tests/unit/test_intraday_pilot.py` 与 `tests/reliability/test_intraday_pilot_validation.py`，并通过现有 `tests/reliability` / `tests/unit` / public demo smoke 回归。
 
 ## 当前阻塞
 
@@ -128,9 +153,9 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live；`M8C.1` 已整合进稳定基线，`M8C.2` 尚未开始。
-- `M8C.2` 尚未开始；若继续，只允许从最新稳定基线 `main` 单独开分支进入单标的 intraday pilot。
+- 当前下一步不是扩 broker/live；先把 `M8C.2` 从 `feature/m8c2-intraday-pilot-spy-15m` 合并进 `main`，当前仍不进入期权、broker、live 或 real-money。
+- 若本轮 merge gate 通过，后续继续扩大 intraday 范围时，也只能从最新稳定基线 `main` 单独开分支，并继续保持 `paper / simulated` 与单一验证目标。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
-- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前也仍未进入期权验证。
+- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前仍未进入期权验证。
