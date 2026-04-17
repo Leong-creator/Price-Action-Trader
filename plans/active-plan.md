@@ -13,7 +13,10 @@
 - M7 已完成正式券商 API readiness assessment，当前冻结结论为 `no-go`。
 - 当前分析基线固定为 `feature/m7-broker-api-assessment`。
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
-- `M8C` 已在 `integration/m8c-offline-reliability` 完成离线端到端可靠性测试。
+- M8 的基础离线可靠性红线与 shadow/paper 框架已完成并冻结，作为后续验证主线的前置基线。
+- `M8C` 当前已切换为 `Long-Horizon & Intraday Paper Validation`：
+  - `M8C.1：长周期日线验证` 已完成
+  - `M8C.2：单标的日内试点` 尚未开始
 - `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
 - `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
 
@@ -558,7 +561,7 @@
   - 已通过 `tests/reliability/test_strategy_atom_trace.py`、`tests/unit/test_strategy_signal_pipeline.py`、`tests/unit/test_news_review_pipeline.py`、`tests/unit/test_public_backtest_demo.py`、`python -m unittest discover -s tests/reliability -v` 与 `python -m unittest discover -s tests/unit -v`。
   - 已从 `feature/m8b2b-knowledge-trace-integration` 整合回稳定基线 `feature/m7-broker-api-assessment`；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 
-### M8C：离线端到端可靠性测试
+### M8 基础离线可靠性门禁
 
 - 当前状态：已完成
 - 目标：
@@ -597,6 +600,62 @@
   - 已覆盖 deterministic replay 一致性、bars / news future leakage fail-fast、forbidden paths、audit / review traceability、`end_of_data`、缺 bar gap 与重复 bar 的稳健性。
   - 已更新 `scripts/run_reliability_suite.py`，使 `integration` 与 `reliability` suites 可统一运行且继续保持 `real_historical_data=deferred`。
   - 已通过 `tests/reliability` 18 项、`tests/integration` 4 项、`tests/unit` 57 项与统一 reliability suite 验证。
+
+### M8C：Long-Horizon & Intraday Paper Validation
+
+- 当前状态：进行中
+- 总目标：
+  - 在不改 trigger 的前提下，把当前 short-window daily demo 扩展为更长周期、更分段、更可解释的 `paper / simulated` 验证套件。
+  - 先完成长周期日线验证，再决定是否进入单标的日内试点。
+  - `knowledge_trace` 与 legacy `source_refs` 继续兼容；`statement` / `source_note` 只作 trace 证据，不进入 trigger。
+
+#### M8C.1：长周期日线验证
+
+- 当前状态：已完成
+- 范围与边界：
+  - 只做 daily、equity/ETF、公有历史数据缓存驱动的长周期验证。
+  - 不做期权、不做 intraday、不改 trigger、不改变 `knowledge_trace` 与 legacy `source_refs` 的兼容语义。
+  - `knowledge_trace` 只用于解释、审计和覆盖率摘要，不得作为 trigger 或 score proxy。
+- 实际完成摘要：
+  - 已新增 `config/examples/public_history_backtest_long_horizon.json`，把 daily demo 扩展到 `2020-01-01 ~ 2025-12-31`，覆盖 `NVDA / TSLA / SPY` 三个 equity/ETF 标的。
+  - 已新增 walk-forward 风格 split：`in_sample`、`validation`、`out_of_sample`。
+  - 已新增 regime 分层窗口：`covid_crash_high_vol`、`liquidity_trend_up`、`macro_drawdown`、`recovery_rotation`、`ai_momentum_and_range`。
+  - 已新增结构化产物：
+    - `summary.json`
+    - `split_summary.json`
+    - `regime_breakdown.json`
+    - `knowledge_trace_coverage.json`
+    - `no_trade_wait.jsonl`
+    - `trades.csv`
+    - `knowledge_trace.json`
+    - `report.md`
+    - `equity_curve.png`
+  - 已新增 `no-trade / wait` 结构化持久化，最小 reason class 包括：
+    - `context_not_trend`
+    - `duplicate_direction_suppressed`
+    - `insufficient_evidence`
+    - `risk_blocked_before_fill`
+  - 已补齐 per-symbol breakdown、regime 摘要、blocked signals 汇总、knowledge trace 覆盖率摘要，以及 curated vs statement trace 占比摘要。
+  - 已保持 curated atom 优先、statement 仅作补充证据；禁止使用 statement 数量作为 confidence 或 trigger proxy。
+  - 已通过新增 `tests/reliability/test_long_horizon_daily_validation.py`、`tests/unit/test_public_backtest_demo.py` 回归，以及现有 `tests/reliability` / `tests/unit` 套件。
+- 验收门槛：
+  - 报告与 JSON 产物生成成功率为 `100%`。
+  - 同一缓存输入重复运行结果保持 deterministic。
+  - executed trades 的 `knowledge_trace` 覆盖率与 curated-first trace 约束稳定。
+  - `no_trade / wait` 输出可重复生成，且保持 `paper / simulated`、不进入期权或 broker/live。
+- 回退点：
+  - 若长周期报告产物、trace 覆盖率摘要或 `no_trade / wait` 持久化不稳定，回退到 `M8B.2b` 检查点。
+
+#### M8C.2：单标的日内试点
+
+- 当前状态：未开始
+- 启动前提：
+  - `M8C.1` 验收通过并整合进稳定基线。
+  - 继续保持 `paper / simulated`，不进入期权、broker/live/real-money。
+- 计划边界：
+  - 默认只选一个标的，优先 `SPY 15m`。
+  - 必须补 session open/close、market hours / timezone、日内风险重置、slippage / fee 最小模型、duplicate signal protection、`no-trade / wait` 结构化输出。
+  - 如实现被迫修改 `src/risk/` 或 `src/execution/` 核心语义，则停止自动合并并转高风险审批。
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
@@ -670,11 +729,12 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架（进行中）。
+- 当前 milestone：M8C.1：长周期日线验证（已完成，待整合进稳定基线）。
 - 当前下一步：
-  - 本轮已完成公共历史数据下载缓存、用户可读回测演示与本地报告输出，当前开发分支为 `feature/m8-user-backtest-demo`
-  - 下一步若要更真实，应优先扩展更长时间窗口、更多 regime、用户自有历史 CSV/JSON，或补历史 news 时间线；不是继续 broker/live
-  - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
+  - 本轮已把 daily public history demo 扩展为长周期、多阶段、可解释的验证套件，当前开发分支为 `feature/m8c1-long-horizon-daily-validation`。
+  - 若本轮 reviewer / qa 通过，则将 `M8C.1` 合并回稳定基线 `feature/m7-broker-api-assessment`；`M8C.2` 尚未开始。
+  - 下一步若继续推进，只允许从最新稳定基线单独开分支进入 `M8C.2`；仍不进入期权、broker/live。
+  - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 
 ## 19. 假设

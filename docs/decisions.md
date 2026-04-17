@@ -84,3 +84,8 @@
 
 - 日期：2026-04-17
 - 结论：`M8B.2b` 只允许把 callable atom 层接入 `Signal / Review / report` 的 trace 能力，不允许改 trigger 逻辑。`statement`、`source_note`、`contradiction`、`open_question` 只进入 `knowledge_trace` / `kb_trace` / machine-readable report，不得参与 trigger，不得因为 source family statement 数量更多而提高 confidence 或影响触发结果。legacy `source_refs` 继续保留，`knowledge_trace.json` 作为全量机器产物落盘，Markdown 报告只展示精简 trace 摘要。当前 `M8B.2b` 已整合进稳定基线，且 trigger 逻辑未改变。
+
+## D-0018 M8C.1 长周期日线验证边界冻结
+
+- 日期：2026-04-17
+- 结论：`M8C.1` 只允许在 `paper / simulated` 边界内，把现有 daily public history demo 扩展为更长周期、多 split、多 regime 的验证套件；不得进入 intraday、期权、broker/live/real-money，也不得修改 trigger 逻辑。`knowledge_trace` 与 legacy `source_refs` 继续兼容，`statement` / `source_note` 只作 trace 与报告证据，不得进入 trigger 或影响 confidence。验证必须输出 per-symbol breakdown、walk-forward split、regime 摘要、structured `no_trade / wait`、blocked signals 汇总，以及 curated vs statement trace 占比摘要。由于 Al Brooks statement 数量偏大，`M8C.1` 的 trace 审计必须继续使用 curated-first 与 source family 多样性控制；任何结论都不得使用 statement 数量作为收益、权重或质量代理。`M8C.2` 只有在 `M8C.1` 验收通过并整合进稳定基线后才允许启动。

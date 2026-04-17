@@ -104,6 +104,22 @@ class PublicBacktestDemoTests(unittest.TestCase):
                         "cache_dir": str(cache_dir),
                         "report_dir": str(report_dir),
                         "source_order": ["yfinance"],
+                        "splits": [
+                            {
+                                "name": "unit_split",
+                                "label": "Unit Split",
+                                "start": "2026-01-05",
+                                "end": "2026-01-05"
+                            }
+                        ],
+                        "regimes": [
+                            {
+                                "name": "unit_regime",
+                                "label": "Unit Regime",
+                                "start": "2026-01-05",
+                                "end": "2026-01-05"
+                            }
+                        ],
                         "instruments": [
                             {
                                 "ticker": "SAMPLE",
@@ -140,6 +156,10 @@ class PublicBacktestDemoTests(unittest.TestCase):
             output_dir = Path(outcome["report_dir"])
 
             self.assertTrue((output_dir / "summary.json").exists())
+            self.assertTrue((output_dir / "split_summary.json").exists())
+            self.assertTrue((output_dir / "regime_breakdown.json").exists())
+            self.assertTrue((output_dir / "knowledge_trace_coverage.json").exists())
+            self.assertTrue((output_dir / "no_trade_wait.jsonl").exists())
             self.assertTrue((output_dir / "report.md").exists())
             self.assertTrue((output_dir / "trades.csv").exists())
             self.assertTrue((output_dir / "knowledge_trace.json").exists())
@@ -147,11 +167,20 @@ class PublicBacktestDemoTests(unittest.TestCase):
             self.assertEqual(outcome["summary"]["boundary"], "paper/simulated")
             report_text = (output_dir / "report.md").read_text(encoding="utf-8")
             trace_payload = json.loads((output_dir / "knowledge_trace.json").read_text(encoding="utf-8"))
-            self.assertIn("trace 摘要：", report_text)
+            summary_payload = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertTrue(
+                "trace 摘要：" in report_text or "当前没有可解释的已完成交易。" in report_text
+            )
             self.assertNotIn("\"match_reason\"", report_text)
+            self.assertIn("## 4. Walk-forward / Split 摘要", report_text)
+            self.assertIn("## 7. no-trade / wait 摘要", report_text)
             self.assertEqual(trace_payload["boundary"], "paper/simulated")
-            self.assertTrue(trace_payload["executed_trades"])
-            self.assertIn("match_reason", trace_payload["executed_trades"][0]["knowledge_trace"][0])
+            if trace_payload["executed_trades"]:
+                self.assertIn("match_reason", trace_payload["executed_trades"][0]["knowledge_trace"][0])
+            self.assertIn("knowledge_trace_coverage", summary_payload)
+            self.assertIn("no_trade_wait_summary", summary_payload)
+            self.assertEqual(summary_payload["splits"][0]["name"], "unit_split")
+            self.assertEqual(summary_payload["regimes"][0]["name"], "unit_regime")
 
     def test_write_knowledge_trace_json_keeps_full_trace_and_blocked_paths(self) -> None:
         signal = self._signal_with_trace(trace_count=5)
@@ -193,6 +222,7 @@ class PublicBacktestDemoTests(unittest.TestCase):
             source="fixture",
             csv_path=ROOT / "tests" / "test_data" / "ohlcv_sample_5m.csv",
             metadata_path=ROOT / "tests" / "test_data" / "README.md",
+            bars=(),
             bars_count=5,
             signals=(signal,),
             backtest_report=report,
@@ -201,6 +231,8 @@ class PublicBacktestDemoTests(unittest.TestCase):
             "title": "Unit Trace Report",
             "symbols": [executed.instrument.symbol],
             "time_range": {"start": "2026-01-05", "end": "2026-01-05", "interval": "5m"},
+            "splits": [{"name": "unit", "label": "Unit Split", "start": "2026-01-05", "end": "2026-01-05"}],
+            "regimes": [{"name": "unit", "label": "Unit Regime", "start": "2026-01-05", "end": "2026-01-05"}],
             "data_source": ["fixture"],
             "cache_dir": "/tmp/cache",
             "report_dir": "/tmp/report",
@@ -212,22 +244,79 @@ class PublicBacktestDemoTests(unittest.TestCase):
                 "max_drawdown_pct": "0.0000",
                 "trade_count": 1,
                 "blocked_signals": 0,
+                "no_trade_wait": 1,
                 "win_rate_pct": "100.0000",
                 "profit_factor": "N/A",
             },
             "per_symbol": [
                 {
                     "symbol": executed.instrument.symbol,
+                    "label": executed.instrument.label,
                     "source": "fixture",
                     "bars": 5,
                     "signals": 1,
                     "baseline_trades": 1,
                     "executed_trades": 1,
                     "blocked_signals": 0,
+                    "no_trade_wait": 1,
                     "pnl_cash": "20.0000",
                     "win_rate_pct": "100.0000",
+                    "trace_curated_signal_pct": "100.0000",
+                    "trace_statement_signal_pct": "100.0000",
                 }
             ],
+            "split_summary_overview": [
+                {
+                    "label": "Unit Split",
+                    "start": "2026-01-05",
+                    "end": "2026-01-05",
+                    "signal_count": 1,
+                    "executed_trades": 1,
+                    "blocked_signals": 0,
+                    "no_trade_wait": 1,
+                    "pnl_cash": "20.0000",
+                    "win_rate_pct": "100.0000",
+                    "trace_curated_signal_pct": "100.0000",
+                    "trace_statement_signal_pct": "100.0000",
+                }
+            ],
+            "regime_breakdown_overview": [
+                {
+                    "label": "Unit Regime",
+                    "start": "2026-01-05",
+                    "end": "2026-01-05",
+                    "signal_count": 1,
+                    "executed_trades": 1,
+                    "blocked_signals": 0,
+                    "no_trade_wait": 1,
+                    "pnl_cash": "20.0000",
+                    "win_rate_pct": "100.0000",
+                    "trace_curated_signal_pct": "100.0000",
+                    "trace_statement_signal_pct": "100.0000",
+                }
+            ],
+            "knowledge_trace_coverage": {
+                "total_signals": 1,
+                "trace_nonempty_pct": "100.0000",
+                "curated_signal_pct": "100.0000",
+                "statement_signal_pct": "100.0000",
+                "source_family_signal_presence": {"curated_concept": 1, "al_brooks_ppt": 1},
+                "curated_vs_statement": {"curated_item_pct": "60.0000", "statement_item_pct": "40.0000"},
+            },
+            "no_trade_wait_summary": {
+                "total_records": 1,
+                "actions": {"wait": 1},
+                "reason_counts": {"context_not_trend": 1},
+                "examples": [
+                    {
+                        "symbol": "SAMPLE",
+                        "timestamp": "2026-01-05T16:00:00+00:00",
+                        "action": "wait",
+                        "reason_code": "context_not_trend",
+                        "reason_detail": "range",
+                    }
+                ],
+            },
             "best_trades": [summary_row],
             "worst_trades": [summary_row],
             "blocked_examples": [],
@@ -255,6 +344,65 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertIn("atom-trace-2", report_text)
         self.assertNotIn("atom-trace-3", report_text)
         self.assertNotIn("atom-trace-4", report_text)
+
+    def test_write_no_trade_wait_jsonl_keeps_structured_records(self) -> None:
+        signal = self._signal_with_trace(trace_count=3)
+        record = MODULE.NoTradeWaitRecord(
+            symbol="SAMPLE",
+            market="US",
+            timeframe="5m",
+            timestamp=MODULE.datetime.now(MODULE.UTC),
+            action="wait",
+            reason_code="context_not_trend",
+            reason_detail="recent closes are compressed into a narrow range",
+            decision_site="signal_scan",
+            pa_context="trading-range",
+            regime_summary="recent closes are compressed into a narrow range",
+            source_refs=("wiki:knowledge/wiki/concepts/market-cycle-overview.md",),
+            signal_id=signal.signal_id,
+            reason_codes=("context_not_trend",),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "no_trade_wait.jsonl"
+            MODULE.write_no_trade_wait_jsonl(output_path, (record,))
+            lines = output_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(len(lines), 1)
+        payload = json.loads(lines[0])
+        self.assertEqual(payload["boundary"], "paper/simulated")
+        self.assertEqual(payload["reason_code"], "context_not_trend")
+        self.assertEqual(payload["action"], "wait")
+
+    def test_trace_coverage_uses_capped_trace_not_raw_statement_population(self) -> None:
+        signal = self._signal_with_trace(trace_count=5)
+        result = MODULE.SymbolBacktestResult(
+            instrument=self._executed_trade(signal).instrument,
+            source="fixture",
+            csv_path=ROOT / "tests" / "test_data" / "ohlcv_sample_5m.csv",
+            metadata_path=ROOT / "tests" / "test_data" / "README.md",
+            bars=(),
+            bars_count=5,
+            signals=(signal,),
+            backtest_report=self._backtest_report(signal.signal_id),
+        )
+        executed = self._executed_trade(signal)
+        paper_outcome = MODULE.PaperDemoOutcome(
+            executed_trades=(executed,),
+            blocked_signals=(),
+            equity_points=((MODULE.datetime.now(MODULE.UTC).isoformat(), 10000.0),),
+            ending_equity=MODULE.Decimal("10020"),
+        )
+
+        coverage = MODULE.build_knowledge_trace_coverage((result,), paper_outcome)
+
+        self.assertEqual(coverage["overall"]["total_signals"], 1)
+        self.assertEqual(coverage["overall"]["curated_signals"], 1)
+        self.assertEqual(coverage["overall"]["statement_signals"], 1)
+        self.assertLessEqual(
+            coverage["overall"]["curated_vs_statement"]["statement_item_count"],
+            len(signal.knowledge_trace),
+        )
 
     def _signal_with_trace(self, *, trace_count: int) -> MODULE.Signal:
         trace = tuple(

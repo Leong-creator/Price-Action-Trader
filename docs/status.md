@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8B.2b：Callable 接入 Strategy / Explanation / Review / Report（已完成并整合进稳定基线）
+- 当前子阶段：M8C.1：长周期日线验证（已完成，待整合进稳定基线）
 
 ## 当前分支
 
-- `feature/m7-broker-api-assessment`
+- `feature/m8c1-long-horizon-daily-validation`
 
 ## 已完成
 
@@ -103,6 +103,23 @@
   - public demo 已新增 machine-readable `knowledge_trace.json`，Markdown `report.md` 只展示精简 trace 摘要，每笔代表性交易最多 3 条。
   - 已通过 `tests/reliability/test_strategy_atom_trace.py`、`tests/unit/test_strategy_signal_pipeline.py`、`tests/unit/test_news_review_pipeline.py`、`tests/unit/test_public_backtest_demo.py`、`python -m unittest discover -s tests/reliability -v`、`python -m unittest discover -s tests/unit -v`。
   - M8B.2b 已从 `feature/m8b2b-knowledge-trace-integration` 整合回稳定基线 `feature/m7-broker-api-assessment`。
+- M8C.1 已完成：
+  - 已新增 `config/examples/public_history_backtest_long_horizon.json`，把 daily public history demo 扩展到 `2020-01-01 ~ 2025-12-31`，覆盖 `NVDA / TSLA / SPY` 三个 equity/ETF 标的。
+  - 已新增 walk-forward 风格 split：`in_sample`、`validation`、`out_of_sample`，并补 regime 分层窗口摘要。
+  - 已新增结构化产物：
+    - `summary.json`
+    - `split_summary.json`
+    - `regime_breakdown.json`
+    - `knowledge_trace_coverage.json`
+    - `no_trade_wait.jsonl`
+    - `trades.csv`
+    - `knowledge_trace.json`
+    - `report.md`
+    - `equity_curve.png`
+  - 已新增 `no-trade / wait` 结构化持久化，覆盖 `context_not_trend`、`duplicate_direction_suppressed`、`insufficient_evidence`、`risk_blocked_before_fill`。
+  - 已补齐 per-symbol breakdown、regime 摘要、blocked signals 汇总、knowledge trace 覆盖率摘要，以及 curated vs statement trace 占比摘要。
+  - 当前示例 run `m8c1_long_horizon_daily_validation` 在 `2020-01-01 ~ 2025-12-31`、`NVDA / TSLA / SPY`、`1d` 条件下输出：总收益率 `-0.0915%`、最大回撤 `1.5697%`、交易 `12` 笔、blocked signals `396`、`no_trade_wait` `4486`；仍明确保持 `paper / simulated`。
+  - 已通过新增 `tests/reliability/test_long_horizon_daily_validation.py`、`tests/unit/test_public_backtest_demo.py` 回归，以及现有 `tests/reliability` / `tests/unit` 套件。
 
 ## 当前阻塞
 
@@ -111,7 +128,8 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live，而是基于最新稳定基线继续做更长周期或更细粒度的 `paper / simulated` 验证。
+- 当前下一步不是扩 broker/live，而是在 reviewer / qa 通过后把 `M8C.1` 合并回稳定基线 `feature/m7-broker-api-assessment`。
+- `M8C.2` 尚未开始；若继续，只允许从最新稳定基线单独开分支进入单标的 intraday pilot。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界。
-- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API。
+- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前也仍未进入期权验证。
