@@ -6,13 +6,13 @@ confidence: low
 market: ["US", "HK"]
 timeframes: ["5m", "15m", "1h", "multi-timeframe"]
 direction: neutral
-source_refs: ["wiki:knowledge/wiki/concepts/market-cycle-overview.md", "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md", "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md", "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md"]
+source_refs: ["wiki:knowledge/wiki/concepts/market-cycle-overview.md", "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md", "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md", "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md", "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md", "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"]
 tags: ["m3", "research-only", "signal-reference", "knowledge-bridge"]
 applicability: ["仅供 M3 signal prototype 建立最小知识引用与字段映射", "仅供研究、回测输入准备和解释性输出占位"]
 not_applicable: ["不构成可执行交易规则", "不构成回测结论", "不允许直接驱动模拟执行或实盘决策"]
 contradictions: []
 missing_visuals: ["市场周期示意图与 signal bar 图例仍待补充"]
-open_questions: ["需要从 raw 资料补齐逐页定位后再冻结规则版本", "需要确认 signal bar setup 的明确过滤条件与失效条件"]
+open_questions: ["需要从 raw 资料补齐逐页定位后再冻结规则版本", "需要确认 signal bar setup 的明确过滤条件与失效条件", "需要确认方方土 transcript 中哪些片段可安全映射到当前 concept/setup 字段", "需要确认 Brooks PPT 中哪些页面可安全映射到当前 placeholder rule pack"]
 pa_context: ["trend", "trading-range", "transition"]
 market_cycle: ["pending-source-confirmation"]
 higher_timeframe_context: ["pending-source-confirmation"]
@@ -38,6 +38,12 @@ last_reviewed: 2026-04-17
 - 本页不新增任何原始事实，只整理现有 wiki 页面与项目规范中已经明确的字段边界。
 - 所有引用都必须保留 `confidence: low`、`source_refs` 和 assumptions。
 - 未完成 raw 抽取前，本页不得被当成可执行策略规则、回测结论或订单触发器。
+
+## Supporting Source Registry
+
+- `knowledge/wiki/sources/fangfangtu-price-action-transcript.md`：已登记 raw transcript，但尚未完成章节切分与字段映射。
+- `knowledge/wiki/sources/al-brooks-price-action-ppt.md`：已登记 raw PPT 集合，但尚未完成页码到规则字段的映射。
+- 上述两类来源当前只作为 active reference pack 的可追溯补充来源，不代表其内容已被抽取成可执行 setup 逻辑。
 
 ## Interface Alignment
 

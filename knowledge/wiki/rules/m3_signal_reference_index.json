@@ -8,6 +8,31 @@
     "docs/pa-strategy-spec.md",
     "knowledge/schema/page-frontmatter-template.md"
   ],
+  "supporting_sources": [
+    {
+      "page": "knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+      "source_refs": [
+        "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf"
+      ],
+      "usage_constraints": [
+        "registered-source-only",
+        "not-yet-mapped-to-structured-fields",
+        "not-an-executable-rule"
+      ]
+    },
+    {
+      "page": "knowledge/wiki/sources/al-brooks-price-action-ppt.md",
+      "source_refs": [
+        "raw:knowledge/raw/brooks/ppt/AIbrooks价格行为通用版1-36单元.pdf",
+        "raw:knowledge/raw/brooks/ppt/AIbrooks价格行为通用版37-52单元.pdf"
+      ],
+      "usage_constraints": [
+        "registered-source-only",
+        "not-yet-mapped-to-structured-fields",
+        "not-an-executable-rule"
+      ]
+    }
+  ],
   "references": [
     {
       "reference_id": "context.market_cycle.overview",

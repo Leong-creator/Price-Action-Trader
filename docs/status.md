@@ -11,7 +11,7 @@
 
 ## 当前分支
 
-- `feature/m8-user-backtest-demo`
+- `fix/knowledge-source-trace-m8b1`
 
 ## 已完成
 
@@ -73,6 +73,8 @@
 - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示范围为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`
 - 已完成一轮公共历史数据演示回测：`yfinance` 下载的本地缓存已落在 `local_data/public_history/`，示例 run `demo_public_2024h1` 生成于 `reports/backtests/demo_public_2024h1/`
 - 该示例 run 在当前 demo 风控参数下输出：总收益率 `1.9923%`、最大回撤 `1.5157%`、交易 `16` 笔、胜率 `43.75%`；仍明确保持 `paper / simulated`
+- M8B.1 已完成知识源接入诊断与最小补齐：确认 transcript / Brooks PPT 先前缺席的根因是 raw-only、无 `source` 页、未入 active rule pack，且默认 strategy bundle 未读取 rule pack；现已新增真实存在文件的 `source` 页、补齐 rule-pack/index 接线，并让默认 signal 链能带出这些 `source` 页引用
+- M8B.1 已新增 `docs/knowledge-source-trace.md` 与 `tests/reliability/test_knowledge_source_trace.py`，验证“已接线的 transcript/PPT 来源能进入 `source_refs`，未接线时不会被编造”
 
 ## 当前阻塞
 
@@ -82,6 +84,7 @@
 ## 下一步
 
 - 当前下一步不是扩 broker，而是继续用更完整的真实历史 CSV/JSON 或用户录制样本扩展回测演示与 shadow/paper 验证
+- 若要让 transcript / Brooks PPT 更深地进入决策字段，下一步最小动作应是把这些来源结构化抽取为可核验的 concept / setup / rule 页面，而不是直接放宽 strategy 边界
 - 若用户需要更真实的测试，应优先补更长时间窗口、更多 regime 样本、或按 `docs/user-backtest-guide.md` 提供自己的历史 CSV
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API

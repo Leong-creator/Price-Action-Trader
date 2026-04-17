@@ -96,7 +96,7 @@ class StrategyKnowledgeBundle:
 
 
 def load_default_knowledge() -> StrategyKnowledgeBundle:
-    return load_strategy_knowledge(DEFAULT_CONCEPT_PATH, DEFAULT_SETUP_PATH)
+    return load_alignment_knowledge()
 
 
 def load_alignment_knowledge() -> StrategyKnowledgeBundle:

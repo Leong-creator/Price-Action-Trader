@@ -242,6 +242,7 @@
 
 - `M8B` 明确把知识库一致性定义为硬门禁，而不是质量建议项。
 - 明确要求 `source_refs` 必须真实存在，不得 hallucinated refs。
+- 明确要求 raw 中的 transcript / PPT 只有在对应 `source` 页、wiki index、active rule pack 与默认 strategy knowledge bundle 都已接线后，才允许进入 `signal.source_refs` / `explanation`；只有 raw 文件而无结构化接线时必须保持缺席。
 - 明确要求不得越过 `not_applicable` 或等价的禁用条件。
 - 明确要求知识冲突场景必须显式输出冲突，而不是伪装成单一路径。
 - 明确要求资料不足时允许且鼓励 `no-trade / wait`。
@@ -250,6 +251,7 @@
 - 当前整合状态：
   - 已于 2026-04-17 通过 `tests/reliability` 7 项与 `tests/unit` 57 项验证。
   - 已通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 合并到 `feature/m7-broker-api-assessment`。
+  - M8B.1 已定位 transcript / Brooks PPT 缺席根因：此前只有 raw 文件，没有对应 `source` 页和 rule-pack 接线，且默认 strategy bundle 未加载 active rule pack；现已补齐最小 traceability 接线，但仍不把这些来源包装成已抽取完成的正式规则。
   - M8C 已在 `integration/m8c-offline-reliability` 完成实现与验证，且仍保持 `paper / simulated` 与 `no-go` 边界。
 
 ### M8C：离线端到端可靠性测试

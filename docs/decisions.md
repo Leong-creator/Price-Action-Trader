@@ -64,3 +64,8 @@
 
 - 日期：2026-04-17
 - 结论：为提供用户可直接理解的真实历史数据回测演示，优先使用公共、低成本、无需 broker 权限的数据源，并将下载结果缓存为本地 CSV。若环境无 Alpha Vantage key，则允许回退到 `yfinance` 作为 research-only fallback。该演示链路只服务于历史研究与 `paper / simulated` 报告输出，不代表 broker/live/real-money 能力。
+
+## D-0014 M8B.1 知识来源 traceability 门禁冻结
+
+- 日期：2026-04-17
+- 结论：raw 层 transcript / PPT 只有在对应 `knowledge/wiki/sources/*.md` 登记页存在、wiki index 收录、active rule pack 明确接入、且默认 strategy knowledge bundle 真正加载该 rule pack 后，才允许出现在 `signal.source_refs` / `signal.explanation` 中。只有 raw 文件而未完成结构化接线时，strategy 不得编造其引用；完成最小接线后，这些来源仍只代表“已登记且可追溯”，不代表其内容已被抽取成正式规则。

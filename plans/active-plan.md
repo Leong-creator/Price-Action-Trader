@@ -14,6 +14,7 @@
 - 当前分析基线固定为 `feature/m7-broker-api-assessment`。
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
 - `M8C` 已在 `integration/m8c-offline-reliability` 完成离线端到端可靠性测试，当前下一步为 M8D。
+- `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
 
 ## 2. 执行总原则
 
@@ -477,6 +478,7 @@
   - 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`。
   - 已验证 explanation 必须存在且回链到 setup/rule/source，且 `wait / no-trade` 在证据不足场景下视为合格结果。
   - 已于 2026-04-17 通过 merge commit `0047100` 整合进稳定基线 `feature/m7-broker-api-assessment`。
+  - 已完成 M8B.1：定位 transcript / Brooks PPT 先前缺席是因为 raw-only、无 `source` 页、未入 active rule pack，且默认 strategy bundle 未加载 rule pack；现已补齐最小 traceability 接线并验证“能接入时出现、未接入时不编造”。
 
 ### M8C：离线端到端可靠性测试
 
