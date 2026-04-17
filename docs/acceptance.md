@@ -242,6 +242,7 @@
 
 - `M8B` 明确把知识库一致性定义为硬门禁，而不是质量建议项。
 - 明确要求 `source_refs` 必须真实存在，不得 hallucinated refs。
+- 明确要求 raw 中的 transcript / PPT 只有在对应 `source` 页、wiki index、active rule pack 与默认 strategy knowledge bundle 都已接线后，才允许进入 `signal.source_refs` / `explanation`；只有 raw 文件而无结构化接线时必须保持缺席。
 - 明确要求不得越过 `not_applicable` 或等价的禁用条件。
 - 明确要求知识冲突场景必须显式输出冲突，而不是伪装成单一路径。
 - 明确要求资料不足时允许且鼓励 `no-trade / wait`。
@@ -250,7 +251,76 @@
 - 当前整合状态：
   - 已于 2026-04-17 通过 `tests/reliability` 7 项与 `tests/unit` 57 项验证。
   - 已通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 合并到 `feature/m7-broker-api-assessment`。
-  - M8C 尚未开始。
+  - M8B.1 已定位 transcript / Brooks PPT 缺席根因：此前只有 raw 文件，没有对应 `source` 页和 rule-pack 接线，且默认 strategy bundle 未加载 active rule pack；现已补齐最小 traceability 接线，但仍不把这些来源包装成已抽取完成的正式规则。
+  - M8C 已在 `integration/m8c-offline-reliability` 完成实现与验证，且仍保持 `paper / simulated` 与 `no-go` 边界。
+
+### M8B.2a：Knowledge Atomization 基础层
+
+完成条件：
+
+- `M8B.2` 已在 `plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md`、`docs/decisions.md` 与 `docs/knowledge-atomization.md` 中拆成 `2a / 2b`。
+- 当前轮次明确只执行 `2a`，不得提前进入 `2b`。
+- 已新增：
+  - `knowledge/schema/source-registry-schema.md`
+  - `knowledge/schema/chunk-registry-schema.md`
+  - `knowledge/schema/knowledge-atom-schema.md`
+  - `knowledge/schema/callable-access-contract.md`
+  - `knowledge/indices/source_manifest.json`
+  - `knowledge/indices/chunk_manifest.jsonl`
+  - `knowledge/indices/knowledge_atoms.jsonl`
+  - `knowledge/indices/knowledge_callable_index.json`
+  - `scripts/build_source_manifest.py`
+  - `scripts/build_chunk_registry.py`
+  - `scripts/build_knowledge_atoms.py`
+  - `scripts/build_callable_index.py`
+  - `scripts/validate_kb_coverage.py`
+  - `scripts/validate_knowledge_atoms.py`
+- 10 个 in-scope source 都必须存在 machine-readable source record。
+- `:Zone.Identifier` 必须被过滤并进入 `coverage_summary.filtered_files`，不得被误判为 source。
+- 每个 source 都要么可解析进 chunk/atom，要么明确进入 `blocked / partial` 并写明原因。
+- `statement` atom 必须存在，并且每条都具备：
+  - `atom_id`
+  - `atom_type=statement`
+  - `source_ref`
+  - `raw_locator`
+  - `evidence_chunk_ids`
+  - `status`
+  - `confidence`
+  - `callable_tags`
+- `statement` 默认是 callable 中间层，不得被标记成 executable strategy rule，不得默认带 `strategy_candidate`。
+- 无证据时不得产出 `statement`。
+- transcript / Brooks / 全部方方土笔记都必须在 callable index 层可检索。
+- 关键 curated atoms 必须形成 evidence-backed atom：
+  - `market-cycle-overview`
+  - `signal-bar-entry-placeholder`
+  - `m3-research-reference-pack`
+- 若满足以下任一条件，必须熔断并停在 `2a`：
+  - `blocked >= 4`
+  - 关键 curated atoms 无法 evidence-backed
+  - `statement` 抽取无法稳定回溯证据
+- `python -m unittest discover -s tests/reliability -v` 必须通过。
+- 必须至少包含并通过：
+  - `tests/reliability/test_kb_coverage.py`
+  - `tests/reliability/test_knowledge_atoms.py`
+  - `tests/reliability/test_callable_access.py`
+- 本轮不得修改 strategy / explanation / review / report 接线，不得修改 trigger 逻辑，不得触碰 broker/live/real-money/real-account。
+- 当前完成事实：
+  - `source_manifest.json` 当前结果为 `parsed=9 / partial=1 / blocked=0`
+  - 当前 partial source 为 `方方土视频笔记 - 楔形.pdf`
+  - 当前未触发熔断
+  - 关键 curated atoms 已形成 evidence-backed atom
+  - `statement` 已落盘并满足 evidence-backed / non-executable / non-trigger 约束
+
+### M8B.2b：Callable 接入 Strategy / Explanation / Review / Report
+
+启动前提：
+
+- `M8B.2a` 全部测试通过
+- 未触发熔断
+- reviewer 通过
+- qa 通过
+
+在满足以上条件前，不得启动 `2b`。
 
 ### M8C：离线端到端可靠性测试
 
@@ -261,6 +331,13 @@
 - 明确要求 `risk_block` 永远先于 simulated fill。
 - 明确要求 audit / review 字段完整且可追溯。
 - 明确要求 forbidden paths 被列为硬门禁。
+- `tests/integration/test_offline_e2e_pipeline.py` 必须覆盖 `src/data -> src/strategy -> src/backtest -> src/risk -> src/execution -> src/news -> src/review` 的离线端到端链路。
+- `tests/reliability/test_replay_determinism.py` 必须覆盖 deterministic replay、相同输入下 signal / backtest 稳定性、重复 bar fail-fast 与 gap bar 不伪造缺失 slot。
+- `tests/reliability/test_no_future_leakage.py` 必须覆盖 bars / news 的 future leakage fail-fast，且缺失 `reference_timestamp` 时显式失败。
+- `tests/reliability/test_audit_traceability.py` 必须覆盖 close-path 审计字段完整性，以及 review 中 KB / explanation / risk / news traceability 完整性。
+- `tests/reliability/test_forbidden_paths.py` 必须覆盖被风控阻断或 request-binding 失配的请求不得进入 simulated fill。
+- `python -m unittest discover -s tests/reliability -v`、`python -m unittest discover -s tests/integration -v`、`python -m unittest discover -s tests/unit -v` 必须全部通过。
+- `python scripts/run_reliability_suite.py` 必须在无真实历史样本时仍可运行，并显式保持 `real_historical_data=deferred`。
 - reviewer 必须确认离线可靠性定义没有越权到 broker / live。
 - qa 必须确认 determinism、future leakage、risk-before-fill 与 traceability 都是硬门禁而非可选质量项。
 
@@ -274,3 +351,18 @@
 - 明确要求任何 broker / live 的重新评估都排在 `M8` 完成之后。
 - reviewer 与 qa 都必须把 “无越权到 broker/live” 作为强制审查项。
 - M8D 不引入付费服务前置条件，不把浏览器自动化写成生产执行链路。
+- `docs/shadow-mode-runbook.md` 必须存在，并明确 manifest、shadow/paper 命令、deferred 语义与 `paper / simulated` 边界。
+- `scripts/run_shadow_session.py` 必须可通过 `python -m py_compile`，并默认保持只读输入、simulated 输出、无真实 broker 依赖。
+- `scripts/run_shadow_session.py` 在未提供 manifest 时必须返回 deferred，而不是伪造真实历史验证已完成。
+- repo-safe 小样本 manifest 必须存在，并能证明 M8D 框架可运行但不等于真实历史验证已完成。
+- `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py` 与 `tests/reliability/test_dataset_manifest_contract.py` 必须通过。
+- `reports/reliability/README.md` 必须明确报告不是盈利证明，并保留 dataset/session/traceability 最小字段要求。
+- `scripts/download_public_history.py` 必须支持：优先使用 Alpha Vantage（仅当环境已提供 key），否则回退到 `yfinance`，并将结果缓存为本地 CSV，而不是每次回测都临时联网抓取。
+- 公共历史数据缓存目录必须落在本地不跟踪目录，并且缓存文件能继续通过 `src/data/` 的 schema 校验与重复加载。
+- `scripts/run_public_backtest_demo.py` 或等价一键入口必须能基于缓存数据生成：
+  - `report.md`
+  - `trades.csv`
+  - `summary.json`
+  - `equity_curve.png`
+- 用户可读报告必须明确：测试标的、时间范围、数据来源、总收益/总盈亏、最大回撤、交易笔数、胜率、盈亏比、代表性交易解释与局限。
+- 该 public-history demo 仍只属于研究/演示能力，不得被写成真实 broker、真实账户、live execution 或实盘能力证明。

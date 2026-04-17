@@ -56,20 +56,62 @@
 - 保持 `paper / simulated`
 - 不进入 broker / live
 
+## 4. 目录约定
+
+### 4.1 Repo-safe 小样本
+
+- `/home/hgl/projects/Price-Action-Trader/tests/test_data/real_history_small/<dataset_slug>/dataset.manifest.json`
+- `/home/hgl/projects/Price-Action-Trader/tests/test_data/real_history_small/<dataset_slug>/README.md`
+
+该层允许复用仓库内现有静态样本，目的仅是验证 M8D 的 manifest、runner 和报告框架。
+
+### 4.2 本地大样本
+
+推荐使用以下任一目录，默认不要求纳入 git：
+
+- `data/real_history/<dataset_slug>/`
+- `local_data/real_history/<dataset_slug>/`
+
+每个数据集都应自带 `dataset.manifest.json`。
+
+### 4.3 录制型实时只读样本
+
+推荐目录：
+
+- `data/realtime_recordings/<dataset_slug>/`
+- `local_data/realtime_recordings/<dataset_slug>/`
+
+这类输入只能进入 `shadow / paper`，不得转化为 live execution。
+
 ## 4. 最小元数据要求
 
 每份后续新增测试数据都应至少记录：
 
 - `dataset_name`
+- `dataset_version`
 - `source_type`
 - `market`
 - `symbol`
 - `timeframe`
-- `time_range`
+- `time_range.start`
+- `time_range.end`
 - `timezone`
+- `regime_tags`
 - `origin`
 - `limitations`
 - `approved_for`
+- `session_type`
+- `files.ohlcv`
+- `files.news`
+
+建议受控枚举：
+
+- `market`: `US | HK | CN | FX | CRYPTO`
+- `timeframe`: `1m | 5m | 15m | 1h | 1d`
+- `source_type`: `local_curated | local_export | local_snapshot | realtime_recorded`
+- `approved_for`: `offline_replay | m8d_history_validation | m8d_shadow_paper | research_only`
+- `session_type`: `paper | simulated`
+- `regime_tags`: `trend_up | trend_down | range | breakout | reversal | high_volatility | low_volatility | event_driven | illiquid | gap_heavy`
 
 ## 5. 样本整理原则
 
@@ -77,6 +119,7 @@
 - 测试样本应复制或导出到测试目录，保持与 raw 解耦。
 - 缺样本时允许先保留目录与说明，不伪造真实数据。
 - 样本不足时，测试结论必须明确为样本不足，而不是伪造通过。
+- M8D 数据集应优先通过 `dataset.manifest.json` 提供时区、market、timeframe、regime 与用途约束。
 
 ## 6. 审查门禁
 
@@ -87,6 +130,9 @@
 - 是否包含最小元数据
 - 是否会诱导越界到真实 broker / live
 - 是否需要人工脱敏
+- manifest 指向的文件若不存在，必须 fail-fast 或 deferred
+- 若 `approved_for` 不包含 `m8d_shadow_paper` 或 `m8d_history_validation`，不得作为 M8D 输入
+- 若没有合格 manifest，runner 必须返回 deferred，不得伪造成功
 
 ## 7. 报告要求
 
@@ -97,3 +143,6 @@ M8 相关报告至少注明：
 - 是否为静态样本、真实历史导出或只读快照
 - 已知缺口与局限
 - 是否仍保持 `paper / simulated`
+- session metadata
+- regime tags
+- KB refs / PA explanation / risk/news traceability

@@ -1,0 +1,170 @@
+{
+  "schema_version": "m8b2.source-registry.v1",
+  "generated_at": "2026-04-17T11:14:31Z",
+  "sources": [
+    {
+      "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+      "file_name": "方方土视频笔记 - 市场周期.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-16T16:31:49Z",
+      "page_count": 3,
+      "non_empty_pages": 3,
+      "empty_pages": []
+    },
+    {
+      "source_id": "fangfangtu_notes--signal-bar-entry-note--f4f198c1",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+      "file_name": "方方土视频笔记 - 信号K线 & 入场.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-16T16:31:49Z",
+      "page_count": 3,
+      "non_empty_pages": 3,
+      "empty_pages": []
+    },
+    {
+      "source_id": "fangfangtu_notes--pullback-counting-bars-note--0259c21f",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf",
+      "file_name": "方方土视频笔记 - 回调&数K线.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 3,
+      "non_empty_pages": 3,
+      "empty_pages": []
+    },
+    {
+      "source_id": "fangfangtu_notes--beginner-note--4c081115",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+      "file_name": "方方土视频笔记 - 新手篇.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-beginner-note.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 3,
+      "non_empty_pages": 3,
+      "empty_pages": []
+    },
+    {
+      "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+      "file_name": "方方土视频笔记 - 楔形.pdf",
+      "parse_status": "partial",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-wedge-note.md",
+      "parse_notes": "1 page(s) produced no stable text",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 6,
+      "non_empty_pages": 5,
+      "empty_pages": [
+        6
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--gap-note--25e2faa1",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 缺口.pdf",
+      "file_name": "方方土视频笔记 - 缺口.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-gap-note.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 3,
+      "non_empty_pages": 3,
+      "empty_pages": []
+    },
+    {
+      "source_id": "fangfangtu_notes--breakout-note--247e0183",
+      "source_family": "fangfangtu_notes",
+      "source_type": "note_pdf",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "file_name": "方方土视频笔记-突破.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 4,
+      "non_empty_pages": 4,
+      "empty_pages": []
+    },
+    {
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "source_type": "transcript_pdf",
+      "raw_path": "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "file_name": "Price_Action方方土.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T10:09:49Z",
+      "page_count": 15,
+      "non_empty_pages": 15,
+      "empty_pages": []
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "source_type": "ppt_pdf",
+      "raw_path": "knowledge/raw/brooks/ppt/AIbrooks价格行为通用版1-36单元.pdf",
+      "file_name": "AIbrooks价格行为通用版1-36单元.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 2819,
+      "non_empty_pages": 2819,
+      "empty_pages": []
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "source_type": "ppt_pdf",
+      "raw_path": "knowledge/raw/brooks/ppt/AIbrooks价格行为通用版37-52单元.pdf",
+      "file_name": "AIbrooks价格行为通用版37-52单元.pdf",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
+      "parse_notes": "stable text extracted from all pages",
+      "reviewed_at": "2026-04-17T11:14:31Z",
+      "page_count": 1397,
+      "non_empty_pages": 1397,
+      "empty_pages": []
+    }
+  ],
+  "coverage_summary": {
+    "total_expected": 10,
+    "total_registered": 10,
+    "parse_status_counts": {
+      "parsed": 9,
+      "partial": 1,
+      "blocked": 0
+    },
+    "filtered_files": [
+      "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf:Zone.Identifier"
+    ]
+  }
+}

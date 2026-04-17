@@ -1,0 +1,47 @@
+{
+  "title": "Public History Backtest Demo",
+  "description": "User-readable historical backtest demo on public research data. Still paper/simulated only.",
+  "start": "2024-01-01",
+  "end": "2024-06-30",
+  "interval": "1d",
+  "cache_dir": "local_data/public_history",
+  "report_dir": "reports/backtests",
+  "source_order": [
+    "alpha_vantage",
+    "yfinance"
+  ],
+  "instruments": [
+    {
+      "ticker": "NVDA",
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "明显趋势段"
+    },
+    {
+      "ticker": "TSLA",
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "高波动震荡/反复段"
+    },
+    {
+      "ticker": "SPY",
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "指数基准与相对平稳段"
+    }
+  ],
+  "risk": {
+    "starting_capital": "25000",
+    "risk_per_trade": "100",
+    "max_total_exposure": "25000",
+    "max_symbol_exposure_ratio": "1.00",
+    "max_daily_loss": "1000",
+    "max_consecutive_losses": 4
+  }
+}

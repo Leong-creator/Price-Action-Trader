@@ -5,6 +5,8 @@ from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from src.execution import ExecutionRequest
+from src.risk import RiskConfig, SessionRiskState
 from src.data.schema import NewsEvent, OhlcvRow
 from src.strategy import (
     DEFAULT_CONCEPT_PATH,
@@ -68,6 +70,164 @@ def synthetic_news_event(*, market: str = "US", index: int = 2) -> NewsEvent:
         severity="high",
         notes="synthetic reliability fixture",
         timezone="America/New_York",
+    )
+
+
+def extended_bullish_trade_bars(*, market: str = "US", timeframe: str = "5m") -> tuple[OhlcvRow, ...]:
+    return bullish_trend_bars(market=market, timeframe=timeframe) + (
+        _bar(
+            3,
+            market=market,
+            timeframe=timeframe,
+            open_="101.2",
+            high="101.6",
+            low="100.8",
+            close="101.4",
+        ),
+        _bar(
+            4,
+            market=market,
+            timeframe=timeframe,
+            open_="101.4",
+            high="103.4",
+            low="101.3",
+            close="103.0",
+        ),
+    )
+
+
+def end_of_data_bars(*, market: str = "US", timeframe: str = "5m") -> tuple[OhlcvRow, ...]:
+    return bullish_trend_bars(market=market, timeframe=timeframe) + (
+        _bar(
+            3,
+            market=market,
+            timeframe=timeframe,
+            open_="101.2",
+            high="101.5",
+            low="101.0",
+            close="101.3",
+        ),
+    )
+
+
+def future_tail_bars(*, market: str = "US", timeframe: str = "5m") -> tuple[OhlcvRow, ...]:
+    return bullish_trend_bars(market=market, timeframe=timeframe) + (
+        _bar(
+            3,
+            market=market,
+            timeframe=timeframe,
+            open_="101.2",
+            high="101.5",
+            low="100.9",
+            close="101.1",
+        ),
+        _bar(
+            4,
+            market=market,
+            timeframe=timeframe,
+            open_="101.1",
+            high="101.2",
+            low="99.2",
+            close="99.5",
+        ),
+    )
+
+
+def past_caution_news(*, market: str = "US", index: int = 1) -> tuple[NewsEvent, ...]:
+    return (
+        NewsEvent(
+            symbol="SAMPLE",
+            market=market,
+            timestamp=_timestamp(index),
+            source="synthetic-news",
+            event_type="conference",
+            headline="synthetic caution event for offline reliability",
+            severity="medium",
+            notes="synthetic reliability fixture",
+            timezone="America/New_York",
+        ),
+    )
+
+
+def future_blocking_news(*, market: str = "US", index: int = 4) -> tuple[NewsEvent, ...]:
+    return (
+        NewsEvent(
+            symbol="SAMPLE",
+            market=market,
+            timestamp=_timestamp(index),
+            source="synthetic-news",
+            event_type="earnings",
+            headline="synthetic future blocking event for leakage testing",
+            severity="high",
+            notes="synthetic reliability fixture",
+            timezone="America/New_York",
+        ),
+    )
+
+
+def equal_timestamp_news(*, market: str = "US", index: int = 0) -> tuple[NewsEvent, ...]:
+    return (
+        NewsEvent(
+            symbol="SAMPLE",
+            market=market,
+            timestamp=_timestamp(index),
+            source="synthetic-news",
+            event_type="filing",
+            headline="synthetic equal timestamp event for replay ordering",
+            severity="low",
+            notes="synthetic reliability fixture",
+            timezone="America/New_York",
+        ),
+    )
+
+
+def between_bar_news(*, market: str = "US") -> tuple[NewsEvent, ...]:
+    return (
+        NewsEvent(
+            symbol="SAMPLE",
+            market=market,
+            timestamp=_timestamp(0) + timedelta(minutes=2),
+            source="synthetic-news",
+            event_type="macro_commentary",
+            headline="synthetic between-bar event for leakage boundary",
+            severity="medium",
+            notes="synthetic reliability fixture",
+            timezone="America/New_York",
+        ),
+    )
+
+
+def default_risk_config() -> RiskConfig:
+    return RiskConfig(
+        max_risk_per_order=Decimal("150"),
+        max_total_exposure=Decimal("1000"),
+        max_symbol_exposure_ratio=Decimal("1"),
+        max_daily_loss=Decimal("200"),
+        max_consecutive_losses=2,
+        allow_manual_resume_from_loss_streak=True,
+    )
+
+
+def default_session_state(session_key: str = "2026-01-05") -> SessionRiskState:
+    return SessionRiskState(session_key=session_key)
+
+
+def build_execution_request(
+    *,
+    signal,
+    trade,
+    session_key: str = "2026-01-05",
+    quantity: str = "1",
+) -> ExecutionRequest:
+    quantity_decimal = Decimal(quantity)
+    return ExecutionRequest(
+        signal=signal,
+        requested_at=trade.entry_timestamp,
+        session_key=session_key,
+        entry_price=trade.entry_price,
+        stop_price=trade.stop_price,
+        target_price=trade.target_price,
+        proposed_quantity=quantity_decimal,
     )
 
 

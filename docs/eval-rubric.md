@@ -52,6 +52,11 @@
 - risk-before-fill
 - audit / review traceability
 - forbidden paths
+- replay snapshot、signal 序列或 backtest 汇总在相同输入下不稳定，直接判 fail
+- bars / news 出现 future leakage，直接判 fail
+- 被 `risk_block` 或 request-binding 阻断的请求若仍进入 simulated fill，直接判 fail
+- close-path 审计字段缺失，直接判 fail
+- review 缺少 KB `source_refs`、PA explanation、risk notes 或 news traceability，直接判 fail
 
 ### M8D
 
@@ -59,6 +64,10 @@
 - 实时只读输入下仍保持 shadow / paper
 - 不进入真实 broker / live
 - 保守性与可解释性保持稳定
+- 缺失 manifest、manifest 指向缺失文件、或 `approved_for` 不允许 M8D 用途时，必须 deferred 或 fail-fast
+- `run_shadow_session.py` 若输出任何 broker-connected / live 字样，直接判 fail
+- shadow / paper 输出若丢失 dataset metadata、session metadata、KB refs、PA explanation、risk/news traceability，直接判 fail
+- 在没有真实历史样本时若声称“真实行情验证已完成”，直接判 fail
 
 ## 5. 人工抽检规则
 

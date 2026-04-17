@@ -55,11 +55,45 @@
 
 - 目标：验证现有最小闭环的 determinism 与安全红线
 - 核心门禁：无 future leakage、同输入 deterministic、risk-before-fill、audit / review traceability、forbidden paths
+- 当前已落盘：
+  - `tests/integration/test_offline_e2e_pipeline.py`
+  - `tests/reliability/test_replay_determinism.py`
+  - `tests/reliability/test_no_future_leakage.py`
+  - `tests/reliability/test_audit_traceability.py`
+  - `tests/reliability/test_forbidden_paths.py`
+  - `scripts/run_reliability_suite.py` 已纳入 `integration` 与 `reliability` suites
+- 当前已覆盖：
+  - deterministic replay、signal 输出与 backtest 结果在同一输入下保持稳定
+  - bars / news 的 future leakage fail-fast
+  - `risk_block`、mismatched risk decision 等 forbidden paths 不得进入 simulated fill
+  - close-path audit 字段与 review 的 KB / explanation / risk / news traceability 必须完整
+  - `end_of_data`、数据不足、缺 bar gap、重复 bar 的本地静态样本稳健性
+- 当前边界说明：
+  - M8C 只使用本地静态 CSV/JSON 与极小 synthetic fixtures
+  - 不伪造真实历史结果
+  - 不进入真实 broker、真实账户或 live execution
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 - 目标：在真实输入下验证系统仍然保守、稳定、可解释
 - 核心门禁：真实输入只进入 shadow / paper，不进入真实 broker / live
+- 当前已落盘：
+  - `docs/shadow-mode-runbook.md`
+  - `scripts/run_shadow_session.py`
+  - `tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`
+  - `tests/reliability/test_regime_robustness.py`
+  - `tests/reliability/test_shadow_paper_consistency.py`
+  - `tests/reliability/test_dataset_manifest_contract.py`
+- 当前已覆盖：
+  - 用户导出的真实历史数据可通过 `dataset.manifest.json` 进入本地 runner
+  - 录制型实时只读输入可通过同一 manifest + `shadow/paper` 模式重放
+  - 无 manifest、manifest 非法、样本缺失时 runner 必须返回 deferred 或 fail-fast
+  - 多 regime 标签、market、timeframe、timezone 约束已进入 manifest 与可靠性测试
+  - 报告最小字段已固定为 dataset/session metadata + KB/explanation/risk/news traceability
+- 当前边界说明：
+  - M8D runner 默认只做只读输入与 simulated 输出
+  - 当前没有真实历史样本或实时源时，不宣称真实行情验证已完成
+  - 实际真实历史执行与实时 shadow/paper 运行仍等待用户提供本地 approved manifests
 
 ## 5. 输入边界
 

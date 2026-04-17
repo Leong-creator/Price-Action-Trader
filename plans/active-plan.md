@@ -13,7 +13,9 @@
 - M7 已完成正式券商 API readiness assessment，当前冻结结论为 `no-go`。
 - 当前分析基线固定为 `feature/m7-broker-api-assessment`。
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
-- `M8C` 尚未启动。
+- `M8C` 已在 `integration/m8c-offline-reliability` 完成离线端到端可靠性测试。
+- `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
+- `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b` 暂未启动。
 
 ## 2. 执行总原则
 
@@ -359,9 +361,9 @@
 
 ## 15. M8 可靠性验证
 
-- 分支：`integration/m8-reliability-validation`
+- 分支：`integration/m8-reliability-validation`（M8A/M8B 已完成）；当前知识原子化分支：`feature/m8b2-knowledge-atomization-callable-access`
 - 当前状态：进行中
-- 当前子阶段：M8A：测试骨架与验收门禁落盘（已完成）
+- 当前子阶段：M8B.2a：Knowledge Atomization 基础层（已完成）
 - 目标：以行为可靠性而不是功能扩展为首目标，验证 M0-M7 既有交付物在知识约束、研究链可复现性、paper-only 安全性和真实输入下的保守稳定性。
 - 总边界：
   - 默认运行边界仍为 `paper / simulated`
@@ -477,10 +479,78 @@
   - 已新增 `tests/reliability/test_kb_alignment.py`、`tests/reliability/test_no_hallucinated_kb_refs.py`、`tests/reliability/test_no_trade_when_insufficient_evidence.py`。
   - 已验证 explanation 必须存在且回链到 setup/rule/source，且 `wait / no-trade` 在证据不足场景下视为合格结果。
   - 已于 2026-04-17 通过 merge commit `0047100` 整合进稳定基线 `feature/m7-broker-api-assessment`。
+  - 已完成 M8B.1：定位 transcript / Brooks PPT 先前缺席是因为 raw-only、无 `source` 页、未入 active rule pack，且默认 strategy bundle 未加载 rule pack；现已补齐最小 traceability 接线并验证“能接入时出现、未接入时不编造”。
+
+### M8B.2a：Knowledge Atomization 基础层
+
+- 当前状态：已完成
+- 目标：
+  - 为 in-scope source 建立 machine-readable source registry
+  - 为可解析资料建立 chunk registry
+  - 为 chunk 与 curated wiki 页面建立 evidence-backed knowledge atoms
+  - 建立可按 source/type/context/status 查询的 callable index
+- 交付物类型：
+  - source / chunk / atom / callable schema
+  - source / chunk / atom / callable indices
+  - builders / validators
+  - reliability tests
+- 验证方式：
+  - 运行 `test_kb_coverage.py`、`test_knowledge_atoms.py`、`test_callable_access.py`
+  - 运行全量 `tests/reliability`
+  - reviewer 核对 evidence-backed 原则与 callable 层边界
+  - qa 核对熔断条件与“本轮不进入 2b”的边界
+- 验收条件：
+  - `M8B.2` 已在 SoT 中拆成 `2a / 2b`
+  - 10 个 in-scope source 全部进入 source registry
+  - `Zone.Identifier` 被过滤且显式记录
+  - `statement` atom 已落盘，且具备 `atom_id / source_ref / raw_locator / evidence_chunk_ids / status / confidence / callable_tags`
+  - 无证据不产出 `statement`
+  - transcript / Brooks / 全部方方土笔记在 callable index 层可检索
+  - 关键 curated atoms 已形成 evidence-backed atom
+  - 本轮不修改 strategy / explanation / review / report 接线，不修改 trigger
+- 熔断条件：
+  - 10 个 in-scope source 中 `blocked >= 4`
+  - 关键 curated atoms 无法形成稳定 evidence-backed atom
+  - `statement` 抽取无法稳定回溯证据
+- 可并行子任务：
+  - `source_inventory / kb_auditor` 负责 coverage baseline 与 source-page 缺口
+  - `kb_structurer` 负责 schema、builders、validators、indices
+  - `reviewer / qa` 负责 contract、熔断判定与回归
+- 依赖：
+  - M8B.1 已完成 source traceability 最小接线
+  - 当前仍保持 `paper / simulated`
+- 风险：
+  - 把 source-level 或 statement-level atom 误包装成 executable rule
+  - PDF 解析失败导致 coverage 统计与 evidence atom 不稳定
+  - 在 2a 中偷跑 strategy 接线
+- 回退点：
+  - 如命中熔断，停在 `M8B.2a`，更新状态并输出 Failure Dossier，不进入 `2b`
+- 实际完成摘要：
+  - 已补齐 10 个 in-scope source 的 source registry 覆盖，并把 `Price_Action方方土.pdf:Zone.Identifier` 显式过滤到 `coverage_summary.filtered_files`。
+  - 已新增 5 份方方土笔记 source page 与 2 份 Brooks PPT per-file source page；现有 `al-brooks-price-action-ppt.md` 继续保留为 family overview。
+  - 已用 `pypdf` 构建 `source_manifest.json`、`chunk_manifest.jsonl`、`knowledge_atoms.jsonl` 与 `knowledge_callable_index.json`。
+  - 当前 source coverage 结果为 `parsed=9 / partial=1 / blocked=0`，partial 来源是 `方方土视频笔记 - 楔形.pdf`，原因为 `1 page(s) produced no stable text`。
+  - 已落盘 `statement` callable atom，且保持 `draft`、evidence-backed、无 `strategy_candidate`；当前 atom 统计为 `statement=14075`、`source_note=5492`、`open_question=24`、`concept=1`、`setup=1`、`rule=1`。
+  - 关键 curated atoms `market-cycle-overview`、`signal-bar-entry-placeholder` 与 `m3-research-reference-pack` 已形成 evidence-backed atom。
+  - 已通过 `python scripts/validate_kb_coverage.py`、`python scripts/validate_knowledge_atoms.py`、`python -m unittest discover -s tests/reliability -v` 与 `python -m unittest discover -s tests/unit -v`。
+  - 当前未触发熔断，且仍严格停在 `2a`，没有新增 strategy / explanation / review / report 接线。
+
+### M8B.2b：Callable 接入 Strategy / Explanation / Review / Report
+
+- 当前状态：未开始
+- 启动前提：
+  - `M8B.2a` 全部测试通过
+  - 未触发熔断
+  - reviewer 通过
+  - qa 通过
+- 当前约束：
+  - `2b` 未启动前，不允许新增 `knowledge_trace`
+  - 不允许改写 legacy `source_refs` 兼容逻辑
+  - 不允许改 public demo report 的 trace 呈现
 
 ### M8C：离线端到端可靠性测试
 
-- 当前状态：待启动
+- 当前状态：已完成
 - 目标：
   - 围绕当前最小闭环定义离线集成可靠性红线
   - 固化无 future leakage、可复现、风险先于成交、审计与复盘可追溯
@@ -511,10 +581,16 @@
   - 将 paper-only 执行红线降级为质量项
 - 回退点：
   - 如离线可靠性门禁表述模糊，回退到 M8B 检查点
+- 实际完成摘要：
+  - 已新增 `tests/integration/test_offline_e2e_pipeline.py`，覆盖 `src/data -> src/strategy -> src/backtest -> src/risk -> src/execution -> src/news -> src/review` 的离线端到端链路。
+  - 已新增 `tests/reliability/test_replay_determinism.py`、`tests/reliability/test_no_future_leakage.py`、`tests/reliability/test_audit_traceability.py`、`tests/reliability/test_forbidden_paths.py`。
+  - 已覆盖 deterministic replay 一致性、bars / news future leakage fail-fast、forbidden paths、audit / review traceability、`end_of_data`、缺 bar gap 与重复 bar 的稳健性。
+  - 已更新 `scripts/run_reliability_suite.py`，使 `integration` 与 `reliability` suites 可统一运行且继续保持 `real_historical_data=deferred`。
+  - 已通过 `tests/reliability` 18 项、`tests/integration` 4 项、`tests/unit` 57 项与统一 reliability suite 验证。
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
-- 当前状态：待启动
+- 当前状态：进行中
 - 目标：
   - 在真实输入条件下验证系统仍然保守、稳定、可解释
   - 只建立 shadow / paper 验证框架，不进入真实 broker
@@ -546,6 +622,17 @@
   - 在未完成 M8 前重开 live 讨论
 - 回退点：
   - 如出现任何真实 broker / live 暗示，整体回退到 M8C 检查点
+- 实际完成摘要：
+  - 已新增 `docs/shadow-mode-runbook.md`，固定 manifest、shadow/paper 命令、deferred 语义与运行边界。
+  - 已新增 `scripts/run_shadow_session.py`，提供本地 manifest 驱动的只读 shadow/paper runner，默认不连接真实 broker、不触发 live execution。
+  - 已新增 repo-safe 小样本 manifest：`tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`。
+  - 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`。
+  - 已补齐 `docs/test-dataset-curation.md` 与 `reports/reliability/README.md`，固定 small/large dataset 约定、受控标签与报告最小字段。
+  - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通公共历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
+  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`。
+  - 已完成一轮公共历史数据演示回测：使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`。
+  - 该示例 run 在当前 demo 风控参数下录得 `1.9923%` 总收益率、`1.5157%` 最大回撤、`16` 笔交易、`43.75%` 胜率；仍明确保持 `paper / simulated`，不代表实盘能力。
+  - 当前更完整的真实历史样本、用户自有 CSV、录制型实时样本与 shadow/paper 延展验证仍可继续扩展，但本轮没有引入真实 broker、真实账户或 live execution。
 
 ## 16. 公共接口冻结点
 
@@ -573,10 +660,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8B：知识库对齐测试（已完成）。
+- 当前 milestone：M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架（进行中）。
 - 当前下一步：
-  - 本轮已完成 `M8B` 整合，当前稳定基线为 `feature/m7-broker-api-assessment`
-  - `M8C` 尚未开始；若下一轮启动，必须从最新稳定基线重新开分支
+  - 本轮已完成公共历史数据下载缓存、用户可读回测演示与本地报告输出，当前开发分支为 `feature/m8-user-backtest-demo`
+  - 下一步若要更真实，应优先扩展更长时间窗口、更多 regime、用户自有历史 CSV/JSON，或补历史 news 时间线；不是继续 broker/live
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

@@ -1,0 +1,32 @@
+{
+  "dataset_name": "sample_us_5m_recorded_session",
+  "dataset_version": "1",
+  "source_type": "local_curated",
+  "market": "US",
+  "symbol": "SAMPLE",
+  "timeframe": "5m",
+  "timezone": "America/New_York",
+  "time_range": {
+    "start": "2026-01-05T09:30:00-05:00",
+    "end": "2026-01-05T09:50:00-05:00"
+  },
+  "regime_tags": [
+    "trend_up",
+    "event_driven"
+  ],
+  "origin": "Repository-safe sample manifest for M8D framework validation only.",
+  "approved_for": [
+    "offline_replay",
+    "m8d_shadow_paper",
+    "research_only"
+  ],
+  "limitations": [
+    "small local sample only",
+    "not a real-history profitability proof"
+  ],
+  "files": {
+    "ohlcv": "ohlcv.csv",
+    "news": "news.json"
+  },
+  "session_type": "simulated"
+}
