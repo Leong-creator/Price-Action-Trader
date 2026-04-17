@@ -15,7 +15,7 @@
 - `M8B` 已于 merge commit `0047100` 从 `integration/m8-reliability-validation` 整合进稳定基线 `feature/m7-broker-api-assessment`。
 - M8 的基础离线可靠性红线与 shadow/paper 框架已完成并冻结，作为后续验证主线的前置基线。
 - `M8C` 当前已切换为 `Long-Horizon & Intraday Paper Validation`：
-  - `M8C.1：长周期日线验证` 已完成
+  - `M8C.1：长周期日线验证` 已完成并整合进稳定基线
   - `M8C.2：单标的日内试点` 尚未开始
 - `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
 - `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
@@ -729,10 +729,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8C.1：长周期日线验证（已完成，待整合进稳定基线）。
+- 当前 milestone：M8C.1：长周期日线验证（已完成并整合进稳定基线）。
 - 当前下一步：
-  - 本轮已把 daily public history demo 扩展为长周期、多阶段、可解释的验证套件，当前开发分支为 `feature/m8c1-long-horizon-daily-validation`。
-  - 若本轮 reviewer / qa 通过，则将 `M8C.1` 合并回稳定基线 `feature/m7-broker-api-assessment`；`M8C.2` 尚未开始。
+  - 本轮已把 daily public history demo 扩展为长周期、多阶段、可解释的验证套件，并已整合进稳定基线 `feature/m7-broker-api-assessment`。
+  - `M8C.2` 尚未开始。
   - 下一步若继续推进，只允许从最新稳定基线单独开分支进入 `M8C.2`；仍不进入期权、broker/live。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API

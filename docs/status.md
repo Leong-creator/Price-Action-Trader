@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8C.1：长周期日线验证（已完成，待整合进稳定基线）
+- 当前子阶段：M8C.1：长周期日线验证（已完成并整合进稳定基线）
 
 ## 当前分支
 
-- `feature/m8c1-long-horizon-daily-validation`
+- `feature/m7-broker-api-assessment`
 
 ## 已完成
 
@@ -128,7 +128,7 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live，而是在 reviewer / qa 通过后把 `M8C.1` 合并回稳定基线 `feature/m7-broker-api-assessment`。
+- 当前下一步不是扩 broker/live；`M8C.1` 已整合进稳定基线，`M8C.2` 尚未开始。
 - `M8C.2` 尚未开始；若继续，只允许从最新稳定基线单独开分支进入单标的 intraday pilot。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界。

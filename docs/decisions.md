@@ -89,3 +89,8 @@
 
 - 日期：2026-04-17
 - 结论：`M8C.1` 只允许在 `paper / simulated` 边界内，把现有 daily public history demo 扩展为更长周期、多 split、多 regime 的验证套件；不得进入 intraday、期权、broker/live/real-money，也不得修改 trigger 逻辑。`knowledge_trace` 与 legacy `source_refs` 继续兼容，`statement` / `source_note` 只作 trace 与报告证据，不得进入 trigger 或影响 confidence。验证必须输出 per-symbol breakdown、walk-forward split、regime 摘要、structured `no_trade / wait`、blocked signals 汇总，以及 curated vs statement trace 占比摘要。由于 Al Brooks statement 数量偏大，`M8C.1` 的 trace 审计必须继续使用 curated-first 与 source family 多样性控制；任何结论都不得使用 statement 数量作为收益、权重或质量代理。`M8C.2` 只有在 `M8C.1` 验收通过并整合进稳定基线后才允许启动。
+
+## D-0019 M8C.1 整合结论冻结
+
+- 日期：2026-04-17
+- 结论：`M8C.1` 已作为低/中风险验证子阶段通过验收，允许整合进稳定基线 `feature/m7-broker-api-assessment`。其整合只代表 long-horizon daily validation、walk-forward split、regime 摘要、structured `no_trade / wait` 与 knowledge trace coverage 已进入稳定基线；不代表 `M8C.2` 已启动，不代表进入期权，不代表 trigger 逻辑发生变化，也不代表 broker/live/real-money 边界被放宽。
