@@ -91,6 +91,12 @@ _REJECT_STATEMENT_PATTERNS = (
     re.compile(r"\bslide\b", re.IGNORECASE),
     re.compile(r"qihua\s*\d+", re.IGNORECASE),
 )
+_QUESTION_HEADING_PREFIXES = ("what ", "why ", "when ", "where ", "who ", "how ")
+_SECTION_HEADING_PATTERNS = (
+    re.compile(r"^(?:模块|阶段)[一二三四五六七八九十0-9]+[:：]"),
+    re.compile(r"^《.+》[:：]"),
+    re.compile(r"^[A-Z][A-Za-z0-9\s()/'&.+-]{2,}[:：]$"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -663,6 +669,8 @@ def qualifies_statement(fragment: str) -> bool:
         return False
     if re.fullmatch(r"[\d\s\-/.:]+", text):
         return False
+    if looks_like_low_value_statement(text):
+        return False
     return True
 
 
@@ -698,6 +706,46 @@ def contains_statement_boilerplate(text: str, *, lowered: str | None = None, col
     if collapsed.startswith("brooks") and "course" in collapsed:
         return True
     return any(pattern.search(normalized) for pattern in _REJECT_STATEMENT_PATTERNS)
+
+
+def looks_like_low_value_statement(text: str) -> bool:
+    normalized = normalize_text(text)
+    lowered = normalized.lower()
+    digit_count = sum(char.isdigit() for char in normalized)
+    alpha_count = sum(char.isalpha() for char in normalized)
+    has_cjk = bool(re.search(r"[\u4e00-\u9fff]", normalized))
+
+    if re.search(r"(?:^|[/\s~'\":])\d{1,4}/\d{1,2}(?:/\d{1,4})?(?:[\s.:]|$)", normalized) and digit_count >= 4:
+        return True
+    if digit_count >= 6 and digit_count >= alpha_count and normalized.count("/") >= 1:
+        return True
+    if digit_count >= 8 and digit_count >= alpha_count:
+        return True
+    if digit_count >= 8 and normalized.count("/") >= 3:
+        return True
+    if re.match(r"^[%+~·•-]", normalized):
+        return True
+    if any(pattern.match(normalized) for pattern in _SECTION_HEADING_PATTERNS):
+        return True
+    if re.search(r"(?:\b[A-Za-z]\s+){3,}[A-Za-z]\b", normalized):
+        return True
+    if re.search(r"[^A-Za-z0-9\u4e00-\u9fff\s,.;:!?()/%&'\"+-]", normalized):
+        weird_chars = sum(
+            1 for char in normalized if not re.match(r"[A-Za-z0-9\u4e00-\u9fff\s,.;:!?()/%&'\"+-]", char)
+        )
+        if weird_chars >= 8 or (weird_chars >= 3 and not has_cjk):
+            return True
+    if re.match(r"^[a-z]", normalized):
+        return True
+    if re.search(r"[,(/-]$", normalized):
+        return True
+    if re.search(r"[:：]\s*$", normalized):
+        return True
+    if normalized.endswith("?") and lowered.startswith(_QUESTION_HEADING_PREFIXES):
+        return True
+    if not has_cjk and re.search(r"\b(or|and|to|of|for|with|than|from|on|in|at|but)$", lowered):
+        return True
+    return False
 
 
 def extract_statement_fragments(chunk_text: str) -> list[str]:
@@ -1082,7 +1130,11 @@ def validate_knowledge_atoms(
             if "strategy_candidate" in atom.get("callable_tags", []):
                 errors.append(f"statement must not carry strategy_candidate: {atom.get('atom_id')}")
             content = str(atom.get("content", ""))
-            if looks_like_header_fragment(content) or contains_statement_boilerplate(content):
+            if (
+                looks_like_header_fragment(content)
+                or contains_statement_boilerplate(content)
+                or looks_like_low_value_statement(content)
+            ):
                 errors.append(f"statement contains header-like boilerplate: {atom.get('atom_id')}")
         if atom_type in {"source_note", "open_question", "contradiction"} and "strategy_candidate" in atom.get(
             "callable_tags", []

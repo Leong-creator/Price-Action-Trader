@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 
 from tests.reliability._atomization_support import load_fixture
@@ -41,6 +42,16 @@ class KnowledgeAtomTests(unittest.TestCase):
         self.assertNotIn("exit with limit order", {content.lower() for content in statements})
         self.assertNotIn("day trading examples 2", {content.lower() for content in statements})
         self.assertTrue(all(not content.startswith("专题系列") for content in statements))
+        self.assertTrue(
+            all(
+                not re.search(r"(?:^|[/\\s~'\\\":])\\d{1,4}/\\d{1,2}(?:/\\d{1,4})?(?:[\\s.:]|$)", content)
+                for content in statements
+            )
+        )
+        self.assertTrue(all(not content.endswith((",", "(", "/", "-")) for content in statements))
+        self.assertTrue(all(not content.lower().startswith(("what ", "why ", "when ", "where ", "who ", "how ")) or not content.endswith("?") for content in statements))
+        self.assertTrue(all(not content[:1].islower() for content in statements if content and content[0].isascii()))
+        self.assertTrue(all(not re.search(r"(?:\\b[A-Za-z]\\s+){3,}[A-Za-z]\\b", content) for content in statements))
 
     def test_key_curated_atoms_are_evidence_backed(self) -> None:
         fixture = load_fixture()
