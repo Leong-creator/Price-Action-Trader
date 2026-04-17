@@ -252,7 +252,7 @@
   - 已于 2026-04-17 通过 `tests/reliability` 7 项与 `tests/unit` 57 项验证。
   - 已通过 merge commit `0047100` 从 `integration/m8-reliability-validation` 合并到 `feature/m7-broker-api-assessment`。
   - M8B.1 已定位 transcript / Brooks PPT 缺席根因：此前只有 raw 文件，没有对应 `source` 页和 rule-pack 接线，且默认 strategy bundle 未加载 active rule pack；现已补齐最小 traceability 接线，但仍不把这些来源包装成已抽取完成的正式规则。
-  - M8C 已在 `integration/m8c-offline-reliability` 完成实现与验证，且仍保持 `paper / simulated` 与 `no-go` 边界。
+  - M8 的基础离线可靠性门禁已完成实现与验证，且仍保持 `paper / simulated` 与 `no-go` 边界。
 
 ### M8B.2a：Knowledge Atomization 基础层
 
