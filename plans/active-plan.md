@@ -520,7 +520,7 @@
 
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
-- 当前状态：待启动
+- 当前状态：进行中
 - 目标：
   - 在真实输入条件下验证系统仍然保守、稳定、可解释
   - 只建立 shadow / paper 验证框架，不进入真实 broker
@@ -552,6 +552,13 @@
   - 在未完成 M8 前重开 live 讨论
 - 回退点：
   - 如出现任何真实 broker / live 暗示，整体回退到 M8C 检查点
+- 实际完成摘要：
+  - 已新增 `docs/shadow-mode-runbook.md`，固定 manifest、shadow/paper 命令、deferred 语义与运行边界。
+  - 已新增 `scripts/run_shadow_session.py`，提供本地 manifest 驱动的只读 shadow/paper runner，默认不连接真实 broker、不触发 live execution。
+  - 已新增 repo-safe 小样本 manifest：`tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`。
+  - 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`。
+  - 已补齐 `docs/test-dataset-curation.md` 与 `reports/reliability/README.md`，固定 small/large dataset 约定、受控标签与报告最小字段。
+  - 当前真实历史样本与实时源的实际运行仍为 deferred，等待用户提供 approved local manifests；本轮不伪造真实行情结果。
 
 ## 16. 公共接口冻结点
 
@@ -579,10 +586,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8C：回测稳健性与离线端到端可靠性测试（已完成）。
+- 当前 milestone：M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架（进行中）。
 - 当前下一步：
-  - 本轮已完成 `M8C` 的离线端到端可靠性测试，当前开发分支为 `integration/m8c-offline-reliability`
-  - 下一步才进入 `M8D`：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+  - 本轮已完成 `M8D` 框架、manifest、runbook 与最小可靠性测试，当前开发分支为 `integration/m8d-shadow-paper-validation`
+  - 下一步是用用户提供的 approved local manifests 实际喂入真实历史 CSV/JSON 或录制型实时样本，执行 shadow/paper 验证
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

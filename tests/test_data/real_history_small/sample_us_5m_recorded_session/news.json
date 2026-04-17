@@ -1,0 +1,13 @@
+[
+  {
+    "symbol": "SAMPLE",
+    "market": "US",
+    "timestamp": "2026-01-05T09:40:00-05:00",
+    "source": "synthetic-news",
+    "event_type": "conference",
+    "headline": "Conference appearance scheduled",
+    "severity": "medium",
+    "notes": "Synthetic recorded-session sample for M8D runner validation.",
+    "timezone": "America/New_York"
+  }
+]

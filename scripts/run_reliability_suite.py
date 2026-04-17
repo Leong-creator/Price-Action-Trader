@@ -33,13 +33,17 @@ OPTIONAL_SUITE_DIRS = {
 OPTIONAL_SUITE_DESCRIPTIONS = {
     "golden": "M8 golden-case catalog；无可执行测试时允许安全跳过",
     "integration": "M8C offline E2E 集成红线；无测试样本时允许安全跳过",
-    "reliability": "M8B/M8C reliability 红线；无测试样本时允许安全跳过",
+    "reliability": "M8B/M8C/M8D reliability 红线；无测试样本时允许安全跳过",
 }
 
 LOCAL_DATASET_SUFFIXES = (".csv", ".json")
 REAL_HISTORY_DATASET_DIRS = (
     ROOT / "tests" / "reliability" / "real_history",
     ROOT / "tests" / "integration" / "real_history",
+    ROOT / "data" / "real_history",
+    ROOT / "data" / "realtime_recordings",
+    ROOT / "local_data" / "real_history",
+    ROOT / "local_data" / "realtime_recordings",
 )
 
 

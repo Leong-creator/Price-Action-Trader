@@ -77,6 +77,23 @@
 
 - 目标：在真实输入下验证系统仍然保守、稳定、可解释
 - 核心门禁：真实输入只进入 shadow / paper，不进入真实 broker / live
+- 当前已落盘：
+  - `docs/shadow-mode-runbook.md`
+  - `scripts/run_shadow_session.py`
+  - `tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`
+  - `tests/reliability/test_regime_robustness.py`
+  - `tests/reliability/test_shadow_paper_consistency.py`
+  - `tests/reliability/test_dataset_manifest_contract.py`
+- 当前已覆盖：
+  - 用户导出的真实历史数据可通过 `dataset.manifest.json` 进入本地 runner
+  - 录制型实时只读输入可通过同一 manifest + `shadow/paper` 模式重放
+  - 无 manifest、manifest 非法、样本缺失时 runner 必须返回 deferred 或 fail-fast
+  - 多 regime 标签、market、timeframe、timezone 约束已进入 manifest 与可靠性测试
+  - 报告最小字段已固定为 dataset/session metadata + KB/explanation/risk/news traceability
+- 当前边界说明：
+  - M8D runner 默认只做只读输入与 simulated 输出
+  - 当前没有真实历史样本或实时源时，不宣称真实行情验证已完成
+  - 实际真实历史执行与实时 shadow/paper 运行仍等待用户提供本地 approved manifests
 
 ## 5. 输入边界
 

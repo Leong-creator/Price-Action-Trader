@@ -7,11 +7,11 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8C：回测稳健性与离线端到端可靠性测试（已完成）
+- 当前子阶段：M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架（进行中）
 
 ## 当前分支
 
-- `integration/m8c-offline-reliability`
+- `integration/m8d-shadow-paper-validation`
 
 ## 已完成
 
@@ -63,6 +63,11 @@
 - M8C 已覆盖 deterministic replay 一致性、bars / news future leakage fail-fast、forbidden paths、audit/review traceability、`end_of_data`、缺 bar gap 与重复 bar 稳健性
 - M8C 已验证 `tests/reliability` 18 项、`tests/integration` 4 项、`tests/unit` 57 项通过；`python scripts/run_reliability_suite.py` 当前合计执行 79 项本地离线测试
 - M8C 保持 `paper / simulated` 与 `no-go` 边界，未新增真实 broker、真实账户或 live execution 路径
+- M8D 已新增 `docs/shadow-mode-runbook.md` 与 `scripts/run_shadow_session.py`，固定 manifest 驱动的只读 shadow/paper 验证路径
+- M8D 已新增 repo-safe 小样本 manifest：`tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`
+- M8D 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`
+- M8D 已补齐 `docs/test-dataset-curation.md` 的 small/large dataset、realtime recording 与受控标签规范，并更新 `reports/reliability/README.md` 的报告最小字段
+- M8D 当前已具备：manifest 校验、shadow/paper dry-run、报告 traceability、无样本 deferred 语义；尚未实际运行用户真实历史样本或录制型实时样本
 
 ## 当前阻塞
 
@@ -71,7 +76,7 @@
 
 ## 下一步
 
-- M8C 已完成；下一步才进入 M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
-- M8D 启动前仍只允许真实历史 CSV/JSON、本地快照与实时只读输入；不得进入 broker / live
+- 继续留在 M8D，但下一步不是扩 broker，而是等待用户提供 approved local manifests
+- 一旦用户提供真实历史 CSV/JSON 或录制型实时样本，应直接用 `python scripts/run_shadow_session.py --manifest ... --mode shadow|paper` 执行本地验证
 - 当前稳定基线继续保持 `paper / simulated` 与 `no-go` 边界
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API

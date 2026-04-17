@@ -281,3 +281,9 @@
 - 明确要求任何 broker / live 的重新评估都排在 `M8` 完成之后。
 - reviewer 与 qa 都必须把 “无越权到 broker/live” 作为强制审查项。
 - M8D 不引入付费服务前置条件，不把浏览器自动化写成生产执行链路。
+- `docs/shadow-mode-runbook.md` 必须存在，并明确 manifest、shadow/paper 命令、deferred 语义与 `paper / simulated` 边界。
+- `scripts/run_shadow_session.py` 必须可通过 `python -m py_compile`，并默认保持只读输入、simulated 输出、无真实 broker 依赖。
+- `scripts/run_shadow_session.py` 在未提供 manifest 时必须返回 deferred，而不是伪造真实历史验证已完成。
+- repo-safe 小样本 manifest 必须存在，并能证明 M8D 框架可运行但不等于真实历史验证已完成。
+- `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py` 与 `tests/reliability/test_dataset_manifest_contract.py` 必须通过。
+- `reports/reliability/README.md` 必须明确报告不是盈利证明，并保留 dataset/session/traceability 最小字段要求。
