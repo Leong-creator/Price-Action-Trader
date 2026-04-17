@@ -60,7 +60,8 @@ class OfflineE2EPipelineTests(unittest.TestCase):
         close_log = result.close_result.logs[0]
 
         self.assertTrue(signal.source_refs)
-        self.assertEqual(item.kb_source_refs, signal.source_refs)
+        self.assertEqual(item.kb_source_refs, signal.actual_source_refs)
+        self.assertEqual(item.kb_bundle_support_refs, signal.bundle_support_refs)
         self.assertTrue(item.pa_explanation)
         self.assertTrue(item.risk_notes)
         self.assertEqual(item.risk_notes, signal.risk_notes)

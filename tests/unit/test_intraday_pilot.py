@@ -164,8 +164,9 @@ class IntradayPilotUnitTests(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(coverage["overall"]["source_family_signal_presence"]["al_brooks_ppt"], 1)
-        self.assertGreater(coverage["overall"]["source_family_item_counts"]["al_brooks_ppt"], 1)
+        self.assertEqual(coverage["overall"]["actual_hit_source_family_presence"]["al_brooks_ppt"], 1)
+        self.assertGreater(coverage["overall"]["actual_hit_source_family_item_counts"]["al_brooks_ppt"], 1)
+        self.assertEqual(coverage["overall"]["bundle_support_family_presence"]["curated_rule"], 1)
 
 
 def _build_symbol_result(
@@ -262,10 +263,27 @@ def _build_signal(
         target_rule="2R target",
         invalidation="close back through setup",
         confidence="low",
-        source_refs=tuple(dict.fromkeys(hit.source_ref for hit in trace)),
+        source_refs=tuple(
+            dict.fromkeys(
+                [*(hit.source_ref for hit in trace), "wiki:knowledge/wiki/rules/m3-research-reference-pack.md"]
+            )
+        ),
+        actual_source_refs=tuple(hit.source_ref for hit in trace),
+        bundle_support_refs=("wiki:knowledge/wiki/rules/m3-research-reference-pack.md",),
         explanation="unit intraday explanation",
         risk_notes=("research-only placeholder",),
         knowledge_trace=tuple(trace),
+        knowledge_debug_trace=(
+            KnowledgeAtomHit(
+                atom_id="rule-support-1",
+                atom_type="rule",
+                source_ref="wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+                raw_locator={"locator_kind": "bundle_support_summary", "label": "bundle_support[1 sources/26 chunks]"},
+                match_reason="bundle_rule_support",
+                applicability_state="supporting",
+                reference_tier="bundle_support",
+            ),
+        ),
     )
 
 

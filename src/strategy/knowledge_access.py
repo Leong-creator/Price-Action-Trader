@@ -31,6 +31,7 @@ TRACE_SUPPORTING_TOTAL_CAP = 1
 TRACE_PER_FAMILY_CAP = 1
 TRACE_MARKDOWN_SUMMARY_CAP = 3
 TRACE_EXPLANATION_SUMMARY_CAP = 2
+TRACE_VISIBLE_RULE_CHUNK_SET_MAX = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +72,14 @@ class KnowledgeTransitionalView:
     statement_atoms: tuple[KnowledgeAtom, ...]
     supporting_atoms: tuple[KnowledgeAtom, ...]
     legacy_source_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class KnowledgeTraceResolution:
+    visible_trace: tuple[KnowledgeAtomHit, ...]
+    debug_trace: tuple[KnowledgeAtomHit, ...]
+    actual_source_refs: tuple[str, ...]
+    bundle_support_refs: tuple[str, ...]
 
 
 def _as_tuple(value: Any) -> tuple[str, ...]:
@@ -163,6 +172,8 @@ def _brief_raw_locator(raw_locator: dict[str, Any]) -> str:
     if locator_kind == "chunk_set":
         member_count = raw_locator.get("member_count", "?")
         return f"chunk_set[{member_count}]"
+    if locator_kind == "bundle_support_summary":
+        return str(raw_locator.get("label", "bundle_support"))
     return locator_kind
 
 
@@ -340,27 +351,84 @@ class CallableKnowledgeAccess:
         timeframe: str,
         pa_context: str,
     ) -> tuple[KnowledgeAtomHit, ...]:
+        return self.resolve_trace_bundle(
+            knowledge=knowledge,
+            market=market,
+            timeframe=timeframe,
+            pa_context=pa_context,
+        ).visible_trace
+
+    def resolve_trace_bundle(
+        self,
+        *,
+        knowledge: StrategyKnowledgeBundle,
+        market: str,
+        timeframe: str,
+        pa_context: str,
+    ) -> KnowledgeTraceResolution:
         view = self.build_transitional_view(
             knowledge=knowledge,
             market=market,
             timeframe=timeframe,
             pa_context=pa_context,
         )
-        hits: list[KnowledgeAtomHit] = []
+        visible_hits: list[KnowledgeAtomHit] = []
+        debug_hits: list[KnowledgeAtomHit] = []
         for atom in view.curated_atoms:
-            hits.append(self._atom_to_hit(atom, match_reason=f"curated_{atom.atom_type}", applicability_state=self._applicability_state(atom)))
+            if self._is_broad_bundle_rule(atom):
+                debug_hits.append(
+                    self._atom_to_hit(
+                        atom,
+                        match_reason="bundle_rule_support",
+                        applicability_state="supporting",
+                        reference_tier="bundle_support",
+                        raw_locator=self._bundle_support_locator(atom),
+                        governance_notes=self._governance_notes(atom),
+                    )
+                )
+                continue
+            visible_hits.append(
+                self._atom_to_hit(
+                    atom,
+                    match_reason=f"curated_{atom.atom_type}",
+                    applicability_state=self._signal_applicability_state(atom),
+                    governance_notes=self._governance_notes(atom),
+                )
+            )
         for atom in view.statement_atoms:
-            hits.append(self._atom_to_hit(atom, match_reason="statement_support", applicability_state="supporting"))
+            visible_hits.append(
+                self._atom_to_hit(
+                    atom,
+                    match_reason="statement_support",
+                    applicability_state="supporting",
+                )
+            )
         for atom in view.supporting_atoms:
-            hits.append(
+            debug_hits.append(
                 self._atom_to_hit(
                     atom,
                     match_reason=f"{atom.atom_type}_support",
-                    applicability_state=self._applicability_state(atom),
+                    applicability_state=self._support_applicability_state(atom),
+                    reference_tier="bundle_support",
+                    governance_notes=self._governance_notes(atom),
                 )
             )
-        deduped = self._dedupe_hits(tuple(hits))
-        return self._apply_trace_caps(tuple(sorted(deduped, key=self._trace_sort_key)))
+        visible_trace = self._apply_trace_caps(
+            tuple(sorted(self._dedupe_hits(tuple(visible_hits)), key=self._trace_sort_key))
+        )
+        debug_trace = tuple(sorted(self._dedupe_hits(tuple(debug_hits)), key=self._trace_sort_key))
+        actual_source_refs = self._source_refs_from_hits(visible_trace)
+        bundle_support_refs = self._bundle_support_refs(
+            view=view,
+            actual_source_refs=actual_source_refs,
+            debug_trace=debug_trace,
+        )
+        return KnowledgeTraceResolution(
+            visible_trace=visible_trace,
+            debug_trace=debug_trace,
+            actual_source_refs=actual_source_refs,
+            bundle_support_refs=bundle_support_refs,
+        )
 
     def _build_atom_to_source_ids(self) -> dict[str, tuple[str, ...]]:
         atom_to_source_ids: dict[str, set[str]] = {atom.atom_id: set() for atom in self._atoms}
@@ -540,18 +608,57 @@ class CallableKnowledgeAccess:
             atom.atom_id,
         )
 
-    def _applicability_state(self, atom: KnowledgeAtom) -> str:
+    def _signal_applicability_state(self, atom: KnowledgeAtom) -> str:
         if atom.atom_type == "contradiction":
             return "conflict"
         if atom.atom_type == "open_question":
             return "open_question"
-        if atom.not_applicable:
-            return "not_applicable"
         if atom.contradictions:
             return "conflict"
         if atom.atom_type in {"concept", "setup", "rule"}:
             return "matched"
         return "supporting"
+
+    def _support_applicability_state(self, atom: KnowledgeAtom) -> str:
+        if atom.atom_type == "contradiction":
+            return "conflict"
+        if atom.atom_type == "open_question":
+            return "open_question"
+        return "supporting"
+
+    def _governance_notes(self, atom: KnowledgeAtom) -> tuple[str, ...]:
+        return _dedupe(atom.not_applicable)
+
+    def _is_broad_bundle_rule(self, atom: KnowledgeAtom) -> bool:
+        if atom.atom_type != "rule":
+            return False
+        raw_locator = atom.raw_locator
+        return (
+            raw_locator.get("locator_kind") == "chunk_set"
+            and int(raw_locator.get("member_count", 0) or 0) > TRACE_VISIBLE_RULE_CHUNK_SET_MAX
+        )
+
+    def _bundle_support_locator(self, atom: KnowledgeAtom) -> dict[str, Any]:
+        raw_locator = dict(atom.raw_locator)
+        if raw_locator.get("locator_kind") != "chunk_set":
+            return raw_locator
+        member_locators = raw_locator.get("member_locators", ())
+        source_ids = tuple(
+            sorted(
+                {
+                    str(item.get("source_id"))
+                    for item in member_locators
+                    if isinstance(item, dict) and item.get("source_id")
+                }
+            )
+        )
+        member_count = int(raw_locator.get("member_count", 0) or 0)
+        return {
+            "locator_kind": "bundle_support_summary",
+            "member_count": member_count,
+            "source_ids": source_ids,
+            "label": f"bundle_support[{len(source_ids)} sources/{member_count} chunks]",
+        }
 
     def _atom_to_hit(
         self,
@@ -559,16 +666,42 @@ class CallableKnowledgeAccess:
         *,
         match_reason: str,
         applicability_state: str,
+        reference_tier: str = "actual_hit",
+        raw_locator: dict[str, Any] | None = None,
+        governance_notes: tuple[str, ...] = (),
     ) -> KnowledgeAtomHit:
         return KnowledgeAtomHit(
             atom_id=atom.atom_id,
             atom_type=atom.atom_type,
             source_ref=atom.source_ref,
-            raw_locator=dict(atom.raw_locator),
+            raw_locator=dict(raw_locator or atom.raw_locator),
             match_reason=match_reason,
             applicability_state=applicability_state,
             conflict_refs=_dedupe(atom.contradictions),
+            reference_tier=reference_tier,
+            governance_notes=governance_notes,
         )
+
+    def _source_refs_from_hits(self, hits: tuple[KnowledgeAtomHit, ...]) -> tuple[str, ...]:
+        refs: list[str] = []
+        for hit in hits:
+            refs.append(hit.source_ref)
+            refs.extend(hit.conflict_refs)
+        return _dedupe(refs)
+
+    def _bundle_support_refs(
+        self,
+        *,
+        view: KnowledgeTransitionalView,
+        actual_source_refs: tuple[str, ...],
+        debug_trace: tuple[KnowledgeAtomHit, ...],
+    ) -> tuple[str, ...]:
+        refs = [ref for ref in view.legacy_source_refs if ref not in actual_source_refs]
+        for hit in debug_trace:
+            if hit.source_ref not in actual_source_refs:
+                refs.append(hit.source_ref)
+            refs.extend(ref for ref in hit.conflict_refs if ref not in actual_source_refs)
+        return _dedupe(refs)
 
     def _dedupe_hits(self, hits: tuple[KnowledgeAtomHit, ...]) -> tuple[KnowledgeAtomHit, ...]:
         seen: set[str] = set()

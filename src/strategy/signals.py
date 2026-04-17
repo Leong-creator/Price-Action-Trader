@@ -134,14 +134,19 @@ def _build_signal(
     ]
     if setup_page.is_placeholder or knowledge.concept_page.is_placeholder:
         risk_notes.append("knowledge page is draft/placeholder, so confidence is intentionally low")
-    knowledge_trace = knowledge_access.resolve_trace(
+    trace_resolution = knowledge_access.resolve_trace_bundle(
         knowledge=knowledge,
         market=step.bar.market,
         timeframe=step.bar.timeframe,
         pa_context=context.market_cycle,
     )
-    legacy_source_refs = aggregate_legacy_source_refs(candidate.source_refs, knowledge_trace)
+    knowledge_trace = trace_resolution.visible_trace
+    legacy_source_refs = aggregate_legacy_source_refs(
+        candidate.source_refs,
+        trace_resolution.visible_trace + trace_resolution.debug_trace,
+    )
     trace_summary = render_trace_summary(knowledge_trace)
+    actual_refs_text = ", ".join(trace_resolution.actual_source_refs) if trace_resolution.actual_source_refs else "none"
 
     return Signal(
         signal_id=_build_signal_id(step.bar, candidate.direction),
@@ -157,12 +162,15 @@ def _build_signal(
         invalidation=candidate.invalidation,
         confidence=candidate.confidence,
         source_refs=legacy_source_refs,
+        actual_source_refs=trace_resolution.actual_source_refs,
+        bundle_support_refs=trace_resolution.bundle_support_refs,
         explanation=(
-            f"{candidate.explanation}; knowledge refs: {', '.join(legacy_source_refs)}; "
+            f"{candidate.explanation}; actual knowledge refs: {actual_refs_text}; "
             f"knowledge trace: {trace_summary}"
         ),
         risk_notes=tuple(risk_notes),
         knowledge_trace=knowledge_trace,
+        knowledge_debug_trace=trace_resolution.debug_trace,
     )
 
 
@@ -186,9 +194,12 @@ def _attach_news_risk(signal: Signal, news_events: Sequence[NewsEvent]) -> Signa
         invalidation=signal.invalidation,
         confidence=signal.confidence,
         source_refs=signal.source_refs,
+        actual_source_refs=signal.actual_source_refs,
+        bundle_support_refs=signal.bundle_support_refs,
         explanation=signal.explanation,
         risk_notes=signal.risk_notes + (f"news context only: {news_summary}",),
         knowledge_trace=signal.knowledge_trace,
+        knowledge_debug_trace=signal.knowledge_debug_trace,
     )
 
 

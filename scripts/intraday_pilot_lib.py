@@ -971,7 +971,8 @@ def write_intraday_markdown_report(
             f"- trace 非空占比：{trace_coverage['trace_nonempty_pct']}%",
             f"- curated trace 覆盖率：{trace_coverage['curated_signal_pct']}%",
             f"- statement 补充覆盖率：{trace_coverage['statement_signal_pct']}%",
-            f"- source family 分布：{_format_counter(trace_coverage['source_family_signal_presence'])}",
+            f"- actual hit family 分布：{_format_counter(trace_coverage['actual_hit_source_family_presence'])}",
+            f"- bundle support family 分布：{_format_counter(trace_coverage['bundle_support_family_presence'])}",
             f"- curated vs statement（按受控 trace item 计）：curated={trace_coverage['curated_vs_statement']['curated_item_pct']}%， statement={trace_coverage['curated_vs_statement']['statement_item_pct']}%",
             "",
             "## 5. no-trade / wait 摘要",
@@ -998,6 +999,8 @@ def write_intraday_markdown_report(
                     f"  进场原因：{item['explanation']}",
                     f"  出场原因：{humanize_exit_reason(item['exit_reason'])}",
                     f"  setup/context：`{item['setup_type']}` / `{item['pa_context']}`",
+                    f"  actual refs：{' | '.join(item['source_refs']) if item['source_refs'] else '当前没有 actual hit refs'}",
+                    f"  bundle support：{' | '.join(item['bundle_support_refs']) if item['bundle_support_refs'] else '当前没有 bundle support refs'}",
                     f"  trace 摘要：{_format_trace_summary(item['knowledge_trace_summary'])}",
                     f"  risk_notes：{' | '.join(item['risk_notes']) if item['risk_notes'] else '当前版本无额外风控注释'}",
                 ]

@@ -40,6 +40,8 @@ class KnowledgeAtomHit:
     match_reason: str
     applicability_state: str
     conflict_refs: tuple[str, ...] = ()
+    reference_tier: str = "actual_hit"
+    governance_notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,4 +61,7 @@ class Signal:
     source_refs: tuple[str, ...]
     explanation: str
     risk_notes: tuple[str, ...]
+    actual_source_refs: tuple[str, ...] = field(default_factory=tuple)
+    bundle_support_refs: tuple[str, ...] = field(default_factory=tuple)
     knowledge_trace: tuple[KnowledgeAtomHit, ...] = field(default_factory=tuple)
+    knowledge_debug_trace: tuple[KnowledgeAtomHit, ...] = field(default_factory=tuple)
