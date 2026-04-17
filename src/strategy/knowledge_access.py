@@ -51,6 +51,11 @@ class KnowledgeAtom:
     raw_locator: dict[str, Any]
     evidence_chunk_ids: tuple[str, ...]
     callable_tags: tuple[str, ...]
+    evidence_refs: tuple[str, ...] = ()
+    evidence_locator_summary: tuple[str, ...] = ()
+    field_mappings: tuple[str, ...] = ()
+    claim_id: str | None = None
+    promotion_theme: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +131,11 @@ def _normalize_atom(record: dict[str, Any]) -> KnowledgeAtom:
         raw_locator=_normalize_locator(record.get("raw_locator", {})),
         evidence_chunk_ids=_as_tuple(record.get("evidence_chunk_ids")),
         callable_tags=_as_tuple(record.get("callable_tags")),
+        evidence_refs=_as_tuple(record.get("evidence_refs")),
+        evidence_locator_summary=_as_tuple(record.get("evidence_locator_summary")),
+        field_mappings=_as_tuple(record.get("field_mappings")),
+        claim_id=str(record["claim_id"]) if record.get("claim_id") else None,
+        promotion_theme=str(record["promotion_theme"]) if record.get("promotion_theme") else None,
     )
 
 
@@ -190,6 +200,9 @@ def summarize_knowledge_trace(
                 "atom_id": hit.atom_id,
                 "source_ref": hit.source_ref,
                 "raw_locator": _brief_raw_locator(hit.raw_locator),
+                "evidence_refs": " | ".join(hit.evidence_refs),
+                "evidence_locator_summary": " | ".join(hit.evidence_locator_summary),
+                "field_mappings": " | ".join(hit.field_mappings),
             }
         )
     return tuple(summaries)
@@ -473,7 +486,16 @@ class CallableKnowledgeAccess:
                 if atom.source_ref == ref and atom.atom_type in {"concept", "setup", "rule"}
             ]
             if candidates:
-                hits.append(sorted(candidates, key=lambda atom: atom.atom_id)[0])
+                hits.append(
+                    sorted(
+                        candidates,
+                        key=lambda atom: (
+                            0 if "promoted_curated" in atom.callable_tags else 1,
+                            0 if atom.evidence_refs else 1,
+                            atom.atom_id,
+                        ),
+                    )[0]
+                )
         return tuple(hits)
 
     def _ordered_source_ids(self, source_refs: tuple[str, ...]) -> tuple[str, ...]:
@@ -680,6 +702,11 @@ class CallableKnowledgeAccess:
             conflict_refs=_dedupe(atom.contradictions),
             reference_tier=reference_tier,
             governance_notes=governance_notes,
+            evidence_refs=atom.evidence_refs,
+            evidence_locator_summary=atom.evidence_locator_summary,
+            field_mappings=atom.field_mappings,
+            claim_id=atom.claim_id,
+            promotion_theme=atom.promotion_theme,
         )
 
     def _source_refs_from_hits(self, hits: tuple[KnowledgeAtomHit, ...]) -> tuple[str, ...]:

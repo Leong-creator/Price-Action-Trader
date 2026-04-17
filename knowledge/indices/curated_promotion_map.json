@@ -1,0 +1,265 @@
+{
+  "schema_version": "m8.curated-promotion-map.v1",
+  "generated_at": "2026-04-18T00:00:00Z",
+  "promotions": [
+    {
+      "theme_id": "market_cycle_context",
+      "page_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+      "atom_type": "concept",
+      "claim_id": "market_cycle.context.minimal.v1",
+      "claim_summary": "Use trend, trading-range, transition, and tight-channel as research-only context buckets; transcript and Brooks evidence support that reliable trend development often transitions through trading range instead of jumping directly from any strong bar to a confirmed trend.",
+      "field_mappings": [
+        {
+          "field": "pa_context",
+          "summary": "Keep trend / trading-range / transition / tight-channel as explanation buckets rather than executable regime labels.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 1,
+                "block_index": 1,
+                "fragment_index": 1
+              },
+              "statement_atom_id": "atom--ea52802c270bd63a"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 12,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--00ab88fd75f3187a"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 1832,
+                "block_index": 1,
+                "fragment_index": 1
+              },
+              "statement_atom_id": "atom--02cf58922868b5d3"
+            }
+          ]
+        },
+        {
+          "field": "higher_timeframe_context",
+          "summary": "Transition and tight-channel context should stay in explanation space until higher-timeframe confirmation rules are explicitly curated.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 1832,
+                "block_index": 1,
+                "fragment_index": 1
+              },
+              "statement_atom_id": "atom--02cf58922868b5d3"
+            }
+          ]
+        }
+      ],
+      "open_questions": [
+        {
+          "content": "The exact threshold for separating transition, tight-channel, and tradeable breakout context still needs narrower field-level extraction before any trigger use.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 12,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--00ab88fd75f3187a"
+            }
+          ]
+        }
+      ],
+      "contradictions": [],
+      "callable_tags": [
+        "promoted_curated",
+        "theme:market_cycle_context"
+      ]
+    },
+    {
+      "theme_id": "signal_bar_entry",
+      "page_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+      "atom_type": "setup",
+      "claim_id": "signal_bar.entry.minimal.v1",
+      "claim_summary": "Signal bars stay research-only, but evidence supports two minimal constraints: a signal bar must be judged in context, and entry should remain close-adjacent / directional rather than treating any reversal-looking bar as executable.",
+      "field_mappings": [
+        {
+          "field": "signal_bar",
+          "summary": "A bar that looks like a reversal is not automatically a valid signal bar; background quality still matters.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 1,
+                "block_index": 1,
+                "fragment_index": 3
+              },
+              "statement_atom_id": "atom--1076684d08fc618d"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 3,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--5c8631c36889d7b7"
+            }
+          ]
+        },
+        {
+          "field": "entry_trigger",
+          "summary": "Entry remains close-adjacent and directional; the bar should open near the prior close and close in the trade direction before it is treated as a valid placeholder entry explanation.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 438,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--00319e552682d8ad"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 2557,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--03ac12b266487e4e"
+            }
+          ]
+        }
+      ],
+      "open_questions": [
+        {
+          "content": "The exact multi-bar threshold for a valid signal bar and the executable invalidation level remain unresolved and must stay outside trigger logic.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 3,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--5c8631c36889d7b7"
+            }
+          ]
+        }
+      ],
+      "contradictions": [],
+      "callable_tags": [
+        "promoted_curated",
+        "theme:signal_bar_entry"
+      ]
+    },
+    {
+      "theme_id": "trend_vs_range_filter",
+      "page_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+      "atom_type": "rule",
+      "claim_id": "trend_vs_range.filter.minimal.v1",
+      "claim_summary": "Good signal bars and breakout attempts still need context: tight channels should be traded only in trend direction, while tight trading ranges and weak breakout context should stay in wait/no-trade explanation space.",
+      "field_mappings": [
+        {
+          "field": "pa_context",
+          "summary": "Use trend-vs-range as a research-only filter layer; tight channels inherit trend direction, while tight ranges require caution.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 2,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--1ed8cf9cdf1a1525"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 12,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--00ab88fd75f3187a"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 457,
+                "block_index": 1,
+                "fragment_index": 1
+              },
+              "statement_atom_id": "atom--02fd7c45aced1f9e"
+            },
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 1400,
+                "block_index": 1,
+                "fragment_index": 1
+              },
+              "statement_atom_id": "atom--05edeeafdaa3367c"
+            }
+          ]
+        },
+        {
+          "field": "invalidation",
+          "summary": "When the market is still tight or context-poor, prefer wait/no-trade instead of promoting a weak breakout to a valid trade idea.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 457,
+                "block_index": 1,
+                "fragment_index": 1
+              },
+              "statement_atom_id": "atom--02fd7c45aced1f9e"
+            }
+          ]
+        }
+      ],
+      "open_questions": [
+        {
+          "content": "The exact threshold for promoting a tight trading range breakout from explanation-only to tradeable context is still unresolved.",
+          "evidence": [
+            {
+              "source_ref": "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+              "raw_locator": {
+                "locator_kind": "page_block",
+                "page_no": 12,
+                "block_index": 1,
+                "fragment_index": 2
+              },
+              "statement_atom_id": "atom--00ab88fd75f3187a"
+            }
+          ]
+        }
+      ],
+      "contradictions": [],
+      "callable_tags": [
+        "promoted_curated",
+        "theme:trend_vs_range_filter"
+      ]
+    }
+  ]
+}

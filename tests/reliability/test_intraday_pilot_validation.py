@@ -106,6 +106,8 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
             self.assertEqual(len(session_summary["sessions"]), 2)
             self.assertIn("paper / simulated", report_text)
             self.assertIn("当前仍未进入期权、broker、live、real-money", report_text)
+            self.assertIn("actual evidence family 分布", report_text)
+            self.assertIn("<= ", report_text)
 
     def test_incomplete_session_is_skipped_and_logged_as_no_trade_wait(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

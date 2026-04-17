@@ -521,6 +521,47 @@
   - 已修复 `knowledge_trace_coverage.json` 的 family 统计，让 transcript / Brooks 能明确显示为 support 还是 actual hit。
   - 本轮未做 curated promotion；transcript / Brooks 仍未被提升为新的 curated actual trace claim。
 
+### Knowledge Reference Repair Track / 阶段 B：Curated Promotion Minimal Set
+
+完成条件：
+
+- 只允许做 transcript / Brooks 的最小 curated promotion，不得重做 atomization 基础层，不得修改 `knowledge/raw`。
+- 只允许选择 2~3 个高价值主题做 promotion；当前冻结的最小主题集为：
+  - `market cycle / context`
+  - `signal bar / entry`
+  - `trend vs range filter`
+- 必须存在 machine-readable 的字段级 evidence mapping 产物；当前最小落盘为：
+  - `knowledge/indices/curated_promotion_map.json`
+- 每条 promoted curated 内容都必须具备：
+  - 对应 `claim_id`
+  - 真实 `source_ref`
+  - 真实 `raw_locator`
+  - 真实 `evidence_chunk_ids`
+  - `field_mappings`
+  - `evidence_refs`
+  - `evidence_locator_summary`
+- transcript / Brooks 必须通过 promoted curated claim 真实进入 actual visible trace，而不是只停留在 `source_refs` / bundle support。
+- 必须保留 `draft / low confidence / research-only` 边界；不得把 promotion 包装成 active executable rule。
+- `open_question` / `contradiction` 必须保留为一等对象；若证据不足，允许只有 `open_question`，不得伪造 `contradiction`。
+- 必须至少通过：
+  - 字段级 evidence mapping contract 测试
+  - curated promotion contract 测试
+  - `open_question` / `contradiction` 保留测试
+  - 至少一个 controlled regression/fixture 测试，证明 transcript / Brooks promoted evidence 能进入 actual visible trace
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- 必须保持：
+  - trigger 逻辑不变
+  - `statement` / `source_note` / `contradiction` / `open_question` 不进入 trigger
+  - 不进入 broker / live / real-money / real-account
+  - 继续保持 `paper / simulated`
+- 当前完成事实：
+  - 已新增 `knowledge/wiki/rules/trend-vs-range-filter-minimal.md`
+  - 已为 `market-cycle-overview`、`signal-bar-entry-placeholder`、`trend-vs-range-filter-minimal` 建立 evidence-backed minimal promotion
+  - transcript 与 Brooks 当前已通过 promoted curated claim 进入 actual visible trace，并在 `knowledge_trace.json` 中保留 `evidence_refs` / `evidence_locator_summary` / `field_mappings`
+  - 当前 `report.md` 只展示精简 trace 摘要；完整证据链继续落在 machine-readable JSON 中
+  - trigger 逻辑未改变；`statement` 仍未进入 trigger
+
 ### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 完成条件：

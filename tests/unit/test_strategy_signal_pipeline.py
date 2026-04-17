@@ -67,7 +67,15 @@ class StrategySignalPipelineTests(unittest.TestCase):
         self.assertIn("raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf", first_run[0].source_refs)
         self.assertIn("wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md", first_run[0].source_refs)
         self.assertIn("wiki:knowledge/wiki/concepts/market-cycle-overview.md", first_run[0].actual_source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md", first_run[0].actual_source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", first_run[0].bundle_support_refs)
+        self.assertTrue(
+            any(
+                "fangfangtu-price-action-transcript.md" in ref or "al-brooks-price-action-ppt-1-36-units.md" in ref
+                for hit in first_run[0].knowledge_trace
+                for ref in hit.evidence_refs
+            )
+        )
         self.assertTrue(all(hit.source_ref in first_run[0].source_refs for hit in first_run[0].knowledge_trace))
 
     def test_placeholder_knowledge_forces_low_confidence_and_risk_notes(self) -> None:

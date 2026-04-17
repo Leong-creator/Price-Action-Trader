@@ -19,8 +19,8 @@ class StrategyAtomTraceTests(unittest.TestCase):
         signal = generate_signals(build_replay(self._trend_bars()))[0]
 
         self.assertTrue(signal.knowledge_trace)
-        self.assertEqual([hit.atom_type for hit in signal.knowledge_trace[:2]], ["concept", "setup"])
-        self.assertNotIn("rule", [hit.atom_type for hit in signal.knowledge_trace])
+        curated_hits = [hit for hit in signal.knowledge_trace if hit.atom_type in {"concept", "setup", "rule"}]
+        self.assertEqual([hit.atom_type for hit in curated_hits], ["concept", "setup", "rule"])
         for hit in signal.knowledge_trace:
             self.assertTrue(hit.atom_id)
             self.assertTrue(hit.source_ref)
@@ -29,6 +29,12 @@ class StrategyAtomTraceTests(unittest.TestCase):
             self.assertTrue(hit.applicability_state)
             self.assertEqual(hit.reference_tier, "actual_hit")
             self.assertNotEqual(hit.applicability_state, "not_applicable")
+        for hit in curated_hits:
+            self.assertTrue(hit.claim_id)
+            self.assertTrue(hit.promotion_theme)
+            self.assertTrue(hit.evidence_refs)
+            self.assertTrue(hit.evidence_locator_summary)
+            self.assertTrue(hit.field_mappings)
         self.assertTrue(signal.knowledge_debug_trace)
         self.assertTrue(any(hit.reference_tier == "bundle_support" for hit in signal.knowledge_debug_trace))
 
@@ -55,7 +61,7 @@ class StrategyAtomTraceTests(unittest.TestCase):
         self.assertEqual(full_signal.confidence, curated_only_signal.confidence)
         self.assertTrue(any(hit.atom_type == "statement" for hit in full_signal.knowledge_trace))
         self.assertTrue(
-            all(hit.atom_type in {"concept", "setup"} for hit in curated_only_signal.knowledge_trace)
+            all(hit.atom_type in {"concept", "setup", "rule"} for hit in curated_only_signal.knowledge_trace)
         )
 
     def test_brooks_heavy_statement_population_does_not_change_confidence_or_trigger(self) -> None:
@@ -90,7 +96,9 @@ class StrategyAtomTraceTests(unittest.TestCase):
         self.assertIn("wiki:knowledge/wiki/concepts/market-cycle-overview.md", signal.source_refs)
         self.assertIn("wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md", signal.source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", signal.source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md", signal.source_refs)
         self.assertNotIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", signal.actual_source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md", signal.actual_source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", signal.bundle_support_refs)
         for hit in signal.knowledge_trace:
             self.assertIn(hit.source_ref, signal.actual_source_refs)
@@ -98,6 +106,13 @@ class StrategyAtomTraceTests(unittest.TestCase):
             for ref in hit.conflict_refs:
                 self.assertIn(ref, signal.source_refs)
         self.assertTrue(any("al-brooks" in ref for ref in signal.bundle_support_refs))
+        self.assertTrue(
+            any(
+                "fangfangtu-price-action-transcript.md" in ref or "al-brooks-price-action-ppt-1-36-units.md" in ref
+                for hit in signal.knowledge_trace
+                for ref in hit.evidence_refs
+            )
+        )
 
     def test_visible_trace_excludes_purely_governance_derived_not_applicable(self) -> None:
         signal = generate_signals(build_replay(self._trend_bars()))[0]
@@ -108,6 +123,11 @@ class StrategyAtomTraceTests(unittest.TestCase):
     def test_visible_trace_does_not_surface_broad_rule_chunk_set(self) -> None:
         signal = generate_signals(build_replay(self._trend_bars()))[0]
 
+        rule_hits = [hit for hit in signal.knowledge_trace if hit.atom_type == "rule"]
+        self.assertEqual(len(rule_hits), 1)
+        self.assertLess(rule_hits[0].raw_locator.get("member_count", 0), 64)
+        self.assertTrue(rule_hits[0].evidence_locator_summary)
+        self.assertTrue(rule_hits[0].field_mappings)
         self.assertFalse(
             any(
                 hit.atom_type == "rule"

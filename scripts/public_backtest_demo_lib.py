@@ -1131,6 +1131,8 @@ def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
     trace_item_counts = Counter()
     actual_hit_source_family_presence = Counter()
     actual_hit_source_family_item_counts = Counter()
+    actual_evidence_source_family_presence = Counter()
+    actual_evidence_source_family_item_counts = Counter()
     bundle_support_family_presence = Counter()
     bundle_support_family_item_counts = Counter()
     curated_signals = 0
@@ -1152,8 +1154,17 @@ def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
             family = infer_source_family(hit.source_ref)
             actual_hit_source_family_item_counts[family] += 1
             families_for_signal.add(family)
+            evidence_refs = hit.evidence_refs or (hit.source_ref,)
+            for evidence_ref in evidence_refs:
+                actual_evidence_source_family_item_counts[infer_source_family(evidence_ref)] += 1
         for family in families_for_signal:
             actual_hit_source_family_presence[family] += 1
+        evidence_families_for_signal: set[str] = set()
+        for hit in signal.knowledge_trace:
+            evidence_refs = hit.evidence_refs or (hit.source_ref,)
+            evidence_families_for_signal.update(infer_source_family(ref) for ref in evidence_refs)
+        for family in evidence_families_for_signal:
+            actual_evidence_source_family_presence[family] += 1
         bundle_families_for_signal = {infer_source_family(ref) for ref in signal.bundle_support_refs}
         for family in bundle_families_for_signal:
             bundle_support_family_presence[family] += 1
@@ -1179,6 +1190,8 @@ def _summarize_trace_group(signals: tuple[Signal, ...]) -> dict[str, Any]:
         "source_family_item_counts": dict(sorted(actual_hit_source_family_item_counts.items())),
         "actual_hit_source_family_presence": dict(sorted(actual_hit_source_family_presence.items())),
         "actual_hit_source_family_item_counts": dict(sorted(actual_hit_source_family_item_counts.items())),
+        "actual_evidence_source_family_presence": dict(sorted(actual_evidence_source_family_presence.items())),
+        "actual_evidence_source_family_item_counts": dict(sorted(actual_evidence_source_family_item_counts.items())),
         "bundle_support_family_presence": dict(sorted(bundle_support_family_presence.items())),
         "bundle_support_family_item_counts": dict(sorted(bundle_support_family_item_counts.items())),
         "curated_vs_statement": {
@@ -1436,6 +1449,7 @@ def write_markdown_report(
             f"- 发出信号总数：{trace_coverage['total_signals']}；trace 非空占比：{trace_coverage['trace_nonempty_pct']}%",
             f"- 含 curated trace 的信号占比：{trace_coverage['curated_signal_pct']}%；含 statement 补充证据的信号占比：{trace_coverage['statement_signal_pct']}%",
             f"- actual hit family 分布（按 visible trace 的信号存在计数）：{_format_counter(trace_coverage['actual_hit_source_family_presence'])}",
+            f"- actual evidence family 分布（按 visible trace 命中的证据家族计数）：{_format_counter(trace_coverage['actual_evidence_source_family_presence'])}",
             f"- bundle support family 分布（按补充来源存在计数）：{_format_counter(trace_coverage['bundle_support_family_presence'])}",
             f"- curated vs statement 命中占比（按受控 trace item 计）：curated={trace_coverage['curated_vs_statement']['curated_item_pct']}%， statement={trace_coverage['curated_vs_statement']['statement_item_pct']}%",
             "",
@@ -1565,6 +1579,11 @@ def _knowledge_trace_payload(trace: tuple[KnowledgeAtomHit, ...]) -> list[dict[s
                 "conflict_refs": list(hit.conflict_refs),
                 "reference_tier": hit.reference_tier,
                 "governance_notes": list(hit.governance_notes),
+                "evidence_refs": list(hit.evidence_refs),
+                "evidence_locator_summary": list(hit.evidence_locator_summary),
+                "field_mappings": list(hit.field_mappings),
+                "claim_id": hit.claim_id,
+                "promotion_theme": hit.promotion_theme,
             }
         )
     return payload
@@ -1573,10 +1592,15 @@ def _knowledge_trace_payload(trace: tuple[KnowledgeAtomHit, ...]) -> list[dict[s
 def _format_trace_summary(items: list[dict[str, Any]]) -> str:
     if not items:
         return "当前版本未提供"
-    return " | ".join(
-        f"{item['atom_type']} {item['atom_id']} @ {item['raw_locator']}"
-        for item in items[:3]
-    )
+    rendered: list[str] = []
+    for item in items[:3]:
+        base = f"{item['atom_type']} {item['atom_id']} @ {item['raw_locator']}"
+        evidence_summary = item.get("evidence_locator_summary", "")
+        if evidence_summary:
+            evidence_preview = " / ".join(evidence_summary.split(" | ")[:2])
+            base += f" <= {evidence_preview}"
+        rendered.append(base)
+    return " | ".join(rendered)
 
 
 def _format_window_table(windows: list[dict[str, Any]]) -> list[str]:

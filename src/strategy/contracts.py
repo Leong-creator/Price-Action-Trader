@@ -42,6 +42,11 @@ class KnowledgeAtomHit:
     conflict_refs: tuple[str, ...] = ()
     reference_tier: str = "actual_hit"
     governance_notes: tuple[str, ...] = ()
+    evidence_refs: tuple[str, ...] = ()
+    evidence_locator_summary: tuple[str, ...] = ()
+    field_mappings: tuple[str, ...] = ()
+    claim_id: str | None = None
+    promotion_theme: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

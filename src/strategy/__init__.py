@@ -10,6 +10,7 @@ from .alignment import (
 from .knowledge import (
     DEFAULT_CONCEPT_PATH,
     DEFAULT_NEWS_RULE_PATH,
+    DEFAULT_PROMOTED_RULE_PATH,
     DEFAULT_RULE_PACK_PATH,
     DEFAULT_SETUP_PATH,
     KnowledgePage,
@@ -39,6 +40,7 @@ __all__ = [
     "GoldenCase",
     "DEFAULT_CONCEPT_PATH",
     "DEFAULT_NEWS_RULE_PATH",
+    "DEFAULT_PROMOTED_RULE_PATH",
     "DEFAULT_RULE_PACK_PATH",
     "DEFAULT_SETUP_PATH",
     "KnowledgePage",

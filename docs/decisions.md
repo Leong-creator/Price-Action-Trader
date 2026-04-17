@@ -109,3 +109,8 @@
 
 - 日期：2026-04-18
 - 结论：Knowledge Reference Repair 的阶段 A 只允许修复 trace fidelity / reference honesty，不允许做 curated promotion。自本决策起，user-facing `actual hit refs` 与 `bundle support refs` 必须显式分层；broad support refs（包括 `m3-research-reference-pack` 这类 registry / bundle support）不得继续以 visible actual evidence 身份进入 `knowledge_trace`、`report.md` 或 `summary.json`。signal-level `applicability_state` 只表达场景级匹配语义，frontmatter 中的治理性 `not_applicable` / maturity warning 只能通过 `governance_notes` 或等价字段保留，不得继续污染 visible trace。`knowledge_trace_coverage.json` 必须区分 `actual_hit_*` 与 `bundle_support_*` 家族统计，从而诚实表达 transcript / Brooks 当前是 support 还是 actual hit。阶段 A 不改 trigger，不让 `statement` / `source_note` / `contradiction` / `open_question` 进入 trigger，不改 `knowledge/raw`，并继续保持 `paper / simulated`。阶段 B 只有在阶段 A 整合进 `main` 后，才允许讨论最小 curated promotion。
+
+## D-0023 Knowledge Reference Repair / 阶段 B 最小 curated promotion 冻结
+
+- 日期：2026-04-18
+- 结论：Knowledge Reference Repair 的阶段 B 只允许做最小 curated promotion，不允许重做 atomization 基础层，也不允许改 trigger。当前冻结的 promotion 主题只有 3 个：`market cycle / context`、`signal bar / entry`、`trend vs range filter`。所有 promotion 都必须基于真实字段级 evidence mapping，且保持 `draft / low confidence / research-only` 边界。transcript / Brooks 可以通过 promoted curated claim 进入 actual visible trace，但 `statement` / `source_note` / `contradiction` / `open_question` 仍不得进入 trigger，不得因为 Brooks statement 数量更多而影响 trigger、confidence 或排序。当前阶段 B 已整合进 `main`；trigger 逻辑未改变，系统仍保持 `paper / simulated`，且仍未进入 broker / live / real-money。

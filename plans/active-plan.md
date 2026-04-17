@@ -21,6 +21,7 @@
 - `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
 - `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
 - Knowledge Reference Repair / 阶段 A：Trace Fidelity & Reference Honesty Repair 已完成，当前已把 actual hit refs 与 bundle support refs 分层、修复 applicability 语义混淆、并把 broad support rule 从 visible trace 中降级为 debug/support。
+- Knowledge Reference Repair / 阶段 B：Curated Promotion Minimal Set 已完成，当前已把 transcript / Brooks 的最小 evidence-backed promotion 接入 curated 层，让 promoted evidence 能在 actual visible trace 中真实出现，同时保持 trigger 不变。
 
 ## 2. 执行总原则
 
@@ -758,11 +759,11 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：Knowledge Reference Repair Track / 阶段 A：Trace Fidelity & Reference Honesty Repair（已完成并整合进 `main`）。
+- 当前 milestone：Knowledge Reference Repair Track / 阶段 B：Curated Promotion Minimal Set（已完成并整合进 `main`）。
 - 当前下一步：
-  - 当前下一步不是扩 broker/live，也不是直接做 curated promotion 以外的策略扩写。
-  - 若继续修复知识引用真实性，只允许从最新稳定基线 `main` 单独开分支进入 Knowledge Reference Repair / 阶段 B：Curated Promotion Minimal Set。
-  - 阶段 B 启动前提：阶段 A 已整合进 `main`，且继续保持不改 trigger、不让 statement/source_note 进入 trigger、不改 `knowledge/raw`。
+  - 当前下一步不是扩 broker/live，也不是继续扩 trigger。
+  - 若继续当前验证主线，优先在 `paper / simulated` 边界内复跑 `SPY 15m` 或扩第二个高流动性标的，验证 promoted curated evidence 在更多样本上的表现。
+  - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
 

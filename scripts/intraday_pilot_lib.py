@@ -972,6 +972,7 @@ def write_intraday_markdown_report(
             f"- curated trace 覆盖率：{trace_coverage['curated_signal_pct']}%",
             f"- statement 补充覆盖率：{trace_coverage['statement_signal_pct']}%",
             f"- actual hit family 分布：{_format_counter(trace_coverage['actual_hit_source_family_presence'])}",
+            f"- actual evidence family 分布：{_format_counter(trace_coverage['actual_evidence_source_family_presence'])}",
             f"- bundle support family 分布：{_format_counter(trace_coverage['bundle_support_family_presence'])}",
             f"- curated vs statement（按受控 trace item 计）：curated={trace_coverage['curated_vs_statement']['curated_item_pct']}%， statement={trace_coverage['curated_vs_statement']['statement_item_pct']}%",
             "",
@@ -1149,10 +1150,15 @@ def _positions_to_snapshots(positions: tuple[PaperPosition, ...]) -> tuple[Posit
 def _format_trace_summary(items: list[dict[str, Any]]) -> str:
     if not items:
         return "当前版本未提供"
-    return " | ".join(
-        f"{item['atom_type']} {item['atom_id']} @ {item['raw_locator']}"
-        for item in items[:3]
-    )
+    rendered: list[str] = []
+    for item in items[:3]:
+        base = f"{item['atom_type']} {item['atom_id']} @ {item['raw_locator']}"
+        evidence_summary = item.get("evidence_locator_summary", "")
+        if evidence_summary:
+            evidence_preview = " / ".join(evidence_summary.split(" | ")[:2])
+            base += f" <= {evidence_preview}"
+        rendered.append(base)
+    return " | ".join(rendered)
 
 
 def _format_counter(counter_payload: dict[str, Any]) -> str:
