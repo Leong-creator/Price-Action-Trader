@@ -10,4 +10,6 @@ reports/backtests/*
 !reports/backtests/README.md
 !reports/backtests/m8c1_long_horizon_daily_validation/
 !reports/backtests/m8c1_long_horizon_daily_validation/**
+!reports/backtests/m8e2_longer_window_daily_validation/
+!reports/backtests/m8e2_longer_window_daily_validation/**
 knowledge/wiki_index.json

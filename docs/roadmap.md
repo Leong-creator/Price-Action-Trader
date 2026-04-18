@@ -23,7 +23,8 @@
    - 已完成：`M8D.2` Curated Promotion Minimal Expansion
    - 已完成：`M8D.3` Repository State Consistency
    - 已完成：`M8E.1` Validation Gap Closure
-   - 下一步：`M8E.2` Longer-Window Daily Validation
+   - 已完成：`M8E.2` Longer-Window Daily Validation
+   - 延后：`M8E.3` Intraday Window Expansion（待每标的至少 30 个完整 regular session）
 
 ## 当前边界
 

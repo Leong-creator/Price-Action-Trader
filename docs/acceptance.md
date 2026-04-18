@@ -647,6 +647,54 @@
   - 已新增 golden catalog smoke test，并补强 artifact portability / sample adequacy 一致性回归。
   - 本阶段未改 trigger，未改 `knowledge_trace` contract，未改 `knowledge/raw`。
 
+### M8E.2：Longer-Window Daily Validation
+
+完成条件：
+
+- 只允许在 `paper / simulated` 边界内，把 daily public history validation 扩展到更长窗口；不得进入 intraday 更长窗口、broker/live/real-money，也不得改 trigger。
+- 验证范围固定为：
+  - 标的：`NVDA / TSLA / SPY`
+  - 周期：`1d`
+  - 时间范围：`2018-01-01 ~ 2026-04-17`
+- 必须新增：
+  - `config/examples/public_history_backtest_longer_window.json`
+  - checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`
+- 新 run 必须至少落盘：
+  - `summary.json`
+  - `report.md`
+  - `knowledge_trace.json`
+  - `knowledge_trace_coverage.json`
+  - `no_trade_wait.jsonl`
+  - `trades.csv`
+  - `split_summary.json`
+  - `regime_breakdown.json`
+  - `equity_curve.png`
+- 新 run 必须继续保持：
+  - repo-relative artifact path
+  - `sample_adequacy`
+  - actual refs / bundle support 分层
+  - `paper / simulated`
+- 若某个 split 仍然 `insufficient_sample`，报告与 summary 必须明确写为“验证诚实但样本不足”，不得包装成通过。
+- 必须至少通过：
+  - `tests/reliability/test_longer_window_daily_validation.py`
+  - `tests/reliability/test_long_horizon_daily_validation.py`
+  - `tests/reliability/test_intraday_pilot_validation.py`
+  - `tests/golden_cases/test_catalog_smoke.py`
+  - `python scripts/run_reliability_suite.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- 必须保持：
+  - trigger 逻辑不变
+  - `statement` / `source_note` / `contradiction` / `open_question` 不进入 trigger
+  - `knowledge/raw` 不变
+  - 不进入 intraday 更长窗口
+  - 不进入 broker/live/real-money
+- 当前完成事实：
+  - 已新增 `config/examples/public_history_backtest_longer_window.json`。
+  - 已新增 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`，并完整落盘 canonical artifact。
+  - 当前 longer-window daily run 的 `in_sample` 为 `adequate`，`validation` / `out_of_sample` 仍为 `insufficient_sample`，并已在 `summary.json` / `report.md` 显式说明。
+  - 已新增 `tests/reliability/test_longer_window_daily_validation.py`，并通过 reliability / unit / suite 全量回归。
+
 ### M8 Shadow/Paper Baseline：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 完成条件：

@@ -1,0 +1,159 @@
+{
+  "boundary": "paper/simulated",
+  "bucket_type": "split",
+  "windows": [
+    {
+      "name": "in_sample",
+      "label": "In-sample",
+      "bucket_type": "split",
+      "start": "2018-01-01",
+      "end": "2020-12-31",
+      "signal_count": 197,
+      "executed_trades": 14,
+      "blocked_signals": 183,
+      "no_trade_wait": 2241,
+      "pnl_cash": "389.9846",
+      "win_rate_pct": "42.8571",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1680,
+        "duplicate_direction_suppressed": 58,
+        "insufficient_evidence": 320,
+        "risk_blocked_before_fill": 183
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 64,
+          "executed_trades": 3,
+          "blocked_signals": 61,
+          "no_trade_wait": 749,
+          "pnl_cash": "-0.0856"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 65,
+          "executed_trades": 6,
+          "blocked_signals": 59,
+          "no_trade_wait": 745,
+          "pnl_cash": "289.1000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 68,
+          "executed_trades": 5,
+          "blocked_signals": 63,
+          "no_trade_wait": 747,
+          "pnl_cash": "100.9702"
+        }
+      ]
+    },
+    {
+      "name": "validation",
+      "label": "Validation",
+      "bucket_type": "split",
+      "start": "2021-01-01",
+      "end": "2023-12-31",
+      "signal_count": 222,
+      "executed_trades": 0,
+      "blocked_signals": 222,
+      "no_trade_wait": 2253,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1628,
+        "duplicate_direction_suppressed": 95,
+        "insufficient_evidence": 308,
+        "risk_blocked_before_fill": 222
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 77,
+          "executed_trades": 0,
+          "blocked_signals": 77,
+          "no_trade_wait": 752,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 79,
+          "executed_trades": 0,
+          "blocked_signals": 79,
+          "no_trade_wait": 748,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 66,
+          "executed_trades": 0,
+          "blocked_signals": 66,
+          "no_trade_wait": 753,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "out_of_sample",
+      "label": "Out-of-sample",
+      "bucket_type": "split",
+      "start": "2024-01-01",
+      "end": "2026-04-17",
+      "signal_count": 157,
+      "executed_trades": 0,
+      "blocked_signals": 157,
+      "no_trade_wait": 1716,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1270,
+        "duplicate_direction_suppressed": 65,
+        "insufficient_evidence": 224,
+        "risk_blocked_before_fill": 157
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 45,
+          "executed_trades": 0,
+          "blocked_signals": 45,
+          "no_trade_wait": 573,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 58,
+          "executed_trades": 0,
+          "blocked_signals": 58,
+          "no_trade_wait": 570,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 54,
+          "executed_trades": 0,
+          "blocked_signals": 54,
+          "no_trade_wait": 573,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    }
+  ]
+}

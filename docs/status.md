@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8E.1 Validation Gap Closure（已完成）
+- 当前子阶段：M8E.2 Longer-Window Daily Validation（已完成）
 
 ## 当前分支
 
@@ -172,6 +172,13 @@
   - 已补齐 `tests/golden_cases/test_catalog_smoke.py`，使 `scripts/run_reliability_suite.py` 的 `golden` suite 不再长期处于无测试可执行状态。
   - 已补强 `tests/unit/test_public_backtest_demo.py`、`tests/reliability/test_long_horizon_daily_validation.py`、`tests/reliability/test_intraday_pilot_validation.py`，并固定 artifact `trades.csv` 使用 LF 写出以减少无意义字节漂移。
   - 本阶段未改 trigger，未改 `knowledge_trace` contract，未改 `knowledge/raw`，未进入 broker/live/real-money。
+- M8E.2 Longer-Window Daily Validation 已完成：
+  - 已新增 `config/examples/public_history_backtest_longer_window.json`，固定验证范围为 `NVDA / TSLA / SPY`、`1d`、`2018-01-01 ~ 2026-04-17`。
+  - 已新增 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`，并落盘 `summary.json`、`report.md`、`knowledge_trace.json`、`knowledge_trace_coverage.json`、`no_trade_wait.jsonl`、`trades.csv`、`split_summary.json`、`regime_breakdown.json` 与 `equity_curve.png`。
+  - 当前更长窗口 daily run 输出：总收益率 `1.5599%`、最大回撤 `1.9237%`、交易 `14` 笔、blocked signals `562`、`no_trade_wait` `6210`；仍明确保持 `paper / simulated`。
+  - 新 run 继续使用 repo-relative artifact path，并继续携带 `sample_adequacy`；当前 `in_sample` 为 `adequate`，`validation` / `out_of_sample` 仍为 `insufficient_sample`。
+  - 已新增 `tests/reliability/test_longer_window_daily_validation.py`，覆盖 artifact 完整性、split / regime / no-trade / trace coverage 回归与 `sample_adequacy` 落盘。
+  - 本阶段未改 trigger，未改 `knowledge/raw`，未进入 broker/live/real-money，也未启动 intraday 更长窗口。
 
 ## 当前阻塞
 
@@ -180,9 +187,10 @@
 
 ## 下一步
 
-- 当前下一步是 `M8E.2 Longer-Window Daily Validation`，不是 broker/live，也不是 intraday 更长窗口。
-- `M8D.1`、`M8D.2`、`M8D.3` 与 `M8E.1` 均已完成；下一步只允许扩 daily 长窗口，并继续保持 `paper / simulated`。
-- `M8E.2` 必须继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
+- 当前不自动进入 `M8E.3 Intraday Window Expansion`；它仍延后，不是 broker/live，也不是策略扩展。
+- `M8D.1`、`M8D.2`、`M8D.3`、`M8E.1`、`M8E.2` 均已完成；若要启动 `M8E.3`，必须先满足每个标的至少 `30` 个完整 regular session 的门槛。
+- 当前 longer-window daily 结果已经可用于继续审计与 no-trade/trace 一致性分析，但 `validation` / `out_of_sample` 仍是 `insufficient_sample`，不能包装成“已充分验证”。
+- 后续仍必须保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前仍未进入期权验证。
