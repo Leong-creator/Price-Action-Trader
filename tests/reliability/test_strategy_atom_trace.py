@@ -20,7 +20,9 @@ class StrategyAtomTraceTests(unittest.TestCase):
 
         self.assertTrue(signal.knowledge_trace)
         curated_hits = [hit for hit in signal.knowledge_trace if hit.atom_type in {"concept", "setup", "rule"}]
-        self.assertEqual([hit.atom_type for hit in curated_hits], ["concept", "setup", "rule"])
+        self.assertEqual([hit.atom_type for hit in curated_hits[:2]], ["concept", "setup"])
+        self.assertTrue(all(hit.atom_type == "rule" for hit in curated_hits[2:]))
+        self.assertEqual(len(curated_hits), 5)
         for hit in signal.knowledge_trace:
             self.assertTrue(hit.atom_id)
             self.assertTrue(hit.source_ref)
@@ -97,8 +99,12 @@ class StrategyAtomTraceTests(unittest.TestCase):
         self.assertIn("wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md", signal.source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", signal.source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md", signal.source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md", signal.source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md", signal.source_refs)
         self.assertNotIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", signal.actual_source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md", signal.actual_source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md", signal.actual_source_refs)
+        self.assertIn("wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md", signal.actual_source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", signal.bundle_support_refs)
         for hit in signal.knowledge_trace:
             self.assertIn(hit.source_ref, signal.actual_source_refs)
@@ -124,10 +130,12 @@ class StrategyAtomTraceTests(unittest.TestCase):
         signal = generate_signals(build_replay(self._trend_bars()))[0]
 
         rule_hits = [hit for hit in signal.knowledge_trace if hit.atom_type == "rule"]
-        self.assertEqual(len(rule_hits), 1)
-        self.assertLess(rule_hits[0].raw_locator.get("member_count", 0), 64)
-        self.assertTrue(rule_hits[0].evidence_locator_summary)
-        self.assertTrue(rule_hits[0].field_mappings)
+        self.assertEqual(len(rule_hits), 3)
+        for hit in rule_hits:
+            self.assertLess(hit.raw_locator.get("member_count", 0), 64)
+            self.assertTrue(hit.evidence_locator_summary)
+            self.assertTrue(hit.field_mappings)
+            self.assertNotEqual(hit.source_ref, "wiki:knowledge/wiki/rules/m3-research-reference-pack.md")
         self.assertFalse(
             any(
                 hit.atom_type == "rule"
@@ -142,6 +150,26 @@ class StrategyAtomTraceTests(unittest.TestCase):
                 and hit.reference_tier == "bundle_support"
                 and hit.raw_locator.get("locator_kind") == "bundle_support_summary"
                 for hit in signal.knowledge_debug_trace
+            )
+        )
+
+    def test_second_round_promoted_rules_increase_actual_theme_diversity(self) -> None:
+        signal = generate_signals(build_replay(self._trend_bars()))[0]
+
+        rule_hits = [hit for hit in signal.knowledge_trace if hit.atom_type == "rule"]
+        self.assertEqual(
+            {hit.promotion_theme for hit in rule_hits},
+            {
+                "trend_vs_range_filter",
+                "breakout_follow_through_failed_breakout",
+                "tight_channel_trend_resumption",
+            },
+        )
+        self.assertTrue(
+            all(
+                "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md" in hit.evidence_refs
+                and "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md" in hit.evidence_refs
+                for hit in rule_hits
             )
         )
 

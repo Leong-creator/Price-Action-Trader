@@ -68,6 +68,14 @@ class StrategySignalPipelineTests(unittest.TestCase):
         self.assertIn("wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md", first_run[0].source_refs)
         self.assertIn("wiki:knowledge/wiki/concepts/market-cycle-overview.md", first_run[0].actual_source_refs)
         self.assertIn("wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md", first_run[0].actual_source_refs)
+        self.assertIn(
+            "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+            first_run[0].actual_source_refs,
+        )
+        self.assertIn(
+            "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+            first_run[0].actual_source_refs,
+        )
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", first_run[0].bundle_support_refs)
         self.assertTrue(
             any(

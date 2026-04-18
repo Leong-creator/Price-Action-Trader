@@ -49,6 +49,8 @@ KEY_CURATED_PAGE_REFS = (
     "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
     "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
     "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+    "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+    "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
 )
 
 DEFAULT_SOURCE_OUTPUT = INDICES_ROOT / "source_manifest.json"

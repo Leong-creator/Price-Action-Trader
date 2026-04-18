@@ -170,6 +170,8 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
         self.assertTrue(set(trade_row["bundle_support_refs"]).issubset(set(trade_row["legacy_source_refs"])))
         self.assertNotIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", trade_row["source_refs"])
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", trade_row["bundle_support_refs"])
+        self.assertIn("wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md", trade_row["source_refs"])
+        self.assertIn("wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md", trade_row["source_refs"])
 
         self.assertTrue(
             {
@@ -184,6 +186,45 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
         self.assertTrue(set(executed["actual_source_refs"]).isdisjoint(set(executed["bundle_support_refs"])))
         self.assertNotIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", executed["actual_source_refs"])
         self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", executed["bundle_support_refs"])
+        self.assertIn(
+            "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+            executed["actual_source_refs"],
+        )
+        self.assertIn(
+            "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+            executed["actual_source_refs"],
+        )
+
+    def test_checked_in_daily_actual_trace_contains_more_than_one_promoted_rule_theme(self) -> None:
+        knowledge_trace = _load_artifact_json("knowledge_trace.json")
+
+        rule_hits = [
+            hit
+            for trade in knowledge_trace["executed_trades"]
+            for hit in trade["visible_trace"]
+            if hit["atom_type"] == "rule"
+        ]
+        self.assertTrue(rule_hits)
+        self.assertTrue(
+            {
+                "trend_vs_range_filter",
+                "breakout_follow_through_failed_breakout",
+                "tight_channel_trend_resumption",
+            }.issubset({hit["promotion_theme"] for hit in rule_hits})
+        )
+        promoted_hits = [
+            hit
+            for hit in rule_hits
+            if hit["promotion_theme"] in {"breakout_follow_through_failed_breakout", "tight_channel_trend_resumption"}
+        ]
+        self.assertTrue(promoted_hits)
+        self.assertTrue(
+            all(
+                "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md" in hit["evidence_refs"]
+                and "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md" in hit["evidence_refs"]
+                for hit in promoted_hits
+            )
+        )
 
     def test_checked_in_daily_no_trade_wait_payload_uses_actual_refs_field(self) -> None:
         records = [
