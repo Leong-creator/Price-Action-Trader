@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8D.1 Artifact & Trace Unification（已完成，阶段 B/C 尚未开始）
+- 当前子阶段：M8D.2 Curated Promotion Minimal Expansion（已完成，阶段 C 尚未开始）
 
 ## 当前分支
 
@@ -154,8 +154,12 @@
   - user-facing artifact 中的 `source_refs` 现只代表 actual refs；`bundle_support_refs` 单独存在；`legacy_source_refs` 只作为兼容/追溯字段保留。
   - `m3-research-reference-pack` 不再在 long-horizon daily run 的 visible actual refs 中伪装成实际命中；当前只保留在 bundle support / legacy trace 层。
   - 已新增/补强 `tests/reliability/test_long_horizon_daily_validation.py`、`tests/reliability/test_intraday_pilot_validation.py`、`tests/unit/test_public_backtest_demo.py`，并通过 `tests/reliability`、`tests/unit` 与 `scripts/run_reliability_suite.py`。
-- M8D.2 Curated Promotion Minimal Expansion 尚未开始：
-  - 当前未做新的 curated promotion，不新增 promoted theme，不改 trigger。
+- M8D.2 Curated Promotion Minimal Expansion 已完成：
+  - 已新增第二轮最小 promoted theme：`breakout_follow_through_failed_breakout`、`tight_channel_trend_resumption`，并新增对应 rule 页 `knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md` 与 `knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md`。
+  - transcript / Brooks 现在会通过更具体的 promoted curated rule theme 进入 actual trace 的 `evidence_refs / evidence_locator_summary`；visible trace 不再只停留在 `market_cycle_context`、`signal_bar_entry` 与单一 `trend_vs_range_filter`。
+  - 新 promoted theme 只进入 actual trace、signal explanation、`no-trade / wait`、report / review 层；仍保持 `draft / low confidence / research-only`，不进入 trigger。
+  - 已重算并落盘 `reports/backtests/m8c1_long_horizon_daily_validation/`，使 checked-in daily artifact 与第二轮最小 promoted theme 保持一致。
+  - 已更新 `tests/reliability/test_curated_promotion_minimal_set.py`、`tests/reliability/test_strategy_atom_trace.py`、`tests/reliability/test_long_horizon_daily_validation.py`、`tests/unit/test_strategy_signal_pipeline.py`，并继续通过 `python -m unittest discover -s tests/reliability -v` 与 `python -m unittest discover -s tests/unit -v`。
 - M8D.3 Repository State Consistency 尚未开始：
   - 当前未进入 README / status / active-plan 之外的仓库口径重整，也未做阶段 C 范围的全仓同步。
 
@@ -166,9 +170,8 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live，也不是继续扩第三个标的或更长窗口；优先保持 M8D.1 的 artifact contract 稳定。
-- `M8D.2` 尚未开始；只有在 `M8D.1` 已整合进 `main` 且收到单独指令后，才允许进入 minimal curated promotion。
-- `M8D.3` 尚未开始；当前不做超出最小同步范围的仓库状态整齐化。
+- 当前下一步不是扩 broker/live，也不是继续扩第三个标的或更长窗口；优先保持 M8D.2 的最小 promoted trace contract 稳定。
+- `M8D.3` 尚未开始；只有在收到单独指令后，才允许进入 repository state consistency。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。

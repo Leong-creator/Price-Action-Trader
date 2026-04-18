@@ -166,6 +166,8 @@
 - `market cycle / context`
 - `signal bar / entry`
 - `trend vs range filter`
+- `breakout follow-through / failed breakout`
+- `tight channel / trend resumption`
 
 阶段 B 之后，引用与证据的层次固定为：
 
@@ -202,6 +204,7 @@
 - transcript / Brooks 现在会通过 promoted curated claim 的 `evidence_refs` 与 `evidence_locator_summary` 真实出现
 - report.md 只显示精简 evidence 摘要
 - `knowledge_trace.json` 保留 machine-readable 全量 evidence chain
+- 第二轮最小集只新增上述两个 promoted curated `rule` theme；它们通过 `evidence_refs / evidence_locator_summary / evidence_chunk_ids` 进入 actual trace，但仍保持 `draft / low confidence / research-only`
 
 当前仍停留在 source / statement 层、尚未进入 trigger 的内容：
 

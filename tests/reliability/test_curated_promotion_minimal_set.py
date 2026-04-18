@@ -24,6 +24,9 @@ PROMOTION_MAP_PATH = ROOT / "knowledge" / "indices" / "curated_promotion_map.jso
 TRANSCRIPT_SOURCE_PAGE = "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
 BROOKS_SOURCE_PAGE = "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
 PROMOTED_RULE_PAGE = "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md"
+BREAKOUT_RULE_PAGE = "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md"
+TIGHT_CHANNEL_RULE_PAGE = "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md"
+FANGFANGTU_BREAKOUT_SOURCE_PAGE = "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md"
 
 
 class CuratedPromotionMinimalSetTests(unittest.TestCase):
@@ -37,7 +40,7 @@ class CuratedPromotionMinimalSetTests(unittest.TestCase):
             and atom["atom_type"] in {"concept", "setup", "rule"}
         }
 
-        self.assertEqual(len(promotion_map["promotions"]), 3)
+        self.assertEqual(len(promotion_map["promotions"]), 5)
         for promotion in promotion_map["promotions"]:
             atom = promoted_atoms[promotion["claim_id"]]
             self.assertEqual(atom["source_ref"], promotion["page_ref"])
@@ -49,6 +52,38 @@ class CuratedPromotionMinimalSetTests(unittest.TestCase):
             self.assertTrue(atom["field_mappings"])
             self.assertEqual(atom["promotion_theme"], promotion["theme_id"])
             self.assertNotIn("strategy_candidate", atom["callable_tags"])
+
+    def test_second_round_promoted_rules_keep_multi_source_evidence_complete(self) -> None:
+        fixture = load_fixture()
+        promoted_atoms = {
+            atom["claim_id"]: atom
+            for atom in fixture["atoms"]
+            if atom["atom_type"] == "rule" and "promoted_curated" in atom.get("callable_tags", [])
+        }
+
+        breakout = promoted_atoms["breakout.follow_through.failed_breakout.minimal.v1"]
+        self.assertEqual(
+            breakout["source_ref"],
+            BREAKOUT_RULE_PAGE,
+        )
+        self.assertEqual(set(breakout["field_mappings"]), {"entry_trigger", "invalidation"})
+        self.assertIn(FANGFANGTU_BREAKOUT_SOURCE_PAGE, breakout["evidence_refs"])
+        self.assertIn(TRANSCRIPT_SOURCE_PAGE, breakout["evidence_refs"])
+        self.assertIn(BROOKS_SOURCE_PAGE, breakout["evidence_refs"])
+        self.assertTrue(breakout["evidence_chunk_ids"])
+        self.assertTrue(breakout["evidence_locator_summary"])
+
+        tight_channel = promoted_atoms["tight_channel.trend_resumption.minimal.v1"]
+        self.assertEqual(
+            tight_channel["source_ref"],
+            TIGHT_CHANNEL_RULE_PAGE,
+        )
+        self.assertEqual(set(tight_channel["field_mappings"]), {"pa_context", "invalidation"})
+        self.assertIn(FANGFANGTU_BREAKOUT_SOURCE_PAGE, tight_channel["evidence_refs"])
+        self.assertIn(TRANSCRIPT_SOURCE_PAGE, tight_channel["evidence_refs"])
+        self.assertIn(BROOKS_SOURCE_PAGE, tight_channel["evidence_refs"])
+        self.assertTrue(tight_channel["evidence_chunk_ids"])
+        self.assertTrue(tight_channel["evidence_locator_summary"])
 
     def test_open_questions_are_preserved_for_promoted_themes(self) -> None:
         fixture = load_fixture()
@@ -92,15 +127,33 @@ class CuratedPromotionMinimalSetTests(unittest.TestCase):
         signal = generate_signals(build_replay(self._trend_bars()))[0]
 
         curated_hits = [hit for hit in signal.knowledge_trace if hit.atom_type in {"concept", "setup", "rule"}]
-        self.assertEqual([hit.atom_type for hit in curated_hits], ["concept", "setup", "rule"])
+        self.assertEqual([hit.atom_type for hit in curated_hits[:2]], ["concept", "setup"])
+        self.assertTrue(all(hit.atom_type == "rule" for hit in curated_hits[2:]))
+        self.assertEqual(len(curated_hits), 5)
         evidence_refs = {ref for hit in curated_hits for ref in hit.evidence_refs}
         self.assertIn(TRANSCRIPT_SOURCE_PAGE, evidence_refs)
         self.assertIn(BROOKS_SOURCE_PAGE, evidence_refs)
-        rule_hit = next(hit for hit in curated_hits if hit.atom_type == "rule")
-        self.assertEqual(rule_hit.source_ref, PROMOTED_RULE_PAGE)
-        self.assertEqual(rule_hit.claim_id, "trend_vs_range.filter.minimal.v1")
-        self.assertEqual(rule_hit.promotion_theme, "trend_vs_range_filter")
-        self.assertTrue(rule_hit.evidence_locator_summary)
+        rule_hits = [hit for hit in curated_hits if hit.atom_type == "rule"]
+        self.assertEqual(
+            {hit.source_ref for hit in rule_hits},
+            {
+                PROMOTED_RULE_PAGE,
+                BREAKOUT_RULE_PAGE,
+                TIGHT_CHANNEL_RULE_PAGE,
+            },
+        )
+        self.assertEqual(
+            {hit.promotion_theme for hit in rule_hits},
+            {
+                "trend_vs_range_filter",
+                "breakout_follow_through_failed_breakout",
+                "tight_channel_trend_resumption",
+            },
+        )
+        for hit in rule_hits:
+            self.assertIn(TRANSCRIPT_SOURCE_PAGE, hit.evidence_refs)
+            self.assertIn(BROOKS_SOURCE_PAGE, hit.evidence_refs)
+            self.assertTrue(hit.evidence_locator_summary)
 
     def test_promotion_does_not_change_trigger_fields(self) -> None:
         replay = build_replay(self._trend_bars())
@@ -122,7 +175,11 @@ class CuratedPromotionMinimalSetTests(unittest.TestCase):
         self.assertEqual(promoted_signal.invalidation, legacy_signal.invalidation)
         self.assertEqual(promoted_signal.confidence, legacy_signal.confidence)
         self.assertIn(PROMOTED_RULE_PAGE, promoted_signal.actual_source_refs)
+        self.assertIn(BREAKOUT_RULE_PAGE, promoted_signal.actual_source_refs)
+        self.assertIn(TIGHT_CHANNEL_RULE_PAGE, promoted_signal.actual_source_refs)
         self.assertNotIn(PROMOTED_RULE_PAGE, legacy_signal.actual_source_refs)
+        self.assertNotIn(BREAKOUT_RULE_PAGE, legacy_signal.actual_source_refs)
+        self.assertNotIn(TIGHT_CHANNEL_RULE_PAGE, legacy_signal.actual_source_refs)
 
     def _trend_bars(self) -> tuple[OhlcvRow, ...]:
         return (

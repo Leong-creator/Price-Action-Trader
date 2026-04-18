@@ -119,3 +119,8 @@
 
 - 日期：2026-04-18
 - 结论：在首轮 `SPY / 15m` intraday pilot 完成后，允许在不改 trigger 的前提下扩一个第二高流动性标的做同边界验证。当前冻结的第二标的扩展为 `NVDA / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`。该扩展继续只验证 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee、`no-trade / wait` 与 `knowledge_trace` 的跨标的一致性；`statement`、`source_note`、`contradiction`、`open_question` 仍不得进入 trigger，Brooks statement 数量也不得成为 confidence、权重或排序代理。当前第二标的扩展已整合进 `main`；仍未进入期权、broker、live、real-money。
+
+## D-0025 M8D.2 Curated Promotion Minimal Expansion 边界冻结
+
+- 日期：2026-04-18
+- 结论：`M8D.2` 只允许做第二轮最小 curated promotion，不做 full promotion，不改 trigger，不改 `knowledge/raw`，不进入 broker/live/real-money。当前只新增两个 promoted curated `rule` theme：`breakout_follow_through_failed_breakout` 与 `tight_channel_trend_resumption`。它们只进入 actual trace、signal explanation、`no-trade / wait`、report / review 层；`statement`、`source_note`、`contradiction`、`open_question` 仍不得进入 trigger。当前 `reports/backtests/m8c1_long_horizon_daily_validation/` 已重算到该最小 promotion contract，且 `tests/reliability` / `tests/unit` 全绿；`M8D.3` 尚未开始。

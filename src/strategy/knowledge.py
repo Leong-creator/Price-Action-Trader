@@ -12,6 +12,17 @@ DEFAULT_CONCEPT_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "concepts" / "marke
 DEFAULT_SETUP_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "setups" / "signal-bar-entry-placeholder.md"
 DEFAULT_RULE_PACK_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "m3-research-reference-pack.md"
 DEFAULT_PROMOTED_RULE_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "trend-vs-range-filter-minimal.md"
+DEFAULT_BREAKOUT_PROMOTED_RULE_PATH = (
+    PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "breakout-follow-through-failed-breakout-minimal.md"
+)
+DEFAULT_TIGHT_CHANNEL_PROMOTED_RULE_PATH = (
+    PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "tight-channel-trend-resumption-minimal.md"
+)
+DEFAULT_PROMOTED_RULE_PATHS = (
+    DEFAULT_PROMOTED_RULE_PATH,
+    DEFAULT_BREAKOUT_PROMOTED_RULE_PATH,
+    DEFAULT_TIGHT_CHANNEL_PROMOTED_RULE_PATH,
+)
 DEFAULT_NEWS_RULE_PATH = PROJECT_ROOT / "knowledge" / "wiki" / "rules" / "m6-news-review-evidence-pack.md"
 DEFAULT_RULE_PACK_REF = "wiki:knowledge/wiki/rules/m3-research-reference-pack.md"
 
@@ -104,7 +115,7 @@ def load_alignment_knowledge() -> StrategyKnowledgeBundle:
     return load_strategy_knowledge(
         DEFAULT_CONCEPT_PATH,
         DEFAULT_SETUP_PATH,
-        supporting_paths=(DEFAULT_PROMOTED_RULE_PATH, DEFAULT_RULE_PACK_PATH),
+        supporting_paths=(*DEFAULT_PROMOTED_RULE_PATHS, DEFAULT_RULE_PACK_PATH),
     )
 
 

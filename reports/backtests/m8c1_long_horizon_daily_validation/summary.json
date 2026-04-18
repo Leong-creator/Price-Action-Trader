@@ -1,6 +1,6 @@
 {
   "run_id": "m8c1_long_horizon_daily_validation",
-  "generated_at": "2026-04-18T04:10:49.674559+00:00",
+  "generated_at": "2026-04-18T04:47:29.573848+00:00",
   "title": "Public History Long-Horizon Daily Validation",
   "description": "Long-horizon walk-forward daily validation on cached public research data. Still paper/simulated only.",
   "boundary": "paper/simulated",
@@ -69,8 +69,8 @@
       "end": "2025-12-31"
     }
   ],
-  "cache_dir": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history",
-  "report_dir": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/reports/backtests/m8c1_long_horizon_daily_validation",
+  "cache_dir": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history",
+  "report_dir": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/reports/backtests/m8c1_long_horizon_daily_validation",
   "risk_model": {
     "starting_capital": "25000.0000",
     "risk_per_trade": "100.0000",
@@ -107,7 +107,7 @@
       "no_trade_wait": 1498,
       "pnl_cash": "-99.8257",
       "win_rate_pct": "25.0000",
-      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history/us_NVDA_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history/us_NVDA_1d_2020-01-01_2025-12-31_yfinance.csv",
       "trace_curated_signal_pct": "100.0000",
       "trace_statement_signal_pct": "100.0000"
     },
@@ -124,7 +124,7 @@
       "no_trade_wait": 1498,
       "pnl_cash": "197.6562",
       "win_rate_pct": "50.0000",
-      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history/us_TSLA_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history/us_TSLA_1d_2020-01-01_2025-12-31_yfinance.csv",
       "trace_curated_signal_pct": "100.0000",
       "trace_statement_signal_pct": "100.0000"
     },
@@ -141,7 +141,7 @@
       "no_trade_wait": 1490,
       "pnl_cash": "-120.7000",
       "win_rate_pct": "25.0000",
-      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history/us_SPY_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history/us_SPY_1d_2020-01-01_2025-12-31_yfinance.csv",
       "trace_curated_signal_pct": "100.0000",
       "trace_statement_signal_pct": "100.0000"
     }
@@ -620,7 +620,7 @@
     "supporting_signal_pct": "0.0000",
     "trace_item_counts": {
       "concept": 425,
-      "rule": 425,
+      "rule": 1275,
       "setup": 425,
       "statement": 425
     },
@@ -632,7 +632,7 @@
     },
     "source_family_item_counts": {
       "curated_concept": 425,
-      "curated_rule": 425,
+      "curated_rule": 1275,
       "curated_setup": 425,
       "fangfangtu_notes": 425
     },
@@ -644,7 +644,7 @@
     },
     "actual_hit_source_family_item_counts": {
       "curated_concept": 425,
-      "curated_rule": 425,
+      "curated_rule": 1275,
       "curated_setup": 425,
       "fangfangtu_notes": 425
     },
@@ -654,9 +654,9 @@
       "fangfangtu_transcript": 425
     },
     "actual_evidence_source_family_item_counts": {
-      "al_brooks_ppt": 1275,
-      "fangfangtu_notes": 1700,
-      "fangfangtu_transcript": 850
+      "al_brooks_ppt": 2125,
+      "fangfangtu_notes": 2550,
+      "fangfangtu_transcript": 1700
     },
     "bundle_support_family_presence": {
       "al_brooks_ppt": 425,
@@ -667,15 +667,15 @@
     "bundle_support_family_item_counts": {
       "al_brooks_ppt": 850,
       "curated_rule": 425,
-      "fangfangtu_notes": 1275,
+      "fangfangtu_notes": 1700,
       "fangfangtu_transcript": 425
     },
     "curated_vs_statement": {
-      "curated_item_count": 1275,
+      "curated_item_count": 2125,
       "statement_item_count": 425,
       "supporting_item_count": 0,
-      "curated_item_pct": "75.0000",
-      "statement_item_pct": "25.0000"
+      "curated_item_pct": "83.3333",
+      "statement_item_pct": "16.6667"
     }
   },
   "no_trade_wait_summary": {
@@ -748,11 +748,13 @@
       "exit_reason": "target_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 28 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 28 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -762,6 +764,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -769,12 +772,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -825,11 +831,13 @@
       "exit_reason": "target_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 36 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 36 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -839,6 +847,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -846,12 +855,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -902,11 +914,13 @@
       "exit_reason": "target_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 4 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 4 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -916,6 +930,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -923,12 +938,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -979,11 +997,13 @@
       "exit_reason": "target_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 34 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 34 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -993,6 +1013,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1000,12 +1021,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -1056,11 +1080,13 @@
       "exit_reason": "stop_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 21 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 21 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -1070,6 +1096,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1077,12 +1104,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -1135,11 +1165,13 @@
       "exit_reason": "stop_before_target_same_bar",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 48 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 48 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -1149,6 +1181,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1156,12 +1189,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -1212,11 +1248,13 @@
       "exit_reason": "stop_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 36 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 36 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -1226,6 +1264,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1233,12 +1272,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -1289,11 +1331,13 @@
       "exit_reason": "stop_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 7 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 7 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -1303,6 +1347,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1310,12 +1355,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -1366,11 +1414,13 @@
       "exit_reason": "stop_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 48 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 48 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -1380,6 +1430,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1387,12 +1438,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [
@@ -1443,11 +1497,13 @@
       "exit_reason": "stop_hit",
       "setup_type": "signal_bar_entry_placeholder",
       "pa_context": "trend",
-      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 5 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 5 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md, wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
       "source_refs": [
         "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
       ],
       "bundle_support_refs": [
@@ -1457,6 +1513,7 @@
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "legacy_source_refs": [
@@ -1464,12 +1521,15 @@
         "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
         "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
         "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md",
+        "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
         "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
         "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
         "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
         "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
         "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
       ],
       "knowledge_trace_summary": [

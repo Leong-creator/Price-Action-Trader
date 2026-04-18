@@ -533,9 +533,32 @@
 
 ### M8D.2：Curated Promotion Minimal Expansion
 
-- 当前状态：未开始。
-- 本阶段必须单独立项和批准；不得在 `M8D.1` 的实现、测试或合并中夹带执行。
-- 在 `M8D.2` 启动前，仓库保持当前 curated coverage，不新增 promoted theme，不改 trigger。
+- 当前状态：已完成。
+- 本阶段只允许做第二轮最小 curated promotion，不做 full promotion，不改 trigger，不改 `knowledge/raw`，不进入 broker/live/real-money。
+- 第二轮最小集只允许新增少量 evidence-backed promoted theme；当前已新增：
+  - `breakout_follow_through_failed_breakout`
+  - `tight_channel_trend_resumption`
+- 每条 promoted curated claim 必须保留：
+  - `claim_id`
+  - `field_mappings`
+  - `evidence_refs`
+  - `evidence_locator_summary`
+  - `evidence_chunk_ids`
+- transcript / Brooks 必须通过 promoted curated claim 的 evidence chain 进入 actual trace；但 promoted curated claim、`statement`、`source_note`、`contradiction`、`open_question` 仍不得进入 trigger。
+- `reports/backtests/m8c1_long_horizon_daily_validation/` 必须重算并落盘，使 checked-in daily artifact 能展示第二轮最小 promoted theme 的 actual trace。
+- 必须至少通过：
+  - `tests/reliability/test_curated_promotion_minimal_set.py`
+  - `tests/reliability/test_strategy_atom_trace.py`
+  - `tests/reliability/test_long_horizon_daily_validation.py`
+  - `tests/unit/test_strategy_signal_pipeline.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- 当前完成事实：
+  - 已新增 `knowledge/wiki/rules/breakout-follow-through-failed-breakout-minimal.md`
+  - 已新增 `knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md`
+  - 已更新 `knowledge/indices/curated_promotion_map.json`、`knowledge_atoms.jsonl` 与 `knowledge_callable_index.json`
+  - 已重算 `reports/backtests/m8c1_long_horizon_daily_validation/`
+  - 已保持 trigger 不变、`knowledge/raw` 不变、阶段 C 未开始
 
 ### M8D.3：Repository State Consistency
 
