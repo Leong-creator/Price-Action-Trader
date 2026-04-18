@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8C.2 第二标的日内验证扩展（已完成并整合进 `main`）
+- 当前子阶段：M8D.1 Artifact & Trace Unification（已完成，阶段 B/C 尚未开始）
 
 ## 当前分支
 
@@ -148,22 +148,16 @@
   - 已完成第二标的扩展验证：新增 `config/examples/intraday_pilot_nvda_15m.json`，并生成 `reports/backtests/m8c2_intraday_pilot_nvda_15m/`。
   - 当前示例 run `m8c2_intraday_pilot_nvda_15m` 在 `NVDA / 15m / 2026-03-30 ~ 2026-04-16` 条件下输出：总收益率 `0.8793%`、最大回撤 `0.0000%`、交易 `2` 笔、blocked signals `27`、`no_trade_wait` `310`；仍明确保持 `paper / simulated`。
   - 第二标的扩展未改 trigger，仍保持 session open/close、market hours / timezone、日内风险重置、duplicate signal protection、slippage / fee、`no-trade / wait` 与 `knowledge_trace` 兼容边界不变。
-- Knowledge Reference Repair / 阶段 A 已完成：
-  - 已把 user-facing `actual hit refs` 与 `bundle support refs` 分层：`Signal`、`knowledge_trace.json`、`summary.json`、`no_trade_wait.jsonl` 现已显式区分 visible actual evidence 与补充性 support refs。
-  - 已修复 `knowledge_trace` 可见层语义：broad registry/support 类型的 `m3-research-reference-pack` 不再默认作为 visible trace 命中展示，改为仅进入 debug/support 层与 bundle support refs。
-  - 已修复 `applicability_state` 的治理/信号语义混淆：frontmatter 中的治理性 `not_applicable` 不再直接污染 signal-level applicability，改为通过 `governance_notes` 保留。
-  - 已修复 `knowledge_trace_coverage.json`：现已区分 `actual_hit_source_family_presence/item_counts` 与 `bundle_support_family_presence/item_counts`，从而明确 transcript / Brooks 是 support 还是 actual hit。
-  - 已重跑并落盘 `reports/backtests/m8c2_intraday_pilot_spy_15m/` 与 `reports/backtests/smoke_public_demo_regression/`，确认报告与 JSON 默认只展示 actual hit refs；bundle support refs 单独落盘。
-  - 本轮未做 curated promotion，transcript / Brooks 仍未被提升为新的 curated actual trace claim；当前只修 trace fidelity / reference honesty。
-- Knowledge Reference Repair / 阶段 B 已完成：
-  - 已按最小范围完成 3 个主题的 curated promotion：`market cycle / context`、`signal bar / entry`、`trend vs range filter`。
-  - 已新增 machine-readable 证据映射：`knowledge/indices/curated_promotion_map.json`，把 transcript / Brooks / FangFangTu 笔记的证据映射到 `pa_context`、`higher_timeframe_context`、`signal_bar`、`entry_trigger`、`invalidation` 等字段。
-  - 已把 transcript / Brooks 的最小 evidence-backed promotion 接入 curated 层：当前 `market-cycle-overview`、`signal-bar-entry-placeholder`、`trend-vs-range-filter-minimal` 的 visible actual trace 会携带 `evidence_refs`、`evidence_locator_summary`、`field_mappings`、`claim_id`、`promotion_theme`。
-  - 已新增 `trend-vs-range-filter-minimal.md` 作为最小 curated rule 页；现有 concept/setup 页已补充最小 evidence-backed promotion，但仍保持 `draft + low confidence + research-only`。
-  - transcript / Brooks 当前已能通过 promoted curated evidence 真实进入 actual visible trace；它们不再只停留在 bundle support refs。
-  - `open_question` 已随 promotion 保留；当前未发现足够证据支撑的 transcript / Brooks 矛盾条目，因此未伪造 `contradiction`。
-  - trigger 逻辑未改变；`statement` / `source_note` / `contradiction` / `open_question` 仍未进入 trigger。
-  - 已重跑并落盘 `reports/backtests/m8c2_intraday_pilot_spy_15m/`，当前报告与 `knowledge_trace.json` 已展示 promoted curated evidence 的精简摘要与 machine-readable 证据链。
+- M8D.1 Artifact & Trace Unification 已完成：
+  - 已重算并落盘 `reports/backtests/m8c1_long_horizon_daily_validation/`，统一 `summary.json`、`report.md`、`knowledge_trace.json`、`knowledge_trace_coverage.json`、`no_trade_wait.jsonl`、`trades.csv`、`split_summary.json`、`regime_breakdown.json` 与 `equity_curve.png`。
+  - 已把 long-horizon daily run 与当前 intraday trace contract 对齐：`actual hit`、`actual evidence`、`bundle support` 在 `summary / report / coverage` 中都已清晰分层。
+  - user-facing artifact 中的 `source_refs` 现只代表 actual refs；`bundle_support_refs` 单独存在；`legacy_source_refs` 只作为兼容/追溯字段保留。
+  - `m3-research-reference-pack` 不再在 long-horizon daily run 的 visible actual refs 中伪装成实际命中；当前只保留在 bundle support / legacy trace 层。
+  - 已新增/补强 `tests/reliability/test_long_horizon_daily_validation.py`、`tests/reliability/test_intraday_pilot_validation.py`、`tests/unit/test_public_backtest_demo.py`，并通过 `tests/reliability`、`tests/unit` 与 `scripts/run_reliability_suite.py`。
+- M8D.2 Curated Promotion Minimal Expansion 尚未开始：
+  - 当前未做新的 curated promotion，不新增 promoted theme，不改 trigger。
+- M8D.3 Repository State Consistency 尚未开始：
+  - 当前未进入 README / status / active-plan 之外的仓库口径重整，也未做阶段 C 范围的全仓同步。
 
 ## 当前阻塞
 
@@ -172,8 +166,9 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live；Knowledge Reference Repair / 阶段 B 已整合进 `main`，当前仍不进入期权、broker、live 或 real-money。
-- 若继续当前验证主线，优先在 `paper / simulated` 边界内扩更长窗口或第三个高流动性标的，继续验证 promoted curated evidence 在更多样本上的表现；不进入新的 trigger 扩写。
+- 当前下一步不是扩 broker/live，也不是继续扩第三个标的或更长窗口；优先保持 M8D.1 的 artifact contract 稳定。
+- `M8D.2` 尚未开始；只有在 `M8D.1` 已整合进 `main` 且收到单独指令后，才允许进入 minimal curated promotion。
+- `M8D.3` 尚未开始；当前不做超出最小同步范围的仓库状态整齐化。
 - `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。

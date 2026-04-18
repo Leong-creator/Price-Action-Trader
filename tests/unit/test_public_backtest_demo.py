@@ -393,9 +393,14 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertEqual(payload["boundary"], "paper/simulated")
         self.assertEqual(payload["reason_code"], "context_not_trend")
         self.assertEqual(payload["action"], "wait")
+        self.assertEqual(payload["source_refs"], [])
         self.assertEqual(payload["actual_source_refs"], [])
         self.assertEqual(
             payload["bundle_support_refs"],
+            ["wiki:knowledge/wiki/concepts/market-cycle-overview.md"],
+        )
+        self.assertEqual(
+            payload["legacy_source_refs"],
             ["wiki:knowledge/wiki/concepts/market-cycle-overview.md"],
         )
 

@@ -13,6 +13,7 @@ from tests._intraday_support import build_session_rows, write_intraday_csv, writ
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "scripts" / "intraday_pilot_lib.py"
+DAILY_ARTIFACT_ROOT = ROOT / "reports" / "backtests" / "m8c1_long_horizon_daily_validation"
 SPEC = importlib.util.spec_from_file_location("intraday_pilot_lib_reliability", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
@@ -110,6 +111,91 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
             self.assertIn("当前仍未进入期权、broker、live、real-money", report_text)
             self.assertIn("actual evidence family 分布", report_text)
             self.assertIn("<= ", report_text)
+
+    def test_intraday_fixture_outputs_match_checked_in_daily_trace_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            config_path = temp_root / "intraday.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "title": "Intraday Fixture Pilot",
+                        "description": "Fixture-backed intraday pilot.",
+                        "start": "2026-01-05",
+                        "end": "2026-01-06",
+                        "interval": "15m",
+                        "cache_dir": str(temp_root / "cache"),
+                        "report_dir": str(temp_root / "reports"),
+                        "source_order": ["yfinance"],
+                        "instrument": {
+                            "ticker": "SPY",
+                            "symbol": "SPY",
+                            "label": "SPDR S&P 500 ETF",
+                            "market": "US",
+                            "timezone": "America/New_York",
+                            "demo_role": "fixture"
+                        },
+                        "risk": {
+                            "starting_capital": "25000",
+                            "risk_per_trade": "100",
+                            "max_total_exposure": "25000",
+                            "max_symbol_exposure_ratio": "1.00",
+                            "max_daily_loss": "1000",
+                            "max_consecutive_losses": 4
+                        },
+                        "session": {
+                            "timezone": "America/New_York",
+                            "regular_open": "09:30",
+                            "regular_close": "16:00",
+                            "expected_bars_per_session": 26,
+                            "allow_extended_hours": False
+                        },
+                        "costs": {
+                            "slippage_bps": "2",
+                            "fee_per_order": "0"
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = MODULE.load_intraday_pilot_config(config_path)
+            cache_path = MODULE.build_intraday_cache_path(config, source="yfinance")
+            rows = build_session_rows(date.fromisoformat("2026-01-05")) + build_session_rows(
+                date.fromisoformat("2026-01-06"),
+                start_price="110",
+            )
+            write_intraday_csv(cache_path, rows)
+            write_metadata(cache_path.with_suffix(".metadata.json"), source="fixture", row_count=len(rows))
+
+            outcome = MODULE.create_intraday_pilot_run(
+                config,
+                refresh_data=False,
+                run_id="intraday_fixture_contract",
+            )
+            report_dir = Path(outcome["report_dir"])
+            intraday_summary = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
+            intraday_coverage = json.loads((report_dir / "knowledge_trace_coverage.json").read_text(encoding="utf-8"))
+            intraday_no_trade = json.loads(
+                (report_dir / "no_trade_wait.jsonl").read_text(encoding="utf-8").splitlines()[0]
+            )
+
+        daily_summary = json.loads((DAILY_ARTIFACT_ROOT / "summary.json").read_text(encoding="utf-8"))
+        daily_coverage = json.loads((DAILY_ARTIFACT_ROOT / "knowledge_trace_coverage.json").read_text(encoding="utf-8"))
+        daily_no_trade = json.loads(
+            (DAILY_ARTIFACT_ROOT / "no_trade_wait.jsonl").read_text(encoding="utf-8").splitlines()[0]
+        )
+
+        self.assertEqual(
+            set(intraday_summary["knowledge_trace_coverage"]),
+            set(daily_summary["knowledge_trace_coverage"]),
+        )
+        self.assertEqual(set(intraday_coverage["overall"]), set(daily_coverage["overall"]))
+        self.assertEqual(set(intraday_no_trade), set(daily_no_trade))
+
+        intraday_trade = (intraday_summary["best_trades"] or intraday_summary["worst_trades"])[0]
+        daily_trade = (daily_summary["best_trades"] or daily_summary["worst_trades"])[0]
+        self.assertEqual(set(intraday_trade), set(daily_trade))
 
     def test_intraday_outputs_follow_configured_symbol(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
