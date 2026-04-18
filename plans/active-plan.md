@@ -23,7 +23,7 @@
 - `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
 - M8D.1：Artifact & Trace Unification 已完成，当前已把 `m8c1_long_horizon_daily_validation` 重算到 canonical trace contract，并统一 `actual hit / actual evidence / bundle support` 的 artifact 语义。
 - M8D.2：Curated Promotion Minimal Expansion 已完成，当前已新增 `breakout_follow_through_failed_breakout` 与 `tight_channel_trend_resumption` 两个最小 promoted curated `rule` theme，并让 transcript / Brooks 通过这些 theme 的 evidence chain 进入更具体的 actual trace。
-- M8D.3：Repository State Consistency 尚未开始。
+- M8D.3：Repository State Consistency 已完成，当前已把 README / status / active-plan / acceptance / decisions / roadmap / reliability docs / testing READMEs 对齐到 `main + M8 + M8 shadow/paper baseline + M8D.1/.2/.3` 的主线口径。
 
 ## 2. 执行总原则
 
@@ -764,10 +764,10 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8D.2 Curated Promotion Minimal Expansion（已完成）。
+- 当前 milestone：M8D.3 Repository State Consistency（已完成）。
 - 当前下一步：
-  - 当前下一步不是扩 broker/live，也不是继续扩第三个标的或更长窗口。
-  - `M8D.3` 尚未开始；只有在收到单独指令后，才允许进入 repository state consistency。
+  - 当前默认不自动进入新的功能开发、第三个标的扩展或更长窗口验证。
+  - `M8D.1`、`M8D.2`、`M8D.3` 当前都已完成，后续若要进入新的修复或验证阶段，必须单独立项。
   - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API

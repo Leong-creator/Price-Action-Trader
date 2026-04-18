@@ -1,6 +1,6 @@
 # Real History Small Samples
 
-This directory holds repo-safe small manifests used to validate the M8D framework itself.
+This directory holds repo-safe small manifests used to validate the repo's `M8 shadow/paper baseline`.
 
 Rules:
 
@@ -14,4 +14,4 @@ Recommended layout:
 - `sample_<slug>/dataset.manifest.json`
 - `sample_<slug>/README.md`
 
-The actual CSV/JSON payload may point to existing local fixtures when the goal is only to validate the M8D framework.
+The actual CSV/JSON payload may point to existing local fixtures when the goal is only to validate the shadow/paper baseline manifest contract.

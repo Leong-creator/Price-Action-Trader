@@ -73,7 +73,7 @@
   - 不伪造真实历史结果
   - 不进入真实 broker、真实账户或 live execution
 
-### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+### M8 Shadow/Paper Baseline：真实历史数据稳健性 + 实时 shadow / paper 验证基线
 
 - 目标：在真实输入下验证系统仍然保守、稳定、可解释
 - 核心门禁：真实输入只进入 shadow / paper，不进入真实 broker / live
@@ -94,6 +94,20 @@
   - M8D runner 默认只做只读输入与 simulated 输出
   - 当前没有真实历史样本或实时源时，不宣称真实行情验证已完成
   - 实际真实历史执行与实时 shadow/paper 运行仍等待用户提供本地 approved manifests
+
+### M8D：Knowledge Reference Consistency Repair
+
+- 目标：在不扩策略、不改 trigger 的前提下，修复知识引用、artifact 语义与仓库主线口径的一致性。
+- 当前已完成子阶段：
+  - `M8D.1 Artifact & Trace Unification`
+    - 已统一 daily 与 intraday checked-in run 的 trace contract。
+    - `actual hit`、`actual evidence`、`bundle support` 已在 `summary / report / coverage / knowledge_trace` 中显式分层。
+  - `M8D.2 Curated Promotion Minimal Expansion`
+    - 已新增最小 promoted theme：`breakout_follow_through_failed_breakout`、`tight_channel_trend_resumption`。
+    - transcript / Brooks 现在通过更具体的 curated evidence chain 进入 actual trace，但仍不进入 trigger。
+  - `M8D.3 Repository State Consistency`
+    - 已同步 README / status / active-plan / acceptance / decisions / roadmap 与 reliability 辅助文档。
+    - 已明确 `main` 是唯一长期稳定基线，当前主线已进入 `M8`，不是停留在 `M7`。
 
 ## 5. 输入边界
 

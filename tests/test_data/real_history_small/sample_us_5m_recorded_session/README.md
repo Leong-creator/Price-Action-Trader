@@ -1,6 +1,6 @@
 # Sample US 5m Recorded Session
 
-This dataset is a repo-safe M8D sample manifest.
+This dataset is a repo-safe `M8 shadow/paper baseline` sample manifest.
 
 It reuses the existing local static fixtures under `/home/hgl/projects/Price-Action-Trader/tests/test_data/`.
 

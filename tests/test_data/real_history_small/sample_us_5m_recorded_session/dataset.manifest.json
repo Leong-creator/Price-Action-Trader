@@ -14,7 +14,7 @@
     "trend_up",
     "event_driven"
   ],
-  "origin": "Repository-safe sample manifest for M8D framework validation only.",
+  "origin": "Repository-safe sample manifest for M8 shadow/paper baseline validation only.",
   "approved_for": [
     "offline_replay",
     "m8d_shadow_paper",
