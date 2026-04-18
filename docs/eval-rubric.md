@@ -58,16 +58,23 @@
 - close-path 审计字段缺失，直接判 fail
 - review 缺少 KB `source_refs`、PA explanation、risk notes 或 news traceability，直接判 fail
 
-### M8D
+### M8 Shadow/Paper Baseline
 
 - 真实历史数据输入下的稳健性
 - 实时只读输入下仍保持 shadow / paper
 - 不进入真实 broker / live
 - 保守性与可解释性保持稳定
-- 缺失 manifest、manifest 指向缺失文件、或 `approved_for` 不允许 M8D 用途时，必须 deferred 或 fail-fast
+- 缺失 manifest、manifest 指向缺失文件、或 `approved_for` 不允许 `m8d_shadow_paper` 用途时，必须 deferred 或 fail-fast
 - `run_shadow_session.py` 若输出任何 broker-connected / live 字样，直接判 fail
 - shadow / paper 输出若丢失 dataset metadata、session metadata、KB refs、PA explanation、risk/news traceability，直接判 fail
 - 在没有真实历史样本时若声称“真实行情验证已完成”，直接判 fail
+
+### M8D
+
+- `M8D.1` 必须确保 artifact 中 `actual hit / actual evidence / bundle support` 分层清晰，broad support 不得伪装成 actual hit
+- `M8D.2` 必须确保新增 promoted theme evidence 完整，且 transcript / Brooks 只通过 curated evidence chain 进入 actual trace，不进入 trigger
+- `M8D.3` 必须确保 README / status / plan / acceptance / decisions / roadmap 与 reliability 辅助 README 口径一致，不再把 `feature/m7-broker-api-assessment` 表述为当前稳定基线
+- 任一阶段若把 `statement` / `source_note` / `contradiction` / `open_question` 升格进 trigger，直接判 fail
 
 ## 5. 人工抽检规则
 

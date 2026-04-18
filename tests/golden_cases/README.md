@@ -2,7 +2,7 @@
 
 `tests/golden_cases/` 用于放置 M8B 的知识库对齐 golden cases。
 
-当前阶段仅完成 M8A 测试骨架，不落真实测试实现。
+当前目录已落盘实际 golden cases，并由 reliability 回归直接消费，不再只是 `M8A` skeleton。
 
 约束：
 
@@ -11,8 +11,7 @@
 - 不接真实 broker、真实账户或 live execution。
 - 保持 `paper / simulated` 边界。
 
-后续建议内容：
+当前用途：
 
-- `fixtures/`：golden 输入样本
-- `expected/`：期望输出快照
-- `test_*.py`：基于 unittest 的对齐测试
+- `cases/`：知识对齐、缺失 refs、`not_applicable`、conflict、insufficient evidence 等代表性样本
+- reliability 测试基于这些 case 验证 “不伪造知识引用、不越过适用性边界、资料不足时允许 no-trade / wait”

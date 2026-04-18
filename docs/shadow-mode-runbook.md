@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-`M8D` uses `shadow / paper` validation to prove the existing research pipeline can consume:
+`M8 shadow/paper baseline` uses `shadow / paper` validation to prove the existing research pipeline can consume:
 
 - user-exported local historical CSV/JSON
 - local recorded realtime snapshots
@@ -53,7 +53,7 @@ python /home/hgl/projects/Price-Action-Trader/scripts/run_shadow_session.py \
 ## 5. Expected Outcomes
 
 - If no manifest is provided, the runner must return `status=deferred`.
-- If the manifest is invalid, points to missing files, or is not approved for M8D shadow/paper, the runner must fail fast without pretending success.
+- If the manifest is invalid, points to missing files, or is not approved for the repo's `m8d_shadow_paper` purpose tag, the runner must fail fast without pretending success.
 - If the input is valid, the runner may produce:
   - signals
   - backtest summaries

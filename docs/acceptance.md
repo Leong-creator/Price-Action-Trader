@@ -562,9 +562,46 @@
 
 ### M8D.3：Repository State Consistency
 
-- 当前状态：未开始。
-- 本阶段必须单独立项和批准；不得在 `M8D.1` 的实现、测试或合并中夹带执行。
-- 在 `M8D.3` 启动前，不做超出最小阶段同步之外的全仓 README / status / plan / decisions 口径重整。
+- 当前状态：已完成。
+- 本阶段只允许做仓库口径对齐，不得借机修改 trigger、knowledge promotion、`knowledge/raw`、broker/live/real-money 或新增验证窗口。
+- 必须至少同步并对齐：
+  - `README.md`
+  - `docs/status.md`
+  - `plans/active-plan.md`
+  - `docs/acceptance.md`
+  - `docs/decisions.md`
+  - `docs/roadmap.md`
+- 若存在与当前主线状态直接相关的辅助说明漂移，也必须最小同步：
+  - `docs/testing-reliability.md`
+  - `docs/eval-rubric.md`
+  - `docs/shadow-mode-runbook.md`
+  - `tests/reliability/README.md`
+  - `tests/golden_cases/README.md`
+  - `tests/integration/README.md`
+  - `tests/test_data/real_history_small/README.md`
+  - `tests/test_data/real_history_small/sample_us_5m_recorded_session/README.md`
+  - `reports/reliability/README.md`
+- 必须明确：
+  - `main` 是唯一长期稳定基线
+  - 当前主线已进入 `M8：可靠性验证`
+  - `M8 shadow/paper baseline` 是已完成前置基线
+  - `M8D.1`、`M8D.2`、`M8D.3` 的状态已完成
+  - `feature/m7-broker-api-assessment` 只保留为历史阶段/里程碑分支
+- 若修改 `scripts/run_shadow_session.py` 的 help / 文案，必须通过 `python -m py_compile scripts/run_shadow_session.py`。
+- 必须至少完成 repo-wide drift audit，确认不再保留以下主显示口径：
+  - “当前分支：feature/m7-broker-api-assessment”
+  - “当前阶段：M7 正式券商 API 接入评估（已完成）”
+  - “当前阶段仅完成 M8A 测试骨架”
+- 必须保持：
+  - trigger 逻辑不变
+  - `knowledge/raw` 不变
+  - 不进入 broker/live/real-money
+  - 继续保持 `paper / simulated`
+- 当前完成事实：
+  - 仓库主线文档与辅助 README 已统一到 `main + M8 + M8 shadow/paper baseline + M8D.1/.2/.3`。
+  - 旧的“`feature/m7-broker-api-assessment` 是当前分支/稳定基线”表述已从主显示口径中移除。
+  - 旧的 “M8A skeleton only” README 口径已替换为当前实际存在的测试与报告说明。
+  - 本阶段未改 trigger，未改 `knowledge/raw`，未新增新的验证扩展。
 
 ### M8 Shadow/Paper Baseline：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 

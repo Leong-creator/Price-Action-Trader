@@ -124,3 +124,8 @@
 
 - 日期：2026-04-18
 - 结论：`M8D.2` 只允许做第二轮最小 curated promotion，不做 full promotion，不改 trigger，不改 `knowledge/raw`，不进入 broker/live/real-money。当前只新增两个 promoted curated `rule` theme：`breakout_follow_through_failed_breakout` 与 `tight_channel_trend_resumption`。它们只进入 actual trace、signal explanation、`no-trade / wait`、report / review 层；`statement`、`source_note`、`contradiction`、`open_question` 仍不得进入 trigger。当前 `reports/backtests/m8c1_long_horizon_daily_validation/` 已重算到该最小 promotion contract，且 `tests/reliability` / `tests/unit` 全绿；`M8D.3` 尚未开始。
+
+## D-0026 M8D.3 Repository State Consistency 冻结
+
+- 日期：2026-04-18
+- 结论：`M8D.3` 只用于修复仓库级状态口径漂移，不得借机修改 trigger、knowledge promotion、`knowledge/raw`、broker/live/real-money 或新增验证窗口。自本决策起，仓库主显示口径统一为：`main` 是唯一长期稳定基线；当前主线阶段是 `M8：可靠性验证`；`M8 shadow/paper baseline` 视为已完成前置基线；`M8D.1 Artifact & Trace Unification`、`M8D.2 Curated Promotion Minimal Expansion` 与 `M8D.3 Repository State Consistency` 均已完成。`README.md`、`docs/status.md`、`plans/active-plan.md`、`docs/acceptance.md`、`docs/decisions.md`、`docs/roadmap.md` 与相关 reliability/shadow README 现已按该口径同步；`feature/m7-broker-api-assessment` 只保留为历史阶段/里程碑分支，不再作为当前分支或稳定基线表述。

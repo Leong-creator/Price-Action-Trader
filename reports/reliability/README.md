@@ -2,7 +2,7 @@
 
 `reports/reliability/` 用于存放 M8 可靠性验证阶段生成的本地报告。
 
-当前阶段仅完成 M8A 目录落盘，不生成真实报告结果。
+本目录不再只是 `M8A` 占位目录；它用于存放 repo-safe、可回溯的 reliability / shadow-session 本地报告与说明。
 
 约束：
 
@@ -19,7 +19,7 @@
 - `reliability/`
 - `shadow_sessions/`
 
-M8D 报告最小字段建议：
+`M8 shadow/paper baseline` 报告最小字段建议：
 
 - `dataset.dataset_name`
 - `dataset.source_type`

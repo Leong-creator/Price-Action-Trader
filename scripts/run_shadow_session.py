@@ -517,7 +517,7 @@ def _require_list_of_strings(raw: dict[str, Any], key: str, issues: list[str]) -
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run M8D shadow/paper validation on local recorded or historical datasets only."
+        description="Run M8 shadow/paper baseline validation on local recorded or historical datasets only."
     )
     parser.add_argument("--manifest", type=Path, help="Path to dataset.manifest.json")
     parser.add_argument(

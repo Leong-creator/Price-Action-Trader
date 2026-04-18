@@ -193,7 +193,7 @@ def run_suites(specs: list[SuiteSpec], verbosity: int) -> int:
 
         if test_count == 0:
             print("  status: skipped")
-            print("  reason: no discoverable tests yet; safe to continue within M8A skeleton")
+            print("  reason: no discoverable tests yet; safe to continue without treating this suite as completed")
             continue
 
         discovered_any = True

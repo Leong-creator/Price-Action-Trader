@@ -11,13 +11,17 @@
 7. `M6`：新闻事件过滤与复盘整合
 8. `M7`：正式券商 API readiness assessment，当前冻结结论为 `no-go`
 
-## 当前下一阶段
+## 当前主线
 
-9. `M8`：可靠性验证（Reliability Validation）
-   - `M8A`：测试基线、文档与门禁落盘
-   - `M8B`：知识库对齐测试
-   - `M8C`：离线端到端可靠性测试
-   - `M8D`：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+9. `M8`：可靠性验证（Reliability Validation，进行中）
+   - 已完成：`M8A` 测试基线、文档与门禁落盘
+   - 已完成：`M8B` 知识库对齐测试与 callable/trace 接入
+   - 已完成：`M8C.1` 长周期日线验证
+   - 已完成：`M8C.2` 单标的与第二标的日内试点
+   - 已完成：`M8 shadow/paper baseline` 真实历史数据与录制型实时输入的只读验证基线
+   - 已完成：`M8D.1` Artifact & Trace Unification
+   - 已完成：`M8D.2` Curated Promotion Minimal Expansion
+   - 已完成：`M8D.3` Repository State Consistency
 
 ## 当前边界
 
