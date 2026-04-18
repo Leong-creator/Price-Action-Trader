@@ -25,7 +25,8 @@
 - M8D.2：Curated Promotion Minimal Expansion 已完成，当前已新增 `breakout_follow_through_failed_breakout` 与 `tight_channel_trend_resumption` 两个最小 promoted curated `rule` theme，并让 transcript / Brooks 通过这些 theme 的 evidence chain 进入更具体的 actual trace。
 - M8D.3：Repository State Consistency 已完成，当前已把 README / status / active-plan / acceptance / decisions / roadmap / reliability docs / testing READMEs 对齐到 `main + M8 + M8 shadow/paper baseline + M8D.1/.2/.3` 的主线口径。
 - M8E.1：Validation Gap Closure 已完成，当前已把 checked-in `summary.json` / `report.md` 的路径元数据统一为 repo-relative logical path，给 `m8c1_long_horizon_daily_validation` 增加 `sample_adequacy`，并补齐 golden catalog smoke test 与 artifact portability 回归。
-- `M8E.2` 当前作为下一步：只允许从更新后的 `main` 启动更长窗口 daily validation，不进入 intraday 更长窗口、broker/live/real-money，也不改 trigger。
+- M8E.2：Longer-Window Daily Validation 已完成，当前已新增 `config/examples/public_history_backtest_longer_window.json`，并生成 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`，覆盖 `2018-01-01 ~ 2026-04-17`、`NVDA / TSLA / SPY`、`1d` 的更长窗口 daily validation。
+- M8E.3 当前继续延后：在每个标的至少具备 `30` 个完整 regular session 之前，不启动 intraday 更长窗口扩展。
 
 ## 2. 执行总原则
 
@@ -766,11 +767,11 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8E.1 Validation Gap Closure（已完成）。
+- 当前 milestone：M8E.2 Longer-Window Daily Validation（已完成）。
 - 当前下一步：
-  - 当前默认不自动进入新的功能开发、第三个标的扩展或 intraday 更长窗口验证。
-  - `M8D.1`、`M8D.2`、`M8D.3`、`M8E.1` 当前都已完成；下一步只允许进入 `M8E.2 Longer-Window Daily Validation`。
-  - `M8E.2` 必须继续保持 `paper / simulated`、repo-relative artifact path、`sample_adequacy` 与 trigger 不变边界。
+  - 当前默认不自动进入新的功能开发、第三个标的扩展或 `M8E.3` intraday 更长窗口验证。
+  - `M8D.1`、`M8D.2`、`M8D.3`、`M8E.1`、`M8E.2` 当前都已完成；下一步若要进入 `M8E.3`，必须先满足每个标的至少 `30` 个完整 regular session 的门槛。
+  - 当前更长窗口验证优先级仍固定为 daily 先于 intraday；`M8E.3` 不得越过 session completeness / timezone / risk reset / no-trade / wait / knowledge trace 门槛。
   - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API

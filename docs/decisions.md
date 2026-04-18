@@ -134,3 +134,13 @@
 
 - 日期：2026-04-18
 - 结论：`M8E.1` 只允许修复“更长窗口 daily validation 启动前必须先收口”的验证缺口，不得改 trigger，不得改 `knowledge_trace` contract，不得改 `knowledge/raw`，不得进入 broker/live/real-money，也不得顺手启动 `M8E.2`。自本决策起，checked-in artifact 的路径元数据必须统一为 repo-relative logical path；`m8c1_long_horizon_daily_validation/summary.json` 必须新增 `sample_adequacy`，并按 split 明确区分 `adequate` 与 `insufficient_sample`。`validation` / `out_of_sample` 这类零执行交易 split 可以继续保留诚实的 `no-trade / wait` 结果，但不得被包装成“已充分验证”。`scripts/run_reliability_suite.py` 的 `golden` suite 也必须至少有一条可执行 catalog smoke test，避免长期只剩空目录 skip。
+
+## D-0028 M8E.2 Longer-Window Daily Validation 边界冻结
+
+- 日期：2026-04-18
+- 结论：`M8E.2` 只允许扩 daily 长窗口验证，不允许扩 intraday session 窗口，不允许改 trigger，不允许改 `knowledge/raw`，不允许进入 broker/live/real-money。固定验证范围为 `NVDA / TSLA / SPY`、`1d`、`2018-01-01 ~ 2026-04-17`，并要求生成 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`。新 run 必须继续保持 repo-relative artifact path、`sample_adequacy`、canonical knowledge trace contract 与 actual refs / bundle support 分层。若 `validation` / `out_of_sample` 仍为零执行交易 split，只能明确标注为“验证诚实但样本不足”，不得包装成充分验证或收益证明。
+
+## D-0029 M8E.3 Intraday Window Expansion 延后门槛冻结
+
+- 日期：2026-04-18
+- 结论：`M8E.3` 当前继续延后。在每个候选标的至少具备 `30` 个完整 regular session 之前，不得启动 intraday 更长窗口扩展；当前 `SPY / NVDA 15m` 仍只有 `13` 个 session/标的，样本不足以支持下一轮 intraday 窗口放大。后续即便满足 session 数量门槛，也仍必须继续保持 session completeness、timezone、risk reset、`no-trade / wait`、knowledge trace 与 trigger 不变边界。
