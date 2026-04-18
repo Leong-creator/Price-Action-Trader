@@ -7,7 +7,7 @@
 ## 当前 milestone
 
 - M8：可靠性验证（进行中）
-- 当前子阶段：M8D.3 Repository State Consistency（已完成）
+- 当前子阶段：M8E.1 Validation Gap Closure（已完成）
 
 ## 当前分支
 
@@ -165,6 +165,13 @@
   - 已把 `docs/testing-reliability.md`、`docs/eval-rubric.md`、`docs/shadow-mode-runbook.md`、`tests/reliability/README.md`、`tests/golden_cases/README.md`、`tests/integration/README.md`、`tests/test_data/real_history_small/*.md`、`reports/reliability/README.md` 的阶段口径统一到 `M8 shadow/paper baseline + M8D.1/.2/.3`。
   - 已明确：`main` 是唯一长期稳定基线；`feature/m7-broker-api-assessment` 只保留为历史阶段分支；当前主线已进入 `M8`，不是停留在 `M7`。
   - 本阶段未改 trigger，未改 `knowledge/raw`，未进入 broker/live/real-money，也未新增新的验证窗口或标的。
+- M8E.1 Validation Gap Closure 已完成：
+  - 已把 checked-in `m8c1_long_horizon_daily_validation` 的 `summary.json` 与 `report.md` 路径元数据统一为 repo-relative logical path，不再保留旧 worktree 绝对路径。
+  - 已在 `reports/backtests/m8c1_long_horizon_daily_validation/summary.json` 新增 `sample_adequacy`，并在 `report.md` 新增“样本充分性”小节；当前规则固定为每个 split `executed_trade_count >= 5` 才视为 `adequate`。
+  - 当前 `validation` 与 `out_of_sample` split 仍为 `insufficient_sample`，口径明确为“验证诚实但样本不足”，而不是伪装成已充分验证。
+  - 已补齐 `tests/golden_cases/test_catalog_smoke.py`，使 `scripts/run_reliability_suite.py` 的 `golden` suite 不再长期处于无测试可执行状态。
+  - 已补强 `tests/unit/test_public_backtest_demo.py`、`tests/reliability/test_long_horizon_daily_validation.py`、`tests/reliability/test_intraday_pilot_validation.py`，并固定 artifact `trades.csv` 使用 LF 写出以减少无意义字节漂移。
+  - 本阶段未改 trigger，未改 `knowledge_trace` contract，未改 `knowledge/raw`，未进入 broker/live/real-money。
 
 ## 当前阻塞
 
@@ -173,9 +180,9 @@
 
 ## 下一步
 
-- 当前下一步不是扩 broker/live，也不是继续扩第三个标的或更长窗口；优先保持当前 `M8` 检查点稳定。
-- `M8D.1`、`M8D.2`、`M8D.3` 均已完成；后续若要进入新的修复或验证阶段，必须单独收到指令。
-- `M8B.2b` 已整合进稳定基线；trigger 逻辑未改变，`statement` 仍未进入 trigger。
+- 当前下一步是 `M8E.2 Longer-Window Daily Validation`，不是 broker/live，也不是 intraday 更长窗口。
+- `M8D.1`、`M8D.2`、`M8D.3` 与 `M8E.1` 均已完成；下一步只允许扩 daily 长窗口，并继续保持 `paper / simulated`。
+- `M8E.2` 必须继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
 - 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
 - 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前仍未进入期权验证。

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -270,6 +271,15 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
             self.assertEqual(summary["symbol"], "NVDA")
             self.assertIn("标的：NVDA", report_text)
             self.assertIn("当前 intraday pilot 只覆盖 NVDA 15m regular session", report_text)
+
+    def test_checked_in_intraday_summaries_use_repo_relative_paths(self) -> None:
+        for run_id in ("m8c2_intraday_pilot_spy_15m", "m8c2_intraday_pilot_nvda_15m"):
+            summary = json.loads(
+                (ROOT / "reports" / "backtests" / run_id / "summary.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(os.path.isabs(summary["cache_csv"]))
+            self.assertFalse(os.path.isabs(summary["cache_metadata"]))
+            self.assertFalse(os.path.isabs(summary["report_dir"]))
 
     def test_incomplete_session_is_skipped_and_logged_as_no_trade_wait(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -603,6 +603,50 @@
   - 旧的 “M8A skeleton only” README 口径已替换为当前实际存在的测试与报告说明。
   - 本阶段未改 trigger，未改 `knowledge/raw`，未新增新的验证扩展。
 
+### M8E.1：Validation Gap Closure
+
+完成条件：
+
+- 只允许收口“更长窗口 daily validation 之前必须修”的验证缺口，不得进入 `M8E.2` 的更长窗口 daily run，不得进入 intraday 更长窗口。
+- checked-in artifact 的路径元数据必须统一为 repo-relative logical path；至少覆盖：
+  - `reports/backtests/m8c1_long_horizon_daily_validation/summary.json`
+  - `reports/backtests/m8c1_long_horizon_daily_validation/report.md`
+  - checked-in intraday pilot `summary.json` 中的 `cache_csv` / `cache_metadata` / `report_dir`
+- `m8c1_long_horizon_daily_validation/summary.json` 必须新增 `sample_adequacy`，至少包含：
+  - `overall_verdict`
+  - `by_split[]`
+  - `split_name`
+  - `split_label`
+  - `executed_trade_count`
+  - `minimum_required_executed_trades`
+  - `verdict`
+- `sample_adequacy` 的最小规则固定为：
+  - 每个 split 独立评估
+  - `executed_trade_count >= 5` 记为 `adequate`
+  - `< 5` 记为 `insufficient_sample`
+- `report.md` 必须新增“样本充分性”小节，并明确 `insufficient_sample` 代表“验证诚实但样本不足”，不是伪造通过。
+- 必须至少通过：
+  - `tests/golden_cases/test_catalog_smoke.py`
+  - `tests/unit/test_public_backtest_demo.py`
+  - `tests/reliability/test_long_horizon_daily_validation.py`
+  - `tests/reliability/test_intraday_pilot_validation.py`
+  - `python scripts/run_reliability_suite.py`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/unit -v`
+- `scripts/run_reliability_suite.py` 的 `golden` suite 不得再长期因为“无测试文件”而只剩 safe skip；至少要有 catalog smoke test 可执行。
+- artifact `trades.csv` 必须保持稳定 LF 写出，不因本地解释器差异引入无意义 CRLF 漂移。
+- 必须保持：
+  - trigger 逻辑不变
+  - `knowledge_trace` contract 不变
+  - `knowledge/raw` 不变
+  - 继续保持 `paper / simulated`
+  - 不进入 broker/live/real-money
+- 当前完成事实：
+  - 已把 checked-in daily / intraday summary path 元数据统一为 repo-relative logical path。
+  - 已为 `m8c1_long_horizon_daily_validation` 增加 `sample_adequacy`，并把 `validation` / `out_of_sample` 明确标为 `insufficient_sample`。
+  - 已新增 golden catalog smoke test，并补强 artifact portability / sample adequacy 一致性回归。
+  - 本阶段未改 trigger，未改 `knowledge_trace` contract，未改 `knowledge/raw`。
+
 ### M8 Shadow/Paper Baseline：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 完成条件：

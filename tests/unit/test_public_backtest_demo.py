@@ -186,8 +186,14 @@ class PublicBacktestDemoTests(unittest.TestCase):
                 self.assertIn("field_mappings", trace_payload["executed_trades"][0]["knowledge_trace"][0])
             self.assertIn("knowledge_trace_coverage", summary_payload)
             self.assertIn("no_trade_wait_summary", summary_payload)
+            self.assertIn("sample_adequacy", summary_payload)
+            self.assertEqual(
+                summary_payload["sample_adequacy"]["by_split"][0]["minimum_required_executed_trades"],
+                MODULE.MIN_REQUIRED_EXECUTED_TRADES_PER_SPLIT,
+            )
             self.assertEqual(summary_payload["splits"][0]["name"], "unit_split")
             self.assertEqual(summary_payload["regimes"][0]["name"], "unit_regime")
+            self.assertNotIn(b"\r\n", (output_dir / "trades.csv").read_bytes())
 
     def test_write_knowledge_trace_json_keeps_full_trace_and_blocked_paths(self) -> None:
         signal = self._signal_with_trace(trace_count=5)
@@ -307,6 +313,18 @@ class PublicBacktestDemoTests(unittest.TestCase):
                     "trace_statement_signal_pct": "100.0000",
                 }
             ],
+            "sample_adequacy": {
+                "overall_verdict": "insufficient_sample",
+                "by_split": [
+                    {
+                        "split_name": "unit",
+                        "split_label": "Unit Split",
+                        "executed_trade_count": 1,
+                        "minimum_required_executed_trades": 5,
+                        "verdict": "insufficient_sample",
+                    }
+                ],
+            },
             "knowledge_trace_coverage": {
                 "total_signals": 1,
                 "trace_nonempty_pct": "100.0000",
@@ -362,6 +380,30 @@ class PublicBacktestDemoTests(unittest.TestCase):
         self.assertIn("atom-trace-2", report_text)
         self.assertNotIn("atom-trace-3", report_text)
         self.assertNotIn("atom-trace-4", report_text)
+        self.assertIn("### 样本充分性", report_text)
+        self.assertIn("insufficient_sample（验证诚实但样本不足）", report_text)
+
+    def test_serialize_repo_logical_path_uses_repo_relative_when_possible(self) -> None:
+        repo_path = ROOT / "reports" / "backtests" / "m8c1_long_horizon_daily_validation" / "summary.json"
+        outside_path = Path("/tmp/pat-outside-summary.json")
+
+        self.assertEqual(
+            MODULE.serialize_repo_logical_path(repo_path),
+            "reports/backtests/m8c1_long_horizon_daily_validation/summary.json",
+        )
+        self.assertEqual(MODULE.serialize_repo_logical_path(outside_path), str(outside_path))
+
+    def test_write_trades_csv_uses_lf_line_endings(self) -> None:
+        signal = self._signal_with_trace(trace_count=1)
+        executed = self._executed_trade(signal)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "trades.csv"
+            MODULE.write_trades_csv(output_path, (executed,))
+            payload = output_path.read_bytes()
+
+        self.assertNotIn(b"\r\n", payload)
+        self.assertTrue(payload.endswith(b"\n"))
 
     def test_write_no_trade_wait_jsonl_keeps_structured_records(self) -> None:
         signal = self._signal_with_trace(trace_count=3)

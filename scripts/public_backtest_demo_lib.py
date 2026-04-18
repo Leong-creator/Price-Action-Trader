@@ -65,10 +65,12 @@ ALPHA_VANTAGE_ENV_VARS = ("ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY")
 QUANT = Decimal("0.0001")
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
+ARTIFACT_CSV_LINE_TERMINATOR = "\n"
 REPORT_READABILITY_NOTE = (
     "本报告仅用于公共历史数据研究演示，仍处于 paper / simulated 边界，"
     "不代表实盘能力或未来收益承诺。"
 )
+MIN_REQUIRED_EXECUTED_TRADES_PER_SPLIT = 5
 CURATED_TRACE_TYPES = frozenset({"concept", "setup", "rule"})
 SUPPORTING_TRACE_TYPES = frozenset({"source_note", "contradiction", "open_question"})
 EXIT_REASON_LABELS = {
@@ -719,6 +721,40 @@ def build_trace_summary_for_signals(
     return summary
 
 
+def build_sample_adequacy_summary(
+    windows: list[dict[str, Any]],
+    *,
+    minimum_required_executed_trades: int,
+) -> dict[str, Any]:
+    by_split = []
+    for item in windows:
+        executed_trade_count = int(item["executed_trades"])
+        verdict = (
+            "adequate"
+            if executed_trade_count >= minimum_required_executed_trades
+            else "insufficient_sample"
+        )
+        by_split.append(
+            {
+                "split_name": item["name"],
+                "split_label": item["label"],
+                "executed_trade_count": executed_trade_count,
+                "minimum_required_executed_trades": minimum_required_executed_trades,
+                "verdict": verdict,
+            }
+        )
+
+    overall_verdict = (
+        "adequate"
+        if by_split and all(item["verdict"] == "adequate" for item in by_split)
+        else "insufficient_sample"
+    )
+    return {
+        "overall_verdict": overall_verdict,
+        "by_split": by_split,
+    }
+
+
 def summarize_no_trade_wait(records: tuple[NoTradeWaitRecord, ...]) -> dict[str, Any]:
     action_counts = Counter(item.action for item in records)
     reason_counts = Counter(item.reason_code for item in records)
@@ -823,7 +859,7 @@ def build_summary_payload(
                 "no_trade_wait": len(no_trade_wait),
                 "pnl_cash": _string_decimal(symbol_pnl),
                 "win_rate_pct": _string_decimal(symbol_win_rate),
-                "cache_csv": str(result.csv_path),
+                "cache_csv": serialize_repo_logical_path(result.csv_path),
                 "trace_curated_signal_pct": symbol_trace_summary["curated_signal_pct"],
                 "trace_statement_signal_pct": symbol_trace_summary["statement_signal_pct"],
             }
@@ -841,6 +877,10 @@ def build_summary_payload(
         for item in paper_outcome.blocked_signals[:5]
     ]
     no_trade_wait_summary = summarize_no_trade_wait(no_trade_wait_records)
+    sample_adequacy = build_sample_adequacy_summary(
+        split_summary["windows"],
+        minimum_required_executed_trades=MIN_REQUIRED_EXECUTED_TRADES_PER_SPLIT,
+    )
 
     return {
         "run_id": run_id,
@@ -857,8 +897,8 @@ def build_summary_payload(
         },
         "splits": [window_to_payload(window) for window in config.splits],
         "regimes": [window_to_payload(window) for window in config.regimes],
-        "cache_dir": str(config.cache_dir),
-        "report_dir": str(report_dir),
+        "cache_dir": serialize_repo_logical_path(config.cache_dir),
+        "report_dir": serialize_repo_logical_path(report_dir),
         "risk_model": {
             "starting_capital": _string_decimal(config.risk.starting_capital),
             "risk_per_trade": _string_decimal(config.risk.risk_per_trade),
@@ -884,6 +924,7 @@ def build_summary_payload(
         "per_symbol": per_symbol,
         "split_summary_overview": split_summary["windows"],
         "regime_breakdown_overview": regime_breakdown["windows"],
+        "sample_adequacy": sample_adequacy,
         "knowledge_trace_coverage": knowledge_trace_coverage["overall"],
         "no_trade_wait_summary": no_trade_wait_summary,
         "best_trades": [trade_to_summary_row(item) for item in best_five],
@@ -1302,6 +1343,7 @@ def write_trades_csv(path: Path, trades: tuple[ExecutedTradeRecord, ...]) -> Non
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
+            lineterminator=ARTIFACT_CSV_LINE_TERMINATOR,
             fieldnames=(
                 "symbol",
                 "label",
@@ -1432,6 +1474,22 @@ def write_markdown_report(
         ]
     )
     lines.extend(_format_window_table(summary["split_summary_overview"]))
+    lines.extend(
+        [
+            "",
+            "### 样本充分性",
+            "",
+            f"- 总体结论：{humanize_sample_adequacy_verdict(summary['sample_adequacy']['overall_verdict'])}",
+        ]
+    )
+    for item in summary["sample_adequacy"]["by_split"]:
+        item_payload = dict(item)
+        item_payload["verdict"] = humanize_sample_adequacy_verdict(item["verdict"])
+        lines.append(
+            "- {split_label} ({split_name})：executed_trades={executed_trade_count} / minimum_required={minimum_required_executed_trades} -> {verdict}".format(
+                **item_payload,
+            )
+        )
 
     lines.extend(
         [
@@ -1624,6 +1682,14 @@ def _format_counter(counter_payload: dict[str, Any]) -> str:
     if not counter_payload:
         return "当前没有记录"
     return " | ".join(f"{key}={value}" for key, value in counter_payload.items())
+
+
+def humanize_sample_adequacy_verdict(verdict: str) -> str:
+    if verdict == "adequate":
+        return "adequate"
+    if verdict == "insufficient_sample":
+        return "insufficient_sample（验证诚实但样本不足）"
+    return verdict
 
 
 def compute_max_drawdown(equity_points: tuple[tuple[str, float], ...]) -> tuple[Decimal, Decimal]:
@@ -1902,6 +1968,16 @@ def humanize_block_reason(reason_codes: list[str] | tuple[str, ...]) -> str:
 def _resolve_repo_path(raw_path: str | Path) -> Path:
     path = Path(raw_path)
     return path if path.is_absolute() else ROOT / path
+
+
+def serialize_repo_logical_path(raw_path: str | Path) -> str:
+    path = Path(raw_path)
+    if not path.is_absolute():
+        return path.as_posix()
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def _string_decimal(value: Decimal | None) -> str:

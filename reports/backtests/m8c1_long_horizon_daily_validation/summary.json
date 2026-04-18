@@ -1,6 +1,6 @@
 {
   "run_id": "m8c1_long_horizon_daily_validation",
-  "generated_at": "2026-04-18T04:47:29.573848+00:00",
+  "generated_at": "2026-04-18T06:45:29.863966+00:00",
   "title": "Public History Long-Horizon Daily Validation",
   "description": "Long-horizon walk-forward daily validation on cached public research data. Still paper/simulated only.",
   "boundary": "paper/simulated",
@@ -69,8 +69,8 @@
       "end": "2025-12-31"
     }
   ],
-  "cache_dir": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history",
-  "report_dir": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/reports/backtests/m8c1_long_horizon_daily_validation",
+  "cache_dir": "local_data/public_history",
+  "report_dir": "reports/backtests/m8c1_long_horizon_daily_validation",
   "risk_model": {
     "starting_capital": "25000.0000",
     "risk_per_trade": "100.0000",
@@ -107,7 +107,7 @@
       "no_trade_wait": 1498,
       "pnl_cash": "-99.8257",
       "win_rate_pct": "25.0000",
-      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history/us_NVDA_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "cache_csv": "local_data/public_history/us_NVDA_1d_2020-01-01_2025-12-31_yfinance.csv",
       "trace_curated_signal_pct": "100.0000",
       "trace_statement_signal_pct": "100.0000"
     },
@@ -124,7 +124,7 @@
       "no_trade_wait": 1498,
       "pnl_cash": "197.6562",
       "win_rate_pct": "50.0000",
-      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history/us_TSLA_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "cache_csv": "local_data/public_history/us_TSLA_1d_2020-01-01_2025-12-31_yfinance.csv",
       "trace_curated_signal_pct": "100.0000",
       "trace_statement_signal_pct": "100.0000"
     },
@@ -141,7 +141,7 @@
       "no_trade_wait": 1490,
       "pnl_cash": "-120.7000",
       "win_rate_pct": "25.0000",
-      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history/us_SPY_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "cache_csv": "local_data/public_history/us_SPY_1d_2020-01-01_2025-12-31_yfinance.csv",
       "trace_curated_signal_pct": "100.0000",
       "trace_statement_signal_pct": "100.0000"
     }
@@ -608,6 +608,32 @@
       ]
     }
   ],
+  "sample_adequacy": {
+    "overall_verdict": "insufficient_sample",
+    "by_split": [
+      {
+        "split_name": "in_sample",
+        "split_label": "In-sample",
+        "executed_trade_count": 12,
+        "minimum_required_executed_trades": 5,
+        "verdict": "adequate"
+      },
+      {
+        "split_name": "validation",
+        "split_label": "Validation",
+        "executed_trade_count": 0,
+        "minimum_required_executed_trades": 5,
+        "verdict": "insufficient_sample"
+      },
+      {
+        "split_name": "out_of_sample",
+        "split_label": "Out-of-sample",
+        "executed_trade_count": 0,
+        "minimum_required_executed_trades": 5,
+        "verdict": "insufficient_sample"
+      }
+    ]
+  },
   "knowledge_trace_coverage": {
     "total_signals": 425,
     "signals_with_trace": 425,
