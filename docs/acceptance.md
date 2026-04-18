@@ -488,83 +488,62 @@
   - 已完成第二标的扩展验证：`NVDA / 15m / America/New_York / 2026-03-30 ~ 2026-04-16`
   - 第二标的扩展继续使用相同的 session / risk reset / duplicate protection / slippage / fee / `knowledge_trace` 契约，且 trigger 语义不变
 
-### Knowledge Reference Repair Track / 阶段 A：Trace Fidelity & Reference Honesty Repair
+### M8D.1：Artifact & Trace Unification
 
 完成条件：
 
-- 只允许修复 trace fidelity / reference honesty，不得进入阶段 B 的 curated promotion。
-- `actual hit refs` 与 `bundle support refs` 必须显式分层；默认 user-facing `report.md`、`summary.json`、`knowledge_trace_coverage.json`、`no_trade_wait.jsonl` 只以 actual hit 为默认展示语义。
-- broad support refs 不得继续以 actual evidence 身份进入 visible `knowledge_trace`。
-- `m3-research-reference-pack` 不得继续在 visible trace / summary 中以巨型 `chunk_set[...]` 形式出现；若仍需保留，只能进入 debug/support 层或 bundle support summary。
-- `applicability_state` 必须只表达 signal-level 语义；治理性 `not_applicable` / maturity warning 不得继续污染 visible trace，可单独进入 `governance_notes` 或等价字段。
+- 只允许统一旧 daily run 与当前 intraday run 的 trace 语义，不得进入 `M8D.2` 的 curated promotion，不得进入 `M8D.3` 的仓库状态整理。
+- `reports/backtests/m8c1_long_horizon_daily_validation/` 必须重算并落盘，至少包含：
+  - `summary.json`
+  - `report.md`
+  - `knowledge_trace.json`
+  - `knowledge_trace_coverage.json`
+  - `no_trade_wait.jsonl`
+  - `trades.csv`
+  - `split_summary.json`
+  - `regime_breakdown.json`
+  - `equity_curve.png`
+- `actual hit`、`actual evidence`、`bundle support` 必须在 `summary.json`、`report.md`、`knowledge_trace.json`、`knowledge_trace_coverage.json` 中显式分层。
+- user-facing `source_refs` 只允许表示 actual refs；`bundle_support_refs` 必须单独存在；若需要兼容旧语义，只能通过 `legacy_source_refs` 单独保留。
+- broad support refs 不得继续以 actual evidence 身份进入 visible `knowledge_trace` 或 `report.md` 的主展示语义。
+- `m3-research-reference-pack` 不得继续在 visible actual refs 中主导 long-horizon daily run 的展示；若仍需保留，只能进入 bundle support 或 legacy 兼容层。
 - `knowledge_trace_coverage.json` 必须至少区分：
   - `actual_hit_source_family_presence`
-  - `actual_hit_source_family_item_counts`
+  - `actual_evidence_source_family_presence`
   - `bundle_support_family_presence`
-  - `bundle_support_family_item_counts`
 - transcript / Brooks 若只是 bundle support，不得在 actual hit coverage 中伪装成真实命中。
 - 必须至少通过：
-  - `tests/reliability/test_strategy_atom_trace.py`
+  - `tests/reliability/test_long_horizon_daily_validation.py`
+  - `tests/reliability/test_intraday_pilot_validation.py`
   - `tests/reliability/test_knowledge_trace_fidelity.py`
-  - `tests/unit/test_strategy_signal_pipeline.py`
   - `tests/unit/test_public_backtest_demo.py`
-  - `tests/unit/test_news_review_pipeline.py`
-  - `python -m unittest discover -s tests/reliability -v`
-  - `python -m unittest discover -s tests/unit -v`
+  - `python -m unittest discover -s tests/reliability`
+  - `python -m unittest discover -s tests/unit`
+  - `python scripts/run_reliability_suite.py`
 - 必须保持：
   - trigger 逻辑不变
   - `statement` / `source_note` / `contradiction` / `open_question` 不进入 trigger
   - `knowledge/raw` 不变
   - 继续保持 `paper / simulated`
 - 当前完成事实：
-  - 已把 `Signal`、`ReviewItem`、`knowledge_trace.json`、`summary.json`、`no_trade_wait.jsonl` 的引用语义拆成 actual hit 与 bundle support 两层。
-  - 已把 broad support 类型的 `m3-research-reference-pack` 从 visible trace 中降级到 debug/support 层。
-  - 已修复 signal-level `applicability_state` 误用治理性 `not_applicable` 的问题，治理提示现通过 `governance_notes` 保留。
-  - 已修复 `knowledge_trace_coverage.json` 的 family 统计，让 transcript / Brooks 能明确显示为 support 还是 actual hit。
-  - 本轮未做 curated promotion；transcript / Brooks 仍未被提升为新的 curated actual trace claim。
+  - 已重算 `reports/backtests/m8c1_long_horizon_daily_validation/` 并把 long-horizon daily run 对齐到当前 intraday trace contract。
+  - `summary.json`、`report.md`、`knowledge_trace.json`、`knowledge_trace_coverage.json`、`no_trade_wait.jsonl` 现在都能明确区分 actual refs 与 bundle support。
+  - `source_refs` 在 user-facing artifact 中只代表 actual refs；兼容层只通过 `legacy_source_refs` 保留。
+  - 本轮未做 curated promotion，未改 trigger，未改 `knowledge/raw`。
 
-### Knowledge Reference Repair Track / 阶段 B：Curated Promotion Minimal Set
+### M8D.2：Curated Promotion Minimal Expansion
 
-完成条件：
+- 当前状态：未开始。
+- 本阶段必须单独立项和批准；不得在 `M8D.1` 的实现、测试或合并中夹带执行。
+- 在 `M8D.2` 启动前，仓库保持当前 curated coverage，不新增 promoted theme，不改 trigger。
 
-- 只允许做 transcript / Brooks 的最小 curated promotion，不得重做 atomization 基础层，不得修改 `knowledge/raw`。
-- 只允许选择 2~3 个高价值主题做 promotion；当前冻结的最小主题集为：
-  - `market cycle / context`
-  - `signal bar / entry`
-  - `trend vs range filter`
-- 必须存在 machine-readable 的字段级 evidence mapping 产物；当前最小落盘为：
-  - `knowledge/indices/curated_promotion_map.json`
-- 每条 promoted curated 内容都必须具备：
-  - 对应 `claim_id`
-  - 真实 `source_ref`
-  - 真实 `raw_locator`
-  - 真实 `evidence_chunk_ids`
-  - `field_mappings`
-  - `evidence_refs`
-  - `evidence_locator_summary`
-- transcript / Brooks 必须通过 promoted curated claim 真实进入 actual visible trace，而不是只停留在 `source_refs` / bundle support。
-- 必须保留 `draft / low confidence / research-only` 边界；不得把 promotion 包装成 active executable rule。
-- `open_question` / `contradiction` 必须保留为一等对象；若证据不足，允许只有 `open_question`，不得伪造 `contradiction`。
-- 必须至少通过：
-  - 字段级 evidence mapping contract 测试
-  - curated promotion contract 测试
-  - `open_question` / `contradiction` 保留测试
-  - 至少一个 controlled regression/fixture 测试，证明 transcript / Brooks promoted evidence 能进入 actual visible trace
-  - `python -m unittest discover -s tests/reliability -v`
-  - `python -m unittest discover -s tests/unit -v`
-- 必须保持：
-  - trigger 逻辑不变
-  - `statement` / `source_note` / `contradiction` / `open_question` 不进入 trigger
-  - 不进入 broker / live / real-money / real-account
-  - 继续保持 `paper / simulated`
-- 当前完成事实：
-  - 已新增 `knowledge/wiki/rules/trend-vs-range-filter-minimal.md`
-  - 已为 `market-cycle-overview`、`signal-bar-entry-placeholder`、`trend-vs-range-filter-minimal` 建立 evidence-backed minimal promotion
-  - transcript 与 Brooks 当前已通过 promoted curated claim 进入 actual visible trace，并在 `knowledge_trace.json` 中保留 `evidence_refs` / `evidence_locator_summary` / `field_mappings`
-  - 当前 `report.md` 只展示精简 trace 摘要；完整证据链继续落在 machine-readable JSON 中
-  - trigger 逻辑未改变；`statement` 仍未进入 trigger
+### M8D.3：Repository State Consistency
 
-### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+- 当前状态：未开始。
+- 本阶段必须单独立项和批准；不得在 `M8D.1` 的实现、测试或合并中夹带执行。
+- 在 `M8D.3` 启动前，不做超出最小阶段同步之外的全仓 README / status / plan / decisions 口径重整。
+
+### M8 Shadow/Paper Baseline：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 完成条件：
 

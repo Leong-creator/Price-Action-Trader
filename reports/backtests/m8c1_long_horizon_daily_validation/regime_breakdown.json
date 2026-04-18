@@ -1,0 +1,311 @@
+{
+  "boundary": "paper/simulated",
+  "bucket_type": "regime",
+  "windows": [
+    {
+      "name": "covid_crash_high_vol",
+      "label": "2020 高波动下跌",
+      "bucket_type": "regime",
+      "start": "2020-02-01",
+      "end": "2020-05-31",
+      "signal_count": 15,
+      "executed_trades": 8,
+      "blocked_signals": 7,
+      "no_trade_wait": 234,
+      "pnl_cash": "78.8475",
+      "win_rate_pct": "37.5000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 184,
+        "duplicate_direction_suppressed": 4,
+        "insufficient_evidence": 39,
+        "risk_blocked_before_fill": 7
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 5,
+          "executed_trades": 3,
+          "blocked_signals": 2,
+          "no_trade_wait": 79,
+          "pnl_cash": "0.0907"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 5,
+          "executed_trades": 2,
+          "blocked_signals": 3,
+          "no_trade_wait": 77,
+          "pnl_cash": "77.4200"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 5,
+          "executed_trades": 3,
+          "blocked_signals": 2,
+          "no_trade_wait": 78,
+          "pnl_cash": "1.3368"
+        }
+      ]
+    },
+    {
+      "name": "liquidity_trend_up",
+      "label": "2020H2-2021 上升趋势",
+      "bucket_type": "regime",
+      "start": "2020-06-01",
+      "end": "2021-12-31",
+      "signal_count": 101,
+      "executed_trades": 0,
+      "blocked_signals": 101,
+      "no_trade_wait": 1202,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 889,
+        "duplicate_direction_suppressed": 45,
+        "insufficient_evidence": 167,
+        "risk_blocked_before_fill": 101
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 34,
+          "executed_trades": 0,
+          "blocked_signals": 34,
+          "no_trade_wait": 401,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 33,
+          "executed_trades": 0,
+          "blocked_signals": 33,
+          "no_trade_wait": 400,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 34,
+          "executed_trades": 0,
+          "blocked_signals": 34,
+          "no_trade_wait": 401,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "macro_drawdown",
+      "label": "2022 宏观回撤",
+      "bucket_type": "regime",
+      "start": "2022-01-01",
+      "end": "2022-12-31",
+      "signal_count": 80,
+      "executed_trades": 0,
+      "blocked_signals": 80,
+      "no_trade_wait": 752,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 523,
+        "duplicate_direction_suppressed": 38,
+        "insufficient_evidence": 111,
+        "risk_blocked_before_fill": 80
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 28,
+          "executed_trades": 0,
+          "blocked_signals": 28,
+          "no_trade_wait": 250,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 28,
+          "executed_trades": 0,
+          "blocked_signals": 28,
+          "no_trade_wait": 251,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 24,
+          "executed_trades": 0,
+          "blocked_signals": 24,
+          "no_trade_wait": 251,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "recovery_rotation",
+      "label": "2023 恢复与轮动",
+      "bucket_type": "regime",
+      "start": "2023-01-01",
+      "end": "2023-12-31",
+      "signal_count": 74,
+      "executed_trades": 0,
+      "blocked_signals": 74,
+      "no_trade_wait": 747,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 553,
+        "duplicate_direction_suppressed": 26,
+        "insufficient_evidence": 94,
+        "risk_blocked_before_fill": 74
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 27,
+          "executed_trades": 0,
+          "blocked_signals": 27,
+          "no_trade_wait": 250,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 29,
+          "executed_trades": 0,
+          "blocked_signals": 29,
+          "no_trade_wait": 247,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 18,
+          "executed_trades": 0,
+          "blocked_signals": 18,
+          "no_trade_wait": 250,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "ai_momentum_and_range",
+      "label": "2024-2025 AI 动量与区间切换",
+      "bucket_type": "regime",
+      "start": "2024-01-01",
+      "end": "2025-12-31",
+      "signal_count": 133,
+      "executed_trades": 0,
+      "blocked_signals": 133,
+      "no_trade_wait": 1498,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1108,
+        "duplicate_direction_suppressed": 57,
+        "insufficient_evidence": 200,
+        "risk_blocked_before_fill": 133
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 39,
+          "executed_trades": 0,
+          "blocked_signals": 39,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 49,
+          "executed_trades": 0,
+          "blocked_signals": 49,
+          "no_trade_wait": 498,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 45,
+          "executed_trades": 0,
+          "blocked_signals": 45,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "unclassified",
+      "label": "未落入显式窗口",
+      "bucket_type": "regime",
+      "start": "2020-02-01",
+      "end": "2025-12-31",
+      "signal_count": 5,
+      "executed_trades": 4,
+      "blocked_signals": 1,
+      "no_trade_wait": 53,
+      "pnl_cash": "-101.7170",
+      "win_rate_pct": "25.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 40,
+        "insufficient_evidence": 12,
+        "risk_blocked_before_fill": 1
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 2,
+          "executed_trades": 1,
+          "blocked_signals": 1,
+          "no_trade_wait": 18,
+          "pnl_cash": "-99.9164"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 2,
+          "executed_trades": 2,
+          "blocked_signals": 0,
+          "no_trade_wait": 17,
+          "pnl_cash": "-198.1200"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 1,
+          "executed_trades": 1,
+          "blocked_signals": 0,
+          "no_trade_wait": 18,
+          "pnl_cash": "196.3194"
+        }
+      ]
+    }
+  ]
+}

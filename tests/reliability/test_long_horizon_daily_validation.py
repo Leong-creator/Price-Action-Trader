@@ -12,6 +12,7 @@ from src.strategy.contracts import KnowledgeAtomHit
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "scripts" / "public_backtest_demo_lib.py"
+ARTIFACT_ROOT = ROOT / "reports" / "backtests" / "m8c1_long_horizon_daily_validation"
 SPEC = importlib.util.spec_from_file_location("public_backtest_demo_lib", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
@@ -127,6 +128,78 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
             coverage["overall"]["bundle_support_family_presence"]["curated_rule"],
             1,
         )
+
+    def test_checked_in_daily_artifacts_keep_summary_report_and_coverage_consistent(self) -> None:
+        summary = _load_artifact_json("summary.json")
+        coverage = _load_artifact_json("knowledge_trace_coverage.json")
+        report_text = (ARTIFACT_ROOT / "report.md").read_text(encoding="utf-8")
+
+        self.assertEqual(summary["run_id"], "m8c1_long_horizon_daily_validation")
+        self.assertEqual(summary["knowledge_trace_coverage"], coverage["overall"])
+        for key in (
+            "actual_hit_source_family_presence",
+            "actual_evidence_source_family_presence",
+            "bundle_support_family_presence",
+        ):
+            self.assertIn(key, summary["knowledge_trace_coverage"])
+            self.assertIn(key, coverage["overall"])
+
+        self.assertIn("actual hit family 分布", report_text)
+        self.assertIn("actual evidence family 分布", report_text)
+        self.assertIn("bundle support family 分布", report_text)
+        self.assertIn("actual refs：", report_text)
+        self.assertIn("bundle support：", report_text)
+        self.assertNotRegex(report_text, r"(?<!actual )knowledge refs:")
+
+    def test_checked_in_daily_trade_and_trace_payloads_split_actual_and_bundle_support(self) -> None:
+        summary = _load_artifact_json("summary.json")
+        knowledge_trace = _load_artifact_json("knowledge_trace.json")
+        trade_row = (summary["best_trades"] or summary["worst_trades"])[0]
+        executed = knowledge_trace["executed_trades"][0]
+
+        self.assertTrue(
+            {
+                "source_refs",
+                "bundle_support_refs",
+                "legacy_source_refs",
+                "knowledge_trace_summary",
+            }.issubset(trade_row)
+        )
+        self.assertTrue(set(trade_row["source_refs"]).isdisjoint(set(trade_row["bundle_support_refs"])))
+        self.assertTrue(set(trade_row["source_refs"]).issubset(set(trade_row["legacy_source_refs"])))
+        self.assertTrue(set(trade_row["bundle_support_refs"]).issubset(set(trade_row["legacy_source_refs"])))
+        self.assertNotIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", trade_row["source_refs"])
+        self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", trade_row["bundle_support_refs"])
+
+        self.assertTrue(
+            {
+                "actual_source_refs",
+                "bundle_support_refs",
+                "legacy_source_refs",
+                "knowledge_trace",
+                "visible_trace",
+                "debug_trace",
+            }.issubset(executed)
+        )
+        self.assertTrue(set(executed["actual_source_refs"]).isdisjoint(set(executed["bundle_support_refs"])))
+        self.assertNotIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", executed["actual_source_refs"])
+        self.assertIn("wiki:knowledge/wiki/rules/m3-research-reference-pack.md", executed["bundle_support_refs"])
+
+    def test_checked_in_daily_no_trade_wait_payload_uses_actual_refs_field(self) -> None:
+        records = [
+            json.loads(line)
+            for line in (ARTIFACT_ROOT / "no_trade_wait.jsonl").read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+
+        self.assertTrue(records)
+        self.assertTrue(all(item["source_refs"] == item["actual_source_refs"] for item in records))
+        self.assertTrue(all("legacy_source_refs" in item for item in records))
+        self.assertTrue(any(not item["source_refs"] and item["bundle_support_refs"] for item in records))
+        self.assertTrue(any(item["source_refs"] and item["bundle_support_refs"] for item in records))
+        for item in records:
+            self.assertTrue(set(item["source_refs"]).issubset(set(item["legacy_source_refs"])))
+            self.assertTrue(set(item["bundle_support_refs"]).issubset(set(item["legacy_source_refs"])))
 
 
 def _build_signal(signal_id: str) -> MODULE.Signal:
@@ -279,6 +352,10 @@ def _build_symbol_result(signal: MODULE.Signal) -> MODULE.SymbolBacktestResult:
         signals=(signal,),
         backtest_report=report,
     )
+
+
+def _load_artifact_json(name: str) -> dict[str, object]:
+    return json.loads((ARTIFACT_ROOT / name).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

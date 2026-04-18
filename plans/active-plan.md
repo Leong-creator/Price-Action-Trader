@@ -21,8 +21,9 @@
   - `M8C.2` 的第二标的扩展验证已完成并整合进 `main`
 - `M8B.1` 已完成知识源接入诊断与最小补齐：补齐 transcript / Brooks PPT 的 `source` 页、rule-pack / index 接线，并修复默认 strategy bundle 读取 active rule pack 的缺口。
 - `M8B.2a：Knowledge Atomization 基础层` 已完成，`M8B.2b：Knowledge Trace 接入` 已完成并整合进稳定基线。
-- Knowledge Reference Repair / 阶段 A：Trace Fidelity & Reference Honesty Repair 已完成，当前已把 actual hit refs 与 bundle support refs 分层、修复 applicability 语义混淆、并把 broad support rule 从 visible trace 中降级为 debug/support。
-- Knowledge Reference Repair / 阶段 B：Curated Promotion Minimal Set 已完成，当前已把 transcript / Brooks 的最小 evidence-backed promotion 接入 curated 层，让 promoted evidence 能在 actual visible trace 中真实出现，同时保持 trigger 不变。
+- M8D.1：Artifact & Trace Unification 已完成，当前已把 `m8c1_long_horizon_daily_validation` 重算到 canonical trace contract，并统一 `actual hit / actual evidence / bundle support` 的 artifact 语义。
+- M8D.2：Curated Promotion Minimal Expansion 尚未开始。
+- M8D.3：Repository State Consistency 尚未开始。
 
 ## 2. 执行总原则
 
@@ -691,7 +692,7 @@
   - `NVDA / 15m / 2026-03-30 ~ 2026-04-16` 当前录得：总收益率 `0.8793%`、最大回撤 `0.0000%`、交易 `2` 笔、blocked signals `27`、`no_trade_wait` `310`；仍保持 `paper / simulated`。
   - 第二标的扩展继续保持 session / risk reset / duplicate protection / slippage / fee / `knowledge_trace` 契约不变，且未改 trigger。
 
-### M8D：真实历史数据稳健性 + 实时 shadow / paper 验证框架
+### M8 Shadow/Paper Baseline：真实历史数据稳健性 + 实时 shadow / paper 验证框架
 
 - 当前状态：进行中
 - 目标：
@@ -758,15 +759,16 @@
 - M8A 重点测主线文档、验收门禁、状态切换、测试骨架与 suite 入口是否同步，且无 broker/live 越界表述。
 - M8B 重点测知识库对齐、`source_refs` 真实性、`not_applicable` 约束、冲突显式化、explanation 回链与资料不足时的保守 `no-trade`。
 - M8C 重点测无 future leakage、同输入 deterministic、risk-before-fill、audit / review traceability 与 forbidden paths。
-- M8D 重点测真实历史数据与实时只读输入下仍保持 shadow / paper、保守稳定、可解释，且不进入真实 broker / live execution。
+- M8 shadow/paper baseline 重点测真实历史数据与实时只读输入下仍保持 shadow / paper、保守稳定、可解释，且不进入真实 broker / live execution。
 
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：Knowledge Reference Repair Track / 阶段 B：Curated Promotion Minimal Set（已完成并整合进 `main`）。
+- 当前 milestone：M8D.1 Artifact & Trace Unification（已完成）。
 - 当前下一步：
-  - 当前下一步不是扩 broker/live，也不是继续扩 trigger。
-  - 若继续当前验证主线，优先在 `paper / simulated` 边界内扩更长窗口或第三个高流动性标的，继续验证 promoted curated evidence 在更多样本上的表现。
+  - 当前下一步不是扩 broker/live，也不是继续扩第三个标的或更长窗口。
+  - `M8D.2` 尚未开始；只有在 `M8D.1` 已整合进 `main` 且收到单独指令后，才允许进入 minimal curated promotion。
+  - `M8D.3` 尚未开始；当前不做超出最小同步范围的仓库状态整齐化。
   - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API

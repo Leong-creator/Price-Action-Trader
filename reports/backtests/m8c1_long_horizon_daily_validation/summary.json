@@ -1,0 +1,1558 @@
+{
+  "run_id": "m8c1_long_horizon_daily_validation",
+  "generated_at": "2026-04-18T04:10:49.674559+00:00",
+  "title": "Public History Long-Horizon Daily Validation",
+  "description": "Long-horizon walk-forward daily validation on cached public research data. Still paper/simulated only.",
+  "boundary": "paper/simulated",
+  "data_source": [
+    "yfinance"
+  ],
+  "symbols": [
+    "NVDA",
+    "TSLA",
+    "SPY"
+  ],
+  "time_range": {
+    "start": "2020-01-01",
+    "end": "2025-12-31",
+    "interval": "1d"
+  },
+  "splits": [
+    {
+      "name": "in_sample",
+      "label": "In-sample",
+      "start": "2020-01-01",
+      "end": "2021-12-31"
+    },
+    {
+      "name": "validation",
+      "label": "Validation",
+      "start": "2022-01-01",
+      "end": "2023-12-31"
+    },
+    {
+      "name": "out_of_sample",
+      "label": "Out-of-sample",
+      "start": "2024-01-01",
+      "end": "2025-12-31"
+    }
+  ],
+  "regimes": [
+    {
+      "name": "covid_crash_high_vol",
+      "label": "2020 高波动下跌",
+      "start": "2020-02-01",
+      "end": "2020-05-31"
+    },
+    {
+      "name": "liquidity_trend_up",
+      "label": "2020H2-2021 上升趋势",
+      "start": "2020-06-01",
+      "end": "2021-12-31"
+    },
+    {
+      "name": "macro_drawdown",
+      "label": "2022 宏观回撤",
+      "start": "2022-01-01",
+      "end": "2022-12-31"
+    },
+    {
+      "name": "recovery_rotation",
+      "label": "2023 恢复与轮动",
+      "start": "2023-01-01",
+      "end": "2023-12-31"
+    },
+    {
+      "name": "ai_momentum_and_range",
+      "label": "2024-2025 AI 动量与区间切换",
+      "start": "2024-01-01",
+      "end": "2025-12-31"
+    }
+  ],
+  "cache_dir": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history",
+  "report_dir": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/reports/backtests/m8c1_long_horizon_daily_validation",
+  "risk_model": {
+    "starting_capital": "25000.0000",
+    "risk_per_trade": "100.0000",
+    "max_total_exposure": "25000.0000",
+    "max_symbol_exposure_ratio": "1.0000",
+    "max_daily_loss": "1000.0000",
+    "max_consecutive_losses": 4,
+    "session_model": "single historical demo session; no daily reset simulation"
+  },
+  "cash_note": "本次现金口径按 USD demo sizing 统计，因为本轮只选择了 US 标的。",
+  "core_results": {
+    "total_pnl": "-22.8695",
+    "ending_equity": "24977.1305",
+    "total_return_pct": "-0.0915",
+    "max_drawdown": "398.3296",
+    "max_drawdown_pct": "1.5697",
+    "trade_count": 12,
+    "blocked_signals": 396,
+    "no_trade_wait": 4486,
+    "win_rate_pct": "33.3333",
+    "profit_factor": "0.9712"
+  },
+  "per_symbol": [
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "market": "US",
+      "source": "yfinance",
+      "bars": 1507,
+      "signals": 138,
+      "baseline_trades": 135,
+      "executed_trades": 4,
+      "blocked_signals": 131,
+      "no_trade_wait": 1498,
+      "pnl_cash": "-99.8257",
+      "win_rate_pct": "25.0000",
+      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history/us_NVDA_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000"
+    },
+    {
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "market": "US",
+      "source": "yfinance",
+      "bars": 1507,
+      "signals": 130,
+      "baseline_trades": 127,
+      "executed_trades": 4,
+      "blocked_signals": 123,
+      "no_trade_wait": 1498,
+      "pnl_cash": "197.6562",
+      "win_rate_pct": "50.0000",
+      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history/us_TSLA_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000"
+    },
+    {
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "market": "US",
+      "source": "yfinance",
+      "bars": 1507,
+      "signals": 157,
+      "baseline_trades": 146,
+      "executed_trades": 4,
+      "blocked_signals": 142,
+      "no_trade_wait": 1490,
+      "pnl_cash": "-120.7000",
+      "win_rate_pct": "25.0000",
+      "cache_csv": "/home/hgl/projects/Price-Action-Trader-m8d1-artifact-trace-unification/local_data/public_history/us_SPY_1d_2020-01-01_2025-12-31_yfinance.csv",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000"
+    }
+  ],
+  "split_summary_overview": [
+    {
+      "name": "in_sample",
+      "label": "In-sample",
+      "bucket_type": "split",
+      "start": "2020-01-01",
+      "end": "2021-12-31",
+      "signal_count": 121,
+      "executed_trades": 12,
+      "blocked_signals": 109,
+      "no_trade_wait": 1489,
+      "pnl_cash": "-22.8695",
+      "win_rate_pct": "33.3333",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1113,
+        "duplicate_direction_suppressed": 49,
+        "insufficient_evidence": 218,
+        "risk_blocked_before_fill": 109
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 41,
+          "executed_trades": 4,
+          "blocked_signals": 37,
+          "no_trade_wait": 498,
+          "pnl_cash": "-99.8257"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 40,
+          "executed_trades": 4,
+          "blocked_signals": 36,
+          "no_trade_wait": 494,
+          "pnl_cash": "-120.7000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 40,
+          "executed_trades": 4,
+          "blocked_signals": 36,
+          "no_trade_wait": 497,
+          "pnl_cash": "197.6562"
+        }
+      ]
+    },
+    {
+      "name": "validation",
+      "label": "Validation",
+      "bucket_type": "split",
+      "start": "2022-01-01",
+      "end": "2023-12-31",
+      "signal_count": 154,
+      "executed_trades": 0,
+      "blocked_signals": 154,
+      "no_trade_wait": 1499,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1076,
+        "duplicate_direction_suppressed": 64,
+        "insufficient_evidence": 205,
+        "risk_blocked_before_fill": 154
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 55,
+          "executed_trades": 0,
+          "blocked_signals": 55,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 57,
+          "executed_trades": 0,
+          "blocked_signals": 57,
+          "no_trade_wait": 498,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 42,
+          "executed_trades": 0,
+          "blocked_signals": 42,
+          "no_trade_wait": 501,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "out_of_sample",
+      "label": "Out-of-sample",
+      "bucket_type": "split",
+      "start": "2024-01-01",
+      "end": "2025-12-31",
+      "signal_count": 133,
+      "executed_trades": 0,
+      "blocked_signals": 133,
+      "no_trade_wait": 1498,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1108,
+        "duplicate_direction_suppressed": 57,
+        "insufficient_evidence": 200,
+        "risk_blocked_before_fill": 133
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 39,
+          "executed_trades": 0,
+          "blocked_signals": 39,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 49,
+          "executed_trades": 0,
+          "blocked_signals": 49,
+          "no_trade_wait": 498,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 45,
+          "executed_trades": 0,
+          "blocked_signals": 45,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    }
+  ],
+  "regime_breakdown_overview": [
+    {
+      "name": "covid_crash_high_vol",
+      "label": "2020 高波动下跌",
+      "bucket_type": "regime",
+      "start": "2020-02-01",
+      "end": "2020-05-31",
+      "signal_count": 15,
+      "executed_trades": 8,
+      "blocked_signals": 7,
+      "no_trade_wait": 234,
+      "pnl_cash": "78.8475",
+      "win_rate_pct": "37.5000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 184,
+        "duplicate_direction_suppressed": 4,
+        "insufficient_evidence": 39,
+        "risk_blocked_before_fill": 7
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 5,
+          "executed_trades": 3,
+          "blocked_signals": 2,
+          "no_trade_wait": 79,
+          "pnl_cash": "0.0907"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 5,
+          "executed_trades": 2,
+          "blocked_signals": 3,
+          "no_trade_wait": 77,
+          "pnl_cash": "77.4200"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 5,
+          "executed_trades": 3,
+          "blocked_signals": 2,
+          "no_trade_wait": 78,
+          "pnl_cash": "1.3368"
+        }
+      ]
+    },
+    {
+      "name": "liquidity_trend_up",
+      "label": "2020H2-2021 上升趋势",
+      "bucket_type": "regime",
+      "start": "2020-06-01",
+      "end": "2021-12-31",
+      "signal_count": 101,
+      "executed_trades": 0,
+      "blocked_signals": 101,
+      "no_trade_wait": 1202,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 889,
+        "duplicate_direction_suppressed": 45,
+        "insufficient_evidence": 167,
+        "risk_blocked_before_fill": 101
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 34,
+          "executed_trades": 0,
+          "blocked_signals": 34,
+          "no_trade_wait": 401,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 33,
+          "executed_trades": 0,
+          "blocked_signals": 33,
+          "no_trade_wait": 400,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 34,
+          "executed_trades": 0,
+          "blocked_signals": 34,
+          "no_trade_wait": 401,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "macro_drawdown",
+      "label": "2022 宏观回撤",
+      "bucket_type": "regime",
+      "start": "2022-01-01",
+      "end": "2022-12-31",
+      "signal_count": 80,
+      "executed_trades": 0,
+      "blocked_signals": 80,
+      "no_trade_wait": 752,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 523,
+        "duplicate_direction_suppressed": 38,
+        "insufficient_evidence": 111,
+        "risk_blocked_before_fill": 80
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 28,
+          "executed_trades": 0,
+          "blocked_signals": 28,
+          "no_trade_wait": 250,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 28,
+          "executed_trades": 0,
+          "blocked_signals": 28,
+          "no_trade_wait": 251,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 24,
+          "executed_trades": 0,
+          "blocked_signals": 24,
+          "no_trade_wait": 251,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "recovery_rotation",
+      "label": "2023 恢复与轮动",
+      "bucket_type": "regime",
+      "start": "2023-01-01",
+      "end": "2023-12-31",
+      "signal_count": 74,
+      "executed_trades": 0,
+      "blocked_signals": 74,
+      "no_trade_wait": 747,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 553,
+        "duplicate_direction_suppressed": 26,
+        "insufficient_evidence": 94,
+        "risk_blocked_before_fill": 74
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 27,
+          "executed_trades": 0,
+          "blocked_signals": 27,
+          "no_trade_wait": 250,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 29,
+          "executed_trades": 0,
+          "blocked_signals": 29,
+          "no_trade_wait": 247,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 18,
+          "executed_trades": 0,
+          "blocked_signals": 18,
+          "no_trade_wait": 250,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "ai_momentum_and_range",
+      "label": "2024-2025 AI 动量与区间切换",
+      "bucket_type": "regime",
+      "start": "2024-01-01",
+      "end": "2025-12-31",
+      "signal_count": 133,
+      "executed_trades": 0,
+      "blocked_signals": 133,
+      "no_trade_wait": 1498,
+      "pnl_cash": "0.0000",
+      "win_rate_pct": "0.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 1108,
+        "duplicate_direction_suppressed": 57,
+        "insufficient_evidence": 200,
+        "risk_blocked_before_fill": 133
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 39,
+          "executed_trades": 0,
+          "blocked_signals": 39,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 49,
+          "executed_trades": 0,
+          "blocked_signals": 49,
+          "no_trade_wait": 498,
+          "pnl_cash": "0.0000"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 45,
+          "executed_trades": 0,
+          "blocked_signals": 45,
+          "no_trade_wait": 500,
+          "pnl_cash": "0.0000"
+        }
+      ]
+    },
+    {
+      "name": "unclassified",
+      "label": "未落入显式窗口",
+      "bucket_type": "regime",
+      "start": "2020-02-01",
+      "end": "2025-12-31",
+      "signal_count": 5,
+      "executed_trades": 4,
+      "blocked_signals": 1,
+      "no_trade_wait": 53,
+      "pnl_cash": "-101.7170",
+      "win_rate_pct": "25.0000",
+      "trace_curated_signal_pct": "100.0000",
+      "trace_statement_signal_pct": "100.0000",
+      "trace_supporting_signal_pct": "0.0000",
+      "reason_counts": {
+        "context_not_trend": 40,
+        "insufficient_evidence": 12,
+        "risk_blocked_before_fill": 1
+      },
+      "per_symbol": [
+        {
+          "symbol": "NVDA",
+          "label": "NVIDIA",
+          "signal_count": 2,
+          "executed_trades": 1,
+          "blocked_signals": 1,
+          "no_trade_wait": 18,
+          "pnl_cash": "-99.9164"
+        },
+        {
+          "symbol": "SPY",
+          "label": "SPDR S&P 500 ETF",
+          "signal_count": 2,
+          "executed_trades": 2,
+          "blocked_signals": 0,
+          "no_trade_wait": 17,
+          "pnl_cash": "-198.1200"
+        },
+        {
+          "symbol": "TSLA",
+          "label": "Tesla",
+          "signal_count": 1,
+          "executed_trades": 1,
+          "blocked_signals": 0,
+          "no_trade_wait": 18,
+          "pnl_cash": "196.3194"
+        }
+      ]
+    }
+  ],
+  "knowledge_trace_coverage": {
+    "total_signals": 425,
+    "signals_with_trace": 425,
+    "trace_nonempty_pct": "100.0000",
+    "curated_signals": 425,
+    "curated_signal_pct": "100.0000",
+    "statement_signals": 425,
+    "statement_signal_pct": "100.0000",
+    "supporting_signals": 0,
+    "supporting_signal_pct": "0.0000",
+    "trace_item_counts": {
+      "concept": 425,
+      "rule": 425,
+      "setup": 425,
+      "statement": 425
+    },
+    "source_family_signal_presence": {
+      "curated_concept": 425,
+      "curated_rule": 425,
+      "curated_setup": 425,
+      "fangfangtu_notes": 425
+    },
+    "source_family_item_counts": {
+      "curated_concept": 425,
+      "curated_rule": 425,
+      "curated_setup": 425,
+      "fangfangtu_notes": 425
+    },
+    "actual_hit_source_family_presence": {
+      "curated_concept": 425,
+      "curated_rule": 425,
+      "curated_setup": 425,
+      "fangfangtu_notes": 425
+    },
+    "actual_hit_source_family_item_counts": {
+      "curated_concept": 425,
+      "curated_rule": 425,
+      "curated_setup": 425,
+      "fangfangtu_notes": 425
+    },
+    "actual_evidence_source_family_presence": {
+      "al_brooks_ppt": 425,
+      "fangfangtu_notes": 425,
+      "fangfangtu_transcript": 425
+    },
+    "actual_evidence_source_family_item_counts": {
+      "al_brooks_ppt": 1275,
+      "fangfangtu_notes": 1700,
+      "fangfangtu_transcript": 850
+    },
+    "bundle_support_family_presence": {
+      "al_brooks_ppt": 425,
+      "curated_rule": 425,
+      "fangfangtu_notes": 425,
+      "fangfangtu_transcript": 425
+    },
+    "bundle_support_family_item_counts": {
+      "al_brooks_ppt": 850,
+      "curated_rule": 425,
+      "fangfangtu_notes": 1275,
+      "fangfangtu_transcript": 425
+    },
+    "curated_vs_statement": {
+      "curated_item_count": 1275,
+      "statement_item_count": 425,
+      "supporting_item_count": 0,
+      "curated_item_pct": "75.0000",
+      "statement_item_pct": "25.0000"
+    }
+  },
+  "no_trade_wait_summary": {
+    "total_records": 4486,
+    "actions": {
+      "no-trade": 396,
+      "wait": 4090
+    },
+    "reason_counts": {
+      "context_not_trend": 3297,
+      "duplicate_direction_suppressed": 170,
+      "insufficient_evidence": 623,
+      "risk_blocked_before_fill": 396
+    },
+    "symbol_counts": {
+      "NVDA": 1498,
+      "SPY": 1490,
+      "TSLA": 1498
+    },
+    "examples": [
+      {
+        "symbol": "NVDA",
+        "timestamp": "2020-01-06T16:00:00-05:00",
+        "action": "wait",
+        "reason_code": "context_not_trend",
+        "reason_detail": "recent bars do not show a stable trend or tight trading range"
+      },
+      {
+        "symbol": "SPY",
+        "timestamp": "2020-01-06T16:00:00-05:00",
+        "action": "wait",
+        "reason_code": "context_not_trend",
+        "reason_detail": "recent bars do not show a stable trend or tight trading range"
+      },
+      {
+        "symbol": "TSLA",
+        "timestamp": "2020-01-06T16:00:00-05:00",
+        "action": "wait",
+        "reason_code": "context_not_trend",
+        "reason_detail": "recent bars do not show a stable trend or tight trading range"
+      },
+      {
+        "symbol": "NVDA",
+        "timestamp": "2020-01-07T16:00:00-05:00",
+        "action": "wait",
+        "reason_code": "context_not_trend",
+        "reason_detail": "recent bars do not show a stable trend or tight trading range"
+      },
+      {
+        "symbol": "SPY",
+        "timestamp": "2020-01-07T16:00:00-05:00",
+        "action": "wait",
+        "reason_code": "context_not_trend",
+        "reason_detail": "recent bars do not show a stable trend or tight trading range"
+      }
+    ]
+  },
+  "best_trades": [
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "direction": "long",
+      "entry_timestamp": "2020-02-13T16:00:00-05:00",
+      "exit_timestamp": "2020-02-14T16:00:00-05:00",
+      "entry_price": "6.7552",
+      "exit_price": "6.8432",
+      "quantity": "2272.0000",
+      "pnl_cash": "199.9360",
+      "pnl_r": "2.0000",
+      "exit_reason": "target_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 28 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "direction": "short",
+      "entry_timestamp": "2020-02-26T16:00:00-05:00",
+      "exit_timestamp": "2020-02-28T16:00:00-05:00",
+      "entry_price": "52.1667",
+      "exit_price": "42.2867",
+      "quantity": "20.0000",
+      "pnl_cash": "197.6000",
+      "pnl_r": "2.0000",
+      "exit_reason": "target_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 36 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "direction": "long",
+      "entry_timestamp": "2020-01-09T16:00:00-05:00",
+      "exit_timestamp": "2020-01-22T16:00:00-05:00",
+      "entry_price": "33.1400",
+      "exit_price": "36.9894",
+      "quantity": "51.0000",
+      "pnl_cash": "196.3194",
+      "pnl_r": "2.0000",
+      "exit_reason": "target_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 4 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "direction": "short",
+      "entry_timestamp": "2020-02-24T16:00:00-05:00",
+      "exit_timestamp": "2020-02-27T16:00:00-05:00",
+      "entry_price": "323.1400",
+      "exit_price": "297.8000",
+      "quantity": "7.0000",
+      "pnl_cash": "177.3800",
+      "pnl_r": "2.0000",
+      "exit_reason": "target_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 34 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "direction": "long",
+      "entry_timestamp": "2020-02-04T16:00:00-05:00",
+      "exit_timestamp": "2020-02-27T16:00:00-05:00",
+      "entry_price": "58.8640",
+      "exit_price": "44.9013",
+      "quantity": "7.0000",
+      "pnl_cash": "-97.7389",
+      "pnl_r": "-1.0000",
+      "exit_reason": "stop_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 21 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    }
+  ],
+  "worst_trades": [
+    {
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "direction": "short",
+      "entry_timestamp": "2020-03-13T16:00:00-04:00",
+      "exit_timestamp": "2020-03-13T16:00:00-04:00",
+      "entry_price": "263.0900",
+      "exit_price": "266.6600",
+      "quantity": "28.0000",
+      "pnl_cash": "-99.9600",
+      "pnl_r": "-1.0000",
+      "exit_reason": "stop_before_target_same_bar",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 48 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "direction": "short",
+      "entry_timestamp": "2020-02-26T16:00:00-05:00",
+      "exit_timestamp": "2020-03-03T16:00:00-05:00",
+      "entry_price": "6.5515",
+      "exit_price": "6.9697",
+      "quantity": "239.0000",
+      "pnl_cash": "-99.9498",
+      "pnl_r": "-1.0000",
+      "exit_reason": "stop_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 36 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "direction": "long",
+      "entry_timestamp": "2020-01-14T16:00:00-05:00",
+      "exit_timestamp": "2020-01-14T16:00:00-05:00",
+      "entry_price": "6.2565",
+      "exit_price": "6.1687",
+      "quantity": "1138.0000",
+      "pnl_cash": "-99.9164",
+      "pnl_r": "-1.0000",
+      "exit_reason": "stop_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 7 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "direction": "short",
+      "entry_timestamp": "2020-03-13T16:00:00-04:00",
+      "exit_timestamp": "2020-03-13T16:00:00-04:00",
+      "entry_price": "5.7625",
+      "exit_price": "5.9030",
+      "quantity": "711.0000",
+      "pnl_cash": "-99.8955",
+      "pnl_r": "-1.0000",
+      "exit_reason": "stop_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar downward progression with falling highs/lows; bar 48 closed below the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    },
+    {
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "direction": "long",
+      "entry_timestamp": "2020-01-10T16:00:00-05:00",
+      "exit_timestamp": "2020-01-10T16:00:00-05:00",
+      "entry_price": "327.2900",
+      "exit_price": "325.5200",
+      "quantity": "56.0000",
+      "pnl_cash": "-99.1200",
+      "pnl_r": "-1.0000",
+      "exit_reason": "stop_hit",
+      "setup_type": "signal_bar_entry_placeholder",
+      "pa_context": "trend",
+      "explanation": "research-only placeholder setup triggered after three-bar upward progression with rising highs/lows; bar 5 closed above the prior close with a directional body in a trend context; actual knowledge refs: wiki:knowledge/wiki/concepts/market-cycle-overview.md, wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md, wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md, wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md; knowledge trace: concept atom--000c21b0fa567ea4 @ chunk_set[3] | setup atom--339abd6106df72a7 @ chunk_set[4]",
+      "source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+      ],
+      "bundle_support_refs": [
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "legacy_source_refs": [
+        "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+        "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+        "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+        "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt.md"
+      ],
+      "knowledge_trace_summary": [
+        {
+          "atom_type": "concept",
+          "atom_id": "atom--000c21b0fa567ea4",
+          "source_ref": "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+          "raw_locator": "chunk_set[3]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f1 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p1832b1#f1",
+          "field_mappings": "pa_context | higher_timeframe_context"
+        },
+        {
+          "atom_type": "setup",
+          "atom_id": "atom--339abd6106df72a7",
+          "source_ref": "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p1b1#f3 | fangfangtu_notes@p3b1#f2 | al_brooks_ppt@p438b1#f2 | al_brooks_ppt@p2557b1#f2",
+          "field_mappings": "signal_bar | entry_trigger"
+        },
+        {
+          "atom_type": "rule",
+          "atom_id": "atom--3c72dac9d9d1c67f",
+          "source_ref": "wiki:knowledge/wiki/rules/trend-vs-range-filter-minimal.md",
+          "raw_locator": "chunk_set[4]",
+          "evidence_refs": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md | wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md | wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+          "evidence_locator_summary": "fangfangtu_notes@p2b1#f2 | fangfangtu_transcript@p12b1#f2 | al_brooks_ppt@p457b1#f1 | al_brooks_ppt@p1400b1#f1",
+          "field_mappings": "pa_context | invalidation"
+        }
+      ],
+      "risk_notes": [
+        "research-only placeholder setup; not validated for live trading",
+        "knowledge page is draft/placeholder, so confidence is intentionally low"
+      ]
+    }
+  ],
+  "blocked_examples": [
+    {
+      "symbol": "NVDA",
+      "timestamp": "2020-01-16T16:00:00-05:00",
+      "reason_codes": [
+        "max_total_exposure_exceeded"
+      ],
+      "message": "Paper order blocked before simulated fill."
+    },
+    {
+      "symbol": "SPY",
+      "timestamp": "2020-03-27T16:00:00-04:00",
+      "reason_codes": [
+        "consecutive_losses_limit"
+      ],
+      "message": "Paper order blocked before simulated fill."
+    },
+    {
+      "symbol": "TSLA",
+      "timestamp": "2020-04-14T16:00:00-04:00",
+      "reason_codes": [
+        "consecutive_losses_limit"
+      ],
+      "message": "Paper order blocked before simulated fill."
+    },
+    {
+      "symbol": "NVDA",
+      "timestamp": "2020-04-22T16:00:00-04:00",
+      "reason_codes": [
+        "consecutive_losses_limit"
+      ],
+      "message": "Paper order blocked before simulated fill."
+    },
+    {
+      "symbol": "TSLA",
+      "timestamp": "2020-04-22T16:00:00-04:00",
+      "reason_codes": [
+        "consecutive_losses_limit"
+      ],
+      "message": "Paper order blocked before simulated fill."
+    }
+  ],
+  "limitations": [
+    "本报告仅用于公共历史数据研究演示，仍处于 paper / simulated 边界，不代表实盘能力或未来收益承诺。",
+    "当前演示未接入历史新闻时间线，因此 news filter 不参与本轮回测结果。",
+    "当前 no-trade / wait 只持久化系统能明确解释的 decision sites，不对所有静默 bar 补造结论。",
+    "当前仍是 daily public-history validation，不模拟 intraday session reset、真实滑点或真实手续费。"
+  ]
+}
