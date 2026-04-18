@@ -22,6 +22,8 @@
    - 已完成：`M8D.1` Artifact & Trace Unification
    - 已完成：`M8D.2` Curated Promotion Minimal Expansion
    - 已完成：`M8D.3` Repository State Consistency
+   - 已完成：`M8E.1` Validation Gap Closure
+   - 下一步：`M8E.2` Longer-Window Daily Validation
 
 ## 当前边界
 

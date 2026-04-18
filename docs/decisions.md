@@ -129,3 +129,8 @@
 
 - 日期：2026-04-18
 - 结论：`M8D.3` 只用于修复仓库级状态口径漂移，不得借机修改 trigger、knowledge promotion、`knowledge/raw`、broker/live/real-money 或新增验证窗口。自本决策起，仓库主显示口径统一为：`main` 是唯一长期稳定基线；当前主线阶段是 `M8：可靠性验证`；`M8 shadow/paper baseline` 视为已完成前置基线；`M8D.1 Artifact & Trace Unification`、`M8D.2 Curated Promotion Minimal Expansion` 与 `M8D.3 Repository State Consistency` 均已完成。`README.md`、`docs/status.md`、`plans/active-plan.md`、`docs/acceptance.md`、`docs/decisions.md`、`docs/roadmap.md` 与相关 reliability/shadow README 现已按该口径同步；`feature/m7-broker-api-assessment` 只保留为历史阶段/里程碑分支，不再作为当前分支或稳定基线表述。
+
+## D-0027 M8E.1 Validation Gap Closure 边界冻结
+
+- 日期：2026-04-18
+- 结论：`M8E.1` 只允许修复“更长窗口 daily validation 启动前必须先收口”的验证缺口，不得改 trigger，不得改 `knowledge_trace` contract，不得改 `knowledge/raw`，不得进入 broker/live/real-money，也不得顺手启动 `M8E.2`。自本决策起，checked-in artifact 的路径元数据必须统一为 repo-relative logical path；`m8c1_long_horizon_daily_validation/summary.json` 必须新增 `sample_adequacy`，并按 split 明确区分 `adequate` 与 `insufficient_sample`。`validation` / `out_of_sample` 这类零执行交易 split 可以继续保留诚实的 `no-trade / wait` 结果，但不得被包装成“已充分验证”。`scripts/run_reliability_suite.py` 的 `golden` suite 也必须至少有一条可执行 catalog smoke test，避免长期只剩空目录 skip。

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -149,7 +150,28 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
         self.assertIn("bundle support family 分布", report_text)
         self.assertIn("actual refs：", report_text)
         self.assertIn("bundle support：", report_text)
+        self.assertIn("### 样本充分性", report_text)
         self.assertNotRegex(report_text, r"(?<!actual )knowledge refs:")
+
+    def test_checked_in_daily_summary_uses_repo_relative_paths_and_sample_adequacy(self) -> None:
+        summary = _load_artifact_json("summary.json")
+        report_text = (ARTIFACT_ROOT / "report.md").read_text(encoding="utf-8")
+
+        self.assertFalse(os.path.isabs(summary["cache_dir"]))
+        self.assertFalse(os.path.isabs(summary["report_dir"]))
+        self.assertTrue(all(not os.path.isabs(item["cache_csv"]) for item in summary["per_symbol"]))
+        self.assertEqual(summary["sample_adequacy"]["overall_verdict"], "insufficient_sample")
+        self.assertEqual(
+            {item["split_name"]: item["verdict"] for item in summary["sample_adequacy"]["by_split"]},
+            {
+                "in_sample": "adequate",
+                "validation": "insufficient_sample",
+                "out_of_sample": "insufficient_sample",
+            },
+        )
+        self.assertIn("validation", report_text)
+        self.assertIn("out_of_sample", report_text)
+        self.assertIn("验证诚实但样本不足", report_text)
 
     def test_checked_in_daily_trade_and_trace_payloads_split_actual_and_bundle_support(self) -> None:
         summary = _load_artifact_json("summary.json")
@@ -194,6 +216,7 @@ class LongHorizonDailyValidationReliabilityTests(unittest.TestCase):
             "wiki:knowledge/wiki/rules/tight-channel-trend-resumption-minimal.md",
             executed["actual_source_refs"],
         )
+        self.assertNotIn(b"\r\n", (ARTIFACT_ROOT / "trades.csv").read_bytes())
 
     def test_checked_in_daily_actual_trace_contains_more_than_one_promoted_rule_theme(self) -> None:
         knowledge_trace = _load_artifact_json("knowledge_trace.json")

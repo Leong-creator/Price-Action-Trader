@@ -7,8 +7,8 @@
 - 标的：NVDA, TSLA, SPY
 - 时间范围：2020-01-01 ~ 2025-12-31 (1d)
 - 数据来源：yfinance
-- 本地缓存目录：`/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/local_data/public_history`
-- 报告目录：`/home/hgl/projects/Price-Action-Trader-m8d2-curated-promotion-minimal-expansion/reports/backtests/m8c1_long_horizon_daily_validation`
+- 本地缓存目录：`local_data/public_history`
+- 报告目录：`reports/backtests/m8c1_long_horizon_daily_validation`
 - 现金口径说明：本次现金口径按 USD demo sizing 统计，因为本轮只选择了 US 标的。
 - Walk-forward 切分：In-sample, Validation, Out-of-sample
 - Regime 分层：2020 高波动下跌, 2020H2-2021 上升趋势, 2022 宏观回撤, 2023 恢复与轮动, 2024-2025 AI 动量与区间切换
@@ -39,6 +39,13 @@
 | In-sample | 2020-01-01 ~ 2021-12-31 | 121 | 12 | 109 | 1489 | -22.8695 | 33.3333% | 100.0000% | 100.0000% |
 | Validation | 2022-01-01 ~ 2023-12-31 | 154 | 0 | 154 | 1499 | 0.0000 | 0.0000% | 100.0000% | 100.0000% |
 | Out-of-sample | 2024-01-01 ~ 2025-12-31 | 133 | 0 | 133 | 1498 | 0.0000 | 0.0000% | 100.0000% | 100.0000% |
+
+### 样本充分性
+
+- 总体结论：insufficient_sample（验证诚实但样本不足）
+- In-sample (in_sample)：executed_trades=12 / minimum_required=5 -> adequate
+- Validation (validation)：executed_trades=0 / minimum_required=5 -> insufficient_sample（验证诚实但样本不足）
+- Out-of-sample (out_of_sample)：executed_trades=0 / minimum_required=5 -> insufficient_sample（验证诚实但样本不足）
 
 ## 5. Regime 分层摘要
 
