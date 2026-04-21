@@ -1,0 +1,3 @@
+{"generated_at": "2026-04-21T14:06:43Z", "batch_id": "HB-001", "stage": "full_pass_chunk_adjudication", "reviewed_count": 5492, "resume_cursor": {"phase": "cross_chunk_synthesis"}}
+{"generated_at": "2026-04-21T14:06:43Z", "batch_id": "HB-002", "stage": "cross_chunk_synthesis", "reviewed_count": 5, "resume_cursor": {"phase": "overmerge_review"}}
+{"generated_at": "2026-04-21T14:06:43Z", "batch_id": "HB-003", "stage": "strategy_closure_catalog_freeze", "reviewed_count": 5, "resume_cursor": {"phase": "completed"}}

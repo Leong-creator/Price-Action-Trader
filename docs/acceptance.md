@@ -711,7 +711,7 @@
 - repo-safe 小样本 manifest 必须存在，并能证明 M8D 框架可运行但不等于真实历史验证已完成。
 - `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py` 与 `tests/reliability/test_dataset_manifest_contract.py` 必须通过。
 - `reports/reliability/README.md` 必须明确报告不是盈利证明，并保留 dataset/session/traceability 最小字段要求。
-- `scripts/download_public_history.py` 必须支持：优先使用 Alpha Vantage（仅当环境已提供 key），否则回退到 `yfinance`，并将结果缓存为本地 CSV，而不是每次回测都临时联网抓取。
+- public-history 入口的当前 `primary_provider` 必须由 repo config 中的 `source_order[0]` 解析，而不是在验收文档中写死某个 provider 名称。
 - 公共历史数据缓存目录必须落在本地不跟踪目录，并且缓存文件能继续通过 `src/data/` 的 schema 校验与重复加载。
 - `scripts/run_public_backtest_demo.py` 或等价一键入口必须能基于缓存数据生成：
   - `report.md`
@@ -720,3 +720,126 @@
   - `equity_curve.png`
 - 用户可读报告必须明确：测试标的、时间范围、数据来源、总收益/总盈亏、最大回撤、交易笔数、胜率、盈亏比、代表性交易解释与局限。
 - 该 public-history demo 仍只属于研究/演示能力，不得被写成真实 broker、真实账户、live execution 或实盘能力证明。
+
+## 阶段 9：Price Action Strategy Lab
+
+<!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
+
+完成条件：
+
+- 已从 `main` 切出独立分支 `feature/m9-price-action-strategy-lab`，且 `main` 未被直接开发。
+- 已生成 `reports/strategy_lab/m9_initial_project_snapshot.md`，至少记录：
+  - 初始分支
+  - 初始 commit
+  - `git status`
+  - 当前 M8 进度摘要
+  - `knowledge/raw/`、`knowledge/wiki/`、`reports/backtests/` 目录概览
+  - `paper / simulated`、`no-go`、不得接真实账户、不得自动实盘下单等边界
+- 已把 M9 正式写入 `plans/active-plan.md`、`docs/status.md`、`docs/decisions.md`。
+- 已保留 legacy `knowledge/wiki/strategy_cards/`，并包含：
+  - `index.md`
+  - `templates/strategy-card-template.md`
+  - `templates/strategy-test-plan-template.md`
+  - `brooks/`
+  - `fangfangtu/`
+  - `combined/`
+- 已新增新的 Strategy Factory 根目录：
+  - `knowledge/wiki/strategy_factory/index.md`
+  - `knowledge/wiki/strategy_factory/strategies/`
+  - `knowledge/wiki/strategy_factory/specs/`
+  - `knowledge/wiki/strategy_factory/test_plans/`
+- `scripts/validate_kb.py` 与 `scripts/build_kb_index.py` 已支持：
+  - `candidate / tested / promoted / rejected` 状态枚举
+  - strategy card 额外字段
+  - strategy factory 额外字段
+  - 跳过 `templates/` 目录
+- 已新增或更新最小自动化验证，覆盖：
+  - strategy card 正向校验
+  - templates 跳过
+  - strategy card 缺字段失败
+  - strategy factory page 正向校验
+  - build_kb_index 收录 strategy card 扩展字段
+- 已保留 legacy M9 baseline 产物：
+  - `m9_source_inventory.md`
+  - `m9_strategy_extraction_log.md`
+  - `m9_strategy_test_plan_index.md`
+  - `m9_strategy_lab_summary.md`
+  - `PA-SC-*` strategy cards 与 `PA-SC-002` 相关历史回测/诊断报告
+- legacy `PA-SC-*` 目录与报告已明确标注为 `legacy / historical baseline`：
+  - 不得作为新 catalog 的 seed、family prior、默认 merge target 或 triage baseline
+  - `PA-SC-002` 只允许作为 historical benchmark / regression reference
+- 已建立 Strategy Factory 运行台账：
+  - `reports/strategy_lab/strategy_factory/coverage_ledger.json`
+  - `reports/strategy_lab/strategy_factory/extraction_queue.json`
+  - `reports/strategy_lab/strategy_factory/catalog_ledger.json`
+  - `reports/strategy_lab/strategy_factory/backtest_queue.json`
+  - `reports/strategy_lab/strategy_factory/triage_ledger.json`
+  - `reports/strategy_lab/strategy_factory/run_state.json`
+  - `reports/strategy_lab/strategy_factory/final_summary.md`
+- 已建立 provider contract 配置：
+  - `config/strategy_factory/active_provider_config.json`
+- 已完成 `M9 Strategy Factory Full Extraction Completeness Audit v4`，并至少生成：
+  - `reports/strategy_lab/strategy_catalog.json`
+  - `reports/strategy_lab/strategy_dedup_map.json`
+  - `reports/strategy_lab/chunk_adjudication.jsonl`
+  - `reports/strategy_lab/source_family_completeness_report.json`
+  - `reports/strategy_lab/source_theme_coverage.json`
+  - `reports/strategy_lab/cross_chunk_synthesis.json`
+  - `reports/strategy_lab/cross_source_corroboration.json`
+  - `reports/strategy_lab/cross_source_corroboration_final.json`
+  - `reports/strategy_lab/overmerge_review.json`
+  - `reports/strategy_lab/saturation_report.json`
+  - `reports/strategy_lab/unresolved_strategy_extraction_gaps.json`
+  - `reports/strategy_lab/full_extraction_audit.json`
+  - `reports/strategy_lab/factory_summary.md`
+  - `reports/strategy_lab/cards/`
+  - `reports/strategy_lab/specs/`
+- `coverage_ledger.json` 已满足：
+  - `knowledge/indices/source_manifest.json` 是唯一 coverage SoT
+  - 全部 `10` 个 in-scope source 都已入账
+  - 每个 source 只能处于 `pending / mapped / partial / blocked / parked` 之一
+  - `fangfangtu-beginner-note` 已显式纳入
+  - `fangfangtu-wedge-note` 已显式标为 `partial`
+  - `al-brooks-price-action-ppt-37-52-units` 已显式保留为独立 source
+- `run_state.json` 已至少包含：
+  - `factory_run_id`
+  - `current_phase`
+  - `resume_cursor`
+  - `active_batch_id`
+  - `active_provider_config_path`
+  - `primary_provider`
+  - `heartbeat_status`
+  - `last_summary_at`
+- `python scripts/validate_strategy_factory_contract.py` 必须通过，并至少确认：
+  - repo config、`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract marker 一致
+  - `primary_provider` 只来自 `active_provider_config_path -> source_order[0]`
+  - `run_state.json` 与 contract config 一致
+- 若 repo config 与 `plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract 不一致，`Contract Freeze` 必须失败，且不得进入提炼或回测。
+- M9 必须继续保持：
+  - `paper / simulated`
+  - 不改 trigger
+  - 不改 `knowledge/raw`
+  - 不进入 broker/live/real-money
+- 全部 parseable chunks 必须完成 full-pass 审计，且：
+  - `unresolved = 0`
+  - `unmapped = 0`
+  - `transcript / PPT / notes` 三个 family 全量复审完成
+- `Cross-Chunk Synthesis Pass`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass` 必须全部落盘。
+- `cross_source_corroboration_final.json` 必须在 catalog freeze 之后重算，文档与 summary 只能引用 final 版本。
+- `saturation_report.json` 必须满足双轮连续零增量 closure 条件。
+- `full_extraction_audit.json` 必须同时写出：
+  - `text_extractable_closure = true`
+  - `full_source_closure` 明确结论
+  - `closure_scope_reason`
+- 若 `full_source_closure = false`，则 `unresolved_strategy_extraction_gaps.json` 必须存在且完整。
+- 本阶段仍不得启动任何 batch backtest；`ready_for_backtest` 只能作为结论字段存在，不得自动执行。
+- 至少通过：
+  - `python scripts/validate_kb.py`
+  - `python scripts/build_kb_index.py`
+  - `python scripts/validate_kb_coverage.py`
+  - `python scripts/validate_knowledge_atoms.py`
+  - `python scripts/validate_strategy_factory_contract.py`
+  - `python -m unittest discover -s tests/unit -v`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/integration -v`
+  - `python scripts/run_reliability_suite.py`

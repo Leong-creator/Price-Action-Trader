@@ -1,0 +1,43 @@
+{
+  "schema_version": "v1",
+  "ledger_kind": "strategy_factory_catalog",
+  "namespace": "SF",
+  "next_strategy_id": "SF-006",
+  "entries": [
+    {
+      "strategy_id": "SF-001",
+      "title": "Trend Pullback Second Entry",
+      "setup_family": "trend_pullback_second_entry",
+      "status": "candidate",
+      "test_priority": "high"
+    },
+    {
+      "strategy_id": "SF-002",
+      "title": "Breakout Follow-Through Continuation",
+      "setup_family": "breakout_follow_through_continuation",
+      "status": "candidate",
+      "test_priority": "high"
+    },
+    {
+      "strategy_id": "SF-003",
+      "title": "Failed Breakout Range-Edge Reversal",
+      "setup_family": "failed_breakout_range_reversal",
+      "status": "candidate",
+      "test_priority": "high"
+    },
+    {
+      "strategy_id": "SF-004",
+      "title": "Tight Channel Trend Continuation",
+      "setup_family": "tight_channel_trend_continuation",
+      "status": "candidate",
+      "test_priority": "medium"
+    },
+    {
+      "strategy_id": "SF-005",
+      "title": "Gap Continuation Versus Exhaustion",
+      "setup_family": "gap_continuation_exhaustion",
+      "status": "candidate",
+      "test_priority": "medium"
+    }
+  ]
+}

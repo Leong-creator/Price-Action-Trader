@@ -1,0 +1,216 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "synthesized_candidates": [
+    {
+      "synthesis_group_id": "SYN-001",
+      "synthesized_candidates": [
+        "RC-005"
+      ],
+      "synthesis_inputs": [
+        "chunk--c16d31d178c4a9",
+        "chunk--2c1a2673cc0bca",
+        "chunk--94bab8f08b623f",
+        "chunk--8ca3ecc90fe347",
+        "chunk--27d6f95e15c698",
+        "chunk--43efbd071e69d2",
+        "chunk--f2cc5c6a8d8a9d",
+        "chunk--cf1f5dc846994a",
+        "chunk--4f94027b608711",
+        "chunk--a78533c126c2b9",
+        "chunk--0253608349c1d4",
+        "chunk--7863aa4ae8e69a",
+        "chunk--cc9e255217c5f1",
+        "chunk--f9d4c645c3773c",
+        "chunk--2f11264dd09ab3",
+        "chunk--0995c1d912b7ed"
+      ],
+      "synthesis_basis": {
+        "theme_id": "tight_channel_trend_continuation",
+        "theme_title": "Tight Channel Trend Continuation"
+      },
+      "new_strategy_candidate_ids": [
+        "RC-005"
+      ],
+      "source_family": "al_brooks_ppt",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "window_type": "source_theme_cluster",
+      "minimum_viability_met": {
+        "context": true,
+        "entry": true,
+        "invalidation": true
+      },
+      "evidence_summary": "Tight Channel Trend Continuation recovered from 16 theme-linked chunks."
+    },
+    {
+      "synthesis_group_id": "SYN-002",
+      "synthesized_candidates": [
+        "RC-011"
+      ],
+      "synthesis_inputs": [
+        "chunk--d53eae3898d30a",
+        "chunk--44482f2c2fac33",
+        "chunk--77e3810bd81d3f",
+        "chunk--a090fdc5034dd6",
+        "chunk--acc309a4268148",
+        "chunk--68c76a075d9218",
+        "chunk--e317da1b302fac",
+        "chunk--15f3d4c5941ac4",
+        "chunk--fd97f4de356946",
+        "chunk--d8e3ade1641ee4",
+        "chunk--78f6cf03c65745",
+        "chunk--7eb725dd7cc0bf",
+        "chunk--a27c19ea1a6f31",
+        "chunk--5bb98c01854616",
+        "chunk--2ef6458adfcae7",
+        "chunk--cddf8cc8bb3c5c",
+        "chunk--17fc09a2db1764",
+        "chunk--f8a742cfca2f6c",
+        "chunk--f33593f5f37efc",
+        "chunk--95c373cce2d0a1",
+        "chunk--12b8d24974c5eb",
+        "chunk--94a1fe768c97ac",
+        "chunk--f7329dead2253a",
+        "chunk--076f01166ff115",
+        "chunk--04a8b36cf6f539",
+        "chunk--738b9e14a983ff",
+        "chunk--3a3d05a69ddeaf",
+        "chunk--07bdc88be4c160",
+        "chunk--1f0403af21f248",
+        "chunk--c21d09bd6e7ac5",
+        "chunk--eb5052e64846bb",
+        "chunk--48b0755658865f",
+        "chunk--6552252118e774",
+        "chunk--36114c1549ea90",
+        "chunk--381db4c471a69e",
+        "chunk--d53b0f8091e13b",
+        "chunk--fea20e4c7f9438",
+        "chunk--0822cbedfdfde7"
+      ],
+      "synthesis_basis": {
+        "theme_id": "signal_bar_contextual_entry",
+        "theme_title": "Signal Bar Contextual Entry"
+      },
+      "new_strategy_candidate_ids": [
+        "RC-011"
+      ],
+      "source_family": "al_brooks_ppt",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "window_type": "source_theme_cluster",
+      "minimum_viability_met": {
+        "context": true,
+        "entry": true,
+        "invalidation": true
+      },
+      "evidence_summary": "Signal Bar Contextual Entry recovered from 38 theme-linked chunks."
+    },
+    {
+      "synthesis_group_id": "SYN-003",
+      "synthesized_candidates": [
+        "RC-012"
+      ],
+      "synthesis_inputs": [
+        "chunk--fbaf50f58e677a",
+        "chunk--4fc82f284ff7e3",
+        "chunk--7a7c32514b7706",
+        "chunk--12d80bfbe6e763",
+        "chunk--3ead192a90660f",
+        "chunk--5d2f5739251d9e",
+        "chunk--e421c24400ae53",
+        "chunk--de87488bcb777c",
+        "chunk--91389c40ea5f1e",
+        "chunk--563f358cbccb22",
+        "chunk--b1fe1ca6998c1c",
+        "chunk--4c22b7fa7545e8",
+        "chunk--592d8a35511c76",
+        "chunk--69e8292fe40a09",
+        "chunk--3c92f839c2381d",
+        "chunk--883a25eb571804",
+        "chunk--f0ee3f1f26829d",
+        "chunk--d836b64e8467b5",
+        "chunk--e60fcbcc84d4db",
+        "chunk--d5f38b6b8c5b20",
+        "chunk--f3d5a17c643cf2",
+        "chunk--15063c2c5b0a2a"
+      ],
+      "synthesis_basis": {
+        "theme_id": "tight_channel_trend_continuation",
+        "theme_title": "Tight Channel Trend Continuation"
+      },
+      "new_strategy_candidate_ids": [
+        "RC-012"
+      ],
+      "source_family": "al_brooks_ppt",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "window_type": "source_theme_cluster",
+      "minimum_viability_met": {
+        "context": true,
+        "entry": true,
+        "invalidation": true
+      },
+      "evidence_summary": "Tight Channel Trend Continuation recovered from 22 theme-linked chunks."
+    },
+    {
+      "synthesis_group_id": "SYN-004",
+      "synthesized_candidates": [
+        "RC-020"
+      ],
+      "synthesis_inputs": [
+        "chunk--b4f5a7e8e56504",
+        "chunk--bb13f38e78cdcc",
+        "chunk--0f11feee689921",
+        "chunk--176e2974529fdc"
+      ],
+      "synthesis_basis": {
+        "theme_id": "wedge_exhaustion_reversal",
+        "theme_title": "Wedge Exhaustion Reversal"
+      },
+      "new_strategy_candidate_ids": [
+        "RC-020"
+      ],
+      "source_family": "fangfangtu_notes",
+      "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+      "window_type": "source_theme_cluster",
+      "minimum_viability_met": {
+        "context": true,
+        "entry": true,
+        "invalidation": true
+      },
+      "evidence_summary": "Wedge Exhaustion Reversal recovered from 4 theme-linked chunks."
+    },
+    {
+      "synthesis_group_id": "SYN-005",
+      "synthesized_candidates": [
+        "RC-022"
+      ],
+      "synthesis_inputs": [
+        "chunk--57298ec47cb825",
+        "chunk--02f70c9911e582",
+        "chunk--f26ac603616cf2",
+        "chunk--1f746cc869dace",
+        "chunk--36c583324d7e76",
+        "chunk--066276f84ec541",
+        "chunk--887ceb30b56749",
+        "chunk--10160a1481bdac",
+        "chunk--13191a964b12a6",
+        "chunk--f0779916481ade"
+      ],
+      "synthesis_basis": {
+        "theme_id": "failed_breakout_range_reversal",
+        "theme_title": "Failed Breakout Range-Edge Reversal"
+      },
+      "new_strategy_candidate_ids": [
+        "RC-022"
+      ],
+      "source_family": "fangfangtu_transcript",
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "window_type": "source_theme_cluster",
+      "minimum_viability_met": {
+        "context": true,
+        "entry": true,
+        "invalidation": true
+      },
+      "evidence_summary": "Failed Breakout Range-Edge Reversal recovered from 10 theme-linked chunks."
+    }
+  ]
+}

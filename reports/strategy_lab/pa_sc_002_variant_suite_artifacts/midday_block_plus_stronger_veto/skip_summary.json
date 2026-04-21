@@ -1,0 +1,8 @@
+{
+  "blocked_time_bucket": 210,
+  "range_veto": 76,
+  "weak_breakout_bar": 53,
+  "returned_to_range": 28,
+  "no_follow_through": 18,
+  "stop_too_wide": 8
+}

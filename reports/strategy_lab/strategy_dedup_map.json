@@ -1,0 +1,289 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "namespace": "SF",
+  "confirmed_merges": [
+    {
+      "theme_id": "trend_pullback_second_entry",
+      "candidate_id": "RC-006",
+      "target_strategy_id": "SF-001",
+      "target_candidate_id": "RC-024"
+    },
+    {
+      "theme_id": "trend_pullback_second_entry",
+      "candidate_id": "RC-013",
+      "target_strategy_id": "SF-001",
+      "target_candidate_id": "RC-024"
+    },
+    {
+      "theme_id": "trend_pullback_second_entry",
+      "candidate_id": "RC-018",
+      "target_strategy_id": "SF-001",
+      "target_candidate_id": "RC-024"
+    },
+    {
+      "theme_id": "breakout_follow_through_continuation",
+      "candidate_id": "RC-001",
+      "target_strategy_id": "SF-002",
+      "target_candidate_id": "RC-021"
+    },
+    {
+      "theme_id": "breakout_follow_through_continuation",
+      "candidate_id": "RC-008",
+      "target_strategy_id": "SF-002",
+      "target_candidate_id": "RC-021"
+    },
+    {
+      "theme_id": "breakout_follow_through_continuation",
+      "candidate_id": "RC-015",
+      "target_strategy_id": "SF-002",
+      "target_candidate_id": "RC-021"
+    },
+    {
+      "theme_id": "failed_breakout_range_reversal",
+      "candidate_id": "RC-002",
+      "target_strategy_id": "SF-003",
+      "target_candidate_id": "RC-022"
+    },
+    {
+      "theme_id": "failed_breakout_range_reversal",
+      "candidate_id": "RC-009",
+      "target_strategy_id": "SF-003",
+      "target_candidate_id": "RC-022"
+    },
+    {
+      "theme_id": "failed_breakout_range_reversal",
+      "candidate_id": "RC-016",
+      "target_strategy_id": "SF-003",
+      "target_candidate_id": "RC-022"
+    },
+    {
+      "theme_id": "tight_channel_trend_continuation",
+      "candidate_id": "RC-005",
+      "target_strategy_id": "SF-004",
+      "target_candidate_id": "RC-012"
+    },
+    {
+      "theme_id": "tight_channel_trend_continuation",
+      "candidate_id": "RC-017",
+      "target_strategy_id": "SF-004",
+      "target_candidate_id": "RC-012"
+    },
+    {
+      "theme_id": "tight_channel_trend_continuation",
+      "candidate_id": "RC-023",
+      "target_strategy_id": "SF-004",
+      "target_candidate_id": "RC-012"
+    },
+    {
+      "theme_id": "gap_continuation_exhaustion",
+      "candidate_id": "RC-010",
+      "target_strategy_id": "SF-005",
+      "target_candidate_id": "RC-003"
+    }
+  ],
+  "review_only_relations": [
+    {
+      "relation_id": "breakout_follow_through__failed_breakout_range_reversal",
+      "left_theme": "breakout_follow_through_continuation",
+      "right_theme": "failed_breakout_range_reversal",
+      "reason": "共享 breakout / TR 语汇，但一个追随 continuation，一个交易 failed follow-through reversal。"
+    },
+    {
+      "relation_id": "trend_pullback__tight_channel_continuation",
+      "left_theme": "trend_pullback_second_entry",
+      "right_theme": "tight_channel_trend_continuation",
+      "reason": "都属于顺势逻辑，但一个等待回调 second-entry，另一个是 Always In / tight-channel continuation。"
+    },
+    {
+      "relation_id": "gap_continuation__breakout_follow_through",
+      "left_theme": "gap_continuation_exhaustion",
+      "right_theme": "breakout_follow_through_continuation",
+      "reason": "gap 可能成为 breakout continuation 的证据，但 gap type 与 gap fill failure 构成独立管理语义。"
+    },
+    {
+      "relation_id": "wedge_exhaustion__failed_breakout_reversal",
+      "left_theme": "wedge_exhaustion_reversal",
+      "right_theme": "failed_breakout_range_reversal",
+      "reason": "两者都有 exhaustion/reversal 语义，但 wedge 仍高度依赖 visual shape，不能默认并入。"
+    }
+  ],
+  "restored_candidates": [],
+  "overmerge_findings": [],
+  "candidate_outcomes": {
+    "RC-006": {
+      "candidate_id": "RC-006",
+      "theme_id": "trend_pullback_second_entry",
+      "outcome": "merged",
+      "strategy_id": "SF-001",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-013": {
+      "candidate_id": "RC-013",
+      "theme_id": "trend_pullback_second_entry",
+      "outcome": "merged",
+      "strategy_id": "SF-001",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-018": {
+      "candidate_id": "RC-018",
+      "theme_id": "trend_pullback_second_entry",
+      "outcome": "merged",
+      "strategy_id": "SF-001",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-024": {
+      "candidate_id": "RC-024",
+      "theme_id": "trend_pullback_second_entry",
+      "outcome": "kept",
+      "strategy_id": "SF-001",
+      "reason": "candidate retained as canonical evidence for the family"
+    },
+    "RC-001": {
+      "candidate_id": "RC-001",
+      "theme_id": "breakout_follow_through_continuation",
+      "outcome": "merged",
+      "strategy_id": "SF-002",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-008": {
+      "candidate_id": "RC-008",
+      "theme_id": "breakout_follow_through_continuation",
+      "outcome": "merged",
+      "strategy_id": "SF-002",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-015": {
+      "candidate_id": "RC-015",
+      "theme_id": "breakout_follow_through_continuation",
+      "outcome": "merged",
+      "strategy_id": "SF-002",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-021": {
+      "candidate_id": "RC-021",
+      "theme_id": "breakout_follow_through_continuation",
+      "outcome": "kept",
+      "strategy_id": "SF-002",
+      "reason": "candidate retained as canonical evidence for the family"
+    },
+    "RC-002": {
+      "candidate_id": "RC-002",
+      "theme_id": "failed_breakout_range_reversal",
+      "outcome": "merged",
+      "strategy_id": "SF-003",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-009": {
+      "candidate_id": "RC-009",
+      "theme_id": "failed_breakout_range_reversal",
+      "outcome": "merged",
+      "strategy_id": "SF-003",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-016": {
+      "candidate_id": "RC-016",
+      "theme_id": "failed_breakout_range_reversal",
+      "outcome": "merged",
+      "strategy_id": "SF-003",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-022": {
+      "candidate_id": "RC-022",
+      "theme_id": "failed_breakout_range_reversal",
+      "outcome": "kept",
+      "strategy_id": "SF-003",
+      "reason": "candidate retained as canonical evidence for the family"
+    },
+    "RC-005": {
+      "candidate_id": "RC-005",
+      "theme_id": "tight_channel_trend_continuation",
+      "outcome": "merged",
+      "strategy_id": "SF-004",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-012": {
+      "candidate_id": "RC-012",
+      "theme_id": "tight_channel_trend_continuation",
+      "outcome": "kept",
+      "strategy_id": "SF-004",
+      "reason": "candidate retained as canonical evidence for the family"
+    },
+    "RC-017": {
+      "candidate_id": "RC-017",
+      "theme_id": "tight_channel_trend_continuation",
+      "outcome": "merged",
+      "strategy_id": "SF-004",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-023": {
+      "candidate_id": "RC-023",
+      "theme_id": "tight_channel_trend_continuation",
+      "outcome": "merged",
+      "strategy_id": "SF-004",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-003": {
+      "candidate_id": "RC-003",
+      "theme_id": "gap_continuation_exhaustion",
+      "outcome": "kept",
+      "strategy_id": "SF-005",
+      "reason": "candidate retained as canonical evidence for the family"
+    },
+    "RC-010": {
+      "candidate_id": "RC-010",
+      "theme_id": "gap_continuation_exhaustion",
+      "outcome": "merged",
+      "strategy_id": "SF-005",
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics"
+    },
+    "RC-004": {
+      "candidate_id": "RC-004",
+      "theme_id": "signal_bar_contextual_entry",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    },
+    "RC-011": {
+      "candidate_id": "RC-011",
+      "theme_id": "signal_bar_contextual_entry",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    },
+    "RC-019": {
+      "candidate_id": "RC-019",
+      "theme_id": "signal_bar_contextual_entry",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    },
+    "RC-007": {
+      "candidate_id": "RC-007",
+      "theme_id": "wedge_exhaustion_reversal",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    },
+    "RC-014": {
+      "candidate_id": "RC-014",
+      "theme_id": "wedge_exhaustion_reversal",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    },
+    "RC-020": {
+      "candidate_id": "RC-020",
+      "theme_id": "wedge_exhaustion_reversal",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    },
+    "RC-025": {
+      "candidate_id": "RC-025",
+      "theme_id": "wedge_exhaustion_reversal",
+      "outcome": "downgraded",
+      "strategy_id": null,
+      "reason": "theme remains outside frozen executable catalog"
+    }
+  }
+}

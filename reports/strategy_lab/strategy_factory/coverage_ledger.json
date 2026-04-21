@@ -1,0 +1,127 @@
+{
+  "schema_version": "v1",
+  "coverage_source_of_truth": "knowledge/indices/source_manifest.json",
+  "factory_namespace": "SF",
+  "legacy_catalog_root": "knowledge/wiki/strategy_cards",
+  "source_summary": {
+    "source_family_count": 3,
+    "source_count": 10,
+    "coverage_status_counts": {
+      "mapped": 4,
+      "parked": 5,
+      "partial": 1
+    }
+  },
+  "sources": [
+    {
+      "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "mapped",
+      "page_count": 3,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--signal-bar-entry-note--f4f198c1",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "parked",
+      "page_count": 3,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--pullback-counting-bars-note--0259c21f",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "mapped",
+      "page_count": 3,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--beginner-note--4c081115",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "mapped",
+      "page_count": 3,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+      "parse_status": "partial",
+      "coverage_status": "partial",
+      "page_count": 6,
+      "notes": [
+        "1 page(s) produced no stable text"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--gap-note--25e2faa1",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记 - 缺口.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "parked",
+      "page_count": 3,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_notes--breakout-note--247e0183",
+      "source_family": "fangfangtu_notes",
+      "raw_path": "knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "mapped",
+      "page_count": 4,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "raw_path": "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "parked",
+      "page_count": 15,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "raw_path": "knowledge/raw/brooks/ppt/AIbrooks价格行为通用版1-36单元.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "parked",
+      "page_count": 2819,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "raw_path": "knowledge/raw/brooks/ppt/AIbrooks价格行为通用版37-52单元.pdf",
+      "parse_status": "parsed",
+      "coverage_status": "parked",
+      "page_count": 1397,
+      "notes": [
+        "stable text extracted from all pages"
+      ]
+    }
+  ]
+}

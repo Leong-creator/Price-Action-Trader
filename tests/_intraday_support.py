@@ -23,9 +23,11 @@ def build_session_rows(
     rows: list[dict[str, str]] = []
     current = datetime.combine(session_date, time(9, 30), tzinfo=zone)
     price = Decimal(str(start_price))
-    for index in range(26):
+    step_minutes = _interval_to_minutes(timeframe)
+    total_bars = _regular_session_bar_count(step_minutes)
+    for index in range(total_bars):
         if drop_bar_at and current.strftime("%H:%M") == drop_bar_at:
-            current += timedelta(minutes=15)
+            current += timedelta(minutes=step_minutes)
             continue
         open_price = price
         close_price = price + Decimal("0.25") if index % 4 != 3 else price - Decimal("0.10")
@@ -46,7 +48,7 @@ def build_session_rows(
             }
         )
         price = close_price
-        current += timedelta(minutes=15)
+        current += timedelta(minutes=step_minutes)
 
     if include_out_of_hours:
         rows.append(
@@ -98,3 +100,23 @@ def write_metadata(path: Path, *, source: str, row_count: int) -> None:
         "boundary": "paper/simulated",
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _interval_to_minutes(timeframe: str) -> int:
+    mapping = {
+        "1m": 1,
+        "5m": 5,
+        "15m": 15,
+        "30m": 30,
+        "1h": 60,
+    }
+    try:
+        return mapping[timeframe]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported test timeframe: {timeframe}") from exc
+
+
+def _regular_session_bar_count(step_minutes: int) -> int:
+    total_minutes = 390
+    count, remainder = divmod(total_minutes, step_minutes)
+    return count + (1 if remainder else 0)

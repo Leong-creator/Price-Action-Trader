@@ -1,0 +1,39 @@
+{
+  "title": "Intraday Pilot SPY 5m (Longbridge)",
+  "description": "Single-symbol intraday pilot on SPY 5m regular sessions sourced from a user-authorized Longbridge simulated account. Still paper/simulated only.",
+  "start": "2026-01-02",
+  "end": "2026-04-17",
+  "interval": "5m",
+  "cache_dir": "local_data/longbridge_intraday",
+  "report_dir": "reports/backtests",
+  "source_order": [
+    "longbridge"
+  ],
+  "instrument": {
+    "ticker": "SPY",
+    "symbol": "SPY",
+    "label": "SPDR S&P 500 ETF",
+    "market": "US",
+    "timezone": "America/New_York",
+    "demo_role": "单标的日内试点"
+  },
+  "risk": {
+    "starting_capital": "25000",
+    "risk_per_trade": "100",
+    "max_total_exposure": "25000",
+    "max_symbol_exposure_ratio": "1.00",
+    "max_daily_loss": "1000",
+    "max_consecutive_losses": 4
+  },
+  "session": {
+    "timezone": "America/New_York",
+    "regular_open": "09:30",
+    "regular_close": "16:00",
+    "expected_bars_per_session": 78,
+    "allow_extended_hours": false
+  },
+  "costs": {
+    "slippage_bps": "2",
+    "fee_per_order": "0"
+  }
+}

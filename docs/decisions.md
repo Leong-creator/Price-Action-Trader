@@ -63,7 +63,7 @@
 ## D-0013 用户可读历史回测演示边界冻结
 
 - 日期：2026-04-17
-- 结论：为提供用户可直接理解的真实历史数据回测演示，优先使用公共、低成本、无需 broker 权限的数据源，并将下载结果缓存为本地 CSV。若环境无 Alpha Vantage key，则允许回退到 `yfinance` 作为 research-only fallback。该演示链路只服务于历史研究与 `paper / simulated` 报告输出，不代表 broker/live/real-money 能力。
+- 结论：为提供用户可直接理解的真实历史数据回测演示，优先使用公共、低成本、无需 broker 权限的数据源，并将下载结果缓存为本地 CSV。若环境无 Alpha Vantage key，则允许回退到 `yfinance` 作为 research-only fallback。该演示链路只服务于历史研究与 `paper / simulated` 报告输出，不代表 broker/live/real-money 能力。该默认入口口径已在 `D-0031` 被 Longbridge 默认链路覆盖，当前仅保留为历史阶段记录。
 
 ## D-0014 M8B.1 知识来源 traceability 门禁冻结
 
@@ -144,3 +144,22 @@
 
 - 日期：2026-04-18
 - 结论：`M8E.3` 当前继续延后。在每个候选标的至少具备 `30` 个完整 regular session 之前，不得启动 intraday 更长窗口扩展；当前 `SPY / NVDA 15m` 仍只有 `13` 个 session/标的，样本不足以支持下一轮 intraday 窗口放大。后续即便满足 session 数量门槛，也仍必须继续保持 session completeness、timezone、risk reset、`no-trade / wait`、knowledge trace 与 trigger 不变边界。
+
+## D-0030 M9 Price Action Strategy Lab 支线冻结
+
+- 日期：2026-04-20
+- 结论：允许在 `feature/m9-price-action-strategy-lab` 上启动 `M9：Price Action Strategy Lab`，但该支线只负责知识提炼、策略卡、测试计划与回测准备，不得改 trigger，不得触碰 `src/risk/`、`src/execution/`、`src/broker/`，不得重开 broker/live/real-money。M9 的来源优先级固定为 `fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。任何只有 notes 支持、缺少 transcript/Brooks 补证的策略，只能保留为 `draft`，不得写成 `promoted` 或已验证可执行规则。`statement`、`source_note`、`bundle support` 仍只允许停留在 trace / explanation / review / report 层，不得进入 trigger、confidence 或排序代理。
+
+## D-0031 默认历史数据源切换到 Longbridge
+
+- 日期：2026-04-21
+- 结论：本决策记录的是 provider-specific 的历史阶段调整：当时项目把默认历史回测入口切到 `Longbridge simulated account -> local CSV cache`，并保留 `Alpha Vantage / yfinance` 作为显式指定时的兼容或历史对照路径。自 `D-0032` 起，Strategy Factory 不再把该 provider 名称当作长期固定口径，而改用 repo config 中的 `primary_provider` contract。
+
+## D-0032 M9G Strategy Factory Contract Freeze
+
+- 日期：2026-04-21
+- 结论：自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告全部降级为 legacy / historical baseline。它们只允许用于 `legacy_overlap_refs`、`historical_comparison_refs`、`historical_benchmark_refs`，不得作为新 catalog 的 seed、family prior、默认 merge target 或 triage baseline。`PA-SC-002` 只允许作为 historical benchmark / regression reference，不能再作为新 catalog 的结构锚点。
+- 结论：新一轮 Strategy Factory 只能从 `knowledge/indices/source_manifest.json` 覆盖的全部来源重新开始，不以旧 10 张卡的编号、命名、聚类或结论作为先验。新 catalog 的编号空间固定为 `SF-*`。
+- 结论：Strategy Factory 的 `primary_provider` 只允许由 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]` 推导。当前固定配置文件为 `config/strategy_factory/active_provider_config.json`。`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 与 `docs/data-sources.md` 只允许描述该 contract，不把具体 provider 名称写成长期固定口径。
+- 结论：`python scripts/validate_strategy_factory_contract.py` 成为 `M9G.0` 的强制门禁。若 repo config、contract docs 与 `run_state.json` 不一致，Contract Freeze 必须失败，且不得进入新一轮提炼或回测。
+- 结论：heartbeat / 自动推进后续可以继续设计，但恢复状态只允许依赖 `coverage_ledger.json`、`extraction_queue.json`、`catalog_ledger.json`、`backtest_queue.json`、`triage_ledger.json` 与 `run_state.json.resume_cursor`，不得依赖隐含聊天上下文。

@@ -1,0 +1,12 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "phase": "M9G.audit_v4_completed",
+  "text_extractable_closure": true,
+  "full_source_closure": false,
+  "ready_for_backtest": true,
+  "resume_cursor": {
+    "phase": "completed",
+    "chunk_offset": 5492
+  }
+}

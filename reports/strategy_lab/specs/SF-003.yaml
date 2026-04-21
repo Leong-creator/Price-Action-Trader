@@ -1,0 +1,41 @@
+strategy_id: "SF-003"
+title: "Failed Breakout Range-Edge Reversal"
+setup_family: "failed_breakout_range_reversal"
+market_context:
+  - "trading_range"
+  - "failed_breakout"
+  - "reversal"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。"
+stop_idea: "放在 failed breakout extreme 之外，若重新获得连续 follow-through 则失效。"
+target_idea: "先看回到 TR 中轴或 opposite edge，再视 broad channel 结构决定是否延伸。"
+invalidation:
+  - "breakout 重新得到连续 follow-through"
+  - "区间结构被 surprise bar 直接改写"
+no_trade_conditions:
+  - "仍在 Always In 强趋势的第一次反转里抢顶/抢底"
+  - "没有足够 range context 就把单根 reversal bar 当失败突破"
+parameter_candidates:
+  - "range edge proximity"
+  - "second leg trap confirmation"
+  - "follow-through failure within 2 bars"
+expected_failure_modes:
+  - "把 broad channel continuation 误当 range reversal"
+  - "在强 breakout 中过早逆势"
+data_requirements:
+  - "OHLCV with session labels"
+  - "range edge and failed follow-through detection"
+chart_dependency: "medium"
+test_priority: "high"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"

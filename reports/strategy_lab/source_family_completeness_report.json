@@ -1,0 +1,212 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "families": {
+    "al_brooks_ppt": {
+      "chunk_total": 5437,
+      "category_counts_before": {
+        "non_strategy": 3250,
+        "supporting_evidence": 1677,
+        "strategy_candidate": 217,
+        "parked_visual_review": 165,
+        "open_question": 128
+      },
+      "category_counts_after": {
+        "non_strategy": 3203,
+        "supporting_evidence": 1664,
+        "duplicate_or_merged": 162,
+        "parked_visual_review": 276,
+        "open_question": 127,
+        "strategy_candidate": 5
+      },
+      "promotions": 14,
+      "false_negative_findings": 1,
+      "still_parked": 276,
+      "still_blocked": 0,
+      "audit_completed": true
+    },
+    "fangfangtu_notes": {
+      "chunk_total": 26,
+      "category_counts_before": {
+        "open_question": 6,
+        "non_strategy": 5,
+        "strategy_candidate": 7,
+        "parked_visual_review": 1,
+        "supporting_evidence": 3,
+        "blocked_or_partial_evidence": 4
+      },
+      "category_counts_after": {
+        "open_question": 6,
+        "non_strategy": 5,
+        "duplicate_or_merged": 6,
+        "parked_visual_review": 6,
+        "supporting_evidence": 3
+      },
+      "promotions": 6,
+      "false_negative_findings": 0,
+      "still_parked": 6,
+      "still_blocked": 0,
+      "audit_completed": true
+    },
+    "fangfangtu_transcript": {
+      "chunk_total": 29,
+      "category_counts_before": {
+        "supporting_evidence": 8,
+        "non_strategy": 11,
+        "strategy_candidate": 6,
+        "parked_visual_review": 2,
+        "open_question": 2
+      },
+      "category_counts_after": {
+        "duplicate_or_merged": 15,
+        "non_strategy": 7,
+        "supporting_evidence": 3,
+        "parked_visual_review": 3,
+        "open_question": 1
+      },
+      "promotions": 5,
+      "false_negative_findings": 0,
+      "still_parked": 3,
+      "still_blocked": 0,
+      "audit_completed": true
+    }
+  },
+  "sources": [
+    {
+      "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "duplicate_or_merged": 2,
+        "supporting_evidence": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=1, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--signal-bar-entry-note--f4f198c1",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "supporting_evidence": 2,
+        "parked_visual_review": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=2, parked=1, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--pullback-counting-bars-note--0259c21f",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "duplicate_or_merged": 2,
+        "non_strategy": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--beginner-note--4c081115",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "open_question": 2,
+        "non_strategy": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+      "source_family": "fangfangtu_notes",
+      "page_total": 6,
+      "chunk_total": 6,
+      "final_category_counts": {
+        "parked_visual_review": 4,
+        "open_question": 1,
+        "non_strategy": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=4, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--gap-note--25e2faa1",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "parked_visual_review": 1,
+        "open_question": 2
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=1, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--breakout-note--247e0183",
+      "source_family": "fangfangtu_notes",
+      "page_total": 4,
+      "chunk_total": 5,
+      "final_category_counts": {
+        "duplicate_or_merged": 2,
+        "non_strategy": 2,
+        "open_question": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "page_total": 15,
+      "chunk_total": 29,
+      "final_category_counts": {
+        "duplicate_or_merged": 15,
+        "non_strategy": 7,
+        "supporting_evidence": 3,
+        "parked_visual_review": 3,
+        "open_question": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=3, parked=3, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "page_total": 2819,
+      "chunk_total": 3217,
+      "final_category_counts": {
+        "non_strategy": 1812,
+        "supporting_evidence": 1092,
+        "duplicate_or_merged": 76,
+        "parked_visual_review": 146,
+        "open_question": 86,
+        "strategy_candidate": 5
+      },
+      "adjudication_summary": "candidates=5, supporting=1092, parked=146, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "page_total": 1397,
+      "chunk_total": 2220,
+      "final_category_counts": {
+        "non_strategy": 1391,
+        "supporting_evidence": 572,
+        "parked_visual_review": 130,
+        "duplicate_or_merged": 86,
+        "open_question": 41
+      },
+      "adjudication_summary": "candidates=0, supporting=572, parked=130, blocked=0",
+      "audit_completed": true
+    }
+  ],
+  "family_bias_assessment": {
+    "bias_detected": false,
+    "reason": "notes family required synthesis/promotions but no longer stays at zero-candidate state"
+  }
+}

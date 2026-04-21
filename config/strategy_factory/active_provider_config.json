@@ -1,0 +1,7 @@
+{
+  "title": "Strategy Factory Active Provider Contract",
+  "description": "Runtime source-of-truth for Strategy Factory primary provider. The primary provider is derived only from source_order[0].",
+  "source_order": [
+    "longbridge"
+  ]
+}

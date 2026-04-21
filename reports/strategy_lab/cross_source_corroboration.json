@@ -1,0 +1,72 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "families": [
+    {
+      "strategy_id": "SF-001",
+      "setup_family": "trend_pullback_second_entry",
+      "source_family_support_breadth": 3,
+      "supporting_sources": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "corroboration_gaps": [],
+      "family_bias_risk": "low",
+      "evidence_summary": "SF-001 is supported by al_brooks_ppt, fangfangtu_notes, fangfangtu_transcript."
+    },
+    {
+      "strategy_id": "SF-002",
+      "setup_family": "breakout_follow_through_continuation",
+      "source_family_support_breadth": 3,
+      "supporting_sources": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "corroboration_gaps": [],
+      "family_bias_risk": "low",
+      "evidence_summary": "SF-002 is supported by al_brooks_ppt, fangfangtu_notes, fangfangtu_transcript."
+    },
+    {
+      "strategy_id": "SF-003",
+      "setup_family": "failed_breakout_range_reversal",
+      "source_family_support_breadth": 3,
+      "supporting_sources": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "corroboration_gaps": [],
+      "family_bias_risk": "low",
+      "evidence_summary": "SF-003 is supported by al_brooks_ppt, fangfangtu_notes, fangfangtu_transcript."
+    },
+    {
+      "strategy_id": "SF-004",
+      "setup_family": "tight_channel_trend_continuation",
+      "source_family_support_breadth": 3,
+      "supporting_sources": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "corroboration_gaps": [],
+      "family_bias_risk": "low",
+      "evidence_summary": "SF-004 is supported by al_brooks_ppt, fangfangtu_notes, fangfangtu_transcript."
+    },
+    {
+      "strategy_id": "SF-005",
+      "setup_family": "gap_continuation_exhaustion",
+      "source_family_support_breadth": 1,
+      "supporting_sources": [
+        "al_brooks_ppt"
+      ],
+      "corroboration_gaps": [
+        "fangfangtu_transcript",
+        "fangfangtu_notes"
+      ],
+      "family_bias_risk": "single_source_risk",
+      "evidence_summary": "SF-005 is supported by al_brooks_ppt."
+    }
+  ]
+}

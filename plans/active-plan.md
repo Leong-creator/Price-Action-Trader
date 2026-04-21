@@ -27,6 +27,8 @@
 - M8E.1：Validation Gap Closure 已完成，当前已把 checked-in `summary.json` / `report.md` 的路径元数据统一为 repo-relative logical path，给 `m8c1_long_horizon_daily_validation` 增加 `sample_adequacy`，并补齐 golden catalog smoke test 与 artifact portability 回归。
 - M8E.2：Longer-Window Daily Validation 已完成，当前已新增 `config/examples/public_history_backtest_longer_window.json`，并生成 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`，覆盖 `2018-01-01 ~ 2026-04-17`、`NVDA / TSLA / SPY`、`1d` 的更长窗口 daily validation。
 - M8E.3 当前继续延后：在每个标的至少具备 `30` 个完整 regular session 之前，不启动 intraday 更长窗口扩展。
+- 已从 `main` 切出 `feature/m9-price-action-strategy-lab` 作为新支线，当前目标是把知识来源系统性提炼为 strategy cards、测试计划与可回测候选，而不是扩展 trigger、risk、execution 或 broker。
+- M9 的来源优先级固定为：`fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。
 
 ## 2. 执行总原则
 
@@ -735,9 +737,9 @@
   - 已新增 repo-safe 小样本 manifest：`tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`。
   - 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`。
   - 已补齐 `docs/test-dataset-curation.md` 与 `reports/reliability/README.md`，固定 small/large dataset 约定、受控标签与报告最小字段。
-  - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通公共历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
-  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`。
-  - 已完成一轮公共历史数据演示回测：使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`。
+  - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
+  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，并在当时的历史阶段接入了 provider-specific 的 public-history 入口配置。
+  - 已完成一轮公共历史数据演示回测：早期历史 run 使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`；当前 Strategy Factory 已改为通过 repo config 合同解析 `primary_provider`，不再把该历史 provider 名称写成长期固定口径。
   - 该示例 run 在当前 demo 风控参数下录得 `1.9923%` 总收益率、`1.5157%` 最大回撤、`16` 笔交易、`43.75%` 胜率；仍明确保持 `paper / simulated`，不代表实盘能力。
   - 当前更完整的真实历史样本、用户自有 CSV、录制型实时样本与 shadow/paper 延展验证仍可继续扩展，但本轮没有引入真实 broker、真实账户或 live execution。
 
@@ -782,3 +784,93 @@
 - `python` 命令已可用，因此验证命令统一写为 `python ...`。
 - 第一实施波次固定为 M1 后接 M2；浏览器验证与正式券商 API 评估都排在后续，不得前置。
 - 若任一 milestone 在执行中触发熔断，则冻结该里程碑分支，更新 `docs/status.md`，输出 Failure Dossier，并等待用户决策。
+
+## 20. M9：Price Action Strategy Lab
+
+- 分支：`feature/m9-price-action-strategy-lab`
+- 当前状态：进行中
+- 目标：
+  - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，建立可恢复、可校验、以 `source_manifest` 为 SoT 的 Strategy Factory。
+  - 在进入任何 batch backtest 之前，先完成 `Full Extraction Completeness Audit v4`，证明 text-extractable 范围内的提炼已闭环，并把 visual / partial 缺口诚实列账。
+- 固定范围：
+  - 必须先保存当前项目快照。
+  - 必须优先盘点并使用 `fangfangtu_transcript`，其次 `al_brooks_ppt`，最后 `fangfangtu_notes`。
+  - 已完成的 `PA-SC-*` 产物全部保留为 legacy / historical baseline。
+  - 新一轮提炼必须从 `knowledge/indices/source_manifest.json` 覆盖的全部来源重新开始。
+- 明确不做：
+  - 不改 trigger 逻辑。
+  - 不触碰 `src/risk/`、`src/execution/`、`src/broker/`。
+  - 不进入真实 broker、真实账户、live execution、付费 API。
+  - 不修改 `knowledge/raw/`。
+- 子阶段：
+  - `M9A`~`M9F`：已完成，但当前只作为 legacy / historical baseline 保留。
+  - `M9G.0`：Contract Freeze & Legacy Boundary Reset（已完成）。
+  - `M9G Audit v4`：`Full-Pass Chunk Adjudication`、`Cross-Chunk Synthesis Pass`、`Discovery Closure`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass`、`Strategy Closure 与 Catalog Freeze`（已完成）。
+  - 下一步不是自动进入回测，而是等待单独的 batch backtest 决策 / Prompt。
+- 当前 Provider Contract：
+  <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
+  - `primary_provider` 的唯一运行时来源是 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]`。
+  - `plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 只描述这个 contract，不把 provider 名称写成长期固定口径。
+  - 若 repo config 与上述文档的 contract block 不一致，`M9G.0` 必须失败并先修正文档/配置一致性。
+- 当前 Legacy Boundary：
+  - `knowledge/wiki/strategy_cards/` 继续保留，但只作为 legacy / historical baseline。
+  - `PA-SC-*` 不得作为新 catalog 的 seed、family prior、默认 merge target 或 triage baseline。
+  - `PA-SC-002` 只允许作为 historical benchmark / regression reference。
+  - 新 catalog 的编号空间固定为 `SF-*`。
+- 关键产物：
+  - legacy baseline：
+    - `knowledge/wiki/strategy_cards/`
+    - `reports/strategy_lab/m9_source_inventory.md`
+    - `reports/strategy_lab/m9_strategy_extraction_log.md`
+    - `reports/strategy_lab/m9_strategy_test_plan_index.md`
+    - `reports/strategy_lab/m9_strategy_lab_summary.md`
+  - Strategy Factory：
+    - `knowledge/wiki/strategy_factory/`
+    - `reports/strategy_lab/strategy_factory/coverage_ledger.json`
+    - `reports/strategy_lab/strategy_factory/extraction_queue.json`
+    - `reports/strategy_lab/strategy_factory/catalog_ledger.json`
+    - `reports/strategy_lab/strategy_factory/backtest_queue.json`
+    - `reports/strategy_lab/strategy_factory/triage_ledger.json`
+    - `reports/strategy_lab/strategy_factory/run_state.json`
+    - `docs/strategy-factory.md`
+    - `reports/strategy_lab/strategy_factory_plan.md`
+    - `reports/strategy_lab/strategy_catalog.json`
+    - `reports/strategy_lab/strategy_dedup_map.json`
+    - `reports/strategy_lab/chunk_adjudication.jsonl`
+    - `reports/strategy_lab/source_family_completeness_report.json`
+    - `reports/strategy_lab/source_theme_coverage.json`
+    - `reports/strategy_lab/cross_chunk_synthesis.json`
+    - `reports/strategy_lab/cross_source_corroboration.json`
+    - `reports/strategy_lab/cross_source_corroboration_final.json`
+    - `reports/strategy_lab/overmerge_review.json`
+    - `reports/strategy_lab/saturation_report.json`
+    - `reports/strategy_lab/unresolved_strategy_extraction_gaps.json`
+    - `reports/strategy_lab/full_extraction_audit.json`
+    - `reports/strategy_lab/factory_summary.md`
+    - `reports/strategy_lab/cards/`
+    - `reports/strategy_lab/specs/`
+  - `reports/strategy_lab/m9_initial_project_snapshot.md`
+- 验收前提：
+  - 文档、KB schema、validator、index 与 `strategy_factory` 字段契约保持一致。
+  - `knowledge/indices/source_manifest.json` 是唯一 coverage SoT；全部 10 个来源都必须进入 `coverage_ledger.json`，且零 silent skip。
+  - `run_state.json`、provider contract config 与 contract docs 必须可通过 `python scripts/validate_strategy_factory_contract.py`。
+  - 新提炼必须不读取 legacy `PA-SC-*` 作为先验；只允许用于 overlap / comparison / benchmark 字段。
+  - `statement`、`source_note`、`bundle support` 仍不得进入 trigger。
+  - 全部 parseable chunks 必须完成 full-pass 审计，且 `unresolved=0`、`unmapped=0`。
+  - `Cross-Chunk Synthesis Pass`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass` 必须全部落盘。
+  - `saturation_report.json` 必须满足双轮连续零增量 closure。
+  - `full_extraction_audit.json` 必须同时写出 `text_extractable_closure=true` 与 `full_source_closure` 结论；若 `full_source_closure=false`，则 `unresolved_strategy_extraction_gaps.json` 必须完整存在。
+  - 本阶段仍不得启动任何 batch backtest。
+- 可并行子任务：
+  - `researcher`：coverage baseline、legacy boundary 与差异盘点。
+  - `kb_curator`：legacy 标注、source mapping 与新 catalog wiki 目录整理。
+  - `implementer`：schema、validator、index、provider contract、ledger / run_state 模板。
+  - `reviewer`：真实性、边界与回归风险审查。
+  - `qa`：KB/trace/reliability 回归与验收清单。
+- 风险：
+  - 把 legacy `PA-SC-*` 误当作新 catalog 的 family prior。
+  - 把 `source_manifest` 以外的 legacy snapshot 当成 coverage SoT。
+  - 把 provider-specific 历史事实误写成长期固定 provider 契约。
+  - 因新字段与目录引入 KB 校验漂移。
+- 回退点：
+  - 本支线初始回退点固定为 `main@d9ef8a73ff8bdb4e08605b13cd64233d95ade6dc`。
