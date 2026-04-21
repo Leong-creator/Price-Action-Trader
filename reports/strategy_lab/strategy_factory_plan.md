@@ -43,14 +43,35 @@
 - `saturation_report.json` 已满足双轮连续零增量 closure。
 - `cross_source_corroboration_final.json` 已在 catalog freeze 后重算。
 
-## 当前仍未做
+## M9H 首轮回测结果
 
-- 未启动任何 batch backtest。
-- 未改 trigger。
-- 未碰 broker / live / real-money。
-- 未修改 `knowledge/raw/`。
+- 已完成 `Controlled Batch Backtest + Strategy Triage` 首轮受控 wave。
+- 本轮只推进：
+  - `SF-001`
+  - `SF-002`
+  - `SF-003`
+  - `SF-004`
+- 本轮保持 deferred：
+  - `SF-005`，原因：`single_source_risk` 与 family 边界偏粗
+- 已落盘：
+  - `reports/strategy_lab/backtest_eligibility_matrix.json`
+  - `reports/strategy_lab/executable_spec_queue.json`
+  - `reports/strategy_lab/backtest_queue.json`
+  - `reports/strategy_lab/backtest_batch_summary.json`
+  - `reports/strategy_lab/strategy_triage_matrix.json`
+  - `reports/strategy_lab/final_strategy_factory_report.md`
+- 当前 triage 结论：
+  - `SF-001 = modify_and_retest`
+  - `SF-002 = insufficient_sample`
+  - `SF-003 = insufficient_sample`
+  - `SF-004 = insufficient_sample`
+  - `SF-005 = deferred_single_source_risk`
+- 当前仍未做：
+  - 未进入 broker / live / real-money。
+  - 未改 trigger。
+  - 未修改 `knowledge/raw/`。
 
 ## 下一步
 
-- 下一步不是自动进入回测，而是等待单独的 batch backtest 决策。
-- 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json` 选择候选。
+- 下一步不是自动扩大 batch backtest，而是等待更窄范围的下一波重测决策。
+- 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json`、`strategy_triage_matrix.json` 与 `unresolved_strategy_extraction_gaps.json` 选择候选。

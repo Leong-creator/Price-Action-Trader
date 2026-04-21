@@ -1,0 +1,125 @@
+{
+  "strategy_id": "SF-001",
+  "title": "Trend Pullback Second Entry",
+  "eligibility_status": "eligible_for_batch_backtest",
+  "queue_status": "completed",
+  "backtest_status": "completed",
+  "sample_status": "exploratory_probe",
+  "triage_status": "modify_and_retest",
+  "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+  "best_variant_id": "quality_filter",
+  "baseline_variant_id": "baseline",
+  "provider": "longbridge",
+  "baseline_variant": {
+    "variant_id": "baseline",
+    "label": "baseline_v0_1",
+    "trade_count": 331,
+    "closed_trade_count": 331,
+    "sample_status": "exploratory_probe",
+    "expectancy_r": "-0.0030",
+    "total_pnl_r": "-1.0000",
+    "win_rate": "0.3323",
+    "max_drawdown_r": "51.0000",
+    "split_trade_counts": {
+      "in_sample": 102,
+      "validation": 116,
+      "out_of_sample": 113
+    },
+    "split_executed_trade_counts": {
+      "in_sample": 102,
+      "validation": 116,
+      "out_of_sample": 113
+    },
+    "artifact_paths": {
+      "summary_json": "reports/strategy_lab/SF-001/variants/baseline/summary.json",
+      "trades_csv": "reports/strategy_lab/SF-001/variants/baseline/trades.csv",
+      "candidate_events_csv": "reports/strategy_lab/SF-001/variants/baseline/candidate_events.csv",
+      "skip_summary_json": "reports/strategy_lab/SF-001/variants/baseline/skip_summary.json"
+    }
+  },
+  "best_variant": {
+    "variant_id": "quality_filter",
+    "label": "quality_filter_v0_1",
+    "trade_count": 280,
+    "closed_trade_count": 280,
+    "sample_status": "exploratory_probe",
+    "expectancy_r": "0.0071",
+    "total_pnl_r": "2.0000",
+    "win_rate": "0.3357",
+    "max_drawdown_r": "36.0000",
+    "split_trade_counts": {
+      "in_sample": 86,
+      "validation": 96,
+      "out_of_sample": 98
+    },
+    "split_executed_trade_counts": {
+      "in_sample": 86,
+      "validation": 96,
+      "out_of_sample": 98
+    },
+    "artifact_paths": {
+      "summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/summary.json",
+      "trades_csv": "reports/strategy_lab/SF-001/variants/quality_filter/trades.csv",
+      "candidate_events_csv": "reports/strategy_lab/SF-001/variants/quality_filter/candidate_events.csv",
+      "skip_summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/skip_summary.json"
+    }
+  },
+  "variants": [
+    {
+      "variant_id": "baseline",
+      "label": "baseline_v0_1",
+      "trade_count": 331,
+      "closed_trade_count": 331,
+      "sample_status": "exploratory_probe",
+      "expectancy_r": "-0.0030",
+      "total_pnl_r": "-1.0000",
+      "win_rate": "0.3323",
+      "max_drawdown_r": "51.0000",
+      "split_trade_counts": {
+        "in_sample": 102,
+        "validation": 116,
+        "out_of_sample": 113
+      },
+      "split_executed_trade_counts": {
+        "in_sample": 102,
+        "validation": 116,
+        "out_of_sample": 113
+      },
+      "artifact_paths": {
+        "summary_json": "reports/strategy_lab/SF-001/variants/baseline/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-001/variants/baseline/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-001/variants/baseline/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-001/variants/baseline/skip_summary.json"
+      }
+    },
+    {
+      "variant_id": "quality_filter",
+      "label": "quality_filter_v0_1",
+      "trade_count": 280,
+      "closed_trade_count": 280,
+      "sample_status": "exploratory_probe",
+      "expectancy_r": "0.0071",
+      "total_pnl_r": "2.0000",
+      "win_rate": "0.3357",
+      "max_drawdown_r": "36.0000",
+      "split_trade_counts": {
+        "in_sample": 86,
+        "validation": 96,
+        "out_of_sample": 98
+      },
+      "split_executed_trade_counts": {
+        "in_sample": 86,
+        "validation": 96,
+        "out_of_sample": 98
+      },
+      "artifact_paths": {
+        "summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-001/variants/quality_filter/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-001/variants/quality_filter/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/skip_summary.json"
+      }
+    }
+  ],
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "boundary": "paper/simulated"
+}

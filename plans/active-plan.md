@@ -768,15 +768,15 @@
 
 ## 18. 当前阶段与下一步
 
-- 当前阶段：阶段 8：可靠性验证（进行中）。
-- 当前 milestone：M8E.2 Longer-Window Daily Validation（已完成）。
+- 当前阶段：阶段 9：Price Action Strategy Lab / Strategy Factory（进行中）。
+- 当前 milestone：`M9H Controlled Batch Backtest + Strategy Triage`（已完成首轮受控 wave）。
 - 当前下一步：
-  - 当前默认不自动进入新的功能开发、第三个标的扩展或 `M8E.3` intraday 更长窗口验证。
-  - `M8D.1`、`M8D.2`、`M8D.3`、`M8E.1`、`M8E.2` 当前都已完成；下一步若要进入 `M8E.3`，必须先满足每个标的至少 `30` 个完整 regular session 的门槛。
-  - 当前更长窗口验证优先级仍固定为 daily 先于 intraday；`M8E.3` 不得越过 session completeness / timezone / risk reset / no-trade / wait / knowledge trace 门槛。
+  - 当前默认不自动进入下一波 batch backtest。
+  - 下一步应基于 `strategy_triage_matrix.json`、`backtest_batch_summary.json`、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json`，决定更窄范围的重测方案。
+  - 当前首轮受控 wave 只测试了 `SF-001 ~ SF-004`，`SF-005` 继续保持 `deferred_single_source_risk`，不得无差别推进。
   - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
-  - 完成 M8 之前，不重新评估真实 broker、真实账户、live execution 或付费 API
+  - 未经单独批准，不重新评估真实 broker、真实账户、live execution 或付费 API。
 
 ## 19. 假设
 
@@ -787,7 +787,7 @@
 
 ## 20. M9：Price Action Strategy Lab
 
-- 分支：`feature/m9-price-action-strategy-lab`
+- 分支：`feature/m9-strategy-factory-batch-backtest`
 - 当前状态：进行中
 - 目标：
   - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，建立可恢复、可校验、以 `source_manifest` 为 SoT 的 Strategy Factory。
@@ -806,7 +806,11 @@
   - `M9A`~`M9F`：已完成，但当前只作为 legacy / historical baseline 保留。
   - `M9G.0`：Contract Freeze & Legacy Boundary Reset（已完成）。
   - `M9G Audit v4`：`Full-Pass Chunk Adjudication`、`Cross-Chunk Synthesis Pass`、`Discovery Closure`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass`、`Strategy Closure 与 Catalog Freeze`（已完成）。
-  - 下一步不是自动进入回测，而是等待单独的 batch backtest 决策 / Prompt。
+  - `M9H`：`Controlled Batch Backtest + Strategy Triage`（已完成首轮受控 wave）。
+    - 首轮 wave 只允许 `SF-001 ~ SF-004` 进入 `5m` intraday baseline + limited diagnostics。
+    - `SF-005` 当前保持 `deferred_single_source_risk`，不得与 `SF-001 ~ SF-004` 无差别推进。
+    - 当前 triage 结果固定为：`SF-001=modify_and_retest`、`SF-002=insufficient_sample`、`SF-003=insufficient_sample`、`SF-004=insufficient_sample`、`SF-005=deferred_single_source_risk`。
+  - 下一步不是自动扩大 batch backtest，而是等待单独的更窄范围重测 / 下一波决策。
 - 当前 Provider Contract：
   <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
   - `primary_provider` 的唯一运行时来源是 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]`。
@@ -849,6 +853,12 @@
     - `reports/strategy_lab/factory_summary.md`
     - `reports/strategy_lab/cards/`
     - `reports/strategy_lab/specs/`
+    - `reports/strategy_lab/backtest_eligibility_matrix.json`
+    - `reports/strategy_lab/executable_spec_queue.json`
+    - `reports/strategy_lab/backtest_queue.json`
+    - `reports/strategy_lab/backtest_batch_summary.json`
+    - `reports/strategy_lab/strategy_triage_matrix.json`
+    - `reports/strategy_lab/final_strategy_factory_report.md`
   - `reports/strategy_lab/m9_initial_project_snapshot.md`
 - 验收前提：
   - 文档、KB schema、validator、index 与 `strategy_factory` 字段契约保持一致。
@@ -860,7 +870,9 @@
   - `Cross-Chunk Synthesis Pass`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass` 必须全部落盘。
   - `saturation_report.json` 必须满足双轮连续零增量 closure。
   - `full_extraction_audit.json` 必须同时写出 `text_extractable_closure=true` 与 `full_source_closure` 结论；若 `full_source_closure=false`，则 `unresolved_strategy_extraction_gaps.json` 必须完整存在。
-  - 本阶段仍不得启动任何 batch backtest。
+  - `M9G Audit v4` 本身不得启动任何 batch backtest。
+  - `M9H` 若启动 batch backtest，必须限制在已冻结且 corroboration 足够的 `SF-*` family；不得把 deferred / parked family 偷渡进 queue。
+  - `M9H` 结果不得夸大为实盘能力或稳定盈利结论。
 - 可并行子任务：
   - `researcher`：coverage baseline、legacy boundary 与差异盘点。
   - `kb_curator`：legacy 标注、source mapping 与新 catalog wiki 目录整理。

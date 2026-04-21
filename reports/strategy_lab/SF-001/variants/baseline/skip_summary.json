@@ -1,0 +1,11 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "baseline",
+  "skipped": {
+    "context_not_ready": 605,
+    "cooldown_active": 152,
+    "weak_signal_bar": 2005
+  },
+  "total_candidates": 3094,
+  "emitted_signals": 332
+}

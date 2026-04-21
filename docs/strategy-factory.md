@@ -104,4 +104,13 @@
   - `text_extractable_closure=true`
   - `full_source_closure=false`
   - 仍存在 visual / partial gaps，已写入 `reports/strategy_lab/unresolved_strategy_extraction_gaps.json`
-- 当前仍不得自动开始 batch backtest；`ready_for_backtest` 只作为审计结论字段存在。
+- 当前已完成 `M9H Controlled Batch Backtest + Strategy Triage` 的首轮受控 wave：
+  - `SF-001 ~ SF-004` 已进入 `5m` intraday baseline + limited diagnostics。
+  - `SF-005` 保持 `deferred_single_source_risk`。
+  - 当前 triage 结论冻结为：
+    - `SF-001 = modify_and_retest`
+    - `SF-002 = insufficient_sample`
+    - `SF-003 = insufficient_sample`
+    - `SF-004 = insufficient_sample`
+    - `SF-005 = deferred_single_source_risk`
+- `ready_for_backtest` 仍然只是结论字段；首轮 wave 已完成，但下一波不得自动启动，必须等待新的范围决策。

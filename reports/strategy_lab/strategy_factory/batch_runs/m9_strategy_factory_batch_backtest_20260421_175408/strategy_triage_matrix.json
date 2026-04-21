@@ -1,0 +1,65 @@
+{
+  "schema_version": "m9-batch-backtest-v10",
+  "generated_at": "2026-04-21T17:54:08.779167+00:00",
+  "records": [
+    {
+      "strategy_id": "SF-001",
+      "title": "Trend Pullback Second Entry",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "sample_status": "exploratory_probe",
+      "best_variant_id": "quality_filter",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      }
+    },
+    {
+      "strategy_id": "SF-002",
+      "title": "Breakout Follow-Through Continuation",
+      "triage_status": "insufficient_sample",
+      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
+      "sample_status": "insufficient_sample",
+      "best_variant_id": "quality_filter",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      }
+    },
+    {
+      "strategy_id": "SF-003",
+      "title": "Failed Breakout Range-Edge Reversal",
+      "triage_status": "insufficient_sample",
+      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
+      "sample_status": "insufficient_sample",
+      "best_variant_id": "quality_filter",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      }
+    },
+    {
+      "strategy_id": "SF-004",
+      "title": "Tight Channel Trend Continuation",
+      "triage_status": "insufficient_sample",
+      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
+      "sample_status": "insufficient_sample",
+      "best_variant_id": "baseline",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      }
+    },
+    {
+      "strategy_id": "SF-005",
+      "title": "Gap Continuation Versus Exhaustion",
+      "triage_status": "deferred_single_source_risk",
+      "triage_reason": "single-source corroboration and coarse family boundary",
+      "sample_status": "not_run",
+      "best_variant_id": null,
+      "variant_status_counts": {
+        "deferred": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "quality_filter",
+  "skipped": {
+    "context_not_ready": 809,
+    "cooldown_active": 112,
+    "weak_signal_bar": 1892
+  },
+  "total_candidates": 3094,
+  "emitted_signals": 281
+}

@@ -1,0 +1,1 @@
+symbol,label,market,direction,entry_timestamp,exit_timestamp,entry_price,exit_price,quantity,pnl_cash,pnl_r,exit_reason,setup_type,entry_trigger,stop_rule,target_rule,actual_source_refs,bundle_support_refs,legacy_source_refs,explanation

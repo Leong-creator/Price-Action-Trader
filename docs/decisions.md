@@ -163,3 +163,10 @@
 - 结论：Strategy Factory 的 `primary_provider` 只允许由 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]` 推导。当前固定配置文件为 `config/strategy_factory/active_provider_config.json`。`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 与 `docs/data-sources.md` 只允许描述该 contract，不把具体 provider 名称写成长期固定口径。
 - 结论：`python scripts/validate_strategy_factory_contract.py` 成为 `M9G.0` 的强制门禁。若 repo config、contract docs 与 `run_state.json` 不一致，Contract Freeze 必须失败，且不得进入新一轮提炼或回测。
 - 结论：heartbeat / 自动推进后续可以继续设计，但恢复状态只允许依赖 `coverage_ledger.json`、`extraction_queue.json`、`catalog_ledger.json`、`backtest_queue.json`、`triage_ledger.json` 与 `run_state.json.resume_cursor`，不得依赖隐含聊天上下文。
+
+## D-0033 M9H Controlled Batch Backtest 首轮范围冻结
+
+- 日期：2026-04-22
+- 结论：`M9H` 的首轮 batch backtest 只允许在 `paper / simulated` 边界内，对已冻结且 corroboration 充分的 `SF-001 ~ SF-004` 做受控 `5m` intraday baseline + limited diagnostics。`SF-005` 因 `single_source_risk` 与 family 边界仍偏粗，必须保持 `deferred_single_source_risk`，不得与前四个 family 无差别推进。
+- 结论：本轮 batch backtest 仍不得修改 trigger，不得修改 `knowledge/raw`，不得触碰 `src/risk/`、`src/execution/`、`src/broker/` 的 live / real-money 语义，也不得把任何结果写成实盘能力、稳定盈利或自动交易能力。
+- 结论：本轮 triage 结果当前冻结为：`SF-001=modify_and_retest`、`SF-002=insufficient_sample`、`SF-003=insufficient_sample`、`SF-004=insufficient_sample`、`SF-005=deferred_single_source_risk`。该结论只代表当前 `SPY / 5m / primary-provider cache` 的受控探索波次，不得外推为 family 终局裁决。

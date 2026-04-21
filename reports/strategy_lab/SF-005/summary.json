@@ -1,0 +1,49 @@
+{
+  "strategy_id": "SF-005",
+  "title": "Gap Continuation Versus Exhaustion",
+  "eligibility_status": "deferred_single_source_risk",
+  "queue_status": "deferred",
+  "backtest_status": "not_run",
+  "sample_status": "not_run",
+  "triage_status": "deferred_single_source_risk",
+  "triage_reason": "single-source corroboration and coarse family boundary",
+  "best_variant_id": null,
+  "baseline_variant_id": null,
+  "variant_status_counts": {
+    "deferred": 1
+  },
+  "variants": [],
+  "artifact_paths": {
+    "strategy_dir": "reports/strategy_lab/SF-005",
+    "summary_json": "reports/strategy_lab/SF-005/summary.json",
+    "trades_csv": "reports/strategy_lab/SF-005/trades.csv",
+    "candidate_events_csv": "reports/strategy_lab/SF-005/candidate_events.csv",
+    "skip_summary_json": "reports/strategy_lab/SF-005/skip_summary.json",
+    "diagnostics_md": "reports/strategy_lab/SF-005/diagnostics.md",
+    "executable_spec_md": "reports/strategy_lab/SF-005/executable_spec.md",
+    "test_plan_md": "reports/strategy_lab/SF-005/test_plan.md"
+  },
+  "dataset_path": null,
+  "triage_record": {
+    "strategy_id": "SF-005",
+    "title": "Gap Continuation Versus Exhaustion",
+    "triage_status": "deferred_single_source_risk",
+    "triage_reason": "single-source corroboration and coarse family boundary",
+    "sample_status": "not_run",
+    "best_variant_id": null,
+    "variant_status_counts": {
+      "deferred": 1
+    }
+  },
+  "heartbeat": {
+    "timestamp": "2026-04-21T17:54:08.778846+00:00",
+    "phase": "strategy_deferred",
+    "strategy_id": "SF-005",
+    "spec_status": "completed",
+    "backtest_status": "deferred",
+    "sample_status": "not_run",
+    "result_status": "deferred_single_source_risk",
+    "next_action": "deferred_visual_or_corroboration_lane"
+  },
+  "gap_reference_count": 14
+}
