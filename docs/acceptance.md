@@ -711,7 +711,7 @@
 - repo-safe 小样本 manifest 必须存在，并能证明 M8D 框架可运行但不等于真实历史验证已完成。
 - `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py` 与 `tests/reliability/test_dataset_manifest_contract.py` 必须通过。
 - `reports/reliability/README.md` 必须明确报告不是盈利证明，并保留 dataset/session/traceability 最小字段要求。
-- `scripts/download_public_history.py` 必须支持：优先使用 Alpha Vantage（仅当环境已提供 key），否则回退到 `yfinance`，并将结果缓存为本地 CSV，而不是每次回测都临时联网抓取。
+- `scripts/download_public_history.py` 必须默认使用用户已授权的 `Longbridge` 只读历史行情下载并缓存为本地 CSV；`Alpha Vantage` / `yfinance` 只允许保留为显式指定时的兼容路径，不得继续作为默认自动回退链路。
 - 公共历史数据缓存目录必须落在本地不跟踪目录，并且缓存文件能继续通过 `src/data/` 的 schema 校验与重复加载。
 - `scripts/run_public_backtest_demo.py` 或等价一键入口必须能基于缓存数据生成：
   - `report.md`
@@ -720,3 +720,69 @@
   - `equity_curve.png`
 - 用户可读报告必须明确：测试标的、时间范围、数据来源、总收益/总盈亏、最大回撤、交易笔数、胜率、盈亏比、代表性交易解释与局限。
 - 该 public-history demo 仍只属于研究/演示能力，不得被写成真实 broker、真实账户、live execution 或实盘能力证明。
+
+## 阶段 9：Price Action Strategy Lab
+
+完成条件：
+
+- 已从 `main` 切出独立分支 `feature/m9-price-action-strategy-lab`，且 `main` 未被直接开发。
+- 已生成 `reports/strategy_lab/m9_initial_project_snapshot.md`，至少记录：
+  - 初始分支
+  - 初始 commit
+  - `git status`
+  - 当前 M8 进度摘要
+  - `knowledge/raw/`、`knowledge/wiki/`、`reports/backtests/` 目录概览
+  - `paper / simulated`、`no-go`、不得接真实账户、不得自动实盘下单等边界
+- 已把 M9 正式写入 `plans/active-plan.md`、`docs/status.md`、`docs/decisions.md`。
+- 已新增 `knowledge/wiki/strategy_cards/`，并包含：
+  - `index.md`
+  - `templates/strategy-card-template.md`
+  - `templates/strategy-test-plan-template.md`
+  - `brooks/`
+  - `fangfangtu/`
+  - `combined/`
+- `scripts/validate_kb.py` 与 `scripts/build_kb_index.py` 已支持：
+  - `candidate / tested / promoted / rejected` 状态枚举
+  - strategy card 额外字段
+  - 跳过 `templates/` 目录
+- 已新增或更新最小自动化验证，覆盖：
+  - strategy card 正向校验
+  - templates 跳过
+  - strategy card 缺字段失败
+  - build_kb_index 收录 strategy card 扩展字段
+- 已完成 `m9_source_inventory.md`，并按固定优先级分层：
+  - `fangfangtu_transcript`
+  - `al_brooks_ppt`
+  - `fangfangtu_notes`
+- 已完成首批至少 10 张独立 `.md` 策略卡，且每张卡：
+  - 保留真实 `source_refs`
+  - 包含来源依据、核心交易思想、适用环境、入场、止损、出场、失效条件、禁止交易条件、可量化规则草案、参数范围、回测假设、测试计划、预期失败模式、当前结论
+  - 未把未经验证内容写成稳定盈利结论
+- `PA-SC-007`、`PA-SC-008`、`PA-SC-010` 默认保留 `needs_visual_review: true`，除非有新增可验证证据。
+- 已完成 `m9_strategy_extraction_log.md` 与 `m9_strategy_test_plan_index.md`。
+- 已为 `PA-SC-002`、`PA-SC-003`、`PA-SC-005` 补完整详细测试计划，明确：
+  - 标的
+  - 周期
+  - regular session 边界
+  - 成本/滑点假设
+  - 时间顺序切分
+  - 最低交易数
+  - 通过/淘汰标准
+- 已完成 `m9_strategy_lab_summary.md`，并显式说明：
+  - 当前哪些策略可进入回测准备
+  - 哪些策略仍证据不足或缺图表确认
+  - 哪些数据缺口阻止本轮直接跑回测
+- M9 必须继续保持：
+  - `paper / simulated`
+  - 不改 trigger
+  - 不改 `knowledge/raw`
+  - 不进入 broker/live/real-money
+- 至少通过：
+  - `python scripts/validate_kb.py`
+  - `python scripts/build_kb_index.py`
+  - `python scripts/validate_kb_coverage.py`
+  - `python scripts/validate_knowledge_atoms.py`
+  - `python -m unittest discover -s tests/unit -v`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `python -m unittest discover -s tests/integration -v`
+  - `python scripts/run_reliability_suite.py`

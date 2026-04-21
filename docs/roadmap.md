@@ -32,3 +32,10 @@
 - 当前 `no-go` 结论继续有效
 - `M8` 完成前，不重新评估真实 broker、真实账户、live execution 或付费 API
 - 浏览器方案继续只允许只读观察、截图辅助分析、导出文件与临时验证，不进入生产执行链路
+
+## 当前支线
+
+10. `M9`：Price Action Strategy Lab（进行中）
+   - 目标：把 transcript / PPT / notes 提炼为 strategy cards、测试计划与可回测候选。
+   - 来源优先级：`fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`
+   - 当前边界：继续保持 `paper / simulated`、不改 trigger、不改 raw、不进入 broker/live。

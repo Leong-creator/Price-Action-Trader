@@ -17,9 +17,12 @@
 - sources
 - glossary
 - case-studies
+- strategy_cards（目录层，不是新的 `type`；内部页面继续使用 `setup` 或 `rule`）
 
 ## PA 专属要求
 
 - setup 页面需要记录 `pa_context`、`bar_by_bar_notes`、`signal_bar`、`entry_trigger`、`stop_rule`、`target_rule`、`invalidation` 等字段。
 - 缺失图表时使用 `missing_visuals` 标记，不阻塞入库。
 - 每页必须保留 `source_refs`。
+- `knowledge/wiki/strategy_cards/` 下的卡片页继续遵守上述要求，并补充策略提炼专用字段与测试计划。
+- `knowledge/wiki/**/templates/*.md` 只作模板脚手架，不进入 KB 校验与 wiki index。

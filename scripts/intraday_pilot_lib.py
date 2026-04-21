@@ -40,6 +40,7 @@ from scripts.public_backtest_demo_lib import (
     humanize_exit_reason,
     summarize_no_trade_wait,
     serialize_repo_logical_path,
+    sanitize_vendor_rows,
     trade_to_summary_row,
     write_equity_curve_png,
     write_knowledge_trace_json,
@@ -47,6 +48,7 @@ from scripts.public_backtest_demo_lib import (
     write_summary_json,
     write_trades_csv,
 )
+from scripts.longbridge_history_lib import fetch_longbridge_intraday_history_rows
 
 try:  # pragma: no cover - optional runtime dependency
     import yfinance as yf
@@ -61,7 +63,14 @@ REGULAR_SESSION_START = time(9, 30)
 REGULAR_SESSION_LAST_BAR = time(15, 45)
 REGULAR_SESSION_CLOSE = time(16, 0)
 CURATED_TRACE_TYPES = frozenset({"concept", "setup", "rule"})
-SUPPORTED_INTRADAY_INTERVALS = frozenset({"15m"})
+SUPPORTED_INTRADAY_INTERVALS = frozenset({"1m", "5m", "15m", "30m", "1h"})
+INTRADAY_INTERVAL_TO_MINUTES = {
+    "1m": 1,
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +164,7 @@ def load_intraday_pilot_config(path: str | Path) -> IntradayPilotConfig:
         interval=interval,
         cache_dir=_resolve_repo_path(payload["cache_dir"]),
         report_dir=_resolve_repo_path(payload["report_dir"]),
-        source_order=tuple(payload.get("source_order") or ("yfinance",)),
+        source_order=tuple(payload.get("source_order") or ("longbridge",)),
         instrument=InstrumentConfig(
             ticker=instrument_payload["ticker"],
             symbol=instrument_payload["symbol"],
@@ -287,7 +296,7 @@ def download_and_cache_intraday_dataset(
     config.cache_dir.mkdir(parents=True, exist_ok=True)
     last_error: Exception | None = None
     for source in config.source_order:
-        if source != "yfinance":
+        if source not in {"longbridge", "yfinance"}:
             last_error = RuntimeError(f"Unsupported intraday source: {source}")
             continue
         csv_path = build_intraday_cache_path(config, source=source)
@@ -310,11 +319,21 @@ def download_and_cache_intraday_dataset(
                 interval=config.interval,
                 source=source,
                 timezone_name=config.session.timezone,
+                allow_extended_hours=config.session.allow_extended_hours,
             )
+            rows, vendor_anomalies = sanitize_vendor_rows(rows)
             if not rows:
                 raise RuntimeError(f"{config.instrument.ticker} returned no rows from {source}")
             write_intraday_cache_csv(csv_path, rows)
             row_count = len(load_ohlcv_csv(csv_path))
+            anomaly_path = csv_path.with_suffix(".vendor_anomalies.json")
+            if vendor_anomalies:
+                anomaly_path.write_text(
+                    json.dumps(vendor_anomalies, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            elif anomaly_path.exists():
+                anomaly_path.unlink()
             metadata = {
                 "instrument": asdict(config.instrument),
                 "source": source,
@@ -326,6 +345,8 @@ def download_and_cache_intraday_dataset(
                 "timezone": config.session.timezone,
                 "regular_session_only": not config.session.allow_extended_hours,
                 "downloaded_at": datetime.now(UTC).isoformat(),
+                "dropped_invalid_vendor_rows": len(vendor_anomalies),
+                "vendor_anomalies_path": str(anomaly_path) if vendor_anomalies else None,
             }
             metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             return DatasetCacheRecord(
@@ -351,7 +372,19 @@ def fetch_intraday_history_rows(
     interval: str,
     source: str,
     timezone_name: str,
+    allow_extended_hours: bool,
 ) -> list[dict[str, str]]:
+    if source == "longbridge":
+        return fetch_longbridge_intraday_history_rows(
+            ticker=instrument.ticker,
+            symbol=instrument.symbol,
+            market=instrument.market,
+            timezone_name=timezone_name,
+            start=start,
+            end=end,
+            interval=interval,
+            allow_extended_hours=allow_extended_hours,
+        )
     if source != "yfinance":
         raise RuntimeError(f"Unsupported intraday source: {source}")
     if yf is None:  # pragma: no cover - runtime dependency
@@ -364,7 +397,7 @@ def fetch_intraday_history_rows(
         auto_adjust=False,
         progress=False,
         threads=False,
-        prepost=False,
+        prepost=allow_extended_hours,
     )
     if getattr(frame, "empty", True):
         raise RuntimeError(f"yfinance returned no intraday rows for {instrument.ticker}")
@@ -448,7 +481,7 @@ def audit_intraday_sessions(
         regular_bars = tuple(
             bar
             for bar in sorted(session_bars, key=lambda item: item.timestamp)
-            if _is_regular_session_bar(bar.timestamp.astimezone(zone).time())
+            if _is_regular_session_bar(bar.timestamp.astimezone(zone).time(), timeframe=timeframe)
         )
         out_of_hours_count = len(session_bars) - len(regular_bars)
         actual_times = {
@@ -606,7 +639,7 @@ def run_intraday_paper_demo(
             positions=_positions_to_snapshots(positions),
             session_state=session_state,
             config=risk_config,
-            market_is_open=_is_regular_session_bar(trade.entry_timestamp.time()),
+            market_is_open=_is_regular_session_bar(trade.entry_timestamp.time(), timeframe=trade.timeframe),
         )
         request = ExecutionRequest(
             signal=signal,
@@ -906,7 +939,11 @@ def build_intraday_summary_payload(
         "session_summary_overview": session_summary["sessions"],
         "limitations": [
             "当前仍处于 paper / simulated 边界，不代表 broker/live/real-money 能力。",
-            f"当前 intraday pilot 只覆盖 {config.instrument.symbol} {config.interval} regular session，不包含期权、不包含多标的并发。",
+            (
+                f"当前 intraday pilot 只覆盖 {config.instrument.symbol} {config.interval} regular session，不包含期权、不包含多标的并发。"
+                if not config.session.allow_extended_hours
+                else f"当前 intraday pilot 只覆盖 {config.instrument.symbol} {config.interval} 单标的时段回放，不包含期权、不包含多标的并发。"
+            ),
             "statement / source_note 仍只进入 knowledge_trace，不参与 trigger。",
             "当前滑点/手续费模型是最小可配置研究模型，不是实盘成交真实性证明。",
         ],
@@ -1112,19 +1149,20 @@ def _close_due_intraday_positions(
 
 
 def _expected_session_times(timeframe: str) -> set[str]:
-    if timeframe != "15m":
+    step_minutes = INTRADAY_INTERVAL_TO_MINUTES.get(timeframe)
+    if step_minutes is None:
         raise ValueError(f"Unsupported intraday timeframe: {timeframe}")
     current = datetime.combine(date.today(), REGULAR_SESSION_START)
-    end = datetime.combine(date.today(), REGULAR_SESSION_LAST_BAR)
     values = set()
-    while current <= end:
+    close = datetime.combine(date.today(), REGULAR_SESSION_CLOSE)
+    while current < close:
         values.add(current.time().strftime("%H:%M"))
-        current += timedelta(minutes=15)
+        current += timedelta(minutes=step_minutes)
     return values
 
 
-def _is_regular_session_bar(value: time) -> bool:
-    return REGULAR_SESSION_START <= value <= REGULAR_SESSION_LAST_BAR
+def _is_regular_session_bar(value: time, *, timeframe: str) -> bool:
+    return value.strftime("%H:%M") in _expected_session_times(timeframe)
 
 
 def _iter_trade_candidates(

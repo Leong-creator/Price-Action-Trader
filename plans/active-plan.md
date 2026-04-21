@@ -27,6 +27,8 @@
 - M8E.1：Validation Gap Closure 已完成，当前已把 checked-in `summary.json` / `report.md` 的路径元数据统一为 repo-relative logical path，给 `m8c1_long_horizon_daily_validation` 增加 `sample_adequacy`，并补齐 golden catalog smoke test 与 artifact portability 回归。
 - M8E.2：Longer-Window Daily Validation 已完成，当前已新增 `config/examples/public_history_backtest_longer_window.json`，并生成 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`，覆盖 `2018-01-01 ~ 2026-04-17`、`NVDA / TSLA / SPY`、`1d` 的更长窗口 daily validation。
 - M8E.3 当前继续延后：在每个标的至少具备 `30` 个完整 regular session 之前，不启动 intraday 更长窗口扩展。
+- 已从 `main` 切出 `feature/m9-price-action-strategy-lab` 作为新支线，当前目标是把知识来源系统性提炼为 strategy cards、测试计划与可回测候选，而不是扩展 trigger、risk、execution 或 broker。
+- M9 的来源优先级固定为：`fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。
 
 ## 2. 执行总原则
 
@@ -735,9 +737,9 @@
   - 已新增 repo-safe 小样本 manifest：`tests/test_data/real_history_small/sample_us_5m_recorded_session/dataset.manifest.json`。
   - 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`。
   - 已补齐 `docs/test-dataset-curation.md` 与 `reports/reliability/README.md`，固定 small/large dataset 约定、受控标签与报告最小字段。
-  - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通公共历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
-  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`。
-  - 已完成一轮公共历史数据演示回测：使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`。
+  - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
+  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，并在当前轮次把默认入口切到 `config/examples/public_history_backtest_long_horizon_longbridge.json`。
+  - 已完成一轮公共历史数据演示回测：早期历史 run 使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`；当前默认入口已改为 `Longbridge simulated account -> local CSV cache`。
   - 该示例 run 在当前 demo 风控参数下录得 `1.9923%` 总收益率、`1.5157%` 最大回撤、`16` 笔交易、`43.75%` 胜率；仍明确保持 `paper / simulated`，不代表实盘能力。
   - 当前更完整的真实历史样本、用户自有 CSV、录制型实时样本与 shadow/paper 延展验证仍可继续扩展，但本轮没有引入真实 broker、真实账户或 live execution。
 
@@ -782,3 +784,55 @@
 - `python` 命令已可用，因此验证命令统一写为 `python ...`。
 - 第一实施波次固定为 M1 后接 M2；浏览器验证与正式券商 API 评估都排在后续，不得前置。
 - 若任一 milestone 在执行中触发熔断，则冻结该里程碑分支，更新 `docs/status.md`，输出 Failure Dossier，并等待用户决策。
+
+## 20. M9：Price Action Strategy Lab
+
+- 分支：`feature/m9-price-action-strategy-lab`
+- 当前状态：进行中
+- 目标：
+  - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，把知识来源提炼为可读、可维护、可测试的 Markdown 策略卡与测试计划。
+  - 建立 `原始来源 -> 来源索引 -> Markdown 摘要 -> 策略卡 -> 测试计划 -> 可回测候选策略` 的最小闭环。
+- 固定范围：
+  - 必须先保存当前项目快照。
+  - 必须优先盘点并使用 `fangfangtu_transcript`，其次 `al_brooks_ppt`，最后 `fangfangtu_notes`。
+  - 本轮至少交付：首批 10 张策略卡、3 份详细测试计划、策略卡索引、strategy lab 汇总报告。
+  - 本轮不承诺新增回测结果；若数据不足，必须显式披露。
+- 明确不做：
+  - 不改 trigger 逻辑。
+  - 不触碰 `src/risk/`、`src/execution/`、`src/broker/`。
+  - 不进入真实 broker、真实账户、live execution、付费 API。
+  - 不修改 `knowledge/raw/`。
+- 子阶段：
+  - `M9A`：保存当前进度、建立支线和目录骨架。
+  - `M9B`：盘点 raw/source/chunk/atom/wiki 资料并写 `m9_source_inventory.md`。
+  - `M9C`：提炼首批 10 张 strategy cards。
+  - `M9D`：为所有卡片补测试计划，并为优先级最高的 3 张卡写详细计划。
+  - `M9E`：为后续回测实验挑选候选策略与数据缺口。
+  - `M9F`：输出普通人可读的 strategy lab summary。
+- 当前 M9E 聚焦：
+  - 当前只推进 `PA-SC-002`，不并行扩到 `PA-SC-003`、`PA-SC-005`。
+  - 已完成 `PA-SC-002 v0.1` 的最小闭环：可执行规则、最小实验设计、`SPY / 5m / regular session only` 第一轮回测、美元口径结果报告。
+  - 已完成 `Midday Block`、`Stronger Negative Veto`、`Midday Block + Stronger Veto` 与 `Late Only Upper Bound` 诊断型变体测试；当前最优先的正式重测候选为 `Midday Block`。
+- 关键产物：
+  - `knowledge/wiki/strategy_cards/`
+  - `reports/strategy_lab/m9_initial_project_snapshot.md`
+  - `reports/strategy_lab/m9_source_inventory.md`
+  - `reports/strategy_lab/m9_strategy_extraction_log.md`
+  - `reports/strategy_lab/m9_strategy_test_plan_index.md`
+  - `reports/strategy_lab/m9_strategy_lab_summary.md`
+- 验收前提：
+  - 文档、KB schema、validator、index 与 strategy_cards 字段契约保持一致。
+  - 所有策略卡必须保留真实 `source_refs` 与证据不足说明。
+  - `statement`、`source_note`、`bundle support` 仍不得进入 trigger。
+- 可并行子任务：
+  - `researcher`：快照与来源盘点。
+  - `kb_curator`：策略卡正文、来源依据、缺口与 extraction log。
+  - `implementer`：schema、validator、index、模板与索引脚手架。
+  - `reviewer`：真实性、边界与回归风险审查。
+  - `qa`：KB/trace/reliability 回归与验收清单。
+- 风险：
+  - 把 raw/source/statement/promoted curated 混成 executable rule。
+  - 把 `insufficient_sample`、`paper / simulated` 结果包装成充分验证或稳定盈利。
+  - 因模板目录和新状态枚举引入 KB 校验漂移。
+- 回退点：
+  - 本支线初始回退点固定为 `main@d9ef8a73ff8bdb4e08605b13cd64233d95ade6dc`。

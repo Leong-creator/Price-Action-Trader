@@ -1,14 +1,13 @@
 {
-  "title": "Public History Longer-Window Daily Validation",
-  "description": "Longer-window walk-forward daily validation on cached public research data. Still paper/simulated only.",
+  "title": "Historical Longer-Window Daily Validation (Longbridge)",
+  "description": "Longer-window walk-forward daily validation on Longbridge-sourced research data. Still paper/simulated only.",
   "start": "2018-01-01",
   "end": "2026-04-17",
   "interval": "1d",
-  "cache_dir": "local_data/public_history",
+  "cache_dir": "local_data/longbridge_history",
   "report_dir": "reports/backtests",
   "source_order": [
-    "alpha_vantage",
-    "yfinance"
+    "longbridge"
   ],
   "instruments": [
     {

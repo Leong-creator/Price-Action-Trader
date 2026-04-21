@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from src.backtest import BacktestReport, BacktestStats
 from src.strategy.contracts import KnowledgeAtomHit
@@ -22,6 +23,45 @@ SPEC.loader.exec_module(MODULE)
 
 
 class PublicBacktestDemoTests(unittest.TestCase):
+    def test_load_demo_config_defaults_to_longbridge_when_source_order_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "demo.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "title": "Unit Demo",
+                        "start": "2026-01-05",
+                        "end": "2026-01-05",
+                        "interval": "1d",
+                        "cache_dir": str(Path(temp_dir) / "cache"),
+                        "report_dir": str(Path(temp_dir) / "reports"),
+                        "instruments": [
+                            {
+                                "ticker": "SPY",
+                                "symbol": "SPY",
+                                "label": "SPY",
+                                "market": "US",
+                                "timezone": "America/New_York"
+                            }
+                        ],
+                        "risk": {
+                            "starting_capital": "10000",
+                            "risk_per_trade": "100",
+                            "max_total_exposure": "10000",
+                            "max_symbol_exposure_ratio": "1.00",
+                            "max_daily_loss": "500",
+                            "max_consecutive_losses": 4
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            config = MODULE.load_demo_config(config_path)
+
+        self.assertEqual(config.source_order, ("longbridge",))
+
     def test_build_ohlcv_row_round_trip_schema(self) -> None:
         instrument = MODULE.InstrumentConfig(
             ticker="NVDA",
@@ -86,6 +126,98 @@ class PublicBacktestDemoTests(unittest.TestCase):
         )
         self.assertEqual(quantity, MODULE.Decimal("20"))
 
+    def test_fetch_public_history_rows_supports_longbridge_source(self) -> None:
+        instrument = MODULE.InstrumentConfig(
+            ticker="SPY",
+            symbol="SPY",
+            label="SPDR S&P 500 ETF",
+            market="US",
+            timezone="America/New_York",
+            demo_role="fixture",
+        )
+        with mock.patch.object(
+            MODULE,
+            "fetch_longbridge_daily_history_rows",
+            return_value=[{"symbol": "SPY"}],
+        ) as fetch_mock:
+            rows = MODULE.fetch_public_history_rows(
+                instrument=instrument,
+                start=MODULE.date.fromisoformat("2026-01-05"),
+                end=MODULE.date.fromisoformat("2026-01-06"),
+                interval="1d",
+                source="longbridge",
+            )
+
+        self.assertEqual(rows, [{"symbol": "SPY"}])
+        fetch_mock.assert_called_once()
+
+    def test_sanitize_vendor_rows_quarantines_invalid_ohlc_ranges(self) -> None:
+        rows, anomalies = MODULE.sanitize_vendor_rows(
+            [
+                {
+                    "symbol": "SPY",
+                    "market": "US",
+                    "timeframe": "1d",
+                    "timestamp": "2026-01-05T16:00:00-05:00",
+                    "timezone": "America/New_York",
+                    "open": "100.0",
+                    "high": "101.0",
+                    "low": "99.5",
+                    "close": "100.5",
+                    "volume": "1000",
+                },
+                {
+                    "symbol": "SPY",
+                    "market": "US",
+                    "timeframe": "1d",
+                    "timestamp": "2026-01-06T16:00:00-05:00",
+                    "timezone": "America/New_York",
+                    "open": "100.0",
+                    "high": "99.0",
+                    "low": "98.5",
+                    "close": "99.5",
+                    "volume": "1000",
+                },
+            ]
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(anomalies[0]["reason"], "ohlc_range_inconsistent")
+
+    def test_run_paper_demo_resets_risk_session_per_trading_day(self) -> None:
+        first = self._symbol_result_for_paper_demo(
+            signal_id="sig-loss",
+            entry_timestamp="2026-01-05T16:00:00-05:00",
+            exit_timestamp="2026-01-05T16:00:00-05:00",
+            exit_price="99",
+            exit_reason="stop_hit",
+        )
+        second = self._symbol_result_for_paper_demo(
+            signal_id="sig-win",
+            entry_timestamp="2026-01-06T16:00:00-05:00",
+            exit_timestamp="2026-01-06T16:00:00-05:00",
+            exit_price="102",
+            exit_reason="target_hit",
+        )
+
+        outcome = MODULE.run_paper_demo(
+            (first, second),
+            risk_settings=MODULE.DemoRiskSettings(
+                starting_capital=MODULE.Decimal("10000"),
+                risk_per_trade=MODULE.Decimal("100"),
+                max_total_exposure=MODULE.Decimal("10000"),
+                max_symbol_exposure_ratio=MODULE.Decimal("1"),
+                max_daily_loss=MODULE.Decimal("1000"),
+                max_consecutive_losses=1,
+            ),
+        )
+
+        self.assertEqual(len(outcome.executed_trades), 2)
+        self.assertEqual(len(outcome.blocked_signals), 0)
+        self.assertEqual(outcome.executed_trades[0].trade.entry_timestamp.date().isoformat(), "2026-01-05")
+        self.assertEqual(outcome.executed_trades[1].trade.entry_timestamp.date().isoformat(), "2026-01-06")
+
     @unittest.skipUnless(MODULE.plt is not None, "matplotlib not available in the active interpreter")
     def test_create_backtest_run_from_cached_fixture_generates_reports(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -103,7 +235,7 @@ class PublicBacktestDemoTests(unittest.TestCase):
                         "interval": "5m",
                         "cache_dir": str(cache_dir),
                         "report_dir": str(report_dir),
-                        "source_order": ["yfinance"],
+                        "source_order": ["longbridge"],
                         "splits": [
                             {
                                 "name": "unit_split",
@@ -144,11 +276,11 @@ class PublicBacktestDemoTests(unittest.TestCase):
                 encoding="utf-8",
             )
             config = MODULE.load_demo_config(config_path)
-            cache_path = MODULE.build_cache_path(config, config.instruments[0], source="yfinance")
+            cache_path = MODULE.build_cache_path(config, config.instruments[0], source="longbridge")
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / "tests" / "test_data" / "ohlcv_sample_5m.csv", cache_path)
             cache_path.with_suffix(".metadata.json").write_text(
-                json.dumps({"source": "yfinance", "row_count": 5}, ensure_ascii=False),
+                json.dumps({"source": "longbridge", "row_count": 5}, ensure_ascii=False),
                 encoding="utf-8",
             )
 
@@ -598,6 +730,110 @@ class PublicBacktestDemoTests(unittest.TestCase):
             quantity=MODULE.Decimal("10"),
             pnl_cash=MODULE.Decimal("20"),
             equity_after_close=MODULE.Decimal("10020"),
+        )
+
+    def _symbol_result_for_paper_demo(
+        self,
+        *,
+        signal_id: str,
+        entry_timestamp: str,
+        exit_timestamp: str,
+        exit_price: str,
+        exit_reason: str,
+    ) -> MODULE.SymbolBacktestResult:
+        base_signal = self._signal_with_trace(trace_count=3)
+        signal = MODULE.Signal(
+            signal_id=signal_id,
+            symbol=base_signal.symbol,
+            market=base_signal.market,
+            timeframe="1d",
+            direction=base_signal.direction,
+            setup_type=base_signal.setup_type,
+            pa_context=base_signal.pa_context,
+            entry_trigger=base_signal.entry_trigger,
+            stop_rule=base_signal.stop_rule,
+            target_rule=base_signal.target_rule,
+            invalidation=base_signal.invalidation,
+            confidence=base_signal.confidence,
+            source_refs=base_signal.source_refs,
+            actual_source_refs=base_signal.actual_source_refs,
+            bundle_support_refs=base_signal.bundle_support_refs,
+            explanation=base_signal.explanation,
+            risk_notes=base_signal.risk_notes,
+            knowledge_trace=base_signal.knowledge_trace,
+            knowledge_debug_trace=base_signal.knowledge_debug_trace,
+        )
+        instrument = MODULE.InstrumentConfig(
+            ticker="SAMPLE",
+            symbol="SAMPLE",
+            label="Sample",
+            market="US",
+            timezone="America/New_York",
+            demo_role="smoke",
+        )
+        trade = MODULE.TradeRecord(
+            signal_id=signal.signal_id,
+            symbol=signal.symbol,
+            market=signal.market,
+            timeframe=signal.timeframe,
+            direction=signal.direction,
+            setup_type=signal.setup_type,
+            signal_bar_index=2,
+            signal_bar_timestamp=MODULE.datetime.fromisoformat(entry_timestamp),
+            entry_bar_index=3,
+            entry_timestamp=MODULE.datetime.fromisoformat(entry_timestamp),
+            entry_price=MODULE.Decimal("100"),
+            stop_price=MODULE.Decimal("99"),
+            target_price=MODULE.Decimal("102"),
+            exit_bar_index=4,
+            exit_timestamp=MODULE.datetime.fromisoformat(exit_timestamp),
+            exit_price=MODULE.Decimal(exit_price),
+            exit_reason=exit_reason,
+            risk_per_share=MODULE.Decimal("1"),
+            pnl_per_share=MODULE.Decimal(exit_price) - MODULE.Decimal("100"),
+            pnl_r=(MODULE.Decimal(exit_price) - MODULE.Decimal("100")) / MODULE.Decimal("1"),
+            bars_held=1,
+            source_refs=signal.source_refs,
+            explanation=signal.explanation,
+            risk_notes=signal.risk_notes,
+        )
+        report = BacktestReport(
+            trades=(trade,),
+            stats=BacktestStats(
+                total_signals=1,
+                trade_count=1,
+                closed_trade_count=1,
+                win_count=1 if MODULE.Decimal(exit_price) > MODULE.Decimal("100") else 0,
+                loss_count=1 if MODULE.Decimal(exit_price) < MODULE.Decimal("100") else 0,
+                win_rate=MODULE.Decimal("1.0000")
+                if MODULE.Decimal(exit_price) > MODULE.Decimal("100")
+                else MODULE.Decimal("0.0000"),
+                average_win_r=MODULE.Decimal("2.0000")
+                if MODULE.Decimal(exit_price) > MODULE.Decimal("100")
+                else MODULE.Decimal("0.0000"),
+                average_loss_r=MODULE.Decimal("-1.0000")
+                if MODULE.Decimal(exit_price) < MODULE.Decimal("100")
+                else MODULE.Decimal("0.0000"),
+                expectancy_r=(MODULE.Decimal(exit_price) - MODULE.Decimal("100")) / MODULE.Decimal("1"),
+                total_pnl_r=(MODULE.Decimal(exit_price) - MODULE.Decimal("100")) / MODULE.Decimal("1"),
+                profit_factor=None,
+                max_drawdown_r=MODULE.Decimal("0.0000"),
+                trades_per_100_bars=MODULE.Decimal("20.0000"),
+                slippage_sensitivity=(),
+            ),
+            summary="unit",
+            warnings=(),
+            assumptions=(),
+        )
+        return MODULE.SymbolBacktestResult(
+            instrument=instrument,
+            source="fixture",
+            csv_path=ROOT / "tests" / "test_data" / "ohlcv_sample_5m.csv",
+            metadata_path=ROOT / "tests" / "test_data" / "README.md",
+            bars=(),
+            bars_count=5,
+            signals=(signal,),
+            backtest_report=report,
         )
 
     def _backtest_report(self, signal_id: str) -> BacktestReport:

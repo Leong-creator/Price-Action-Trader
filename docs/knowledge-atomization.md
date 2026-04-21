@@ -10,6 +10,7 @@
 - 不进入 broker / live / real-money / real-account
 - 不修改 `knowledge/raw/`
 - 不把 source-level 或 statement-level callable 包装成 executable strategy rule
+- `M9 strategy cards` 只允许消费上述层的 evidence / traceability，不得把 statement、source_note 或 bundle support 直接升格为 trigger
 
 ## 四层结构
 

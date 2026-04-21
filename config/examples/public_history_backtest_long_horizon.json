@@ -1,14 +1,13 @@
 {
-  "title": "Public History Long-Horizon Daily Validation",
-  "description": "Long-horizon walk-forward daily validation on cached public research data. Still paper/simulated only.",
+  "title": "Historical Long-Horizon Daily Validation (Longbridge)",
+  "description": "Long-horizon walk-forward daily validation on Longbridge-sourced research data. Still paper/simulated only.",
   "start": "2020-01-01",
   "end": "2025-12-31",
   "interval": "1d",
-  "cache_dir": "local_data/public_history",
+  "cache_dir": "local_data/longbridge_history",
   "report_dir": "reports/backtests",
   "source_order": [
-    "alpha_vantage",
-    "yfinance"
+    "longbridge"
   ],
   "instruments": [
     {

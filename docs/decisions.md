@@ -63,7 +63,7 @@
 ## D-0013 用户可读历史回测演示边界冻结
 
 - 日期：2026-04-17
-- 结论：为提供用户可直接理解的真实历史数据回测演示，优先使用公共、低成本、无需 broker 权限的数据源，并将下载结果缓存为本地 CSV。若环境无 Alpha Vantage key，则允许回退到 `yfinance` 作为 research-only fallback。该演示链路只服务于历史研究与 `paper / simulated` 报告输出，不代表 broker/live/real-money 能力。
+- 结论：为提供用户可直接理解的真实历史数据回测演示，优先使用公共、低成本、无需 broker 权限的数据源，并将下载结果缓存为本地 CSV。若环境无 Alpha Vantage key，则允许回退到 `yfinance` 作为 research-only fallback。该演示链路只服务于历史研究与 `paper / simulated` 报告输出，不代表 broker/live/real-money 能力。该默认入口口径已在 `D-0031` 被 Longbridge 默认链路覆盖，当前仅保留为历史阶段记录。
 
 ## D-0014 M8B.1 知识来源 traceability 门禁冻结
 
@@ -144,3 +144,13 @@
 
 - 日期：2026-04-18
 - 结论：`M8E.3` 当前继续延后。在每个候选标的至少具备 `30` 个完整 regular session 之前，不得启动 intraday 更长窗口扩展；当前 `SPY / NVDA 15m` 仍只有 `13` 个 session/标的，样本不足以支持下一轮 intraday 窗口放大。后续即便满足 session 数量门槛，也仍必须继续保持 session completeness、timezone、risk reset、`no-trade / wait`、knowledge trace 与 trigger 不变边界。
+
+## D-0030 M9 Price Action Strategy Lab 支线冻结
+
+- 日期：2026-04-20
+- 结论：允许在 `feature/m9-price-action-strategy-lab` 上启动 `M9：Price Action Strategy Lab`，但该支线只负责知识提炼、策略卡、测试计划与回测准备，不得改 trigger，不得触碰 `src/risk/`、`src/execution/`、`src/broker/`，不得重开 broker/live/real-money。M9 的来源优先级固定为 `fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。任何只有 notes 支持、缺少 transcript/Brooks 补证的策略，只能保留为 `draft`，不得写成 `promoted` 或已验证可执行规则。`statement`、`source_note`、`bundle support` 仍只允许停留在 trace / explanation / review / report 层，不得进入 trigger、confidence 或排序代理。
+
+## D-0031 默认历史数据源切换到 Longbridge
+
+- 日期：2026-04-21
+- 结论：自当前轮次起，项目默认历史回测数据源统一切换到 `Longbridge simulated account -> local CSV cache`。`scripts/run_public_backtest_demo.py`、`scripts/download_public_history.py`、`scripts/run_intraday_pilot.py` 与 `PA-SC-002` 的默认实验入口都必须优先落到 Longbridge 配置；`Alpha Vantage` / `yfinance` 只保留为显式指定时的兼容或历史对照路径，不再作为默认自动回退链路。该调整只改变默认历史数据入口，不改变 `paper / simulated`、`no-go`、不触碰真实下单、持仓、资产或 live execution 边界。
