@@ -1,0 +1,32 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "required_zero_passes": 2,
+  "passes": [
+    {
+      "pass_index": 1,
+      "new_strategy_candidates": 0,
+      "new_promotions": 0,
+      "new_restored_candidates": 0,
+      "new_false_negative_findings": 0,
+      "required_zero_passes": 2,
+      "consecutive_zero_passes": 1,
+      "closure_reached": false,
+      "closure_reason": "first zero-delta pass recorded; one more zero pass required before closure"
+    },
+    {
+      "pass_index": 2,
+      "new_strategy_candidates": 0,
+      "new_promotions": 0,
+      "new_restored_candidates": 0,
+      "new_false_negative_findings": 0,
+      "required_zero_passes": 2,
+      "consecutive_zero_passes": 2,
+      "closure_reached": true,
+      "closure_reason": "two consecutive convergence passes found zero new candidates/promotions/restorations/false negatives"
+    }
+  ],
+  "consecutive_zero_passes": 2,
+  "closure_reached": true,
+  "closure_reason": "two consecutive convergence passes found zero new candidates/promotions/restorations/false negatives"
+}

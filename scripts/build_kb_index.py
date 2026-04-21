@@ -30,6 +30,13 @@ INDEX_FIELDS = [
     "needs_visual_review",
     "test_priority",
     "last_updated",
+    "factory_stage",
+    "readiness_gate",
+    "factory_decision",
+    "decision_reason",
+    "legacy_overlap_refs",
+    "historical_comparison_refs",
+    "historical_benchmark_refs",
 ]
 SKIP_DIR_NAMES = {"templates"}
 
@@ -133,6 +140,13 @@ def build_index_records(root: Path, repo_root: Path) -> list[dict[str, object]]:
             "needs_visual_review": frontmatter.get("needs_visual_review", ""),
             "test_priority": frontmatter.get("test_priority", ""),
             "last_updated": frontmatter.get("last_updated", ""),
+            "factory_stage": frontmatter.get("factory_stage", ""),
+            "readiness_gate": frontmatter.get("readiness_gate", ""),
+            "factory_decision": frontmatter.get("factory_decision", ""),
+            "decision_reason": frontmatter.get("decision_reason", ""),
+            "legacy_overlap_refs": ensure_list(frontmatter.get("legacy_overlap_refs")),
+            "historical_comparison_refs": ensure_list(frontmatter.get("historical_comparison_refs")),
+            "historical_benchmark_refs": ensure_list(frontmatter.get("historical_benchmark_refs")),
         }
         index.append({field: record[field] for field in INDEX_FIELDS})
     return index

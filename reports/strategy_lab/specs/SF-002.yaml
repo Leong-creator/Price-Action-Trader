@@ -1,0 +1,41 @@
+strategy_id: "SF-002"
+title: "Breakout Follow-Through Continuation"
+setup_family: "breakout_follow_through_continuation"
+market_context:
+  - "breakout"
+  - "follow_through"
+  - "trend_continuation"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。"
+stop_idea: "放在 breakout bar 或 follow-through cluster 的 opposite extreme 外侧。"
+target_idea: "优先看 measured move 与后续 second leg continuation。"
+invalidation:
+  - "breakout 后 follow-through 很差"
+  - "出现 deep pullback 或 gap 被迅速回补"
+no_trade_conditions:
+  - "突破没有急迫感或没有连续性"
+  - "处于明显 trading range 且 follow-through 质量差"
+parameter_candidates:
+  - "minimum breakout bar body size"
+  - "follow-through bars within 2~3 bars"
+  - "gap persistence requirement"
+expected_failure_modes:
+  - "TR 内追 breakout 被 80-20 假突破打回"
+  - "把 weak breakout 误判成 strong breakout"
+data_requirements:
+  - "OHLCV with session labels"
+  - "gap detection based on bar overlap"
+chart_dependency: "medium"
+test_priority: "high"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"

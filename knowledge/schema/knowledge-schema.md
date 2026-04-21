@@ -107,12 +107,21 @@ frontmatter 模板保持同名：
 - `needs_visual_review`
 - `test_priority`
 - `last_updated`
+- `factory_stage`
+- `readiness_gate`
+- `factory_decision`
+- `decision_reason`
+- `legacy_overlap_refs`
+- `historical_comparison_refs`
+- `historical_benchmark_refs`
 
 说明：
 
 - `measured_move` 为布尔值。
 - `needs_visual_review` 为布尔值。
 - `risk_reward_min` 为数值或空值。
+- `factory_stage`、`readiness_gate`、`factory_decision`、`decision_reason`
+  为标量字段。
 - 其余 PA 字段按列表处理。
 
 ## 7. Strategy Card 补充约束
@@ -137,7 +146,41 @@ frontmatter 模板保持同名：
 - `market_context` 必须为非空列表。
 - `templates/` 目录中的 Markdown 文件只作模板，不参与 KB 校验与索引。
 
-## 8. wiki index 输出字段
+## 8. Strategy Factory 策略页补充约束
+
+位于 `knowledge/wiki/strategy_factory/strategies/` 目录下的页面视为
+strategy factory strategy，除通用字段外还必须补齐：
+
+- `strategy_id`
+- `source_family`
+- `setup_family`
+- `market_context`
+- `evidence_quality`
+- `chart_dependency`
+- `needs_visual_review`
+- `test_priority`
+- `last_updated`
+- `factory_stage`
+- `readiness_gate`
+- `factory_decision`
+- `decision_reason`
+- `legacy_overlap_refs`
+- `historical_comparison_refs`
+- `historical_benchmark_refs`
+
+说明：
+
+- `strategy_id` 必须使用 `SF-*` 编号空间。
+- `readiness_gate` 允许值固定为：
+  `ready`、`needs_visual_review`、`needs_event_labels`、
+  `needs_definition_freeze`、`blocked_source`、`blocked_provider`。
+- `factory_decision` 允许值固定为：
+  `retain`、`modify_and_retest`、`insufficient_sample`、`parked`、
+  `rejected_variant`。
+- `legacy_overlap_refs`、`historical_comparison_refs`、
+  `historical_benchmark_refs` 必须为列表。
+
+## 9. wiki index 输出字段
 
 `scripts/build_kb_index.py` 生成的 `knowledge/wiki_index.json` 至少保留以下字段：
 
@@ -162,8 +205,15 @@ frontmatter 模板保持同名：
 - `needs_visual_review`
 - `test_priority`
 - `last_updated`
+- `factory_stage`
+- `readiness_gate`
+- `factory_decision`
+- `decision_reason`
+- `legacy_overlap_refs`
+- `historical_comparison_refs`
+- `historical_benchmark_refs`
 
-## 9. M1 / M9 验证约束
+## 10. M1 / M9 验证约束
 
 - 空 wiki 目录必须返回成功，不视为错误。
 - 非空 wiki 目录至少应支持 `concept`、`setup`、`source` 三类页面。

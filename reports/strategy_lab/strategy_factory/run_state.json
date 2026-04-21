@@ -1,0 +1,20 @@
+{
+  "schema_version": "v1",
+  "factory_run_id": "m9-strategy-factory-full-extraction-audit-v4",
+  "current_phase": "M9G.audit_v4_completed",
+  "resume_cursor": {
+    "phase": "completed",
+    "audit_pass": "saturation_convergence_pass",
+    "source_family": null,
+    "source_id": null,
+    "category": null,
+    "chunk_offset": 5492
+  },
+  "active_batch_id": null,
+  "active_provider_config_path": "config/strategy_factory/active_provider_config.json",
+  "primary_provider": "longbridge",
+  "heartbeat_status": "completed",
+  "last_summary_at": "2026-04-21T14:06:43Z",
+  "text_extractable_closure": true,
+  "full_source_closure": false
+}

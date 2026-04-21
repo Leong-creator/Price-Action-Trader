@@ -1,5 +1,9 @@
 # M9 Source Inventory
 
+> Historical snapshot only. 自 `M9G.0` 起，本文件不再作为 coverage SoT。
+> 当前 coverage SoT 固定为 `knowledge/indices/source_manifest.json`，
+> 当前运行台账固定为 `reports/strategy_lab/strategy_factory/coverage_ledger.json`。
+
 ## 来源优先级
 
 1. `fangfangtu_transcript`

@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "ledger_kind": "strategy_factory_backtest_queue",
+  "namespace": "SF",
+  "contract_freeze_required": true,
+  "items": [],
+  "recommended_candidates": [
+    "SF-001",
+    "SF-002",
+    "SF-003",
+    "SF-004",
+    "SF-005"
+  ],
+  "status": "not_started_by_scope"
+}

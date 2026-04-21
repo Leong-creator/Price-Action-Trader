@@ -1,0 +1,41 @@
+strategy_id: "SF-004"
+title: "Tight Channel Trend Continuation"
+setup_family: "tight_channel_trend_continuation"
+market_context:
+  - "tight_channel"
+  - "always_in"
+  - "trend_continuation"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。"
+stop_idea: "放在最近短回调极值之外；若 channel 重叠明显增加则失效。"
+target_idea: "以前高/前低、measured move 或 trend day extension 为主。"
+invalidation:
+  - "channel 退化成 broad channel / trading range"
+  - "出现清晰的二次反转并伴随强 follow-through"
+no_trade_conditions:
+  - "在强窄通道里逆势数 wedge 或抢第一次反转"
+  - "回调 bar 数和重叠度已经明显失去 tight-channel 特征"
+parameter_candidates:
+  - "max pullback bars <= 3"
+  - "channel overlap threshold"
+  - "trend day session filter"
+expected_failure_modes:
+  - "把 weak channel 误当 tight channel"
+  - "进入 broad channel 后仍按 Always In 持有"
+data_requirements:
+  - "OHLCV with session labels"
+  - "channel overlap and pullback depth stats"
+chart_dependency: "medium"
+test_priority: "medium"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"

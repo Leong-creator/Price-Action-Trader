@@ -13,3 +13,5 @@ reports/backtests/*
 !reports/backtests/m8e2_longer_window_daily_validation/
 !reports/backtests/m8e2_longer_window_daily_validation/**
 knowledge/wiki_index.json
+knowledge/raw/brooks/ppt/AIbrooks价格行为通用版1-36单元.pdf
+knowledge/raw/brooks/ppt/AIbrooks价格行为通用版37-52单元.pdf

@@ -8,8 +8,10 @@
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M9 Price Action Strategy Lab`（进行中）
-- 当前子阶段：`M9A`~`M9D` 与 `M9F` 首轮已完成；`M9E`（优先策略进入回测实验）已启动，当前只聚焦 `PA-SC-002`
+- 当前支线 milestone：`M9 Price Action Strategy Lab / Strategy Factory Reset`（进行中）
+- 当前子阶段：`M9A`~`M9F` 首轮已完成并已降级为 legacy / historical baseline；`M9G Full Extraction Completeness Audit v4` 已完成，当前仍未进入 batch backtest
+
+<!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
@@ -70,7 +72,7 @@
 - M8D 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`
 - M8D 已补齐 `docs/test-dataset-curation.md` 的 small/large dataset、realtime recording 与受控标签规范，并更新 `reports/reliability/README.md` 的报告最小字段
 - M8D 当前已具备：manifest 校验、shadow/paper dry-run、报告 traceability、无样本 deferred 语义；尚未实际运行用户真实历史样本或录制型实时样本
-- 已新增 `scripts/download_public_history.py`，当前默认使用 `Longbridge` 只读历史行情下载并缓存为本地 CSV；`Alpha Vantage` / `yfinance` 只保留为显式指定时的兼容路径
+- 已新增 `scripts/download_public_history.py`，public-history 入口当前通过 repo config 中的 `source_order[0]` 解析 `primary_provider`；provider-specific 历史路径仍保留为兼容或对照事实
 - 已新增 `scripts/run_public_backtest_demo.py` 与 `scripts/run_public_backtest_demo.sh`，可在本地缓存基础上直接生成用户可读的历史回测演示报告
 - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示范围为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`
 - 已完成一轮公共历史数据演示回测：`yfinance` 下载的本地缓存已落在 `local_data/public_history/`，示例 run `demo_public_2024h1` 生成于 `reports/backtests/demo_public_2024h1/`
@@ -199,13 +201,13 @@
   - 已落盘 `reports/strategy_lab/m9_strategy_lab_summary.md`，汇总来源、策略卡、优先级、测试方案、当前不能证明的内容与下一步建议。
 - M9E `PA-SC-002` 第一轮最小闭环已完成：
   - 已落盘 `knowledge/wiki/strategy_cards/combined/PA-SC-002-executable-v0.1.md`、`reports/strategy_lab/pa_sc_002_minimum_experiment_v0.1.md`、`reports/strategy_lab/pa_sc_002_first_backtest_report.md`。
-  - 已在 `SPY / 5m / regular session only / yfinance / 2026-02-20 ~ 2026-04-17` 范围内完成第一轮最小回测，结果为 `98` 笔交易、Expectancy `-0.1066R`、净盈亏 `-$374.65`、期末权益 `$24,625.35`。该结果只保留为首轮历史记录，当前默认重测入口已切到 Longbridge。
+  - 已在 `SPY / 5m / regular session only / yfinance / 2026-02-20 ~ 2026-04-17` 范围内完成第一轮最小回测，结果为 `98` 笔交易、Expectancy `-0.1066R`、净盈亏 `-$374.65`、期末权益 `$24,625.35`。该结果只保留为首轮历史记录；后续 Strategy Factory 的 provider 选择以 repo config contract 为准。
   - 已明确本轮资本口径：默认起始本金 `$25,000`、单笔风险预算 `$100`，后续实验固定同步报告美元盈亏、权益变化与美元回撤。
 - M9E `PA-SC-002` 诊断型变体测试已完成：
   - 已落盘 `reports/strategy_lab/pa_sc_002_diagnostic_analysis.md` 与 `reports/strategy_lab/pa_sc_002_variant_suite.md`，并生成 `reports/strategy_lab/pa_sc_002_variant_suite_artifacts/`。
   - 当前诊断结论为：`Midday Block` 是唯一既改善明显、又仍达到最小 probe 门槛的单因素变体；`Stronger Negative Veto` 单独使用改善不足；`Late Only` 仅可视为后验诊断上限，不可直接升格为正式版本。
   - 当前 `PA-SC-002` 的业务结论仍为“修改后重测”，尚未达到保留进入第二轮改进的门槛。
-- M9 Longbridge 历史数据接入与长窗口验证已完成：
+- M9 provider-specific 历史数据接入与长窗口验证已完成：
   - 已新增 `scripts/longbridge_history_lib.py`，通过 `longbridge kline history --format json` 接入只读历史数据 adapter，并支持 `1m / 5m / 15m / 30m / 1h / 1d / 1w / 1mo / 1y` 的分段抓取。
   - 已新增 `config/examples/public_history_backtest_long_horizon_longbridge.json` 与 `config/examples/intraday_pilot_spy_5m_longbridge.json`，分别用于 `NVDA / TSLA / SPY 1d` 长周期 daily validation 与 `SPY 5m` intraday pilot。
   - 已完成模拟账户授权与真实下载验证：`NVDA / TSLA / SPY 1d` 已成功拉到 `2020-01-02 ~ 2025-12-31`，`SPY 5m` 已确认在当前账户权限下可稳定拉到 `2024-04-01 ~ 2026-04-17`。
@@ -214,10 +216,25 @@
   - 已修复 intraday session audit 的 timeframe 识别：`5m` regular session 现可正确接受 `15:50`、`15:55` 两根尾盘 bar，不再误判为 out-of-hours。
   - 当前 longbridge daily run `reports/backtests/m9_longbridge_daily_validation_reset/` 在 `2020-01-01 ~ 2025-12-31`、`NVDA / TSLA / SPY`、`1d` 条件下输出：总收益率 `14.2321%`、最大回撤 `7.3702%`、交易 `370` 笔；`in_sample / validation / out_of_sample` 三个 split 当前均为 `adequate`。
   - 当前 longbridge intraday run `reports/backtests/m9_longbridge_intraday_spy_5m_full_window/` 在 `2024-04-01 ~ 2026-04-17`、`SPY / 5m` 条件下输出：总收益率 `-62.6007%`、最大回撤 `62.6647%`、交易 `2869` 笔、可用 session `507 / 514`；说明数据覆盖已足够，但当前策略在该日内口径下表现较差。
-  - 当前项目默认回测入口已统一切到 Longbridge：`run_public_backtest_demo.py`、`download_public_history.py`、`run_intraday_pilot.py` 和 `PA-SC-002` 默认实验脚本都不再默认回退到 `yfinance`。
+  - 上述 provider-specific run 只保留为历史事实；当前 Strategy Factory 的 provider 口径已切到 config contract，而不是把某个 provider 名称写成长期默认值。
 - M9 配套契约与门禁已同步：
   - 已更新 `plans/active-plan.md`、`docs/acceptance.md`、`docs/decisions.md`、`docs/requirements.md`、`docs/architecture.md`、`docs/pa-strategy-spec.md`、`docs/knowledge-base-design.md`、`docs/knowledge-atomization.md`、`docs/roadmap.md`、`README.md`。
   - 已更新 `knowledge/schema/*.md`、`scripts/validate_kb.py`、`scripts/build_kb_index.py`，并新增 `tests/unit/test_kb_scripts.py` 以支持 strategy cards frontmatter 与 `templates/` 跳过逻辑。
+- M9G.0 Strategy Factory Contract Freeze & Legacy Boundary Reset 已完成：
+  - 已新增 `config/strategy_factory/active_provider_config.json`，并把 Strategy Factory 的 `primary_provider` 固定为 `active_provider_config_path -> source_order[0]` 的运行时 contract。
+  - 已新增 `docs/strategy-factory.md`、`reports/strategy_lab/strategy_factory_plan.md` 与 `knowledge/wiki/strategy_factory/` 目录骨架。
+  - 已新增 `reports/strategy_lab/strategy_factory/coverage_ledger.json`、`extraction_queue.json`、`catalog_ledger.json`、`backtest_queue.json`、`triage_ledger.json`、`run_state.json`、`final_summary.md`。
+  - `coverage_ledger.json` 当前已完整入账 `3 family / 10 source`，并显式保留 `fangfangtu-beginner-note`、`fangfangtu-wedge-note(partial)`、`al-brooks-price-action-ppt-37-52-units`。
+  - legacy `PA-SC-*` 目录与 `PA-SC-002` 历史报告当前只作为 legacy / historical baseline；新 catalog 不再以其编号、聚类或结论作为先验。
+  - 已新增 `scripts/validate_strategy_factory_contract.py` 与 `tests/unit/test_strategy_factory_contract.py`，用于校验 repo config、contract docs 与 `run_state.json` 的一致性。
+- M9G Full Extraction Completeness Audit v4 已完成：
+  - 已新增并冻结 `reports/strategy_lab/strategy_catalog.json`、`strategy_dedup_map.json`、`chunk_adjudication.jsonl`、`source_family_completeness_report.json`、`source_theme_coverage.json`、`cross_chunk_synthesis.json`、`cross_source_corroboration.json`、`cross_source_corroboration_final.json`、`overmerge_review.json`、`saturation_report.json`、`unresolved_strategy_extraction_gaps.json`、`full_extraction_audit.json` 与 `factory_summary.md`。
+  - 已生成 `reports/strategy_lab/cards/SF-001.md` ~ `SF-005.md` 与对应 `reports/strategy_lab/specs/SF-001.yaml` ~ `SF-005.yaml`。
+  - 新 catalog 当前冻结为 `5` 张 `SF-*` strategy cards：`SF-001 Trend Pullback Second Entry`、`SF-002 Breakout Follow-Through Continuation`、`SF-003 Failed Breakout Range-Edge Reversal`、`SF-004 Tight Channel Trend Continuation`、`SF-005 Gap Continuation Versus Exhaustion`。
+  - `full_extraction_audit.json` 当前结论为：`text_extractable_closure=true`、`full_source_closure=false`；原因是 visual-heavy / partial source gaps 仍存在，并已逐条写入 `unresolved_strategy_extraction_gaps.json`。
+  - `saturation_report.json` 当前已完成双轮连续零增量收敛检查，`closure_reached=true`。
+  - `cross_source_corroboration_final.json` 已在 catalog freeze 之后重算，后续文档与汇总只允许引用 final 版本。
+  - 当前 `ready_for_backtest=true` 只表示 text-extractable catalog 已具备进入下一阶段的条件，不代表本轮已启动任何 batch backtest。
 
 ## 当前阻塞
 
@@ -226,11 +243,10 @@
 
 ## 下一步
 
-- M9 下一步继续停留在 `M9E`，先只推进 `PA-SC-002` 的单策略收敛，不扩到 `PA-SC-003`、`PA-SC-005`。
-- `PA-SC-002` 当前最优先的正式重测方向是 `Midday Block`；`Midday Block + Stronger Veto` 只保留为第二优先的 underpowered 诊断版本，等待更长样本或更多标的后再决定是否升格。
-- 后续 `PA-SC-002` 与其他历史回测实验默认使用 Longbridge 历史缓存，不再把 `yfinance` 作为默认实验数据源。
-- `PA-SC-001`、`PA-SC-003`、`PA-SC-004`、`PA-SC-005`、`PA-SC-006`、`PA-SC-009` 暂不扩测，等 `PA-SC-002` 形成更清晰的保留/修改/淘汰结论后再决定。
-- `PA-SC-007`、`PA-SC-008`、`PA-SC-010` 先补图表、事件标签或统一定义；在完成这些前，不进入正式回测。
+- 当前不自动进入 batch backtest；是否启动下一阶段回测需要单独 Prompt / 用户决策。
+- 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json` 决定候选，不得回退到 legacy `PA-SC-*` 作为 seed。
+- 若 repo config、`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract 不一致，必须先修正文档/配置一致性，停止任何后续提炼或回测。
+- heartbeat / 自动推进若继续扩展，恢复状态只允许依赖 ledgers + `run_state.json.resume_cursor`。
 - M9 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
 - 当前长期稳定基线仍是 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 继续保留为历史阶段/里程碑分支，不再作为未来默认合并目标。

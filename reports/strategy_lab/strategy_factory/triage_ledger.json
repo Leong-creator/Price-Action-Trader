@@ -1,0 +1,12 @@
+{
+  "schema_version": "v1",
+  "ledger_kind": "strategy_factory_triage",
+  "allowed_factory_decisions": [
+    "retain",
+    "modify_and_retest",
+    "insufficient_sample",
+    "parked",
+    "rejected_variant"
+  ],
+  "entries": []
+}

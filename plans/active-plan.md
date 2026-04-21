@@ -738,8 +738,8 @@
   - 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`。
   - 已补齐 `docs/test-dataset-curation.md` 与 `reports/reliability/README.md`，固定 small/large dataset 约定、受控标签与报告最小字段。
   - 已新增 `scripts/download_public_history.py`、`scripts/run_public_backtest_demo.py`、`scripts/run_public_backtest_demo.sh`，打通历史数据下载缓存、用户可直接执行的一键回测入口与用户可读报告链路。
-  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，并在当前轮次把默认入口切到 `config/examples/public_history_backtest_long_horizon_longbridge.json`。
-  - 已完成一轮公共历史数据演示回测：早期历史 run 使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`；当前默认入口已改为 `Longbridge simulated account -> local CSV cache`。
+  - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，并在当时的历史阶段接入了 provider-specific 的 public-history 入口配置。
+  - 已完成一轮公共历史数据演示回测：早期历史 run 使用 `yfinance` 作为 research-only fallback，把数据缓存到 `local_data/public_history/`，并生成 `reports/backtests/demo_public_2024h1/`；当前 Strategy Factory 已改为通过 repo config 合同解析 `primary_provider`，不再把该历史 provider 名称写成长期固定口径。
   - 该示例 run 在当前 demo 风控参数下录得 `1.9923%` 总收益率、`1.5157%` 最大回撤、`16` 笔交易、`43.75%` 胜率；仍明确保持 `paper / simulated`，不代表实盘能力。
   - 当前更完整的真实历史样本、用户自有 CSV、录制型实时样本与 shadow/paper 延展验证仍可继续扩展，但本轮没有引入真实 broker、真实账户或 live execution。
 
@@ -790,49 +790,87 @@
 - 分支：`feature/m9-price-action-strategy-lab`
 - 当前状态：进行中
 - 目标：
-  - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，把知识来源提炼为可读、可维护、可测试的 Markdown 策略卡与测试计划。
-  - 建立 `原始来源 -> 来源索引 -> Markdown 摘要 -> 策略卡 -> 测试计划 -> 可回测候选策略` 的最小闭环。
+  - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，建立可恢复、可校验、以 `source_manifest` 为 SoT 的 Strategy Factory。
+  - 在进入任何 batch backtest 之前，先完成 `Full Extraction Completeness Audit v4`，证明 text-extractable 范围内的提炼已闭环，并把 visual / partial 缺口诚实列账。
 - 固定范围：
   - 必须先保存当前项目快照。
   - 必须优先盘点并使用 `fangfangtu_transcript`，其次 `al_brooks_ppt`，最后 `fangfangtu_notes`。
-  - 本轮至少交付：首批 10 张策略卡、3 份详细测试计划、策略卡索引、strategy lab 汇总报告。
-  - 本轮不承诺新增回测结果；若数据不足，必须显式披露。
+  - 已完成的 `PA-SC-*` 产物全部保留为 legacy / historical baseline。
+  - 新一轮提炼必须从 `knowledge/indices/source_manifest.json` 覆盖的全部来源重新开始。
 - 明确不做：
   - 不改 trigger 逻辑。
   - 不触碰 `src/risk/`、`src/execution/`、`src/broker/`。
   - 不进入真实 broker、真实账户、live execution、付费 API。
   - 不修改 `knowledge/raw/`。
 - 子阶段：
-  - `M9A`：保存当前进度、建立支线和目录骨架。
-  - `M9B`：盘点 raw/source/chunk/atom/wiki 资料并写 `m9_source_inventory.md`。
-  - `M9C`：提炼首批 10 张 strategy cards。
-  - `M9D`：为所有卡片补测试计划，并为优先级最高的 3 张卡写详细计划。
-  - `M9E`：为后续回测实验挑选候选策略与数据缺口。
-  - `M9F`：输出普通人可读的 strategy lab summary。
-- 当前 M9E 聚焦：
-  - 当前只推进 `PA-SC-002`，不并行扩到 `PA-SC-003`、`PA-SC-005`。
-  - 已完成 `PA-SC-002 v0.1` 的最小闭环：可执行规则、最小实验设计、`SPY / 5m / regular session only` 第一轮回测、美元口径结果报告。
-  - 已完成 `Midday Block`、`Stronger Negative Veto`、`Midday Block + Stronger Veto` 与 `Late Only Upper Bound` 诊断型变体测试；当前最优先的正式重测候选为 `Midday Block`。
+  - `M9A`~`M9F`：已完成，但当前只作为 legacy / historical baseline 保留。
+  - `M9G.0`：Contract Freeze & Legacy Boundary Reset（已完成）。
+  - `M9G Audit v4`：`Full-Pass Chunk Adjudication`、`Cross-Chunk Synthesis Pass`、`Discovery Closure`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass`、`Strategy Closure 与 Catalog Freeze`（已完成）。
+  - 下一步不是自动进入回测，而是等待单独的 batch backtest 决策 / Prompt。
+- 当前 Provider Contract：
+  <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
+  - `primary_provider` 的唯一运行时来源是 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]`。
+  - `plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 只描述这个 contract，不把 provider 名称写成长期固定口径。
+  - 若 repo config 与上述文档的 contract block 不一致，`M9G.0` 必须失败并先修正文档/配置一致性。
+- 当前 Legacy Boundary：
+  - `knowledge/wiki/strategy_cards/` 继续保留，但只作为 legacy / historical baseline。
+  - `PA-SC-*` 不得作为新 catalog 的 seed、family prior、默认 merge target 或 triage baseline。
+  - `PA-SC-002` 只允许作为 historical benchmark / regression reference。
+  - 新 catalog 的编号空间固定为 `SF-*`。
 - 关键产物：
-  - `knowledge/wiki/strategy_cards/`
+  - legacy baseline：
+    - `knowledge/wiki/strategy_cards/`
+    - `reports/strategy_lab/m9_source_inventory.md`
+    - `reports/strategy_lab/m9_strategy_extraction_log.md`
+    - `reports/strategy_lab/m9_strategy_test_plan_index.md`
+    - `reports/strategy_lab/m9_strategy_lab_summary.md`
+  - Strategy Factory：
+    - `knowledge/wiki/strategy_factory/`
+    - `reports/strategy_lab/strategy_factory/coverage_ledger.json`
+    - `reports/strategy_lab/strategy_factory/extraction_queue.json`
+    - `reports/strategy_lab/strategy_factory/catalog_ledger.json`
+    - `reports/strategy_lab/strategy_factory/backtest_queue.json`
+    - `reports/strategy_lab/strategy_factory/triage_ledger.json`
+    - `reports/strategy_lab/strategy_factory/run_state.json`
+    - `docs/strategy-factory.md`
+    - `reports/strategy_lab/strategy_factory_plan.md`
+    - `reports/strategy_lab/strategy_catalog.json`
+    - `reports/strategy_lab/strategy_dedup_map.json`
+    - `reports/strategy_lab/chunk_adjudication.jsonl`
+    - `reports/strategy_lab/source_family_completeness_report.json`
+    - `reports/strategy_lab/source_theme_coverage.json`
+    - `reports/strategy_lab/cross_chunk_synthesis.json`
+    - `reports/strategy_lab/cross_source_corroboration.json`
+    - `reports/strategy_lab/cross_source_corroboration_final.json`
+    - `reports/strategy_lab/overmerge_review.json`
+    - `reports/strategy_lab/saturation_report.json`
+    - `reports/strategy_lab/unresolved_strategy_extraction_gaps.json`
+    - `reports/strategy_lab/full_extraction_audit.json`
+    - `reports/strategy_lab/factory_summary.md`
+    - `reports/strategy_lab/cards/`
+    - `reports/strategy_lab/specs/`
   - `reports/strategy_lab/m9_initial_project_snapshot.md`
-  - `reports/strategy_lab/m9_source_inventory.md`
-  - `reports/strategy_lab/m9_strategy_extraction_log.md`
-  - `reports/strategy_lab/m9_strategy_test_plan_index.md`
-  - `reports/strategy_lab/m9_strategy_lab_summary.md`
 - 验收前提：
-  - 文档、KB schema、validator、index 与 strategy_cards 字段契约保持一致。
-  - 所有策略卡必须保留真实 `source_refs` 与证据不足说明。
+  - 文档、KB schema、validator、index 与 `strategy_factory` 字段契约保持一致。
+  - `knowledge/indices/source_manifest.json` 是唯一 coverage SoT；全部 10 个来源都必须进入 `coverage_ledger.json`，且零 silent skip。
+  - `run_state.json`、provider contract config 与 contract docs 必须可通过 `python scripts/validate_strategy_factory_contract.py`。
+  - 新提炼必须不读取 legacy `PA-SC-*` 作为先验；只允许用于 overlap / comparison / benchmark 字段。
   - `statement`、`source_note`、`bundle support` 仍不得进入 trigger。
+  - 全部 parseable chunks 必须完成 full-pass 审计，且 `unresolved=0`、`unmapped=0`。
+  - `Cross-Chunk Synthesis Pass`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass` 必须全部落盘。
+  - `saturation_report.json` 必须满足双轮连续零增量 closure。
+  - `full_extraction_audit.json` 必须同时写出 `text_extractable_closure=true` 与 `full_source_closure` 结论；若 `full_source_closure=false`，则 `unresolved_strategy_extraction_gaps.json` 必须完整存在。
+  - 本阶段仍不得启动任何 batch backtest。
 - 可并行子任务：
-  - `researcher`：快照与来源盘点。
-  - `kb_curator`：策略卡正文、来源依据、缺口与 extraction log。
-  - `implementer`：schema、validator、index、模板与索引脚手架。
+  - `researcher`：coverage baseline、legacy boundary 与差异盘点。
+  - `kb_curator`：legacy 标注、source mapping 与新 catalog wiki 目录整理。
+  - `implementer`：schema、validator、index、provider contract、ledger / run_state 模板。
   - `reviewer`：真实性、边界与回归风险审查。
   - `qa`：KB/trace/reliability 回归与验收清单。
 - 风险：
-  - 把 raw/source/statement/promoted curated 混成 executable rule。
-  - 把 `insufficient_sample`、`paper / simulated` 结果包装成充分验证或稳定盈利。
-  - 因模板目录和新状态枚举引入 KB 校验漂移。
+  - 把 legacy `PA-SC-*` 误当作新 catalog 的 family prior。
+  - 把 `source_manifest` 以外的 legacy snapshot 当成 coverage SoT。
+  - 把 provider-specific 历史事实误写成长期固定 provider 契约。
+  - 因新字段与目录引入 KB 校验漂移。
 - 回退点：
   - 本支线初始回退点固定为 `main@d9ef8a73ff8bdb4e08605b13cd64233d95ade6dc`。

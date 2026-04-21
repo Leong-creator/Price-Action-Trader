@@ -1,0 +1,472 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "namespace": "SF",
+  "catalog_status": "frozen",
+  "raw_candidate_count": 25,
+  "final_strategy_count": 5,
+  "strategies": [
+    {
+      "strategy_id": "SF-001",
+      "title": "Trend Pullback Second Entry",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"
+      ],
+      "source_family": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "evidence_refs": [
+        "chunk--0be93a3b36ffe5",
+        "chunk--40db9c89515ea4",
+        "chunk--5eb288c6a9ca65",
+        "chunk--c99661f8a7a47f"
+      ],
+      "setup_family": "trend_pullback_second_entry",
+      "market_context": [
+        "trend",
+        "pullback",
+        "second_entry"
+      ],
+      "applicable_market": [
+        "US",
+        "HK"
+      ],
+      "timeframe": [
+        "5m",
+        "15m",
+        "1h"
+      ],
+      "direction": "both",
+      "entry_idea": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+      "stop_idea": "放在 signal bar 或失败 second-entry 的 opposite extreme 外侧。",
+      "target_idea": "先看 1R~2R，若趋势与 channel 仍强则允许转成 swing。",
+      "invalidation": [
+        "后续 follow-through 很差",
+        "出现 bull trap / bear trap 或关键低点/高点被反向突破"
+      ],
+      "no_trade_conditions": [
+        "背景不是顺势 pullback",
+        "在强趋势第一次反转就逆势抢反转"
+      ],
+      "parameter_candidates": [
+        "pullback bar count <= 3",
+        "signal bar quality >= close near extreme",
+        "minimum R multiple >= 1.0"
+      ],
+      "expected_failure_modes": [
+        "把 broad channel 误当 tight trend",
+        "在 MM 附近或 climax 后继续追价"
+      ],
+      "chart_dependency": "medium",
+      "test_priority": "high",
+      "status": "candidate",
+      "open_questions": [],
+      "data_requirements": [
+        "OHLCV with session labels",
+        "bar-level high/low for stop placement"
+      ],
+      "legacy_overlap_refs": [
+        "wiki:knowledge/wiki/strategy_cards/combined/pa-sc-001-trend-pullback-resumption.md",
+        "wiki:knowledge/wiki/strategy_cards/combined/pa-sc-005-h2-l2-second-entry.md"
+      ],
+      "historical_comparison_refs": [
+        "report:reports/strategy_lab/m9_strategy_lab_summary.md"
+      ],
+      "historical_benchmark_refs": [],
+      "absorbed_candidate_ids": [
+        "RC-006",
+        "RC-013",
+        "RC-018"
+      ],
+      "canonical_candidate_id": "RC-024",
+      "supporting_candidate_ids": [
+        "RC-006",
+        "RC-013",
+        "RC-018",
+        "RC-024"
+      ]
+    },
+    {
+      "strategy_id": "SF-002",
+      "title": "Breakout Follow-Through Continuation",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+      ],
+      "source_family": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "evidence_refs": [
+        "chunk--7e94211d9cafe9",
+        "chunk--8e1e372ed7bd72",
+        "chunk--8fcbe85007224d",
+        "chunk--dbb4e097f6a13d"
+      ],
+      "setup_family": "breakout_follow_through_continuation",
+      "market_context": [
+        "breakout",
+        "follow_through",
+        "trend_continuation"
+      ],
+      "applicable_market": [
+        "US",
+        "HK"
+      ],
+      "timeframe": [
+        "5m",
+        "15m",
+        "1h"
+      ],
+      "direction": "both",
+      "entry_idea": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+      "stop_idea": "放在 breakout bar 或 follow-through cluster 的 opposite extreme 外侧。",
+      "target_idea": "优先看 measured move 与后续 second leg continuation。",
+      "invalidation": [
+        "breakout 后 follow-through 很差",
+        "出现 deep pullback 或 gap 被迅速回补"
+      ],
+      "no_trade_conditions": [
+        "突破没有急迫感或没有连续性",
+        "处于明显 trading range 且 follow-through 质量差"
+      ],
+      "parameter_candidates": [
+        "minimum breakout bar body size",
+        "follow-through bars within 2~3 bars",
+        "gap persistence requirement"
+      ],
+      "expected_failure_modes": [
+        "TR 内追 breakout 被 80-20 假突破打回",
+        "把 weak breakout 误判成 strong breakout"
+      ],
+      "chart_dependency": "medium",
+      "test_priority": "high",
+      "status": "candidate",
+      "open_questions": [],
+      "data_requirements": [
+        "OHLCV with session labels",
+        "gap detection based on bar overlap"
+      ],
+      "legacy_overlap_refs": [
+        "wiki:knowledge/wiki/strategy_cards/combined/pa-sc-002-breakout-follow-through.md"
+      ],
+      "historical_comparison_refs": [
+        "report:reports/strategy_lab/m9_strategy_lab_summary.md"
+      ],
+      "historical_benchmark_refs": [
+        "report:reports/strategy_lab/pa_sc_002_first_backtest_report.md"
+      ],
+      "absorbed_candidate_ids": [
+        "RC-001",
+        "RC-008",
+        "RC-015"
+      ],
+      "canonical_candidate_id": "RC-021",
+      "supporting_candidate_ids": [
+        "RC-001",
+        "RC-008",
+        "RC-015",
+        "RC-021"
+      ]
+    },
+    {
+      "strategy_id": "SF-003",
+      "title": "Failed Breakout Range-Edge Reversal",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+      ],
+      "source_family": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "evidence_refs": [
+        "chunk--02f70c9911e582",
+        "chunk--066276f84ec541",
+        "chunk--10160a1481bdac",
+        "chunk--13191a964b12a6",
+        "chunk--1f746cc869dace",
+        "chunk--36c583324d7e76",
+        "chunk--57298ec47cb825",
+        "chunk--7912fdc231b140",
+        "chunk--887ceb30b56749",
+        "chunk--930467c8d46a90",
+        "chunk--c6761e93abd87f",
+        "chunk--f0779916481ade",
+        "chunk--f26ac603616cf2"
+      ],
+      "setup_family": "failed_breakout_range_reversal",
+      "market_context": [
+        "trading_range",
+        "failed_breakout",
+        "reversal"
+      ],
+      "applicable_market": [
+        "US",
+        "HK"
+      ],
+      "timeframe": [
+        "5m",
+        "15m",
+        "1h"
+      ],
+      "direction": "both",
+      "entry_idea": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+      "stop_idea": "放在 failed breakout extreme 之外，若重新获得连续 follow-through 则失效。",
+      "target_idea": "先看回到 TR 中轴或 opposite edge，再视 broad channel 结构决定是否延伸。",
+      "invalidation": [
+        "breakout 重新得到连续 follow-through",
+        "区间结构被 surprise bar 直接改写"
+      ],
+      "no_trade_conditions": [
+        "仍在 Always In 强趋势的第一次反转里抢顶/抢底",
+        "没有足够 range context 就把单根 reversal bar 当失败突破"
+      ],
+      "parameter_candidates": [
+        "range edge proximity",
+        "second leg trap confirmation",
+        "follow-through failure within 2 bars"
+      ],
+      "expected_failure_modes": [
+        "把 broad channel continuation 误当 range reversal",
+        "在强 breakout 中过早逆势"
+      ],
+      "chart_dependency": "medium",
+      "test_priority": "high",
+      "status": "candidate",
+      "open_questions": [],
+      "data_requirements": [
+        "OHLCV with session labels",
+        "range edge and failed follow-through detection"
+      ],
+      "legacy_overlap_refs": [
+        "wiki:knowledge/wiki/strategy_cards/combined/pa-sc-003-failed-breakout-reversal.md",
+        "wiki:knowledge/wiki/strategy_cards/fangfangtu/pa-sc-004-trading-range-edge-reversal.md"
+      ],
+      "historical_comparison_refs": [
+        "report:reports/strategy_lab/m9_strategy_lab_summary.md"
+      ],
+      "historical_benchmark_refs": [],
+      "absorbed_candidate_ids": [
+        "RC-002",
+        "RC-009",
+        "RC-016"
+      ],
+      "canonical_candidate_id": "RC-022",
+      "supporting_candidate_ids": [
+        "RC-002",
+        "RC-009",
+        "RC-016",
+        "RC-022"
+      ]
+    },
+    {
+      "strategy_id": "SF-004",
+      "title": "Tight Channel Trend Continuation",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+      ],
+      "source_family": [
+        "al_brooks_ppt",
+        "fangfangtu_notes",
+        "fangfangtu_transcript"
+      ],
+      "evidence_refs": [
+        "chunk--0253608349c1d4",
+        "chunk--0995c1d912b7ed",
+        "chunk--12d80bfbe6e763",
+        "chunk--15063c2c5b0a2a",
+        "chunk--27d6f95e15c698",
+        "chunk--2c1a2673cc0bca",
+        "chunk--2f11264dd09ab3",
+        "chunk--3c92f839c2381d",
+        "chunk--3ead192a90660f",
+        "chunk--43efbd071e69d2",
+        "chunk--4c22b7fa7545e8",
+        "chunk--4f94027b608711",
+        "chunk--4fc82f284ff7e3",
+        "chunk--563f358cbccb22",
+        "chunk--592d8a35511c76",
+        "chunk--5d2f5739251d9e",
+        "chunk--69e8292fe40a09",
+        "chunk--6ceceab122cb5f",
+        "chunk--7863aa4ae8e69a",
+        "chunk--7a7c32514b7706",
+        "chunk--883a25eb571804",
+        "chunk--8ca3ecc90fe347",
+        "chunk--91389c40ea5f1e",
+        "chunk--94bab8f08b623f",
+        "chunk--a78533c126c2b9",
+        "chunk--b1fe1ca6998c1c",
+        "chunk--c16d31d178c4a9",
+        "chunk--cc9e255217c5f1",
+        "chunk--cf1f5dc846994a",
+        "chunk--d1e225d2c9677b",
+        "chunk--d5f38b6b8c5b20",
+        "chunk--d836b64e8467b5",
+        "chunk--de87488bcb777c",
+        "chunk--e421c24400ae53",
+        "chunk--e60fcbcc84d4db",
+        "chunk--f0ee3f1f26829d",
+        "chunk--f2cc5c6a8d8a9d",
+        "chunk--f3d5a17c643cf2",
+        "chunk--f9d4c645c3773c",
+        "chunk--fbaf50f58e677a"
+      ],
+      "setup_family": "tight_channel_trend_continuation",
+      "market_context": [
+        "tight_channel",
+        "always_in",
+        "trend_continuation"
+      ],
+      "applicable_market": [
+        "US",
+        "HK"
+      ],
+      "timeframe": [
+        "5m",
+        "15m",
+        "1h"
+      ],
+      "direction": "both",
+      "entry_idea": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+      "stop_idea": "放在最近短回调极值之外；若 channel 重叠明显增加则失效。",
+      "target_idea": "以前高/前低、measured move 或 trend day extension 为主。",
+      "invalidation": [
+        "channel 退化成 broad channel / trading range",
+        "出现清晰的二次反转并伴随强 follow-through"
+      ],
+      "no_trade_conditions": [
+        "在强窄通道里逆势数 wedge 或抢第一次反转",
+        "回调 bar 数和重叠度已经明显失去 tight-channel 特征"
+      ],
+      "parameter_candidates": [
+        "max pullback bars <= 3",
+        "channel overlap threshold",
+        "trend day session filter"
+      ],
+      "expected_failure_modes": [
+        "把 weak channel 误当 tight channel",
+        "进入 broad channel 后仍按 Always In 持有"
+      ],
+      "chart_dependency": "medium",
+      "test_priority": "medium",
+      "status": "candidate",
+      "open_questions": [],
+      "data_requirements": [
+        "OHLCV with session labels",
+        "channel overlap and pullback depth stats"
+      ],
+      "legacy_overlap_refs": [
+        "wiki:knowledge/wiki/strategy_cards/combined/pa-sc-006-tight-channel-resumption.md",
+        "wiki:knowledge/wiki/strategy_cards/combined/pa-sc-009-trend-day-range-day-filter.md"
+      ],
+      "historical_comparison_refs": [
+        "report:reports/strategy_lab/m9_strategy_lab_summary.md"
+      ],
+      "historical_benchmark_refs": [],
+      "absorbed_candidate_ids": [
+        "RC-005",
+        "RC-017",
+        "RC-023"
+      ],
+      "canonical_candidate_id": "RC-012",
+      "supporting_candidate_ids": [
+        "RC-005",
+        "RC-012",
+        "RC-017",
+        "RC-023"
+      ]
+    },
+    {
+      "strategy_id": "SF-005",
+      "title": "Gap Continuation Versus Exhaustion",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
+        "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+      ],
+      "source_family": [
+        "al_brooks_ppt"
+      ],
+      "evidence_refs": [
+        "chunk--60e5ab0d9b0e8a",
+        "chunk--ede02540852298"
+      ],
+      "setup_family": "gap_continuation_exhaustion",
+      "market_context": [
+        "gap",
+        "breakout",
+        "measurement",
+        "exhaustion"
+      ],
+      "applicable_market": [
+        "US",
+        "HK"
+      ],
+      "timeframe": [
+        "5m",
+        "15m",
+        "1h",
+        "2h"
+      ],
+      "direction": "both",
+      "entry_idea": "先判断 gap 是 breakout / measuring 还是 exhaustion，再决定顺势 continuation 或 gap fill reversal。",
+      "stop_idea": "顺势单放在 gap base 外侧，exhaustion/filled-gap 单放在 gap recovery failure 外侧。",
+      "target_idea": "breakout / measuring gap 看 measured move；exhaustion gap 先看回补与进入 TR。",
+      "invalidation": [
+        "gap 被迅速回补且 follow-through 失败",
+        "本应 exhaustion 的 gap 反而保持连续 trend bars"
+      ],
+      "no_trade_conditions": [
+        "gap 类型无法区分",
+        "只看到 gap 但没有 trend / TR 背景"
+      ],
+      "parameter_candidates": [
+        "gap type classification",
+        "EMA / prior high-low gap persistence",
+        "measured-move target anchor"
+      ],
+      "expected_failure_modes": [
+        "把 exhaustion gap 误当 continuation",
+        "只看 gap 不看 trend context"
+      ],
+      "chart_dependency": "medium",
+      "test_priority": "medium",
+      "status": "candidate",
+      "open_questions": [],
+      "data_requirements": [
+        "OHLCV with gap/overlap detection",
+        "prior-session anchors"
+      ],
+      "legacy_overlap_refs": [
+        "wiki:knowledge/wiki/strategy_cards/brooks/pa-sc-008-opening-range-breakout.md"
+      ],
+      "historical_comparison_refs": [
+        "report:reports/strategy_lab/m9_strategy_lab_summary.md"
+      ],
+      "historical_benchmark_refs": [],
+      "absorbed_candidate_ids": [
+        "RC-010"
+      ],
+      "canonical_candidate_id": "RC-003",
+      "supporting_candidate_ids": [
+        "RC-003",
+        "RC-010"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,354 @@
+{
+  "schema_version": "v1",
+  "queue_kind": "strategy_factory_extraction_queue",
+  "namespace": "SF",
+  "legacy_input_policy": {
+    "ignore_knowledge_strategy_cards_as_prior": true,
+    "allow_overlap_tagging": true,
+    "allow_historical_comparison": true,
+    "allow_historical_benchmarking": true
+  },
+  "allowed_candidate_kinds": [
+    "claim",
+    "rule",
+    "filter",
+    "non_strategy_evidence"
+  ],
+  "items": [
+    {
+      "candidate_id": "RC-001",
+      "theme_id": "breakout_follow_through_continuation",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--7e94211d9cafe9"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-002",
+      "theme_id": "failed_breakout_range_reversal",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--c6761e93abd87f"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-003",
+      "theme_id": "gap_continuation_exhaustion",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--60e5ab0d9b0e8a"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-004",
+      "theme_id": "signal_bar_contextual_entry",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--985b4c3605c096"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-005",
+      "theme_id": "tight_channel_trend_continuation",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--c16d31d178c4a9",
+        "chunk--2c1a2673cc0bca",
+        "chunk--94bab8f08b623f",
+        "chunk--8ca3ecc90fe347",
+        "chunk--27d6f95e15c698",
+        "chunk--43efbd071e69d2",
+        "chunk--f2cc5c6a8d8a9d",
+        "chunk--cf1f5dc846994a",
+        "chunk--4f94027b608711",
+        "chunk--a78533c126c2b9",
+        "chunk--0253608349c1d4",
+        "chunk--7863aa4ae8e69a",
+        "chunk--cc9e255217c5f1",
+        "chunk--f9d4c645c3773c",
+        "chunk--2f11264dd09ab3",
+        "chunk--0995c1d912b7ed"
+      ],
+      "synthesized": true
+    },
+    {
+      "candidate_id": "RC-006",
+      "theme_id": "trend_pullback_second_entry",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--0be93a3b36ffe5"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-007",
+      "theme_id": "wedge_exhaustion_reversal",
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--06f4c71f5d7d12"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-008",
+      "theme_id": "breakout_follow_through_continuation",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--8fcbe85007224d"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-009",
+      "theme_id": "failed_breakout_range_reversal",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--7912fdc231b140"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-010",
+      "theme_id": "gap_continuation_exhaustion",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--ede02540852298"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-011",
+      "theme_id": "signal_bar_contextual_entry",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--d53eae3898d30a",
+        "chunk--44482f2c2fac33",
+        "chunk--77e3810bd81d3f",
+        "chunk--a090fdc5034dd6",
+        "chunk--acc309a4268148",
+        "chunk--68c76a075d9218",
+        "chunk--e317da1b302fac",
+        "chunk--15f3d4c5941ac4",
+        "chunk--fd97f4de356946",
+        "chunk--d8e3ade1641ee4",
+        "chunk--78f6cf03c65745",
+        "chunk--7eb725dd7cc0bf",
+        "chunk--a27c19ea1a6f31",
+        "chunk--5bb98c01854616",
+        "chunk--2ef6458adfcae7",
+        "chunk--cddf8cc8bb3c5c",
+        "chunk--17fc09a2db1764",
+        "chunk--f8a742cfca2f6c",
+        "chunk--f33593f5f37efc",
+        "chunk--95c373cce2d0a1",
+        "chunk--12b8d24974c5eb",
+        "chunk--94a1fe768c97ac",
+        "chunk--f7329dead2253a",
+        "chunk--076f01166ff115",
+        "chunk--04a8b36cf6f539",
+        "chunk--738b9e14a983ff",
+        "chunk--3a3d05a69ddeaf",
+        "chunk--07bdc88be4c160",
+        "chunk--1f0403af21f248",
+        "chunk--c21d09bd6e7ac5",
+        "chunk--eb5052e64846bb",
+        "chunk--48b0755658865f",
+        "chunk--6552252118e774",
+        "chunk--36114c1549ea90",
+        "chunk--381db4c471a69e",
+        "chunk--d53b0f8091e13b",
+        "chunk--fea20e4c7f9438",
+        "chunk--0822cbedfdfde7"
+      ],
+      "synthesized": true
+    },
+    {
+      "candidate_id": "RC-012",
+      "theme_id": "tight_channel_trend_continuation",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--fbaf50f58e677a",
+        "chunk--4fc82f284ff7e3",
+        "chunk--7a7c32514b7706",
+        "chunk--12d80bfbe6e763",
+        "chunk--3ead192a90660f",
+        "chunk--5d2f5739251d9e",
+        "chunk--e421c24400ae53",
+        "chunk--de87488bcb777c",
+        "chunk--91389c40ea5f1e",
+        "chunk--563f358cbccb22",
+        "chunk--b1fe1ca6998c1c",
+        "chunk--4c22b7fa7545e8",
+        "chunk--592d8a35511c76",
+        "chunk--69e8292fe40a09",
+        "chunk--3c92f839c2381d",
+        "chunk--883a25eb571804",
+        "chunk--f0ee3f1f26829d",
+        "chunk--d836b64e8467b5",
+        "chunk--e60fcbcc84d4db",
+        "chunk--d5f38b6b8c5b20",
+        "chunk--f3d5a17c643cf2",
+        "chunk--15063c2c5b0a2a"
+      ],
+      "synthesized": true
+    },
+    {
+      "candidate_id": "RC-013",
+      "theme_id": "trend_pullback_second_entry",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--40db9c89515ea4"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-014",
+      "theme_id": "wedge_exhaustion_reversal",
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "chunk_ids": [
+        "chunk--582467726c54e3"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-015",
+      "theme_id": "breakout_follow_through_continuation",
+      "source_id": "fangfangtu_notes--breakout-note--247e0183",
+      "source_family": "fangfangtu_notes",
+      "chunk_ids": [
+        "chunk--dbb4e097f6a13d"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-016",
+      "theme_id": "failed_breakout_range_reversal",
+      "source_id": "fangfangtu_notes--breakout-note--247e0183",
+      "source_family": "fangfangtu_notes",
+      "chunk_ids": [
+        "chunk--930467c8d46a90"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-017",
+      "theme_id": "tight_channel_trend_continuation",
+      "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
+      "source_family": "fangfangtu_notes",
+      "chunk_ids": [
+        "chunk--6ceceab122cb5f"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-018",
+      "theme_id": "trend_pullback_second_entry",
+      "source_id": "fangfangtu_notes--pullback-counting-bars-note--0259c21f",
+      "source_family": "fangfangtu_notes",
+      "chunk_ids": [
+        "chunk--5eb288c6a9ca65"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-019",
+      "theme_id": "signal_bar_contextual_entry",
+      "source_id": "fangfangtu_notes--signal-bar-entry-note--f4f198c1",
+      "source_family": "fangfangtu_notes",
+      "chunk_ids": [
+        "chunk--29bcb35675920b"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-020",
+      "theme_id": "wedge_exhaustion_reversal",
+      "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+      "source_family": "fangfangtu_notes",
+      "chunk_ids": [
+        "chunk--b4f5a7e8e56504",
+        "chunk--bb13f38e78cdcc",
+        "chunk--0f11feee689921",
+        "chunk--176e2974529fdc"
+      ],
+      "synthesized": true
+    },
+    {
+      "candidate_id": "RC-021",
+      "theme_id": "breakout_follow_through_continuation",
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "chunk_ids": [
+        "chunk--8e1e372ed7bd72"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-022",
+      "theme_id": "failed_breakout_range_reversal",
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "chunk_ids": [
+        "chunk--57298ec47cb825",
+        "chunk--02f70c9911e582",
+        "chunk--f26ac603616cf2",
+        "chunk--1f746cc869dace",
+        "chunk--36c583324d7e76",
+        "chunk--066276f84ec541",
+        "chunk--887ceb30b56749",
+        "chunk--10160a1481bdac",
+        "chunk--13191a964b12a6",
+        "chunk--f0779916481ade"
+      ],
+      "synthesized": true
+    },
+    {
+      "candidate_id": "RC-023",
+      "theme_id": "tight_channel_trend_continuation",
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "chunk_ids": [
+        "chunk--d1e225d2c9677b"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-024",
+      "theme_id": "trend_pullback_second_entry",
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "chunk_ids": [
+        "chunk--c99661f8a7a47f"
+      ],
+      "synthesized": false
+    },
+    {
+      "candidate_id": "RC-025",
+      "theme_id": "wedge_exhaustion_reversal",
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "chunk_ids": [
+        "chunk--6e29f3ab19d85b"
+      ],
+      "synthesized": false
+    }
+  ]
+}

@@ -2,6 +2,15 @@
 
 本文件用于帮助 GitHub 网页读者快速理解 `M9: Price Action Strategy Lab` 的当前阶段、重点文件和阅读顺序。
 
+## 先看这条边界
+
+- 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
+- 新一轮 Strategy Factory 不再以旧 10 张卡或 `PA-SC-002` 为 seed；新 catalog 使用 `SF-*` 编号空间。
+- 当前应优先阅读：
+  - `docs/strategy-factory.md`
+  - `reports/strategy_lab/strategy_factory_plan.md`
+  - `reports/strategy_lab/strategy_factory/final_summary.md`
+
 ## 先看哪个分支
 
 - 当前策略提炼与 `PA-SC-002` 回测实验都在：`feature/m9-price-action-strategy-lab`
@@ -11,30 +20,34 @@
 
 ## 当前阶段
 
-- `M9A`~`M9D` 与 `M9F` 首轮已完成：
+- `M9A`~`M9F` 首轮已完成，但当前全部视为 legacy / historical baseline：
   - 已建立 strategy cards 目录与模板
   - 已盘点 transcript / Brooks PPT / notes
   - 已产出首批 `10` 张策略卡
   - 已为优先策略写测试计划
   - 已输出普通人可读的 strategy lab 总结
-- `M9E` 已启动，但当前只聚焦一个主策略：
-  - `PA-SC-002` 突破后的 Follow-Through 延续
+- `M9G.0` 已完成：
+  - 已冻结 Strategy Factory 的 legacy boundary、provider contract、`SF-*` 命名空间与 ledger/run_state 模板
 
 ## 当前最重要的阅读顺序
 
 1. 项目整体状态：
    - `docs/status.md`
    - `plans/active-plan.md`
-2. M9 总览：
+2. Strategy Factory 契约：
+   - `docs/strategy-factory.md`
+   - `reports/strategy_lab/strategy_factory_plan.md`
+   - `knowledge/wiki/strategy_factory/index.md`
+3. Legacy 对照基线：
    - `reports/strategy_lab/m9_strategy_lab_summary.md`
    - `knowledge/wiki/strategy_cards/index.md`
-3. `PA-SC-002` 策略定义：
+4. `PA-SC-002` 历史 benchmark：
    - `knowledge/wiki/strategy_cards/combined/pa-sc-002-breakout-follow-through.md`
    - `knowledge/wiki/strategy_cards/combined/PA-SC-002-executable-v0.1.md`
-4. `PA-SC-002` 第一轮实验：
+5. `PA-SC-002` 第一轮实验：
    - `reports/strategy_lab/pa_sc_002_minimum_experiment_v0.1.md`
    - `reports/strategy_lab/pa_sc_002_first_backtest_report.md`
-5. `PA-SC-002` 深入诊断：
+6. `PA-SC-002` 深入诊断：
    - `reports/strategy_lab/pa_sc_002_diagnostic_analysis.md`
    - `reports/strategy_lab/pa_sc_002_variant_suite.md`
 

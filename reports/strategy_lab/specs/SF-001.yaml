@@ -1,0 +1,41 @@
+strategy_id: "SF-001"
+title: "Trend Pullback Second Entry"
+setup_family: "trend_pullback_second_entry"
+market_context:
+  - "trend"
+  - "pullback"
+  - "second_entry"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。"
+stop_idea: "放在 signal bar 或失败 second-entry 的 opposite extreme 外侧。"
+target_idea: "先看 1R~2R，若趋势与 channel 仍强则允许转成 swing。"
+invalidation:
+  - "后续 follow-through 很差"
+  - "出现 bull trap / bear trap 或关键低点/高点被反向突破"
+no_trade_conditions:
+  - "背景不是顺势 pullback"
+  - "在强趋势第一次反转就逆势抢反转"
+parameter_candidates:
+  - "pullback bar count <= 3"
+  - "signal bar quality >= close near extreme"
+  - "minimum R multiple >= 1.0"
+expected_failure_modes:
+  - "把 broad channel 误当 tight trend"
+  - "在 MM 附近或 climax 后继续追价"
+data_requirements:
+  - "OHLCV with session labels"
+  - "bar-level high/low for stop placement"
+chart_dependency: "medium"
+test_priority: "high"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"

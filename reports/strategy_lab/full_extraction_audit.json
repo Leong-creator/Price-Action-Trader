@@ -1,0 +1,259 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "generated_at": "2026-04-21T14:06:43Z",
+  "total_parseable_chunks": 5492,
+  "category_counts": {
+    "strategy_candidate": 5,
+    "supporting_evidence": 1670,
+    "non_strategy": 3215,
+    "open_question": 134,
+    "parked_visual_review": 285,
+    "duplicate_or_merged": 183,
+    "blocked_or_partial_evidence": 0
+  },
+  "unresolved_count": 0,
+  "unmapped_count": 0,
+  "source_family_counts": {
+    "al_brooks_ppt": 5437,
+    "fangfangtu_notes": 26,
+    "fangfangtu_transcript": 29
+  },
+  "source_by_source_summary": [
+    {
+      "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "duplicate_or_merged": 2,
+        "supporting_evidence": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=1, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--signal-bar-entry-note--f4f198c1",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "supporting_evidence": 2,
+        "parked_visual_review": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=2, parked=1, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--pullback-counting-bars-note--0259c21f",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "duplicate_or_merged": 2,
+        "non_strategy": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--beginner-note--4c081115",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "open_question": 2,
+        "non_strategy": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+      "source_family": "fangfangtu_notes",
+      "page_total": 6,
+      "chunk_total": 6,
+      "final_category_counts": {
+        "parked_visual_review": 4,
+        "open_question": 1,
+        "non_strategy": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=4, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--gap-note--25e2faa1",
+      "source_family": "fangfangtu_notes",
+      "page_total": 3,
+      "chunk_total": 3,
+      "final_category_counts": {
+        "parked_visual_review": 1,
+        "open_question": 2
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=1, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_notes--breakout-note--247e0183",
+      "source_family": "fangfangtu_notes",
+      "page_total": 4,
+      "chunk_total": 5,
+      "final_category_counts": {
+        "duplicate_or_merged": 2,
+        "non_strategy": 2,
+        "open_question": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=0, parked=0, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "fangfangtu_transcript--price-action-transcript--4ab4de84",
+      "source_family": "fangfangtu_transcript",
+      "page_total": 15,
+      "chunk_total": 29,
+      "final_category_counts": {
+        "duplicate_or_merged": 15,
+        "non_strategy": 7,
+        "supporting_evidence": 3,
+        "parked_visual_review": 3,
+        "open_question": 1
+      },
+      "adjudication_summary": "candidates=0, supporting=3, parked=3, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-1-36-units--9858a3f1",
+      "source_family": "al_brooks_ppt",
+      "page_total": 2819,
+      "chunk_total": 3217,
+      "final_category_counts": {
+        "non_strategy": 1812,
+        "supporting_evidence": 1092,
+        "duplicate_or_merged": 76,
+        "parked_visual_review": 146,
+        "open_question": 86,
+        "strategy_candidate": 5
+      },
+      "adjudication_summary": "candidates=5, supporting=1092, parked=146, blocked=0",
+      "audit_completed": true
+    },
+    {
+      "source_id": "al_brooks_ppt--price-action-ppt-37-52-units--51cfc77b",
+      "source_family": "al_brooks_ppt",
+      "page_total": 1397,
+      "chunk_total": 2220,
+      "final_category_counts": {
+        "non_strategy": 1391,
+        "supporting_evidence": 572,
+        "parked_visual_review": 130,
+        "duplicate_or_merged": 86,
+        "open_question": 41
+      },
+      "adjudication_summary": "candidates=0, supporting=572, parked=130, blocked=0",
+      "audit_completed": true
+    }
+  ],
+  "promoted_from_supporting": 18,
+  "promoted_from_open_question": 14,
+  "promoted_from_non_strategy": 17,
+  "promoted_from_parked_visual": 4,
+  "released_from_blocked_partial": 1,
+  "restored_from_duplicate": 0,
+  "false_negative_findings": 1,
+  "still_parked_visual": 285,
+  "still_blocked_partial": 1,
+  "notes_zero_candidate_analysis": {
+    "family_summary": {
+      "reason_code": "promotions_found_after_audit",
+      "summary": "notes family was under-extracted in the pre-audit state; after full-pass + cross-chunk synthesis, 5 note sources now contribute strategy candidates."
+    },
+    "per_source_findings": [
+      {
+        "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
+        "reason_code": "promotions_found_after_audit",
+        "strategy_candidate_found": true,
+        "promoted_count": 1,
+        "false_negative_found": false,
+        "final_assessment": "note contributes to frozen or parked strategy families",
+        "evidence_summary": "supporting=1, parked=0, blocked=0, candidates=1"
+      },
+      {
+        "source_id": "fangfangtu_notes--signal-bar-entry-note--f4f198c1",
+        "reason_code": "promotions_found_after_audit",
+        "strategy_candidate_found": true,
+        "promoted_count": 1,
+        "false_negative_found": false,
+        "final_assessment": "note contributes to frozen or parked strategy families",
+        "evidence_summary": "supporting=2, parked=1, blocked=0, candidates=1"
+      },
+      {
+        "source_id": "fangfangtu_notes--pullback-counting-bars-note--0259c21f",
+        "reason_code": "promotions_found_after_audit",
+        "strategy_candidate_found": true,
+        "promoted_count": 1,
+        "false_negative_found": false,
+        "final_assessment": "note contributes to frozen or parked strategy families",
+        "evidence_summary": "supporting=0, parked=0, blocked=0, candidates=1"
+      },
+      {
+        "source_id": "fangfangtu_notes--beginner-note--4c081115",
+        "reason_code": "content_not_strategy_viable",
+        "strategy_candidate_found": false,
+        "promoted_count": 0,
+        "false_negative_found": false,
+        "final_assessment": "note remains explanatory / glossary / risk-only",
+        "evidence_summary": "supporting=0, parked=0, blocked=0, candidates=0"
+      },
+      {
+        "source_id": "fangfangtu_notes--wedge-note--ed59adb7",
+        "reason_code": "cross_chunk_synthesis_recovered_candidate",
+        "strategy_candidate_found": true,
+        "promoted_count": 1,
+        "false_negative_found": true,
+        "final_assessment": "note contributes to frozen or parked strategy families",
+        "evidence_summary": "supporting=0, parked=4, blocked=0, candidates=1"
+      },
+      {
+        "source_id": "fangfangtu_notes--gap-note--25e2faa1",
+        "reason_code": "visual_dependency_blocks_strategy",
+        "strategy_candidate_found": false,
+        "promoted_count": 0,
+        "false_negative_found": false,
+        "final_assessment": "note contributes to frozen or parked strategy families",
+        "evidence_summary": "supporting=0, parked=1, blocked=0, candidates=0"
+      },
+      {
+        "source_id": "fangfangtu_notes--breakout-note--247e0183",
+        "reason_code": "promotions_found_after_audit",
+        "strategy_candidate_found": true,
+        "promoted_count": 2,
+        "false_negative_found": false,
+        "final_assessment": "note contributes to frozen or parked strategy families",
+        "evidence_summary": "supporting=0, parked=0, blocked=0, candidates=2"
+      }
+    ]
+  },
+  "merge_assessment": {
+    "overmerge_found": false,
+    "reason": "no overmerge restored; merged pairs only differed by source/example evidence, not executable semantics"
+  },
+  "cross_chunk_synthesis_summary": {
+    "synthesized_candidate_count": 5,
+    "new_strategy_candidate_ids": [
+      "RC-005",
+      "RC-011",
+      "RC-012",
+      "RC-020",
+      "RC-022"
+    ]
+  },
+  "family_bias_assessment": {
+    "bias_detected": false,
+    "reason": "notes family required synthesis/promotions but no longer stays at zero-candidate state"
+  },
+  "text_extractable_closure": true,
+  "full_source_closure": false,
+  "closure_scope_reason": "all parseable/text-extractable evidence is frozen, but visual/partial gaps still remain and prevent full-source closure",
+  "final_strategy_card_count": 5,
+  "ready_for_backtest": true,
+  "backtest_block_reason": "audit scope intentionally stops before batch backtest execution"
+}

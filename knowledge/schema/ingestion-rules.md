@@ -29,7 +29,15 @@
 - `strategy_cards/*/*.md`：继续使用 `setup` 或 `rule` 页面类型；同时补齐
   `strategy_id`、`source_family`、`setup_family`、`market_context`、
   `evidence_quality`、`chart_dependency`、`needs_visual_review`、
-  `test_priority`、`last_updated`。
+  `test_priority`、`last_updated`。该目录自 `M9G.0` 起只作为 legacy /
+  historical baseline，不再作为新一轮 strategy extraction 的 seed catalog。
+- `strategy_factory/strategies/*.md`：继续使用 `setup` 或 `rule` 页面类型；同时补齐
+  `strategy_id`、`source_family`、`setup_family`、`market_context`、
+  `evidence_quality`、`chart_dependency`、`needs_visual_review`、
+  `test_priority`、`last_updated`、`factory_stage`、`readiness_gate`、
+  `factory_decision`、`decision_reason`、`legacy_overlap_refs`、
+  `historical_comparison_refs`、`historical_benchmark_refs`。新编号空间固定为
+  `SF-*`。
 
 ## 4. 可追溯与整理原则
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -33,8 +34,24 @@ ALLOWED_CONFIDENCE = {"low", "medium", "high"}
 ALLOWED_DIRECTION = {"long", "short", "both", "neutral"}
 ALLOWED_CHART_DEPENDENCY = {"low", "medium", "high"}
 ALLOWED_TEST_PRIORITY = {"high", "medium", "low"}
+ALLOWED_READINESS_GATES = {
+    "ready",
+    "needs_visual_review",
+    "needs_event_labels",
+    "needs_definition_freeze",
+    "blocked_source",
+    "blocked_provider",
+}
+ALLOWED_FACTORY_DECISIONS = {
+    "retain",
+    "modify_and_retest",
+    "insufficient_sample",
+    "parked",
+    "rejected_variant",
+}
 STRATEGY_CARD_PARENT_DIRS = {"brooks", "fangfangtu", "combined"}
 SKIP_DIR_NAMES = {"templates"}
+SF_STRATEGY_ID_PATTERN = re.compile(r"^SF-\d{3}$")
 
 REQUIRED_FIELDS = [
     "title",
@@ -75,6 +92,9 @@ LIST_FIELDS = [
     "target_rule",
     "trade_management",
     "invalidation",
+    "legacy_overlap_refs",
+    "historical_comparison_refs",
+    "historical_benchmark_refs",
 ]
 
 STRATEGY_CARD_REQUIRED_FIELDS = [
@@ -87,6 +107,17 @@ STRATEGY_CARD_REQUIRED_FIELDS = [
     "needs_visual_review",
     "test_priority",
     "last_updated",
+]
+
+STRATEGY_FACTORY_REQUIRED_FIELDS = [
+    *STRATEGY_CARD_REQUIRED_FIELDS,
+    "factory_stage",
+    "readiness_gate",
+    "factory_decision",
+    "decision_reason",
+    "legacy_overlap_refs",
+    "historical_comparison_refs",
+    "historical_benchmark_refs",
 ]
 
 
@@ -145,6 +176,10 @@ def should_skip_file(path: Path) -> bool:
 
 def is_strategy_card(path: Path) -> bool:
     return "strategy_cards" in path.parts and path.parent.name in STRATEGY_CARD_PARENT_DIRS
+
+
+def is_strategy_factory_strategy(path: Path) -> bool:
+    return "strategy_factory" in path.parts and path.parent.name == "strategies"
 
 
 def list_markdown_files(root: Path) -> list[Path]:
@@ -218,6 +253,11 @@ def validate_scalar_fields(path: Path, frontmatter: dict[str, object], errors: l
         if value not in ("", None) and not is_non_empty_string(value):
             errors.append(f"{path}: field '{field}' must be a non-empty string when provided")
 
+    for field in ("factory_stage", "readiness_gate", "factory_decision", "decision_reason"):
+        value = frontmatter.get(field)
+        if value not in ("", None) and not is_non_empty_string(value):
+            errors.append(f"{path}: field '{field}' must be a non-empty string when provided")
+
 
 def validate_strategy_card_fields(
     path: Path,
@@ -244,6 +284,31 @@ def validate_strategy_card_fields(
         errors.append(f"{path}: invalid 'test_priority' value '{test_priority}'")
 
 
+def validate_strategy_factory_fields(
+    path: Path,
+    frontmatter: dict[str, object],
+    errors: list[str],
+) -> None:
+    if not is_strategy_factory_strategy(path):
+        return
+
+    for field in STRATEGY_FACTORY_REQUIRED_FIELDS:
+        if field not in frontmatter or is_missing(frontmatter[field]):
+            errors.append(f"{path}: strategy factory page missing required field '{field}'")
+
+    readiness_gate = frontmatter.get("readiness_gate")
+    if readiness_gate not in ("", None, *sorted(ALLOWED_READINESS_GATES)):
+        errors.append(f"{path}: invalid 'readiness_gate' value '{readiness_gate}'")
+
+    factory_decision = frontmatter.get("factory_decision")
+    if factory_decision not in ("", None, *sorted(ALLOWED_FACTORY_DECISIONS)):
+        errors.append(f"{path}: invalid 'factory_decision' value '{factory_decision}'")
+
+    strategy_id = frontmatter.get("strategy_id")
+    if isinstance(strategy_id, str) and strategy_id and not SF_STRATEGY_ID_PATTERN.match(strategy_id):
+        errors.append(f"{path}: strategy factory 'strategy_id' must use SF-### format")
+
+
 def validate_file(path: Path) -> list[str]:
     errors: list[str] = []
     frontmatter = parse_frontmatter(path.read_text(encoding="utf-8"))
@@ -258,6 +323,7 @@ def validate_file(path: Path) -> list[str]:
     validate_list_fields(path, frontmatter, errors)
     validate_scalar_fields(path, frontmatter, errors)
     validate_strategy_card_fields(path, frontmatter, errors)
+    validate_strategy_factory_fields(path, frontmatter, errors)
 
     if frontmatter.get("type") == "setup":
         for field in SETUP_REQUIRED_FIELDS:

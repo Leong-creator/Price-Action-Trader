@@ -1,0 +1,454 @@
+{
+  "schema_version": "m9-strategy-factory-audit-v4",
+  "reviewed_candidate_pairs": [
+    {
+      "candidate_id": "RC-006",
+      "target_candidate_id": "RC-024",
+      "target_strategy_id": "SF-001",
+      "theme_id": "trend_pullback_second_entry",
+      "merge_dimensions": {
+        "environment_context": "trend, pullback, second_entry",
+        "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+        "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+        "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-006 and RC-024 share the same setup family 'trend_pullback_second_entry' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-013",
+      "target_candidate_id": "RC-024",
+      "target_strategy_id": "SF-001",
+      "theme_id": "trend_pullback_second_entry",
+      "merge_dimensions": {
+        "environment_context": "trend, pullback, second_entry",
+        "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+        "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+        "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-013 and RC-024 share the same setup family 'trend_pullback_second_entry' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-018",
+      "target_candidate_id": "RC-024",
+      "target_strategy_id": "SF-001",
+      "theme_id": "trend_pullback_second_entry",
+      "merge_dimensions": {
+        "environment_context": "trend, pullback, second_entry",
+        "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+        "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+        "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-018 and RC-024 share the same setup family 'trend_pullback_second_entry' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-001",
+      "target_candidate_id": "RC-021",
+      "target_strategy_id": "SF-002",
+      "theme_id": "breakout_follow_through_continuation",
+      "merge_dimensions": {
+        "environment_context": "breakout, follow_through, trend_continuation",
+        "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+        "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+        "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-001 and RC-021 share the same setup family 'breakout_follow_through_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-008",
+      "target_candidate_id": "RC-021",
+      "target_strategy_id": "SF-002",
+      "theme_id": "breakout_follow_through_continuation",
+      "merge_dimensions": {
+        "environment_context": "breakout, follow_through, trend_continuation",
+        "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+        "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+        "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-008 and RC-021 share the same setup family 'breakout_follow_through_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-015",
+      "target_candidate_id": "RC-021",
+      "target_strategy_id": "SF-002",
+      "theme_id": "breakout_follow_through_continuation",
+      "merge_dimensions": {
+        "environment_context": "breakout, follow_through, trend_continuation",
+        "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+        "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+        "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-015 and RC-021 share the same setup family 'breakout_follow_through_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-002",
+      "target_candidate_id": "RC-022",
+      "target_strategy_id": "SF-003",
+      "theme_id": "failed_breakout_range_reversal",
+      "merge_dimensions": {
+        "environment_context": "trading_range, failed_breakout, reversal",
+        "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+        "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+        "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-002 and RC-022 share the same setup family 'failed_breakout_range_reversal' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-009",
+      "target_candidate_id": "RC-022",
+      "target_strategy_id": "SF-003",
+      "theme_id": "failed_breakout_range_reversal",
+      "merge_dimensions": {
+        "environment_context": "trading_range, failed_breakout, reversal",
+        "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+        "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+        "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-009 and RC-022 share the same setup family 'failed_breakout_range_reversal' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-016",
+      "target_candidate_id": "RC-022",
+      "target_strategy_id": "SF-003",
+      "theme_id": "failed_breakout_range_reversal",
+      "merge_dimensions": {
+        "environment_context": "trading_range, failed_breakout, reversal",
+        "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+        "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+        "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-016 and RC-022 share the same setup family 'failed_breakout_range_reversal' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-005",
+      "target_candidate_id": "RC-012",
+      "target_strategy_id": "SF-004",
+      "theme_id": "tight_channel_trend_continuation",
+      "merge_dimensions": {
+        "environment_context": "tight_channel, always_in, trend_continuation",
+        "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+        "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+        "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-005 and RC-012 share the same setup family 'tight_channel_trend_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-017",
+      "target_candidate_id": "RC-012",
+      "target_strategy_id": "SF-004",
+      "theme_id": "tight_channel_trend_continuation",
+      "merge_dimensions": {
+        "environment_context": "tight_channel, always_in, trend_continuation",
+        "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+        "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+        "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-017 and RC-012 share the same setup family 'tight_channel_trend_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-023",
+      "target_candidate_id": "RC-012",
+      "target_strategy_id": "SF-004",
+      "theme_id": "tight_channel_trend_continuation",
+      "merge_dimensions": {
+        "environment_context": "tight_channel, always_in, trend_continuation",
+        "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+        "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+        "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-023 and RC-012 share the same setup family 'tight_channel_trend_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-010",
+      "target_candidate_id": "RC-003",
+      "target_strategy_id": "SF-005",
+      "theme_id": "gap_continuation_exhaustion",
+      "merge_dimensions": {
+        "environment_context": "gap, breakout, measurement, exhaustion",
+        "trigger_entry": "先判断 gap 是 breakout / measuring 还是 exhaustion，再决定顺势 continuation 或 gap fill reversal。",
+        "invalidation_stop": "gap 被迅速回补且 follow-through 失败; 本应 exhaustion 的 gap 反而保持连续 trend bars",
+        "management": "把 exhaustion gap 误当 continuation; 只看 gap 不看 trend context"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-010 and RC-003 share the same setup family 'gap_continuation_exhaustion' and differ mainly by source/example placement."
+    }
+  ],
+  "kept_merged_pairs": [
+    {
+      "candidate_id": "RC-006",
+      "target_candidate_id": "RC-024",
+      "target_strategy_id": "SF-001",
+      "theme_id": "trend_pullback_second_entry",
+      "merge_dimensions": {
+        "environment_context": "trend, pullback, second_entry",
+        "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+        "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+        "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-006 and RC-024 share the same setup family 'trend_pullback_second_entry' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-013",
+      "target_candidate_id": "RC-024",
+      "target_strategy_id": "SF-001",
+      "theme_id": "trend_pullback_second_entry",
+      "merge_dimensions": {
+        "environment_context": "trend, pullback, second_entry",
+        "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+        "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+        "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-013 and RC-024 share the same setup family 'trend_pullback_second_entry' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-018",
+      "target_candidate_id": "RC-024",
+      "target_strategy_id": "SF-001",
+      "theme_id": "trend_pullback_second_entry",
+      "merge_dimensions": {
+        "environment_context": "trend, pullback, second_entry",
+        "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+        "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+        "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-018 and RC-024 share the same setup family 'trend_pullback_second_entry' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-001",
+      "target_candidate_id": "RC-021",
+      "target_strategy_id": "SF-002",
+      "theme_id": "breakout_follow_through_continuation",
+      "merge_dimensions": {
+        "environment_context": "breakout, follow_through, trend_continuation",
+        "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+        "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+        "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-001 and RC-021 share the same setup family 'breakout_follow_through_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-008",
+      "target_candidate_id": "RC-021",
+      "target_strategy_id": "SF-002",
+      "theme_id": "breakout_follow_through_continuation",
+      "merge_dimensions": {
+        "environment_context": "breakout, follow_through, trend_continuation",
+        "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+        "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+        "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-008 and RC-021 share the same setup family 'breakout_follow_through_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-015",
+      "target_candidate_id": "RC-021",
+      "target_strategy_id": "SF-002",
+      "theme_id": "breakout_follow_through_continuation",
+      "merge_dimensions": {
+        "environment_context": "breakout, follow_through, trend_continuation",
+        "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+        "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+        "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-015 and RC-021 share the same setup family 'breakout_follow_through_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-002",
+      "target_candidate_id": "RC-022",
+      "target_strategy_id": "SF-003",
+      "theme_id": "failed_breakout_range_reversal",
+      "merge_dimensions": {
+        "environment_context": "trading_range, failed_breakout, reversal",
+        "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+        "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+        "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-002 and RC-022 share the same setup family 'failed_breakout_range_reversal' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-009",
+      "target_candidate_id": "RC-022",
+      "target_strategy_id": "SF-003",
+      "theme_id": "failed_breakout_range_reversal",
+      "merge_dimensions": {
+        "environment_context": "trading_range, failed_breakout, reversal",
+        "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+        "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+        "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-009 and RC-022 share the same setup family 'failed_breakout_range_reversal' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-016",
+      "target_candidate_id": "RC-022",
+      "target_strategy_id": "SF-003",
+      "theme_id": "failed_breakout_range_reversal",
+      "merge_dimensions": {
+        "environment_context": "trading_range, failed_breakout, reversal",
+        "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+        "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+        "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-016 and RC-022 share the same setup family 'failed_breakout_range_reversal' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-005",
+      "target_candidate_id": "RC-012",
+      "target_strategy_id": "SF-004",
+      "theme_id": "tight_channel_trend_continuation",
+      "merge_dimensions": {
+        "environment_context": "tight_channel, always_in, trend_continuation",
+        "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+        "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+        "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-005 and RC-012 share the same setup family 'tight_channel_trend_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-017",
+      "target_candidate_id": "RC-012",
+      "target_strategy_id": "SF-004",
+      "theme_id": "tight_channel_trend_continuation",
+      "merge_dimensions": {
+        "environment_context": "tight_channel, always_in, trend_continuation",
+        "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+        "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+        "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-017 and RC-012 share the same setup family 'tight_channel_trend_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-023",
+      "target_candidate_id": "RC-012",
+      "target_strategy_id": "SF-004",
+      "theme_id": "tight_channel_trend_continuation",
+      "merge_dimensions": {
+        "environment_context": "tight_channel, always_in, trend_continuation",
+        "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+        "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+        "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-023 and RC-012 share the same setup family 'tight_channel_trend_continuation' and differ mainly by source/example placement."
+    },
+    {
+      "candidate_id": "RC-010",
+      "target_candidate_id": "RC-003",
+      "target_strategy_id": "SF-005",
+      "theme_id": "gap_continuation_exhaustion",
+      "merge_dimensions": {
+        "environment_context": "gap, breakout, measurement, exhaustion",
+        "trigger_entry": "先判断 gap 是 breakout / measuring 还是 exhaustion，再决定顺势 continuation 或 gap fill reversal。",
+        "invalidation_stop": "gap 被迅速回补且 follow-through 失败; 本应 exhaustion 的 gap 反而保持连续 trend bars",
+        "management": "把 exhaustion gap 误当 continuation; 只看 gap 不看 trend context"
+      },
+      "reason": "candidate shares the same family-level environment, trigger, invalidation and management semantics",
+      "evidence_summary": "RC-010 and RC-003 share the same setup family 'gap_continuation_exhaustion' and differ mainly by source/example placement."
+    }
+  ],
+  "restored_pairs": [],
+  "merge_dimensions": {
+    "RC-006": {
+      "environment_context": "trend, pullback, second_entry",
+      "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+      "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+      "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+    },
+    "RC-013": {
+      "environment_context": "trend, pullback, second_entry",
+      "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+      "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+      "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+    },
+    "RC-018": {
+      "environment_context": "trend, pullback, second_entry",
+      "trigger_entry": "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。",
+      "invalidation_stop": "后续 follow-through 很差; 出现 bull trap / bear trap 或关键低点/高点被反向突破",
+      "management": "把 broad channel 误当 tight trend; 在 MM 附近或 climax 后继续追价"
+    },
+    "RC-001": {
+      "environment_context": "breakout, follow_through, trend_continuation",
+      "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+      "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+      "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+    },
+    "RC-008": {
+      "environment_context": "breakout, follow_through, trend_continuation",
+      "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+      "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+      "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+    },
+    "RC-015": {
+      "environment_context": "breakout, follow_through, trend_continuation",
+      "trigger_entry": "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。",
+      "invalidation_stop": "breakout 后 follow-through 很差; 出现 deep pullback 或 gap 被迅速回补",
+      "management": "TR 内追 breakout 被 80-20 假突破打回; 把 weak breakout 误判成 strong breakout"
+    },
+    "RC-002": {
+      "environment_context": "trading_range, failed_breakout, reversal",
+      "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+      "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+      "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+    },
+    "RC-009": {
+      "environment_context": "trading_range, failed_breakout, reversal",
+      "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+      "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+      "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+    },
+    "RC-016": {
+      "environment_context": "trading_range, failed_breakout, reversal",
+      "trigger_entry": "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。",
+      "invalidation_stop": "breakout 重新得到连续 follow-through; 区间结构被 surprise bar 直接改写",
+      "management": "把 broad channel continuation 误当 range reversal; 在强 breakout 中过早逆势"
+    },
+    "RC-005": {
+      "environment_context": "tight_channel, always_in, trend_continuation",
+      "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+      "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+      "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+    },
+    "RC-017": {
+      "environment_context": "tight_channel, always_in, trend_continuation",
+      "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+      "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+      "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+    },
+    "RC-023": {
+      "environment_context": "tight_channel, always_in, trend_continuation",
+      "trigger_entry": "在 Tight Channel / Always In 背景中只顺势做，等待微回调或 signal bar 后继续跟随。",
+      "invalidation_stop": "channel 退化成 broad channel / trading range; 出现清晰的二次反转并伴随强 follow-through",
+      "management": "把 weak channel 误当 tight channel; 进入 broad channel 后仍按 Always In 持有"
+    },
+    "RC-010": {
+      "environment_context": "gap, breakout, measurement, exhaustion",
+      "trigger_entry": "先判断 gap 是 breakout / measuring 还是 exhaustion，再决定顺势 continuation 或 gap fill reversal。",
+      "invalidation_stop": "gap 被迅速回补且 follow-through 失败; 本应 exhaustion 的 gap 反而保持连续 trend bars",
+      "management": "把 exhaustion gap 误当 continuation; 只看 gap 不看 trend context"
+    }
+  },
+  "reason": "Candidates are only merged when they share the same theme family and differ by source/example rather than executable semantics.",
+  "evidence_summary": "Cross-source families were kept distinct when trigger / invalidation or management semantics diverged."
+}

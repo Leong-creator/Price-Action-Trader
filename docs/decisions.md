@@ -153,4 +153,13 @@
 ## D-0031 默认历史数据源切换到 Longbridge
 
 - 日期：2026-04-21
-- 结论：自当前轮次起，项目默认历史回测数据源统一切换到 `Longbridge simulated account -> local CSV cache`。`scripts/run_public_backtest_demo.py`、`scripts/download_public_history.py`、`scripts/run_intraday_pilot.py` 与 `PA-SC-002` 的默认实验入口都必须优先落到 Longbridge 配置；`Alpha Vantage` / `yfinance` 只保留为显式指定时的兼容或历史对照路径，不再作为默认自动回退链路。该调整只改变默认历史数据入口，不改变 `paper / simulated`、`no-go`、不触碰真实下单、持仓、资产或 live execution 边界。
+- 结论：本决策记录的是 provider-specific 的历史阶段调整：当时项目把默认历史回测入口切到 `Longbridge simulated account -> local CSV cache`，并保留 `Alpha Vantage / yfinance` 作为显式指定时的兼容或历史对照路径。自 `D-0032` 起，Strategy Factory 不再把该 provider 名称当作长期固定口径，而改用 repo config 中的 `primary_provider` contract。
+
+## D-0032 M9G Strategy Factory Contract Freeze
+
+- 日期：2026-04-21
+- 结论：自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告全部降级为 legacy / historical baseline。它们只允许用于 `legacy_overlap_refs`、`historical_comparison_refs`、`historical_benchmark_refs`，不得作为新 catalog 的 seed、family prior、默认 merge target 或 triage baseline。`PA-SC-002` 只允许作为 historical benchmark / regression reference，不能再作为新 catalog 的结构锚点。
+- 结论：新一轮 Strategy Factory 只能从 `knowledge/indices/source_manifest.json` 覆盖的全部来源重新开始，不以旧 10 张卡的编号、命名、聚类或结论作为先验。新 catalog 的编号空间固定为 `SF-*`。
+- 结论：Strategy Factory 的 `primary_provider` 只允许由 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]` 推导。当前固定配置文件为 `config/strategy_factory/active_provider_config.json`。`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 与 `docs/data-sources.md` 只允许描述该 contract，不把具体 provider 名称写成长期固定口径。
+- 结论：`python scripts/validate_strategy_factory_contract.py` 成为 `M9G.0` 的强制门禁。若 repo config、contract docs 与 `run_state.json` 不一致，Contract Freeze 必须失败，且不得进入新一轮提炼或回测。
+- 结论：heartbeat / 自动推进后续可以继续设计，但恢复状态只允许依赖 `coverage_ledger.json`、`extraction_queue.json`、`catalog_ledger.json`、`backtest_queue.json`、`triage_ledger.json` 与 `run_state.json.resume_cursor`，不得依赖隐含聊天上下文。
