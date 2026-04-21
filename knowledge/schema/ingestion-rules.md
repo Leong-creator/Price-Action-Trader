@@ -18,6 +18,7 @@
 - 缺图不阻塞入库，但必须记录在 `missing_visuals`。
 - 已知冲突、版本差异、相互矛盾描述必须记录在 `contradictions`。
 - 仍待确认的问题必须记录在 `open_questions`，不得用猜测填补缺口。
+- `knowledge/wiki/**/templates/*.md` 仅作为模板占位，不参与 KB 校验与索引。
 
 ## 3. 页面类型与最小要求
 
@@ -25,12 +26,18 @@
 - `setup`：必须补齐 `pa_context`、`signal_bar`、`entry_trigger`、`stop_rule`、
   `invalidation`。
 - `source`：用于登记来源本身、资料说明或索引页；同样必须保留 `source_refs`。
+- `strategy_cards/*/*.md`：继续使用 `setup` 或 `rule` 页面类型；同时补齐
+  `strategy_id`、`source_family`、`setup_family`、`market_context`、
+  `evidence_quality`、`chart_dependency`、`needs_visual_review`、
+  `test_priority`、`last_updated`。
 
 ## 4. 可追溯与整理原则
 
 - 来源文件、转录文档、补充资料都要能回溯到 raw 层。
 - 不得把推断写成事实；不确定内容必须落在 `open_questions`。
 - 不得把 wiki 页面写成“已验证盈利结论”。
+- 若同一策略只有 notes 支持、缺少 transcript / Brooks 补证，应明确保留为
+  `draft`，不得写成 `promoted`。
 - 对同一规则的不同表述，优先保留原始引用，再在 wiki 中做结构化整理。
 
 ## 5. 脚本协同规则
@@ -40,6 +47,7 @@
 - `scripts/build_kb_index.py` 负责从 wiki 页面提取统一索引字段并写入
   `knowledge/wiki_index.json`。
 - 两个脚本都必须支持空 wiki 目录路径，不得因“没有页面”而失败。
+- 两个脚本都必须跳过 `templates/` 目录中的 Markdown 文件。
 
 ## 6. M1 代表性验证路径
 

@@ -218,6 +218,18 @@ OHLCV 最小字段：
 - 标的集中度。
 - 日内最大亏损。
 - 连续亏损暂停。
+
+### 4.11 Strategy Lab
+
+系统必须支持把原始知识来源整理成独立的 Markdown strategy cards 和 test plans，而不是每次运行前临时检索大文件。
+
+最小要求：
+
+- 策略卡必须保留真实 `source_refs`，并显式区分 transcript、Brooks PPT、用户 notes 的证据优先级。
+- 每张策略卡都必须包含可测试的入场、止损、出场、失效条件与禁止交易条件；证据不足时必须明确写出。
+- 系统必须支持记录策略当前结论：`draft / candidate / tested / promoted / rejected`。
+- 系统必须支持为策略写独立测试计划，包括标的、周期、历史窗口、成本/滑点、样本切分、最低交易数、通过/淘汰标准。
+- strategy lab 产物只服务 research / backtest / paper / simulated，不代表 broker/live/real-money 能力。
 - 止损规则。
 - 熔断与紧急停止。
 

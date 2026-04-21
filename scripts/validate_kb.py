@@ -19,9 +19,22 @@ ALLOWED_TYPES = {
     "glossary",
     "case-study",
 }
-ALLOWED_STATUS = {"draft", "active", "experimental", "superseded"}
+ALLOWED_STATUS = {
+    "draft",
+    "active",
+    "experimental",
+    "superseded",
+    "candidate",
+    "tested",
+    "promoted",
+    "rejected",
+}
 ALLOWED_CONFIDENCE = {"low", "medium", "high"}
 ALLOWED_DIRECTION = {"long", "short", "both", "neutral"}
+ALLOWED_CHART_DEPENDENCY = {"low", "medium", "high"}
+ALLOWED_TEST_PRIORITY = {"high", "medium", "low"}
+STRATEGY_CARD_PARENT_DIRS = {"brooks", "fangfangtu", "combined"}
+SKIP_DIR_NAMES = {"templates"}
 
 REQUIRED_FIELDS = [
     "title",
@@ -42,6 +55,7 @@ SETUP_REQUIRED_FIELDS = [
 
 LIST_FIELDS = [
     "market",
+    "market_context",
     "timeframes",
     "source_refs",
     "tags",
@@ -61,6 +75,18 @@ LIST_FIELDS = [
     "target_rule",
     "trade_management",
     "invalidation",
+]
+
+STRATEGY_CARD_REQUIRED_FIELDS = [
+    "strategy_id",
+    "source_family",
+    "setup_family",
+    "market_context",
+    "evidence_quality",
+    "chart_dependency",
+    "needs_visual_review",
+    "test_priority",
+    "last_updated",
 ]
 
 
@@ -113,6 +139,18 @@ def parse_frontmatter(text: str):
     return None
 
 
+def should_skip_file(path: Path) -> bool:
+    return any(part in SKIP_DIR_NAMES for part in path.parts)
+
+
+def is_strategy_card(path: Path) -> bool:
+    return "strategy_cards" in path.parts and path.parent.name in STRATEGY_CARD_PARENT_DIRS
+
+
+def list_markdown_files(root: Path) -> list[Path]:
+    return sorted(path for path in root.rglob("*.md") if not should_skip_file(path))
+
+
 def is_missing(value: object) -> bool:
     return value is None or value == "" or value == []
 
@@ -153,9 +191,17 @@ def validate_scalar_fields(path: Path, frontmatter: dict[str, object], errors: l
     if last_reviewed is not None and not is_non_empty_string(last_reviewed):
         errors.append(f"{path}: field 'last_reviewed' must be a non-empty string")
 
+    last_updated = frontmatter.get("last_updated")
+    if last_updated not in ("", None) and not is_non_empty_string(last_updated):
+        errors.append(f"{path}: field 'last_updated' must be a non-empty string when provided")
+
     measured_move = frontmatter.get("measured_move")
     if measured_move not in ("", None) and not isinstance(measured_move, bool):
         errors.append(f"{path}: field 'measured_move' must be boolean when provided")
+
+    needs_visual_review = frontmatter.get("needs_visual_review")
+    if needs_visual_review not in ("", None) and not isinstance(needs_visual_review, bool):
+        errors.append(f"{path}: field 'needs_visual_review' must be boolean when provided")
 
     risk_reward_min = frontmatter.get("risk_reward_min")
     if risk_reward_min not in ("", None):
@@ -166,6 +212,36 @@ def validate_scalar_fields(path: Path, frontmatter: dict[str, object], errors: l
                 float(risk_reward_min)
             except ValueError:
                 errors.append(f"{path}: field 'risk_reward_min' must be numeric when provided")
+
+    for field in ("strategy_id", "source_family", "setup_family"):
+        value = frontmatter.get(field)
+        if value not in ("", None) and not is_non_empty_string(value):
+            errors.append(f"{path}: field '{field}' must be a non-empty string when provided")
+
+
+def validate_strategy_card_fields(
+    path: Path,
+    frontmatter: dict[str, object],
+    errors: list[str],
+) -> None:
+    if not is_strategy_card(path):
+        return
+
+    for field in STRATEGY_CARD_REQUIRED_FIELDS:
+        if field not in frontmatter or is_missing(frontmatter[field]):
+            errors.append(f"{path}: strategy card missing required field '{field}'")
+
+    evidence_quality = frontmatter.get("evidence_quality")
+    if evidence_quality not in ("", None, *sorted(ALLOWED_CONFIDENCE)):
+        errors.append(f"{path}: invalid 'evidence_quality' value '{evidence_quality}'")
+
+    chart_dependency = frontmatter.get("chart_dependency")
+    if chart_dependency not in ("", None, *sorted(ALLOWED_CHART_DEPENDENCY)):
+        errors.append(f"{path}: invalid 'chart_dependency' value '{chart_dependency}'")
+
+    test_priority = frontmatter.get("test_priority")
+    if test_priority not in ("", None, *sorted(ALLOWED_TEST_PRIORITY)):
+        errors.append(f"{path}: invalid 'test_priority' value '{test_priority}'")
 
 
 def validate_file(path: Path) -> list[str]:
@@ -181,6 +257,7 @@ def validate_file(path: Path) -> list[str]:
     validate_enum(path, frontmatter, errors)
     validate_list_fields(path, frontmatter, errors)
     validate_scalar_fields(path, frontmatter, errors)
+    validate_strategy_card_fields(path, frontmatter, errors)
 
     if frontmatter.get("type") == "setup":
         for field in SETUP_REQUIRED_FIELDS:
@@ -201,7 +278,7 @@ def main() -> int:
         print(f"wiki root does not exist: {root}", file=sys.stderr)
         return 1
 
-    files = sorted(root.rglob("*.md"))
+    files = list_markdown_files(root)
     if not files:
         print(f"No wiki markdown files found under {root}")
         return 0

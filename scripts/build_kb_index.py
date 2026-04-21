@@ -21,7 +21,17 @@ INDEX_FIELDS = [
     "pa_context",
     "tags",
     "open_questions",
+    "strategy_id",
+    "source_family",
+    "setup_family",
+    "market_context",
+    "evidence_quality",
+    "chart_dependency",
+    "needs_visual_review",
+    "test_priority",
+    "last_updated",
 ]
+SKIP_DIR_NAMES = {"templates"}
 
 
 def parse_scalar(raw: str):
@@ -73,6 +83,14 @@ def parse_frontmatter(text: str):
     return None
 
 
+def should_skip_file(path: Path) -> bool:
+    return any(part in SKIP_DIR_NAMES for part in path.parts)
+
+
+def list_markdown_files(root: Path) -> list[Path]:
+    return sorted(path for path in root.rglob("*.md") if not should_skip_file(path))
+
+
 def ensure_list(value):
     if isinstance(value, list):
         return value
@@ -81,21 +99,8 @@ def ensure_list(value):
     return [value]
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Build a lightweight knowledge wiki index.")
-    repo_root = Path(__file__).resolve().parents[1]
-    parser.add_argument("root", nargs="?", default=str(repo_root / "knowledge" / "wiki"))
-    parser.add_argument(
-        "--output",
-        default=str(repo_root / "knowledge" / "wiki_index.json"),
-        help="Output JSON path.",
-    )
-    args = parser.parse_args()
-
-    root = Path(args.root)
-    output = Path(args.output)
-    files = sorted(root.rglob("*.md")) if root.exists() else []
-
+def build_index_records(root: Path, repo_root: Path) -> list[dict[str, object]]:
+    files = list_markdown_files(root) if root.exists() else []
     index = []
     for path in files:
         frontmatter = parse_frontmatter(path.read_text(encoding="utf-8"))
@@ -119,8 +124,34 @@ def main() -> int:
             "pa_context": ensure_list(frontmatter.get("pa_context")),
             "tags": ensure_list(frontmatter.get("tags")),
             "open_questions": ensure_list(frontmatter.get("open_questions")),
+            "strategy_id": frontmatter.get("strategy_id", ""),
+            "source_family": frontmatter.get("source_family", ""),
+            "setup_family": frontmatter.get("setup_family", ""),
+            "market_context": ensure_list(frontmatter.get("market_context")),
+            "evidence_quality": frontmatter.get("evidence_quality", ""),
+            "chart_dependency": frontmatter.get("chart_dependency", ""),
+            "needs_visual_review": frontmatter.get("needs_visual_review", ""),
+            "test_priority": frontmatter.get("test_priority", ""),
+            "last_updated": frontmatter.get("last_updated", ""),
         }
         index.append({field: record[field] for field in INDEX_FIELDS})
+    return index
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Build a lightweight knowledge wiki index.")
+    repo_root = Path(__file__).resolve().parents[1]
+    parser.add_argument("root", nargs="?", default=str(repo_root / "knowledge" / "wiki"))
+    parser.add_argument(
+        "--output",
+        default=str(repo_root / "knowledge" / "wiki_index.json"),
+        help="Output JSON path.",
+    )
+    args = parser.parse_args()
+
+    root = Path(args.root)
+    output = Path(args.output)
+    index = build_index_records(root, repo_root)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

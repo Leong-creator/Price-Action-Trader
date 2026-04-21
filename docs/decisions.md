@@ -144,3 +144,8 @@
 
 - 日期：2026-04-18
 - 结论：`M8E.3` 当前继续延后。在每个候选标的至少具备 `30` 个完整 regular session 之前，不得启动 intraday 更长窗口扩展；当前 `SPY / NVDA 15m` 仍只有 `13` 个 session/标的，样本不足以支持下一轮 intraday 窗口放大。后续即便满足 session 数量门槛，也仍必须继续保持 session completeness、timezone、risk reset、`no-trade / wait`、knowledge trace 与 trigger 不变边界。
+
+## D-0030 M9 Price Action Strategy Lab 支线冻结
+
+- 日期：2026-04-20
+- 结论：允许在 `feature/m9-price-action-strategy-lab` 上启动 `M9：Price Action Strategy Lab`，但该支线只负责知识提炼、策略卡、测试计划与回测准备，不得改 trigger，不得触碰 `src/risk/`、`src/execution/`、`src/broker/`，不得重开 broker/live/real-money。M9 的来源优先级固定为 `fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。任何只有 notes 支持、缺少 transcript/Brooks 补证的策略，只能保留为 `draft`，不得写成 `promoted` 或已验证可执行规则。`statement`、`source_note`、`bundle support` 仍只允许停留在 trace / explanation / review / report 层，不得进入 trigger、confidence 或排序代理。

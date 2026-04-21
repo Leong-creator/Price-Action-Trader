@@ -1,0 +1,363 @@
+{
+  "strategy_id": "PA-SC-002",
+  "strategy_name": "突破后的 Follow-Through 延续",
+  "filter_id": "PA-SC-009",
+  "filter_name": "强趋势日 vs 震荡日过滤 v0.1（negative veto）",
+  "dataset": {
+    "symbol": "SPY",
+    "market": "US",
+    "timeframe": "5m",
+    "session_scope": "regular_session_only",
+    "blocked_time_buckets": [
+      "midday_1100_1330"
+    ],
+    "source": "yfinance",
+    "cache_csv": "/home/hgl/projects/Price-Action-Trader/local_data/public_intraday/us_SPY_5m_2026-02-20_2026-04-17_yfinance.csv",
+    "cache_metadata": "/home/hgl/projects/Price-Action-Trader/local_data/public_intraday/us_SPY_5m_2026-02-20_2026-04-17_yfinance.metadata.json",
+    "date_range": "2026-02-20 -> 2026-04-17",
+    "complete_sessions": 40,
+    "split_windows": {
+      "in_sample": "2026-02-20 -> 2026-03-19",
+      "validation": "2026-03-20 -> 2026-04-02",
+      "out_of_sample": "2026-04-06 -> 2026-04-17"
+    }
+  },
+  "costs": {
+    "slippage": "1bp + 1 tick/side",
+    "fees": "0",
+    "event_exclusion_applied": false,
+    "event_exclusion_gap": "当前仓库没有可直接复用的 SPY 5m 事件标签，本轮未排除宏观新闻窗口。"
+  },
+  "capital": {
+    "starting_capital": 25000.0,
+    "risk_per_trade": 100.0,
+    "position_sizing_rule": "按每笔固定 100 USD 风险预算 sizing，并受账户可买股数限制。"
+  },
+  "candidate_summary": {
+    "candidate_count": 414,
+    "executed_trade_count": 65,
+    "skip_count": 349,
+    "skip_counts": {
+      "blocked_time_bucket": 198,
+      "weak_breakout_bar": 58,
+      "range_veto": 33,
+      "returned_to_range": 27,
+      "no_follow_through": 23,
+      "stop_too_wide": 10
+    }
+  },
+  "stats": {
+    "trade_count": 65,
+    "win_rate": 0.5538,
+    "average_r": -0.0637,
+    "expectancy_r": -0.0637,
+    "profit_factor": 0.8651,
+    "max_drawdown_r": -8.7769,
+    "max_consecutive_losses": 4,
+    "starting_capital": 25000.0,
+    "ending_equity": 24790.38,
+    "net_pnl_cash": -209.62,
+    "average_trade_pnl_cash": -3.22,
+    "profit_factor_cash": 0.8498,
+    "max_drawdown_cash": -594.5
+  },
+  "split_stats": {
+    "in_sample": {
+      "trade_count": 25,
+      "win_rate": 0.56,
+      "average_r": -0.0565,
+      "expectancy_r": -0.0565,
+      "profit_factor": 0.871,
+      "max_drawdown_r": -4.7194,
+      "max_consecutive_losses": 3,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": 95.92,
+      "average_trade_pnl_cash": 3.84,
+      "profit_factor_cash": 1.1803,
+      "max_drawdown_cash": -261.4
+    },
+    "validation": {
+      "trade_count": 19,
+      "win_rate": 0.5789,
+      "average_r": 0.0026,
+      "expectancy_r": 0.0026,
+      "profit_factor": 1.0056,
+      "max_drawdown_r": -3.1062,
+      "max_consecutive_losses": 2,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": -243.37,
+      "average_trade_pnl_cash": -12.81,
+      "profit_factor_cash": 0.5484,
+      "max_drawdown_cash": -336.55
+    },
+    "out_of_sample": {
+      "trade_count": 21,
+      "win_rate": 0.5238,
+      "average_r": -0.1322,
+      "expectancy_r": -0.1322,
+      "profit_factor": 0.7452,
+      "max_drawdown_r": -5.3043,
+      "max_consecutive_losses": 4,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": -62.17,
+      "average_trade_pnl_cash": -2.96,
+      "profit_factor_cash": 0.8088,
+      "max_drawdown_cash": -114.96
+    }
+  },
+  "env_stats": {
+    "trend_supportive": {
+      "trade_count": 6,
+      "win_rate": 0.5,
+      "average_r": -0.1553,
+      "expectancy_r": -0.1553,
+      "profit_factor": 0.7238,
+      "max_drawdown_r": -2.5515,
+      "max_consecutive_losses": 2,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": -82.52,
+      "average_trade_pnl_cash": -13.75,
+      "profit_factor_cash": 0.4984,
+      "max_drawdown_cash": -138.67
+    },
+    "neutral": {
+      "trade_count": 59,
+      "win_rate": 0.5593,
+      "average_r": -0.0544,
+      "expectancy_r": -0.0544,
+      "profit_factor": 0.8826,
+      "max_drawdown_r": -6.9669,
+      "max_consecutive_losses": 4,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": -127.11,
+      "average_trade_pnl_cash": -2.15,
+      "profit_factor_cash": 0.8968,
+      "max_drawdown_cash": -484.43
+    }
+  },
+  "time_bucket_stats": {
+    "open_0930_1100": {
+      "trade_count": 22,
+      "win_rate": 0.5,
+      "average_r": -0.1694,
+      "expectancy_r": -0.1694,
+      "profit_factor": 0.6968,
+      "max_drawdown_r": -8.3273,
+      "max_consecutive_losses": 6,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": -153.66,
+      "average_trade_pnl_cash": -6.98,
+      "profit_factor_cash": 0.7833,
+      "max_drawdown_cash": -508.25
+    },
+    "midday_1100_1330": {
+      "trade_count": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "expectancy_r": 0.0,
+      "profit_factor": null,
+      "max_drawdown_r": 0.0,
+      "max_consecutive_losses": 0,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": 0.0,
+      "average_trade_pnl_cash": 0.0,
+      "profit_factor_cash": null,
+      "max_drawdown_cash": 0.0
+    },
+    "late_1330_1600": {
+      "trade_count": 43,
+      "win_rate": 0.5814,
+      "average_r": -0.0096,
+      "expectancy_r": -0.0096,
+      "profit_factor": 0.9776,
+      "max_drawdown_r": -5.0438,
+      "max_consecutive_losses": 4,
+      "starting_capital": null,
+      "ending_equity": null,
+      "net_pnl_cash": -55.96,
+      "average_trade_pnl_cash": -1.3,
+      "profit_factor_cash": 0.9185,
+      "max_drawdown_cash": -207.41
+    }
+  },
+  "filter_comparison": {
+    "without_filter": {
+      "trade_count": 73,
+      "win_rate": 0.5342,
+      "average_r": -0.1086,
+      "expectancy_r": -0.1086,
+      "profit_factor": 0.7822,
+      "max_drawdown_r": -10.815,
+      "max_consecutive_losses": 6,
+      "starting_capital": 25000.0,
+      "ending_equity": 24644.71,
+      "net_pnl_cash": -355.29,
+      "average_trade_pnl_cash": -4.87,
+      "profit_factor_cash": 0.7899,
+      "max_drawdown_cash": -671.78
+    },
+    "with_filter": {
+      "trade_count": 65,
+      "win_rate": 0.5538,
+      "average_r": -0.0637,
+      "expectancy_r": -0.0637,
+      "profit_factor": 0.8651,
+      "max_drawdown_r": -8.7769,
+      "max_consecutive_losses": 4,
+      "starting_capital": 25000.0,
+      "ending_equity": 24790.38,
+      "net_pnl_cash": -209.62,
+      "average_trade_pnl_cash": -3.22,
+      "profit_factor_cash": 0.8498,
+      "max_drawdown_cash": -594.5
+    },
+    "delta_expectancy_r": 0.0449,
+    "delta_trade_count": -8
+  },
+  "sample_conclusion": "达到最小实验样本要求，但未达到正式 promotion 门槛",
+  "minimum_probe_gate": {
+    "total_trades": 60,
+    "validation_or_oos_min_trades": 15
+  },
+  "formal_gate": {
+    "total_trades": 100,
+    "validation_or_oos_min_trades": 20
+  },
+  "case_studies": {
+    "winners": [
+      {
+        "trade_id": "PA-SC-002-2026-03-02-01",
+        "day": "2026-03-02",
+        "direction": "long",
+        "breakout_time": "10:00:00",
+        "entry_time": "10:15:00",
+        "filter_state": "neutral",
+        "exit_reason": "target_hit",
+        "pnl_r": 0.9382,
+        "pnl_cash": 85.9608,
+        "why": "突破 bar 收盘靠近极值，1 至 2 根 bar 内出现同向确认，且交易发生在成本影响相对可控的窗口，因此固定 1R 目标仍能在滑点后保住正收益。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-03-05-01",
+        "day": "2026-03-05",
+        "direction": "long",
+        "breakout_time": "15:00:00",
+        "entry_time": "15:15:00",
+        "filter_state": "neutral",
+        "exit_reason": "target_hit",
+        "pnl_r": 0.9363,
+        "pnl_cash": 82.584,
+        "why": "突破 bar 收盘靠近极值，1 至 2 根 bar 内出现同向确认，且交易发生在成本影响相对可控的窗口，因此固定 1R 目标仍能在滑点后保住正收益。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-03-13-01",
+        "day": "2026-03-13",
+        "direction": "short",
+        "breakout_time": "10:40:00",
+        "entry_time": "10:55:00",
+        "filter_state": "neutral",
+        "exit_reason": "target_hit",
+        "pnl_r": 0.9357,
+        "pnl_cash": 82.3953,
+        "why": "突破 bar 收盘靠近极值，1 至 2 根 bar 内出现同向确认，且交易发生在成本影响相对可控的窗口，因此固定 1R 目标仍能在滑点后保住正收益。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-02-23-01",
+        "day": "2026-02-23",
+        "direction": "short",
+        "breakout_time": "10:00:00",
+        "entry_time": "10:10:00",
+        "filter_state": "neutral",
+        "exit_reason": "target_hit",
+        "pnl_r": 0.9318,
+        "pnl_cash": 77.1552,
+        "why": "突破 bar 收盘靠近极值，1 至 2 根 bar 内出现同向确认，且交易发生在成本影响相对可控的窗口，因此固定 1R 目标仍能在滑点后保住正收益。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-03-09-01",
+        "day": "2026-03-09",
+        "direction": "long",
+        "breakout_time": "10:35:00",
+        "entry_time": "10:45:00",
+        "filter_state": "neutral",
+        "exit_reason": "target_hit",
+        "pnl_r": 0.9289,
+        "pnl_cash": 74.2368,
+        "why": "突破 bar 收盘靠近极值，1 至 2 根 bar 内出现同向确认，且交易发生在成本影响相对可控的窗口，因此固定 1R 目标仍能在滑点后保住正收益。"
+      }
+    ],
+    "losers": [
+      {
+        "trade_id": "PA-SC-002-2026-04-10-01",
+        "day": "2026-04-10",
+        "direction": "long",
+        "breakout_time": "13:50:00",
+        "entry_time": "14:00:00",
+        "filter_state": "neutral",
+        "exit_reason": "stop_hit",
+        "pnl_r": -1.6756,
+        "pnl_cash": -13.9104,
+        "why": "结构本身成立，但初始 stop 很近，1bp + 1 tick/side 的摩擦把亏损放大，导致这类小风险 breakout 在回撤中被成本吃掉。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-04-09-01",
+        "day": "2026-04-09",
+        "direction": "long",
+        "breakout_time": "10:50:00",
+        "entry_time": "11:00:00",
+        "filter_state": "neutral",
+        "exit_reason": "stop_hit",
+        "pnl_r": -1.246,
+        "pnl_cash": -28.26,
+        "why": "结构本身成立，但初始 stop 很近，1bp + 1 tick/side 的摩擦把亏损放大，导致这类小风险 breakout 在回撤中被成本吃掉。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-04-08-02",
+        "day": "2026-04-08",
+        "direction": "long",
+        "breakout_time": "13:55:00",
+        "entry_time": "14:05:00",
+        "filter_state": "neutral",
+        "exit_reason": "stop_hit",
+        "pnl_r": -1.2352,
+        "pnl_cash": -29.3472,
+        "why": "结构本身成立，但初始 stop 很近，1bp + 1 tick/side 的摩擦把亏损放大，导致这类小风险 breakout 在回撤中被成本吃掉。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-04-10-02",
+        "day": "2026-04-10",
+        "direction": "long",
+        "breakout_time": "15:00:00",
+        "entry_time": "15:15:00",
+        "filter_state": "neutral",
+        "exit_reason": "stop_hit",
+        "pnl_r": -1.2327,
+        "pnl_cash": -29.7324,
+        "why": "结构本身成立，但初始 stop 很近，1bp + 1 tick/side 的摩擦把亏损放大，导致这类小风险 breakout 在回撤中被成本吃掉。"
+      },
+      {
+        "trade_id": "PA-SC-002-2026-02-27-01",
+        "day": "2026-02-27",
+        "direction": "long",
+        "breakout_time": "15:15:00",
+        "entry_time": "15:25:00",
+        "filter_state": "neutral",
+        "exit_reason": "stop_hit",
+        "pnl_r": -1.2152,
+        "pnl_cash": -31.9356,
+        "why": "突破后虽然一度确认，但后续跟进不足或很快被反向打回，说明当前 v0.1 对午盘/区间化环境的过滤仍不够强。"
+      }
+    ]
+  },
+  "conclusion": {
+    "label": "淘汰，不再投入",
+    "reason": "达到最小实验样本要求，但未达到正式 promotion 门槛，且过滤后仍未出现可复用的正期望线索。"
+  }
+}
