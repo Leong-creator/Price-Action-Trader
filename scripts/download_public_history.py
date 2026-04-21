@@ -15,11 +15,11 @@ from scripts.public_backtest_demo_lib import download_and_cache_dataset, load_de
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Download and cache public historical market data for the user-readable backtest demo."
+        description="Download and cache historical market data for the user-readable backtest demo."
     )
     parser.add_argument(
         "--config",
-        default="config/examples/public_history_backtest_demo.json",
+        default="config/examples/public_history_backtest_long_horizon_longbridge.json",
         help="Path to the demo config JSON.",
     )
     parser.add_argument(

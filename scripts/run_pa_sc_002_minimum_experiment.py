@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refresh-data",
         action="store_true",
-        help="Refresh the cached SPY 5m dataset from yfinance before running.",
+        help="Refresh the cached SPY 5m dataset from Longbridge before running.",
     )
     parser.add_argument(
         "--summary-json",

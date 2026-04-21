@@ -35,6 +35,7 @@ class ExperimentConfig:
     symbol: str
     market: str
     timeframe: str
+    source: str
     timezone: str
     start: date
     end: date
@@ -145,18 +146,19 @@ class ExecutedTrade:
 
 
 def build_default_config() -> ExperimentConfig:
-    artifact_dir = ROOT / "reports" / "strategy_lab" / "pa_sc_002_first_backtest_artifacts"
+    artifact_dir = ROOT / "reports" / "strategy_lab" / "pa_sc_002_longbridge_backtest_artifacts"
     return ExperimentConfig(
         ticker="SPY",
         symbol="SPY",
         market="US",
         timeframe="5m",
+        source="longbridge",
         timezone="America/New_York",
         start=date.fromisoformat("2026-02-20"),
         end=date.fromisoformat("2026-04-17"),
-        cache_dir=ROOT / "local_data" / "public_intraday",
+        cache_dir=ROOT / "local_data" / "longbridge_intraday",
         artifact_dir=artifact_dir,
-        report_path=ROOT / "reports" / "strategy_lab" / "pa_sc_002_first_backtest_report.md",
+        report_path=ROOT / "reports" / "strategy_lab" / "pa_sc_002_longbridge_backtest_report.md",
         summary_path=artifact_dir / "summary.json",
         trades_csv_path=artifact_dir / "trades.csv",
         candidates_csv_path=artifact_dir / "candidate_events.csv",
@@ -246,8 +248,9 @@ def load_or_download_dataset(
         start=config.start,
         end=config.end,
         interval=config.timeframe,
-        source="yfinance",
+        source=config.source,
         timezone_name=config.timezone,
+        allow_extended_hours=False,
     )
     if not rows:
         raise RuntimeError(f"No intraday rows returned for {config.ticker} {config.timeframe}.")
@@ -255,7 +258,7 @@ def load_or_download_dataset(
     row_count = len(load_ohlcv_csv(csv_path))
     metadata = {
         "instrument": asdict(instrument),
-        "source": "yfinance",
+        "source": config.source,
         "row_count": row_count,
         "start": config.start.isoformat(),
         "end": config.end.isoformat(),
@@ -283,7 +286,7 @@ def build_cache_path(config: ExperimentConfig) -> Path:
             config.timeframe,
             config.start.isoformat(),
             config.end.isoformat(),
-            "yfinance",
+            config.source,
         )
     )
     return config.cache_dir / f"{filename}.csv"
@@ -1277,7 +1280,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
     losers = summary["case_studies"]["losers"][:3]
     out_of_sample = split_stats["out_of_sample"]
     lines = [
-        "# PA-SC-002 First Backtest Report",
+        "# PA-SC-002 Longbridge Backtest Report",
         "",
         "本报告只代表 `paper / simulated` 范围内的最小研究闭环，不代表实盘能力或收益承诺。",
         "",
@@ -1297,6 +1300,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
         f"| 过滤器 | {summary['filter_name']} |",
         f"| 标的 | `{summary['dataset']['symbol']}` |",
         f"| 周期 | `{summary['dataset']['timeframe']}` |",
+        f"| 数据源 | `{summary['dataset']['source']}` |",
         "| 时段限制 | `regular session only` |",
         f"| 数据区间 | `{summary['dataset']['date_range']}` |",
         f"| 假设本金 | `${summary['capital']['starting_capital']:.2f}` |",

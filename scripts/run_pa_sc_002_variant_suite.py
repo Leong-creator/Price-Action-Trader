@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refresh-data",
         action="store_true",
-        help="Refresh cached SPY 5m data before the suite runs.",
+        help="Refresh cached SPY 5m Longbridge data before the suite runs.",
     )
     parser.add_argument(
         "--summary-json",

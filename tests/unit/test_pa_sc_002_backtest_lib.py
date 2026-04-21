@@ -20,6 +20,13 @@ SPEC.loader.exec_module(MODULE)
 
 
 class PASC002BacktestLibUnitTests(unittest.TestCase):
+    def test_build_default_config_uses_longbridge_dataset_defaults(self) -> None:
+        config = MODULE.build_default_config()
+
+        self.assertEqual(config.source, "longbridge")
+        self.assertIn("longbridge_intraday", str(config.cache_dir))
+        self.assertIn("longbridge", config.report_path.name)
+
     def test_classify_filter_state_marks_choppy_history_as_range_veto(self) -> None:
         config = MODULE.build_default_config()
         history = (
