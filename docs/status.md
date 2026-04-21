@@ -2,16 +2,18 @@
 
 ## 当前阶段
 
-- 阶段 8：可靠性验证（进行中）
+- 稳定基线：阶段 8：可靠性验证（已完成至 `M8E.2`，位于 `main`）
+- 当前支线：阶段 9：Price Action Strategy Lab（进行中，位于 `feature/m9-price-action-strategy-lab`）
 
 ## 当前 milestone
 
-- M8：可靠性验证（进行中）
-- 当前子阶段：M8E.2 Longer-Window Daily Validation（已完成）
+- 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
+- 当前支线 milestone：`M9 Price Action Strategy Lab`（进行中）
+- 当前子阶段：`M9A`~`M9D` 与 `M9F` 首轮已完成；`M9E`（优先策略进入回测实验）已启动，当前只聚焦 `PA-SC-002`
 
 ## 当前分支
 
-- `main`
+- `feature/m9-price-action-strategy-lab`
 
 ## 已完成
 
@@ -179,6 +181,33 @@
   - 新 run 继续使用 repo-relative artifact path，并继续携带 `sample_adequacy`；当前 `in_sample` 为 `adequate`，`validation` / `out_of_sample` 仍为 `insufficient_sample`。
   - 已新增 `tests/reliability/test_longer_window_daily_validation.py`，覆盖 artifact 完整性、split / regime / no-trade / trace coverage 回归与 `sample_adequacy` 落盘。
   - 本阶段未改 trigger，未改 `knowledge/raw`，未进入 broker/live/real-money，也未启动 intraday 更长窗口。
+- M9A 项目保护与支线建立已完成：
+  - 已从 `main` 新建 `feature/m9-price-action-strategy-lab`，不在 `main` 直接开发。
+  - 已落盘 `reports/strategy_lab/m9_initial_project_snapshot.md`，固定记录起始分支、commit、`git status`、M8 进度摘要、目录概览与安全边界。
+  - 已明确 `paper / simulated`、`no-go`、不得接真实账户、不得自动实盘下单的边界在 M9 继续有效。
+- M9B 来源盘点已完成：
+  - 已落盘 `reports/strategy_lab/m9_source_inventory.md`，并固定来源优先级为 `fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。
+  - 已把方方土 YouTube 转录补入第一优先来源，Brooks PPT 为第二优先，方方土 notes 为第三优先。
+- M9C 首批策略卡提炼已完成：
+  - 已新增 `knowledge/wiki/strategy_cards/` 目录、模板与索引。
+  - 已落盘首批 `10` 张 Markdown 策略卡，覆盖趋势恢复、突破 follow-through、失败突破、区间边缘反转、H2/L2、tight channel、楔形、开盘区间、趋势日过滤、高波动风险过滤。
+  - `PA-SC-007`、`PA-SC-008`、`PA-SC-010` 已明确保留 `draft`、`chart_dependency: high`、`needs_visual_review: true`。
+- M9D 测试计划首轮已完成：
+  - 已落盘 `reports/strategy_lab/m9_strategy_test_plan_index.md`。
+  - `PA-SC-002`、`PA-SC-003`、`PA-SC-005` 已写成详细测试计划，其余卡片已写简版测试计划。
+- M9F 面向非技术用户的总结已完成：
+  - 已落盘 `reports/strategy_lab/m9_strategy_lab_summary.md`，汇总来源、策略卡、优先级、测试方案、当前不能证明的内容与下一步建议。
+- M9E `PA-SC-002` 第一轮最小闭环已完成：
+  - 已落盘 `knowledge/wiki/strategy_cards/combined/PA-SC-002-executable-v0.1.md`、`reports/strategy_lab/pa_sc_002_minimum_experiment_v0.1.md`、`reports/strategy_lab/pa_sc_002_first_backtest_report.md`。
+  - 已在 `SPY / 5m / regular session only / yfinance / 2026-02-20 ~ 2026-04-17` 范围内完成第一轮最小回测，结果为 `98` 笔交易、Expectancy `-0.1066R`、净盈亏 `-$374.65`、期末权益 `$24,625.35`。
+  - 已明确本轮资本口径：默认起始本金 `$25,000`、单笔风险预算 `$100`，后续实验固定同步报告美元盈亏、权益变化与美元回撤。
+- M9E `PA-SC-002` 诊断型变体测试已完成：
+  - 已落盘 `reports/strategy_lab/pa_sc_002_diagnostic_analysis.md` 与 `reports/strategy_lab/pa_sc_002_variant_suite.md`，并生成 `reports/strategy_lab/pa_sc_002_variant_suite_artifacts/`。
+  - 当前诊断结论为：`Midday Block` 是唯一既改善明显、又仍达到最小 probe 门槛的单因素变体；`Stronger Negative Veto` 单独使用改善不足；`Late Only` 仅可视为后验诊断上限，不可直接升格为正式版本。
+  - 当前 `PA-SC-002` 的业务结论仍为“修改后重测”，尚未达到保留进入第二轮改进的门槛。
+- M9 配套契约与门禁已同步：
+  - 已更新 `plans/active-plan.md`、`docs/acceptance.md`、`docs/decisions.md`、`docs/requirements.md`、`docs/architecture.md`、`docs/pa-strategy-spec.md`、`docs/knowledge-base-design.md`、`docs/knowledge-atomization.md`、`docs/roadmap.md`、`README.md`。
+  - 已更新 `knowledge/schema/*.md`、`scripts/validate_kb.py`、`scripts/build_kb_index.py`，并新增 `tests/unit/test_kb_scripts.py` 以支持 strategy cards frontmatter 与 `templates/` 跳过逻辑。
 
 ## 当前阻塞
 
@@ -187,10 +216,11 @@
 
 ## 下一步
 
-- 当前不自动进入 `M8E.3 Intraday Window Expansion`；它仍延后，不是 broker/live，也不是策略扩展。
-- `M8D.1`、`M8D.2`、`M8D.3`、`M8E.1`、`M8E.2` 均已完成；若要启动 `M8E.3`，必须先满足每个标的至少 `30` 个完整 regular session 的门槛。
-- 当前 longer-window daily 结果已经可用于继续审计与 no-trade/trace 一致性分析，但 `validation` / `out_of_sample` 仍是 `insufficient_sample`，不能包装成“已充分验证”。
-- 后续仍必须保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
-- 当前长期稳定基线为 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
-- `feature/m7-broker-api-assessment` 保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
-- 完成 M8 前，不重新评估真实 broker、真实账户、live execution 或付费 API；当前仍未进入期权验证。
+- M9 下一步继续停留在 `M9E`，先只推进 `PA-SC-002` 的单策略收敛，不扩到 `PA-SC-003`、`PA-SC-005`。
+- `PA-SC-002` 当前最优先的正式重测方向是 `Midday Block`；`Midday Block + Stronger Veto` 只保留为第二优先的 underpowered 诊断版本，等待更长样本或更多标的后再决定是否升格。
+- `PA-SC-001`、`PA-SC-003`、`PA-SC-004`、`PA-SC-005`、`PA-SC-006`、`PA-SC-009` 暂不扩测，等 `PA-SC-002` 形成更清晰的保留/修改/淘汰结论后再决定。
+- `PA-SC-007`、`PA-SC-008`、`PA-SC-010` 先补图表、事件标签或统一定义；在完成这些前，不进入正式回测。
+- M9 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
+- 当前长期稳定基线仍是 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
+- `feature/m7-broker-api-assessment` 继续保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
+- M9 不是 broker/live 扩展；当前仍不重新评估真实 broker、真实账户、live execution 或付费 API。
