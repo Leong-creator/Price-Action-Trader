@@ -70,7 +70,7 @@
 - M8D 已新增 `tests/reliability/test_regime_robustness.py`、`tests/reliability/test_shadow_paper_consistency.py`、`tests/reliability/test_dataset_manifest_contract.py`
 - M8D 已补齐 `docs/test-dataset-curation.md` 的 small/large dataset、realtime recording 与受控标签规范，并更新 `reports/reliability/README.md` 的报告最小字段
 - M8D 当前已具备：manifest 校验、shadow/paper dry-run、报告 traceability、无样本 deferred 语义；尚未实际运行用户真实历史样本或录制型实时样本
-- 已新增 `scripts/download_public_history.py`，支持优先使用 Alpha Vantage（若环境已有 key）、否则回退到 `yfinance` 下载公共历史数据并缓存为本地 CSV
+- 已新增 `scripts/download_public_history.py`，当前默认使用 `Longbridge` 只读历史行情下载并缓存为本地 CSV；`Alpha Vantage` / `yfinance` 只保留为显式指定时的兼容路径
 - 已新增 `scripts/run_public_backtest_demo.py` 与 `scripts/run_public_backtest_demo.sh`，可在本地缓存基础上直接生成用户可读的历史回测演示报告
 - 已新增 `config/examples/public_history_backtest_demo.json` 与 `docs/user-backtest-guide.md`，固定第一轮演示范围为 `NVDA / TSLA / SPY`、`2024-01-01 ~ 2024-06-30`、`1d`
 - 已完成一轮公共历史数据演示回测：`yfinance` 下载的本地缓存已落在 `local_data/public_history/`，示例 run `demo_public_2024h1` 生成于 `reports/backtests/demo_public_2024h1/`
@@ -199,12 +199,22 @@
   - 已落盘 `reports/strategy_lab/m9_strategy_lab_summary.md`，汇总来源、策略卡、优先级、测试方案、当前不能证明的内容与下一步建议。
 - M9E `PA-SC-002` 第一轮最小闭环已完成：
   - 已落盘 `knowledge/wiki/strategy_cards/combined/PA-SC-002-executable-v0.1.md`、`reports/strategy_lab/pa_sc_002_minimum_experiment_v0.1.md`、`reports/strategy_lab/pa_sc_002_first_backtest_report.md`。
-  - 已在 `SPY / 5m / regular session only / yfinance / 2026-02-20 ~ 2026-04-17` 范围内完成第一轮最小回测，结果为 `98` 笔交易、Expectancy `-0.1066R`、净盈亏 `-$374.65`、期末权益 `$24,625.35`。
+  - 已在 `SPY / 5m / regular session only / yfinance / 2026-02-20 ~ 2026-04-17` 范围内完成第一轮最小回测，结果为 `98` 笔交易、Expectancy `-0.1066R`、净盈亏 `-$374.65`、期末权益 `$24,625.35`。该结果只保留为首轮历史记录，当前默认重测入口已切到 Longbridge。
   - 已明确本轮资本口径：默认起始本金 `$25,000`、单笔风险预算 `$100`，后续实验固定同步报告美元盈亏、权益变化与美元回撤。
 - M9E `PA-SC-002` 诊断型变体测试已完成：
   - 已落盘 `reports/strategy_lab/pa_sc_002_diagnostic_analysis.md` 与 `reports/strategy_lab/pa_sc_002_variant_suite.md`，并生成 `reports/strategy_lab/pa_sc_002_variant_suite_artifacts/`。
   - 当前诊断结论为：`Midday Block` 是唯一既改善明显、又仍达到最小 probe 门槛的单因素变体；`Stronger Negative Veto` 单独使用改善不足；`Late Only` 仅可视为后验诊断上限，不可直接升格为正式版本。
   - 当前 `PA-SC-002` 的业务结论仍为“修改后重测”，尚未达到保留进入第二轮改进的门槛。
+- M9 Longbridge 历史数据接入与长窗口验证已完成：
+  - 已新增 `scripts/longbridge_history_lib.py`，通过 `longbridge kline history --format json` 接入只读历史数据 adapter，并支持 `1m / 5m / 15m / 30m / 1h / 1d / 1w / 1mo / 1y` 的分段抓取。
+  - 已新增 `config/examples/public_history_backtest_long_horizon_longbridge.json` 与 `config/examples/intraday_pilot_spy_5m_longbridge.json`，分别用于 `NVDA / TSLA / SPY 1d` 长周期 daily validation 与 `SPY 5m` intraday pilot。
+  - 已完成模拟账户授权与真实下载验证：`NVDA / TSLA / SPY 1d` 已成功拉到 `2020-01-02 ~ 2025-12-31`，`SPY 5m` 已确认在当前账户权限下可稳定拉到 `2024-04-01 ~ 2026-04-17`。
+  - 已新增 vendor anomaly 隔离：若供应商返回的 OHLC 明显违反 `high/low` 约束，会被单独落到 `.vendor_anomalies.json`，不混入正式回测 CSV；当前已记录 `SPY 1d 2020-11-18` 一根异常 bar。
+  - 已把 daily public-history demo 的 risk session 从单一 `historical-demo` 改为 `session_key reset per trading day`，避免 `consecutive_losses_limit` / `daily_loss_limit` 跨多年窗口持续冻结后续样本。
+  - 已修复 intraday session audit 的 timeframe 识别：`5m` regular session 现可正确接受 `15:50`、`15:55` 两根尾盘 bar，不再误判为 out-of-hours。
+  - 当前 longbridge daily run `reports/backtests/m9_longbridge_daily_validation_reset/` 在 `2020-01-01 ~ 2025-12-31`、`NVDA / TSLA / SPY`、`1d` 条件下输出：总收益率 `14.2321%`、最大回撤 `7.3702%`、交易 `370` 笔；`in_sample / validation / out_of_sample` 三个 split 当前均为 `adequate`。
+  - 当前 longbridge intraday run `reports/backtests/m9_longbridge_intraday_spy_5m_full_window/` 在 `2024-04-01 ~ 2026-04-17`、`SPY / 5m` 条件下输出：总收益率 `-62.6007%`、最大回撤 `62.6647%`、交易 `2869` 笔、可用 session `507 / 514`；说明数据覆盖已足够，但当前策略在该日内口径下表现较差。
+  - 当前项目默认回测入口已统一切到 Longbridge：`run_public_backtest_demo.py`、`download_public_history.py`、`run_intraday_pilot.py` 和 `PA-SC-002` 默认实验脚本都不再默认回退到 `yfinance`。
 - M9 配套契约与门禁已同步：
   - 已更新 `plans/active-plan.md`、`docs/acceptance.md`、`docs/decisions.md`、`docs/requirements.md`、`docs/architecture.md`、`docs/pa-strategy-spec.md`、`docs/knowledge-base-design.md`、`docs/knowledge-atomization.md`、`docs/roadmap.md`、`README.md`。
   - 已更新 `knowledge/schema/*.md`、`scripts/validate_kb.py`、`scripts/build_kb_index.py`，并新增 `tests/unit/test_kb_scripts.py` 以支持 strategy cards frontmatter 与 `templates/` 跳过逻辑。
@@ -218,6 +228,7 @@
 
 - M9 下一步继续停留在 `M9E`，先只推进 `PA-SC-002` 的单策略收敛，不扩到 `PA-SC-003`、`PA-SC-005`。
 - `PA-SC-002` 当前最优先的正式重测方向是 `Midday Block`；`Midday Block + Stronger Veto` 只保留为第二优先的 underpowered 诊断版本，等待更长样本或更多标的后再决定是否升格。
+- 后续 `PA-SC-002` 与其他历史回测实验默认使用 Longbridge 历史缓存，不再把 `yfinance` 作为默认实验数据源。
 - `PA-SC-001`、`PA-SC-003`、`PA-SC-004`、`PA-SC-005`、`PA-SC-006`、`PA-SC-009` 暂不扩测，等 `PA-SC-002` 形成更清晰的保留/修改/淘汰结论后再决定。
 - `PA-SC-007`、`PA-SC-008`、`PA-SC-010` 先补图表、事件标签或统一定义；在完成这些前，不进入正式回测。
 - M9 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。

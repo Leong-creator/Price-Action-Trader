@@ -1,6 +1,6 @@
 {
-  "title": "Historical Long-Horizon Daily Validation (Longbridge)",
-  "description": "Long-horizon walk-forward daily validation on Longbridge-sourced research data. Still paper/simulated only.",
+  "title": "Public History Long-Horizon Daily Validation (Longbridge)",
+  "description": "Long-horizon walk-forward daily validation sourced from a user-authorized Longbridge simulated account. Still paper/simulated only.",
   "start": "2020-01-01",
   "end": "2025-12-31",
   "interval": "1d",

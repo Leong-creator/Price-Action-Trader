@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 from src.backtest import BacktestReport, TradeRecord, run_backtest
 from src.data import DataValidationError, OhlcvRow, build_replay, load_ohlcv_csv
 from src.execution import ExecutionRequest, PaperBrokerAdapter, PaperPosition
-from src.risk import PositionSnapshot, RiskConfig, SessionRiskState, evaluate_order_request
+from src.risk import PositionSnapshot, RiskConfig, SessionRiskState, evaluate_order_request, maybe_reset_session
 from src.strategy import (
     KnowledgeAtomHit,
     Signal,
@@ -31,6 +31,7 @@ from src.strategy import (
     load_default_knowledge,
     summarize_knowledge_trace,
 )
+from scripts.longbridge_history_lib import fetch_longbridge_daily_history_rows
 
 try:  # pragma: no cover - optional runtime dependency
     import matplotlib.pyplot as plt
@@ -60,14 +61,14 @@ CSV_HEADER = (
     "close",
     "volume",
 )
-DEFAULT_SOURCE_ORDER = ("alpha_vantage", "yfinance")
+DEFAULT_SOURCE_ORDER = ("longbridge",)
 ALPHA_VANTAGE_ENV_VARS = ("ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY")
 QUANT = Decimal("0.0001")
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 ARTIFACT_CSV_LINE_TERMINATOR = "\n"
 REPORT_READABILITY_NOTE = (
-    "本报告仅用于公共历史数据研究演示，仍处于 paper / simulated 边界，"
+    "本报告仅用于历史数据研究演示，仍处于 paper / simulated 边界，"
     "不代表实盘能力或未来收益承诺。"
 )
 MIN_REQUIRED_EXECUTED_TRADES_PER_SPLIT = 5
@@ -276,10 +277,19 @@ def download_and_cache_dataset(
                 interval=config.interval,
                 source=source,
             )
+            rows, vendor_anomalies = sanitize_vendor_rows(rows)
             if not rows:
                 raise RuntimeError(f"{instrument.ticker} returned no rows from {source}")
             write_cache_csv(csv_path, rows)
             row_count = len(load_ohlcv_csv(csv_path))
+            anomaly_path = csv_path.with_suffix(".vendor_anomalies.json")
+            if vendor_anomalies:
+                anomaly_path.write_text(
+                    json.dumps(vendor_anomalies, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            elif anomaly_path.exists():
+                anomaly_path.unlink()
             metadata = {
                 "instrument": asdict(instrument),
                 "source": source,
@@ -289,6 +299,8 @@ def download_and_cache_dataset(
                 "interval": config.interval,
                 "downloaded_at": datetime.now(UTC).isoformat(),
                 "boundary": "paper/simulated",
+                "dropped_invalid_vendor_rows": len(vendor_anomalies),
+                "vendor_anomalies_path": str(anomaly_path) if vendor_anomalies else None,
             }
             metadata_path.write_text(
                 json.dumps(metadata, ensure_ascii=False, indent=2),
@@ -307,7 +319,7 @@ def download_and_cache_dataset(
 
     if last_error is None:
         raise RuntimeError(
-            "No public data source is available. Alpha Vantage key is missing and yfinance is not usable."
+            "No historical data source is available. Configure Longbridge access or provide an explicit source_order."
         )
     raise RuntimeError(str(last_error))
 
@@ -324,6 +336,16 @@ def fetch_public_history_rows(
         raise RuntimeError("The public backtest demo currently supports only 1d interval.")
     if source == "alpha_vantage":
         return _fetch_alpha_vantage_rows(instrument=instrument, start=start, end=end, interval=interval)
+    if source == "longbridge":
+        return fetch_longbridge_daily_history_rows(
+            ticker=instrument.ticker,
+            symbol=instrument.symbol,
+            market=instrument.market,
+            timezone_name=instrument.timezone,
+            start=start,
+            end=end,
+            interval=interval,
+        )
     if source == "yfinance":
         return _fetch_yfinance_rows(instrument=instrument, start=start, end=end, interval=interval)
     raise RuntimeError(f"Unsupported source: {source}")
@@ -349,6 +371,34 @@ def write_cache_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=CSV_HEADER)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def sanitize_vendor_rows(rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    sanitized: list[dict[str, str]] = []
+    anomalies: list[dict[str, Any]] = []
+    for row in rows:
+        open_value = _decimal(row["open"])
+        high_value = _decimal(row["high"])
+        low_value = _decimal(row["low"])
+        close_value = _decimal(row["close"])
+        if high_value < max(open_value, low_value, close_value) or low_value > min(
+            open_value,
+            high_value,
+            close_value,
+        ):
+            anomalies.append(
+                {
+                    "reason": "ohlc_range_inconsistent",
+                    "symbol": row["symbol"],
+                    "market": row["market"],
+                    "timeframe": row["timeframe"],
+                    "timestamp": row["timestamp"],
+                    "row": row,
+                }
+            )
+            continue
+        sanitized.append(row)
+    return sanitized, anomalies
 
 
 def run_symbol_backtest(record: DatasetCacheRecord) -> SymbolBacktestResult:
@@ -381,13 +431,11 @@ def run_paper_demo(
         max_daily_loss=risk_settings.max_daily_loss,
         max_consecutive_losses=risk_settings.max_consecutive_losses,
     )
-    session_state = SessionRiskState(session_key="historical-demo")
+    session_state: SessionRiskState | None = None
     positions: tuple[PaperPosition, ...] = ()
     seen_signal_ids = frozenset()
     equity = risk_settings.starting_capital
-    equity_points: list[tuple[str, float]] = [
-        (datetime.combine(date.today(), time(0, 0), tzinfo=UTC).isoformat(), float(equity))
-    ]
+    equity_points: list[tuple[str, float]] = []
     executed: list[ExecutedTradeRecord] = []
     blocked: list[BlockedSignalRecord] = []
     open_plans: dict[str, tuple[SymbolBacktestResult, Signal, TradeRecord, Decimal]] = {}
@@ -398,6 +446,10 @@ def run_paper_demo(
     )
 
     for result, signal, trade in candidates:
+        session_key = trade.entry_timestamp.date().isoformat()
+        if session_state is None:
+            session_state = SessionRiskState(session_key=session_key)
+            equity_points.append((trade.entry_timestamp.isoformat(), float(equity)))
         positions, session_state, equity = _close_due_positions(
             adapter=adapter,
             current_positions=positions,
@@ -409,6 +461,9 @@ def run_paper_demo(
             executed=executed,
             equity_points=equity_points,
         )
+        if session_state.session_key != session_key:
+            session_state = maybe_reset_session(session_state, next_session_key=session_key)
+            equity_points.append((trade.entry_timestamp.isoformat(), float(equity)))
 
         quantity = compute_demo_quantity(
             trade=trade,
@@ -479,7 +534,7 @@ def run_paper_demo(
     positions, session_state, equity = _close_due_positions(
         adapter=adapter,
         current_positions=positions,
-        session_state=session_state,
+        session_state=session_state or SessionRiskState(session_key="historical-demo"),
         config=risk_config,
         current_equity=equity,
         due_before=None,
@@ -906,7 +961,7 @@ def build_summary_payload(
             "max_symbol_exposure_ratio": _string_decimal(config.risk.max_symbol_exposure_ratio),
             "max_daily_loss": _string_decimal(config.risk.max_daily_loss),
             "max_consecutive_losses": config.risk.max_consecutive_losses,
-            "session_model": "single historical demo session; no daily reset simulation",
+            "session_model": "session_key reset per trading day",
         },
         "cash_note": infer_cash_note(config),
         "core_results": {
@@ -934,7 +989,7 @@ def build_summary_payload(
             REPORT_READABILITY_NOTE,
             "当前演示未接入历史新闻时间线，因此 news filter 不参与本轮回测结果。",
             "当前 no-trade / wait 只持久化系统能明确解释的 decision sites，不对所有静默 bar 补造结论。",
-            "当前仍是 daily public-history validation，不模拟 intraday session reset、真实滑点或真实手续费。",
+            "当前仍是 daily public-history validation；风控 session_key 仅按交易日重置，不模拟 intraday session reset、真实滑点或真实手续费。",
         ],
     }
 
@@ -1918,6 +1973,7 @@ def _close_due_positions(
             positions=positions,
             session_state=next_state,
             config=config,
+            session_key=trade.exit_timestamp.date().isoformat(),
             exit_reason=trade.exit_reason,
         )
         positions = close_result.resulting_positions

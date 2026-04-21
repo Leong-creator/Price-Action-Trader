@@ -37,7 +37,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                         "interval": "15m",
                         "cache_dir": str(temp_root / "cache"),
                         "report_dir": str(temp_root / "reports"),
-                        "source_order": ["yfinance"],
+                        "source_order": ["longbridge"],
                         "instrument": {
                             "ticker": "SPY",
                             "symbol": "SPY",
@@ -71,7 +71,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
             config = MODULE.load_intraday_pilot_config(config_path)
-            cache_path = MODULE.build_intraday_cache_path(config, source="yfinance")
+            cache_path = MODULE.build_intraday_cache_path(config, source="longbridge")
             rows = build_session_rows(date.fromisoformat("2026-01-05")) + build_session_rows(
                 date.fromisoformat("2026-01-06"),
                 start_price="110",
@@ -127,7 +127,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                         "interval": "15m",
                         "cache_dir": str(temp_root / "cache"),
                         "report_dir": str(temp_root / "reports"),
-                        "source_order": ["yfinance"],
+                        "source_order": ["longbridge"],
                         "instrument": {
                             "ticker": "SPY",
                             "symbol": "SPY",
@@ -161,7 +161,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
             config = MODULE.load_intraday_pilot_config(config_path)
-            cache_path = MODULE.build_intraday_cache_path(config, source="yfinance")
+            cache_path = MODULE.build_intraday_cache_path(config, source="longbridge")
             rows = build_session_rows(date.fromisoformat("2026-01-05")) + build_session_rows(
                 date.fromisoformat("2026-01-06"),
                 start_price="110",
@@ -212,7 +212,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                         "interval": "15m",
                         "cache_dir": str(temp_root / "cache"),
                         "report_dir": str(temp_root / "reports"),
-                        "source_order": ["yfinance"],
+                        "source_order": ["longbridge"],
                         "instrument": {
                             "ticker": "NVDA",
                             "symbol": "NVDA",
@@ -246,7 +246,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
             config = MODULE.load_intraday_pilot_config(config_path)
-            cache_path = MODULE.build_intraday_cache_path(config, source="yfinance")
+            cache_path = MODULE.build_intraday_cache_path(config, source="longbridge")
             rows = build_session_rows(
                 date.fromisoformat("2026-01-05"),
                 symbol="NVDA",
@@ -295,7 +295,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                         "interval": "15m",
                         "cache_dir": str(temp_root / "cache"),
                         "report_dir": str(temp_root / "reports"),
-                        "source_order": ["yfinance"],
+                        "source_order": ["longbridge"],
                         "instrument": {
                             "ticker": "NVDA",
                             "symbol": "NVDA",
@@ -329,7 +329,7 @@ class IntradayPilotReliabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
             config = MODULE.load_intraday_pilot_config(config_path)
-            cache_path = MODULE.build_intraday_cache_path(config, source="yfinance")
+            cache_path = MODULE.build_intraday_cache_path(config, source="longbridge")
             rows = build_session_rows(date.fromisoformat("2026-01-05")) + build_session_rows(
                 date.fromisoformat("2026-01-06"),
                 drop_bar_at="11:00",

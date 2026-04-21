@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--config",
-        default="config/examples/intraday_pilot_spy_15m.json",
+        default="config/examples/intraday_pilot_spy_5m_longbridge.json",
         help="Path to the intraday pilot config JSON.",
     )
     parser.add_argument(

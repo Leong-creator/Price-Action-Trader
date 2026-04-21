@@ -1,9 +1,9 @@
 {
-  "title": "Intraday Pilot SPY 15m (Longbridge)",
-  "description": "Single-symbol intraday pilot on SPY 15m regular sessions sourced from a user-authorized Longbridge simulated account. Still paper/simulated only.",
-  "start": "2026-03-30",
-  "end": "2026-04-16",
-  "interval": "15m",
+  "title": "Intraday Pilot SPY 5m (Longbridge)",
+  "description": "Single-symbol intraday pilot on SPY 5m regular sessions sourced from a user-authorized Longbridge simulated account. Still paper/simulated only.",
+  "start": "2026-01-02",
+  "end": "2026-04-17",
+  "interval": "5m",
   "cache_dir": "local_data/longbridge_intraday",
   "report_dir": "reports/backtests",
   "source_order": [
@@ -29,7 +29,7 @@
     "timezone": "America/New_York",
     "regular_open": "09:30",
     "regular_close": "16:00",
-    "expected_bars_per_session": 26,
+    "expected_bars_per_session": 78,
     "allow_extended_hours": false
   },
   "costs": {

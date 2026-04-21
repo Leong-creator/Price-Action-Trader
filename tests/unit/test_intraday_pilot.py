@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+import tempfile
 import unittest
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from unittest import mock
 
 from src.backtest import BacktestReport, BacktestStats, TradeRecord
 from src.strategy.contracts import KnowledgeAtomHit, Signal
@@ -23,6 +26,54 @@ SPEC.loader.exec_module(MODULE)
 
 
 class IntradayPilotUnitTests(unittest.TestCase):
+    def test_load_intraday_config_defaults_to_longbridge_when_source_order_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "intraday.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "title": "Intraday Fixture Pilot",
+                        "start": "2026-01-05",
+                        "end": "2026-01-06",
+                        "interval": "15m",
+                        "cache_dir": str(Path(temp_dir) / "cache"),
+                        "report_dir": str(Path(temp_dir) / "reports"),
+                        "instrument": {
+                            "ticker": "SPY",
+                            "symbol": "SPY",
+                            "label": "SPDR S&P 500 ETF",
+                            "market": "US",
+                            "timezone": "America/New_York"
+                        },
+                        "risk": {
+                            "starting_capital": "25000",
+                            "risk_per_trade": "100",
+                            "max_total_exposure": "25000",
+                            "max_symbol_exposure_ratio": "1.00",
+                            "max_daily_loss": "1000",
+                            "max_consecutive_losses": 4
+                        },
+                        "session": {
+                            "timezone": "America/New_York",
+                            "regular_open": "09:30",
+                            "regular_close": "16:00",
+                            "expected_bars_per_session": 26,
+                            "allow_extended_hours": False
+                        },
+                        "costs": {
+                            "slippage_bps": "2",
+                            "fee_per_order": "0"
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            config = MODULE.load_intraday_pilot_config(config_path)
+
+        self.assertEqual(config.source_order, ("longbridge",))
+
     def test_audit_intraday_sessions_flags_missing_and_out_of_hours(self) -> None:
         rows = build_session_rows(
             date.fromisoformat("2026-01-05"),
@@ -89,6 +140,30 @@ class IntradayPilotUnitTests(unittest.TestCase):
         self.assertFalse(reset_map["2026-01-05"])
         self.assertTrue(reset_map["2026-01-06"])
         self.assertLess(outcome.executed_trades[1].pnl_cash, Decimal("200"))
+
+    def test_audit_intraday_sessions_accepts_complete_five_minute_session(self) -> None:
+        rows = build_session_rows(
+            date.fromisoformat("2026-01-05"),
+            timeframe="5m",
+        )
+        bars = [MODULE.OhlcvRow(**row_to_payload(row)) for row in rows]
+
+        audits = MODULE.audit_intraday_sessions(
+            bars,
+            timeframe="5m",
+            timezone_name="America/New_York",
+            expected_bars_per_session=78,
+            allow_extended_hours=False,
+        )
+
+        self.assertEqual(len(audits), 1)
+        audit = audits[0]
+        self.assertTrue(audit.complete)
+        self.assertTrue(audit.used_for_pilot)
+        self.assertEqual(audit.missing_bar_count, 0)
+        self.assertEqual(audit.out_of_hours_bar_count, 0)
+        self.assertEqual(audit.regular_bar_count, 78)
+        self.assertEqual(audit.last_bar_timestamp.time().strftime("%H:%M"), "15:55")
 
     def test_duplicate_signal_is_still_blocked_in_intraday_wrapper(self) -> None:
         first = _build_symbol_result(
@@ -167,6 +242,40 @@ class IntradayPilotUnitTests(unittest.TestCase):
         self.assertEqual(coverage["overall"]["actual_hit_source_family_presence"]["al_brooks_ppt"], 1)
         self.assertGreater(coverage["overall"]["actual_hit_source_family_item_counts"]["al_brooks_ppt"], 1)
         self.assertEqual(coverage["overall"]["bundle_support_family_presence"]["curated_rule"], 1)
+
+    def test_fetch_intraday_history_rows_supports_longbridge_source(self) -> None:
+        instrument = MODULE.InstrumentConfig(
+            ticker="SPY",
+            symbol="SPY",
+            label="SPDR S&P 500 ETF",
+            market="US",
+            timezone="America/New_York",
+            demo_role="fixture",
+        )
+        with mock.patch.object(
+            MODULE,
+            "fetch_longbridge_intraday_history_rows",
+            return_value=[{"symbol": "SPY"}],
+        ) as fetch_mock:
+            rows = MODULE.fetch_intraday_history_rows(
+                instrument=instrument,
+                start=date.fromisoformat("2026-01-05"),
+                end=date.fromisoformat("2026-01-06"),
+                interval="5m",
+                source="longbridge",
+                timezone_name="America/New_York",
+                allow_extended_hours=False,
+            )
+
+        self.assertEqual(rows, [{"symbol": "SPY"}])
+        fetch_mock.assert_called_once()
+
+    def test_expected_session_times_supports_five_minute(self) -> None:
+        expected = MODULE._expected_session_times("5m")
+
+        self.assertEqual(len(expected), 78)
+        self.assertIn("09:30", expected)
+        self.assertIn("15:55", expected)
 
 
 def _build_symbol_result(

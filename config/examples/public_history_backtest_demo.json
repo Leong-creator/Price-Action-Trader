@@ -1,14 +1,13 @@
 {
-  "title": "Public History Backtest Demo",
-  "description": "User-readable historical backtest demo on public research data. Still paper/simulated only.",
+  "title": "Historical Backtest Demo (Longbridge)",
+  "description": "User-readable historical backtest demo on Longbridge-sourced research data. Still paper/simulated only.",
   "start": "2024-01-01",
   "end": "2024-06-30",
   "interval": "1d",
-  "cache_dir": "local_data/public_history",
+  "cache_dir": "local_data/longbridge_history",
   "report_dir": "reports/backtests",
   "source_order": [
-    "alpha_vantage",
-    "yfinance"
+    "longbridge"
   ],
   "instruments": [
     {
