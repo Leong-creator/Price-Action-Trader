@@ -1,0 +1,67 @@
+{
+  "schema_version": "m9-batch-backtest-v10",
+  "generated_at": "2026-04-21T17:54:08.459905+00:00",
+  "eligible_count": 4,
+  "records": [
+    {
+      "strategy_id": "SF-001",
+      "title": "Trend Pullback Second Entry",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration",
+      "source_family_support_breadth": 3,
+      "family_bias_risk": "low",
+      "chart_dependency": "medium",
+      "readiness_gate": "ready",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics",
+      "queue_kind": "batch_backtest"
+    },
+    {
+      "strategy_id": "SF-002",
+      "title": "Breakout Follow-Through Continuation",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration",
+      "source_family_support_breadth": 3,
+      "family_bias_risk": "low",
+      "chart_dependency": "medium",
+      "readiness_gate": "ready",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics",
+      "queue_kind": "batch_backtest"
+    },
+    {
+      "strategy_id": "SF-003",
+      "title": "Failed Breakout Range-Edge Reversal",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration",
+      "source_family_support_breadth": 3,
+      "family_bias_risk": "low",
+      "chart_dependency": "medium",
+      "readiness_gate": "ready",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics",
+      "queue_kind": "batch_backtest"
+    },
+    {
+      "strategy_id": "SF-004",
+      "title": "Tight Channel Trend Continuation",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration",
+      "source_family_support_breadth": 3,
+      "family_bias_risk": "low",
+      "chart_dependency": "medium",
+      "readiness_gate": "ready",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics",
+      "queue_kind": "batch_backtest"
+    },
+    {
+      "strategy_id": "SF-005",
+      "title": "Gap Continuation Versus Exhaustion",
+      "eligibility_status": "deferred_single_source_risk",
+      "eligibility_reason": "single-source corroboration and coarse family boundary",
+      "source_family_support_breadth": 1,
+      "family_bias_risk": "single_source_risk",
+      "chart_dependency": "medium",
+      "readiness_gate": "deferred",
+      "wave_assignment": "deferred_wave",
+      "queue_kind": "deferred"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "strategy_id": "SF-001",
+  "title": "Trend Pullback Second Entry",
+  "variant_id": "quality_filter",
+  "label": "quality_filter_v0_1",
+  "provider": "longbridge",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "timeframe": "5m",
+  "bar_count": 3120,
+  "signal_count": 281,
+  "trade_count": 280,
+  "closed_trade_count": 280,
+  "sample_status": "exploratory_probe",
+  "expectancy_r": "0.0071",
+  "total_pnl_r": "2.0000",
+  "win_rate": "0.3357",
+  "max_drawdown_r": "36.0000",
+  "split_trade_counts": {
+    "in_sample": 86,
+    "validation": 96,
+    "out_of_sample": 98
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 86,
+    "validation": 96,
+    "out_of_sample": 98
+  },
+  "warnings": [
+    "signal 7bba5c8005664c47 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "280 trade(s) from 281 signal(s); win_rate=33.5700%; expectancy=0.0071R; total_pnl=2.0000R; max_drawdown=36.0000R; slippage=[baseline_0r:2.0000R, stress_0.05r_per_trade:-12.0000R]; warnings=1",
+  "artifact_paths": {
+    "summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/summary.json",
+    "trades_csv": "reports/strategy_lab/SF-001/variants/quality_filter/trades.csv",
+    "candidate_events_csv": "reports/strategy_lab/SF-001/variants/quality_filter/candidate_events.csv",
+    "skip_summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/skip_summary.json"
+  },
+  "boundary": "paper/simulated"
+}

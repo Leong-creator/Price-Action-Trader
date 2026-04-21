@@ -1,15 +1,39 @@
 {
-  "schema_version": "v1",
+  "schema_version": "m9-batch-backtest-v10",
+  "generated_at": "2026-04-21T17:54:08.780143+00:00",
+  "run_id": "m9_strategy_factory_batch_backtest_20260421_175408",
   "ledger_kind": "strategy_factory_backtest_queue",
-  "namespace": "SF",
-  "contract_freeze_required": true,
-  "items": [],
-  "recommended_candidates": [
-    "SF-001",
-    "SF-002",
-    "SF-003",
-    "SF-004",
-    "SF-005"
-  ],
-  "status": "not_started_by_scope"
+  "provider": "longbridge",
+  "items": [
+    {
+      "strategy_id": "SF-001",
+      "queue_status": "completed",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics"
+    },
+    {
+      "strategy_id": "SF-002",
+      "queue_status": "completed",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics"
+    },
+    {
+      "strategy_id": "SF-003",
+      "queue_status": "completed",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics"
+    },
+    {
+      "strategy_id": "SF-004",
+      "queue_status": "completed",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "wave_assignment": "wave_1_baseline_and_wave_2_diagnostics"
+    },
+    {
+      "strategy_id": "SF-005",
+      "queue_status": "deferred",
+      "eligibility_status": "deferred_single_source_risk",
+      "wave_assignment": "deferred_wave"
+    }
+  ]
 }

@@ -1,12 +1,16 @@
 {
-  "schema_version": "m9-strategy-factory-audit-v4",
-  "generated_at": "2026-04-21T14:06:43Z",
-  "phase": "M9G.audit_v4_completed",
-  "text_extractable_closure": true,
-  "full_source_closure": false,
-  "ready_for_backtest": true,
-  "resume_cursor": {
-    "phase": "completed",
-    "chunk_offset": 5492
-  }
+  "schema_version": "m9-batch-backtest-v10",
+  "updated_at": "2026-04-21T17:54:08.780008+00:00",
+  "current_phase": "M9H.batch_backtest_triage_completed",
+  "run_id": "m9_strategy_factory_batch_backtest_20260421_175408",
+  "primary_provider": "longbridge",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "eligible_strategy_count": 4,
+  "triage_counts": {
+    "deferred_single_source_risk": 1,
+    "insufficient_sample": 3,
+    "modify_and_retest": 1
+  },
+  "next_action": "manual_review_before_next_wave",
+  "boundary": "paper/simulated"
 }

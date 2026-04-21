@@ -1,0 +1,39 @@
+{
+  "strategy_id": "SF-002",
+  "title": "Breakout Follow-Through Continuation",
+  "variant_id": "quality_filter",
+  "label": "quality_filter_v0_1",
+  "provider": "longbridge",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "timeframe": "5m",
+  "bar_count": 3120,
+  "signal_count": 46,
+  "trade_count": 45,
+  "closed_trade_count": 45,
+  "sample_status": "insufficient_sample",
+  "expectancy_r": "0.1333",
+  "total_pnl_r": "6.0000",
+  "win_rate": "0.3778",
+  "max_drawdown_r": "12.0000",
+  "split_trade_counts": {
+    "in_sample": 17,
+    "validation": 9,
+    "out_of_sample": 19
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 17,
+    "validation": 9,
+    "out_of_sample": 19
+  },
+  "warnings": [
+    "signal 27294199fecde8d4 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "45 trade(s) from 46 signal(s); win_rate=37.7800%; expectancy=0.1333R; total_pnl=6.0000R; max_drawdown=12.0000R; slippage=[baseline_0r:6.0000R, stress_0.05r_per_trade:3.7500R]; warnings=1",
+  "artifact_paths": {
+    "summary_json": "reports/strategy_lab/SF-002/variants/quality_filter/summary.json",
+    "trades_csv": "reports/strategy_lab/SF-002/variants/quality_filter/trades.csv",
+    "candidate_events_csv": "reports/strategy_lab/SF-002/variants/quality_filter/candidate_events.csv",
+    "skip_summary_json": "reports/strategy_lab/SF-002/variants/quality_filter/skip_summary.json"
+  },
+  "boundary": "paper/simulated"
+}

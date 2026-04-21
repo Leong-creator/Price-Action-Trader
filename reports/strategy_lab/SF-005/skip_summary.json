@@ -1,0 +1,6 @@
+{
+  "strategy_id": "SF-005",
+  "status": "deferred_single_source_risk",
+  "reason": "single-source corroboration and coarse family boundary",
+  "deferred": true
+}

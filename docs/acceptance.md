@@ -843,3 +843,39 @@
   - `python -m unittest discover -s tests/reliability -v`
   - `python -m unittest discover -s tests/integration -v`
   - `python scripts/run_reliability_suite.py`
+
+## 阶段 9H：Controlled Batch Backtest + Strategy Triage
+
+完成条件：
+
+- 只能基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json` 与 provider contract 启动，且不得回退到 legacy `PA-SC-*` 作为 seed 或 triage baseline。
+- 启动前必须通过 `python scripts/validate_strategy_factory_contract.py`。
+- 当前 wave 只能让 `SF-001 ~ SF-004` 进入 batch backtest eligibility；`SF-005` 必须因 `single_source_risk` 保持 deferred。
+- 必须落盘：
+  - `reports/strategy_lab/backtest_eligibility_matrix.json`
+  - `reports/strategy_lab/executable_spec_queue.json`
+  - `reports/strategy_lab/backtest_queue.json`
+  - `reports/strategy_lab/backtest_batch_summary.json`
+  - `reports/strategy_lab/strategy_triage_matrix.json`
+  - `reports/strategy_lab/final_strategy_factory_report.md`
+- 每个冻结策略必须生成 `reports/strategy_lab/<strategy_id>/` 目录；对已测试策略还必须生成 variant 级 artifact。
+- triage 结果必须清楚区分：
+  - `modify_and_retest`
+  - `insufficient_sample`
+  - `retain_candidate`
+  - `rejected_variant`
+  - `deferred_single_source_risk`
+  - 其他 parked/deferred 状态
+- 本轮不得把任何结果写成实盘能力、稳定盈利或可自动交易。
+- 本轮必须继续保持：
+  - `paper / simulated`
+  - 不改 trigger
+  - 不改 `knowledge/raw`
+  - 不进入 broker/live/real-money
+- 至少通过：
+  - `python scripts/validate_strategy_factory_contract.py`
+  - `python scripts/validate_kb.py`
+  - `python scripts/build_kb_index.py`
+  - `python -m unittest tests/unit/test_strategy_factory_backtest_eligibility.py tests/unit/test_strategy_factory_queue.py tests/unit/test_strategy_triage.py -v`
+  - `python -m unittest tests/reliability/test_strategy_factory_pipeline.py -v`
+  - `python -m unittest discover -s tests/unit -v`

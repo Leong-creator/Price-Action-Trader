@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：阶段 8：可靠性验证（已完成至 `M8E.2`，位于 `main`）
-- 当前支线：阶段 9：Price Action Strategy Lab（进行中，位于 `feature/m9-price-action-strategy-lab`）
+- 当前支线：阶段 9：Price Action Strategy Lab（进行中，位于 `feature/m9-strategy-factory-batch-backtest`）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M9 Price Action Strategy Lab / Strategy Factory Reset`（进行中）
-- 当前子阶段：`M9A`~`M9F` 首轮已完成并已降级为 legacy / historical baseline；`M9G Full Extraction Completeness Audit v4` 已完成，当前仍未进入 batch backtest
+- 当前支线 milestone：`M9 Controlled Batch Backtest + Strategy Triage`（已完成首轮受控 wave）
+- 当前子阶段：`M9A`~`M9F` 首轮已完成并已降级为 legacy / historical baseline；`M9G Full Extraction Completeness Audit v4` 与 `M9H Controlled Batch Backtest + Strategy Triage` 已完成首轮受控 wave
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m9-price-action-strategy-lab`
+- `feature/m9-strategy-factory-batch-backtest`
 
 ## 已完成
 
@@ -235,6 +235,24 @@
   - `saturation_report.json` 当前已完成双轮连续零增量收敛检查，`closure_reached=true`。
   - `cross_source_corroboration_final.json` 已在 catalog freeze 之后重算，后续文档与汇总只允许引用 final 版本。
   - 当前 `ready_for_backtest=true` 只表示 text-extractable catalog 已具备进入下一阶段的条件，不代表本轮已启动任何 batch backtest。
+- M9H Controlled Batch Backtest + Strategy Triage 已完成首轮受控 wave：
+  - 已新增并落盘：
+    - `reports/strategy_lab/backtest_eligibility_matrix.json`
+    - `reports/strategy_lab/executable_spec_queue.json`
+    - `reports/strategy_lab/backtest_queue.json`
+    - `reports/strategy_lab/backtest_batch_summary.json`
+    - `reports/strategy_lab/strategy_triage_matrix.json`
+    - `reports/strategy_lab/final_strategy_factory_report.md`
+  - 已为 `SF-001 ~ SF-005` 生成 `reports/strategy_lab/<strategy_id>/executable_spec.md`、`test_plan.md`、`summary.json`、`candidate_events.csv`、`skip_summary.json`、`diagnostics.md`；`SF-001 ~ SF-004` 另生成 baseline / quality_filter 两个 variant artifact。
+  - 首轮受控 wave 只让 `SF-001 ~ SF-004` 进入 `SPY / 5m / primary-provider local cache` 的 baseline + limited diagnostics；`SF-005` 当前明确保持 `deferred_single_source_risk`。
+  - 当前 triage 结果为：
+    - `SF-001 = modify_and_retest`
+    - `SF-002 = insufficient_sample`
+    - `SF-003 = insufficient_sample`
+    - `SF-004 = insufficient_sample`
+    - `SF-005 = deferred_single_source_risk`
+  - 当前 `automation_state.json`、`heartbeat.jsonl`、`reports/strategy_lab/strategy_factory/backtest_queue.json`、`triage_ledger.json`、`run_state.json` 已同步到 `M9H.batch_backtest_triage_completed`。
+  - 当前回测结论仍严格保持 `paper / simulated`；不构成 broker/live/real-money 能力，不构成稳定盈利结论。
 
 ## 当前阻塞
 
@@ -243,8 +261,9 @@
 
 ## 下一步
 
-- 当前不自动进入 batch backtest；是否启动下一阶段回测需要单独 Prompt / 用户决策。
+- 当前不自动进入下一波 batch backtest；下一步应先根据 `strategy_triage_matrix.json` 决定更窄范围的重测方案。
 - 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json` 决定候选，不得回退到 legacy `PA-SC-*` 作为 seed。
+- `SF-005` 当前继续保持 deferred，除非单独完成 family 边界澄清与 corroboration 风险处理，否则不得进入下一波。
 - 若 repo config、`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract 不一致，必须先修正文档/配置一致性，停止任何后续提炼或回测。
 - heartbeat / 自动推进若继续扩展，恢复状态只允许依赖 ledgers + `run_state.json.resume_cursor`。
 - M9 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
