@@ -1,11 +1,11 @@
 # SF-002 Diagnostics
 
-- `triage_status`: `insufficient_sample`
-- `triage_reason`: baseline trade count or split coverage did not clear the minimum probe gate
+- `triage_status`: `modify_and_retest`
+- `triage_reason`: `quality_filter` is a `diagnostic_selected_variant`; it improved on the baseline and should guide a narrower `v0.2 spec freeze`, not be treated as a validated production rule
 - `baseline_variant`: `baseline`
 - `best_variant`: `quality_filter`
+- `best_variant_role`: `diagnostic_selected_variant`
 
 ## Variant Snapshot
-- `baseline`: trades=68, sample_status=insufficient_sample, expectancy=0.0147R, pnl=1.0000R
-- `quality_filter`: trades=45, sample_status=insufficient_sample, expectancy=0.1333R, pnl=6.0000R
-
+- `baseline`: trades=1560, sample_status=robust_candidate, expectancy=0.0173R, pnl=27.0000R
+- `quality_filter`: trades=988, sample_status=robust_candidate, expectancy=0.0354R, pnl=35.0000R

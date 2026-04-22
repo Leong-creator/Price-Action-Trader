@@ -1,0 +1,33 @@
+{
+  "strategy_id": "SF-003",
+  "variant_id": "quality_filter",
+  "symbol": "NVDA",
+  "dataset_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 273,
+  "trade_count": 270,
+  "closed_trade_count": 270,
+  "expectancy_r": "-0.0111",
+  "total_pnl_r": "-3.0000",
+  "win_rate": "0.3296",
+  "max_drawdown_r": "24.0000",
+  "split_trade_counts": {
+    "in_sample": 76,
+    "validation": 93,
+    "out_of_sample": 101
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 76,
+    "validation": 93,
+    "out_of_sample": 101
+  },
+  "warnings": [
+    "signal d21c76fb2793ff91 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1ad78c660dca3193 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 15320486ec429109 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "270 trade(s) from 273 signal(s); win_rate=32.9600%; expectancy=-0.0111R; total_pnl=-3.0000R; max_drawdown=24.0000R; slippage=[baseline_0r:-3.0000R, stress_0.05r_per_trade:-16.5000R]; warnings=3",
+  "boundary": "paper/simulated"
+}

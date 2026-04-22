@@ -1,0 +1,13 @@
+{
+  "strategy_id": "SF-002",
+  "variant_id": "quality_filter",
+  "symbol": "NVDA",
+  "dataset_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "skipped": {
+    "cooldown_active": 58,
+    "missing_follow_through": 1632,
+    "no_breakout_context": 18579
+  },
+  "total_candidates": 20517,
+  "emitted_signals": 248
+}

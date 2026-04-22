@@ -853,12 +853,19 @@
 - 当前 wave 只能让 `SF-001 ~ SF-004` 进入 batch backtest eligibility；`SF-005` 必须因 `single_source_risk` 保持 deferred。
 - 必须落盘：
   - `reports/strategy_lab/backtest_eligibility_matrix.json`
+  - `reports/strategy_lab/backtest_dataset_inventory.json`
   - `reports/strategy_lab/executable_spec_queue.json`
   - `reports/strategy_lab/backtest_queue.json`
   - `reports/strategy_lab/backtest_batch_summary.json`
   - `reports/strategy_lab/strategy_triage_matrix.json`
   - `reports/strategy_lab/final_strategy_factory_report.md`
+  - `reports/strategy_lab/final_strategy_factory_trade_report.md`
+  - `reports/strategy_lab/final_strategy_factory_cash_report.md`
+- 若进入 wave2 或后续扩样本回测，必须把 `dataset_count`、`symbols`、`coverage_start`、`coverage_end` 写入 `backtest_batch_summary.json`、`automation_state.json` 与最终报告。
+- 若某个 best variant 选中 `quality_filter`，必须明确标记为 `diagnostic_selected_variant`，不得写成正式冻结策略、validated rule 或默认生产版本。
+- 若同一 strategy/variant 出现 `R` 口径与 cash 口径异号，必须在 merge gate 报告和现金报告中明确解释其为独立 sizing layer 的结果；未解释则不得通过合并门禁。
 - 每个冻结策略必须生成 `reports/strategy_lab/<strategy_id>/` 目录；对已测试策略还必须生成 variant 级 artifact。
+- 若 runner 改为多数据集聚合，则每个已测试 variant 还必须生成 `reports/strategy_lab/<strategy_id>/variants/<variant_id>/datasets/<symbol>/` 的数据集级 artifact。
 - triage 结果必须清楚区分：
   - `modify_and_retest`
   - `insufficient_sample`
@@ -872,6 +879,8 @@
   - 不改 trigger
   - 不改 `knowledge/raw`
   - 不进入 broker/live/real-money
+- 若样本已扩展到多标的、多时间窗，`robust_candidate` 只表示样本覆盖达到更高门槛，不得被解释成稳定盈利、实盘 readiness 或自动交易能力。
+- wave2 完成后不得自动继续下一波 batch backtest；merge gate 通过后的默认下一步是更窄范围的 `v0.2 spec freeze`。
 - 至少通过：
   - `python scripts/validate_strategy_factory_contract.py`
   - `python scripts/validate_kb.py`

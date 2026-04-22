@@ -1,0 +1,55 @@
+{
+  "schema_version": "m9-batch-backtest-v11",
+  "generated_at": "2026-04-21T18:24:11.602408+00:00",
+  "provider": "longbridge",
+  "datasets": [
+    {
+      "symbol": "SPY",
+      "market": "US",
+      "timeframe": "5m",
+      "provider": "longbridge",
+      "start": "2025-04-01",
+      "end": "2026-04-21",
+      "csv_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
+      "row_count": 20542,
+      "fetch_mode": "local_cache"
+    },
+    {
+      "symbol": "QQQ",
+      "market": "US",
+      "timeframe": "5m",
+      "provider": "longbridge",
+      "start": "2025-04-01",
+      "end": "2026-04-21",
+      "csv_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
+      "row_count": 20541,
+      "fetch_mode": "local_cache"
+    },
+    {
+      "symbol": "NVDA",
+      "market": "US",
+      "timeframe": "5m",
+      "provider": "longbridge",
+      "start": "2025-04-01",
+      "end": "2026-04-21",
+      "csv_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
+      "row_count": 20543,
+      "fetch_mode": "local_cache"
+    },
+    {
+      "symbol": "TSLA",
+      "market": "US",
+      "timeframe": "5m",
+      "provider": "longbridge",
+      "start": "2025-04-01",
+      "end": "2026-04-21",
+      "csv_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
+      "row_count": 20543,
+      "fetch_mode": "local_cache"
+    }
+  ]
+}

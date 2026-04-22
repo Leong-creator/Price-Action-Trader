@@ -4,31 +4,45 @@
   "eligibility_status": "eligible_for_batch_backtest",
   "queue_status": "completed",
   "backtest_status": "completed",
-  "sample_status": "insufficient_sample",
-  "triage_status": "insufficient_sample",
-  "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
+  "sample_status": "robust_candidate",
+  "triage_status": "modify_and_retest",
+  "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline and should guide a narrower v0.2 spec freeze, not be treated as a validated production rule",
   "best_variant_id": "quality_filter",
+  "best_variant_role": "diagnostic_selected_variant",
   "baseline_variant_id": "baseline",
   "provider": "longbridge",
   "baseline_variant": {
     "variant_id": "baseline",
     "label": "baseline_v0_1",
-    "trade_count": 68,
-    "closed_trade_count": 68,
-    "sample_status": "insufficient_sample",
-    "expectancy_r": "0.0147",
-    "total_pnl_r": "1.0000",
-    "win_rate": "0.3382",
-    "max_drawdown_r": "17.0000",
+    "dataset_count": 4,
+    "symbol_count": 4,
+    "regime_count": 5,
+    "trade_count": 1560,
+    "closed_trade_count": 1560,
+    "sample_status": "robust_candidate",
+    "expectancy_r": "0.0173",
+    "total_pnl_r": "27.0000",
+    "win_rate": "0.3391",
+    "max_drawdown_r": "88.0000",
+    "cash_metrics": {
+      "starting_capital": "25000.0000",
+      "risk_per_trade": "100.0000",
+      "ending_equity": "29148.6790",
+      "net_pnl_cash": "4148.6790",
+      "average_trade_pnl_cash": "2.6594",
+      "max_drawdown_cash": "4161.3450",
+      "profit_factor_cash": "1.0705",
+      "total_return_pct": "16.5947"
+    },
     "split_trade_counts": {
-      "in_sample": 25,
-      "validation": 14,
-      "out_of_sample": 29
+      "in_sample": 493,
+      "validation": 511,
+      "out_of_sample": 556
     },
     "split_executed_trade_counts": {
-      "in_sample": 25,
-      "validation": 14,
-      "out_of_sample": 29
+      "in_sample": 493,
+      "validation": 511,
+      "out_of_sample": 556
     },
     "artifact_paths": {
       "summary_json": "reports/strategy_lab/SF-002/variants/baseline/summary.json",
@@ -40,22 +54,35 @@
   "best_variant": {
     "variant_id": "quality_filter",
     "label": "quality_filter_v0_1",
-    "trade_count": 45,
-    "closed_trade_count": 45,
-    "sample_status": "insufficient_sample",
-    "expectancy_r": "0.1333",
-    "total_pnl_r": "6.0000",
-    "win_rate": "0.3778",
-    "max_drawdown_r": "12.0000",
+    "dataset_count": 4,
+    "symbol_count": 4,
+    "regime_count": 5,
+    "trade_count": 988,
+    "closed_trade_count": 988,
+    "sample_status": "robust_candidate",
+    "expectancy_r": "0.0354",
+    "total_pnl_r": "35.0000",
+    "win_rate": "0.3451",
+    "max_drawdown_r": "50.0000",
+    "cash_metrics": {
+      "starting_capital": "25000.0000",
+      "risk_per_trade": "100.0000",
+      "ending_equity": "25920.8710",
+      "net_pnl_cash": "920.8710",
+      "average_trade_pnl_cash": "0.9321",
+      "max_drawdown_cash": "4110.6050",
+      "profit_factor_cash": "1.0237",
+      "total_return_pct": "3.6835"
+    },
     "split_trade_counts": {
-      "in_sample": 17,
-      "validation": 9,
-      "out_of_sample": 19
+      "in_sample": 318,
+      "validation": 325,
+      "out_of_sample": 345
     },
     "split_executed_trade_counts": {
-      "in_sample": 17,
-      "validation": 9,
-      "out_of_sample": 19
+      "in_sample": 318,
+      "validation": 325,
+      "out_of_sample": 345
     },
     "artifact_paths": {
       "summary_json": "reports/strategy_lab/SF-002/variants/quality_filter/summary.json",
@@ -68,22 +95,35 @@
     {
       "variant_id": "baseline",
       "label": "baseline_v0_1",
-      "trade_count": 68,
-      "closed_trade_count": 68,
-      "sample_status": "insufficient_sample",
-      "expectancy_r": "0.0147",
-      "total_pnl_r": "1.0000",
-      "win_rate": "0.3382",
-      "max_drawdown_r": "17.0000",
+      "dataset_count": 4,
+      "symbol_count": 4,
+      "regime_count": 5,
+      "trade_count": 1560,
+      "closed_trade_count": 1560,
+      "sample_status": "robust_candidate",
+      "expectancy_r": "0.0173",
+      "total_pnl_r": "27.0000",
+      "win_rate": "0.3391",
+      "max_drawdown_r": "88.0000",
+      "cash_metrics": {
+        "starting_capital": "25000.0000",
+        "risk_per_trade": "100.0000",
+        "ending_equity": "29148.6790",
+        "net_pnl_cash": "4148.6790",
+        "average_trade_pnl_cash": "2.6594",
+        "max_drawdown_cash": "4161.3450",
+        "profit_factor_cash": "1.0705",
+        "total_return_pct": "16.5947"
+      },
       "split_trade_counts": {
-        "in_sample": 25,
-        "validation": 14,
-        "out_of_sample": 29
+        "in_sample": 493,
+        "validation": 511,
+        "out_of_sample": 556
       },
       "split_executed_trade_counts": {
-        "in_sample": 25,
-        "validation": 14,
-        "out_of_sample": 29
+        "in_sample": 493,
+        "validation": 511,
+        "out_of_sample": 556
       },
       "artifact_paths": {
         "summary_json": "reports/strategy_lab/SF-002/variants/baseline/summary.json",
@@ -95,22 +135,35 @@
     {
       "variant_id": "quality_filter",
       "label": "quality_filter_v0_1",
-      "trade_count": 45,
-      "closed_trade_count": 45,
-      "sample_status": "insufficient_sample",
-      "expectancy_r": "0.1333",
-      "total_pnl_r": "6.0000",
-      "win_rate": "0.3778",
-      "max_drawdown_r": "12.0000",
+      "dataset_count": 4,
+      "symbol_count": 4,
+      "regime_count": 5,
+      "trade_count": 988,
+      "closed_trade_count": 988,
+      "sample_status": "robust_candidate",
+      "expectancy_r": "0.0354",
+      "total_pnl_r": "35.0000",
+      "win_rate": "0.3451",
+      "max_drawdown_r": "50.0000",
+      "cash_metrics": {
+        "starting_capital": "25000.0000",
+        "risk_per_trade": "100.0000",
+        "ending_equity": "25920.8710",
+        "net_pnl_cash": "920.8710",
+        "average_trade_pnl_cash": "0.9321",
+        "max_drawdown_cash": "4110.6050",
+        "profit_factor_cash": "1.0237",
+        "total_return_pct": "3.6835"
+      },
       "split_trade_counts": {
-        "in_sample": 17,
-        "validation": 9,
-        "out_of_sample": 19
+        "in_sample": 318,
+        "validation": 325,
+        "out_of_sample": 345
       },
       "split_executed_trade_counts": {
-        "in_sample": 17,
-        "validation": 9,
-        "out_of_sample": 19
+        "in_sample": 318,
+        "validation": 325,
+        "out_of_sample": 345
       },
       "artifact_paths": {
         "summary_json": "reports/strategy_lab/SF-002/variants/quality_filter/summary.json",
@@ -120,6 +173,15 @@
       }
     }
   ],
-  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "dataset_count": 4,
+  "symbol_count": 4,
+  "regime_count": 5,
+  "dataset_paths": [
+    "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+  ],
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
   "boundary": "paper/simulated"
 }

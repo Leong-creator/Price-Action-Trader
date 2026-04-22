@@ -1,7 +1,7 @@
 {
-  "schema_version": "m9-batch-backtest-v10",
-  "generated_at": "2026-04-21T17:54:08.780143+00:00",
-  "run_id": "m9_strategy_factory_batch_backtest_20260421_175408",
+  "schema_version": "m9-batch-backtest-v11",
+  "generated_at": "2026-04-22T03:52:09.967014+00:00",
+  "run_id": "m9_strategy_factory_batch_backtest_20260422_035151",
   "ledger_kind": "strategy_factory_backtest_queue",
   "provider": "longbridge",
   "items": [

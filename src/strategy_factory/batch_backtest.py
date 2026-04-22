@@ -5,12 +5,15 @@ import json
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from src.backtest import BacktestReport, run_backtest
+from scripts.longbridge_history_lib import fetch_longbridge_intraday_history_rows
+from src.backtest import BacktestReport, TradeRecord, run_backtest
+from src.backtest.engine import _compute_stats
+from src.backtest.reporting import build_summary, default_assumptions
 from src.data import OhlcvRow, load_ohlcv_csv
 from src.strategy.contracts import Signal
 
@@ -25,6 +28,28 @@ QUANT = Decimal("0.0001")
 PRIMARY_DATASET_SYMBOL = "SPY"
 SUPPORTED_TIMEFRAME = "5m"
 SPLIT_NAMES = ("in_sample", "validation", "out_of_sample")
+SCHEMA_VERSION = "m9-batch-backtest-v11"
+WAVE2_START = date(2025, 4, 1)
+WAVE2_END = date(2026, 4, 21)
+WAVE2_SYMBOLS = ("SPY", "QQQ", "NVDA", "TSLA")
+DATASET_TIMEZONE = "America/New_York"
+DATASET_MARKET = "US"
+CASH_STARTING_CAPITAL = Decimal("25000")
+CASH_RISK_PER_TRADE = Decimal("100")
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetRecord:
+    symbol: str
+    market: str
+    timeframe: str
+    provider: str
+    start: date
+    end: date
+    csv_path: Path
+    metadata_path: Path
+    row_count: int
+    fetch_mode: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +116,9 @@ class VariantResult:
     strategy_id: str
     variant_id: str
     label: str
+    dataset_count: int
+    symbol_count: int
+    regime_count: int
     bar_count: int
     signal_count: int
     trade_count: int
@@ -128,22 +156,49 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
         item.strategy_id for item in eligibility if item.eligibility_status == "eligible_for_batch_backtest"
     ]
 
-    dataset_path = _select_primary_intraday_dataset(resolved_root, provider=provider)
-    bars = tuple(load_ohlcv_csv(dataset_path))
-    split_labels = _build_split_labels(bars)
+    datasets = _prepare_wave2_datasets(resolved_root, provider=provider)
+    dataset_inventory = [_dataset_public_payload(item) for item in datasets]
 
     run_id = datetime.now(UTC).strftime("m9_strategy_factory_batch_backtest_%Y%m%d_%H%M%S")
     batch_root = resolved_root / "reports/strategy_lab/strategy_factory" / "batch_runs" / run_id
     batch_root.mkdir(parents=True, exist_ok=True)
 
-    executable_spec_queue = _build_executable_spec_queue(eligibility, run_id, dataset_path, provider)
-    backtest_queue = _build_backtest_queue(eligibility, run_id, dataset_path, provider)
+    executable_spec_queue = _build_executable_spec_queue(
+        eligibility,
+        run_id,
+        datasets=datasets,
+        provider=provider,
+    )
+    backtest_queue = _build_backtest_queue(
+        eligibility,
+        run_id,
+        datasets=datasets,
+        provider=provider,
+    )
     _write_json(resolved_root / "reports/strategy_lab/executable_spec_queue.json", executable_spec_queue)
     _write_json(resolved_root / "reports/strategy_lab/backtest_queue.json", backtest_queue)
+    _write_json(
+        resolved_root / "reports/strategy_lab/backtest_dataset_inventory.json",
+        {
+            "schema_version": SCHEMA_VERSION,
+            "generated_at": _utc_now(),
+            "provider": provider,
+            "datasets": dataset_inventory,
+        },
+    )
     _write_json(batch_root / "executable_spec_queue.json", executable_spec_queue)
     _write_json(batch_root / "backtest_queue.json", backtest_queue)
+    _write_json(
+        batch_root / "backtest_dataset_inventory.json",
+        {
+            "schema_version": SCHEMA_VERSION,
+            "generated_at": _utc_now(),
+            "provider": provider,
+            "datasets": dataset_inventory,
+        },
+    )
     _write_json(resolved_root / "reports/strategy_lab/backtest_eligibility_matrix.json", {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_now(),
         "eligible_count": len(eligible_ids),
         "records": [asdict(item) for item in eligibility],
@@ -158,8 +213,8 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
         strategy_dir.mkdir(parents=True, exist_ok=True)
         variants_dir = strategy_dir / "variants"
         variants_dir.mkdir(parents=True, exist_ok=True)
-        _write_executable_spec(strategy_dir / "executable_spec.md", strategy, provider, dataset_path, run_id)
-        _write_test_plan(strategy_dir / "test_plan.md", strategy, provider, dataset_path)
+        _write_executable_spec(strategy_dir / "executable_spec.md", strategy, provider, datasets, run_id)
+        _write_test_plan(strategy_dir / "test_plan.md", strategy, provider, datasets)
 
         eligibility_record = next(item for item in eligibility if item.strategy_id == strategy.strategy_id)
         if eligibility_record.eligibility_status != "eligible_for_batch_backtest":
@@ -186,68 +241,32 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
         baseline_result: VariantResult | None = None
         best_result: VariantResult | None = None
         for variant in variants:
-            candidate_events, signals = _generate_signals_for_variant(
-                bars=bars,
-                split_labels=split_labels,
-                strategy=strategy,
-                variant=variant,
-                provider=provider,
-            )
-            report = run_backtest(bars, signals)
-            skip_counts = Counter(
-                item.reason_code for item in candidate_events if item.status == "skipped"
-            )
             variant_dir = variants_dir / variant.variant_id
             variant_dir.mkdir(parents=True, exist_ok=True)
-            candidate_path = variant_dir / "candidate_events.csv"
-            trades_path = variant_dir / "trades.csv"
-            skip_path = variant_dir / "skip_summary.json"
-            summary_path = variant_dir / "summary.json"
-            _write_candidate_events(candidate_path, candidate_events)
-            _write_trade_rows(trades_path, strategy, variant, report)
-            _write_json(skip_path, {
-                "strategy_id": strategy.strategy_id,
-                "variant_id": variant.variant_id,
-                "skipped": dict(sorted(skip_counts.items())),
-                "total_candidates": len(candidate_events),
-                "emitted_signals": len(signals),
-            })
-            split_trade_counts = _count_split_trades(report, split_labels, closed_only=True)
-            split_executed = _count_split_trades(report, split_labels, closed_only=False)
-            sample_status = _classify_sample_status(
-                trade_count=report.stats.closed_trade_count,
-                split_trade_counts=split_trade_counts,
-                symbol_count=1,
-                regime_count=1,
+            variant_result, aggregated_report = _run_variant_across_datasets(
+                resolved_root=resolved_root,
+                strategy=strategy,
+                variant=variant,
+                datasets=datasets,
+                provider=provider,
+                variant_dir=variant_dir,
             )
-            variant_result = VariantResult(
-                strategy_id=strategy.strategy_id,
-                variant_id=variant.variant_id,
-                label=variant.label,
-                bar_count=len(bars),
-                signal_count=len(signals),
-                trade_count=report.stats.trade_count,
-                closed_trade_count=report.stats.closed_trade_count,
-                sample_status=sample_status,
-                expectancy_r=report.stats.expectancy_r,
-                total_pnl_r=report.stats.total_pnl_r,
-                win_rate=report.stats.win_rate,
-                max_drawdown_r=report.stats.max_drawdown_r,
-                split_trade_counts=split_trade_counts,
-                split_executed_trade_counts=split_executed,
-                result_status="completed",
-                queue_status="completed",
-                summary_path=summary_path,
-                trades_path=trades_path,
-                candidate_events_path=candidate_path,
-                skip_summary_path=skip_path,
-            )
-            _write_json(summary_path, _variant_result_payload(strategy, variant, variant_result, report, dataset_path, provider))
             variant_results.append(variant_result)
             if variant.variant_id == "baseline":
                 baseline_result = variant_result
             if best_result is None or _is_better_variant(variant_result, best_result):
                 best_result = variant_result
+            _write_json(
+                variant_result.summary_path,
+                _variant_result_payload(
+                    strategy,
+                    variant,
+                    variant_result,
+                    aggregated_report,
+                    datasets,
+                    provider,
+                ),
+            )
 
         assert baseline_result is not None
         assert best_result is not None
@@ -293,7 +312,11 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
                 "executable_spec_md": _repo_relative(strategy_dir / "executable_spec.md"),
                 "test_plan_md": _repo_relative(strategy_dir / "test_plan.md"),
             },
-            "dataset_path": _repo_relative(dataset_path),
+            "dataset_count": baseline_result.dataset_count,
+            "symbol_count": baseline_result.symbol_count,
+            "regime_count": baseline_result.regime_count,
+            "dataset_paths": [_repo_relative(item.csv_path) for item in datasets],
+            "dataset_path": _repo_relative(datasets[0].csv_path),
         }
         _write_json(strategy_dir / "summary.json", {
             "strategy_id": strategy.strategy_id,
@@ -310,7 +333,11 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
             "baseline_variant": _variant_public_payload(baseline_result),
             "best_variant": _variant_public_payload(best_result),
             "variants": [_variant_public_payload(item) for item in variant_results],
-            "dataset_path": _repo_relative(dataset_path),
+            "dataset_count": baseline_result.dataset_count,
+            "symbol_count": baseline_result.symbol_count,
+            "regime_count": baseline_result.regime_count,
+            "dataset_paths": [_repo_relative(item.csv_path) for item in datasets],
+            "dataset_path": _repo_relative(datasets[0].csv_path),
             "boundary": "paper/simulated",
         })
         results.append(strategy_result)
@@ -337,28 +364,34 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
     batch_summary = _build_batch_summary(
         run_id=run_id,
         provider=provider,
-        dataset_path=dataset_path,
+        datasets=datasets,
         eligibility=eligibility,
         results=results,
         audit=audit,
     )
     triage_matrix = {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_now(),
         "records": triage_records,
     }
     report_path = resolved_root / "reports/strategy_lab/final_strategy_factory_report.md"
+    trade_report_path = resolved_root / "reports/strategy_lab/final_strategy_factory_trade_report.md"
+    cash_report_path = resolved_root / "reports/strategy_lab/final_strategy_factory_cash_report.md"
     _write_json(resolved_root / "reports/strategy_lab/backtest_batch_summary.json", batch_summary)
     _write_json(batch_root / "backtest_batch_summary.json", batch_summary)
     _write_json(resolved_root / "reports/strategy_lab/strategy_triage_matrix.json", triage_matrix)
     _write_json(batch_root / "strategy_triage_matrix.json", triage_matrix)
     _write_final_report(report_path, batch_summary, triage_matrix, eligibility)
+    _write_trading_style_report(trade_report_path, batch_summary)
+    _write_trading_style_report(batch_root / "final_strategy_factory_trade_report.md", batch_summary)
+    _write_cash_style_report(cash_report_path, batch_summary)
+    _write_cash_style_report(batch_root / "final_strategy_factory_cash_report.md", batch_summary)
     _append_heartbeat_rows(resolved_root / "reports/strategy_lab/heartbeat.jsonl", heartbeat_rows)
     _write_automation_state(
         resolved_root / "reports/strategy_lab/automation_state.json",
         run_id=run_id,
         provider=provider,
-        dataset_path=dataset_path,
+        datasets=datasets,
         eligibility=eligibility,
         triage_matrix=triage_matrix,
     )
@@ -366,6 +399,7 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
         resolved_root=resolved_root,
         run_id=run_id,
         provider=provider,
+        datasets=datasets,
         eligibility=eligibility,
         results=results,
         triage_matrix=triage_matrix,
@@ -374,10 +408,13 @@ def run_strategy_factory_batch_backtest(repo_root: Path | None = None) -> dict[s
     return {
         "run_id": run_id,
         "provider": provider,
-        "dataset_path": dataset_path,
+        "dataset_path": datasets[0].csv_path,
+        "datasets": [item.csv_path for item in datasets],
         "batch_summary": batch_summary,
         "triage_matrix": triage_matrix,
         "report_path": report_path,
+        "trade_report_path": trade_report_path,
+        "cash_report_path": cash_report_path,
     }
 
 
@@ -472,15 +509,17 @@ def _build_eligibility_matrix(
 def _build_executable_spec_queue(
     eligibility: list[EligibilityRecord],
     run_id: str,
-    dataset_path: Path,
+    *,
+    datasets: list[DatasetRecord],
     provider: str,
 ) -> dict[str, Any]:
     return {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_now(),
         "run_id": run_id,
         "provider": provider,
-        "dataset_path": _repo_relative(dataset_path),
+        "dataset_paths": [_repo_relative(item.csv_path) for item in datasets],
+        "symbols": [item.symbol for item in datasets],
         "items": [
             {
                 "strategy_id": item.strategy_id,
@@ -497,7 +536,8 @@ def _build_executable_spec_queue(
 def _build_backtest_queue(
     eligibility: list[EligibilityRecord],
     run_id: str,
-    dataset_path: Path,
+    *,
+    datasets: list[DatasetRecord],
     provider: str,
 ) -> dict[str, Any]:
     queue_items = []
@@ -506,7 +546,8 @@ def _build_backtest_queue(
             queue_items.append(
                 {
                     "strategy_id": item.strategy_id,
-                    "dataset_path": _repo_relative(dataset_path),
+                    "dataset_paths": [_repo_relative(dataset.csv_path) for dataset in datasets],
+                    "symbols": [dataset.symbol for dataset in datasets],
                     "provider": provider,
                     "timeframe": SUPPORTED_TIMEFRAME,
                     "variants": ["baseline", "quality_filter"],
@@ -517,7 +558,8 @@ def _build_backtest_queue(
             queue_items.append(
                 {
                     "strategy_id": item.strategy_id,
-                    "dataset_path": _repo_relative(dataset_path),
+                    "dataset_paths": [_repo_relative(dataset.csv_path) for dataset in datasets],
+                    "symbols": [dataset.symbol for dataset in datasets],
                     "provider": provider,
                     "timeframe": SUPPORTED_TIMEFRAME,
                     "variants": [],
@@ -526,7 +568,7 @@ def _build_backtest_queue(
                 }
             )
     return {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_now(),
         "run_id": run_id,
         "items": queue_items,
@@ -548,6 +590,396 @@ def _build_strategy_variants(strategy_id: str) -> tuple[StrategyVariant, ...]:
             rule_overrides={"mode": "quality_filter"},
         ),
     )
+
+
+def _prepare_wave2_datasets(repo_root: Path, *, provider: str) -> list[DatasetRecord]:
+    datasets = [
+        _ensure_wave2_intraday_dataset(repo_root, provider=provider, symbol=symbol)
+        for symbol in WAVE2_SYMBOLS
+    ]
+    if len(datasets) < 2:
+        raise RuntimeError("Wave2 batch backtest requires at least two intraday datasets.")
+    return datasets
+
+
+def _ensure_wave2_intraday_dataset(
+    repo_root: Path,
+    *,
+    provider: str,
+    symbol: str,
+) -> DatasetRecord:
+    cache_dir = repo_root / "local_data" / f"{provider}_intraday"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    covering_csv = _find_covering_intraday_dataset(
+        cache_dir=cache_dir,
+        symbol=symbol,
+        provider=provider,
+        start=WAVE2_START,
+        end=WAVE2_END,
+    )
+    if covering_csv is not None:
+        metadata_path = covering_csv.with_suffix(".metadata.json")
+        row_count = len(load_ohlcv_csv(covering_csv))
+        return DatasetRecord(
+            symbol=symbol,
+            market=DATASET_MARKET,
+            timeframe=SUPPORTED_TIMEFRAME,
+            provider=provider,
+            start=WAVE2_START,
+            end=WAVE2_END,
+            csv_path=covering_csv,
+            metadata_path=metadata_path,
+            row_count=row_count,
+            fetch_mode="local_cache",
+        )
+
+    if provider != "longbridge":
+        raise FileNotFoundError(
+            f"No cached {provider} intraday dataset covers {symbol} {WAVE2_START.isoformat()}~{WAVE2_END.isoformat()}"
+        )
+
+    rows = fetch_longbridge_intraday_history_rows(
+        ticker=symbol,
+        symbol=symbol,
+        market=DATASET_MARKET,
+        timezone_name=DATASET_TIMEZONE,
+        start=WAVE2_START,
+        end=WAVE2_END,
+        interval=SUPPORTED_TIMEFRAME,
+        allow_extended_hours=False,
+    )
+    rows, anomalies = _sanitize_vendor_rows(rows)
+    if not rows:
+        raise RuntimeError(
+            f"Longbridge returned no usable intraday rows for {symbol} {SUPPORTED_TIMEFRAME} {WAVE2_START}~{WAVE2_END}"
+        )
+
+    csv_path = cache_dir / (
+        f"{DATASET_MARKET.lower()}_{symbol}_{SUPPORTED_TIMEFRAME}_{WAVE2_START.isoformat()}_{WAVE2_END.isoformat()}_{provider}.csv"
+    )
+    metadata_path = csv_path.with_suffix(".metadata.json")
+    anomaly_path = csv_path.with_suffix(".vendor_anomalies.json")
+    _write_intraday_cache_csv(csv_path, rows)
+    row_count = len(load_ohlcv_csv(csv_path))
+    if anomalies:
+        anomaly_path.write_text(json.dumps(anomalies, ensure_ascii=False, indent=2), encoding="utf-8")
+    elif anomaly_path.exists():
+        anomaly_path.unlink()
+    metadata = {
+        "instrument": {
+            "ticker": symbol,
+            "symbol": symbol,
+            "market": DATASET_MARKET,
+            "timezone": DATASET_TIMEZONE,
+        },
+        "source": provider,
+        "row_count": row_count,
+        "start": WAVE2_START.isoformat(),
+        "end": WAVE2_END.isoformat(),
+        "interval": SUPPORTED_TIMEFRAME,
+        "boundary": "paper/simulated",
+        "timezone": DATASET_TIMEZONE,
+        "regular_session_only": True,
+        "downloaded_at": _utc_now(),
+        "dropped_invalid_vendor_rows": len(anomalies),
+        "vendor_anomalies_path": str(anomaly_path) if anomalies else None,
+    }
+    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    return DatasetRecord(
+        symbol=symbol,
+        market=DATASET_MARKET,
+        timeframe=SUPPORTED_TIMEFRAME,
+        provider=provider,
+        start=WAVE2_START,
+        end=WAVE2_END,
+        csv_path=csv_path,
+        metadata_path=metadata_path,
+        row_count=row_count,
+        fetch_mode="fetched_from_provider",
+    )
+
+
+def _find_covering_intraday_dataset(
+    *,
+    cache_dir: Path,
+    symbol: str,
+    provider: str,
+    start: date,
+    end: date,
+) -> Path | None:
+    dataset_glob = f"{DATASET_MARKET.lower()}_{symbol}_{SUPPORTED_TIMEFRAME}_*_{provider}.csv"
+    covering: list[tuple[date, date, Path]] = []
+    for csv_path in cache_dir.glob(dataset_glob):
+        parsed = _parse_intraday_cache_name(csv_path)
+        if parsed is None:
+            continue
+        file_start, file_end = parsed
+        if file_start <= start and file_end >= end:
+            covering.append((file_start, file_end, csv_path))
+    if not covering:
+        return None
+    covering.sort(key=lambda item: ((item[1] - item[0]).days, item[2].name))
+    return covering[0][2]
+
+
+def _parse_intraday_cache_name(path: Path) -> tuple[date, date] | None:
+    parts = path.stem.split("_")
+    if len(parts) < 6:
+        return None
+    try:
+        return (
+            date.fromisoformat(parts[3]),
+            date.fromisoformat(parts[4]),
+        )
+    except ValueError:
+        return None
+
+
+def _write_intraday_cache_csv(path: Path, rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=(
+                "symbol",
+                "market",
+                "timeframe",
+                "timestamp",
+                "timezone",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+            ),
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _sanitize_vendor_rows(rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    sanitized: list[dict[str, str]] = []
+    anomalies: list[dict[str, Any]] = []
+    for row in rows:
+        open_value = Decimal(row["open"])
+        high_value = Decimal(row["high"])
+        low_value = Decimal(row["low"])
+        close_value = Decimal(row["close"])
+        if high_value < max(open_value, low_value, close_value) or low_value > min(
+            open_value,
+            high_value,
+            close_value,
+        ):
+            anomalies.append(
+                {
+                    "reason": "ohlc_range_inconsistent",
+                    "symbol": row["symbol"],
+                    "market": row["market"],
+                    "timeframe": row["timeframe"],
+                    "timestamp": row["timestamp"],
+                    "row": row,
+                }
+            )
+            continue
+        sanitized.append(row)
+    return sanitized, anomalies
+
+
+def _dataset_public_payload(dataset: DatasetRecord) -> dict[str, Any]:
+    return {
+        "symbol": dataset.symbol,
+        "market": dataset.market,
+        "timeframe": dataset.timeframe,
+        "provider": dataset.provider,
+        "start": dataset.start.isoformat(),
+        "end": dataset.end.isoformat(),
+        "csv_path": _repo_relative(dataset.csv_path),
+        "metadata_path": _repo_relative(dataset.metadata_path),
+        "row_count": dataset.row_count,
+        "fetch_mode": dataset.fetch_mode,
+    }
+
+
+def _run_variant_across_datasets(
+    *,
+    resolved_root: Path,
+    strategy: StrategyDefinition,
+    variant: StrategyVariant,
+    datasets: list[DatasetRecord],
+    provider: str,
+    variant_dir: Path,
+) -> tuple[VariantResult, BacktestReport]:
+    datasets_dir = variant_dir / "datasets"
+    datasets_dir.mkdir(parents=True, exist_ok=True)
+    aggregated_events: list[CandidateEvent] = []
+    aggregated_trades: list[TradeRecord] = []
+    aggregated_warnings: list[str] = []
+    total_bar_count = 0
+    total_signal_count = 0
+    split_trade_counts = {name: 0 for name in SPLIT_NAMES}
+    split_executed_trade_counts = {name: 0 for name in SPLIT_NAMES}
+    emitted_symbols: set[str] = set()
+    regime_buckets: set[str] = set()
+    skipped_reason_counts: Counter[str] = Counter()
+    per_dataset_summary: list[dict[str, Any]] = []
+
+    for dataset in datasets:
+        bars = tuple(load_ohlcv_csv(dataset.csv_path))
+        split_labels = _build_split_labels(bars)
+        candidate_events, signals = _generate_signals_for_variant(
+            bars=bars,
+            split_labels=split_labels,
+            strategy=strategy,
+            variant=variant,
+            provider=provider,
+        )
+        report = run_backtest(bars, signals)
+        dataset_dir = datasets_dir / dataset.symbol
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        candidate_path = dataset_dir / "candidate_events.csv"
+        trades_path = dataset_dir / "trades.csv"
+        skip_path = dataset_dir / "skip_summary.json"
+        summary_path = dataset_dir / "summary.json"
+        _write_candidate_events(candidate_path, candidate_events)
+        _write_trade_rows(trades_path, strategy, variant, report)
+
+        skip_counts = Counter(item.reason_code for item in candidate_events if item.status == "skipped")
+        skipped_reason_counts.update(skip_counts)
+        closed_split_counts = _count_split_trades(report, split_labels, closed_only=True)
+        executed_split_counts = _count_split_trades(report, split_labels, closed_only=False)
+        for split_name in SPLIT_NAMES:
+            split_trade_counts[split_name] += closed_split_counts[split_name]
+            split_executed_trade_counts[split_name] += executed_split_counts[split_name]
+
+        emitted_symbols.update(item.symbol for item in candidate_events if item.status == "emitted")
+        for trade in report.trades:
+            if trade.exit_reason == "end_of_data":
+                continue
+            regime_buckets.add(_regime_bucket(trade.entry_timestamp))
+
+        total_bar_count += len(bars)
+        total_signal_count += len(signals)
+        aggregated_events.extend(candidate_events)
+        aggregated_trades.extend(report.trades)
+        aggregated_warnings.extend(report.warnings)
+        _write_json(
+            skip_path,
+            {
+                "strategy_id": strategy.strategy_id,
+                "variant_id": variant.variant_id,
+                "symbol": dataset.symbol,
+                "dataset_path": _repo_relative(dataset.csv_path),
+                "skipped": dict(sorted(skip_counts.items())),
+                "total_candidates": len(candidate_events),
+                "emitted_signals": len(signals),
+            },
+        )
+        dataset_summary = {
+            "strategy_id": strategy.strategy_id,
+            "variant_id": variant.variant_id,
+            "symbol": dataset.symbol,
+            "dataset_path": _repo_relative(dataset.csv_path),
+            "provider": provider,
+            "timeframe": SUPPORTED_TIMEFRAME,
+            "bar_count": len(bars),
+            "signal_count": len(signals),
+            "trade_count": report.stats.trade_count,
+            "closed_trade_count": report.stats.closed_trade_count,
+            "expectancy_r": _string_decimal(report.stats.expectancy_r),
+            "total_pnl_r": _string_decimal(report.stats.total_pnl_r),
+            "win_rate": _string_decimal(report.stats.win_rate),
+            "max_drawdown_r": _string_decimal(report.stats.max_drawdown_r),
+            "split_trade_counts": closed_split_counts,
+            "split_executed_trade_counts": executed_split_counts,
+            "warnings": list(report.warnings),
+            "summary": report.summary,
+            "boundary": "paper/simulated",
+        }
+        _write_json(summary_path, dataset_summary)
+        per_dataset_summary.append(dataset_summary)
+
+    aggregated_events_tuple = tuple(
+        sorted(
+            aggregated_events,
+            key=lambda item: (item.timestamp, item.symbol, item.variant_id, item.reason_code),
+        )
+    )
+    aggregated_trades_tuple = tuple(
+        sorted(
+            aggregated_trades,
+            key=lambda item: (item.exit_timestamp, item.entry_timestamp, item.symbol, item.signal_id),
+        )
+    )
+    aggregated_warnings_tuple = tuple(sorted(set(aggregated_warnings)))
+    stats = _compute_stats(
+        aggregated_trades_tuple,
+        bar_count=total_bar_count,
+        signal_count=total_signal_count,
+    )
+    aggregated_report = BacktestReport(
+        trades=aggregated_trades_tuple,
+        stats=stats,
+        summary=build_summary(stats, aggregated_warnings_tuple),
+        warnings=aggregated_warnings_tuple,
+        assumptions=default_assumptions(),
+    )
+    candidate_path = variant_dir / "candidate_events.csv"
+    trades_path = variant_dir / "trades.csv"
+    skip_path = variant_dir / "skip_summary.json"
+    summary_path = variant_dir / "summary.json"
+    _write_candidate_events(candidate_path, aggregated_events_tuple)
+    _write_trade_rows(trades_path, strategy, variant, aggregated_report)
+    _write_json(
+        skip_path,
+        {
+            "strategy_id": strategy.strategy_id,
+            "variant_id": variant.variant_id,
+            "dataset_count": len(datasets),
+            "symbols": [item.symbol for item in datasets],
+            "skipped": dict(sorted(skipped_reason_counts.items())),
+            "total_candidates": len(aggregated_events_tuple),
+            "emitted_signals": total_signal_count,
+            "per_dataset": per_dataset_summary,
+        },
+    )
+    sample_status = _classify_sample_status(
+        trade_count=aggregated_report.stats.closed_trade_count,
+        split_trade_counts=split_trade_counts,
+        symbol_count=len(emitted_symbols),
+        regime_count=len(regime_buckets),
+    )
+    variant_result = VariantResult(
+        strategy_id=strategy.strategy_id,
+        variant_id=variant.variant_id,
+        label=variant.label,
+        dataset_count=len(datasets),
+        symbol_count=len(emitted_symbols),
+        regime_count=len(regime_buckets),
+        bar_count=total_bar_count,
+        signal_count=total_signal_count,
+        trade_count=aggregated_report.stats.trade_count,
+        closed_trade_count=aggregated_report.stats.closed_trade_count,
+        sample_status=sample_status,
+        expectancy_r=aggregated_report.stats.expectancy_r,
+        total_pnl_r=aggregated_report.stats.total_pnl_r,
+        win_rate=aggregated_report.stats.win_rate,
+        max_drawdown_r=aggregated_report.stats.max_drawdown_r,
+        split_trade_counts=split_trade_counts,
+        split_executed_trade_counts=split_executed_trade_counts,
+        result_status="completed",
+        queue_status="completed",
+        summary_path=summary_path,
+        trades_path=trades_path,
+        candidate_events_path=candidate_path,
+        skip_summary_path=skip_path,
+    )
+    return variant_result, aggregated_report
+
+
+def _regime_bucket(timestamp: datetime) -> str:
+    quarter = ((timestamp.month - 1) // 3) + 1
+    return f"{timestamp.year}-Q{quarter}"
 
 
 def _generate_signals_for_variant(
@@ -943,6 +1375,67 @@ def _classify_sample_status(
     return "exploratory_probe"
 
 
+def _compute_cash_metrics(
+    report: BacktestReport,
+    *,
+    starting_capital: Decimal = CASH_STARTING_CAPITAL,
+    risk_per_trade: Decimal = CASH_RISK_PER_TRADE,
+) -> dict[str, Any]:
+    closed_trades = [
+        trade
+        for trade in sorted(report.trades, key=lambda item: (item.entry_timestamp, item.exit_timestamp, item.signal_id))
+        if trade.exit_reason != "end_of_data"
+    ]
+    if not closed_trades:
+        return {
+            "starting_capital": _string_decimal(starting_capital),
+            "risk_per_trade": _string_decimal(risk_per_trade),
+            "ending_equity": _string_decimal(starting_capital),
+            "net_pnl_cash": _string_decimal(ZERO),
+            "average_trade_pnl_cash": _string_decimal(ZERO),
+            "max_drawdown_cash": _string_decimal(ZERO),
+            "profit_factor_cash": None,
+            "total_return_pct": _string_decimal(ZERO),
+        }
+
+    equity = starting_capital
+    peak = starting_capital
+    max_drawdown_cash = ZERO
+    pnl_cash_values: list[Decimal] = []
+    for trade in closed_trades:
+        quantity_by_risk = (risk_per_trade / trade.risk_per_share).to_integral_value(rounding=ROUND_DOWN)
+        quantity_by_capital = (equity / trade.entry_price).to_integral_value(rounding=ROUND_DOWN)
+        quantity = min(quantity_by_risk, quantity_by_capital)
+        if quantity <= 0:
+            quantity = Decimal("1")
+        pnl_cash = _quantize(trade.pnl_per_share * quantity)
+        pnl_cash_values.append(pnl_cash)
+        equity = _quantize(equity + pnl_cash)
+        if equity > peak:
+            peak = equity
+        drawdown = peak - equity
+        if drawdown > max_drawdown_cash:
+            max_drawdown_cash = drawdown
+
+    gross_profit_cash = sum((value for value in pnl_cash_values if value > ZERO), ZERO)
+    gross_loss_cash = abs(sum((value for value in pnl_cash_values if value < ZERO), ZERO))
+    net_pnl_cash = sum(pnl_cash_values, ZERO)
+    average_trade_pnl_cash = _quantize(net_pnl_cash / Decimal(len(pnl_cash_values)))
+    total_return_pct = _quantize(((equity - starting_capital) / starting_capital) * HUNDRED)
+    return {
+        "starting_capital": _string_decimal(starting_capital),
+        "risk_per_trade": _string_decimal(risk_per_trade),
+        "ending_equity": _string_decimal(equity),
+        "net_pnl_cash": _string_decimal(net_pnl_cash),
+        "average_trade_pnl_cash": _string_decimal(average_trade_pnl_cash),
+        "max_drawdown_cash": _string_decimal(max_drawdown_cash),
+        "profit_factor_cash": _string_decimal(gross_profit_cash / gross_loss_cash)
+        if gross_loss_cash > ZERO
+        else None,
+        "total_return_pct": _string_decimal(total_return_pct),
+    }
+
+
 def _triage_strategy(
     *,
     strategy: StrategyDefinition,
@@ -998,16 +1491,21 @@ def _variant_result_payload(
     variant: StrategyVariant,
     result: VariantResult,
     report: BacktestReport,
-    dataset_path: Path,
+    datasets: list[DatasetRecord],
     provider: str,
 ) -> dict[str, Any]:
+    cash_metrics = _compute_cash_metrics(report)
     return {
         "strategy_id": strategy.strategy_id,
         "title": strategy.title,
         "variant_id": variant.variant_id,
         "label": variant.label,
         "provider": provider,
-        "dataset_path": _repo_relative(dataset_path),
+        "dataset_count": result.dataset_count,
+        "symbol_count": result.symbol_count,
+        "regime_count": result.regime_count,
+        "dataset_path": _repo_relative(datasets[0].csv_path),
+        "dataset_paths": [_repo_relative(item.csv_path) for item in datasets],
         "timeframe": SUPPORTED_TIMEFRAME,
         "bar_count": result.bar_count,
         "signal_count": result.signal_count,
@@ -1022,6 +1520,11 @@ def _variant_result_payload(
         "split_executed_trade_counts": result.split_executed_trade_counts,
         "warnings": list(report.warnings),
         "summary": report.summary,
+        "cash_model": {
+            "starting_capital": _string_decimal(CASH_STARTING_CAPITAL),
+            "risk_per_trade": _string_decimal(CASH_RISK_PER_TRADE),
+        },
+        "cash_metrics": cash_metrics,
         "artifact_paths": {
             "summary_json": _repo_relative(result.summary_path),
             "trades_csv": _repo_relative(result.trades_path),
@@ -1033,9 +1536,13 @@ def _variant_result_payload(
 
 
 def _variant_public_payload(result: VariantResult) -> dict[str, Any]:
+    summary_payload = _load_json(result.summary_path)
     return {
         "variant_id": result.variant_id,
         "label": result.label,
+        "dataset_count": result.dataset_count,
+        "symbol_count": result.symbol_count,
+        "regime_count": result.regime_count,
         "trade_count": result.trade_count,
         "closed_trade_count": result.closed_trade_count,
         "sample_status": result.sample_status,
@@ -1043,6 +1550,7 @@ def _variant_public_payload(result: VariantResult) -> dict[str, Any]:
         "total_pnl_r": _string_decimal(result.total_pnl_r),
         "win_rate": _string_decimal(result.win_rate),
         "max_drawdown_r": _string_decimal(result.max_drawdown_r),
+        "cash_metrics": summary_payload.get("cash_metrics"),
         "split_trade_counts": result.split_trade_counts,
         "split_executed_trade_counts": result.split_executed_trade_counts,
         "artifact_paths": {
@@ -1188,7 +1696,7 @@ def _build_batch_summary(
     *,
     run_id: str,
     provider: str,
-    dataset_path: Path,
+    datasets: list[DatasetRecord],
     eligibility: list[EligibilityRecord],
     results: list[dict[str, Any]],
     audit: dict[str, Any],
@@ -1196,22 +1704,31 @@ def _build_batch_summary(
     completed = [item for item in results if item["backtest_status"] == "completed"]
     triage_counts = Counter(item["triage_status"] for item in results)
     return {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_now(),
         "run_id": run_id,
         "provider": provider,
-        "dataset_path": _repo_relative(dataset_path),
+        "dataset_path": _repo_relative(datasets[0].csv_path),
+        "dataset_paths": [_repo_relative(item.csv_path) for item in datasets],
+        "dataset_count": len(datasets),
+        "symbols": [item.symbol for item in datasets],
+        "coverage_start": min(item.start for item in datasets).isoformat(),
+        "coverage_end": max(item.end for item in datasets).isoformat(),
         "frozen_strategy_count": audit["final_strategy_card_count"],
         "eligible_strategy_count": sum(
             1 for item in eligibility if item.eligibility_status == "eligible_for_batch_backtest"
         ),
         "tested_strategy_count": len(completed),
         "completed_backtests": len(completed),
+        "cash_model": {
+            "starting_capital": _string_decimal(CASH_STARTING_CAPITAL),
+            "risk_per_trade": _string_decimal(CASH_RISK_PER_TRADE),
+        },
         "triage_counts": dict(sorted(triage_counts.items())),
         "results": results,
         "boundary": "paper/simulated",
         "notes": [
-            "This wave is a controlled intraday 5m exploratory batch built on the primary-provider cache.",
+            "This wave is a controlled intraday 5m multi-symbol exploratory batch built on the primary-provider cache.",
             "SF-005 remains deferred because the final corroboration report marks it as single_source_risk.",
         ],
     }
@@ -1230,11 +1747,14 @@ def _write_final_report(
         f"- `run_id`: `{batch_summary['run_id']}`",
         f"- `provider`: `{batch_summary['provider']}`",
         f"- `dataset_path`: `{batch_summary['dataset_path']}`",
+        f"- `dataset_count`: {batch_summary['dataset_count']}",
+        f"- `symbols`: {', '.join(batch_summary['symbols'])}",
+        f"- `coverage_window`: `{batch_summary['coverage_start']} ~ {batch_summary['coverage_end']}`",
         f"- `frozen_strategy_count`: {batch_summary['frozen_strategy_count']}",
         f"- `eligible_strategy_count`: {batch_summary['eligible_strategy_count']}",
         f"- `tested_strategy_count`: {batch_summary['tested_strategy_count']}",
         "- `boundary`: `paper/simulated`",
-        "- `scope`: `exploratory single-symbol intraday batch; not live / not real-money`",
+        "- `scope`: `exploratory multi-symbol intraday batch; not live / not real-money`",
         "",
         "## Triage Counts",
     ]
@@ -1264,6 +1784,124 @@ def _write_final_report(
     _write_text(path, "\n".join(lines) + "\n")
 
 
+def _write_trading_style_report(path: Path, batch_summary: dict[str, Any]) -> None:
+    lines = [
+        "# M9 Trading-Style Batch Report",
+        "",
+        f"- `run_id`: `{batch_summary['run_id']}`",
+        f"- `provider`: `{batch_summary['provider']}`",
+        f"- `symbols`: {', '.join(batch_summary['symbols'])}",
+        f"- `coverage_window`: `{batch_summary['coverage_start']} ~ {batch_summary['coverage_end']}`",
+        f"- `timeframe`: `{SUPPORTED_TIMEFRAME}`",
+        "- `capital_model`: `notional capital not modeled in this runner; all PnL is reported in R`",
+        "- `boundary`: `paper/simulated`",
+        "",
+        "| Strategy | Baseline Trades | Baseline Win Rate | Baseline PnL | Baseline Max DD | Best Variant | Best Trades | Best Win Rate | Best PnL | Best Max DD | Sample Status | Triage |",
+        "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |",
+    ]
+    for result in batch_summary["results"]:
+        if result["backtest_status"] != "completed":
+            lines.append(
+                f"| {result['strategy_id']} | 0 | - | - | - | - | 0 | - | - | - | {result['sample_status']} | {result['triage_status']} |"
+            )
+            continue
+        baseline = next(
+            item for item in result["variants"] if item["variant_id"] == result["baseline_variant_id"]
+        )
+        best = next(
+            item for item in result["variants"] if item["variant_id"] == result["best_variant_id"]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    result["strategy_id"],
+                    str(baseline["trade_count"]),
+                    baseline["win_rate"],
+                    f"{baseline['total_pnl_r']}R",
+                    f"{baseline['max_drawdown_r']}R",
+                    best["variant_id"],
+                    str(best["trade_count"]),
+                    best["win_rate"],
+                    f"{best['total_pnl_r']}R",
+                    f"{best['max_drawdown_r']}R",
+                    result["sample_status"],
+                    result["triage_status"],
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Notes",
+            "- 本报告按交易报告口径展示交易笔数、胜率、总盈亏与最大回撤，但当前 runner 仍使用 R 倍数口径，不输出美元本金权益曲线。",
+            "- `robust_candidate` 仅表示样本覆盖更充分，不代表稳定盈利、实盘 readiness 或自动交易能力。",
+            "",
+        ]
+    )
+    _write_text(path, "\n".join(lines))
+
+
+def _write_cash_style_report(path: Path, batch_summary: dict[str, Any]) -> None:
+    cash_model = batch_summary["cash_model"]
+    lines = [
+        "# M9 Cash-Equity Batch Report",
+        "",
+        f"- `run_id`: `{batch_summary['run_id']}`",
+        f"- `provider`: `{batch_summary['provider']}`",
+        f"- `symbols`: {', '.join(batch_summary['symbols'])}",
+        f"- `coverage_window`: `{batch_summary['coverage_start']} ~ {batch_summary['coverage_end']}`",
+        f"- `timeframe`: `{SUPPORTED_TIMEFRAME}`",
+        f"- `starting_capital`: `${cash_model['starting_capital']}`",
+        f"- `risk_per_trade`: `${cash_model['risk_per_trade']}`",
+        "- `sizing_rule`: `position_size = min(floor(risk_per_trade / risk_per_share), floor(current_equity / entry_price))`",
+        "- `boundary`: `paper/simulated`",
+        "",
+        "| Strategy | Variant | Trades | Win Rate | Net PnL | Ending Equity | Return | Max DD | Avg Trade | Triage |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for result in batch_summary["results"]:
+        if result["backtest_status"] != "completed":
+            lines.append(
+                f"| {result['strategy_id']} | - | 0 | - | - | - | - | - | - | {result['triage_status']} |"
+            )
+            continue
+        best = next(
+            item for item in result["variants"] if item["variant_id"] == result["best_variant_id"]
+        )
+        cash = best.get("cash_metrics") or {}
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    result["strategy_id"],
+                    result["best_variant_id"],
+                    str(best["trade_count"]),
+                    best["win_rate"],
+                    f"${cash.get('net_pnl_cash', '-')}",
+                    f"${cash.get('ending_equity', '-')}",
+                    f"{cash.get('total_return_pct', '-')}%",
+                    f"${cash.get('max_drawdown_cash', '-')}",
+                    f"${cash.get('average_trade_pnl_cash', '-')}",
+                    result["triage_status"],
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Notes",
+            "- 现金口径为研究用途的固定 sizing layer，不改变现有 trigger、risk、execution 或 broker 语义。",
+            "- 本报告按每个策略独立账户计算，默认从 `$25,000` 起始、单笔风险预算 `$100`，不模拟策略间资金共享。",
+            "- 该层仅用于把 R 倍数结果映射为更直观的美元盈亏/回撤/权益变化，不代表实盘能力。",
+            "",
+        ]
+    )
+    _write_text(path, "\n".join(lines))
+
+
 def _append_heartbeat_rows(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
@@ -1275,17 +1913,21 @@ def _write_automation_state(
     *,
     run_id: str,
     provider: str,
-    dataset_path: Path,
+    datasets: list[DatasetRecord],
     eligibility: list[EligibilityRecord],
     triage_matrix: dict[str, Any],
 ) -> None:
     payload = {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "updated_at": _utc_now(),
-        "current_phase": "M9H.batch_backtest_triage_completed",
+        "current_phase": "M9H.wave2_batch_backtest_triage_completed",
         "run_id": run_id,
         "primary_provider": provider,
-        "dataset_path": _repo_relative(dataset_path),
+        "dataset_path": _repo_relative(datasets[0].csv_path),
+        "dataset_paths": [_repo_relative(item.csv_path) for item in datasets],
+        "dataset_count": len(datasets),
+        "coverage_start": min(item.start for item in datasets).isoformat(),
+        "coverage_end": max(item.end for item in datasets).isoformat(),
         "eligible_strategy_count": sum(
             1 for item in eligibility if item.eligibility_status == "eligible_for_batch_backtest"
         ),
@@ -1302,13 +1944,14 @@ def _update_strategy_factory_ledgers(
     resolved_root: Path,
     run_id: str,
     provider: str,
+    datasets: list[DatasetRecord],
     eligibility: list[EligibilityRecord],
     results: list[dict[str, Any]],
     triage_matrix: dict[str, Any],
     batch_summary: dict[str, Any],
 ) -> None:
     strategy_backtest_queue = {
-        "schema_version": "m9-batch-backtest-v10",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_now(),
         "run_id": run_id,
         "ledger_kind": "strategy_factory_backtest_queue",
@@ -1329,7 +1972,7 @@ def _update_strategy_factory_ledgers(
     _write_json(
         STRATEGY_FACTORY_ROOT / "triage_ledger.json",
         {
-            "schema_version": "m9-batch-backtest-v10",
+            "schema_version": SCHEMA_VERSION,
             "generated_at": _utc_now(),
             "run_id": run_id,
             "ledger_kind": "strategy_factory_triage",
@@ -1339,9 +1982,12 @@ def _update_strategy_factory_ledgers(
     run_state = _load_json(STRATEGY_FACTORY_ROOT / "run_state.json")
     run_state.update(
         {
-            "current_phase": "M9H.batch_backtest_triage_completed",
+            "current_phase": "M9H.wave2_batch_backtest_triage_completed",
             "active_batch_id": run_id,
             "primary_provider": provider,
+            "dataset_count": len(datasets),
+            "coverage_start": min(item.start for item in datasets).isoformat(),
+            "coverage_end": max(item.end for item in datasets).isoformat(),
             "last_summary_at": _utc_now(),
         }
     )
@@ -1354,9 +2000,10 @@ def _update_strategy_factory_ledgers(
                 "",
                 f"- `run_id`: `{run_id}`",
                 f"- `provider`: `{provider}`",
+                f"- `dataset_count`: {len(datasets)}",
+                f"- `coverage_window`: `{min(item.start for item in datasets).isoformat()} ~ {max(item.end for item in datasets).isoformat()}`",
                 f"- `eligible_strategy_count`: {batch_summary['eligible_strategy_count']}",
                 f"- `tested_strategy_count`: {batch_summary['tested_strategy_count']}",
-                "",
             ]
         )
         + "\n",
@@ -1367,7 +2014,7 @@ def _write_executable_spec(
     path: Path,
     strategy: StrategyDefinition,
     provider: str,
-    dataset_path: Path,
+    datasets: list[DatasetRecord],
     run_id: str,
 ) -> None:
     lines = [
@@ -1376,7 +2023,8 @@ def _write_executable_spec(
         f"- `run_id`: `{run_id}`",
         f"- `setup_family`: `{strategy.setup_family}`",
         f"- `provider`: `{provider}`",
-        f"- `dataset_path`: `{_repo_relative(dataset_path)}`",
+        f"- `dataset_count`: {len(datasets)}",
+        f"- `dataset_paths`: `{', '.join(_repo_relative(item.csv_path) for item in datasets)}`",
         f"- `timeframe`: `{SUPPORTED_TIMEFRAME}`",
         f"- `boundary`: `paper/simulated`",
         "",
@@ -1404,13 +2052,15 @@ def _write_test_plan(
     path: Path,
     strategy: StrategyDefinition,
     provider: str,
-    dataset_path: Path,
+    datasets: list[DatasetRecord],
 ) -> None:
     lines = [
         f"# {strategy.strategy_id} Test Plan",
         "",
         f"- `provider`: `{provider}`",
-        f"- `dataset_path`: `{_repo_relative(dataset_path)}`",
+        f"- `dataset_count`: `{len(datasets)}`",
+        f"- `symbols`: `{', '.join(item.symbol for item in datasets)}`",
+        f"- `coverage_window`: `{min(item.start for item in datasets).isoformat()} ~ {max(item.end for item in datasets).isoformat()}`",
         f"- `timeframe`: `{SUPPORTED_TIMEFRAME}`",
         "- `variants`: `baseline`, `quality_filter`",
         "- `sample gates`: probe>=60 trades with validation/OOS>=15; formal>=100 trades with validation/OOS>=20",
@@ -1604,7 +2254,11 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _quantize(value: Decimal) -> Decimal:
+    return value.quantize(QUANT, rounding=ROUND_HALF_UP)
+
+
 def _string_decimal(value: Decimal | None) -> str | None:
     if value is None:
         return None
-    return str(value.quantize(QUANT, rounding=ROUND_HALF_UP))
+    return str(_quantize(value))

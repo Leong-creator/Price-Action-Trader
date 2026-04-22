@@ -1,0 +1,40 @@
+{
+  "strategy_id": "SF-002",
+  "variant_id": "baseline",
+  "symbol": "QQQ",
+  "dataset_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20541,
+  "signal_count": 403,
+  "trade_count": 393,
+  "closed_trade_count": 393,
+  "expectancy_r": "0.0000",
+  "total_pnl_r": "0.0000",
+  "win_rate": "0.3333",
+  "max_drawdown_r": "28.0000",
+  "split_trade_counts": {
+    "in_sample": 131,
+    "validation": 123,
+    "out_of_sample": 139
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 131,
+    "validation": 123,
+    "out_of_sample": 139
+  },
+  "warnings": [
+    "signal cecf7c039b9540b1 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 4fca8e456a481e81 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal c1c6a2078bd5bea0 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal adb6748ac5f24dbd produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 657fad61b1a9fd1c produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal b3af3b7295425869 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal c736d27815c8d0c7 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 65ff44ee3f5600c0 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1d1cc16c5bb78753 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 18acb43872d9099f produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "393 trade(s) from 403 signal(s); win_rate=33.3300%; expectancy=0.0000R; total_pnl=0.0000R; max_drawdown=28.0000R; slippage=[baseline_0r:0.0000R, stress_0.05r_per_trade:-19.6500R]; warnings=10",
+  "boundary": "paper/simulated"
+}

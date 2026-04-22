@@ -1,0 +1,31 @@
+{
+  "strategy_id": "SF-004",
+  "variant_id": "baseline",
+  "symbol": "TSLA",
+  "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 285,
+  "trade_count": 284,
+  "closed_trade_count": 284,
+  "expectancy_r": "-0.0810",
+  "total_pnl_r": "-23.0000",
+  "win_rate": "0.3063",
+  "max_drawdown_r": "33.0000",
+  "split_trade_counts": {
+    "in_sample": 93,
+    "validation": 103,
+    "out_of_sample": 88
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 93,
+    "validation": 103,
+    "out_of_sample": 88
+  },
+  "warnings": [
+    "signal 1abc3ea63dc56392 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "284 trade(s) from 285 signal(s); win_rate=30.6300%; expectancy=-0.0810R; total_pnl=-23.0000R; max_drawdown=33.0000R; slippage=[baseline_0r:-23.0000R, stress_0.05r_per_trade:-37.2000R]; warnings=1",
+  "boundary": "paper/simulated"
+}

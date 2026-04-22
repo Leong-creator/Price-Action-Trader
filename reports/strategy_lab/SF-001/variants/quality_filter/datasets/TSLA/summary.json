@@ -1,0 +1,43 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "quality_filter",
+  "symbol": "TSLA",
+  "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 1962,
+  "trade_count": 1949,
+  "closed_trade_count": 1949,
+  "expectancy_r": "0.0359",
+  "total_pnl_r": "70.0000",
+  "win_rate": "0.3453",
+  "max_drawdown_r": "76.0000",
+  "split_trade_counts": {
+    "in_sample": 622,
+    "validation": 657,
+    "out_of_sample": 670
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 622,
+    "validation": 657,
+    "out_of_sample": 670
+  },
+  "warnings": [
+    "signal 512bfb221c0c4ca7 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 4379b766626d01ff produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 8281490a3db5dc15 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1c519ce0030c91d6 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 6e253cc8cfdef9e3 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal b952c5b8cc596923 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal e07521ade253cc64 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal b51e4a7c4bef46b1 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 68189a54082dae31 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal dccd5a0efa1e724e produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal d2b145b5afd7a73a produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 52a4b95090cd3f99 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 6b8d6a2463733a92 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "1949 trade(s) from 1962 signal(s); win_rate=34.5300%; expectancy=0.0359R; total_pnl=70.0000R; max_drawdown=76.0000R; slippage=[baseline_0r:70.0000R, stress_0.05r_per_trade:-27.4500R]; warnings=13",
+  "boundary": "paper/simulated"
+}

@@ -1,0 +1,44 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "baseline",
+  "symbol": "TSLA",
+  "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 2262,
+  "trade_count": 2248,
+  "closed_trade_count": 2248,
+  "expectancy_r": "0.0169",
+  "total_pnl_r": "38.0000",
+  "win_rate": "0.3390",
+  "max_drawdown_r": "104.0000",
+  "split_trade_counts": {
+    "in_sample": 731,
+    "validation": 741,
+    "out_of_sample": 776
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 731,
+    "validation": 741,
+    "out_of_sample": 776
+  },
+  "warnings": [
+    "signal aecda9c787eb02ed produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 3d469e1d063a080c produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal cb75e675da396e30 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 72c7e608d512adc9 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 360e46bb68edd17b produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal b3c195fdce0cae9a produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 9d167baff2a4e467 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 55c94c82ee6c69a2 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal aa373920695a3b11 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal fb11ab2264c17bfe produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal bdd27f2f6eac15ac produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 87416fc8857ba38b produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 348054bc5a169a41 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 2e34ff9d71f6ad31 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "2248 trade(s) from 2262 signal(s); win_rate=33.9000%; expectancy=0.0169R; total_pnl=38.0000R; max_drawdown=104.0000R; slippage=[baseline_0r:38.0000R, stress_0.05r_per_trade:-74.4000R]; warnings=14",
+  "boundary": "paper/simulated"
+}

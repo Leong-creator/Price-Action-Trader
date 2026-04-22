@@ -4,29 +4,54 @@
   "variant_id": "quality_filter",
   "label": "quality_filter_v0_1",
   "provider": "longbridge",
-  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "dataset_count": 4,
+  "symbol_count": 4,
+  "regime_count": 5,
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "dataset_paths": [
+    "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+  ],
   "timeframe": "5m",
-  "bar_count": 3120,
-  "signal_count": 8,
-  "trade_count": 8,
-  "closed_trade_count": 8,
-  "sample_status": "insufficient_sample",
-  "expectancy_r": "-0.2500",
-  "total_pnl_r": "-2.0000",
-  "win_rate": "0.2500",
-  "max_drawdown_r": "4.0000",
+  "bar_count": 82169,
+  "signal_count": 302,
+  "trade_count": 301,
+  "closed_trade_count": 301,
+  "sample_status": "robust_candidate",
+  "expectancy_r": "-0.0133",
+  "total_pnl_r": "-4.0000",
+  "win_rate": "0.3289",
+  "max_drawdown_r": "39.0000",
   "split_trade_counts": {
-    "in_sample": 3,
-    "validation": 2,
-    "out_of_sample": 3
+    "in_sample": 108,
+    "validation": 109,
+    "out_of_sample": 84
   },
   "split_executed_trade_counts": {
-    "in_sample": 3,
-    "validation": 2,
-    "out_of_sample": 3
+    "in_sample": 108,
+    "validation": 109,
+    "out_of_sample": 84
   },
-  "warnings": [],
-  "summary": "8 trade(s) from 8 signal(s); win_rate=25.0000%; expectancy=-0.2500R; total_pnl=-2.0000R; max_drawdown=4.0000R; slippage=[baseline_0r:-2.0000R, stress_0.05r_per_trade:-2.4000R]",
+  "warnings": [
+    "signal e6941b03a2ed7dbb produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "301 trade(s) from 302 signal(s); win_rate=32.8900%; expectancy=-0.0133R; total_pnl=-4.0000R; max_drawdown=39.0000R; slippage=[baseline_0r:-4.0000R, stress_0.05r_per_trade:-19.0500R]; warnings=1",
+  "cash_model": {
+    "starting_capital": "25000.0000",
+    "risk_per_trade": "100.0000"
+  },
+  "cash_metrics": {
+    "starting_capital": "25000.0000",
+    "risk_per_trade": "100.0000",
+    "ending_equity": "25517.0960",
+    "net_pnl_cash": "517.0960",
+    "average_trade_pnl_cash": "1.7179",
+    "max_drawdown_cash": "2066.0500",
+    "profit_factor_cash": "1.0509",
+    "total_return_pct": "2.0684"
+  },
   "artifact_paths": {
     "summary_json": "reports/strategy_lab/SF-004/variants/quality_filter/summary.json",
     "trades_csv": "reports/strategy_lab/SF-004/variants/quality_filter/trades.csv",

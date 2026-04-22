@@ -1,14 +1,15 @@
 {
-  "schema_version": "m9-batch-backtest-v10",
-  "generated_at": "2026-04-21T17:54:08.779167+00:00",
+  "schema_version": "m9-batch-backtest-v11",
+  "generated_at": "2026-04-22T03:52:09.960520+00:00",
   "records": [
     {
       "strategy_id": "SF-001",
       "title": "Trend Pullback Second Entry",
       "triage_status": "modify_and_retest",
-      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
-      "sample_status": "exploratory_probe",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline and should guide a narrower v0.2 spec freeze, not be treated as a validated production rule",
+      "sample_status": "robust_candidate",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "variant_status_counts": {
         "rejected_variant": 1,
         "selected_variant": 1
@@ -17,10 +18,11 @@
     {
       "strategy_id": "SF-002",
       "title": "Breakout Follow-Through Continuation",
-      "triage_status": "insufficient_sample",
-      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
-      "sample_status": "insufficient_sample",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline and should guide a narrower v0.2 spec freeze, not be treated as a validated production rule",
+      "sample_status": "robust_candidate",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "variant_status_counts": {
         "rejected_variant": 1,
         "selected_variant": 1
@@ -29,10 +31,11 @@
     {
       "strategy_id": "SF-003",
       "title": "Failed Breakout Range-Edge Reversal",
-      "triage_status": "insufficient_sample",
-      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
-      "sample_status": "insufficient_sample",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline, but both baseline and best variant remain negative in R. Cash-layer positivity comes from independent per-trade sizing and does not justify promotion beyond modify_and_retest",
+      "sample_status": "robust_candidate",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "variant_status_counts": {
         "rejected_variant": 1,
         "selected_variant": 1
@@ -41,10 +44,11 @@
     {
       "strategy_id": "SF-004",
       "title": "Tight Channel Trend Continuation",
-      "triage_status": "insufficient_sample",
-      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
-      "sample_status": "insufficient_sample",
-      "best_variant_id": "baseline",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline, but the best variant remains negative in R. Cash-layer positivity comes from independent per-trade sizing and does not justify promotion beyond modify_and_retest",
+      "sample_status": "robust_candidate",
+      "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "variant_status_counts": {
         "rejected_variant": 1,
         "selected_variant": 1

@@ -23,8 +23,11 @@ class TestStrategyFactoryPipeline(unittest.TestCase):
 
     def test_pipeline_respects_frozen_catalog_and_provider_contract(self) -> None:
         self.assertEqual(self.batch_summary["frozen_strategy_count"], 5)
-        self.assertEqual(self.run_state["current_phase"], "M9H.batch_backtest_triage_completed")
+        self.assertEqual(self.run_state["current_phase"], "M9H.wave2_batch_backtest_triage_completed")
         self.assertEqual(self.run_state["primary_provider"], "longbridge")
+        self.assertEqual(self.run_state["dataset_count"], 4)
+        self.assertEqual(self.run_state["coverage_start"], "2025-04-01")
+        self.assertEqual(self.run_state["coverage_end"], "2026-04-21")
         self.assertTrue(self.run_state["text_extractable_closure"])
         self.assertFalse(self.run_state["full_source_closure"])
 
@@ -41,6 +44,7 @@ class TestStrategyFactoryPipeline(unittest.TestCase):
         self.assertEqual(len(tested), 4)
         self.assertEqual(len(deferred), 1)
         self.assertEqual(deferred[0]["strategy_id"], "SF-005")
+        self.assertEqual(self.batch_summary["symbols"], ["SPY", "QQQ", "NVDA", "TSLA"])
         support = {
             item["strategy_id"]: item["source_family_support_breadth"]
             for item in self.final_corroboration["families"]

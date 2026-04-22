@@ -104,13 +104,17 @@
   - `text_extractable_closure=true`
   - `full_source_closure=false`
   - 仍存在 visual / partial gaps，已写入 `reports/strategy_lab/unresolved_strategy_extraction_gaps.json`
-- 当前已完成 `M9H Controlled Batch Backtest + Strategy Triage` 的首轮受控 wave：
-  - `SF-001 ~ SF-004` 已进入 `5m` intraday baseline + limited diagnostics。
+- 当前已完成 `M9H Controlled Batch Backtest + Strategy Triage` 的 wave2 扩样本回测：
+  - `SF-001 ~ SF-004` 已进入 `SPY / QQQ / NVDA / TSLA`、`5m`、`2025-04-01 ~ 2026-04-21` 的多标的聚合 baseline + limited diagnostics。
   - `SF-005` 保持 `deferred_single_source_risk`。
   - 当前 triage 结论冻结为：
     - `SF-001 = modify_and_retest`
-    - `SF-002 = insufficient_sample`
-    - `SF-003 = insufficient_sample`
-    - `SF-004 = insufficient_sample`
+    - `SF-002 = modify_and_retest`
+    - `SF-003 = modify_and_retest`
+    - `SF-004 = modify_and_retest`
     - `SF-005 = deferred_single_source_risk`
-- `ready_for_backtest` 仍然只是结论字段；首轮 wave 已完成，但下一波不得自动启动，必须等待新的范围决策。
+- 当前样本覆盖结论为：
+  - `SF-001 ~ SF-004 = robust_candidate`
+  - `SF-005 = not_run`
+- `quality_filter` 若被选为 best variant，只能解释为 `diagnostic_selected_variant`，不能被写成正式冻结策略。
+- `ready_for_backtest` 仍然只是结论字段；wave2 已完成，但下一波不得自动启动，必须先完成 merge gate，并在通过后进入更窄范围的 `v0.2 spec freeze`。

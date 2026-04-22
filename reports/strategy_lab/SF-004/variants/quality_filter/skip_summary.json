@@ -1,11 +1,138 @@
 {
   "strategy_id": "SF-004",
   "variant_id": "quality_filter",
+  "dataset_count": 4,
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "NVDA",
+    "TSLA"
+  ],
   "skipped": {
-    "cooldown_active": 1,
-    "tight_channel_context_missing": 3029,
-    "weak_channel_resumption": 56
+    "cooldown_active": 49,
+    "tight_channel_context_missing": 80279,
+    "weak_channel_resumption": 1435
   },
-  "total_candidates": 3094,
-  "emitted_signals": 8
+  "total_candidates": 82065,
+  "emitted_signals": 302,
+  "per_dataset": [
+    {
+      "strategy_id": "SF-004",
+      "variant_id": "quality_filter",
+      "symbol": "SPY",
+      "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "provider": "longbridge",
+      "timeframe": "5m",
+      "bar_count": 20542,
+      "signal_count": 99,
+      "trade_count": 99,
+      "closed_trade_count": 99,
+      "expectancy_r": "-0.0606",
+      "total_pnl_r": "-6.0000",
+      "win_rate": "0.3131",
+      "max_drawdown_r": "24.0000",
+      "split_trade_counts": {
+        "in_sample": 38,
+        "validation": 31,
+        "out_of_sample": 30
+      },
+      "split_executed_trade_counts": {
+        "in_sample": 38,
+        "validation": 31,
+        "out_of_sample": 30
+      },
+      "warnings": [],
+      "summary": "99 trade(s) from 99 signal(s); win_rate=31.3100%; expectancy=-0.0606R; total_pnl=-6.0000R; max_drawdown=24.0000R; slippage=[baseline_0r:-6.0000R, stress_0.05r_per_trade:-10.9500R]",
+      "boundary": "paper/simulated"
+    },
+    {
+      "strategy_id": "SF-004",
+      "variant_id": "quality_filter",
+      "symbol": "QQQ",
+      "dataset_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "provider": "longbridge",
+      "timeframe": "5m",
+      "bar_count": 20541,
+      "signal_count": 84,
+      "trade_count": 84,
+      "closed_trade_count": 84,
+      "expectancy_r": "0.0714",
+      "total_pnl_r": "6.0000",
+      "win_rate": "0.3571",
+      "max_drawdown_r": "14.0000",
+      "split_trade_counts": {
+        "in_sample": 36,
+        "validation": 33,
+        "out_of_sample": 15
+      },
+      "split_executed_trade_counts": {
+        "in_sample": 36,
+        "validation": 33,
+        "out_of_sample": 15
+      },
+      "warnings": [],
+      "summary": "84 trade(s) from 84 signal(s); win_rate=35.7100%; expectancy=0.0714R; total_pnl=6.0000R; max_drawdown=14.0000R; slippage=[baseline_0r:6.0000R, stress_0.05r_per_trade:1.8000R]",
+      "boundary": "paper/simulated"
+    },
+    {
+      "strategy_id": "SF-004",
+      "variant_id": "quality_filter",
+      "symbol": "NVDA",
+      "dataset_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "provider": "longbridge",
+      "timeframe": "5m",
+      "bar_count": 20543,
+      "signal_count": 64,
+      "trade_count": 63,
+      "closed_trade_count": 63,
+      "expectancy_r": "0.1429",
+      "total_pnl_r": "9.0000",
+      "win_rate": "0.3810",
+      "max_drawdown_r": "8.0000",
+      "split_trade_counts": {
+        "in_sample": 17,
+        "validation": 23,
+        "out_of_sample": 23
+      },
+      "split_executed_trade_counts": {
+        "in_sample": 17,
+        "validation": 23,
+        "out_of_sample": 23
+      },
+      "warnings": [
+        "signal e6941b03a2ed7dbb produced non-positive risk using signal-bar extremum; trade skipped"
+      ],
+      "summary": "63 trade(s) from 64 signal(s); win_rate=38.1000%; expectancy=0.1429R; total_pnl=9.0000R; max_drawdown=8.0000R; slippage=[baseline_0r:9.0000R, stress_0.05r_per_trade:5.8500R]; warnings=1",
+      "boundary": "paper/simulated"
+    },
+    {
+      "strategy_id": "SF-004",
+      "variant_id": "quality_filter",
+      "symbol": "TSLA",
+      "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+      "provider": "longbridge",
+      "timeframe": "5m",
+      "bar_count": 20543,
+      "signal_count": 55,
+      "trade_count": 55,
+      "closed_trade_count": 55,
+      "expectancy_r": "-0.2364",
+      "total_pnl_r": "-13.0000",
+      "win_rate": "0.2545",
+      "max_drawdown_r": "17.0000",
+      "split_trade_counts": {
+        "in_sample": 17,
+        "validation": 22,
+        "out_of_sample": 16
+      },
+      "split_executed_trade_counts": {
+        "in_sample": 17,
+        "validation": 22,
+        "out_of_sample": 16
+      },
+      "warnings": [],
+      "summary": "55 trade(s) from 55 signal(s); win_rate=25.4500%; expectancy=-0.2364R; total_pnl=-13.0000R; max_drawdown=17.0000R; slippage=[baseline_0r:-13.0000R, stress_0.05r_per_trade:-15.7500R]",
+      "boundary": "paper/simulated"
+    }
+  ]
 }

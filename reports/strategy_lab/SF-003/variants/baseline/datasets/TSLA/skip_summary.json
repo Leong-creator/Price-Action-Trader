@@ -1,0 +1,13 @@
+{
+  "strategy_id": "SF-003",
+  "variant_id": "baseline",
+  "symbol": "TSLA",
+  "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "skipped": {
+    "cooldown_active": 17,
+    "failed_breakout_not_confirmed": 18842,
+    "range_context_missing": 1234
+  },
+  "total_candidates": 20517,
+  "emitted_signals": 424
+}

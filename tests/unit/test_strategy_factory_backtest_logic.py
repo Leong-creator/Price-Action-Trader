@@ -16,6 +16,8 @@ from src.strategy_factory.batch_backtest import (
     _classify_sample_status,
     _count_split_trades,
     _evaluate_sf003,
+    _find_covering_intraday_dataset,
+    _parse_intraday_cache_name,
     _select_primary_intraday_dataset,
 )
 
@@ -85,6 +87,31 @@ class TestStrategyFactoryBacktestLogic(unittest.TestCase):
             selected = _select_primary_intraday_dataset(root, provider="custom_provider")
 
         self.assertEqual(selected.name, newer.name)
+
+    def test_find_covering_intraday_dataset_prefers_smallest_covering_window(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_dir = Path(temp_dir)
+            wide = cache_dir / "us_SPY_5m_2025-01-01_2026-12-31_longbridge.csv"
+            exact = cache_dir / "us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv"
+            wide.write_text("stub\n", encoding="utf-8")
+            exact.write_text("stub\n", encoding="utf-8")
+
+            selected = _find_covering_intraday_dataset(
+                cache_dir=cache_dir,
+                symbol="SPY",
+                provider="longbridge",
+                start=datetime(2025, 4, 1, tzinfo=UTC).date(),
+                end=datetime(2026, 4, 21, tzinfo=UTC).date(),
+            )
+
+        self.assertEqual(selected, exact)
+
+    def test_parse_intraday_cache_name_extracts_dates(self) -> None:
+        start, end = _parse_intraday_cache_name(
+            Path("us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv")
+        )
+        self.assertEqual(start.isoformat(), "2025-04-01")
+        self.assertEqual(end.isoformat(), "2026-04-21")
 
     def test_sf003_can_emit_failed_breakout_reversal(self) -> None:
         start = datetime(2026, 3, 2, 9, 30, tzinfo=UTC)
@@ -185,6 +212,15 @@ class TestStrategyFactoryBacktestLogic(unittest.TestCase):
                 regime_count=2,
             ),
             "formal_candidate",
+        )
+        self.assertEqual(
+            _classify_sample_status(
+                trade_count=220,
+                split_trade_counts={"in_sample": 70, "validation": 70, "out_of_sample": 80},
+                symbol_count=4,
+                regime_count=5,
+            ),
+            "robust_candidate",
         )
 
 

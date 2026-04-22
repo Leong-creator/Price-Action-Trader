@@ -1,0 +1,38 @@
+{
+  "strategy_id": "SF-002",
+  "variant_id": "baseline",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20542,
+  "signal_count": 414,
+  "trade_count": 406,
+  "closed_trade_count": 406,
+  "expectancy_r": "0.0567",
+  "total_pnl_r": "23.0000",
+  "win_rate": "0.3522",
+  "max_drawdown_r": "33.0000",
+  "split_trade_counts": {
+    "in_sample": 127,
+    "validation": 130,
+    "out_of_sample": 149
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 127,
+    "validation": 130,
+    "out_of_sample": 149
+  },
+  "warnings": [
+    "signal 5e052ed92538cbb5 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal abe83afeff6dfcd5 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 69f78ef654fa4d7a produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal fd833c964a64ed4c produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 99724c49c9183607 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal faf430006e182a53 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal ca814f6a9cff1f1c produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal b16d2f41854766ae produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "406 trade(s) from 414 signal(s); win_rate=35.2200%; expectancy=0.0567R; total_pnl=23.0000R; max_drawdown=33.0000R; slippage=[baseline_0r:23.0000R, stress_0.05r_per_trade:2.7000R]; warnings=8",
+  "boundary": "paper/simulated"
+}

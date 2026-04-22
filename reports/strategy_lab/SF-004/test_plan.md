@@ -1,7 +1,9 @@
 # SF-004 Test Plan
 
 - `provider`: `longbridge`
-- `dataset_path`: `local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv`
+- `dataset_count`: `4`
+- `symbols`: `SPY, QQQ, NVDA, TSLA`
+- `coverage_window`: `2025-04-01 ~ 2026-04-21`
 - `timeframe`: `5m`
 - `variants`: `baseline`, `quality_filter`
 - `sample gates`: probe>=60 trades with validation/OOS>=15; formal>=100 trades with validation/OOS>=20

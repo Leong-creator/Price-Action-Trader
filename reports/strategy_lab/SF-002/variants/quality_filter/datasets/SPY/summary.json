@@ -1,0 +1,35 @@
+{
+  "strategy_id": "SF-002",
+  "variant_id": "quality_filter",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20542,
+  "signal_count": 264,
+  "trade_count": 259,
+  "closed_trade_count": 259,
+  "expectancy_r": "0.1120",
+  "total_pnl_r": "29.0000",
+  "win_rate": "0.3707",
+  "max_drawdown_r": "19.0000",
+  "split_trade_counts": {
+    "in_sample": 81,
+    "validation": 87,
+    "out_of_sample": 91
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 81,
+    "validation": 87,
+    "out_of_sample": 91
+  },
+  "warnings": [
+    "signal 3f822223a8f24d53 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 259f1c8059cb5b9c produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 0ec606e033cf5f39 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal d5d377bd772e03b6 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 27294199fecde8d4 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "259 trade(s) from 264 signal(s); win_rate=37.0700%; expectancy=0.1120R; total_pnl=29.0000R; max_drawdown=19.0000R; slippage=[baseline_0r:29.0000R, stress_0.05r_per_trade:16.0500R]; warnings=5",
+  "boundary": "paper/simulated"
+}
