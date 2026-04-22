@@ -1,0 +1,98 @@
+strategy_id: "SF-003"
+title: "Failed Breakout Range-Edge Reversal"
+spec_version: "v0.2-candidate"
+candidate_status: "frozen_candidate"
+base_spec_ref: "reports/strategy_lab/specs/SF-003.yaml"
+base_spec_version: "v0.1"
+selected_variant_id: "quality_filter"
+selected_variant_role: "diagnostic_selected_variant"
+wave2_run_id: "m9_strategy_factory_batch_backtest_20260422_035151"
+wave2_artifacts:
+  batch_summary_json: "reports/strategy_lab/backtest_batch_summary.json"
+  triage_matrix_json: "reports/strategy_lab/strategy_triage_matrix.json"
+  strategy_summary_json: "reports/strategy_lab/SF-003/summary.json"
+  strategy_diagnostics_md: "reports/strategy_lab/SF-003/diagnostics.md"
+  selected_variant_summary_json: "reports/strategy_lab/SF-003/variants/quality_filter/summary.json"
+  trade_report_md: "reports/strategy_lab/final_strategy_factory_trade_report.md"
+  cash_report_md: "reports/strategy_lab/final_strategy_factory_cash_report.md"
+wave2_observed_metrics:
+  baseline:
+    trade_count: 1707
+    expectancy_r: -0.0422
+    total_pnl_r: -72.0
+    max_drawdown_r: 128.0
+    win_rate: 0.3193
+    net_pnl_cash: 237.327
+  selected_variant:
+    trade_count: 1119
+    expectancy_r: -0.0214
+    total_pnl_r: -24.0
+    max_drawdown_r: 65.0
+    win_rate: 0.3262
+    net_pnl_cash: 1118.674
+setup_family: "failed_breakout_range_reversal"
+market_context:
+  - "trading_range"
+  - "failed_breakout"
+  - "reversal"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "在区间边缘或第二段 trap 明确失败后，等反转 signal 再逆势进场。"
+stop_idea: "放在 failed breakout extreme 之外，若重新获得连续 follow-through 则失效。"
+target_idea: "先看回到 TR 中轴或 opposite edge，再视 broad channel 结构决定是否延伸。"
+invalidation:
+  - "breakout 重新得到连续 follow-through"
+  - "区间结构被 surprise bar 直接改写"
+no_trade_conditions:
+  - "仍在 Always In 强趋势的第一次反转里抢顶/抢底"
+  - "没有足够 range context 就把单根 reversal bar 当失败突破"
+parameter_candidates:
+  - "range edge proximity"
+  - "second leg trap confirmation"
+  - "follow-through failure within 2 bars"
+expected_failure_modes:
+  - "把 broad channel continuation 误当 range reversal"
+  - "在强 breakout 中过早逆势"
+data_requirements:
+  - "OHLCV with session labels"
+  - "range edge and failed follow-through detection"
+chart_dependency: "medium"
+test_priority: "high"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+rule_overrides:
+  range_height_to_avg_bar_range_max: 6.0
+  reversal_body_ratio_min: 0.55
+change_log:
+  - field: "range_height_to_avg_bar_range_max"
+    from: 8.0
+    to: 6.0
+    why_changed: "先更严格确认 prior window 仍是 trading range，而不是已经过度 directional。"
+    evidence_artifact: "reports/strategy_lab/SF-003/variants/quality_filter/summary.json"
+    expected_failure_mode: "broad directional move 被误当成 range-edge reversal"
+  - field: "reversal_body_ratio_min"
+    from: 0.42
+    to: 0.55
+    why_changed: "只保留更强的 reversal confirmation bar，减少 trap 失败后的继续逆势。"
+    evidence_artifact: "reports/strategy_lab/SF-003/variants/quality_filter/summary.json"
+    expected_failure_mode: "reversal confirmation 太弱导致继续逆势"
+expected_failure_mode_improvements:
+  - "broad directional move 被误当成 range-edge reversal"
+  - "reversal confirmation 太弱导致继续逆势"
+residual_risks:
+  - "R 口径仍为负。"
+  - "cash 正值只属于 sizing 解释层，不能当作策略转正。"
+validation_scope: "wave3_robustness_validation_candidate"
+validation_claims:
+  - "not_validated_production_strategy"
+  - "not_approved_for_live_or_real_money"
+  - "derived_only_from_wave2_observed_quality_filter"

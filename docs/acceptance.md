@@ -888,3 +888,61 @@
   - `python -m unittest tests/unit/test_strategy_factory_backtest_eligibility.py tests/unit/test_strategy_factory_queue.py tests/unit/test_strategy_triage.py -v`
   - `python -m unittest tests/reliability/test_strategy_factory_pipeline.py -v`
   - `python -m unittest discover -s tests/unit -v`
+
+## 阶段 9I.1：Freeze v0.2 Candidate Specs
+
+完成条件：
+
+- 只允许基于 `Wave2` 已被选中的 `quality_filter` 观察结果生成 `v0.2-candidate`；不得新增未测试过的过滤器、阈值组合或策略 family。
+- 只能生成：
+  - `reports/strategy_lab/specs/SF-001-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-002-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-003-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-004-v0.2-candidate.yaml`
+- 现有 `reports/strategy_lab/specs/SF-001.yaml ~ SF-004.yaml` 必须保留为 `v0.1` 基线；`strategy_catalog.json` 必须继续保持 `catalog_status = frozen`，且 `final_strategy_count = 5`。
+- 每个 `v0.2-candidate` 文件必须是完整自包含 spec，并至少包含：
+  - `spec_version = v0.2-candidate`
+  - `candidate_status = frozen_candidate`
+  - `base_spec_ref`
+  - `selected_variant_id = quality_filter`
+  - `selected_variant_role = diagnostic_selected_variant`
+  - `wave2_run_id`
+  - `wave2_artifacts`
+  - `rule_overrides`
+  - `change_log`
+  - `expected_failure_mode_improvements`
+  - `residual_risks`
+  - `validation_scope = wave3_robustness_validation_candidate`
+  - `validation_claims`
+- 每个 `v0.2-candidate` 必须可追溯到：
+  - `reports/strategy_lab/backtest_batch_summary.json`
+  - `reports/strategy_lab/strategy_triage_matrix.json`
+  - 对应 `reports/strategy_lab/SF-00x/summary.json`
+  - 对应 `reports/strategy_lab/SF-00x/diagnostics.md`
+  - 对应 `reports/strategy_lab/SF-00x/variants/quality_filter/summary.json`
+  - `reports/strategy_lab/final_strategy_factory_trade_report.md`
+  - `reports/strategy_lab/final_strategy_factory_cash_report.md`
+- `rule_overrides` 必须与 `Wave2` 已测试实现完全一致：
+  - `SF-001`: `signal_bar_body_ratio_min = 0.50`，`max_pullback_bars = 2`
+  - `SF-002`: `breakout_bar_body_ratio_min = 0.60`，`follow_through_bar_body_ratio_min = 0.60`
+  - `SF-003`: `range_height_to_avg_bar_range_max = 6.0`，`reversal_body_ratio_min = 0.55`
+  - `SF-004`: `channel_overlap_ratio_max = 0.35`
+- `SF-005` 必须继续保持 `deferred_single_source_risk`，不得生成 `SF-005-v0.2-candidate.yaml`。
+- 必须新增 `reports/strategy_lab/v0_2_spec_freeze_summary.md`，明确：
+  - 本轮只冻结 `v0.2-candidate`
+  - `quality_filter` 是 `diagnostic_selected_variant`
+  - 本轮未新增未测试过滤器
+  - `SF-005` 继续 deferred
+  - 本轮不自动进入 `Wave3`
+- 本阶段不得：
+  - 启动新的 batch backtest
+  - 新增 strategy cards
+  - 继续提炼知识来源
+  - 处理 visual gaps
+  - 改 trigger
+  - 进入 broker/live/real-money
+- 至少通过：
+  - `python scripts/validate_strategy_factory_contract.py`
+  - `python scripts/validate_kb.py`
+  - `python -m unittest tests/unit/test_strategy_catalog.py tests/unit/test_strategy_triage.py tests/unit/test_v0_2_candidate_specs.py tests/unit/test_strategy_factory_docs_sync.py -v`
+  - `git diff --check`
