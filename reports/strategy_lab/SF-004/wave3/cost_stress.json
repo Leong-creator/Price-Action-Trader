@@ -1,0 +1,92 @@
+{
+  "proxy_holdout": {
+    "baseline": {
+      "closed_trades": 22,
+      "total_pnl_r": "2.0000",
+      "profit_factor": "1.1429",
+      "max_drawdown_r": "4.0000",
+      "cash_net_pnl": "359.6690"
+    },
+    "stress_0.05r_per_trade": {
+      "closed_trades": 22,
+      "total_pnl_r": "0.9000",
+      "profit_factor": "1.0612",
+      "max_drawdown_r": "4.6500",
+      "cash_net_pnl": "315.6420"
+    },
+    "stress_0.10r_per_trade": {
+      "closed_trades": 22,
+      "total_pnl_r": "-0.2000",
+      "profit_factor": "0.9870",
+      "max_drawdown_r": "5.3000",
+      "cash_net_pnl": "270.5797"
+    },
+    "stress_0.15r_per_trade": {
+      "closed_trades": 22,
+      "total_pnl_r": "-1.3000",
+      "profit_factor": "0.9193",
+      "max_drawdown_r": "5.9500",
+      "cash_net_pnl": "226.2514"
+    }
+  },
+  "strict_holdout": {
+    "baseline": {
+      "closed_trades": 0,
+      "total_pnl_r": "0.0000",
+      "profit_factor": null,
+      "max_drawdown_r": "0.0000",
+      "cash_net_pnl": "0.0000"
+    },
+    "stress_0.05r_per_trade": {
+      "closed_trades": 0,
+      "total_pnl_r": "0.0000",
+      "profit_factor": null,
+      "max_drawdown_r": "0.0000",
+      "cash_net_pnl": "0.0000"
+    },
+    "stress_0.10r_per_trade": {
+      "closed_trades": 0,
+      "total_pnl_r": "0.0000",
+      "profit_factor": null,
+      "max_drawdown_r": "0.0000",
+      "cash_net_pnl": "0.0000"
+    },
+    "stress_0.15r_per_trade": {
+      "closed_trades": 0,
+      "total_pnl_r": "0.0000",
+      "profit_factor": null,
+      "max_drawdown_r": "0.0000",
+      "cash_net_pnl": "0.0000"
+    }
+  },
+  "aggregate_oos": {
+    "baseline": {
+      "closed_trades": 22,
+      "total_pnl_r": "2.0000",
+      "profit_factor": "1.1429",
+      "max_drawdown_r": "4.0000",
+      "cash_net_pnl": "359.6690"
+    },
+    "stress_0.05r_per_trade": {
+      "closed_trades": 22,
+      "total_pnl_r": "0.9000",
+      "profit_factor": "1.0612",
+      "max_drawdown_r": "4.6500",
+      "cash_net_pnl": "315.6420"
+    },
+    "stress_0.10r_per_trade": {
+      "closed_trades": 22,
+      "total_pnl_r": "-0.2000",
+      "profit_factor": "0.9870",
+      "max_drawdown_r": "5.3000",
+      "cash_net_pnl": "270.5797"
+    },
+    "stress_0.15r_per_trade": {
+      "closed_trades": 22,
+      "total_pnl_r": "-1.3000",
+      "profit_factor": "0.9193",
+      "max_drawdown_r": "5.9500",
+      "cash_net_pnl": "226.2514"
+    }
+  }
+}

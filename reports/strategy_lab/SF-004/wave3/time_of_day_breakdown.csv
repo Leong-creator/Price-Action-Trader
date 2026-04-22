@@ -1,0 +1,4 @@
+time_bucket,closed_trades,total_pnl_r,cash_net_pnl,profit_factor,conversion_rate
+open_hour,4,-1.0000,25.9800,0.6667,0.0003
+midday,9,-3.0000,-79.0370,0.5714,0.0002
+late_day,9,6.0000,411.2040,2.5000,0.0003

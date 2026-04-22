@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：阶段 8：可靠性验证（已完成至 `M8E.2`，位于 `main`）
-- 当前支线：阶段 9：Price Action Strategy Lab（进行中，位于 `feature/m9-v0-2-spec-freeze`）
+- 当前支线：阶段 9：Price Action Strategy Lab（进行中，位于 `feature/m9-wave3-robustness-validation`）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M9I.1 Freeze v0.2 Candidate Specs`（当前分支完成）
-- 当前子阶段：`M9A`~`M9F` 首轮已完成并已降级为 legacy / historical baseline；`M9G Full Extraction Completeness Audit v4` 已完成，`M9H Controlled Batch Backtest + Strategy Triage` 已完成 wave2 扩样本回测，`M9I.1 Freeze v0.2 Candidate Specs` 已完成
+- 当前支线 milestone：`M9I.2 Wave3 Holdout / Walk-forward Robustness Validation`（当前分支完成）
+- 当前子阶段：`M9A`~`M9F` 首轮已完成并已降级为 legacy / historical baseline；`M9G Full Extraction Completeness Audit v4` 已完成，`M9H Controlled Batch Backtest + Strategy Triage` 已完成 wave2 扩样本回测，`M9I.1 Freeze v0.2 Candidate Specs` 已完成，`M9I.2 Wave3 Holdout / Walk-forward Robustness Validation` 已完成
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m9-v0-2-spec-freeze`
+- `feature/m9-wave3-robustness-validation`
 
 ## 已完成
 
@@ -266,6 +266,16 @@
   - 现有 `reports/strategy_lab/specs/SF-001.yaml ~ SF-004.yaml` 继续保留为 `v0.1` 基线；`strategy_catalog.json` 继续保持 `frozen`。
   - `SF-005` 当前仍保持 `deferred_single_source_risk`，未进入本轮 `v0.2-candidate` freeze。
   - 已新增 `reports/strategy_lab/v0_2_spec_freeze_summary.md` 汇总本轮冻结结果与下一步验证建议。
+- M9I.2 Wave3 Holdout / Walk-forward Robustness Validation 已完成：
+  - 已新增 `reports/strategy_lab/wave3_robustness_summary.md` 与 `wave3_robustness_summary.json`，并在 `reports/strategy_lab/SF-001~004/wave3/` 下落盘 holdout / walk-forward / symbol / regime / time-of-day / cost-stress / conversion 产物。
+  - 本轮只加载冻结后的 `SF-001 ~ SF-004 v0.2-candidate`，未修改 specs，未新增过滤器，`SF-005` 继续保持 `deferred_single_source_risk`。
+  - 当前 Wave3 实际公共窗口为 `2025-04-01 ~ 2026-04-21`、`SPY / QQQ / NVDA / TSLA`、`5m`；由于没有 `strict post-freeze holdout`，本轮不允许输出 `retain_candidate`。
+  - 当前 Wave3 triage 结果为：
+    - `SF-001 = modify_and_retest`
+    - `SF-002 = modify_and_retest`
+    - `SF-003 = modify_and_retest`
+    - `SF-004 = insufficient_sample`
+  - `strategy_triage_matrix.json` 当前已保留 Wave2 历史，并追加 Wave3 history；`run_state.json` 已同步到 `M9I.2.wave3_robustness_validation_completed`。
 
 ## 当前阻塞
 
@@ -274,10 +284,10 @@
 
 ## 下一步
 
-- 当前不自动进入下一波 batch backtest；`M9I.1` 已完成，下一步应规划 `Wave3 robustness validation`，而不是直接启动新回测。
+- 当前不自动进入下一波 batch backtest；`M9I.2` 已完成，下一步应在 `paper shadow`、`再次修改并重测`、`继续补 SF-005 evidence` 三者中决策，而不是自动继续扩大回测。
 - 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json` 决定候选，不得回退到 legacy `PA-SC-*` 作为 seed。
 - `SF-005` 当前继续保持 deferred，除非单独完成 family 边界澄清与 corroboration 风险处理，否则不得进入下一波。
-- `SF-001 ~ SF-004` 当前虽然已达到 `robust_candidate` 的样本覆盖，但 wave2 最优 variant 仍全部指向 `quality_filter`，且其语义只允许是 `diagnostic_selected_variant`；当前已完成 `v0.2-candidate` freeze，下一步只能基于这 4 份候选规格规划更正式的 `Wave3 robustness validation`。
+- `SF-001 ~ SF-004` 当前都已完成 `Wave3`；其中 `SF-001 ~ SF-003` 仍为 `modify_and_retest`，`SF-004` 为 `insufficient_sample`。由于当前没有严格 post-freeze holdout，这四个策略都不能直接升格为 `retain_candidate`。
 - 若 repo config、`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract 不一致，必须先修正文档/配置一致性，停止任何后续提炼或回测。
 - heartbeat / 自动推进若继续扩展，恢复状态只允许依赖 ledgers + `run_state.json.resume_cursor`。
 - M9 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。

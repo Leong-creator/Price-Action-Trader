@@ -21,6 +21,8 @@ class TestStrategyFactoryDocsSync(unittest.TestCase):
             text = read_text(target)
             self.assertIn("Full Extraction", text)
             self.assertIn("full_source_closure", text)
+            self.assertIn("Wave3", text)
+            self.assertIn("v0.2", text)
 
     def test_docs_do_not_claim_batch_backtest_never_started_after_m9h(self) -> None:
         run_state = load_json("reports/strategy_lab/strategy_factory/run_state.json")

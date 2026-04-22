@@ -20,14 +20,15 @@ class TestStrategyFactoryPipeline(unittest.TestCase):
         self.final_corroboration = _load_json(
             "reports/strategy_lab/cross_source_corroboration_final.json"
         )
+        self.wave3 = _load_json("reports/strategy_lab/wave3_robustness_summary.json")
 
     def test_pipeline_respects_frozen_catalog_and_provider_contract(self) -> None:
         self.assertEqual(self.batch_summary["frozen_strategy_count"], 5)
-        self.assertEqual(self.run_state["current_phase"], "M9H.wave2_batch_backtest_triage_completed")
+        self.assertEqual(self.run_state["current_phase"], "M9I.2.wave3_robustness_validation_completed")
         self.assertEqual(self.run_state["primary_provider"], "longbridge")
         self.assertEqual(self.run_state["dataset_count"], 4)
-        self.assertEqual(self.run_state["coverage_start"], "2025-04-01")
-        self.assertEqual(self.run_state["coverage_end"], "2026-04-21")
+        self.assertEqual(self.run_state["coverage_start"], self.wave3["data_window"]["actual_common_start"])
+        self.assertEqual(self.run_state["coverage_end"], self.wave3["data_window"]["actual_common_end"])
         self.assertTrue(self.run_state["text_extractable_closure"])
         self.assertFalse(self.run_state["full_source_closure"])
 
@@ -37,27 +38,28 @@ class TestStrategyFactoryPipeline(unittest.TestCase):
                 if relative_path is None:
                     continue
                 self.assertTrue((ROOT / relative_path).exists(), relative_path)
+        self.assertTrue((ROOT / "reports/strategy_lab/wave3_robustness_summary.json").exists())
+        self.assertTrue((ROOT / "reports/strategy_lab/wave3_robustness_summary.md").exists())
+        for strategy_id in self.wave3["tested_strategies"]:
+            self.assertTrue((ROOT / "reports" / "strategy_lab" / strategy_id / "wave3" / "summary.json").exists())
 
     def test_only_four_families_were_tested_and_sf005_stayed_deferred(self) -> None:
-        tested = [item for item in self.batch_summary["results"] if item["backtest_status"] == "completed"]
-        deferred = [item for item in self.batch_summary["results"] if item["backtest_status"] != "completed"]
-        self.assertEqual(len(tested), 4)
-        self.assertEqual(len(deferred), 1)
-        self.assertEqual(deferred[0]["strategy_id"], "SF-005")
-        self.assertEqual(self.batch_summary["symbols"], ["SPY", "QQQ", "NVDA", "TSLA"])
+        self.assertEqual(self.wave3["tested_strategies"], ["SF-001", "SF-002", "SF-003", "SF-004"])
         support = {
             item["strategy_id"]: item["source_family_support_breadth"]
             for item in self.final_corroboration["families"]
         }
-        for item in tested:
-            self.assertGreaterEqual(support[item["strategy_id"]], 2)
+        for strategy_id in self.wave3["tested_strategies"]:
+            self.assertGreaterEqual(support[strategy_id], 2)
         self.assertEqual(support["SF-005"], 1)
 
     def test_triage_counts_align_with_triage_matrix(self) -> None:
         counts: dict[str, int] = {}
         for record in self.triage["records"]:
             counts[record["triage_status"]] = counts.get(record["triage_status"], 0) + 1
-        self.assertEqual(counts, self.batch_summary["triage_counts"])
+        expected_counts = dict(self.wave3["triage_counts"])
+        expected_counts["deferred_single_source_risk"] = 1
+        self.assertEqual(counts, expected_counts)
 
 
 if __name__ == "__main__":

@@ -946,3 +946,64 @@
   - `python scripts/validate_kb.py`
   - `python -m unittest tests/unit/test_strategy_catalog.py tests/unit/test_strategy_triage.py tests/unit/test_v0_2_candidate_specs.py tests/unit/test_strategy_factory_docs_sync.py -v`
   - `git diff --check`
+
+## 阶段 9I.2：Wave3 Holdout / Walk-forward Robustness Validation
+
+完成条件：
+
+- 只允许加载冻结后的：
+  - `reports/strategy_lab/specs/SF-001-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-002-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-003-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-004-v0.2-candidate.yaml`
+- 本阶段不得：
+  - 修改上述 4 份 frozen spec
+  - 新增 strategy cards
+  - 继续提炼知识来源
+  - 改 trigger 核心语义
+  - 进入 broker/live/real-money
+  - 把 `SF-005` 纳入本轮
+- Wave3 必须至少落盘：
+  - `reports/strategy_lab/wave3_robustness_summary.md`
+  - `reports/strategy_lab/wave3_robustness_summary.json`
+  - `reports/strategy_lab/SF-001/wave3/`
+  - `reports/strategy_lab/SF-002/wave3/`
+  - `reports/strategy_lab/SF-003/wave3/`
+  - `reports/strategy_lab/SF-004/wave3/`
+- 每个策略的 `wave3/` 子目录至少包含：
+  - `summary.json`
+  - `holdout_summary.json`
+  - `walk_forward_windows.csv`
+  - `symbol_breakdown.csv`
+  - `regime_breakdown.csv`
+  - `time_of_day_breakdown.csv`
+  - `cost_stress.json`
+  - `conversion_analysis.json`
+- Wave3 必须显式覆盖：
+  - holdout / out-of-sample validation
+  - walk-forward / rolling-window validation
+  - symbol-level breakdown
+  - regime-level breakdown
+  - time-of-day breakdown
+  - cost / slippage stress
+  - candidate event -> executed trade conversion analysis
+  - robustness score
+- 切分必须满足：
+  - `core_history / proxy_holdout / strict_post_freeze_holdout` 彼此不重叠
+  - walk-forward 的 `IS / OOS` 不重叠
+  - walk-forward 的任何窗口都不能泄漏进 proxy / strict holdout
+- triage 结果只能落入：
+  - `retain_candidate`
+  - `modify_and_retest`
+  - `insufficient_sample`
+  - `rejected_variant`
+  - `parked`
+- 若不存在 strict post-freeze holdout，则本轮不得输出 `retain_candidate`。
+- `strategy_triage_matrix.json` 必须保留 Wave2 历史，并追加 Wave3 history，不得覆盖 `SF-005` 的 deferred 历史事实。
+- `reports/strategy_lab/backtest_dataset_inventory.json` 必须更新为本轮实际使用的数据窗口与 provider 来源。
+- 至少通过：
+  - `python scripts/validate_strategy_factory_contract.py`
+  - `python scripts/validate_kb.py`
+  - `python -m unittest discover -s tests/unit -v`
+  - `python -m unittest tests/reliability/test_strategy_factory_pipeline.py -v`
+  - `git diff --check`

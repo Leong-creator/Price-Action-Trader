@@ -87,3 +87,61 @@
 - 下一步不是自动扩大 batch backtest，而是先完成 PR #2 merge gate；若通过，则进入更窄范围的 `v0.2 spec freeze`。
 - 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json`、`strategy_triage_matrix.json` 与 `unresolved_strategy_extraction_gaps.json` 选择候选。
 - wave2 已证明单纯继续扩样本不足以直接把 family 升为 retain/promoted；`quality_filter` 只能被解释为 `diagnostic_selected_variant`，下一步重点应转向 `v0.2 spec freeze`，再决定是否进入更正式的 retest。
+
+## M9I.1 v0.2 Candidate Spec Freeze
+
+- 已基于 wave2 已测试的 `quality_filter` 观察结果，冻结以下 `v0.2-candidate` spec：
+  - `reports/strategy_lab/specs/SF-001-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-002-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-003-v0.2-candidate.yaml`
+  - `reports/strategy_lab/specs/SF-004-v0.2-candidate.yaml`
+- 这些 `v0.2-candidate` 只允许作为下一轮验证输入，不得解释成已验证正式策略。
+- `SF-005` 继续保持 `deferred_single_source_risk`，未纳入 `v0.2-candidate` freeze。
+- 本阶段已落盘：
+  - `reports/strategy_lab/v0_2_spec_freeze_summary.md`
+- 本阶段不做：
+  - 新 batch backtest
+  - 新策略提炼
+  - visual gap closure
+
+## M9I.2 Wave3 Holdout / Walk-forward Robustness Validation
+
+- 已完成对 4 份 frozen `v0.2-candidate` spec 的 `Wave3` robustness validation。
+- 本轮验证对象固定为：
+  - `SF-001`
+  - `SF-002`
+  - `SF-003`
+  - `SF-004`
+- `SF-005` 不在本轮验证范围内。
+- 本轮数据窗口与切分：
+  - `SPY / QQQ / NVDA / TSLA`
+  - `5m`
+  - 目标窗口：`2024-04-01 ~ 2026-04-22`
+  - 实际公共窗口：`2025-04-01 ~ 2026-04-21`
+  - `core_history = 225 sessions`
+  - `proxy_holdout = 40 sessions`
+  - `strict_post_freeze_holdout = 0 sessions`
+  - `walk-forward = 4 windows`
+- 本轮已落盘：
+  - `reports/strategy_lab/wave3_robustness_summary.md`
+  - `reports/strategy_lab/wave3_robustness_summary.json`
+  - `reports/strategy_lab/SF-001/wave3/`
+  - `reports/strategy_lab/SF-002/wave3/`
+  - `reports/strategy_lab/SF-003/wave3/`
+  - `reports/strategy_lab/SF-004/wave3/`
+- 当前 `Wave3` triage 结论：
+  - `SF-001 = modify_and_retest`
+  - `SF-002 = modify_and_retest`
+  - `SF-003 = modify_and_retest`
+  - `SF-004 = insufficient_sample`
+- 当前没有 `retain_candidate`，原因不是策略已被否定，而是：
+  - 没有严格意义上的 post-freeze holdout
+  - `retain_candidate` gate 被锁定依赖 strict holdout
+- 当前仓库状态应解释为：
+  - `v0.2-candidate specs frozen`
+  - `Wave3 completed`
+  - `eligible to decide among paper shadow / 再修改 / 继续补 SF-005 evidence`
+- 当前默认下一步不是自动继续扩大回测，而是三选一：
+  - `paper shadow`
+  - `再修改`
+  - `继续补 SF-005 evidence`

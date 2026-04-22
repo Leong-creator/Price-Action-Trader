@@ -1,8 +1,8 @@
 {
-  "title": "Public History Long-Horizon Daily Validation (Longbridge)",
-  "description": "Long-horizon walk-forward daily validation sourced from a user-authorized Longbridge simulated account. Still paper/simulated only.",
-  "start": "2020-01-01",
-  "end": "2025-12-31",
+  "title": "Public History Extended Daily Validation (Longbridge)",
+  "description": "Extended daily walk-forward validation sourced from a user-authorized Longbridge simulated account. Still paper/simulated only.",
+  "start": "2010-06-29",
+  "end": "2026-04-21",
   "interval": "1d",
   "cache_dir": "local_data/longbridge_history",
   "report_dir": "reports/backtests",
@@ -47,23 +47,41 @@
     {
       "name": "in_sample",
       "label": "In-sample",
-      "start": "2020-01-01",
-      "end": "2021-12-31"
+      "start": "2010-06-29",
+      "end": "2015-12-31"
     },
     {
       "name": "validation",
       "label": "Validation",
-      "start": "2022-01-01",
-      "end": "2023-12-31"
+      "start": "2016-01-01",
+      "end": "2020-12-31"
     },
     {
       "name": "out_of_sample",
       "label": "Out-of-sample",
-      "start": "2024-01-01",
-      "end": "2025-12-31"
+      "start": "2021-01-01",
+      "end": "2026-04-21"
     }
   ],
   "regimes": [
+    {
+      "name": "post_gfc_repricing",
+      "label": "2010-2012 复苏与再定价",
+      "start": "2010-06-29",
+      "end": "2012-12-31"
+    },
+    {
+      "name": "qe_trend_up",
+      "label": "2013-2017 流动性上升趋势",
+      "start": "2013-01-01",
+      "end": "2017-12-31"
+    },
+    {
+      "name": "rate_hike_and_repricing",
+      "label": "2018-2019 紧缩与修复",
+      "start": "2018-01-01",
+      "end": "2019-12-31"
+    },
     {
       "name": "covid_crash_high_vol",
       "label": "2020 高波动下跌",
@@ -71,28 +89,10 @@
       "end": "2020-05-31"
     },
     {
-      "name": "liquidity_trend_up",
-      "label": "2020H2-2021 上升趋势",
+      "name": "recovery_and_ai_rotation",
+      "label": "2020H2-2026 恢复、宏观回撤与 AI 轮动",
       "start": "2020-06-01",
-      "end": "2021-12-31"
-    },
-    {
-      "name": "macro_drawdown",
-      "label": "2022 宏观回撤",
-      "start": "2022-01-01",
-      "end": "2022-12-31"
-    },
-    {
-      "name": "recovery_rotation",
-      "label": "2023 恢复与轮动",
-      "start": "2023-01-01",
-      "end": "2023-12-31"
-    },
-    {
-      "name": "ai_momentum_and_range",
-      "label": "2024-2025 AI 动量与区间切换",
-      "start": "2024-01-01",
-      "end": "2025-12-31"
+      "end": "2026-04-21"
     }
   ]
 }
