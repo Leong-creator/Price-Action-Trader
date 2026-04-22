@@ -84,6 +84,6 @@
 
 ## 下一步
 
-- 下一步不是自动扩大 batch backtest，而是等待更窄范围的下一波重测决策。
+- 下一步不是自动扩大 batch backtest，而是先完成 PR #2 merge gate；若通过，则进入更窄范围的 `v0.2 spec freeze`。
 - 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json`、`strategy_triage_matrix.json` 与 `unresolved_strategy_extraction_gaps.json` 选择候选。
-- wave2 已证明单纯继续扩样本不足以直接把 family 升为 retain/promoted；下一步重点应转向按 `quality_filter` 收紧 executable spec，再决定是否进入更正式的 retest。
+- wave2 已证明单纯继续扩样本不足以直接把 family 升为 retain/promoted；`quality_filter` 只能被解释为 `diagnostic_selected_variant`，下一步重点应转向 `v0.2 spec freeze`，再决定是否进入更正式的 retest。

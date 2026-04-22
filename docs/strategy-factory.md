@@ -113,7 +113,8 @@
     - `SF-003 = modify_and_retest`
     - `SF-004 = modify_and_retest`
     - `SF-005 = deferred_single_source_risk`
-  - 当前样本覆盖结论为：
-    - `SF-001 ~ SF-004 = robust_candidate`
-    - `SF-005 = not_run`
-- `ready_for_backtest` 仍然只是结论字段；wave2 已完成，但下一波不得自动启动，必须等待新的范围决策。
+- 当前样本覆盖结论为：
+  - `SF-001 ~ SF-004 = robust_candidate`
+  - `SF-005 = not_run`
+- `quality_filter` 若被选为 best variant，只能解释为 `diagnostic_selected_variant`，不能被写成正式冻结策略。
+- `ready_for_backtest` 仍然只是结论字段；wave2 已完成，但下一波不得自动启动，必须先完成 merge gate，并在通过后进入更窄范围的 `v0.2 spec freeze`。

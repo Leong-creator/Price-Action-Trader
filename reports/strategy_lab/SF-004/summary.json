@@ -6,8 +6,9 @@
   "backtest_status": "completed",
   "sample_status": "robust_candidate",
   "triage_status": "modify_and_retest",
-  "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+  "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline, but the best variant remains negative in R. Cash-layer positivity comes from independent per-trade sizing and does not justify promotion beyond modify_and_retest",
   "best_variant_id": "quality_filter",
+  "best_variant_role": "diagnostic_selected_variant",
   "baseline_variant_id": "baseline",
   "provider": "longbridge",
   "baseline_variant": {

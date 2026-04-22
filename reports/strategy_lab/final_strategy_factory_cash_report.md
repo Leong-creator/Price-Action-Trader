@@ -21,4 +21,7 @@
 ## Notes
 - 现金口径为研究用途的固定 sizing layer，不改变现有 trigger、risk、execution 或 broker 语义。
 - 本报告按每个策略独立账户计算，默认从 `$25,000` 起始、单笔风险预算 `$100`，不模拟策略间资金共享。
-- 该层仅用于把 R 倍数结果映射为更直观的美元盈亏/回撤/权益变化，不代表实盘能力。
+- 该层不是把 `R` 直接乘成美元；它会按每笔 `risk_per_share` 与 `entry_price` 重新 sizing，因此同一 strategy/variant 可能出现 `R` 为负而 cash 为正的情况。
+- 当前已解释的异号案例为：`SF-003 baseline`、`SF-003 quality_filter`、`SF-004 quality_filter`。这些案例只说明 cash layer 在多标的聚合下重新加权了结果，不代表策略已经转为正向或可升级为 `retain_candidate`。
+- 表中的 `quality_filter` 必须读作 `diagnostic_selected_variant`，只用于指示下一轮更窄的 `v0.2 spec freeze`，不代表已验证正式策略。
+- 该层仅用于提供更直观的美元盈亏/回撤/权益变化，不代表实盘能力。

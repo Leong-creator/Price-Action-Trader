@@ -812,7 +812,7 @@
     - `SF-005` 当前继续保持 `deferred_single_source_risk`，不得与 `SF-001 ~ SF-004` 无差别推进。
     - 当前 wave2 triage 结果固定为：`SF-001=modify_and_retest`、`SF-002=modify_and_retest`、`SF-003=modify_and_retest`、`SF-004=modify_and_retest`、`SF-005=deferred_single_source_risk`。
     - 当前 wave2 sample status 固定为：`SF-001 ~ SF-004 = robust_candidate`，但这只表示样本覆盖提高，不代表已具备实盘能力或稳定盈利结论。
-  - 下一步不是自动扩大 batch backtest，而是等待单独的更窄范围重测 / 下一波决策，重点应落在 `quality_filter` 指向的更紧规则冻结，而不是继续盲目扩量。
+  - 下一步不是自动扩大 batch backtest，而是先完成 PR #2 merge gate；若通过，则进入 `quality_filter` 指向的更窄 `v0.2 spec freeze`，而不是继续盲目扩量。
 - 当前 Provider Contract：
   <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
   - `primary_provider` 的唯一运行时来源是 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]`。

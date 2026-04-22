@@ -40,8 +40,9 @@
       "backtest_status": "completed",
       "sample_status": "robust_candidate",
       "triage_status": "modify_and_retest",
-      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline and should guide a narrower v0.2 spec freeze, not be treated as a validated production rule",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "baseline_variant_id": "baseline",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -158,8 +159,9 @@
       "backtest_status": "completed",
       "sample_status": "robust_candidate",
       "triage_status": "modify_and_retest",
-      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline and should guide a narrower v0.2 spec freeze, not be treated as a validated production rule",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "baseline_variant_id": "baseline",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -276,8 +278,9 @@
       "backtest_status": "completed",
       "sample_status": "robust_candidate",
       "triage_status": "modify_and_retest",
-      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline, but both baseline and best variant remain negative in R. Cash-layer positivity comes from independent per-trade sizing and does not justify promotion beyond modify_and_retest",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "baseline_variant_id": "baseline",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -394,8 +397,9 @@
       "backtest_status": "completed",
       "sample_status": "robust_candidate",
       "triage_status": "modify_and_retest",
-      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "triage_reason": "quality_filter is a diagnostic_selected_variant; it improved on the baseline, but the best variant remains negative in R. Cash-layer positivity comes from independent per-trade sizing and does not justify promotion beyond modify_and_retest",
       "best_variant_id": "quality_filter",
+      "best_variant_role": "diagnostic_selected_variant",
       "baseline_variant_id": "baseline",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -557,6 +561,8 @@
   "boundary": "paper/simulated",
   "notes": [
     "This wave is a controlled intraday 5m multi-symbol exploratory batch built on the primary-provider cache.",
-    "SF-005 remains deferred because the final corroboration report marks it as single_source_risk."
+    "SF-005 remains deferred because the final corroboration report marks it as single_source_risk.",
+    "When quality_filter is selected, treat it as a diagnostic_selected_variant for a narrower v0.2 spec freeze rather than as a validated production rule.",
+    "Cash-layer sign divergence is explained separately from R results because the cash report re-sizes each closed trade by risk_per_share and entry_price."
   ]
 }
