@@ -125,3 +125,10 @@
   - 每个 `v0.2-candidate` 都必须绑定 wave2 证据路径、记录 `v0.1 -> v0.2-candidate` 的具体变更、预期改善和残余风险。
   - `SF-005` 在 `M9I.1` 继续保持 `deferred_single_source_risk`，不纳入 `v0.2-candidate` freeze。
   - `M9I.1` 完成后，仓库状态应解释为 `v0.2-candidate specs frozen; eligible to plan Wave3 robustness validation`，而不是自动进入新的 batch backtest。
+- 当前已完成 `M9I.2 Wave3 Holdout / Walk-forward Robustness Validation`：
+  - 只加载冻结后的 `SF-001 ~ SF-004 v0.2-candidate`，不修改 specs，不新增过滤器，`SF-005` 继续保持 `deferred_single_source_risk`。
+  - 当前实际公共数据窗口为 `2025-04-01 ~ 2026-04-21`、`SPY / QQQ / NVDA / TSLA`、`5m`；由于不存在 `strict post-freeze holdout`，本轮不允许输出 `retain_candidate`。
+  - 当前 Wave3 triage 结果固定为：`SF-001=modify_and_retest`、`SF-002=modify_and_retest`、`SF-003=modify_and_retest`、`SF-004=insufficient_sample`。
+  - 当前已新增 `reports/strategy_lab/wave3_robustness_summary.md`、`wave3_robustness_summary.json` 与各策略 `wave3/` 子目录，用于 holdout / walk-forward / breadth / cost / conversion 审计。
+  - `strategy_triage_matrix.json` 当前已保留 Wave2 history，并把 Wave3 追加为当前快照；`run_state.json` 当前阶段为 `M9I.2.wave3_robustness_validation_completed`。
+  - 当前下一步不自动进入新的 batch backtest；只能在 `paper shadow`、`再次修改并重测`、`继续补 SF-005 evidence` 三者之间决策。

@@ -1,0 +1,53 @@
+{
+  "strict_holdout_summary": {
+    "label": "strict_post_freeze_holdout",
+    "available": false,
+    "session_count": 0,
+    "start": null,
+    "end": null,
+    "trade_count": 0,
+    "closed_trades": 0,
+    "win_rate": "0.0000",
+    "total_pnl_r": "0.0000",
+    "profit_factor": null,
+    "max_drawdown_r": "0.0000",
+    "avg_trade_r": "0.0000",
+    "cash_net_pnl": "0.0000",
+    "cash_max_drawdown": "0.0000",
+    "r_cash_sign_consistency": "zero_alignment"
+  },
+  "proxy_holdout_summary": {
+    "label": "proxy_holdout",
+    "available": true,
+    "session_count": 40,
+    "start": "2026-02-24",
+    "end": "2026-04-21",
+    "trade_count": 22,
+    "closed_trades": 22,
+    "win_rate": "0.3636",
+    "total_pnl_r": "2.0000",
+    "profit_factor": "1.1429",
+    "max_drawdown_r": "4.0000",
+    "avg_trade_r": "0.0909",
+    "cash_net_pnl": "359.6690",
+    "cash_max_drawdown": "331.9300",
+    "r_cash_sign_consistency": "consistent_sign"
+  },
+  "aggregate_oos_summary": {
+    "label": "aggregate_oos",
+    "available": true,
+    "session_count": 40,
+    "start": "2026-02-24",
+    "end": "2026-04-21",
+    "trade_count": 22,
+    "closed_trades": 22,
+    "win_rate": "0.3636",
+    "total_pnl_r": "2.0000",
+    "profit_factor": "1.1429",
+    "max_drawdown_r": "4.0000",
+    "avg_trade_r": "0.0909",
+    "cash_net_pnl": "359.6690",
+    "cash_max_drawdown": "331.9300",
+    "r_cash_sign_consistency": "consistent_sign"
+  }
+}

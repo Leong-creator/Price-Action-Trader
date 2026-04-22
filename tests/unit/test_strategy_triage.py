@@ -12,6 +12,7 @@ class TestStrategyTriage(unittest.TestCase):
     def setUp(self) -> None:
         self.batch_summary = load_json("reports/strategy_lab/backtest_batch_summary.json")
         self.triage = load_json("reports/strategy_lab/strategy_triage_matrix.json")
+        self.wave3 = load_json("reports/strategy_lab/wave3_robustness_summary.json")
         self.records = {
             item["strategy_id"]: item
             for item in self.triage["records"]
@@ -31,11 +32,20 @@ class TestStrategyTriage(unittest.TestCase):
             },
         )
 
-    def test_triage_matrix_matches_expected_statuses(self) -> None:
+    def test_triage_matrix_preserves_wave2_and_appends_wave3(self) -> None:
+        wave3_by_id = {item["strategy_id"]: item for item in self.wave3["strategies"]}
         for strategy_id in ("SF-001", "SF-002", "SF-003", "SF-004"):
-            self.assertEqual(self.records[strategy_id]["triage_status"], "modify_and_retest")
-            self.assertEqual(self.records[strategy_id]["sample_status"], "robust_candidate")
-            self.assertEqual(self.records[strategy_id]["best_variant_id"], "quality_filter")
+            record = self.records[strategy_id]
+            self.assertEqual(record["current_wave"], "wave3")
+            self.assertEqual(record["triage_status"], wave3_by_id[strategy_id]["triage_status"])
+            self.assertEqual(record["best_variant_id"], "v0.2-candidate")
+            history = {item["wave"]: item for item in record["history"]}
+            self.assertIn("wave2", history)
+            self.assertIn("wave3", history)
+            self.assertEqual(history["wave2"]["spec_version"], "v0.1")
+            self.assertEqual(history["wave2"]["best_variant_id"], "quality_filter")
+            self.assertEqual(history["wave3"]["spec_version"], "v0.2-candidate")
+            self.assertEqual(history["wave3"]["triage_status"], wave3_by_id[strategy_id]["triage_status"])
         self.assertEqual(self.records["SF-005"]["triage_status"], "deferred_single_source_risk")
         self.assertEqual(self.records["SF-005"]["sample_status"], "not_run")
 

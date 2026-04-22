@@ -769,11 +769,11 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 9：Price Action Strategy Lab / Strategy Factory（进行中）。
-- 当前 milestone：`M9I.1 Freeze v0.2 Candidate Specs`（当前分支完成）。
+- 当前 milestone：`M9I.2 Wave3 Holdout / Walk-forward Robustness Validation`（当前分支完成）。
 - 当前下一步：
-  - 当前默认不自动进入下一波 batch backtest，也不自动进入 `Wave3 robustness validation`。
-  - 下一步应基于已冻结的 `reports/strategy_lab/specs/SF-001-v0.2-candidate.yaml ~ SF-004-v0.2-candidate.yaml`、wave2 的 `strategy_triage_matrix.json`、`backtest_batch_summary.json`、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json`，规划更窄范围的 `Wave3 robustness validation`。
-  - 当前 `SF-001 ~ SF-004` 已完成 `v0.2-candidate` freeze；`SF-005` 继续保持 `deferred_single_source_risk`，不得无差别推进。
+  - 当前默认不自动启动新的 batch backtest，也不自动进入 `paper shadow`。
+  - `SF-001 ~ SF-003` 已完成 `Wave3 robustness validation`，当前仍为 `modify_and_retest`；`SF-004` 当前为 `insufficient_sample`；`SF-005` 继续保持 `deferred_single_source_risk`。
+  - 由于当前不存在 `strict post-freeze holdout`，本轮 `Wave3` 不允许给出 `retain_candidate`；下一步只能在 `paper shadow`、`再次修改并重测`、`继续补 SF-005 evidence` 三者中决策。
   - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 未经单独批准，不重新评估真实 broker、真实账户、live execution 或付费 API。
@@ -787,7 +787,7 @@
 
 ## 20. M9：Price Action Strategy Lab
 
-- 分支：`feature/m9-v0-2-spec-freeze`
+- 分支：`feature/m9-wave3-robustness-validation`
 - 当前状态：进行中
 - 目标：
   - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，建立可恢复、可校验、以 `source_manifest` 为 SoT 的 Strategy Factory。
@@ -817,7 +817,12 @@
     - `v0.2-candidate` 只作为候选包装层，不替代现有 `SF-001.yaml ~ SF-004.yaml` 的 `v0.1` 基线，也不改写 `strategy_catalog.json` 的 freeze 语义。
     - 每个 `v0.2-candidate` 必须绑定 wave2 证据路径、明确 `v0.1 -> v0.2-candidate` 的变更、预期改善的失败模式与残余风险。
     - `SF-005` 在 `M9I.1` 继续保持 `deferred_single_source_risk`，不得生成 `v0.2-candidate`。
-  - 下一步不是自动扩大 batch backtest，而是在 `v0.2-candidate` 冻结后，才允许规划 `Wave3 robustness validation`；本轮本身不启动 `Wave3`。
+  - `M9I.2`：`Wave3 Holdout / Walk-forward Robustness Validation`（当前分支完成）。
+    - 只允许加载冻结后的 `SF-001 ~ SF-004 v0.2-candidate`，不得修改 specs，不得边测边调。
+    - 当前 `Wave3` 实际公共窗口为 `2025-04-01 ~ 2026-04-21`、`SPY / QQQ / NVDA / TSLA`、`5m`；当前 `strict post-freeze holdout` 不可用，因此本轮不存在 `retain_candidate`。
+    - 当前 `Wave3` triage 结果固定为：`SF-001=modify_and_retest`、`SF-002=modify_and_retest`、`SF-003=modify_and_retest`、`SF-004=insufficient_sample`。
+    - 本轮新增 `reports/strategy_lab/wave3_robustness_summary.md`、`wave3_robustness_summary.json` 与各策略 `wave3/` artifact，用于 holdout / walk-forward / symbol / regime / time-of-day / cost-stress / conversion 审计。
+  - 下一步不是自动扩大 batch backtest，而是根据 `Wave3` 结论在 `paper shadow`、`再修改`、`继续补 SF-005 evidence` 三者之间人工决策。
 - 当前 Provider Contract：
   <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
   - `primary_provider` 的唯一运行时来源是 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]`。

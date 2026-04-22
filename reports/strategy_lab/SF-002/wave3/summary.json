@@ -1,0 +1,345 @@
+{
+  "strategy_id": "SF-002",
+  "title": "Breakout Follow-Through Continuation",
+  "spec_ref": "reports/strategy_lab/specs/SF-002-v0.2-candidate.yaml",
+  "spec_version": "v0.2-candidate",
+  "provider": "longbridge",
+  "triage_status": "modify_and_retest",
+  "triage_reason": "strict post-freeze holdout is unavailable, so this frozen candidate cannot be promoted beyond modify_and_retest.",
+  "strict_holdout_available": false,
+  "strict_holdout_summary": {
+    "label": "strict_post_freeze_holdout",
+    "available": false,
+    "session_count": 0,
+    "start": null,
+    "end": null,
+    "trade_count": 0,
+    "closed_trades": 0,
+    "win_rate": "0.0000",
+    "total_pnl_r": "0.0000",
+    "profit_factor": null,
+    "max_drawdown_r": "0.0000",
+    "avg_trade_r": "0.0000",
+    "cash_net_pnl": "0.0000",
+    "cash_max_drawdown": "0.0000",
+    "r_cash_sign_consistency": "zero_alignment"
+  },
+  "proxy_holdout_summary": {
+    "label": "proxy_holdout",
+    "available": true,
+    "session_count": 40,
+    "start": "2026-02-24",
+    "end": "2026-04-21",
+    "trade_count": 156,
+    "closed_trades": 156,
+    "win_rate": "0.2821",
+    "total_pnl_r": "-24.0000",
+    "profit_factor": "0.7857",
+    "max_drawdown_r": "34.0000",
+    "avg_trade_r": "-0.1538",
+    "cash_net_pnl": "-1372.5720",
+    "cash_max_drawdown": "1865.0640",
+    "r_cash_sign_consistency": "consistent_sign"
+  },
+  "aggregate_oos_summary": {
+    "label": "aggregate_oos",
+    "available": true,
+    "session_count": 40,
+    "start": "2026-02-24",
+    "end": "2026-04-21",
+    "trade_count": 156,
+    "closed_trades": 156,
+    "win_rate": "0.2821",
+    "total_pnl_r": "-24.0000",
+    "profit_factor": "0.7857",
+    "max_drawdown_r": "34.0000",
+    "avg_trade_r": "-0.1538",
+    "cash_net_pnl": "-1372.5720",
+    "cash_max_drawdown": "1865.0640",
+    "r_cash_sign_consistency": "consistent_sign"
+  },
+  "walk_forward_summary": {
+    "window_count": 4,
+    "non_negative_oos_window_ratio": "0.2500",
+    "median_oos_pnl_r": "-14.0000",
+    "worst_oos_window_pnl_r": "-14.0000",
+    "best_oos_window_pnl_r": "21.0000",
+    "oos_trade_count_total": 591
+  },
+  "symbol_breadth_summary": {
+    "records": [
+      {
+        "symbol": "SPY",
+        "closed_trades": 44,
+        "total_pnl_r": "4.0000",
+        "cash_net_pnl": "102.6530",
+        "max_drawdown_r": "11.0000",
+        "profit_factor": "1.1429",
+        "candidate_event_count": 3099,
+        "executed_trade_count": 259,
+        "conversion_rate": "0.0126"
+      },
+      {
+        "symbol": "QQQ",
+        "closed_trades": 40,
+        "total_pnl_r": "-10.0000",
+        "cash_net_pnl": "-240.9660",
+        "max_drawdown_r": "12.0000",
+        "profit_factor": "0.6667",
+        "candidate_event_count": 3099,
+        "executed_trade_count": 255,
+        "conversion_rate": "0.0124"
+      },
+      {
+        "symbol": "NVDA",
+        "closed_trades": 41,
+        "total_pnl_r": "-11.0000",
+        "cash_net_pnl": "-727.7320",
+        "max_drawdown_r": "11.0000",
+        "profit_factor": "0.6452",
+        "candidate_event_count": 3100,
+        "executed_trade_count": 242,
+        "conversion_rate": "0.0118"
+      },
+      {
+        "symbol": "TSLA",
+        "closed_trades": 31,
+        "total_pnl_r": "-7.0000",
+        "cash_net_pnl": "-493.3860",
+        "max_drawdown_r": "10.0000",
+        "profit_factor": "0.6957",
+        "candidate_event_count": 3100,
+        "executed_trade_count": 232,
+        "conversion_rate": "0.0113"
+      }
+    ],
+    "positive_symbol_count": 1,
+    "positive_contribution_share_max": "1.0000"
+  },
+  "regime_breadth_summary": {
+    "records": [
+      {
+        "regime": "range_high_vol",
+        "closed_trades": 6,
+        "total_pnl_r": "0.0000",
+        "cash_net_pnl": "56.1500",
+        "profit_factor": "1.0000",
+        "max_drawdown_r": "3.0000"
+      },
+      {
+        "regime": "range_low_vol",
+        "closed_trades": 94,
+        "total_pnl_r": "-37.0000",
+        "cash_net_pnl": "-1931.0360",
+        "profit_factor": "0.5067",
+        "max_drawdown_r": "37.0000"
+      },
+      {
+        "regime": "trend_down",
+        "closed_trades": 24,
+        "total_pnl_r": "6.0000",
+        "cash_net_pnl": "138.1990",
+        "profit_factor": "1.4286",
+        "max_drawdown_r": "5.0000"
+      },
+      {
+        "regime": "trend_up",
+        "closed_trades": 32,
+        "total_pnl_r": "7.0000",
+        "cash_net_pnl": "411.9000",
+        "profit_factor": "1.3684",
+        "max_drawdown_r": "9.0000"
+      }
+    ],
+    "positive_regime_count": 3,
+    "positive_contribution_share_max": "0.5385"
+  },
+  "time_of_day_summary": {
+    "records": [
+      {
+        "time_bucket": "open_hour",
+        "closed_trades": 40,
+        "total_pnl_r": "-4.0000",
+        "cash_net_pnl": "-411.2960",
+        "profit_factor": "0.8571",
+        "conversion_rate": "0.0032"
+      },
+      {
+        "time_bucket": "midday",
+        "closed_trades": 62,
+        "total_pnl_r": "-17.0000",
+        "cash_net_pnl": "-1112.5280",
+        "profit_factor": "0.6383",
+        "conversion_rate": "0.0016"
+      },
+      {
+        "time_bucket": "late_day",
+        "closed_trades": 54,
+        "total_pnl_r": "-3.0000",
+        "cash_net_pnl": "169.9490",
+        "profit_factor": "0.9189",
+        "conversion_rate": "0.0017"
+      }
+    ],
+    "non_negative_bucket_count": 0
+  },
+  "cost_stress_summary": {
+    "proxy_holdout": {
+      "baseline": {
+        "closed_trades": 156,
+        "total_pnl_r": "-24.0000",
+        "profit_factor": "0.7857",
+        "max_drawdown_r": "34.0000",
+        "cash_net_pnl": "-1372.5720"
+      },
+      "stress_0.05r_per_trade": {
+        "closed_trades": 156,
+        "total_pnl_r": "-31.8000",
+        "profit_factor": "0.7296",
+        "max_drawdown_r": "38.8500",
+        "cash_net_pnl": "-1793.1585"
+      },
+      "stress_0.10r_per_trade": {
+        "closed_trades": 156,
+        "total_pnl_r": "-39.6000",
+        "profit_factor": "0.6786",
+        "max_drawdown_r": "43.8000",
+        "cash_net_pnl": "-2203.9866"
+      },
+      "stress_0.15r_per_trade": {
+        "closed_trades": 156,
+        "total_pnl_r": "-47.4000",
+        "profit_factor": "0.6320",
+        "max_drawdown_r": "49.2000",
+        "cash_net_pnl": "-2614.8514"
+      }
+    },
+    "strict_holdout": {
+      "baseline": {
+        "closed_trades": 0,
+        "total_pnl_r": "0.0000",
+        "profit_factor": null,
+        "max_drawdown_r": "0.0000",
+        "cash_net_pnl": "0.0000"
+      },
+      "stress_0.05r_per_trade": {
+        "closed_trades": 0,
+        "total_pnl_r": "0.0000",
+        "profit_factor": null,
+        "max_drawdown_r": "0.0000",
+        "cash_net_pnl": "0.0000"
+      },
+      "stress_0.10r_per_trade": {
+        "closed_trades": 0,
+        "total_pnl_r": "0.0000",
+        "profit_factor": null,
+        "max_drawdown_r": "0.0000",
+        "cash_net_pnl": "0.0000"
+      },
+      "stress_0.15r_per_trade": {
+        "closed_trades": 0,
+        "total_pnl_r": "0.0000",
+        "profit_factor": null,
+        "max_drawdown_r": "0.0000",
+        "cash_net_pnl": "0.0000"
+      }
+    },
+    "aggregate_oos": {
+      "baseline": {
+        "closed_trades": 156,
+        "total_pnl_r": "-24.0000",
+        "profit_factor": "0.7857",
+        "max_drawdown_r": "34.0000",
+        "cash_net_pnl": "-1372.5720"
+      },
+      "stress_0.05r_per_trade": {
+        "closed_trades": 156,
+        "total_pnl_r": "-31.8000",
+        "profit_factor": "0.7296",
+        "max_drawdown_r": "38.8500",
+        "cash_net_pnl": "-1793.1585"
+      },
+      "stress_0.10r_per_trade": {
+        "closed_trades": 156,
+        "total_pnl_r": "-39.6000",
+        "profit_factor": "0.6786",
+        "max_drawdown_r": "43.8000",
+        "cash_net_pnl": "-2203.9866"
+      },
+      "stress_0.15r_per_trade": {
+        "closed_trades": 156,
+        "total_pnl_r": "-47.4000",
+        "profit_factor": "0.6320",
+        "max_drawdown_r": "49.2000",
+        "cash_net_pnl": "-2614.8514"
+      }
+    }
+  },
+  "conversion_summary": {
+    "aggregate_conversion_rate": "0.0120",
+    "total_candidates": 82065,
+    "total_executed_trades": 988,
+    "conversion_rate_by_symbol": [
+      {
+        "symbol": "SPY",
+        "candidate_event_count": 3099,
+        "executed_trade_count": 259,
+        "conversion_rate": "0.0126"
+      },
+      {
+        "symbol": "QQQ",
+        "candidate_event_count": 3099,
+        "executed_trade_count": 255,
+        "conversion_rate": "0.0124"
+      },
+      {
+        "symbol": "NVDA",
+        "candidate_event_count": 3100,
+        "executed_trade_count": 242,
+        "conversion_rate": "0.0118"
+      },
+      {
+        "symbol": "TSLA",
+        "candidate_event_count": 3100,
+        "executed_trade_count": 232,
+        "conversion_rate": "0.0113"
+      }
+    ],
+    "conversion_rate_by_time_bucket": [
+      {
+        "time_bucket": "open_hour",
+        "candidate_event_count": 12672,
+        "executed_trade_count": 215,
+        "conversion_rate": "0.0170"
+      },
+      {
+        "time_bucket": "midday",
+        "candidate_event_count": 38036,
+        "executed_trade_count": 423,
+        "conversion_rate": "0.0111"
+      },
+      {
+        "time_bucket": "late_day",
+        "candidate_event_count": 31357,
+        "executed_trade_count": 350,
+        "conversion_rate": "0.0112"
+      }
+    ],
+    "top_skip_reasons": [
+      {
+        "reason_code": "no_breakout_context",
+        "count": 74067
+      },
+      {
+        "reason_code": "missing_follow_through",
+        "count": 6733
+      },
+      {
+        "reason_code": "cooldown_active",
+        "count": 258
+      }
+    ]
+  },
+  "robustness_score": 27,
+  "r_cash_explanation": "R 和 cash 同号，无需额外解释。"
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import time as time_module
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
@@ -207,28 +208,34 @@ def _run_longbridge_command(
     start: date,
     end: date,
 ) -> Any:
-    completed = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    output = (completed.stderr or completed.stdout or "").strip()
-    if completed.returncode != 0:
+    last_detail = ""
+    for attempt in range(3):
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        output = (completed.stderr or completed.stdout or "").strip()
+        if completed.returncode == 0:
+            stdout = completed.stdout.strip()
+            if not stdout:
+                return []
+            try:
+                return json.loads(stdout)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"longbridge returned non-JSON output for {symbol}: {stdout}") from exc
+
         lowered = output.lower()
         if any(token in lowered for token in ("auth", "login", "unauthorized", "forbidden", "permission")):
             raise RuntimeError(LONGRIDGE_AUTH_HINT)
-        detail = output or f"exit code {completed.returncode}"
-        raise RuntimeError(
-            f"longbridge kline history failed for {symbol} {start.isoformat()}~{end.isoformat()}: {detail}"
-        )
-    stdout = completed.stdout.strip()
-    if not stdout:
-        return []
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"longbridge returned non-JSON output for {symbol}: {stdout}") from exc
+        last_detail = output or f"exit code {completed.returncode}"
+        if "timeout" not in lowered or attempt == 2:
+            break
+        time_module.sleep(float(attempt + 1))
+    raise RuntimeError(
+        f"longbridge kline history failed for {symbol} {start.isoformat()}~{end.isoformat()}: {last_detail}"
+    )
 
 
 def _parse_history_payload(payload: Any) -> list[LongbridgeHistoryBar]:

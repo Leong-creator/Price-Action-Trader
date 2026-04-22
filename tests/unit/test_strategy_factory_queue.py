@@ -41,11 +41,12 @@ class TestStrategyFactoryQueue(unittest.TestCase):
         self.assertEqual(items["SF-005"]["queue_status"], "deferred")
         self.assertEqual(items["SF-005"]["variants"], [])
 
-    def test_dataset_inventory_tracks_wave2_scope(self) -> None:
+    def test_dataset_inventory_tracks_wave_scope(self) -> None:
         self.assertEqual(self.dataset_inventory["provider"], "longbridge")
         self.assertEqual([item["symbol"] for item in self.dataset_inventory["datasets"]], ["SPY", "QQQ", "NVDA", "TSLA"])
-        self.assertTrue(all(item["start"] == "2025-04-01" for item in self.dataset_inventory["datasets"]))
-        self.assertTrue(all(item["end"] == "2026-04-21" for item in self.dataset_inventory["datasets"]))
+        self.assertIn(self.dataset_inventory["phase"], {"M9H", "M9I.2"})
+        self.assertTrue(all(item["actual_start"] == "2025-04-01" for item in self.dataset_inventory["datasets"]))
+        self.assertTrue(all(item["actual_end"] == "2026-04-21" for item in self.dataset_inventory["datasets"]))
 
     def test_factory_ledgers_mark_completed_or_deferred(self) -> None:
         items = {item["strategy_id"]: item for item in self.factory_queue["items"]}

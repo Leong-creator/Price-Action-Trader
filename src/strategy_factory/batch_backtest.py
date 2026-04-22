@@ -1085,8 +1085,16 @@ def _evaluate_sf001(
     bearish_pullback_count = sum(1 for item in pullback if item.close > item.open)
     body_ratio = _body_ratio(bar)
     close_ratio = _close_ratio(bar)
-    threshold = Decimal("0.50") if variant.variant_id == "quality_filter" else Decimal("0.42")
-    max_pullback = 2 if variant.variant_id == "quality_filter" else 3
+    threshold = _variant_decimal(
+        variant,
+        "signal_bar_body_ratio_min",
+        Decimal("0.50") if variant.variant_id == "quality_filter" else Decimal("0.42"),
+    )
+    max_pullback = _variant_int(
+        variant,
+        "max_pullback_bars",
+        2 if variant.variant_id == "quality_filter" else 3,
+    )
     if sma_fast > sma_slow and bullish_pullback_count and bullish_pullback_count <= max_pullback:
         if bar.close > bars[index - 1].high and body_ratio >= threshold and close_ratio >= Decimal("0.60"):
             return (
@@ -1140,9 +1148,18 @@ def _evaluate_sf002(
     short_breakout_level = min(item.low for item in breakout_window)
     prior_body = _body_ratio(prior)
     current_body = _body_ratio(bar)
-    threshold = Decimal("0.60") if variant.variant_id == "quality_filter" else Decimal("0.48")
-    if prior.close > long_breakout_level and prior_body >= threshold:
-        if bar.close > prior.high and current_body >= threshold:
+    breakout_threshold = _variant_decimal(
+        variant,
+        "breakout_bar_body_ratio_min",
+        Decimal("0.60") if variant.variant_id == "quality_filter" else Decimal("0.48"),
+    )
+    follow_through_threshold = _variant_decimal(
+        variant,
+        "follow_through_bar_body_ratio_min",
+        Decimal("0.60") if variant.variant_id == "quality_filter" else Decimal("0.48"),
+    )
+    if prior.close > long_breakout_level and prior_body >= breakout_threshold:
+        if bar.close > prior.high and current_body >= follow_through_threshold:
             return (
                 "emitted",
                 "long",
@@ -1157,8 +1174,8 @@ def _evaluate_sf002(
             "breakout occurred but current bar did not confirm continuation",
             "follow-through cluster quality below threshold",
         )
-    if prior.close < short_breakout_level and prior_body >= threshold:
-        if bar.close < prior.low and current_body >= threshold:
+    if prior.close < short_breakout_level and prior_body >= breakout_threshold:
+        if bar.close < prior.low and current_body >= follow_through_threshold:
             return (
                 "emitted",
                 "short",
@@ -1202,7 +1219,11 @@ def _evaluate_sf003(
     range_low = min(item.low for item in window)
     avg_range = _average([item.high - item.low for item in window])
     range_height = range_high - range_low
-    max_range_multiple = Decimal("6.0") if variant.variant_id == "quality_filter" else Decimal("8.0")
+    max_range_multiple = _variant_decimal(
+        variant,
+        "range_height_to_avg_bar_range_max",
+        Decimal("6.0") if variant.variant_id == "quality_filter" else Decimal("8.0"),
+    )
     if avg_range <= ZERO or range_height > avg_range * max_range_multiple:
         return (
             "skipped",
@@ -1211,7 +1232,11 @@ def _evaluate_sf003(
             "prior 20-bar window is too directional for range-edge reversal logic",
             "failed breakout reversal requires a stable trading-range context",
         )
-    body_threshold = Decimal("0.55") if variant.variant_id == "quality_filter" else Decimal("0.42")
+    body_threshold = _variant_decimal(
+        variant,
+        "reversal_body_ratio_min",
+        Decimal("0.55") if variant.variant_id == "quality_filter" else Decimal("0.42"),
+    )
     if prior.high > range_high and prior.close < range_high and bar.close < prior.low and _body_ratio(bar) >= body_threshold:
         return (
             "emitted",
@@ -1247,7 +1272,11 @@ def _evaluate_sf004(
     bullish_count = sum(1 for item in window[:-1] if item.close >= item.open)
     bearish_count = sum(1 for item in window[:-1] if item.close <= item.open)
     overlap_ratio = _overlap_ratio(window[:-1])
-    max_overlap = Decimal("0.35") if variant.variant_id == "quality_filter" else Decimal("0.48")
+    max_overlap = _variant_decimal(
+        variant,
+        "channel_overlap_ratio_max",
+        Decimal("0.35") if variant.variant_id == "quality_filter" else Decimal("0.48"),
+    )
     pullback_bars = bars[index - 2 : index]
     if bullish_count >= 6 and overlap_ratio <= max_overlap and any(item.close < item.open for item in pullback_bars):
         if bar.close > bars[index - 1].high and _body_ratio(bar) >= Decimal("0.40"):
@@ -1338,6 +1367,20 @@ def _build_signal(
         ),
         risk_notes=tuple(risk_notes),
     )
+
+
+def _variant_decimal(variant: StrategyVariant, key: str, default: Decimal) -> Decimal:
+    raw_value = variant.rule_overrides.get(key)
+    if raw_value is None:
+        return default
+    return Decimal(str(raw_value))
+
+
+def _variant_int(variant: StrategyVariant, key: str, default: int) -> int:
+    raw_value = variant.rule_overrides.get(key)
+    if raw_value is None:
+        return default
+    return int(raw_value)
 
 
 def _count_split_trades(

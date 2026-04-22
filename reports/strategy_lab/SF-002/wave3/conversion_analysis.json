@@ -1,0 +1,65 @@
+{
+  "aggregate_conversion_rate": "0.0120",
+  "total_candidates": 82065,
+  "total_executed_trades": 988,
+  "conversion_rate_by_symbol": [
+    {
+      "symbol": "SPY",
+      "candidate_event_count": 3099,
+      "executed_trade_count": 259,
+      "conversion_rate": "0.0126"
+    },
+    {
+      "symbol": "QQQ",
+      "candidate_event_count": 3099,
+      "executed_trade_count": 255,
+      "conversion_rate": "0.0124"
+    },
+    {
+      "symbol": "NVDA",
+      "candidate_event_count": 3100,
+      "executed_trade_count": 242,
+      "conversion_rate": "0.0118"
+    },
+    {
+      "symbol": "TSLA",
+      "candidate_event_count": 3100,
+      "executed_trade_count": 232,
+      "conversion_rate": "0.0113"
+    }
+  ],
+  "conversion_rate_by_time_bucket": [
+    {
+      "time_bucket": "open_hour",
+      "candidate_event_count": 12672,
+      "executed_trade_count": 215,
+      "conversion_rate": "0.0170"
+    },
+    {
+      "time_bucket": "midday",
+      "candidate_event_count": 38036,
+      "executed_trade_count": 423,
+      "conversion_rate": "0.0111"
+    },
+    {
+      "time_bucket": "late_day",
+      "candidate_event_count": 31357,
+      "executed_trade_count": 350,
+      "conversion_rate": "0.0112"
+    }
+  ],
+  "top_skip_reasons": [
+    {
+      "reason_code": "no_breakout_context",
+      "count": 74067
+    },
+    {
+      "reason_code": "missing_follow_through",
+      "count": 6733
+    },
+    {
+      "reason_code": "cooldown_active",
+      "count": 258
+    }
+  ]
+}

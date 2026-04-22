@@ -1,55 +1,66 @@
 {
-  "schema_version": "m9-batch-backtest-v11",
-  "generated_at": "2026-04-22T03:51:51.738745+00:00",
+  "schema_version": "m9-wave3-robustness-v1",
+  "generated_at": "2026-04-22T08:11:19.662051+00:00",
+  "phase": "M9I.2",
+  "run_id": "m9_wave3_robustness_validation_20260422_081119",
   "provider": "longbridge",
+  "target_start": "2024-04-01",
+  "target_end": "2026-04-22",
+  "common_session_count": 265,
+  "common_start": "2025-04-01",
+  "common_end": "2026-04-21",
   "datasets": [
     {
       "symbol": "SPY",
-      "market": "US",
-      "timeframe": "5m",
       "provider": "longbridge",
-      "start": "2025-04-01",
-      "end": "2026-04-21",
+      "timeframe": "5m",
+      "requested_start": "2024-04-01",
+      "requested_end": "2026-04-22",
+      "actual_start": "2025-04-01",
+      "actual_end": "2026-04-21",
       "csv_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
       "metadata_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
       "row_count": 20542,
-      "fetch_mode": "local_cache"
+      "fetch_mode": "local_cache_fallback"
     },
     {
       "symbol": "QQQ",
-      "market": "US",
-      "timeframe": "5m",
       "provider": "longbridge",
-      "start": "2025-04-01",
-      "end": "2026-04-21",
+      "timeframe": "5m",
+      "requested_start": "2024-04-01",
+      "requested_end": "2026-04-22",
+      "actual_start": "2025-04-01",
+      "actual_end": "2026-04-21",
       "csv_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
       "metadata_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
       "row_count": 20541,
-      "fetch_mode": "local_cache"
+      "fetch_mode": "local_cache_fallback"
     },
     {
       "symbol": "NVDA",
-      "market": "US",
-      "timeframe": "5m",
       "provider": "longbridge",
-      "start": "2025-04-01",
-      "end": "2026-04-21",
+      "timeframe": "5m",
+      "requested_start": "2024-04-01",
+      "requested_end": "2026-04-22",
+      "actual_start": "2025-04-01",
+      "actual_end": "2026-04-21",
       "csv_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
       "metadata_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
       "row_count": 20543,
-      "fetch_mode": "local_cache"
+      "fetch_mode": "local_cache_fallback"
     },
     {
       "symbol": "TSLA",
-      "market": "US",
-      "timeframe": "5m",
       "provider": "longbridge",
-      "start": "2025-04-01",
-      "end": "2026-04-21",
+      "timeframe": "5m",
+      "requested_start": "2024-04-01",
+      "requested_end": "2026-04-22",
+      "actual_start": "2025-04-01",
+      "actual_end": "2026-04-21",
       "csv_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
       "metadata_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.metadata.json",
       "row_count": 20543,
-      "fetch_mode": "local_cache"
+      "fetch_mode": "local_cache_fallback"
     }
   ]
 }

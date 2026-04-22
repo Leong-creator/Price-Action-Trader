@@ -1,0 +1,5 @@
+symbol,closed_trades,total_pnl_r,cash_net_pnl,max_drawdown_r,profit_factor,candidate_event_count,executed_trade_count,conversion_rate
+SPY,44,4.0000,102.6530,11.0000,1.1429,3099,259,0.0126
+QQQ,40,-10.0000,-240.9660,12.0000,0.6667,3099,255,0.0124
+NVDA,41,-11.0000,-727.7320,11.0000,0.6452,3100,242,0.0118
+TSLA,31,-7.0000,-493.3860,10.0000,0.6957,3100,232,0.0113

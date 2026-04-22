@@ -1,0 +1,5 @@
+regime,closed_trades,total_pnl_r,cash_net_pnl,profit_factor,max_drawdown_r
+range_high_vol,2,4.0000,335.6160,,0.0000
+range_low_vol,107,-14.0000,-925.9900,0.8158,20.0000
+trend_down,22,-19.0000,-724.3930,0.0952,19.0000
+trend_up,26,4.0000,294.2980,1.2500,5.0000
