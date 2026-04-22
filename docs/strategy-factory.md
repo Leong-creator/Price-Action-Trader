@@ -118,3 +118,10 @@
   - `SF-005 = not_run`
 - `quality_filter` 若被选为 best variant，只能解释为 `diagnostic_selected_variant`，不能被写成正式冻结策略。
 - `ready_for_backtest` 仍然只是结论字段；wave2 已完成，但下一波不得自动启动，必须先完成 merge gate，并在通过后进入更窄范围的 `v0.2 spec freeze`。
+- 当前已完成 `M9I.1 Freeze v0.2 Candidate Specs`：
+  - 已新增 `SF-001 ~ SF-004` 的 `v0.2-candidate` 文件到 `reports/strategy_lab/specs/`。
+  - 这些文件只作为候选包装层，保留 `SF-001.yaml ~ SF-004.yaml` 作为 `v0.1` 基线，不回写 `strategy_catalog.json`。
+  - `v0.2-candidate` 只能来自 wave2 已观察到的 `quality_filter`，不得新增未测试过滤器。
+  - 每个 `v0.2-candidate` 都必须绑定 wave2 证据路径、记录 `v0.1 -> v0.2-candidate` 的具体变更、预期改善和残余风险。
+  - `SF-005` 在 `M9I.1` 继续保持 `deferred_single_source_risk`，不纳入 `v0.2-candidate` freeze。
+  - `M9I.1` 完成后，仓库状态应解释为 `v0.2-candidate specs frozen; eligible to plan Wave3 robustness validation`，而不是自动进入新的 batch backtest。

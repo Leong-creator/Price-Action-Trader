@@ -1,0 +1,98 @@
+strategy_id: "SF-002"
+title: "Breakout Follow-Through Continuation"
+spec_version: "v0.2-candidate"
+candidate_status: "frozen_candidate"
+base_spec_ref: "reports/strategy_lab/specs/SF-002.yaml"
+base_spec_version: "v0.1"
+selected_variant_id: "quality_filter"
+selected_variant_role: "diagnostic_selected_variant"
+wave2_run_id: "m9_strategy_factory_batch_backtest_20260422_035151"
+wave2_artifacts:
+  batch_summary_json: "reports/strategy_lab/backtest_batch_summary.json"
+  triage_matrix_json: "reports/strategy_lab/strategy_triage_matrix.json"
+  strategy_summary_json: "reports/strategy_lab/SF-002/summary.json"
+  strategy_diagnostics_md: "reports/strategy_lab/SF-002/diagnostics.md"
+  selected_variant_summary_json: "reports/strategy_lab/SF-002/variants/quality_filter/summary.json"
+  trade_report_md: "reports/strategy_lab/final_strategy_factory_trade_report.md"
+  cash_report_md: "reports/strategy_lab/final_strategy_factory_cash_report.md"
+wave2_observed_metrics:
+  baseline:
+    trade_count: 1560
+    expectancy_r: 0.0173
+    total_pnl_r: 27.0
+    max_drawdown_r: 88.0
+    win_rate: 0.3391
+    net_pnl_cash: 4148.679
+  selected_variant:
+    trade_count: 988
+    expectancy_r: 0.0354
+    total_pnl_r: 35.0
+    max_drawdown_r: 50.0
+    win_rate: 0.3451
+    net_pnl_cash: 920.871
+setup_family: "breakout_follow_through_continuation"
+market_context:
+  - "breakout"
+  - "follow_through"
+  - "trend_continuation"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "确认 breakout 后的 good follow-through，再用 market/stop order 顺势跟进。"
+stop_idea: "放在 breakout bar 或 follow-through cluster 的 opposite extreme 外侧。"
+target_idea: "优先看 measured move 与后续 second leg continuation。"
+invalidation:
+  - "breakout 后 follow-through 很差"
+  - "出现 deep pullback 或 gap 被迅速回补"
+no_trade_conditions:
+  - "突破没有急迫感或没有连续性"
+  - "处于明显 trading range 且 follow-through 质量差"
+parameter_candidates:
+  - "minimum breakout bar body size"
+  - "follow-through bars within 2~3 bars"
+  - "gap persistence requirement"
+expected_failure_modes:
+  - "TR 内追 breakout 被 80-20 假突破打回"
+  - "把 weak breakout 误判成 strong breakout"
+data_requirements:
+  - "OHLCV with session labels"
+  - "gap detection based on bar overlap"
+chart_dependency: "medium"
+test_priority: "high"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+rule_overrides:
+  breakout_bar_body_ratio_min: 0.6
+  follow_through_bar_body_ratio_min: 0.6
+change_log:
+  - field: "breakout_bar_body_ratio_min"
+    from: 0.48
+    to: 0.6
+    why_changed: "只保留实体更强的 breakout bar，减少 weak breakout 误入。"
+    evidence_artifact: "reports/strategy_lab/SF-002/variants/quality_filter/summary.json"
+    expected_failure_mode: "weak breakout 被误判为 continuation"
+  - field: "follow_through_bar_body_ratio_min"
+    from: 0.48
+    to: 0.6
+    why_changed: "要求 breakout 后的确认 bar 同样强势，减少区间内假突破追价。"
+    evidence_artifact: "reports/strategy_lab/SF-002/variants/quality_filter/summary.json"
+    expected_failure_mode: "range 内假突破被追价"
+expected_failure_mode_improvements:
+  - "weak breakout 被误判为 continuation"
+  - "range 内假突破被追价"
+residual_risks:
+  - "样本会继续收缩。"
+  - "美元层改善未与 R 口径的改善同步放大。"
+validation_scope: "wave3_robustness_validation_candidate"
+validation_claims:
+  - "not_validated_production_strategy"
+  - "not_approved_for_live_or_real_money"
+  - "derived_only_from_wave2_observed_quality_filter"

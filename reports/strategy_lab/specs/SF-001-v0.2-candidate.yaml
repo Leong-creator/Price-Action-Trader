@@ -1,0 +1,98 @@
+strategy_id: "SF-001"
+title: "Trend Pullback Second Entry"
+spec_version: "v0.2-candidate"
+candidate_status: "frozen_candidate"
+base_spec_ref: "reports/strategy_lab/specs/SF-001.yaml"
+base_spec_version: "v0.1"
+selected_variant_id: "quality_filter"
+selected_variant_role: "diagnostic_selected_variant"
+wave2_run_id: "m9_strategy_factory_batch_backtest_20260422_035151"
+wave2_artifacts:
+  batch_summary_json: "reports/strategy_lab/backtest_batch_summary.json"
+  triage_matrix_json: "reports/strategy_lab/strategy_triage_matrix.json"
+  strategy_summary_json: "reports/strategy_lab/SF-001/summary.json"
+  strategy_diagnostics_md: "reports/strategy_lab/SF-001/diagnostics.md"
+  selected_variant_summary_json: "reports/strategy_lab/SF-001/variants/quality_filter/summary.json"
+  trade_report_md: "reports/strategy_lab/final_strategy_factory_trade_report.md"
+  cash_report_md: "reports/strategy_lab/final_strategy_factory_cash_report.md"
+wave2_observed_metrics:
+  baseline:
+    trade_count: 9164
+    expectancy_r: 0.0017
+    total_pnl_r: 16.0
+    max_drawdown_r: 234.0
+    win_rate: 0.3339
+    net_pnl_cash: 11004.821
+  selected_variant:
+    trade_count: 8037
+    expectancy_r: 0.0112
+    total_pnl_r: 90.0
+    max_drawdown_r: 145.0
+    win_rate: 0.3371
+    net_pnl_cash: 8683.731
+setup_family: "trend_pullback_second_entry"
+market_context:
+  - "trend"
+  - "pullback"
+  - "second_entry"
+applicable_market:
+  - "US"
+  - "HK"
+timeframe:
+  - "5m"
+  - "15m"
+  - "1h"
+direction: "both"
+entry_idea: "在顺势背景中等待 H1/H2/L1/L2 或 second-entry 触发，再用 buy/sell stop 跟进。"
+stop_idea: "放在 signal bar 或失败 second-entry 的 opposite extreme 外侧。"
+target_idea: "先看 1R~2R，若趋势与 channel 仍强则允许转成 swing。"
+invalidation:
+  - "后续 follow-through 很差"
+  - "出现 bull trap / bear trap 或关键低点/高点被反向突破"
+no_trade_conditions:
+  - "背景不是顺势 pullback"
+  - "在强趋势第一次反转就逆势抢反转"
+parameter_candidates:
+  - "pullback bar count <= 3"
+  - "signal bar quality >= close near extreme"
+  - "minimum R multiple >= 1.0"
+expected_failure_modes:
+  - "把 broad channel 误当 tight trend"
+  - "在 MM 附近或 climax 后继续追价"
+data_requirements:
+  - "OHLCV with session labels"
+  - "bar-level high/low for stop placement"
+chart_dependency: "medium"
+test_priority: "high"
+source_refs:
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md"
+  - "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md"
+  - "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"
+rule_overrides:
+  signal_bar_body_ratio_min: 0.5
+  max_pullback_bars: 2
+change_log:
+  - field: "signal_bar_body_ratio_min"
+    from: 0.42
+    to: 0.5
+    why_changed: "收紧 signal bar 实体质量，只保留更强的续势确认 bar。"
+    evidence_artifact: "reports/strategy_lab/SF-001/variants/quality_filter/summary.json"
+    expected_failure_mode: "弱 signal bar"
+  - field: "max_pullback_bars"
+    from: 3
+    to: 2
+    why_changed: "减少过深 pullback 被误判为 second-entry 顺势恢复。"
+    evidence_artifact: "reports/strategy_lab/SF-001/variants/quality_filter/summary.json"
+    expected_failure_mode: "过深 pullback 被误判为顺势恢复"
+expected_failure_mode_improvements:
+  - "弱 signal bar"
+  - "过深 pullback 被误判为顺势恢复"
+residual_risks:
+  - "现金口径回撤未同步改善。"
+  - "更窄过滤可能牺牲一部分高频但边际有效的信号。"
+validation_scope: "wave3_robustness_validation_candidate"
+validation_claims:
+  - "not_validated_production_strategy"
+  - "not_approved_for_live_or_real_money"
+  - "derived_only_from_wave2_observed_quality_filter"
