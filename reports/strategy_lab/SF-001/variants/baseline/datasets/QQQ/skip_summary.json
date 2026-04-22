@@ -1,0 +1,13 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "baseline",
+  "symbol": "QQQ",
+  "dataset_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "skipped": {
+    "context_not_ready": 4009,
+    "cooldown_active": 941,
+    "weak_signal_bar": 13263
+  },
+  "total_candidates": 20515,
+  "emitted_signals": 2302
+}

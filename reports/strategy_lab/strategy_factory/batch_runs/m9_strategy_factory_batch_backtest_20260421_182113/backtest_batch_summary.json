@@ -1,0 +1,478 @@
+{
+  "schema_version": "m9-batch-backtest-v11",
+  "generated_at": "2026-04-21T18:21:31.210084+00:00",
+  "run_id": "m9_strategy_factory_batch_backtest_20260421_182113",
+  "provider": "longbridge",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "dataset_paths": [
+    "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+  ],
+  "dataset_count": 4,
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "NVDA",
+    "TSLA"
+  ],
+  "coverage_start": "2025-04-01",
+  "coverage_end": "2026-04-21",
+  "frozen_strategy_count": 5,
+  "eligible_strategy_count": 4,
+  "tested_strategy_count": 4,
+  "completed_backtests": 4,
+  "triage_counts": {
+    "deferred_single_source_risk": 1,
+    "modify_and_retest": 4
+  },
+  "results": [
+    {
+      "strategy_id": "SF-001",
+      "title": "Trend Pullback Second Entry",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "queue_status": "completed",
+      "backtest_status": "completed",
+      "sample_status": "robust_candidate",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "best_variant_id": "quality_filter",
+      "baseline_variant_id": "baseline",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      },
+      "variants": [
+        {
+          "variant_id": "baseline",
+          "label": "baseline_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 9164,
+          "closed_trade_count": 9164,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "0.0017",
+          "total_pnl_r": "16.0000",
+          "win_rate": "0.3339",
+          "max_drawdown_r": "234.0000",
+          "split_trade_counts": {
+            "in_sample": 2985,
+            "validation": 3116,
+            "out_of_sample": 3063
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 2985,
+            "validation": 3116,
+            "out_of_sample": 3063
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-001/variants/baseline/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-001/variants/baseline/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-001/variants/baseline/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-001/variants/baseline/skip_summary.json"
+          }
+        },
+        {
+          "variant_id": "quality_filter",
+          "label": "quality_filter_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 8037,
+          "closed_trade_count": 8037,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "0.0112",
+          "total_pnl_r": "90.0000",
+          "win_rate": "0.3371",
+          "max_drawdown_r": "145.0000",
+          "split_trade_counts": {
+            "in_sample": 2618,
+            "validation": 2753,
+            "out_of_sample": 2666
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 2618,
+            "validation": 2753,
+            "out_of_sample": 2666
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-001/variants/quality_filter/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-001/variants/quality_filter/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-001/variants/quality_filter/skip_summary.json"
+          }
+        }
+      ],
+      "artifact_paths": {
+        "strategy_dir": "reports/strategy_lab/SF-001",
+        "summary_json": "reports/strategy_lab/SF-001/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-001/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-001/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-001/skip_summary.json",
+        "diagnostics_md": "reports/strategy_lab/SF-001/diagnostics.md",
+        "executable_spec_md": "reports/strategy_lab/SF-001/executable_spec.md",
+        "test_plan_md": "reports/strategy_lab/SF-001/test_plan.md"
+      },
+      "dataset_count": 4,
+      "symbol_count": 4,
+      "regime_count": 5,
+      "dataset_paths": [
+        "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+      ],
+      "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv"
+    },
+    {
+      "strategy_id": "SF-002",
+      "title": "Breakout Follow-Through Continuation",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "queue_status": "completed",
+      "backtest_status": "completed",
+      "sample_status": "robust_candidate",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "best_variant_id": "quality_filter",
+      "baseline_variant_id": "baseline",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      },
+      "variants": [
+        {
+          "variant_id": "baseline",
+          "label": "baseline_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 1560,
+          "closed_trade_count": 1560,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "0.0173",
+          "total_pnl_r": "27.0000",
+          "win_rate": "0.3391",
+          "max_drawdown_r": "88.0000",
+          "split_trade_counts": {
+            "in_sample": 493,
+            "validation": 511,
+            "out_of_sample": 556
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 493,
+            "validation": 511,
+            "out_of_sample": 556
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-002/variants/baseline/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-002/variants/baseline/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-002/variants/baseline/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-002/variants/baseline/skip_summary.json"
+          }
+        },
+        {
+          "variant_id": "quality_filter",
+          "label": "quality_filter_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 988,
+          "closed_trade_count": 988,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "0.0354",
+          "total_pnl_r": "35.0000",
+          "win_rate": "0.3451",
+          "max_drawdown_r": "50.0000",
+          "split_trade_counts": {
+            "in_sample": 318,
+            "validation": 325,
+            "out_of_sample": 345
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 318,
+            "validation": 325,
+            "out_of_sample": 345
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-002/variants/quality_filter/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-002/variants/quality_filter/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-002/variants/quality_filter/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-002/variants/quality_filter/skip_summary.json"
+          }
+        }
+      ],
+      "artifact_paths": {
+        "strategy_dir": "reports/strategy_lab/SF-002",
+        "summary_json": "reports/strategy_lab/SF-002/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-002/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-002/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-002/skip_summary.json",
+        "diagnostics_md": "reports/strategy_lab/SF-002/diagnostics.md",
+        "executable_spec_md": "reports/strategy_lab/SF-002/executable_spec.md",
+        "test_plan_md": "reports/strategy_lab/SF-002/test_plan.md"
+      },
+      "dataset_count": 4,
+      "symbol_count": 4,
+      "regime_count": 5,
+      "dataset_paths": [
+        "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+      ],
+      "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv"
+    },
+    {
+      "strategy_id": "SF-003",
+      "title": "Failed Breakout Range-Edge Reversal",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "queue_status": "completed",
+      "backtest_status": "completed",
+      "sample_status": "robust_candidate",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "best_variant_id": "quality_filter",
+      "baseline_variant_id": "baseline",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      },
+      "variants": [
+        {
+          "variant_id": "baseline",
+          "label": "baseline_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 1707,
+          "closed_trade_count": 1707,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "-0.0422",
+          "total_pnl_r": "-72.0000",
+          "win_rate": "0.3193",
+          "max_drawdown_r": "128.0000",
+          "split_trade_counts": {
+            "in_sample": 527,
+            "validation": 577,
+            "out_of_sample": 603
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 527,
+            "validation": 577,
+            "out_of_sample": 603
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-003/variants/baseline/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-003/variants/baseline/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-003/variants/baseline/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-003/variants/baseline/skip_summary.json"
+          }
+        },
+        {
+          "variant_id": "quality_filter",
+          "label": "quality_filter_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 1119,
+          "closed_trade_count": 1119,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "-0.0214",
+          "total_pnl_r": "-24.0000",
+          "win_rate": "0.3262",
+          "max_drawdown_r": "65.0000",
+          "split_trade_counts": {
+            "in_sample": 339,
+            "validation": 383,
+            "out_of_sample": 397
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 339,
+            "validation": 383,
+            "out_of_sample": 397
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-003/variants/quality_filter/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-003/variants/quality_filter/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-003/variants/quality_filter/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-003/variants/quality_filter/skip_summary.json"
+          }
+        }
+      ],
+      "artifact_paths": {
+        "strategy_dir": "reports/strategy_lab/SF-003",
+        "summary_json": "reports/strategy_lab/SF-003/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-003/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-003/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-003/skip_summary.json",
+        "diagnostics_md": "reports/strategy_lab/SF-003/diagnostics.md",
+        "executable_spec_md": "reports/strategy_lab/SF-003/executable_spec.md",
+        "test_plan_md": "reports/strategy_lab/SF-003/test_plan.md"
+      },
+      "dataset_count": 4,
+      "symbol_count": 4,
+      "regime_count": 5,
+      "dataset_paths": [
+        "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+      ],
+      "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv"
+    },
+    {
+      "strategy_id": "SF-004",
+      "title": "Tight Channel Trend Continuation",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "queue_status": "completed",
+      "backtest_status": "completed",
+      "sample_status": "robust_candidate",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "best_variant_id": "quality_filter",
+      "baseline_variant_id": "baseline",
+      "variant_status_counts": {
+        "rejected_variant": 1,
+        "selected_variant": 1
+      },
+      "variants": [
+        {
+          "variant_id": "baseline",
+          "label": "baseline_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 1198,
+          "closed_trade_count": 1198,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "-0.0184",
+          "total_pnl_r": "-22.0000",
+          "win_rate": "0.3272",
+          "max_drawdown_r": "80.0000",
+          "split_trade_counts": {
+            "in_sample": 430,
+            "validation": 402,
+            "out_of_sample": 366
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 430,
+            "validation": 402,
+            "out_of_sample": 366
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-004/variants/baseline/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-004/variants/baseline/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-004/variants/baseline/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-004/variants/baseline/skip_summary.json"
+          }
+        },
+        {
+          "variant_id": "quality_filter",
+          "label": "quality_filter_v0_1",
+          "dataset_count": 4,
+          "symbol_count": 4,
+          "regime_count": 5,
+          "trade_count": 301,
+          "closed_trade_count": 301,
+          "sample_status": "robust_candidate",
+          "expectancy_r": "-0.0133",
+          "total_pnl_r": "-4.0000",
+          "win_rate": "0.3289",
+          "max_drawdown_r": "39.0000",
+          "split_trade_counts": {
+            "in_sample": 108,
+            "validation": 109,
+            "out_of_sample": 84
+          },
+          "split_executed_trade_counts": {
+            "in_sample": 108,
+            "validation": 109,
+            "out_of_sample": 84
+          },
+          "artifact_paths": {
+            "summary_json": "reports/strategy_lab/SF-004/variants/quality_filter/summary.json",
+            "trades_csv": "reports/strategy_lab/SF-004/variants/quality_filter/trades.csv",
+            "candidate_events_csv": "reports/strategy_lab/SF-004/variants/quality_filter/candidate_events.csv",
+            "skip_summary_json": "reports/strategy_lab/SF-004/variants/quality_filter/skip_summary.json"
+          }
+        }
+      ],
+      "artifact_paths": {
+        "strategy_dir": "reports/strategy_lab/SF-004",
+        "summary_json": "reports/strategy_lab/SF-004/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-004/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-004/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-004/skip_summary.json",
+        "diagnostics_md": "reports/strategy_lab/SF-004/diagnostics.md",
+        "executable_spec_md": "reports/strategy_lab/SF-004/executable_spec.md",
+        "test_plan_md": "reports/strategy_lab/SF-004/test_plan.md"
+      },
+      "dataset_count": 4,
+      "symbol_count": 4,
+      "regime_count": 5,
+      "dataset_paths": [
+        "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+        "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+      ],
+      "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv"
+    },
+    {
+      "strategy_id": "SF-005",
+      "title": "Gap Continuation Versus Exhaustion",
+      "eligibility_status": "deferred_single_source_risk",
+      "queue_status": "deferred",
+      "backtest_status": "not_run",
+      "sample_status": "not_run",
+      "triage_status": "deferred_single_source_risk",
+      "triage_reason": "single-source corroboration and coarse family boundary",
+      "best_variant_id": null,
+      "baseline_variant_id": null,
+      "variant_status_counts": {
+        "deferred": 1
+      },
+      "variants": [],
+      "artifact_paths": {
+        "strategy_dir": "reports/strategy_lab/SF-005",
+        "summary_json": "reports/strategy_lab/SF-005/summary.json",
+        "trades_csv": "reports/strategy_lab/SF-005/trades.csv",
+        "candidate_events_csv": "reports/strategy_lab/SF-005/candidate_events.csv",
+        "skip_summary_json": "reports/strategy_lab/SF-005/skip_summary.json",
+        "diagnostics_md": "reports/strategy_lab/SF-005/diagnostics.md",
+        "executable_spec_md": "reports/strategy_lab/SF-005/executable_spec.md",
+        "test_plan_md": "reports/strategy_lab/SF-005/test_plan.md"
+      },
+      "dataset_path": null,
+      "triage_record": {
+        "strategy_id": "SF-005",
+        "title": "Gap Continuation Versus Exhaustion",
+        "triage_status": "deferred_single_source_risk",
+        "triage_reason": "single-source corroboration and coarse family boundary",
+        "sample_status": "not_run",
+        "best_variant_id": null,
+        "variant_status_counts": {
+          "deferred": 1
+        }
+      },
+      "heartbeat": {
+        "timestamp": "2026-04-21T18:21:31.209761+00:00",
+        "phase": "strategy_deferred",
+        "strategy_id": "SF-005",
+        "spec_status": "completed",
+        "backtest_status": "deferred",
+        "sample_status": "not_run",
+        "result_status": "deferred_single_source_risk",
+        "next_action": "deferred_visual_or_corroboration_lane"
+      },
+      "gap_reference_count": 14
+    }
+  ],
+  "boundary": "paper/simulated",
+  "notes": [
+    "This wave is a controlled intraday 5m multi-symbol exploratory batch built on the primary-provider cache.",
+    "SF-005 remains deferred because the final corroboration report marks it as single_source_risk."
+  ]
+}

@@ -170,3 +170,11 @@
 - 结论：`M9H` 的首轮 batch backtest 只允许在 `paper / simulated` 边界内，对已冻结且 corroboration 充分的 `SF-001 ~ SF-004` 做受控 `5m` intraday baseline + limited diagnostics。`SF-005` 因 `single_source_risk` 与 family 边界仍偏粗，必须保持 `deferred_single_source_risk`，不得与前四个 family 无差别推进。
 - 结论：本轮 batch backtest 仍不得修改 trigger，不得修改 `knowledge/raw`，不得触碰 `src/risk/`、`src/execution/`、`src/broker/` 的 live / real-money 语义，也不得把任何结果写成实盘能力、稳定盈利或自动交易能力。
 - 结论：本轮 triage 结果当前冻结为：`SF-001=modify_and_retest`、`SF-002=insufficient_sample`、`SF-003=insufficient_sample`、`SF-004=insufficient_sample`、`SF-005=deferred_single_source_risk`。该结论只代表当前 `SPY / 5m / primary-provider cache` 的受控探索波次，不得外推为 family 终局裁决。
+
+## D-0034 M9H Wave2 扩样本回测范围与结果冻结
+
+- 日期：2026-04-22
+- 结论：在 `paper / simulated`、不改 trigger、`knowledge/raw` 只读、`broker/live/real-money` 禁止的边界内，`M9H` 的 wave2 扩样本回测允许把 `SF-001 ~ SF-004` 扩展到 `SPY / QQQ / NVDA / TSLA`、`5m`、`2025-04-01 ~ 2026-04-21` 的多标的聚合回测；`SF-005` 继续保持 `deferred_single_source_risk`。
+- 结论：wave2 runner 必须按数据集逐个生成 signals/backtest，再在 variant 层做聚合统计；禁止把不同 symbol 的 bars 直接拼接成一个时间序列后再跑 setup 逻辑。
+- 结论：wave2 的样本覆盖当前已把 `SF-001 ~ SF-004` 推到 `robust_candidate`，但 triage 结论当前冻结为：`SF-001=modify_and_retest`、`SF-002=modify_and_retest`、`SF-003=modify_and_retest`、`SF-004=modify_and_retest`、`SF-005=deferred_single_source_risk`。这表示样本更充分后，四个已测 family 仍需要收紧到 `quality_filter` 指向的更紧 executable spec，再决定是否进入更正式的下一波重测。
+- 结论：`robust_candidate` 只代表 wave2 的样本覆盖门槛，不代表稳定盈利、实盘 readiness 或可自动交易能力。

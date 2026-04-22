@@ -1,0 +1,29 @@
+{
+  "strategy_id": "SF-004",
+  "variant_id": "quality_filter",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20542,
+  "signal_count": 99,
+  "trade_count": 99,
+  "closed_trade_count": 99,
+  "expectancy_r": "-0.0606",
+  "total_pnl_r": "-6.0000",
+  "win_rate": "0.3131",
+  "max_drawdown_r": "24.0000",
+  "split_trade_counts": {
+    "in_sample": 38,
+    "validation": 31,
+    "out_of_sample": 30
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 38,
+    "validation": 31,
+    "out_of_sample": 30
+  },
+  "warnings": [],
+  "summary": "99 trade(s) from 99 signal(s); win_rate=31.3100%; expectancy=-0.0606R; total_pnl=-6.0000R; max_drawdown=24.0000R; slippage=[baseline_0r:-6.0000R, stress_0.05r_per_trade:-10.9500R]",
+  "boundary": "paper/simulated"
+}

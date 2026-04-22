@@ -1,15 +1,23 @@
 {
-  "schema_version": "m9-batch-backtest-v10",
-  "updated_at": "2026-04-21T17:54:08.780008+00:00",
-  "current_phase": "M9H.batch_backtest_triage_completed",
-  "run_id": "m9_strategy_factory_batch_backtest_20260421_175408",
+  "schema_version": "m9-batch-backtest-v11",
+  "updated_at": "2026-04-22T03:52:09.961900+00:00",
+  "current_phase": "M9H.wave2_batch_backtest_triage_completed",
+  "run_id": "m9_strategy_factory_batch_backtest_20260422_035151",
   "primary_provider": "longbridge",
-  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "dataset_paths": [
+    "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+  ],
+  "dataset_count": 4,
+  "coverage_start": "2025-04-01",
+  "coverage_end": "2026-04-21",
   "eligible_strategy_count": 4,
   "triage_counts": {
     "deferred_single_source_risk": 1,
-    "insufficient_sample": 3,
-    "modify_and_retest": 1
+    "modify_and_retest": 4
   },
   "next_action": "manual_review_before_next_wave",
   "boundary": "paper/simulated"

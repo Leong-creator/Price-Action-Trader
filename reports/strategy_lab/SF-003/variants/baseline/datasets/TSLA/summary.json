@@ -1,0 +1,36 @@
+{
+  "strategy_id": "SF-003",
+  "variant_id": "baseline",
+  "symbol": "TSLA",
+  "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 424,
+  "trade_count": 418,
+  "closed_trade_count": 418,
+  "expectancy_r": "-0.0311",
+  "total_pnl_r": "-13.0000",
+  "win_rate": "0.3230",
+  "max_drawdown_r": "29.0000",
+  "split_trade_counts": {
+    "in_sample": 124,
+    "validation": 131,
+    "out_of_sample": 163
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 124,
+    "validation": 131,
+    "out_of_sample": 163
+  },
+  "warnings": [
+    "signal 3a11d362edeaa850 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 8459bb6938d0beb7 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 02b905e258fd9a24 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 7fcc913c7571fe0d produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 6e958f1e307c410d produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 8f665f37f0d9c251 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "418 trade(s) from 424 signal(s); win_rate=32.3000%; expectancy=-0.0311R; total_pnl=-13.0000R; max_drawdown=29.0000R; slippage=[baseline_0r:-13.0000R, stress_0.05r_per_trade:-33.9000R]; warnings=6",
+  "boundary": "paper/simulated"
+}

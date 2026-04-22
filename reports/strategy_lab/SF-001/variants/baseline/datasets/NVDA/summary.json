@@ -1,0 +1,41 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "baseline",
+  "symbol": "NVDA",
+  "dataset_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 2316,
+  "trade_count": 2305,
+  "closed_trade_count": 2305,
+  "expectancy_r": "-0.0447",
+  "total_pnl_r": "-103.0000",
+  "win_rate": "0.3184",
+  "max_drawdown_r": "184.0000",
+  "split_trade_counts": {
+    "in_sample": 737,
+    "validation": 794,
+    "out_of_sample": 774
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 737,
+    "validation": 794,
+    "out_of_sample": 774
+  },
+  "warnings": [
+    "signal e9d1ed213e3e1ddf produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 6c25c18a8da6a38d produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal f53b3905dd37bf2b produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal f53fc807499f3513 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal a0e777499974b552 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 2324fd4fa615acfd produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal cfaf4aefb5adb88f produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal fbd5a9c20f4905cf produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 257cb611c3538af6 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 2b509a6f6d9b4ec7 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal d3c723ba4b7634d2 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "2305 trade(s) from 2316 signal(s); win_rate=31.8400%; expectancy=-0.0447R; total_pnl=-103.0000R; max_drawdown=184.0000R; slippage=[baseline_0r:-103.0000R, stress_0.05r_per_trade:-218.2500R]; warnings=11",
+  "boundary": "paper/simulated"
+}

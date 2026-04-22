@@ -1,0 +1,13 @@
+{
+  "strategy_id": "SF-004",
+  "variant_id": "quality_filter",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "skipped": {
+    "cooldown_active": 13,
+    "tight_channel_context_missing": 19999,
+    "weak_channel_resumption": 405
+  },
+  "total_candidates": 20516,
+  "emitted_signals": 99
+}

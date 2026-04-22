@@ -1,9 +1,10 @@
 # SF-003 Executable Spec
 
-- `run_id`: `m9_strategy_factory_batch_backtest_20260421_175408`
+- `run_id`: `m9_strategy_factory_batch_backtest_20260422_035151`
 - `setup_family`: `failed_breakout_range_reversal`
 - `provider`: `longbridge`
-- `dataset_path`: `local_data/longbridge_intraday/us_SPY_5m_2026-02-20_2026-04-17_longbridge.csv`
+- `dataset_count`: 4
+- `dataset_paths`: `local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv, local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv, local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv, local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv`
 - `timeframe`: `5m`
 - `boundary`: `paper/simulated`
 

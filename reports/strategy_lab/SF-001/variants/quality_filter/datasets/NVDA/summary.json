@@ -1,0 +1,42 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "quality_filter",
+  "symbol": "NVDA",
+  "dataset_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 2066,
+  "trade_count": 2054,
+  "closed_trade_count": 2054,
+  "expectancy_r": "-0.0375",
+  "total_pnl_r": "-77.0000",
+  "win_rate": "0.3208",
+  "max_drawdown_r": "140.0000",
+  "split_trade_counts": {
+    "in_sample": 651,
+    "validation": 715,
+    "out_of_sample": 688
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 651,
+    "validation": 715,
+    "out_of_sample": 688
+  },
+  "warnings": [
+    "signal b70c282e900e25a4 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 926df61c3836ba09 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal cdce6187efe95d5c produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 5e4e84c96a2b4c58 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal a549dac289c21683 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 3f1fdea1fc3dd310 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal c922015f892e53ae produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 282fa464b76fc794 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 5168f1284a514212 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 39d79d9dd728532d produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal d7d3e4a2f8515ddc produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal d93ca48eeb0d8410 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "2054 trade(s) from 2066 signal(s); win_rate=32.0800%; expectancy=-0.0375R; total_pnl=-77.0000R; max_drawdown=140.0000R; slippage=[baseline_0r:-77.0000R, stress_0.05r_per_trade:-179.7000R]; warnings=12",
+  "boundary": "paper/simulated"
+}

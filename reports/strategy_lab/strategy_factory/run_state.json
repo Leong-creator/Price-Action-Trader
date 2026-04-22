@@ -1,7 +1,7 @@
 {
   "schema_version": "v1",
   "factory_run_id": "m9-strategy-factory-full-extraction-audit-v4",
-  "current_phase": "M9H.batch_backtest_triage_completed",
+  "current_phase": "M9H.wave2_batch_backtest_triage_completed",
   "resume_cursor": {
     "phase": "completed",
     "audit_pass": "saturation_convergence_pass",
@@ -10,11 +10,14 @@
     "category": null,
     "chunk_offset": 5492
   },
-  "active_batch_id": "m9_strategy_factory_batch_backtest_20260421_175408",
+  "active_batch_id": "m9_strategy_factory_batch_backtest_20260422_035151",
   "active_provider_config_path": "config/strategy_factory/active_provider_config.json",
   "primary_provider": "longbridge",
   "heartbeat_status": "completed",
-  "last_summary_at": "2026-04-21T17:54:08.780350+00:00",
+  "last_summary_at": "2026-04-22T03:52:09.967676+00:00",
   "text_extractable_closure": true,
-  "full_source_closure": false
+  "full_source_closure": false,
+  "dataset_count": 4,
+  "coverage_start": "2025-04-01",
+  "coverage_end": "2026-04-21"
 }

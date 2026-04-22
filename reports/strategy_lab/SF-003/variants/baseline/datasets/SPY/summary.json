@@ -1,0 +1,33 @@
+{
+  "strategy_id": "SF-003",
+  "variant_id": "baseline",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20542,
+  "signal_count": 452,
+  "trade_count": 449,
+  "closed_trade_count": 449,
+  "expectancy_r": "-0.0512",
+  "total_pnl_r": "-23.0000",
+  "win_rate": "0.3163",
+  "max_drawdown_r": "58.0000",
+  "split_trade_counts": {
+    "in_sample": 146,
+    "validation": 157,
+    "out_of_sample": 146
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 146,
+    "validation": 157,
+    "out_of_sample": 146
+  },
+  "warnings": [
+    "signal 966b6a653a188c01 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal bfc0c664cc2abc3d produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1de73203daf68f71 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "449 trade(s) from 452 signal(s); win_rate=31.6300%; expectancy=-0.0512R; total_pnl=-23.0000R; max_drawdown=58.0000R; slippage=[baseline_0r:-23.0000R, stress_0.05r_per_trade:-45.4500R]; warnings=3",
+  "boundary": "paper/simulated"
+}

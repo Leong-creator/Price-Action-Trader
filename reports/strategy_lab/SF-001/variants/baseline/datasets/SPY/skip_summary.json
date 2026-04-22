@@ -1,0 +1,13 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "baseline",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "skipped": {
+    "context_not_ready": 3955,
+    "cooldown_active": 968,
+    "weak_signal_bar": 13260
+  },
+  "total_candidates": 20516,
+  "emitted_signals": 2333
+}

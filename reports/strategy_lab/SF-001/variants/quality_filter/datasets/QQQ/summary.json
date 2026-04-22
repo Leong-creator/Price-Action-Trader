@@ -1,0 +1,41 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "quality_filter",
+  "symbol": "QQQ",
+  "dataset_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20541,
+  "signal_count": 1996,
+  "trade_count": 1985,
+  "closed_trade_count": 1985,
+  "expectancy_r": "0.0171",
+  "total_pnl_r": "34.0000",
+  "win_rate": "0.3390",
+  "max_drawdown_r": "64.0000",
+  "split_trade_counts": {
+    "in_sample": 655,
+    "validation": 684,
+    "out_of_sample": 646
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 655,
+    "validation": 684,
+    "out_of_sample": 646
+  },
+  "warnings": [
+    "signal 0ed5ea22881edcb7 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal fa57d4f84cba0588 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal caf84d6408bd9628 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 8b846f8220327ae2 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal a32d79580dde2f1f produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1fc079b06547c3d4 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 184cbe306179613a produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal e44303b4684d7f03 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 7bb244afcf3f5653 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal d340b68f0c407505 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal bac8526ebff6a7d5 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "1985 trade(s) from 1996 signal(s); win_rate=33.9000%; expectancy=0.0171R; total_pnl=34.0000R; max_drawdown=64.0000R; slippage=[baseline_0r:34.0000R, stress_0.05r_per_trade:-65.2500R]; warnings=11",
+  "boundary": "paper/simulated"
+}

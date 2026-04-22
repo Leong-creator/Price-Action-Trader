@@ -1,7 +1,7 @@
 {
-  "schema_version": "m9-batch-backtest-v10",
-  "generated_at": "2026-04-21T17:54:08.780217+00:00",
-  "run_id": "m9_strategy_factory_batch_backtest_20260421_175408",
+  "schema_version": "m9-batch-backtest-v11",
+  "generated_at": "2026-04-22T03:52:09.967355+00:00",
+  "run_id": "m9_strategy_factory_batch_backtest_20260422_035151",
   "ledger_kind": "strategy_factory_triage",
   "records": [
     {
@@ -9,7 +9,7 @@
       "title": "Trend Pullback Second Entry",
       "triage_status": "modify_and_retest",
       "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
-      "sample_status": "exploratory_probe",
+      "sample_status": "robust_candidate",
       "best_variant_id": "quality_filter",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -19,9 +19,9 @@
     {
       "strategy_id": "SF-002",
       "title": "Breakout Follow-Through Continuation",
-      "triage_status": "insufficient_sample",
-      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
-      "sample_status": "insufficient_sample",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "sample_status": "robust_candidate",
       "best_variant_id": "quality_filter",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -31,9 +31,9 @@
     {
       "strategy_id": "SF-003",
       "title": "Failed Breakout Range-Edge Reversal",
-      "triage_status": "insufficient_sample",
-      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
-      "sample_status": "insufficient_sample",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "sample_status": "robust_candidate",
       "best_variant_id": "quality_filter",
       "variant_status_counts": {
         "rejected_variant": 1,
@@ -43,10 +43,10 @@
     {
       "strategy_id": "SF-004",
       "title": "Tight Channel Trend Continuation",
-      "triage_status": "insufficient_sample",
-      "triage_reason": "baseline trade count or split coverage did not clear the minimum probe gate",
-      "sample_status": "insufficient_sample",
-      "best_variant_id": "baseline",
+      "triage_status": "modify_and_retest",
+      "triage_reason": "a stricter diagnostic variant materially outperformed the baseline and should guide the next exploratory spec freeze before any broader wave",
+      "sample_status": "robust_candidate",
+      "best_variant_id": "quality_filter",
       "variant_status_counts": {
         "rejected_variant": 1,
         "selected_variant": 1

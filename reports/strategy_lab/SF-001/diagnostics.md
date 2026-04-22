@@ -6,6 +6,6 @@
 - `best_variant`: `quality_filter`
 
 ## Variant Snapshot
-- `baseline`: trades=331, sample_status=exploratory_probe, expectancy=-0.0030R, pnl=-1.0000R
-- `quality_filter`: trades=280, sample_status=exploratory_probe, expectancy=0.0071R, pnl=2.0000R
+- `baseline`: trades=9164, sample_status=robust_candidate, expectancy=0.0017R, pnl=16.0000R
+- `quality_filter`: trades=8037, sample_status=robust_candidate, expectancy=0.0112R, pnl=90.0000R
 

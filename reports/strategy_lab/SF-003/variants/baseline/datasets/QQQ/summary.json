@@ -1,0 +1,34 @@
+{
+  "strategy_id": "SF-003",
+  "variant_id": "baseline",
+  "symbol": "QQQ",
+  "dataset_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20541,
+  "signal_count": 442,
+  "trade_count": 438,
+  "closed_trade_count": 438,
+  "expectancy_r": "-0.0959",
+  "total_pnl_r": "-42.0000",
+  "win_rate": "0.3014",
+  "max_drawdown_r": "72.0000",
+  "split_trade_counts": {
+    "in_sample": 134,
+    "validation": 151,
+    "out_of_sample": 153
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 134,
+    "validation": 151,
+    "out_of_sample": 153
+  },
+  "warnings": [
+    "signal 9a3b18b918677a80 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 659e2040de5987bf produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1321f149443810ec produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal ad637ac75bcbcd92 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "438 trade(s) from 442 signal(s); win_rate=30.1400%; expectancy=-0.0959R; total_pnl=-42.0000R; max_drawdown=72.0000R; slippage=[baseline_0r:-42.0000R, stress_0.05r_per_trade:-63.9000R]; warnings=4",
+  "boundary": "paper/simulated"
+}

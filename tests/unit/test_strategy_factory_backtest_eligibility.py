@@ -17,7 +17,7 @@ class TestStrategyFactoryBacktestEligibility(unittest.TestCase):
         }
 
     def test_frozen_catalog_is_five_sf_strategies(self) -> None:
-        self.assertEqual(self.matrix["schema_version"], "m9-batch-backtest-v10")
+        self.assertEqual(self.matrix["schema_version"], "m9-batch-backtest-v11")
         self.assertEqual(len(self.records), 5)
         self.assertEqual(set(self.records), {"SF-001", "SF-002", "SF-003", "SF-004", "SF-005"})
 

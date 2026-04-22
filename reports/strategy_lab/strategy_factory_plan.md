@@ -43,9 +43,9 @@
 - `saturation_report.json` 已满足双轮连续零增量 closure。
 - `cross_source_corroboration_final.json` 已在 catalog freeze 后重算。
 
-## M9H 首轮回测结果
+## M9H Wave2 扩样本回测结果
 
-- 已完成 `Controlled Batch Backtest + Strategy Triage` 首轮受控 wave。
+- 已完成 `Controlled Batch Backtest + Strategy Triage` 的 wave2 扩样本回测。
 - 本轮只推进：
   - `SF-001`
   - `SF-002`
@@ -53,19 +53,30 @@
   - `SF-004`
 - 本轮保持 deferred：
   - `SF-005`，原因：`single_source_risk` 与 family 边界偏粗
+- wave2 数据范围：
+  - `SPY / QQQ / NVDA / TSLA`
+  - `5m`
+  - `2025-04-01 ~ 2026-04-21`
+  - `primary provider = longbridge`
 - 已落盘：
   - `reports/strategy_lab/backtest_eligibility_matrix.json`
+  - `reports/strategy_lab/backtest_dataset_inventory.json`
   - `reports/strategy_lab/executable_spec_queue.json`
   - `reports/strategy_lab/backtest_queue.json`
   - `reports/strategy_lab/backtest_batch_summary.json`
   - `reports/strategy_lab/strategy_triage_matrix.json`
   - `reports/strategy_lab/final_strategy_factory_report.md`
-- 当前 triage 结论：
+  - `reports/strategy_lab/final_strategy_factory_trade_report.md`
+  - `reports/strategy_lab/final_strategy_factory_cash_report.md`
+- 当前 wave2 triage 结论：
   - `SF-001 = modify_and_retest`
-  - `SF-002 = insufficient_sample`
-  - `SF-003 = insufficient_sample`
-  - `SF-004 = insufficient_sample`
+  - `SF-002 = modify_and_retest`
+  - `SF-003 = modify_and_retest`
+  - `SF-004 = modify_and_retest`
   - `SF-005 = deferred_single_source_risk`
+- 当前 wave2 sample status：
+  - `SF-001 ~ SF-004 = robust_candidate`
+  - `SF-005 = not_run`
 - 当前仍未做：
   - 未进入 broker / live / real-money。
   - 未改 trigger。
@@ -75,3 +86,4 @@
 
 - 下一步不是自动扩大 batch backtest，而是等待更窄范围的下一波重测决策。
 - 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json`、`strategy_triage_matrix.json` 与 `unresolved_strategy_extraction_gaps.json` 选择候选。
+- wave2 已证明单纯继续扩样本不足以直接把 family 升为 retain/promoted；下一步重点应转向按 `quality_filter` 收紧 executable spec，再决定是否进入更正式的 retest。

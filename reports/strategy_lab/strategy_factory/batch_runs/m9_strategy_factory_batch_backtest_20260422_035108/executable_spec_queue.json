@@ -1,0 +1,55 @@
+{
+  "schema_version": "m9-batch-backtest-v11",
+  "generated_at": "2026-04-22T03:51:08.179725+00:00",
+  "run_id": "m9_strategy_factory_batch_backtest_20260422_035108",
+  "provider": "longbridge",
+  "dataset_paths": [
+    "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+    "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv"
+  ],
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "NVDA",
+    "TSLA"
+  ],
+  "items": [
+    {
+      "strategy_id": "SF-001",
+      "title": "Trend Pullback Second Entry",
+      "queue_status": "ready",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration"
+    },
+    {
+      "strategy_id": "SF-002",
+      "title": "Breakout Follow-Through Continuation",
+      "queue_status": "ready",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration"
+    },
+    {
+      "strategy_id": "SF-003",
+      "title": "Failed Breakout Range-Edge Reversal",
+      "queue_status": "ready",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration"
+    },
+    {
+      "strategy_id": "SF-004",
+      "title": "Tight Channel Trend Continuation",
+      "queue_status": "ready",
+      "eligibility_status": "eligible_for_batch_backtest",
+      "eligibility_reason": "frozen text-extractable family with multi-source corroboration"
+    },
+    {
+      "strategy_id": "SF-005",
+      "title": "Gap Continuation Versus Exhaustion",
+      "queue_status": "deferred",
+      "eligibility_status": "deferred_single_source_risk",
+      "eligibility_reason": "single-source corroboration and coarse family boundary"
+    }
+  ]
+}

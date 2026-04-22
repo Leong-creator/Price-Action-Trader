@@ -769,11 +769,11 @@
 ## 18. 当前阶段与下一步
 
 - 当前阶段：阶段 9：Price Action Strategy Lab / Strategy Factory（进行中）。
-- 当前 milestone：`M9H Controlled Batch Backtest + Strategy Triage`（已完成首轮受控 wave）。
+- 当前 milestone：`M9H Controlled Batch Backtest + Strategy Triage`（已完成 wave2 扩样本回测）。
 - 当前下一步：
   - 当前默认不自动进入下一波 batch backtest。
-  - 下一步应基于 `strategy_triage_matrix.json`、`backtest_batch_summary.json`、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json`，决定更窄范围的重测方案。
-  - 当前首轮受控 wave 只测试了 `SF-001 ~ SF-004`，`SF-005` 继续保持 `deferred_single_source_risk`，不得无差别推进。
+  - 下一步应基于 wave2 的 `strategy_triage_matrix.json`、`backtest_batch_summary.json`、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json`，决定更窄范围的重测方案。
+  - 当前 wave2 已将 `SF-001 ~ SF-004` 扩展到 `SPY / QQQ / NVDA / TSLA`、`5m`、`2025-04-01 ~ 2026-04-21` 的多标的聚合回测；`SF-005` 继续保持 `deferred_single_source_risk`，不得无差别推进。
   - 当前不做全量 curated promotion，不做 statement/source_note 入 trigger，不改 `knowledge/raw`。
   - 保持当前 `no-go` 结论与 `paper / simulated` 边界，不继续 broker 开发。
   - 未经单独批准，不重新评估真实 broker、真实账户、live execution 或付费 API。
@@ -787,7 +787,7 @@
 
 ## 20. M9：Price Action Strategy Lab
 
-- 分支：`feature/m9-strategy-factory-batch-backtest`
+- 分支：`feature/m9-strategy-factory-batch-backtest-wave2`
 - 当前状态：进行中
 - 目标：
   - 在保持 `paper / simulated`、`no-go`、raw 只读与 trigger 不变边界下，建立可恢复、可校验、以 `source_manifest` 为 SoT 的 Strategy Factory。
@@ -806,11 +806,13 @@
   - `M9A`~`M9F`：已完成，但当前只作为 legacy / historical baseline 保留。
   - `M9G.0`：Contract Freeze & Legacy Boundary Reset（已完成）。
   - `M9G Audit v4`：`Full-Pass Chunk Adjudication`、`Cross-Chunk Synthesis Pass`、`Discovery Closure`、`Overmerge Review`、`Notes Per-Source Findings`、`Source Section / Unit / Theme Coverage Matrix`、`Cross-Source Corroboration Report`、`Saturation / Convergence Pass`、`Strategy Closure 与 Catalog Freeze`（已完成）。
-  - `M9H`：`Controlled Batch Backtest + Strategy Triage`（已完成首轮受控 wave）。
-    - 首轮 wave 只允许 `SF-001 ~ SF-004` 进入 `5m` intraday baseline + limited diagnostics。
-    - `SF-005` 当前保持 `deferred_single_source_risk`，不得与 `SF-001 ~ SF-004` 无差别推进。
-    - 当前 triage 结果固定为：`SF-001=modify_and_retest`、`SF-002=insufficient_sample`、`SF-003=insufficient_sample`、`SF-004=insufficient_sample`、`SF-005=deferred_single_source_risk`。
-  - 下一步不是自动扩大 batch backtest，而是等待单独的更窄范围重测 / 下一波决策。
+  - `M9H`：`Controlled Batch Backtest + Strategy Triage`（已完成 wave2 扩样本回测）。
+    - 首轮 wave 仅覆盖 `SPY / 5m` 的受控 baseline + limited diagnostics，当前只保留为历史参考。
+    - wave2 已将 `SF-001 ~ SF-004` 扩展到 `SPY / QQQ / NVDA / TSLA`、`5m`、`2025-04-01 ~ 2026-04-21` 的多标的聚合回测。
+    - `SF-005` 当前继续保持 `deferred_single_source_risk`，不得与 `SF-001 ~ SF-004` 无差别推进。
+    - 当前 wave2 triage 结果固定为：`SF-001=modify_and_retest`、`SF-002=modify_and_retest`、`SF-003=modify_and_retest`、`SF-004=modify_and_retest`、`SF-005=deferred_single_source_risk`。
+    - 当前 wave2 sample status 固定为：`SF-001 ~ SF-004 = robust_candidate`，但这只表示样本覆盖提高，不代表已具备实盘能力或稳定盈利结论。
+  - 下一步不是自动扩大 batch backtest，而是等待单独的更窄范围重测 / 下一波决策，重点应落在 `quality_filter` 指向的更紧规则冻结，而不是继续盲目扩量。
 - 当前 Provider Contract：
   <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
   - `primary_provider` 的唯一运行时来源是 `reports/strategy_lab/strategy_factory/run_state.json.active_provider_config_path` 指向的 repo 配置文件中的 `source_order[0]`。

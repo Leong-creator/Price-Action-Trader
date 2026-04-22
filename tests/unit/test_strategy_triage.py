@@ -21,22 +21,21 @@ class TestStrategyTriage(unittest.TestCase):
         self.assertEqual(self.batch_summary["eligible_strategy_count"], 4)
         self.assertEqual(self.batch_summary["tested_strategy_count"], 4)
         self.assertEqual(self.batch_summary["completed_backtests"], 4)
+        self.assertEqual(self.batch_summary["dataset_count"], 4)
+        self.assertEqual(self.batch_summary["symbols"], ["SPY", "QQQ", "NVDA", "TSLA"])
         self.assertEqual(
             self.batch_summary["triage_counts"],
             {
                 "deferred_single_source_risk": 1,
-                "insufficient_sample": 3,
-                "modify_and_retest": 1,
+                "modify_and_retest": 4,
             },
         )
 
     def test_triage_matrix_matches_expected_statuses(self) -> None:
-        self.assertEqual(self.records["SF-001"]["triage_status"], "modify_and_retest")
-        self.assertEqual(self.records["SF-001"]["sample_status"], "exploratory_probe")
-        self.assertEqual(self.records["SF-001"]["best_variant_id"], "quality_filter")
-        for strategy_id in ("SF-002", "SF-003", "SF-004"):
-            self.assertEqual(self.records[strategy_id]["triage_status"], "insufficient_sample")
-            self.assertEqual(self.records[strategy_id]["sample_status"], "insufficient_sample")
+        for strategy_id in ("SF-001", "SF-002", "SF-003", "SF-004"):
+            self.assertEqual(self.records[strategy_id]["triage_status"], "modify_and_retest")
+            self.assertEqual(self.records[strategy_id]["sample_status"], "robust_candidate")
+            self.assertEqual(self.records[strategy_id]["best_variant_id"], "quality_filter")
         self.assertEqual(self.records["SF-005"]["triage_status"], "deferred_single_source_risk")
         self.assertEqual(self.records["SF-005"]["sample_status"], "not_run")
 
@@ -45,8 +44,15 @@ class TestStrategyTriage(unittest.TestCase):
             summary = load_json(f"reports/strategy_lab/{strategy_id}/summary.json")
             self.assertEqual(summary["strategy_id"], strategy_id)
             self.assertEqual(summary["backtest_status"], "completed")
-            self.assertIn(summary["sample_status"], {"exploratory_probe", "insufficient_sample"})
-            self.assertIsNotNone(summary["best_variant_id"])
+            self.assertEqual(summary["sample_status"], "robust_candidate")
+            self.assertEqual(summary["dataset_count"], 4)
+            self.assertEqual(summary["dataset_paths"][0].startswith("local_data/longbridge_intraday/"), True)
+            self.assertEqual(summary["symbol_count"], 4)
+            self.assertGreaterEqual(summary["regime_count"], 2)
+            self.assertEqual(summary["best_variant_id"], "quality_filter")
+            self.assertEqual(summary["baseline_variant"]["cash_metrics"]["starting_capital"], "25000.0000")
+            self.assertEqual(summary["baseline_variant"]["cash_metrics"]["risk_per_trade"], "100.0000")
+            self.assertIsNotNone(summary["best_variant"]["cash_metrics"]["ending_equity"])
             self.assertEqual(summary["boundary"], "paper/simulated")
         deferred = load_json("reports/strategy_lab/SF-005/summary.json")
         self.assertEqual(deferred["triage_status"], "deferred_single_source_risk")
@@ -54,12 +60,26 @@ class TestStrategyTriage(unittest.TestCase):
 
     def test_final_report_mentions_wave_scope_and_deferred_strategy(self) -> None:
         report = read_text("reports/strategy_lab/final_strategy_factory_report.md")
-        self.assertIn("eligible_strategy_count", report)
-        self.assertIn("tested_strategy_count", report)
+        self.assertIn("dataset_count", report)
+        self.assertIn("SPY, QQQ, NVDA, TSLA", report)
+        self.assertIn("coverage_window", report)
         self.assertIn("SF-005", report)
         self.assertIn("deferred_single_source_risk", report)
         self.assertIn("paper/simulated", report)
         self.assertIn("not live / not real-money", report)
+
+        trade_report = read_text("reports/strategy_lab/final_strategy_factory_trade_report.md")
+        self.assertIn("Trading-Style Batch Report", trade_report)
+        self.assertIn("Baseline Trades", trade_report)
+        self.assertIn("Best Variant", trade_report)
+        self.assertIn("capital_model", trade_report)
+
+        cash_report = read_text("reports/strategy_lab/final_strategy_factory_cash_report.md")
+        self.assertIn("Cash-Equity Batch Report", cash_report)
+        self.assertIn("starting_capital", cash_report)
+        self.assertIn("risk_per_trade", cash_report)
+        self.assertIn("Ending Equity", cash_report)
+        self.assertIn("Net PnL", cash_report)
 
 
 if __name__ == "__main__":

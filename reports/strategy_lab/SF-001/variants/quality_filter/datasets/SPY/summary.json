@@ -1,0 +1,42 @@
+{
+  "strategy_id": "SF-001",
+  "variant_id": "quality_filter",
+  "symbol": "SPY",
+  "dataset_path": "local_data/longbridge_intraday/us_SPY_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20542,
+  "signal_count": 2061,
+  "trade_count": 2049,
+  "closed_trade_count": 2049,
+  "expectancy_r": "0.0307",
+  "total_pnl_r": "63.0000",
+  "win_rate": "0.3436",
+  "max_drawdown_r": "55.0000",
+  "split_trade_counts": {
+    "in_sample": 690,
+    "validation": 697,
+    "out_of_sample": 662
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 690,
+    "validation": 697,
+    "out_of_sample": 662
+  },
+  "warnings": [
+    "signal 4a0da5c7a68211c7 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 1d845d3841f84f04 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal da8cfc948177f919 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal bd34a1dab125c0e1 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 4681539db49cadc1 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 10741eb7832b5413 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 950825331027ab4d produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal b13a9a3c34ba2424 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 0fb7af329060df16 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 53f4df1ac902fe1a produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal eefc51849bfcb9a0 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 7bba5c8005664c47 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "2049 trade(s) from 2061 signal(s); win_rate=34.3600%; expectancy=0.0307R; total_pnl=63.0000R; max_drawdown=55.0000R; slippage=[baseline_0r:63.0000R, stress_0.05r_per_trade:-39.4500R]; warnings=12",
+  "boundary": "paper/simulated"
+}

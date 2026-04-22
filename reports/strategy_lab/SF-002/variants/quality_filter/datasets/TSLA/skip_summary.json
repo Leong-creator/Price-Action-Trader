@@ -1,0 +1,13 @@
+{
+  "strategy_id": "SF-002",
+  "variant_id": "quality_filter",
+  "symbol": "TSLA",
+  "dataset_path": "local_data/longbridge_intraday/us_TSLA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "skipped": {
+    "cooldown_active": 54,
+    "missing_follow_through": 1687,
+    "no_breakout_context": 18539
+  },
+  "total_candidates": 20517,
+  "emitted_signals": 237
+}

@@ -1,0 +1,34 @@
+{
+  "strategy_id": "SF-004",
+  "variant_id": "baseline",
+  "symbol": "NVDA",
+  "dataset_path": "local_data/longbridge_intraday/us_NVDA_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20543,
+  "signal_count": 282,
+  "trade_count": 278,
+  "closed_trade_count": 278,
+  "expectancy_r": "-0.1475",
+  "total_pnl_r": "-41.0000",
+  "win_rate": "0.2842",
+  "max_drawdown_r": "65.0000",
+  "split_trade_counts": {
+    "in_sample": 94,
+    "validation": 93,
+    "out_of_sample": 91
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 94,
+    "validation": 93,
+    "out_of_sample": 91
+  },
+  "warnings": [
+    "signal 669e605a93dee078 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal ce4e5d00fa165b55 produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal 5a81c19d8fc1210e produced non-positive risk using signal-bar extremum; trade skipped",
+    "signal a3944cf03352b607 produced non-positive risk using signal-bar extremum; trade skipped"
+  ],
+  "summary": "278 trade(s) from 282 signal(s); win_rate=28.4200%; expectancy=-0.1475R; total_pnl=-41.0000R; max_drawdown=65.0000R; slippage=[baseline_0r:-41.0000R, stress_0.05r_per_trade:-54.9000R]; warnings=4",
+  "boundary": "paper/simulated"
+}

@@ -1,0 +1,29 @@
+{
+  "strategy_id": "SF-004",
+  "variant_id": "quality_filter",
+  "symbol": "QQQ",
+  "dataset_path": "local_data/longbridge_intraday/us_QQQ_5m_2025-04-01_2026-04-21_longbridge.csv",
+  "provider": "longbridge",
+  "timeframe": "5m",
+  "bar_count": 20541,
+  "signal_count": 84,
+  "trade_count": 84,
+  "closed_trade_count": 84,
+  "expectancy_r": "0.0714",
+  "total_pnl_r": "6.0000",
+  "win_rate": "0.3571",
+  "max_drawdown_r": "14.0000",
+  "split_trade_counts": {
+    "in_sample": 36,
+    "validation": 33,
+    "out_of_sample": 15
+  },
+  "split_executed_trade_counts": {
+    "in_sample": 36,
+    "validation": 33,
+    "out_of_sample": 15
+  },
+  "warnings": [],
+  "summary": "84 trade(s) from 84 signal(s); win_rate=35.7100%; expectancy=0.0714R; total_pnl=6.0000R; max_drawdown=14.0000R; slippage=[baseline_0r:6.0000R, stress_0.05r_per_trade:1.8000R]",
+  "boundary": "paper/simulated"
+}
