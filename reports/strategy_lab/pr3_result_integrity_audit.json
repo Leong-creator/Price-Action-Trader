@@ -1,0 +1,53 @@
+{
+  "pr_number": 3,
+  "pr_title": "[codex] Add M9I.2 Wave3 robustness validation artifacts",
+  "base_ref": "main",
+  "head_ref": "feature/m9-wave3-robustness-validation",
+  "merge_gate_status": "merge_ready",
+  "blockers": [],
+  "retain_candidate_count": 0,
+  "wave3_triage": {
+    "SF-001": "modify_and_retest",
+    "SF-002": "modify_and_retest",
+    "SF-003": "modify_and_retest",
+    "SF-004": "insufficient_sample",
+    "SF-005": "deferred_single_source_risk"
+  },
+  "strict_holdout_available": false,
+  "provider_contract": {
+    "active_provider_config_path": "config/strategy_factory/active_provider_config.json",
+    "primary_provider": "longbridge",
+    "validated": true
+  },
+  "dataset_inventory": {
+    "phase": "M9I.2",
+    "provider": "longbridge",
+    "common_start": "2025-04-01",
+    "common_end": "2026-04-21",
+    "common_session_count": 265,
+    "symbols": [
+      "SPY",
+      "QQQ",
+      "NVDA",
+      "TSLA"
+    ]
+  },
+  "semantic_checks": {
+    "retain_candidate_zero_consistent": true,
+    "wave3_triage_consistent_across_summary_and_matrix": true,
+    "sf005_deferred_consistent": true,
+    "ready_for_backtest_is_historical_only_and_not_conflicting": true,
+    "docs_synced_to_m9i2": true
+  },
+  "validation_commands": [
+    "python scripts/validate_strategy_factory_contract.py",
+    "python scripts/validate_kb.py",
+    "python -m unittest tests/unit/test_strategy_factory_docs_sync.py tests/unit/test_strategy_triage.py tests/unit/test_strategy_factory_dataset_inventory.py tests/unit/test_strategy_factory_queue.py tests/unit/test_wave3_spec_loading.py tests/unit/test_wave3_split_integrity.py tests/unit/test_wave3_cost_stress.py tests/unit/test_wave3_triage.py tests/reliability/test_strategy_factory_pipeline.py -v",
+    "git diff --check"
+  ],
+  "recommended_next_baseline": {
+    "prefer": "main after merging PR #3",
+    "pre_merge_head_commit": "17d9df2"
+  },
+  "recommended_next_step": "M9J.1 Historical Expansion Backtest"
+}
