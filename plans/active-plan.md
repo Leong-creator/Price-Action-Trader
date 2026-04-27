@@ -45,6 +45,7 @@
 - M10.12 已完成 All Strategy Scorecard：把 16 条 `M10-PA-*` 汇总为甲方状态矩阵、资金测试成绩和 portfolio proxy；该 proxy 只用于业务视角汇总，不是可执行组合回测，不批准 paper trading。
 - M10.13 已完成 Read-only Observation Runbook：把通过筛选的 `M10-PA-001/002/012/008/009` 整理为只读观察队列、周报模板和暂停条件；本阶段不启动真实观察，不接 broker，不批准 paper trading。
 - M11 已完成 Paper Gate 当前检查点：输出 paper gate report、候选策略清单和风险暂停规则；`M10-PA-001/002/012` 只是 Tier A 核心观察候选，`M10-PA-008/009` 只是 Tier B 视觉条件候选，当前 gate decision 为 `not_approved`，不批准 paper trading。
+- M12.0 已完成 Longbridge Read-only Auth Preflight：确认本地 Longbridge CLI 可用且当前 token/quote/K 线只读探针可用；本阶段只允许 `check / quote / kline / subscriptions` 行情检查命令，不调用交易、账户、资产、持仓或订单命令，不批准 paper/live。
 
 ## 2. 执行总原则
 

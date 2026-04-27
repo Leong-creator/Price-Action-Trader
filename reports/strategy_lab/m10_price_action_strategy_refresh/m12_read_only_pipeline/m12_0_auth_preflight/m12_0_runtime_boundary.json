@@ -1,0 +1,146 @@
+{
+  "auth_status": "valid_readonly_market_data",
+  "generated_at": "2026-04-27T09:51:34Z",
+  "longbridge_cli_path": "/home/hgl/.local/bin/longbridge",
+  "next_action": "ready_for_m12_1_readonly_feed",
+  "probe_symbol": "SPY.US",
+  "probes": [
+    {
+      "command": [
+        "longbridge",
+        "check",
+        "--format",
+        "json"
+      ],
+      "error": "New version 0.17.4 is available, run `longbridge update` to update.\nRelease notes: https://open.longbridge.cn/docs/cli/release-notes.md",
+      "name": "auth_check",
+      "payload_summary": {
+        "active_region": "CN",
+        "connectivity_ok": true,
+        "token": "valid"
+      },
+      "returncode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "longbridge",
+        "quote",
+        "SPY.US",
+        "--format",
+        "json"
+      ],
+      "error": "New version 0.17.4 is available, run `longbridge update` to update.\nRelease notes: https://open.longbridge.cn/docs/cli/release-notes.md",
+      "name": "quote_snapshot",
+      "payload_summary": {
+        "first_keys": [
+          "high",
+          "last",
+          "low",
+          "open",
+          "overnight_quote",
+          "post_market_quote",
+          "pre_market_quote",
+          "prev_close",
+          "status",
+          "symbol",
+          "turnover",
+          "volume"
+        ],
+        "first_symbol": "SPY.US",
+        "row_count": 1
+      },
+      "returncode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "longbridge",
+        "kline",
+        "SPY.US",
+        "--period",
+        "day",
+        "--count",
+        "1",
+        "--format",
+        "json"
+      ],
+      "error": "New version 0.17.4 is available, run `longbridge update` to update.\nRelease notes: https://open.longbridge.cn/docs/cli/release-notes.md",
+      "name": "latest_kline",
+      "payload_summary": {
+        "first_keys": [
+          "close",
+          "high",
+          "low",
+          "open",
+          "time",
+          "turnover",
+          "volume"
+        ],
+        "first_symbol": null,
+        "row_count": 1
+      },
+      "returncode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "longbridge",
+        "subscriptions",
+        "--format",
+        "json"
+      ],
+      "error": "New version 0.17.4 is available, run `longbridge update` to update.\nRelease notes: https://open.longbridge.cn/docs/cli/release-notes.md",
+      "name": "subscription_snapshot",
+      "payload_summary": {
+        "first_keys": [],
+        "first_symbol": null,
+        "row_count": 0
+      },
+      "returncode": 0,
+      "status": "ok"
+    }
+  ],
+  "runtime_boundary": {
+    "allowed_capabilities": [
+      "connectivity_check",
+      "quote_snapshot",
+      "latest_kline_snapshot",
+      "subscription_status_read"
+    ],
+    "allowed_cli_commands": [
+      "check",
+      "kline",
+      "quote",
+      "subscriptions"
+    ],
+    "broker_connection": false,
+    "explicitly_excluded_capabilities": [
+      "trading",
+      "account_assets",
+      "account_positions",
+      "order_submit_cancel_replace",
+      "cash_or_margin_information",
+      "paper_or_live_execution"
+    ],
+    "forbidden_cli_commands": [
+      "order",
+      "assets",
+      "positions",
+      "portfolio",
+      "statement",
+      "cash-flow",
+      "max-qty",
+      "dca",
+      "fund-positions",
+      "profit-analysis"
+    ],
+    "live_execution": false,
+    "mode": "longbridge_simulated_readonly",
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_orders": false
+  },
+  "schema_version": "m12.readonly-auth-preflight.v1",
+  "stage": "M12.0.readonly_auth_preflight"
+}
