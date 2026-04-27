@@ -1,0 +1,37 @@
+{
+  "schema_version": "m10.4.per-symbol-breakdown.v1",
+  "rows": [
+    {
+      "symbol": "NVDA",
+      "candidate_event_count": 3023,
+      "executed_trade_count": 3023,
+      "baseline_total_r": "-16.8613",
+      "baseline_mean_r": "-0.0056",
+      "baseline_win_rate": "0.3411"
+    },
+    {
+      "symbol": "QQQ",
+      "candidate_event_count": 3146,
+      "executed_trade_count": 3146,
+      "baseline_total_r": "-33.7663",
+      "baseline_mean_r": "-0.0107",
+      "baseline_win_rate": "0.3522"
+    },
+    {
+      "symbol": "SPY",
+      "candidate_event_count": 3180,
+      "executed_trade_count": 3180,
+      "baseline_total_r": "59.7008",
+      "baseline_mean_r": "0.0188",
+      "baseline_win_rate": "0.3695"
+    },
+    {
+      "symbol": "TSLA",
+      "candidate_event_count": 3103,
+      "executed_trade_count": 3103,
+      "baseline_total_r": "189.0549",
+      "baseline_mean_r": "0.0609",
+      "baseline_win_rate": "0.3616"
+    }
+  ]
+}

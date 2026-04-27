@@ -1,6 +1,6 @@
 {
   "schema_version": "m8b2.source-registry.v1",
-  "generated_at": "2026-04-17T11:14:31Z",
+  "generated_at": "2026-04-26T04:22:43Z",
   "sources": [
     {
       "source_id": "fangfangtu_notes--market-cycle-note--842b1d97",
@@ -12,7 +12,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-16T16:31:49Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 3,
       "non_empty_pages": 3,
       "empty_pages": []
@@ -27,7 +27,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-16T16:31:49Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 3,
       "non_empty_pages": 3,
       "empty_pages": []
@@ -42,7 +42,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 3,
       "non_empty_pages": 3,
       "empty_pages": []
@@ -57,7 +57,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-beginner-note.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 3,
       "non_empty_pages": 3,
       "empty_pages": []
@@ -72,7 +72,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-wedge-note.md",
       "parse_notes": "1 page(s) produced no stable text",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 6,
       "non_empty_pages": 5,
       "empty_pages": [
@@ -89,7 +89,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-gap-note.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 3,
       "non_empty_pages": 3,
       "empty_pages": []
@@ -104,7 +104,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-breakout-note.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 4,
       "non_empty_pages": 4,
       "empty_pages": []
@@ -119,7 +119,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T10:09:49Z",
+      "reviewed_at": "2026-04-26T04:14:41Z",
       "page_count": 15,
       "non_empty_pages": 15,
       "empty_pages": []
@@ -134,7 +134,7 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-1-36-units.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:22:43Z",
       "page_count": 2819,
       "non_empty_pages": 2819,
       "empty_pages": []
@@ -149,22 +149,39 @@
       "machine_readable": true,
       "source_page_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
       "parse_notes": "stable text extracted from all pages",
-      "reviewed_at": "2026-04-17T11:14:31Z",
+      "reviewed_at": "2026-04-26T04:22:43Z",
       "page_count": 1397,
       "non_empty_pages": 1397,
       "empty_pages": []
+    },
+    {
+      "source_id": "brooks_v2_manual_transcript--price-action-course-v2-manual-transcript--07183c40",
+      "source_family": "brooks_v2_manual_transcript",
+      "source_type": "manual_transcript_md_tree",
+      "raw_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2",
+      "file_name": "al_brooks_price_action_course_v2",
+      "parse_status": "parsed",
+      "machine_readable": true,
+      "source_page_ref": "wiki:knowledge/wiki/sources/al-brooks-price-action-course-v2-manual-transcript.md",
+      "parse_notes": "stable markdown unit text extracted from all unit files",
+      "reviewed_at": "2026-04-26T04:21:48Z",
+      "page_count": 191,
+      "non_empty_pages": 191,
+      "empty_pages": [],
+      "unit_count": 191,
+      "evidence_file_count": 191,
+      "asset_directory_present": true,
+      "empty_units": []
     }
   ],
   "coverage_summary": {
-    "total_expected": 10,
-    "total_registered": 10,
+    "total_expected": 11,
+    "total_registered": 11,
     "parse_status_counts": {
-      "parsed": 9,
+      "parsed": 10,
       "partial": 1,
       "blocked": 0
     },
-    "filtered_files": [
-      "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf:Zone.Identifier"
-    ]
+    "filtered_files": []
   }
 }

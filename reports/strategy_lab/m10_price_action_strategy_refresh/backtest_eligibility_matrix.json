@@ -1,0 +1,307 @@
+{
+  "schema_version": "m10.backtest-eligibility-matrix.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "matrix": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "historical_backtest_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "historical_backtest_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "title": "Tight Channel Trend Continuation",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "title": "Broad Channel Boundary Reversal",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "historical_backtest_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-006",
+      "title": "Trading Range BLSHS Limit-Order Framework",
+      "timeframe_test_lines": {
+        "1d": "not_primary",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": false,
+      "eligible_for_historical_backtest": false,
+      "test_route": "research_or_visual_review_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion",
+        "risk_definition_freeze_before_simulation"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "title": "Second-Leg Trap Reversal",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "title": "Final Flag or Climax TBTL Reversal",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "title": "Opening Reversal",
+      "timeframe_test_lines": {
+        "1d": "not_primary",
+        "1h": "not_primary",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "timeframe_test_lines": {
+        "1d": "not_primary",
+        "1h": "not_primary",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "historical_backtest_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "title": "Support and Resistance Failed Test",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "test_route": "historical_backtest_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-014",
+      "title": "Measured Move Target Engine",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": false,
+      "test_route": "supporting_rule_attached_to_parent_setups",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "attach_to_parent_strategy_not_standalone"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "title": "Protective Stops and Position Sizing",
+      "timeframe_test_lines": {
+        "1d": "independent_daily_line",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": false,
+      "test_route": "supporting_rule_attached_to_parent_setups",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "attach_to_parent_strategy_not_standalone"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-016",
+      "title": "Trading Range Scaling-In Research",
+      "timeframe_test_lines": {
+        "1d": "not_primary",
+        "1h": "independent_intraday_swing_line",
+        "15m": "independent_intraday_structure_line",
+        "5m": "independent_intraday_execution_line"
+      },
+      "ohlcv_approximable": false,
+      "eligible_for_historical_backtest": false,
+      "test_route": "research_or_visual_review_queue",
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion",
+        "risk_definition_freeze_before_simulation"
+      ]
+    }
+  ]
+}

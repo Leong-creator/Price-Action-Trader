@@ -1,0 +1,187 @@
+{
+  "schema_version": "m10.visual-golden-case-pack.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "strategy_id": "M10-PA-007",
+  "title": "Second-Leg Trap Reversal",
+  "pack_status": "visual_pack_ready",
+  "review_status": "agent_selected_pending_manual_review",
+  "case_counts": {
+    "positive": 3,
+    "counterexample": 1,
+    "boundary": 1
+  },
+  "requirements": {
+    "positive_cases": 3,
+    "counterexamples": 1,
+    "boundary_cases": 1,
+    "brooks_v2_images_are_local_only": true
+  },
+  "source_policy": {
+    "primary_case_source": "brooks_v2_manual_transcript_assets",
+    "youtube_notes_role": "terminology_or_explanation_only_not_visual_case_replacement",
+    "legacy_pa_sc_sf_role": "forbidden_as_case_source"
+  },
+  "cases": [
+    {
+      "case_id": "M10-PA-007-positive-001",
+      "strategy_id": "M10-PA-007",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "evidence_video_id": "video_018B",
+      "evidence_page": 64,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0064_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0064.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0064_crop.webp",
+      "evidence_image_checksum": "7cc04e9f0dea283057c80d69ce7214fc1989d26f7acea50ee65302add923adf9",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "交易区间"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Every TR has both bull and bear trends, and buy and sell setups ~ Whenever good reason to buy and to sell, then TR ¢T Many attempts to BO, but most fail Eventually, BO succeeds Eve",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-007-positive-002",
+      "strategy_id": "M10-PA-007",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "evidence_video_id": "video_018B",
+      "evidence_page": 65,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0065_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0065.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0065_crop.webp",
+      "evidence_image_checksum": "f526a437d0d21cbbfc0543caa71317308991e761329a802b4a03f2bac605dd58",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "交易区间"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "TR: Always Contains Buy and Sell Setups Every TR has both bull and bear trends, and buy and sell setups l! Whenever good reason to · YT•+ ~ buy and to sell, then TR I \\....]__) ~, ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-007-positive-003",
+      "strategy_id": "M10-PA-007",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "evidence_video_id": "video_018B",
+      "evidence_page": 73,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0073_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0073.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0073_crop.webp",
+      "evidence_image_checksum": "4f73f6af2d6092f2e0cac2a249361865acad5267509face1539a59d9932cfd03",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "failed",
+        "breakout mode",
+        "交易区间"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "80°/o of TR Breakouts Fail: Except in BOM (Breakout Mode) BOM is breakout mode Range so tight, that BO likely within next 5 - 10 bars Higher Lows means it is in bull trend Probabil",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-007-counterexample-001",
+      "strategy_id": "M10-PA-007",
+      "case_type": "counterexample",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "evidence_video_id": "video_018B",
+      "evidence_page": 66,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0066_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0066.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0066_crop.webp",
+      "evidence_image_checksum": "6b1bd289406236fe72c4484741b0388a968536f13cd358526653686df1623702",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "eventually break out into trend",
+        "trend",
+        "50% chance"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "TR will eventually break out into trend 50% chance bull BO 50% chance bear BO tt Eventual BO, but 80% of BO attempts fail BrooksTradingCourse.com BrooksPriceAction.com Slide 4 @Alb",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-007-boundary-001",
+      "strategy_id": "M10-PA-007",
+      "case_type": "boundary",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md",
+      "evidence_video_id": "video_015G",
+      "evidence_page": 1171,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/part1_p1171_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/part1_p1171.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/part1_p1171_crop.webp",
+      "evidence_image_checksum": "ee659f8a5b633a9e9f5783c543eab07f80f03971c9a9af9ad9ce021916b8f0ef",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "if",
+        "可能",
+        "如果"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Trapped Emini Scalpers: 5 Tick Traps (and 9, 13, and 17 Tick) ■ Emini scalpers often take 1, 2, 3, or 4 points profits ( 4, 8, 12, or 16 ticks) ■ Creates support & resistance (5/R)",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Second leg resumes strongly with follow-through."
+      ],
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    }
+  ],
+  "gap_notes": []
+}

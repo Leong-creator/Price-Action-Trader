@@ -1,0 +1,119 @@
+{
+  "schema_version": "m10.skip-rule-ledger.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "entries": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "skip_code": "m10_001_no_clear_trend",
+      "reason": "20-bar context does not show trend sequence or clear close relative to 20 SMA.",
+      "spec_ref": "backtest_specs/M10-PA-001.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "skip_code": "m10_001_tight_trading_range",
+      "reason": "Pullback occurs inside a narrow overlapping range with no trend resumption evidence.",
+      "spec_ref": "backtest_specs/M10-PA-001.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "skip_code": "m10_001_opposite_breakout",
+      "reason": "Strong opposite breakout with follow-through cancels the continuation premise.",
+      "spec_ref": "backtest_specs/M10-PA-001.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "skip_code": "m10_001_insufficient_bar_count",
+      "reason": "Not enough bars to evaluate trend, pullback, and second-entry sequence.",
+      "spec_ref": "backtest_specs/M10-PA-001.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "skip_code": "m10_002_weak_breakout_bar",
+      "reason": "Breakout bar body is below 50% of true range or close is not in the directional third.",
+      "spec_ref": "backtest_specs/M10-PA-002.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "skip_code": "m10_002_no_follow_through",
+      "reason": "No confirmation close within the next 1-2 bars.",
+      "spec_ref": "backtest_specs/M10-PA-002.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "skip_code": "m10_002_immediate_range_reentry",
+      "reason": "Price closes back inside the prior range before confirmation.",
+      "spec_ref": "backtest_specs/M10-PA-002.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "skip_code": "m10_002_range_too_narrow_for_costs",
+      "reason": "Prior range height is too small to evaluate after cost/slippage tiers.",
+      "spec_ref": "backtest_specs/M10-PA-002.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "skip_code": "m10_005_no_mature_range",
+      "reason": "Range has fewer than 20 bars or does not show overlapping two-sided structure.",
+      "spec_ref": "backtest_specs/M10-PA-005.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "skip_code": "m10_005_breakout_not_failed",
+      "reason": "Breakout has follow-through or does not close back inside within 1-3 bars.",
+      "spec_ref": "backtest_specs/M10-PA-005.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "skip_code": "m10_005_ambiguous_range_bounds",
+      "reason": "Range high/low cannot be determined from OHLCV without after-the-fact selection.",
+      "spec_ref": "backtest_specs/M10-PA-005.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "skip_code": "m10_005_range_height_unsuitable",
+      "reason": "Range is too narrow for costs or too wide for the configured risk budget.",
+      "spec_ref": "backtest_specs/M10-PA-005.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "skip_code": "m10_012_incomplete_session",
+      "reason": "Missing regular-session open, timezone, or first-30-minute bars.",
+      "spec_ref": "backtest_specs/M10-PA-012.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "skip_code": "m10_012_range_too_narrow_for_costs",
+      "reason": "Opening range is too narrow for cost/slippage tiers.",
+      "spec_ref": "backtest_specs/M10-PA-012.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "skip_code": "m10_012_range_too_wide_for_risk",
+      "reason": "Opening range stop distance exceeds the pilot risk budget.",
+      "spec_ref": "backtest_specs/M10-PA-012.json#skip_rules"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "skip_code": "m10_012_failed_orb_routed_elsewhere",
+      "reason": "Failed ORB is routed to Opening Reversal or Trading Range Failed Breakout queues, not executed here.",
+      "spec_ref": "backtest_specs/M10-PA-012.json#skip_rules"
+    }
+  ]
+}

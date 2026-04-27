@@ -19,10 +19,14 @@
 
 ## 字段约束
 
-- `locator_kind`：首轮固定为 `page_block`
-- `raw_locator`：对象，首轮至少包含
+- `locator_kind`：支持 `page_block` 与 `markdown_block`
+- `raw_locator`：对象，`page_block` 至少包含
   - `locator_kind`
   - `page_no`
+  - `block_index`
+- `raw_locator`：对象，`markdown_block` 至少包含
+  - `locator_kind`
+  - `file_path`
   - `block_index`
 - `chunk_status`：首轮固定支持
   - `parsed`
@@ -33,8 +37,10 @@
 
 ## 首轮切片规则
 
-- 解析器固定为 `pypdf`
+- PDF 解析器固定为 `pypdf`
+- Brooks v2 markdown-tree source 使用 `markdown_tree`
 - transcript / PPT / note PDF 首轮统一按 `page_block` 路径切片
+- Brooks v2 `units/*.md` 按 `markdown_block` 路径切片
 - 先按页抽文本，再按空行切 paragraph
 - paragraph 为空则丢弃
 - paragraph 过长时允许切成固定窗口块

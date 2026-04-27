@@ -1,0 +1,355 @@
+{
+  "schema_version": "m10.strategy-test-queue.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.1.catalog_review_and_test_queue_freeze",
+  "boundaries": {
+    "paper_simulated_only": true,
+    "real_broker_connection": false,
+    "real_account": false,
+    "live_execution": false,
+    "automatic_real_orders": false,
+    "daily_1h_15m_5m_are_independent_lines": true,
+    "visual_golden_case_is_not_global_prerequisite": true
+  },
+  "allowed_wave_a_outcomes": [
+    "needs_definition_fix",
+    "needs_visual_review",
+    "continue_testing",
+    "reject_for_now"
+  ],
+  "queues": {
+    "backtest_wave_a": [
+      {
+        "strategy_id": "M10-PA-001",
+        "title": "Trend Pullback Second-Entry Continuation",
+        "timeframes": [
+          "1d",
+          "1h",
+          "15m",
+          "5m"
+        ],
+        "required_outputs": [
+          "candidate_events",
+          "skip_no_trade_ledger",
+          "source_ledger",
+          "cost_slippage_sensitivity",
+          "per_symbol_breakdown",
+          "per_regime_breakdown",
+          "failure_mode_notes"
+        ],
+        "allowed_outcomes": [
+          "needs_definition_fix",
+          "needs_visual_review",
+          "continue_testing",
+          "reject_for_now"
+        ],
+        "retain_or_promote_allowed": false
+      },
+      {
+        "strategy_id": "M10-PA-002",
+        "title": "Breakout Follow-Through Continuation",
+        "timeframes": [
+          "1d",
+          "1h",
+          "15m",
+          "5m"
+        ],
+        "required_outputs": [
+          "candidate_events",
+          "skip_no_trade_ledger",
+          "source_ledger",
+          "cost_slippage_sensitivity",
+          "per_symbol_breakdown",
+          "per_regime_breakdown",
+          "failure_mode_notes"
+        ],
+        "allowed_outcomes": [
+          "needs_definition_fix",
+          "needs_visual_review",
+          "continue_testing",
+          "reject_for_now"
+        ],
+        "retain_or_promote_allowed": false
+      },
+      {
+        "strategy_id": "M10-PA-005",
+        "title": "Trading Range Failed Breakout Reversal",
+        "timeframes": [
+          "1d",
+          "1h",
+          "15m",
+          "5m"
+        ],
+        "required_outputs": [
+          "candidate_events",
+          "skip_no_trade_ledger",
+          "source_ledger",
+          "cost_slippage_sensitivity",
+          "per_symbol_breakdown",
+          "per_regime_breakdown",
+          "failure_mode_notes"
+        ],
+        "allowed_outcomes": [
+          "needs_definition_fix",
+          "needs_visual_review",
+          "continue_testing",
+          "reject_for_now"
+        ],
+        "retain_or_promote_allowed": false
+      },
+      {
+        "strategy_id": "M10-PA-012",
+        "title": "Opening Range Breakout",
+        "timeframes": [
+          "15m",
+          "5m"
+        ],
+        "required_outputs": [
+          "candidate_events",
+          "skip_no_trade_ledger",
+          "source_ledger",
+          "cost_slippage_sensitivity",
+          "per_symbol_breakdown",
+          "per_regime_breakdown",
+          "failure_mode_notes"
+        ],
+        "allowed_outcomes": [
+          "needs_definition_fix",
+          "needs_visual_review",
+          "continue_testing",
+          "reject_for_now"
+        ],
+        "retain_or_promote_allowed": false
+      }
+    ],
+    "backtest_wave_b_candidate": [
+      {
+        "strategy_id": "M10-PA-013",
+        "title": "Support and Resistance Failed Test",
+        "timeframes": [
+          "1d",
+          "1h",
+          "15m",
+          "5m"
+        ],
+        "entry_gate": "M10.3_or_later_spec_freeze",
+        "allowed_outcomes": [
+          "queue_for_wave_b_spec_after_m10_3"
+        ]
+      }
+    ],
+    "visual_promotion_to_wave_b": [
+      {
+        "strategy_id": "M10-PA-003",
+        "title": "Tight Channel Trend Continuation",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      },
+      {
+        "strategy_id": "M10-PA-004",
+        "title": "Broad Channel Boundary Reversal",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      },
+      {
+        "strategy_id": "M10-PA-007",
+        "title": "Second-Leg Trap Reversal",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      },
+      {
+        "strategy_id": "M10-PA-008",
+        "title": "Major Trend Reversal",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      },
+      {
+        "strategy_id": "M10-PA-009",
+        "title": "Wedge Reversal and Wedge Flag",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      },
+      {
+        "strategy_id": "M10-PA-010",
+        "title": "Final Flag or Climax TBTL Reversal",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      },
+      {
+        "strategy_id": "M10-PA-011",
+        "title": "Opening Reversal",
+        "entry_gate": "must_pass_m10_2_visual_golden_case_pack"
+      }
+    ],
+    "visual_golden_case_first": [
+      {
+        "strategy_id": "M10-PA-003",
+        "title": "Tight Channel Trend Continuation",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      },
+      {
+        "strategy_id": "M10-PA-004",
+        "title": "Broad Channel Boundary Reversal",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      },
+      {
+        "strategy_id": "M10-PA-007",
+        "title": "Second-Leg Trap Reversal",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      },
+      {
+        "strategy_id": "M10-PA-008",
+        "title": "Major Trend Reversal",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      },
+      {
+        "strategy_id": "M10-PA-009",
+        "title": "Wedge Reversal and Wedge Flag",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      },
+      {
+        "strategy_id": "M10-PA-010",
+        "title": "Final Flag or Climax TBTL Reversal",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      },
+      {
+        "strategy_id": "M10-PA-011",
+        "title": "Opening Reversal",
+        "requirements": {
+          "brooks_v2_positive_cases": 3,
+          "counterexamples": 1,
+          "boundary_cases": 1,
+          "required_fields": [
+            "brooks_v2_evidence_image_or_source_ref",
+            "counterexample_source_ref",
+            "boundary_case_source_ref",
+            "pattern_decision_points",
+            "ohlcv_approximation_risk"
+          ]
+        },
+        "failure_policy": "failed_visual_review_remains_research_or_visual_review_only"
+      }
+    ],
+    "supporting_rule": [
+      {
+        "strategy_id": "M10-PA-014",
+        "title": "Measured Move Target Engine",
+        "standalone_trigger_allowed": false,
+        "usage": "attach_to_parent_strategy_for_target_risk_or_position_sizing"
+      },
+      {
+        "strategy_id": "M10-PA-015",
+        "title": "Protective Stops and Position Sizing",
+        "standalone_trigger_allowed": false,
+        "usage": "attach_to_parent_strategy_for_target_risk_or_position_sizing"
+      }
+    ],
+    "research_only": [
+      {
+        "strategy_id": "M10-PA-006",
+        "title": "Trading Range BLSHS Limit-Order Framework",
+        "standalone_trigger_allowed": false,
+        "usage": "research_only_until_risk_definition_and_source_scope_are_frozen"
+      },
+      {
+        "strategy_id": "M10-PA-016",
+        "title": "Trading Range Scaling-In Research",
+        "standalone_trigger_allowed": false,
+        "usage": "research_only_until_risk_definition_and_source_scope_are_frozen"
+      }
+    ]
+  },
+  "future_handoffs": [
+    {
+      "stage": "M10.2",
+      "name": "Visual Golden Case Pack",
+      "handoff": "为高视觉策略建立 Brooks v2 正例、反例、边界例和人工复核记录。"
+    },
+    {
+      "stage": "M10.3",
+      "name": "Backtest Spec Freeze",
+      "handoff": "为 Wave A 策略冻结事件识别、skip 规则、成本、样本门槛和失败标准。"
+    },
+    {
+      "stage": "M10.4",
+      "name": "Historical Backtest Pilot",
+      "handoff": "只跑 Wave A 小范围 pilot，验证事件识别、ledger 和成本敏感性，不证明盈利。"
+    },
+    {
+      "stage": "M10.5",
+      "name": "Read-only Observation Plan",
+      "handoff": "pilot 合格后才设计实时只读观察；仍不接 broker、不下单。"
+    },
+    {
+      "stage": "M11",
+      "name": "Paper Trading Candidate Gate",
+      "handoff": "historical pilot、visual review、实时只读观察达标后才讨论 paper trading。"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": "m10.4.cost-slippage-sensitivity.v1",
+  "candidate_event_count": 3534,
+  "executed_trade_count": 3534,
+  "tiers": [
+    {
+      "tier": "baseline",
+      "slippage_bps": 1,
+      "fee_per_order": 0,
+      "total_r": "75.2391",
+      "mean_r": "0.0213",
+      "win_rate": "0.3645"
+    },
+    {
+      "tier": "stress_low",
+      "slippage_bps": 2,
+      "fee_per_order": 0,
+      "total_r": "-178.3752",
+      "mean_r": "-0.0505",
+      "win_rate": "0.3642"
+    },
+    {
+      "tier": "stress_high",
+      "slippage_bps": 5,
+      "fee_per_order": 0,
+      "total_r": "-939.2043",
+      "mean_r": "-0.2658",
+      "win_rate": "0.3605"
+    }
+  ]
+}

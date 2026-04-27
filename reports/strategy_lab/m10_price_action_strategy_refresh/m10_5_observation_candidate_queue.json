@@ -1,0 +1,130 @@
+{
+  "schema_version": "m10.read-only-observation-candidate-queue.v1",
+  "generated_at": "2026-04-26T10:30:00Z",
+  "stage": "M10.5.read_only_observation_plan",
+  "input_refs": {
+    "frozen_catalog": "reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10_frozen.json",
+    "spec_index": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_backtest_spec_index.json",
+    "pilot_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_wave_a_pilot_summary.json",
+    "dataset_inventory": "reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_dataset_inventory.json"
+  },
+  "boundaries": {
+    "paper_simulated_only": true,
+    "plan_only": true,
+    "observation_runner_started": false,
+    "broker_connection": false,
+    "real_orders": false,
+    "live_execution": false,
+    "catalog_status_upgrade_allowed": false,
+    "profitability_claim_allowed": false
+  },
+  "allowed_observation_outcomes": [
+    "needs_definition_fix",
+    "needs_visual_review",
+    "continue_testing",
+    "reject_for_now",
+    "continue_observation"
+  ],
+  "observation_input_status": "observation_input_deferred",
+  "observation_input_rule": "No live read-only feed is configured in M10.5; do not fabricate observation events.",
+  "density_policy": {
+    "candidate_events_per_1000_bars_review_threshold": 100,
+    "flag": "definition_breadth_review",
+    "interpretation": "review_only_not_profitability_evaluation"
+  },
+  "lineage_requirements": {
+    "daily_default_window": {
+      "start": "2010-06-29",
+      "end": "2026-04-21",
+      "source": "m10_4_dataset_inventory.json"
+    },
+    "derived_timeframes": {
+      "15m": "derived_from_5m",
+      "1h": "derived_from_5m"
+    },
+    "native_timeframes": {
+      "1d": "native_cache",
+      "5m": "native_cache"
+    }
+  },
+  "candidate_queue": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "spec_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs/M10-PA-001.json",
+      "timeframes": ["1d", "1h", "15m", "5m"],
+      "observation_cadence": {
+        "1d": "after_regular_session_close_only",
+        "1h": "regular_session_bar_close_only",
+        "15m": "regular_session_bar_close_only",
+        "5m": "regular_session_bar_close_only"
+      },
+      "m10_4_results": [
+        {"timeframe": "1d", "candidate_event_count": 1518, "executed_trade_count": 1518, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 95.43, "quality_flag": "normal_density_review"},
+        {"timeframe": "1h", "candidate_event_count": 1011, "executed_trade_count": 1011, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 82.12, "quality_flag": "normal_density_review"},
+        {"timeframe": "15m", "candidate_event_count": 4331, "executed_trade_count": 4331, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 81.14, "quality_flag": "normal_density_review"},
+        {"timeframe": "5m", "candidate_event_count": 12452, "executed_trade_count": 12452, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 77.76, "quality_flag": "normal_density_review"}
+      ],
+      "review_requirement": "read_only_observation_after_m10_4_quality_review"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "spec_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs/M10-PA-002.json",
+      "timeframes": ["1d", "1h", "15m", "5m"],
+      "observation_cadence": {
+        "1d": "after_regular_session_close_only",
+        "1h": "regular_session_bar_close_only",
+        "15m": "regular_session_bar_close_only",
+        "5m": "regular_session_bar_close_only"
+      },
+      "m10_4_results": [
+        {"timeframe": "1d", "candidate_event_count": 1196, "executed_trade_count": 1196, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 75.19, "quality_flag": "normal_density_review"},
+        {"timeframe": "1h", "candidate_event_count": 814, "executed_trade_count": 814, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 66.11, "quality_flag": "normal_density_review"},
+        {"timeframe": "15m", "candidate_event_count": 3534, "executed_trade_count": 3534, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 66.21, "quality_flag": "normal_density_review"},
+        {"timeframe": "5m", "candidate_event_count": 10759, "executed_trade_count": 10759, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 67.18, "quality_flag": "normal_density_review"}
+      ],
+      "review_requirement": "read_only_observation_after_m10_4_quality_review"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "spec_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs/M10-PA-005.json",
+      "timeframes": ["1d", "1h", "15m", "5m"],
+      "observation_cadence": {
+        "1d": "after_regular_session_close_only",
+        "1h": "regular_session_bar_close_only",
+        "15m": "regular_session_bar_close_only",
+        "5m": "regular_session_bar_close_only"
+      },
+      "m10_4_results": [
+        {"timeframe": "1d", "candidate_event_count": 1481, "executed_trade_count": 1481, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 93.10, "quality_flag": "normal_density_review"},
+        {"timeframe": "1h", "candidate_event_count": 1469, "executed_trade_count": 1469, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 119.31, "quality_flag": "definition_breadth_review"},
+        {"timeframe": "15m", "candidate_event_count": 7511, "executed_trade_count": 7511, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 140.72, "quality_flag": "definition_breadth_review"},
+        {"timeframe": "5m", "candidate_event_count": 23881, "executed_trade_count": 23881, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 149.12, "quality_flag": "definition_breadth_review"}
+      ],
+      "review_requirement": "read_only_observation_only_after_definition_breadth_review"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "spec_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs/M10-PA-012.json",
+      "timeframes": ["15m", "5m"],
+      "observation_cadence": {
+        "15m": "regular_session_bar_close_only",
+        "5m": "regular_session_bar_close_only"
+      },
+      "m10_4_results": [
+        {"timeframe": "15m", "candidate_event_count": 1762, "executed_trade_count": 1762, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 33.01, "quality_flag": "normal_density_review"},
+        {"timeframe": "5m", "candidate_event_count": 1900, "executed_trade_count": 1900, "sample_gate_passed": true, "outcome": "continue_testing", "candidate_events_per_1000_bars": 11.86, "quality_flag": "normal_density_review"}
+      ],
+      "review_requirement": "read_only_observation_after_m10_4_quality_review"
+    }
+  ],
+  "excluded_strategy_ids": {
+    "visual_first": ["M10-PA-003", "M10-PA-004", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-010", "M10-PA-011"],
+    "wave_b_candidate": ["M10-PA-013"],
+    "supporting_only": ["M10-PA-014", "M10-PA-015"],
+    "research_only": ["M10-PA-006", "M10-PA-016"]
+  }
+}

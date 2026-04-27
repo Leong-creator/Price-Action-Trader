@@ -1,0 +1,37 @@
+{
+  "title": "M10.4 Wave A Historical Backtest Pilot",
+  "description": "Small-scope paper/simulated pilot for M10 Wave A specs. No broker, no live execution, no retain/promote conclusion.",
+  "run_id": "m10_4_wave_a_pilot",
+  "symbols": ["SPY", "QQQ", "NVDA", "TSLA"],
+  "market": "US",
+  "timezone": "America/New_York",
+  "data_windows": {
+    "1d": {
+      "start": "2010-06-29",
+      "end": "2026-04-21"
+    },
+    "5m": {
+      "start": "2024-04-01",
+      "end": "2026-04-21"
+    },
+    "15m": {
+      "start": "2024-04-01",
+      "end": "2026-04-21",
+      "derive_from": "5m"
+    },
+    "1h": {
+      "start": "2024-04-01",
+      "end": "2026-04-21",
+      "derive_from": "5m"
+    }
+  },
+  "cache_roots": [
+    "local_data",
+    "/home/hgl/projects/Price-Action-Trader/local_data"
+  ],
+  "spec_index_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_backtest_spec_index.json",
+  "cost_sample_policy_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_cost_sample_gate_policy.json",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot",
+  "allow_download": false,
+  "paper_simulated_only": true
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": "m10.6.deferred-inputs.v1",
+  "run_id": "m10_6_replay",
+  "deferred_count": 0,
+  "rule": "Missing local input creates deferred records only; no synthetic observation events are generated.",
+  "records": []
+}

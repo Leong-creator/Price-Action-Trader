@@ -1,0 +1,189 @@
+{
+  "schema_version": "m10.visual-golden-case-pack.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "strategy_id": "M10-PA-004",
+  "title": "Broad Channel Boundary Reversal",
+  "pack_status": "visual_pack_ready",
+  "review_status": "agent_selected_pending_manual_review",
+  "case_counts": {
+    "positive": 3,
+    "counterexample": 1,
+    "boundary": 1
+  },
+  "requirements": {
+    "positive_cases": 3,
+    "counterexamples": 1,
+    "boundary_cases": 1,
+    "brooks_v2_images_are_local_only": true
+  },
+  "source_policy": {
+    "primary_case_source": "brooks_v2_manual_transcript_assets",
+    "youtube_notes_role": "terminology_or_explanation_only_not_visual_case_replacement",
+    "legacy_pa_sc_sf_role": "forbidden_as_case_source"
+  },
+  "cases": [
+    {
+      "case_id": "M10-PA-004-positive-001",
+      "strategy_id": "M10-PA-004",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+      "evidence_video_id": "video_016F",
+      "evidence_page": 1382,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1382_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1382.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1382_crop.webp",
+      "evidence_image_checksum": "d8c2db028982d5313cc1eabf5ec2415f9bba73de56ad9ce89f4c911fa2b8c9f6",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "broad channel",
+        "limit orders",
+        "fade test"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Main Points: Broad Channel or Trading Range? ■ Limit orders to fade test of line ■ Breakouts at start of trend ■ Reversals and breakout failures ■ Broad Channel or Trading Range (T",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-004-positive-002",
+      "strategy_id": "M10-PA-004",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_046D_broad_bear_channels_lhs_second_leg_trap_bulls_buy_lows.md",
+      "evidence_video_id": "video_046D",
+      "evidence_page": 764,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/advanced_p0764_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/advanced_p0764.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/advanced_p0764_crop.webp",
+      "evidence_image_checksum": "27568825c8ac1a17eaa05542c7a9bcf860445c4e9f9bcefef280d6d6fd5ca712",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "broad channel",
+        "channel line",
+        "limit orders"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "When Broad Channel or TR, bulls and bears kee,p drawing channel lines When a channel has broad swings, 75% of BO attempts at top and bottom fail Sell with limit orders at top of ch",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-004-positive-003",
+      "strategy_id": "M10-PA-004",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+      "evidence_video_id": "video_016F",
+      "evidence_page": 1365,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1365_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1365.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1365_crop.webp",
+      "evidence_image_checksum": "5673cb118a0570752679f2f54d2b9905fde41b2d1c64147234afbb6c7a588476",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "broad channel",
+        "limit orders",
+        "fade test"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "• Limit orders to fade test of line • Breakouts at start of trend • Reversals and breakout failures • Broad Channel or Trading Range (TR)? • Every TR has bull and bear channel 2 5 ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-004-counterexample-001",
+      "strategy_id": "M10-PA-004",
+      "case_type": "counterexample",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+      "evidence_video_id": "video_016F",
+      "evidence_page": 1368,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1368_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1368.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1368_crop.webp",
+      "evidence_image_checksum": "a0fbdc113befa0a86a1406c1daf102acfecfa598cebaad0e3e1375983b659be7",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "breakouts at start of trend"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Main Points: Breakouts at Start of Trend • Limit orders to fade test of line ■ Breakouts at start of trend • Reversals and breakout failures • Broad Channel or Trading Range (TR)? ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-004-boundary-001",
+      "strategy_id": "M10-PA-004",
+      "case_type": "boundary",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014A_trends_higher_lows_lower_highs.md",
+      "evidence_video_id": "video_014A",
+      "evidence_page": 891,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/part1_p0891_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/part1_p0891.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/part1_p0891_crop.webp",
+      "evidence_image_checksum": "812a1bea1c65b72425ab208b303e53b9b78efe224f210da0c653a9810fb58a4d",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "if",
+        "可能",
+        "如果"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Breakout above Lower High: Might Now Be TR or Bull Trend If market rallies above prior Lower High ■ Might be broader, flatter bear trend ■ Trend might be over ■ Might have evolved ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Strong breakout beyond the boundary with follow-through."
+      ],
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    }
+  ],
+  "gap_notes": []
+}

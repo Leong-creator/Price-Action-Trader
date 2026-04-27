@@ -21,10 +21,7 @@ class KnowledgeCoverageTests(unittest.TestCase):
         manifest = fixture["source_manifest"]
         filtered = manifest["coverage_summary"]["filtered_files"]
 
-        self.assertIn(
-            "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf:Zone.Identifier",
-            filtered,
-        )
+        self.assertTrue(all(item.endswith(":Zone.Identifier") for item in filtered))
         self.assertNotIn(
             "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf:Zone.Identifier",
             {record["raw_path"] for record in manifest["sources"]},

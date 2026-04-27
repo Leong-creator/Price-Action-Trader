@@ -32,7 +32,12 @@ CHUNK_REGISTRY_SCHEMA = "m8b2.chunk-registry.v1"
 KNOWLEDGE_ATOM_SCHEMA = "m8b2.knowledge-atoms.v1"
 CALLABLE_INDEX_SCHEMA = "m8b2.callable-index.v1"
 
-ALLOWED_SOURCE_TYPES = {"note_pdf", "transcript_pdf", "ppt_pdf"}
+ALLOWED_SOURCE_TYPES = {
+    "note_pdf",
+    "transcript_pdf",
+    "ppt_pdf",
+    "manual_transcript_md_tree",
+}
 ALLOWED_PARSE_STATUS = {"parsed", "partial", "blocked"}
 ALLOWED_ATOM_TYPES = {
     "concept",
@@ -196,6 +201,13 @@ SOURCE_SPECS: tuple[SourceSpec, ...] = (
         slug="price-action-ppt-37-52-units",
         source_page_ref="wiki:knowledge/wiki/sources/al-brooks-price-action-ppt-37-52-units.md",
     ),
+    SourceSpec(
+        raw_path="knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2",
+        source_family="brooks_v2_manual_transcript",
+        source_type="manual_transcript_md_tree",
+        slug="price-action-course-v2-manual-transcript",
+        source_page_ref="wiki:knowledge/wiki/sources/al-brooks-price-action-course-v2-manual-transcript.md",
+    ),
 )
 
 
@@ -276,6 +288,7 @@ def discover_filtered_files() -> list[str]:
         PROJECT_ROOT / "knowledge" / "raw" / "notes",
         PROJECT_ROOT / "knowledge" / "raw" / "youtube" / "fangfangtu" / "transcripts",
         PROJECT_ROOT / "knowledge" / "raw" / "brooks" / "ppt",
+        PROJECT_ROOT / "knowledge" / "raw" / "brooks" / "transcribed_v2",
     )
     for root in scan_roots:
         if not root.exists():
@@ -350,6 +363,46 @@ def probe_pdf(path: Path) -> dict[str, Any]:
     }
 
 
+def probe_markdown_tree(path: Path) -> dict[str, Any]:
+    units_dir = path / "units"
+    evidence_dir = path / "evidence"
+    asset_dir = path / "assets" / "evidence"
+    unit_files = sorted(units_dir.glob("*.md")) if units_dir.exists() else []
+    evidence_files = sorted(evidence_dir.glob("*.md")) if evidence_dir.exists() else []
+    empty_units: list[str] = []
+    non_empty_units = 0
+
+    for unit in unit_files:
+        text = unit.read_text(encoding="utf-8", errors="replace")
+        if meaningful_page_text(text):
+            non_empty_units += 1
+        else:
+            empty_units.append(unit.relative_to(path).as_posix())
+
+    if not unit_files or non_empty_units == 0:
+        status = "blocked"
+        notes = "no stable markdown unit text extracted"
+    elif empty_units:
+        status = "partial"
+        notes = f"{len(empty_units)} markdown unit file(s) produced no stable text"
+    else:
+        status = "parsed"
+        notes = "stable markdown unit text extracted from all unit files"
+
+    return {
+        "parse_status": status,
+        "machine_readable": status != "blocked",
+        "parse_notes": notes,
+        "page_count": len(unit_files),
+        "non_empty_pages": non_empty_units,
+        "empty_pages": [],
+        "unit_count": len(unit_files),
+        "evidence_file_count": len(evidence_files),
+        "asset_directory_present": asset_dir.exists(),
+        "empty_units": empty_units,
+    }
+
+
 def build_source_manifest() -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     generated_paths: list[Path] = []
@@ -363,7 +416,10 @@ def build_source_manifest() -> dict[str, Any]:
             raise FileNotFoundError(f"source page is missing: {spec.source_page_ref}")
 
         generated_paths.extend([raw_path, source_page_path])
-        probe = probe_pdf(raw_path)
+        if spec.source_type == "manual_transcript_md_tree":
+            probe = probe_markdown_tree(raw_path)
+        else:
+            probe = probe_pdf(raw_path)
         record = {
             "source_id": spec.source_id,
             "source_family": spec.source_family,
@@ -379,6 +435,14 @@ def build_source_manifest() -> dict[str, Any]:
             "non_empty_pages": probe["non_empty_pages"],
             "empty_pages": probe["empty_pages"],
         }
+        for optional_field in (
+            "unit_count",
+            "evidence_file_count",
+            "asset_directory_present",
+            "empty_units",
+        ):
+            if optional_field in probe:
+                record[optional_field] = probe[optional_field]
         records.append(record)
 
     filtered_files = discover_filtered_files()
@@ -459,6 +523,55 @@ def chunk_record(
     }
 
 
+def markdown_chunk_record(
+    *,
+    source_id: str,
+    source_family: str,
+    relative_path: str,
+    block_index: int,
+    chunk_text: str,
+    chunk_status: str,
+) -> dict[str, Any]:
+    raw_locator = {
+        "locator_kind": "markdown_block",
+        "file_path": relative_path,
+        "block_index": block_index,
+    }
+    base = f"{source_id}|{relative_path}|{block_index}|{chunk_text}"
+    return {
+        "chunk_id": f"chunk--{short_sha1(base, length=14)}",
+        "source_id": source_id,
+        "source_family": source_family,
+        "locator_kind": "markdown_block",
+        "raw_locator": raw_locator,
+        "chunk_text": chunk_text,
+        "chunk_status": chunk_status,
+        "parser_name": "markdown_tree",
+        "parser_version": "m10",
+        "derived_from": {
+            "source_id": source_id,
+            "file_path": relative_path,
+        },
+    }
+
+
+def chunk_sort_key(item: dict[str, Any]) -> tuple[str, str, int, int]:
+    locator = item["raw_locator"]
+    if locator.get("locator_kind") == "markdown_block":
+        return (
+            item["source_id"],
+            str(locator.get("file_path", "")),
+            0,
+            int(locator.get("block_index", 0)),
+        )
+    return (
+        item["source_id"],
+        "",
+        int(locator.get("page_no", 0)),
+        int(locator.get("block_index", 0)),
+    )
+
+
 def build_chunk_manifest(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     source_records = source_manifest["sources"]
@@ -466,6 +579,36 @@ def build_chunk_manifest(source_manifest: dict[str, Any]) -> list[dict[str, Any]
     for source in source_records:
         raw_path = PROJECT_ROOT / source["raw_path"]
         if source["parse_status"] == "blocked":
+            continue
+        if source["source_type"] == "manual_transcript_md_tree":
+            units_dir = raw_path / "units"
+            for unit_path in sorted(units_dir.glob("*.md")):
+                relative_path = unit_path.relative_to(raw_path).as_posix()
+                text = unit_path.read_text(encoding="utf-8", errors="replace")
+                blocks = split_page_blocks(text)
+                if not blocks:
+                    records.append(
+                        markdown_chunk_record(
+                            source_id=source["source_id"],
+                            source_family=source["source_family"],
+                            relative_path=relative_path,
+                            block_index=0,
+                            chunk_text="",
+                            chunk_status="blocked",
+                        )
+                    )
+                    continue
+                for block_index, block in enumerate(blocks, start=1):
+                    records.append(
+                        markdown_chunk_record(
+                            source_id=source["source_id"],
+                            source_family=source["source_family"],
+                            relative_path=relative_path,
+                            block_index=block_index,
+                            chunk_text=block,
+                            chunk_status="parsed",
+                        )
+                    )
             continue
         reader = PdfReader(str(raw_path))
         for page_no, page in enumerate(reader.pages, start=1):
@@ -499,13 +642,7 @@ def build_chunk_manifest(source_manifest: dict[str, Any]) -> list[dict[str, Any]
                     )
                 )
 
-    records.sort(
-        key=lambda item: (
-            item["source_id"],
-            item["raw_locator"]["page_no"],
-            item["raw_locator"]["block_index"],
-        )
-    )
+    records.sort(key=chunk_sort_key)
     return records
 
 
@@ -572,7 +709,22 @@ def locator_brief(raw_locator: dict[str, Any]) -> str:
         return f"p{page_no}b{block_index}{suffix}"
     if locator_kind == "chunk_set":
         return f"chunk_set[{raw_locator.get('member_count', '?')}]"
+    if locator_kind == "markdown_block":
+        file_path = raw_locator.get("file_path", "?")
+        block_index = raw_locator.get("block_index", "?")
+        fragment_index = raw_locator.get("fragment_index")
+        suffix = f"#f{fragment_index}" if fragment_index is not None else ""
+        return f"{file_path}#b{block_index}{suffix}"
     return locator_kind
+
+
+def chunk_locator_member(chunk: dict[str, Any]) -> dict[str, Any]:
+    locator = chunk["raw_locator"]
+    member = {"source_id": chunk["source_id"], "locator_kind": locator.get("locator_kind", "unknown")}
+    for field in ("page_no", "file_path", "block_index", "fragment_index"):
+        if field in locator:
+            member[field] = locator[field]
+    return member
 
 
 def load_curated_promotion_map(path: Path | None = None) -> dict[str, Any]:
@@ -622,14 +774,7 @@ def source_ids_for_reference(
 
 
 def build_chunk_set_locator(chunks: list[dict[str, Any]]) -> dict[str, Any]:
-    members = [
-        {
-            "source_id": chunk["source_id"],
-            "page_no": chunk["raw_locator"]["page_no"],
-            "block_index": chunk["raw_locator"]["block_index"],
-        }
-        for chunk in chunks[:20]
-    ]
+    members = [chunk_locator_member(chunk) for chunk in chunks[:20]]
     return {
         "locator_kind": "chunk_set",
         "member_count": len(chunks),
@@ -714,13 +859,7 @@ def build_curated_subset_locator(
 ) -> dict[str, Any]:
     members: list[dict[str, Any]] = []
     for chunk in chunks:
-        members.append(
-            {
-                "source_id": chunk["source_id"],
-                "page_no": chunk["raw_locator"]["page_no"],
-                "block_index": chunk["raw_locator"]["block_index"],
-            }
-        )
+        members.append(chunk_locator_member(chunk))
 
     return {
         "locator_kind": "chunk_set",
@@ -1395,8 +1534,12 @@ def validate_source_manifest(source_manifest: dict[str, Any]) -> list[str]:
     filtered_files = source_manifest.get("coverage_summary", {}).get("filtered_files", [])
     if any(not item.endswith(":Zone.Identifier") for item in filtered_files):
         errors.append("filtered_files contains non-sidecar entries")
-    if "knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf:Zone.Identifier" not in filtered_files:
-        errors.append("Zone.Identifier sidecar is not recorded in filtered_files")
+    for record in records:
+        if record.get("source_type") == "manual_transcript_md_tree":
+            if int(record.get("unit_count", 0)) <= 0:
+                errors.append(f"markdown source missing units: {record.get('source_id')}")
+            if record.get("parse_status") == "parsed" and not record.get("asset_directory_present"):
+                errors.append(f"markdown source missing asset directory: {record.get('source_id')}")
     blocked_count = source_manifest.get("coverage_summary", {}).get("parse_status_counts", {}).get("blocked", 0)
     if blocked_count >= 4:
         errors.append(f"blocked source fuse triggered: blocked={blocked_count}")

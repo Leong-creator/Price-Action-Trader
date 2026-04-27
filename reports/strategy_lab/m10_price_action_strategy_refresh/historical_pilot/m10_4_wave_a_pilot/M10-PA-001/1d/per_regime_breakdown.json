@@ -1,0 +1,37 @@
+{
+  "schema_version": "m10.4.per-regime-breakdown.v1",
+  "rows": [
+    {
+      "regime": "insufficient_context",
+      "candidate_event_count": 14,
+      "executed_trade_count": 14,
+      "baseline_total_r": "18.9612",
+      "baseline_mean_r": "1.3544",
+      "baseline_win_rate": "0.7857"
+    },
+    {
+      "regime": "range_or_mixed",
+      "candidate_event_count": 590,
+      "executed_trade_count": 590,
+      "baseline_total_r": "9.9050",
+      "baseline_mean_r": "0.0168",
+      "baseline_win_rate": "0.3407"
+    },
+    {
+      "regime": "trend_down",
+      "candidate_event_count": 233,
+      "executed_trade_count": 233,
+      "baseline_total_r": "-131.5009",
+      "baseline_mean_r": "-0.5644",
+      "baseline_win_rate": "0.1545"
+    },
+    {
+      "regime": "trend_up",
+      "candidate_event_count": 681,
+      "executed_trade_count": 681,
+      "baseline_total_r": "287.3616",
+      "baseline_mean_r": "0.4220",
+      "baseline_win_rate": "0.4758"
+    }
+  ]
+}

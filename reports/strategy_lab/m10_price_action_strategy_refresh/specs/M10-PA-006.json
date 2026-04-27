@@ -1,0 +1,165 @@
+{
+  "schema_version": "m10.strategy-spec.v1",
+  "strategy": {
+    "strategy_id": "M10-PA-006",
+    "namespace": "M10-PA",
+    "title": "Trading Range BLSHS Limit-Order Framework",
+    "status": "research_only",
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "confidence": "high",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "source_refs": [
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_048G_trading_the_middle_look_for_change.md"
+        },
+        "title": "Video 48G: Trading the Middle of the Day",
+        "matched_keywords": [
+          "blshs",
+          "limit order",
+          "trading range",
+          "限价单",
+          "低买高卖",
+          "交易区间"
+        ]
+      },
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md"
+        },
+        "title": "Video 18F: Trading Ranges - Do Not Bet on Breakouts and Early Signs of a TR Day",
+        "matched_keywords": [
+          "blshs",
+          "trading range",
+          "限价单",
+          "低买高卖",
+          "交易区间"
+        ]
+      },
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+        },
+        "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions",
+        "matched_keywords": [
+          "trading range",
+          "交易区间"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_youtube_transcript",
+        "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 11
+        },
+        "title": "fangfangtu YouTube transcript p11",
+        "matched_keywords": [
+          "限价单"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_youtube_transcript",
+        "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 6
+        },
+        "title": "fangfangtu YouTube transcript p6",
+        "matched_keywords": [
+          "限价单"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_notes",
+        "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 2
+        },
+        "title": "方方土视频笔记 - 市场周期 p2",
+        "matched_keywords": [
+          "blshs",
+          "buy low sell high scalp",
+          "trading range"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_notes",
+        "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 2
+        },
+        "title": "方方土视频笔记 - 楔形 p2",
+        "matched_keywords": [
+          "limit order",
+          "限价单"
+        ]
+      }
+    ],
+    "source_families": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "market_context": [
+      "trading range",
+      "limit order market",
+      "scalping"
+    ],
+    "timeframes": [
+      "1h",
+      "15m",
+      "5m"
+    ],
+    "direction": "both",
+    "entry_logic": [
+      "In a mature trading range, buy low and sell high with limit-order logic rather than breakout-chasing.",
+      "Only research this as a framework until range maturity and transaction-cost assumptions are frozen."
+    ],
+    "stop_logic": [
+      "Protect beyond the range edge or abandon if the range converts to a trend."
+    ],
+    "target_logic": [
+      "Scalp toward the range midpoint or opposite edge; costs and slippage are first-order constraints."
+    ],
+    "invalidation": [
+      "Breakout converts into trend with follow-through."
+    ],
+    "no_trade_conditions": [
+      "Immature range, news shock, or insufficient spread/cost margin."
+    ],
+    "visual_dependency": "high",
+    "backtest_eligibility": {
+      "ohlcv_approximable": false,
+      "eligible_for_historical_backtest": false,
+      "route": "research_or_visual_review_queue"
+    },
+    "clean_room_guard": {
+      "legacy_ids_used_in_extraction": [],
+      "forbidden_legacy_inputs": [
+        "knowledge/wiki/strategy_cards",
+        "reports/strategy_lab/strategy_catalog.json",
+        "reports/strategy_lab/specs",
+        "reports/strategy_lab/strategy_triage_matrix.json",
+        "reports/strategy_lab/cards"
+      ]
+    },
+    "chatgpt_bpa_reference_overlap": [
+      "BPA-007",
+      "BPA-020"
+    ]
+  },
+  "paper_simulated_only": true
+}

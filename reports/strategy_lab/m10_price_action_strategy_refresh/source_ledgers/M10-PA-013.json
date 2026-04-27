@@ -1,0 +1,79 @@
+{
+  "schema_version": "m10.strategy-source-ledger.v1",
+  "strategy_id": "M10-PA-013",
+  "title": "Support and Resistance Failed Test",
+  "source_priority": [
+    "brooks_v2_manual_transcript",
+    "fangfangtu_youtube_transcript",
+    "fangfangtu_notes"
+  ],
+  "support_summary": {
+    "strategy_id": "M10-PA-013",
+    "title": "Support and Resistance Failed Test",
+    "support_counts": {
+      "brooks_v2_manual_transcript": 3,
+      "fangfangtu_youtube_transcript": 0,
+      "fangfangtu_notes": 0
+    },
+    "supported_families": [
+      "brooks_v2_manual_transcript"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "brooks_or_youtube_only_allowed": true,
+    "notes_only_downgraded": false
+  },
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_019A_support_resistance_definitions_news_monthly_stops_precision.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_019A_support_resistance_definitions_news_monthly_stops_precision.md"
+      },
+      "title": "Video 19A: Support and Resistance - Definitions, News, Monthly Stops, and Precision",
+      "matched_keywords": [
+        "支撑",
+        "阻力"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_019C_support_resistance_monthly_magnets_round_numbers_list.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_019C_support_resistance_monthly_magnets_round_numbers_list.md"
+      },
+      "title": "Video 19C: Support and Resistance - Monthly Magnets, Round Numbers, and Complete S/R List",
+      "matched_keywords": [
+        "magnet",
+        "支撑",
+        "阻力"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018E_trading_ranges_vacuum_effect_perverse_logic_fade_bo.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_018E_trading_ranges_vacuum_effect_perverse_logic_fade_bo.md"
+      },
+      "title": "Video 18E: Trading Ranges - Vacuum Effect and Perverse Logic to Fade Breakouts",
+      "matched_keywords": [
+        "支撑",
+        "阻力"
+      ]
+    }
+  ],
+  "legacy_influence": {
+    "legacy_ids_used_in_extraction": [],
+    "forbidden_legacy_inputs": [
+      "knowledge/wiki/strategy_cards",
+      "reports/strategy_lab/strategy_catalog.json",
+      "reports/strategy_lab/specs",
+      "reports/strategy_lab/strategy_triage_matrix.json",
+      "reports/strategy_lab/cards"
+    ]
+  }
+}

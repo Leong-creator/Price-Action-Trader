@@ -1,0 +1,136 @@
+{
+  "schema_version": "m10.strategy-source-ledger.v1",
+  "strategy_id": "M10-PA-007",
+  "title": "Second-Leg Trap Reversal",
+  "source_priority": [
+    "brooks_v2_manual_transcript",
+    "fangfangtu_youtube_transcript",
+    "fangfangtu_notes"
+  ],
+  "support_summary": {
+    "strategy_id": "M10-PA-007",
+    "title": "Second-Leg Trap Reversal",
+    "support_counts": {
+      "brooks_v2_manual_transcript": 3,
+      "fangfangtu_youtube_transcript": 2,
+      "fangfangtu_notes": 2
+    },
+    "supported_families": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "brooks_or_youtube_only_allowed": true,
+    "notes_only_downgraded": false
+  },
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md"
+      },
+      "title": "Video 18B: Trading Ranges - Buy/Sell Setups, Breakout Mode, and Second Leg Traps",
+      "matched_keywords": [
+        "second leg trap",
+        "trap",
+        "陷阱"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_047C_trading_ranges_second_leg_traps_fade_breakouts_reversal_entries_scaling.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_047C_trading_ranges_second_leg_traps_fade_breakouts_reversal_entries_scaling.md"
+      },
+      "title": "Video 47C: Trading in Trading Ranges - Second Leg Traps, Fading Breakouts, Reversal Entries, Wide Stops, and Scaling In",
+      "matched_keywords": [
+        "second leg trap",
+        "trap",
+        "trapped",
+        "第二腿陷阱",
+        "陷阱"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md"
+      },
+      "title": "Video 15G: Breakouts - Tick Traps, Pip Traps, and Fading Weak Setups",
+      "matched_keywords": [
+        "trap",
+        "陷阱"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 13
+      },
+      "title": "fangfangtu YouTube transcript p13",
+      "matched_keywords": [
+        "trap",
+        "陷阱"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 14
+      },
+      "title": "fangfangtu YouTube transcript p14",
+      "matched_keywords": [
+        "trap",
+        "陷阱"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 4
+      },
+      "title": "方方土视频笔记 - 楔形 p4",
+      "matched_keywords": [
+        "trap",
+        "陷阱"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 3
+      },
+      "title": "方方土视频笔记-突破 p3",
+      "matched_keywords": [
+        "trap",
+        "陷阱"
+      ]
+    }
+  ],
+  "legacy_influence": {
+    "legacy_ids_used_in_extraction": [],
+    "forbidden_legacy_inputs": [
+      "knowledge/wiki/strategy_cards",
+      "reports/strategy_lab/strategy_catalog.json",
+      "reports/strategy_lab/specs",
+      "reports/strategy_lab/strategy_triage_matrix.json",
+      "reports/strategy_lab/cards"
+    ]
+  }
+}

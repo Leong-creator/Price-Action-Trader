@@ -1,0 +1,38 @@
+{
+  "title": "M10.6 Read-only Observation Recorded Replay",
+  "description": "Recorded replay prototype for M10.5 read-only observation ledger. No broker, no live feed, no orders, no paper trading approval.",
+  "run_id": "m10_6_replay",
+  "symbols": ["SPY", "QQQ", "NVDA", "TSLA"],
+  "market": "US",
+  "timezone": "America/New_York",
+  "data_windows": {
+    "1d": {
+      "start": "2010-06-29",
+      "end": "2026-04-21"
+    },
+    "5m": {
+      "start": "2024-04-01",
+      "end": "2026-04-21"
+    },
+    "15m": {
+      "start": "2024-04-01",
+      "end": "2026-04-21",
+      "derive_from": "5m"
+    },
+    "1h": {
+      "start": "2024-04-01",
+      "end": "2026-04-21",
+      "derive_from": "5m"
+    }
+  },
+  "cache_roots": [
+    "local_data",
+    "/home/hgl/projects/Price-Action-Trader/local_data"
+  ],
+  "observation_queue_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_observation_candidate_queue.json",
+  "observation_schema_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_observation_event_schema.json",
+  "spec_index_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_backtest_spec_index.json",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay",
+  "paper_simulated_only": true,
+  "recorded_replay_only": true
+}

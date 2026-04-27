@@ -1,0 +1,194 @@
+{
+  "schema_version": "m10.visual-golden-case-pack.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "strategy_id": "M10-PA-011",
+  "title": "Opening Reversal",
+  "pack_status": "visual_pack_ready",
+  "review_status": "agent_selected_pending_manual_review",
+  "case_counts": {
+    "positive": 3,
+    "counterexample": 1,
+    "boundary": 1
+  },
+  "requirements": {
+    "positive_cases": 3,
+    "counterexamples": 1,
+    "boundary_cases": 1,
+    "brooks_v2_images_are_local_only": true
+  },
+  "source_policy": {
+    "primary_case_source": "brooks_v2_manual_transcript_assets",
+    "youtube_notes_role": "terminology_or_explanation_only_not_visual_case_replacement",
+    "legacy_pa_sc_sf_role": "forbidden_as_case_source"
+  },
+  "cases": [
+    {
+      "case_id": "M10-PA-011-positive-001",
+      "strategy_id": "M10-PA-011",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048F_gap_openings_early_flags.md",
+      "evidence_video_id": "video_048F",
+      "evidence_page": 986,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0986_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0986.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0986_crop.webp",
+      "evidence_image_checksum": "b978f737d4849308a6b722c755ddb43de5f4ddead6e8451cb221cb2af4837d87",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "open",
+        "yesterday",
+        "gap",
+        "开盘"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Gap Down: Creates Resistance, Which Is Magnet Computers use gaps as targets Computers have many choices Gap below yesterday's low creates gap d·own on daily chart t~ -➔ -+ [.+(- Cl",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-011-positive-002",
+      "strategy_id": "M10-PA-011",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048F_gap_openings_early_flags.md",
+      "evidence_video_id": "video_048F",
+      "evidence_page": 984,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0984_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0984.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0984_crop.webp",
+      "evidence_image_checksum": "651a30015fcabdf9887fd187456e82f2bc680f8dad40b8048f529f3d5a10731f",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "open",
+        "yesterday",
+        "gap",
+        "开盘"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Gap Up: Creates Support, Which Is Magnet Computers use gaps as targets Computers have many choices Gap above yesterday's high creates gap up on daily chart As soon as day opens, , ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-011-positive-003",
+      "strategy_id": "M10-PA-011",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+      "evidence_video_id": "video_048A",
+      "evidence_page": 896,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0896_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0896.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0896_crop.webp",
+      "evidence_image_checksum": "c1f7c46907ff4373855c3796f9e8a773dffe4bd22d19dd84f65c7134ed5a6db0",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "open",
+        "开盘"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Sometimes there is an Opening BO up or down instead of an Opening Range \\a)lt~ \\ which is an early TR before there is a + BO into the 1st swing of the day It is the time from when ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-011-counterexample-001",
+      "strategy_id": "M10-PA-011",
+      "case_type": "counterexample",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+      "evidence_video_id": "video_048A",
+      "evidence_page": 894,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0894_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0894.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0894_crop.webp",
+      "evidence_image_checksum": "29c16f10fa5251c5e1950a0658da5e13a89f6d29131f88c41f51ad114bf1aaf4",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "strong trend day",
+        "one direction"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "A strong trend day trades in one direction all day long without any significant Pullback (PB) Only 10% of days are strong trend days Vil 90% of the time, the price action changes R",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "No clean prior-day or opening-range context."
+      ],
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-011-boundary-001",
+      "strategy_id": "M10-PA-011",
+      "case_type": "boundary",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+      "evidence_video_id": "video_048A",
+      "evidence_page": 900,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0900_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0900.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0900_crop.webp",
+      "evidence_image_checksum": "c381f1a0e42d81bc674c2d5cfad8fd36d63c5d982428b7f8bdaf2466a4b305a1",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "sometimes",
+        "usually",
+        "if",
+        "可能",
+        "通常",
+        "如果"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Big Failed Bear BO: TR More Likely Than Big Bull Trend If initial selloff is 25 - 50% of average range, then often get big bull trend after reversal l992J)J 19o800 19'il6 00 1976.0",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Opening trend breakout with follow-through."
+      ],
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    }
+  ],
+  "gap_notes": []
+}

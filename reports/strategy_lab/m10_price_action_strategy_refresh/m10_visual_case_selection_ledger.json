@@ -1,0 +1,683 @@
+{
+  "schema_version": "m10.visual-case-selection-ledger.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "source_policy": {
+    "first_choice": "Brooks v2 source refs from strategy_catalog_m10_frozen.json",
+    "fallback": "other Brooks v2 same-theme units only if frozen refs lack resolvable evidence",
+    "youtube_notes": "terminology_only_not_visual_case_replacement",
+    "legacy": "not_read_for_case_selection"
+  },
+  "strategies": [
+    {
+      "strategy_id": "M10-PA-003",
+      "title": "Tight Channel Trend Continuation",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_014E",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 29
+        },
+        {
+          "video_id": "video_017A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 20
+        },
+        {
+          "video_id": "video_014C",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 31
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-003-positive-001",
+          "case_type": "positive",
+          "video_id": "video_014E",
+          "evidence_page": 987,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "tight channel",
+            "higher time frame",
+            "only look",
+            "紧密通道"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-003-positive-002",
+          "case_type": "positive",
+          "video_id": "video_014E",
+          "evidence_page": 988,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "tight channel",
+            "higher time frame",
+            "紧密通道"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-003-positive-003",
+          "case_type": "positive",
+          "video_id": "video_017A",
+          "evidence_page": 1397,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "tight channel",
+            "higher time frame",
+            "only look",
+            "紧密通道"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-003-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_014C",
+          "evidence_page": 936,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "trading range",
+            "broad"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-003-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_014C",
+          "evidence_page": 942,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "usually",
+            "sometimes",
+            "sometimes",
+            "usually",
+            "可能",
+            "通常"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "title": "Broad Channel Boundary Reversal",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_014A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014A_trends_higher_lows_lower_highs.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 27
+        },
+        {
+          "video_id": "video_016F",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 29
+        },
+        {
+          "video_id": "video_046D",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_046D_broad_bear_channels_lhs_second_leg_trap_bulls_buy_lows.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 25
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-004-positive-001",
+          "case_type": "positive",
+          "video_id": "video_016F",
+          "evidence_page": 1382,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "broad channel",
+            "limit orders",
+            "fade test"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1382_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-004-positive-002",
+          "case_type": "positive",
+          "video_id": "video_046D",
+          "evidence_page": 764,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "broad channel",
+            "channel line",
+            "limit orders"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/advanced_p0764_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-004-positive-003",
+          "case_type": "positive",
+          "video_id": "video_016F",
+          "evidence_page": 1365,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "broad channel",
+            "limit orders",
+            "fade test"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1365_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-004-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_016F",
+          "evidence_page": 1368,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "breakouts at start of trend"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1368_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-004-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_014A",
+          "evidence_page": 891,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "if",
+            "可能",
+            "如果"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/part1_p0891_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "title": "Second-Leg Trap Reversal",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_018B",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 24
+        },
+        {
+          "video_id": "video_047C",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_047C_trading_ranges_second_leg_traps_fade_breakouts_reversal_entries_scaling.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_047C/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 28
+        },
+        {
+          "video_id": "video_015G",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 21
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-007-positive-001",
+          "case_type": "positive",
+          "video_id": "video_018B",
+          "evidence_page": 64,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "交易区间"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0064_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-007-positive-002",
+          "case_type": "positive",
+          "video_id": "video_018B",
+          "evidence_page": 65,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "交易区间"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0065_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-007-positive-003",
+          "case_type": "positive",
+          "video_id": "video_018B",
+          "evidence_page": 73,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "failed",
+            "breakout mode",
+            "交易区间"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0073_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-007-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_018B",
+          "evidence_page": 66,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "eventually break out into trend",
+            "trend",
+            "50% chance"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0066_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-007-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_015G",
+          "evidence_page": 1171,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "if",
+            "可能",
+            "如果"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/part1_p1171_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_022A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 24
+        },
+        {
+          "video_id": "video_021A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_021A_reversals_definition_minor_major_breakouts.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_021A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 27
+        },
+        {
+          "video_id": "video_022D",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022D_mtr_bottoms_head_shoulders_failed_mtr.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022D/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 26
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-008-positive-001",
+          "case_type": "positive",
+          "video_id": "video_022A",
+          "evidence_page": 478,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "mtr",
+            "主要趋势反转"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0478_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-008-positive-002",
+          "case_type": "positive",
+          "video_id": "video_022A",
+          "evidence_page": 467,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "mtr",
+            "主要趋势反转"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0467_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-008-positive-003",
+          "case_type": "positive",
+          "video_id": "video_022D",
+          "evidence_page": 517,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "mtr",
+            "主要趋势反转"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022D/part2_p0517_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-008-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_021A",
+          "evidence_page": 371,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "minor reversal",
+            "minor"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_021A/part2_p0371_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-008-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_022A",
+          "evidence_page": 465,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "usually",
+            "if",
+            "可能",
+            "通常",
+            "如果"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0465_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_024B",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024B_wedges_imperfect_channels_variations_context.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 25
+        },
+        {
+          "video_id": "video_024A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 17
+        },
+        {
+          "video_id": "video_024D",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024D/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 27
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-009-positive-001",
+          "case_type": "positive",
+          "video_id": "video_024B",
+          "evidence_page": 583,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "wedge",
+            "楔形"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/part2_p0583_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-009-positive-002",
+          "case_type": "positive",
+          "video_id": "video_024A",
+          "evidence_page": 576,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "wedge",
+            "triangle",
+            "楔形"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0576_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-009-positive-003",
+          "case_type": "positive",
+          "video_id": "video_024A",
+          "evidence_page": 567,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "wedge",
+            "triangle",
+            "楔形"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0567_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-009-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_024A",
+          "evidence_page": 575,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "failed"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0575_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-009-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_024A",
+          "evidence_page": 573,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "if",
+            "可能",
+            "如果"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0573_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "title": "Final Flag or Climax TBTL Reversal",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_029A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 19
+        },
+        {
+          "video_id": "video_029C",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 24
+        },
+        {
+          "video_id": "video_029E",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 16
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-010-positive-001",
+          "case_type": "positive",
+          "video_id": "video_029E",
+          "evidence_page": 877,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "climax",
+            "高潮"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0877_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-010-positive-002",
+          "case_type": "positive",
+          "video_id": "video_029C",
+          "evidence_page": 835,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "climax",
+            "climactic reversal",
+            "高潮"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/part2_p0835_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-010-positive-003",
+          "case_type": "positive",
+          "video_id": "video_029E",
+          "evidence_page": 885,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "climax",
+            "exhaustion",
+            "tbtl",
+            "高潮"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0885_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-010-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_029A",
+          "evidence_page": 807,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "every trend bar",
+            "continues"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0807_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-010-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_029A",
+          "evidence_page": 803,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "acceleration",
+            "usually fails",
+            "usually",
+            "can be",
+            "可能",
+            "通常"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0803_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "title": "Opening Reversal",
+      "source_selection_policy": "frozen_catalog_brooks_v2_source_refs_first",
+      "source_videos": [
+        {
+          "video_id": "video_048F",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048F_gap_openings_early_flags.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 17
+        },
+        {
+          "video_id": "video_048A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 19
+        },
+        {
+          "video_id": "video_049A",
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_049A_swing_trading_day_examples.md",
+          "evidence_json": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_049A/evidence.json",
+          "evidence_json_exists": true,
+          "candidate_count": 22
+        }
+      ],
+      "selected_cases": [
+        {
+          "case_id": "M10-PA-011-positive-001",
+          "case_type": "positive",
+          "video_id": "video_048F",
+          "evidence_page": 986,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "open",
+            "yesterday",
+            "gap",
+            "开盘"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0986_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-011-positive-002",
+          "case_type": "positive",
+          "video_id": "video_048F",
+          "evidence_page": 984,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "open",
+            "yesterday",
+            "gap",
+            "开盘"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0984_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-011-positive-003",
+          "case_type": "positive",
+          "video_id": "video_048A",
+          "evidence_page": 896,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "open",
+            "开盘"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0896_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-011-counterexample-001",
+          "case_type": "counterexample",
+          "video_id": "video_048A",
+          "evidence_page": 894,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "strong trend day",
+            "one direction"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0894_crop.webp"
+        },
+        {
+          "case_id": "M10-PA-011-boundary-001",
+          "case_type": "boundary",
+          "video_id": "video_048A",
+          "evidence_page": 900,
+          "selection_reason": "term_match",
+          "matched_terms": [
+            "sometimes",
+            "usually",
+            "if",
+            "可能",
+            "通常",
+            "如果"
+          ],
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0900_crop.webp"
+        }
+      ],
+      "pack_status": "visual_pack_ready"
+    }
+  ]
+}

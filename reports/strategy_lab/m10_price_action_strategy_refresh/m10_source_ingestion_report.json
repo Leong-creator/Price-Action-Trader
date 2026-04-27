@@ -1,0 +1,50 @@
+{
+  "schema_version": "m10.source-ingestion-report.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "source_priority": [
+    "brooks_v2_manual_transcript",
+    "fangfangtu_youtube_transcript",
+    "fangfangtu_notes"
+  ],
+  "brooks_v2": {
+    "raw_root": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2",
+    "manifest_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/manifest.json",
+    "manifest_exists": true,
+    "checksums_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/checksums.sha256",
+    "asset_checksums_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets_evidence_checksums.sha256",
+    "import_manifest": {
+      "schema_version": "m10.brooks-v2-import.v1",
+      "generated_at": "2026-04-26T04:21:48Z",
+      "external_source_root": "/home/hgl/projects/Al Brooks extra/knowledge_base_v2",
+      "raw_root": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2",
+      "included": {
+        "readme": true,
+        "units": 191,
+        "evidence_pages": 191,
+        "assets_evidence_copied": true,
+        "assets_evidence_files": 9041,
+        "assets_evidence_bytes": 2128719315
+      },
+      "git_tracking_policy": {
+        "text_units_and_evidence": "tracked",
+        "assets_evidence": "local_only_ignored_by_git",
+        "asset_checksums": "tracked"
+      },
+      "source_priority_role": "highest_priority_strategy_source_for_m10",
+      "tracked_text_checksums": {
+        "file_count": 383,
+        "total_bytes": 3371905,
+        "checksum_path": "checksums.sha256"
+      },
+      "asset_checksums": {
+        "file_count": 9041,
+        "total_bytes": 2128719315,
+        "checksum_path": "assets_evidence_checksums.sha256"
+      }
+    }
+  },
+  "reference_only": {
+    "chatgpt_share": "https://chatgpt.com/share/69ed8224-a360-8327-a2cc-0976be6555d5",
+    "codex_thread": "codex://threads/019dbf29-e38d-7660-aed8-48fb252a7300"
+  }
+}

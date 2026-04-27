@@ -1,0 +1,193 @@
+{
+  "schema_version": "m10.visual-golden-case-pack.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "strategy_id": "M10-PA-010",
+  "title": "Final Flag or Climax TBTL Reversal",
+  "pack_status": "visual_pack_ready",
+  "review_status": "agent_selected_pending_manual_review",
+  "case_counts": {
+    "positive": 3,
+    "counterexample": 1,
+    "boundary": 1
+  },
+  "requirements": {
+    "positive_cases": 3,
+    "counterexamples": 1,
+    "boundary_cases": 1,
+    "brooks_v2_images_are_local_only": true
+  },
+  "source_policy": {
+    "primary_case_source": "brooks_v2_manual_transcript_assets",
+    "youtube_notes_role": "terminology_or_explanation_only_not_visual_case_replacement",
+    "legacy_pa_sc_sf_role": "forbidden_as_case_source"
+  },
+  "cases": [
+    {
+      "case_id": "M10-PA-010-positive-001",
+      "strategy_id": "M10-PA-010",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+      "evidence_video_id": "video_029E",
+      "evidence_page": 877,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0877_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0877.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0877_crop.webp",
+      "evidence_image_checksum": "ab0b094b9656749ef494f9539dcdd5f5c7b0701a4de3b07ff77131b206f09eeb",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "climax",
+        "高潮"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Consecutive Sell Climax: Often Caused by Option Firms Sell Climaxes slightly different from Buy Climaxes Most firms prefer to buy value Fewer are willing to buy strong rallies Buy ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+        "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+      ],
+      "disqualifiers": [
+        "Climax continues as a strong trend without reversal follow-through.",
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-010-positive-002",
+      "strategy_id": "M10-PA-010",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md",
+      "evidence_video_id": "video_029C",
+      "evidence_page": 835,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/part2_p0835_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/part2_p0835.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/part2_p0835_crop.webp",
+      "evidence_image_checksum": "9143659d1a8b55083a863561c9417b72dafc181e03c4ea9192b1c0ce7eb2bce6",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "climax",
+        "climactic reversal",
+        "高潮"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Climax: Can Have 1 - 3 Big or Many Small Bars 1- 3 big bars or 10 or more small bars Early or late in trend Single climax Consecutive climaxes Big brief Climactic Reversal Sometime",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+        "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+      ],
+      "disqualifiers": [
+        "Climax continues as a strong trend without reversal follow-through.",
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-010-positive-003",
+      "strategy_id": "M10-PA-010",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+      "evidence_video_id": "video_029E",
+      "evidence_page": 885,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0885_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0885.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0885_crop.webp",
+      "evidence_image_checksum": "5d99dae065bcff398af838bc2a42cf72e58960a020340877c2ce020b5778947c",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "climax",
+        "exhaustion",
+        "tbtl",
+        "高潮"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Consecutive Buy Climaxes: Final Climax Often Very Big Buy Climax ~ Traders expect TBTL sideways to down ___________________ Then, either Trend Resumption up 0¢~+1□, ~ l I or Trend ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+        "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+      ],
+      "disqualifiers": [
+        "Climax continues as a strong trend without reversal follow-through.",
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-010-counterexample-001",
+      "strategy_id": "M10-PA-010",
+      "case_type": "counterexample",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+      "evidence_video_id": "video_029A",
+      "evidence_page": 807,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0807_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0807.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0807_crop.webp",
+      "evidence_image_checksum": "142f871bafb1cff4fc68cba8d54d2a11345d1c00be7162da5bb56764ef2d8eea",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "every trend bar",
+        "continues"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Any unsustainable move, usually late in trend (after 20 or more bars) If trend continues, call it BO If trend pauses or reverses, call it climax or failed BO All markets constantly",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "disqualifiers": [
+        "Climax continues as a strong trend without reversal follow-through.",
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-010-boundary-001",
+      "strategy_id": "M10-PA-010",
+      "case_type": "boundary",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+      "evidence_video_id": "video_029A",
+      "evidence_page": 803,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0803_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0803.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0803_crop.webp",
+      "evidence_image_checksum": "32ed711ae003dfe58971f784b8a1b23a4e6f78cc62f908995beab239f6d64984",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "acceleration",
+        "usually fails",
+        "usually",
+        "can be",
+        "可能",
+        "通常"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Climax: Acceleration of a Move up or Down BO usually fails and is therefore at least a small climax Most are only a single bar Most lead to minor reversal (either a PB in a trend o",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Climax continues as a strong trend without reversal follow-through."
+      ],
+      "disqualifiers": [
+        "Climax continues as a strong trend without reversal follow-through.",
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    }
+  ],
+  "gap_notes": []
+}

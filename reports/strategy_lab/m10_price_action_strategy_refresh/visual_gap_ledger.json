@@ -1,0 +1,150 @@
+{
+  "schema_version": "m10.visual-gap-ledger.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "ledger": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "text_first_ok",
+      "notes": "OHLCV approximation can start, but sample failures require chart review before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "text_first_ok",
+      "notes": "OHLCV approximation can start, but sample failures require chart review before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "title": "Tight Channel Trend Continuation",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "title": "Broad Channel Boundary Reversal",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "text_first_ok",
+      "notes": "OHLCV approximation can start, but sample failures require chart review before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-006",
+      "title": "Trading Range BLSHS Limit-Order Framework",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "research_only_no_standard_visual_review",
+      "notes": "Research-only item; do not run ordinary visual review or standalone trigger tests in M10.1."
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "title": "Second-Leg Trap Reversal",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "title": "Final Flag or Climax TBTL Reversal",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "title": "Opening Reversal",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": true,
+      "visual_gap_status": "visual_golden_case_first",
+      "notes": "Pattern geometry or trapped-trader context must be reviewed against Brooks v2 evidence images before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "text_first_ok",
+      "notes": "OHLCV approximation can start, but sample failures require chart review before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "title": "Support and Resistance Failed Test",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "text_first_ok",
+      "notes": "OHLCV approximation can start, but sample failures require chart review before promotion."
+    },
+    {
+      "strategy_id": "M10-PA-014",
+      "title": "Measured Move Target Engine",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "supporting_rule_no_standard_visual_review",
+      "notes": "Supporting rule; attach to parent setup specs and do not review as a standalone visual trigger."
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "title": "Protective Stops and Position Sizing",
+      "visual_dependency": "medium",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "supporting_rule_no_standard_visual_review",
+      "notes": "Supporting rule; attach to parent setup specs and do not review as a standalone visual trigger."
+    },
+    {
+      "strategy_id": "M10-PA-016",
+      "title": "Trading Range Scaling-In Research",
+      "visual_dependency": "high",
+      "source_assets_available": true,
+      "requires_golden_case": false,
+      "visual_gap_status": "research_only_no_standard_visual_review",
+      "notes": "Research-only item; do not run ordinary visual review or standalone trigger tests in M10.1."
+    }
+  ]
+}

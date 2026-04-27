@@ -1,0 +1,138 @@
+{
+  "schema_version": "m10.strategy-source-ledger.v1",
+  "strategy_id": "M10-PA-009",
+  "title": "Wedge Reversal and Wedge Flag",
+  "source_priority": [
+    "brooks_v2_manual_transcript",
+    "fangfangtu_youtube_transcript",
+    "fangfangtu_notes"
+  ],
+  "support_summary": {
+    "strategy_id": "M10-PA-009",
+    "title": "Wedge Reversal and Wedge Flag",
+    "support_counts": {
+      "brooks_v2_manual_transcript": 3,
+      "fangfangtu_youtube_transcript": 2,
+      "fangfangtu_notes": 2
+    },
+    "supported_families": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "brooks_or_youtube_only_allowed": true,
+    "notes_only_downgraded": false
+  },
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024B_wedges_imperfect_channels_variations_context.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_024B_wedges_imperfect_channels_variations_context.md"
+      },
+      "title": "Video 24B: Wedges - Imperfect Shapes, Channels, Variations, and Context",
+      "matched_keywords": [
+        "wedge",
+        "楔形",
+        "三推"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_024A_wedges_definition_flags_mtr_climax_probability.md"
+      },
+      "title": "Video 24A: Wedges - Definition, Flags, MTRs, Climaxes, and Reversal Probability",
+      "matched_keywords": [
+        "wedge",
+        "楔形",
+        "三推"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md"
+      },
+      "title": "Video 24D: Wedges - Parabolic Wedges and Bad Wedges in Strong Trends",
+      "matched_keywords": [
+        "wedge",
+        "parabolic wedge",
+        "楔形",
+        "三推"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 4
+      },
+      "title": "fangfangtu YouTube transcript p4",
+      "matched_keywords": [
+        "楔形",
+        "三推"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 7
+      },
+      "title": "fangfangtu YouTube transcript p7",
+      "matched_keywords": [
+        "楔形",
+        "三推"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 1
+      },
+      "title": "方方土视频笔记 - 楔形 p1",
+      "matched_keywords": [
+        "wedge",
+        "楔形",
+        "三推"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 4
+      },
+      "title": "方方土视频笔记 - 楔形 p4",
+      "matched_keywords": [
+        "wedge",
+        "楔形",
+        "三推"
+      ]
+    }
+  ],
+  "legacy_influence": {
+    "legacy_ids_used_in_extraction": [],
+    "forbidden_legacy_inputs": [
+      "knowledge/wiki/strategy_cards",
+      "reports/strategy_lab/strategy_catalog.json",
+      "reports/strategy_lab/specs",
+      "reports/strategy_lab/strategy_triage_matrix.json",
+      "reports/strategy_lab/cards"
+    ]
+  }
+}

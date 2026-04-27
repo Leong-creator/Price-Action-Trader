@@ -1,0 +1,61 @@
+{
+  "schema_version": "m10.event-definition-ledger.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "entries": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "event_name": "trend_pullback_second_entry_continuation",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "definition_ref": "backtest_specs/M10-PA-001.json#event_definition",
+      "ohlcv_approximation": "Trend, pullback, and second-entry are approximated from swing sequence, bar closes, and a 20-bar simple moving average.",
+      "visual_review_fallback": "needs_visual_review_if_ohlcv_sequence_cannot_represent_source_context"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "event_name": "breakout_follow_through_continuation",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "definition_ref": "backtest_specs/M10-PA-002.json#event_definition",
+      "ohlcv_approximation": "Breakout and follow-through are approximated from a prior 20-bar range, breakout-bar body size, close location, and next 1-2 bars.",
+      "visual_review_fallback": "needs_visual_review_if_ohlcv_sequence_cannot_represent_source_context"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "event_name": "trading_range_failed_breakout_reversal",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "definition_ref": "backtest_specs/M10-PA-005.json#event_definition",
+      "ohlcv_approximation": "Trading range and failed breakout are approximated from a 20-bar overlapping range, outside-edge attempt, and close back inside within 1-3 bars.",
+      "visual_review_fallback": "needs_visual_review_if_ohlcv_sequence_cannot_represent_source_context"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "event_name": "opening_range_breakout",
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "definition_ref": "backtest_specs/M10-PA-012.json#event_definition",
+      "ohlcv_approximation": "Opening range breakout uses regular-session OHLCV, first 30 minutes of the session, breakout strength, and next 1-2 bars of follow-through.",
+      "visual_review_fallback": "needs_visual_review_if_ohlcv_sequence_cannot_represent_source_context"
+    }
+  ]
+}

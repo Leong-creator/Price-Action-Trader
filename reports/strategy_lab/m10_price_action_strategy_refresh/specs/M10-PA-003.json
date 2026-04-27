@@ -1,0 +1,165 @@
+{
+  "schema_version": "m10.strategy-spec.v1",
+  "strategy": {
+    "strategy_id": "M10-PA-003",
+    "namespace": "M10-PA",
+    "title": "Tight Channel Trend Continuation",
+    "status": "backtest_candidate",
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "confidence": "high",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "source_refs": [
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_014E_trends_tight_channel_small_pullback.md"
+        },
+        "title": "Video 14E: Trends - Tight Channel and Small Pullback Trend",
+        "matched_keywords": [
+          "tight channel",
+          "small pullback",
+          "紧密通道",
+          "小回调",
+          "channel"
+        ]
+      },
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_017A_tight_channels_micro_channels_definitions.md"
+        },
+        "title": "Video 17A: Tight Channels and Micro Channels - Definitions, Measurements, and Trading Direction",
+        "matched_keywords": [
+          "tight channel",
+          "micro channel",
+          "紧密通道",
+          "小回调",
+          "channel"
+        ]
+      },
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_014C_trends_types_spike_channel_traps.md"
+        },
+        "title": "Video 14C: Trends - Types, Spike and Channel, Traps and Breakouts",
+        "matched_keywords": [
+          "tight channel",
+          "small pullback",
+          "紧密通道",
+          "小回调",
+          "channel"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_youtube_transcript",
+        "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 2
+        },
+        "title": "fangfangtu YouTube transcript p2",
+        "matched_keywords": [
+          "channel"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_youtube_transcript",
+        "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 11
+        },
+        "title": "fangfangtu YouTube transcript p11",
+        "matched_keywords": [
+          "channel"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_notes",
+        "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 1
+        },
+        "title": "方方土视频笔记 - 市场周期 p1",
+        "matched_keywords": [
+          "tight channel",
+          "channel"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_notes",
+        "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 2
+        },
+        "title": "方方土视频笔记 - 市场周期 p2",
+        "matched_keywords": [
+          "channel"
+        ]
+      }
+    ],
+    "source_families": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "market_context": [
+      "tight channel",
+      "trend",
+      "small pullback trend"
+    ],
+    "timeframes": [
+      "1d",
+      "1h",
+      "15m",
+      "5m"
+    ],
+    "direction": "both",
+    "entry_logic": [
+      "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+      "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+    ],
+    "stop_logic": [
+      "Protect beyond the recent channel pullback extreme; avoid oversizing because channels can accelerate."
+    ],
+    "target_logic": [
+      "Trail with channel structure; initial target at prior extreme or measured channel leg."
+    ],
+    "invalidation": [
+      "Clear channel break followed by opposite follow-through."
+    ],
+    "no_trade_conditions": [
+      "Late entry after a climactic channel extension without room to target."
+    ],
+    "visual_dependency": "high",
+    "backtest_eligibility": {
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "route": "visual_golden_case_then_historical_backtest"
+    },
+    "clean_room_guard": {
+      "legacy_ids_used_in_extraction": [],
+      "forbidden_legacy_inputs": [
+        "knowledge/wiki/strategy_cards",
+        "reports/strategy_lab/strategy_catalog.json",
+        "reports/strategy_lab/specs",
+        "reports/strategy_lab/strategy_triage_matrix.json",
+        "reports/strategy_lab/cards"
+      ]
+    },
+    "chatgpt_bpa_reference_overlap": [
+      "BPA-003"
+    ]
+  },
+  "paper_simulated_only": true
+}
