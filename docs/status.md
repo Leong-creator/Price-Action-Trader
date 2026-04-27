@@ -312,6 +312,12 @@
   - M10.7 固定后续甲方报告默认口径：初始本金 `100,000 USD`、单笔风险当前权益 `0.5%`、不使用杠杆、每条 strategy/timeframe/symbol 先独立账户测试、成本压力 `1 / 2 / 5 bps`。
   - M10.7 只冻结后续模拟资金曲线和成绩单口径；未运行新回测，未批准 paper trading，未接 broker、真实账户或订单通道。
   - M10.7 已通过新增 business metric policy 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.8 Wave A Capital Backtest，新增 `scripts/m10_capital_backtest_lib.py`、`scripts/run_m10_wave_a_capital_backtest.py`、`capital_backtest/m10_8_wave_a/` 与 M10.8 单测。
+  - M10.8 使用 M10.4 candidate events 重新按 M10.7 资本模型计算仓位、成本、权益、胜率和回撤；未重新发明信号，未读取旧 `PA-SC-*` / `SF-*` 作为策略来源。
+  - M10.8 当前生成 baseline trade ledger `73619` 行、all-cost simulated rows `220857` 行、metrics `222` 行，并输出 baseline equity curve CSV/SVG。
+  - M10.8 baseline strategy results：`M10-PA-001` 净利润 `395723.86` / 收益 `24.7327%` / 胜率 `0.3584`；`M10-PA-002` 净利润 `52496.28` / 收益 `3.2810%` / 胜率 `0.3492`；`M10-PA-005` 净利润 `-147665.89` / 收益 `-9.2291%` / 胜率 `0.3401`；`M10-PA-012` 净利润 `215141.29` / 收益 `26.8927%` / 胜率 `0.3815`。
+  - M10.8 继续把 `M10-PA-005` 标记为 `needs_definition_fix`，资本结果不得覆盖其 `definition_breadth_review` 问题。
+  - M10.8 已通过新增 Wave A capital backtest 单测、M10.7 policy 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
   - M10 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
 
 ## 当前阻塞
@@ -321,7 +327,7 @@
 
 ## 下一步
 
-- 下一步进入 `M10.8 Wave A Capital Backtest`：把 `M10-PA-001/002/005/012` 的 Wave A pilot 从 R 值事件链路转成甲方可读资金曲线、交易明细、胜率、回撤和分标的/分周期成绩单。
+- 下一步进入 `M10.9 Definition Tightening`：优先处理 `M10-PA-005` 日内 `1h / 15m / 5m` 事件过密和定义偏宽问题，只允许基于 Brooks / YouTube / notes 与策略逻辑收紧定义，不按收益曲线调参。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 仍关闭，只有后续真实只读观察、visual review 和人工复核都达标后才讨论。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
 - M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。

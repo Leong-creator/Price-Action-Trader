@@ -39,6 +39,7 @@
 - M10.3 backtest specs 只冻结 Wave A historical pilot 的事件识别、entry/stop/target、skip 规则、成本敏感性和样本门槛；它们不代表已回测结论、盈利结论、promoted strategy 或 live execution 能力。
 - M10.5 read-only observation plan 只定义观察候选、事件 schema、质量复核和 paper gate handoff；它不启动实时观察 runner，不接真实 broker，不写入真实订单路径。
 - M10.6 read-only observation replay 只用本地 cached OHLCV 生成 recorded replay ledger；它不是实时行情订阅，不生成执行、仓位、现金或盈亏结论，也不进入 `src/risk/`、`src/execution/`、`src/broker/` 的 live 行为。
+- M10.8 Wave A capital backtest 只把 M10.4 candidate events 按 M10.7 capital model 转成 historical simulation 成绩单；它可以输出模拟本金、权益、净利润、胜率、回撤和交易明细，但不代表策略升级、paper trading 批准、broker 接入或真实订单能力。
 - M10.2 visual pack 只记录 Brooks v2 evidence image logical path 与 checksum；图片资产继续 local-only，不进入普通 Git 跟踪。
 - 本层仍属于 `paper / simulated` 研究能力，不进入 `src/risk/`、`src/execution/`、`src/broker/`。
 

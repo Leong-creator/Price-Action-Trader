@@ -1122,6 +1122,14 @@
   - 成本压力必须固定为 baseline `1 bps`、stress low `2 bps`、stress high `5 bps`。
   - 后续甲方成绩单必备指标必须包括 initial capital、final equity、net profit、return percent、trade count、win rate、profit factor、max drawdown、max consecutive losses、average holding bars。
   - M10.7 只冻结后续资金曲线模拟口径，不运行新回测，不接 broker、不接真实账户、不下单、不批准 paper trading。
+- M10.8 Wave A Capital Backtest 必须满足：
+  - 只覆盖 `M10-PA-001`、`M10-PA-002`、`M10-PA-005`、`M10-PA-012`；`M10-PA-012` 只能覆盖 `15m / 5m`。
+  - 必须使用 M10.4 candidate events 的 `entry/stop/exit` 字段按 M10.7 capital model 重新计算仓位、成本、权益、胜率和回撤，不得直接把 R 值当作资金曲线。
+  - 必须输出 `m10_8_wave_a_metrics.csv`、`m10_8_wave_a_trade_ledger.csv`、`m10_8_wave_a_strategy_scorecard.md`、`m10_8_wave_a_client_report.md`、`m10_8_wave_a_capital_summary.json` 与 `m10_8_wave_a_equity_curves/`。
+  - metrics 必须覆盖 strategy、strategy/timeframe、strategy/timeframe/symbol 与 cost tier 粒度，并包含 M10.7 必备甲方指标。
+  - trade ledger 必须包含 `event_id`、`trade_id`、risk budget、risk-budget quantity、notional-cap quantity、gross/cost/net PnL、equity before/after 与 source/spec refs。
+  - `M10-PA-005` 的 `1h / 15m / 5m` 必须保留 `definition_breadth_review` / `needs_definition_fix`，不得因资金结果自动升级。
+  - M10.8 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。
