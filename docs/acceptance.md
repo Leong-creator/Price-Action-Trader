@@ -1161,6 +1161,14 @@
   - `M10-PA-005` 在 range-geometry 定义修正完成前不得进入主观察队列。
   - 周报模板必须覆盖本周触发策略、策略和标的分布、资金曲线偏离、暂停条件和人工复核结论。
   - M10.13 不得启动真实观察 runner，不接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M11 Paper Gate 必须满足：
+  - 必须输出 `m11_paper_gate_report.md`、`m11_candidate_strategy_list.json`、`m11_risk_and_pause_policy.md` 与结构化 summary。
+  - candidate list 只能来自 M10.13 主观察队列：`M10-PA-001/002/012/008/009`。
+  - `M10-PA-001/002/012` 必须标记为 Tier A 核心观察候选；`M10-PA-008/009` 必须标记为 Tier B 视觉条件候选，并保留 `manual_visual_context_review_required`。
+  - 当前 gate decision 必须为 `not_approved`，所有候选当前都不得计为 paper trading approval evidence。
+  - `M10-PA-005`、`needs_definition_fix`、`visual_only_not_backtestable`、supporting-only、research-only、non-positive/watchlist 策略不得进入可批准候选池。
+  - risk/pause policy 必须保留 M10.13 的暂停红线，并新增未完成真实只读观察、缺少人工业务审批和候选状态降级的 gate 阻塞项。
+  - M11 不得启动真实观察 runner，不接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 live-ready 或 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。
@@ -1180,4 +1188,5 @@
   - `python -m unittest tests/unit/test_m10_historical_pilot.py -v`
   - `python -m unittest tests/unit/test_m10_read_only_observation_plan.py -v`
   - `python -m unittest tests/unit/test_m10_read_only_observation_replay.py -v`
+  - `python -m unittest tests/unit/test_m11_paper_gate.py -v`
   - `git diff --check`

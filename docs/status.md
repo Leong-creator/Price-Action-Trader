@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，当前阶段分支 `codex/m10-13-read-only-observation-runbook`）
+- 当前支线：阶段 11：Paper Gate（当前阶段分支 `codex/m11-paper-gate`，gate 未批准）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M10 Price Action Strategy Refresh`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard 与 M10.13 Read-only Observation Runbook
+- 当前支线 milestone：`M11 Paper Gate`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook 与 M11 Paper Gate Report
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m10-13-read-only-observation-runbook`
+- `codex/m11-paper-gate`
 
 ## 已完成
 
@@ -342,7 +342,12 @@
   - M10.13 明确排除 `M10-PA-005`，直到 range-geometry 定义修正完成；`M10-PA-003/011/013` 保留 watchlist/deferred，不进入主观察队列。
   - M10.13 输出 `m10_13_observation_candidate_queue.json`、`m10_13_read_only_observation_runbook.md`、`m10_13_weekly_observation_template.md` 与结构化 summary；仍不启动 observation runner，不接 broker、不下单。
   - M10.13 已通过新增 read-only observation runbook 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
-  - M10 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
+  - 已完成 M11 Paper Gate，新增 `scripts/m11_paper_gate_lib.py`、`scripts/run_m11_paper_gate.py`、`paper_gate/m11/` 与 M11 单测。
+  - M11 候选池来自 M10.13 主观察队列：`M10-PA-001/002/012/008/009`；其中 `M10-PA-001/002/012` 是 Tier A 核心观察候选，`M10-PA-008/009` 是 Tier B 视觉条件候选，必须先关闭人工图形语境复核。
+  - M11 gate decision 为 `not_approved`，所有候选当前都标记为 `counts_as_gate_evidence_now=false`；当前没有任何策略可作为 paper trading approval evidence。
+  - M11 明确阻塞项：尚无真实只读观察周报闭环、缺少人工业务审批、视觉候选仍需人工图形复核、broker/order 路径必须继续禁用。
+  - M11 输出 `m11_paper_gate_report.md`、`m11_candidate_strategy_list.json`、`m11_risk_and_pause_policy.md` 与结构化 summary；仍不启动 observation runner，不接 broker、不接真实账户、不下单、不批准 paper trading。
+  - M10/M11 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
 
 ## 当前阻塞
 
@@ -351,8 +356,8 @@
 
 ## 下一步
 
-- 下一步进入 `M11 Paper Gate`：基于 M10.12/M10.13 结果准备 paper gate 报告、候选策略清单和风险暂停规则；该阶段仍不批准 paper trading。
-- M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 仍关闭，只有后续真实只读观察、visual review 和人工复核都达标后才讨论。
+- M11 paper gate 当前关闭；下一步必须先完成真实只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和人工业务审批，才允许重新评估 paper trading。
+- M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
 - M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。
 - 若 repo config、`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract 不一致，必须先修正文档/配置一致性，停止任何后续提炼或回测。

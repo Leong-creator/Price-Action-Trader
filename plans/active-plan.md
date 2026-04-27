@@ -44,6 +44,7 @@
 - M10.11 已完成 Wave B Capital Backtest：对 `M10-PA-013/003/008/009/011` 输出第二批模拟资金曲线成绩单；视觉策略仍保留 OHLCV proxy / 人工图形复核边界。
 - M10.12 已完成 All Strategy Scorecard：把 16 条 `M10-PA-*` 汇总为甲方状态矩阵、资金测试成绩和 portfolio proxy；该 proxy 只用于业务视角汇总，不是可执行组合回测，不批准 paper trading。
 - M10.13 已完成 Read-only Observation Runbook：把通过筛选的 `M10-PA-001/002/012/008/009` 整理为只读观察队列、周报模板和暂停条件；本阶段不启动真实观察，不接 broker，不批准 paper trading。
+- M11 已完成 Paper Gate 当前检查点：输出 paper gate report、候选策略清单和风险暂停规则；`M10-PA-001/002/012` 只是 Tier A 核心观察候选，`M10-PA-008/009` 只是 Tier B 视觉条件候选，当前 gate decision 为 `not_approved`，不批准 paper trading。
 
 ## 2. 执行总原则
 
@@ -1004,8 +1005,7 @@
   - M10.6 继续保持 `M10-PA-005` 的 `1h / 15m / 5m` 为 `needs_definition_fix` / `definition_breadth_review` 路径，不做自动升级。
   - 阶段顺序固定为 historical backtest -> realtime read-only observation -> paper trading -> live approval；M10 不进入真实下单。
 - 后续承接：
-  - `M10.7`: Observation Ledger QA / Definition Review，优先复核 ledger schema、bar-close 语义、M10-PA-005 definition breadth 与人工 review 队列。
-  - `M11`: Paper Trading Candidate Gate，只有 M10.7 复核、后续真实只读观察、visual review 和人工复核都达标后才讨论。
+  - 当前 M11 gate 继续关闭；只有完成真实只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和明确人工业务审批后，才允许重新评估 paper trading gate。
 - 当前边界：
   - 继续保持 `paper / simulated`。
   - 不接真实账户，不连真实 broker，不自动下单。
