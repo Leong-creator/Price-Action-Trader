@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `codex/m12-2-core-strategy-daily-observation`，M12.2 已完成）
+- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `codex/m12-3-visual-review-precheck`，M12.3 已完成）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.2 Core Strategy Daily Observation`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed 与 M12.2 Core Strategy Daily Observation
+- 当前支线 milestone：`M12.3 Visual Review Precheck`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation 与 M12.3 Visual Review Precheck
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m12-2-core-strategy-daily-observation`
+- `codex/m12-3-visual-review-precheck`
 
 ## 已完成
 
@@ -359,6 +359,10 @@
   - M12.2 只消费 M12.1 feed ledger、M10.13 observation queue、M11 Tier A 候选与 M10.3 backtest specs；自动观察范围严格限制为 `M10-PA-001/002/012`，未纳入 `M10-PA-008/009` 视觉条件候选。
   - M12.2 当前生成 `32` 条只读观察记录：`M10-PA-001` 12 条、`M10-PA-002` 12 条、`M10-PA-012` 8 条；由于输入只有单根 latest bar，本阶段全部诚实标记为 `skip_no_trade`，不从单根 bar 编造完整策略触发。
   - M12.2 输出 `m12_2_daily_observation_report.md`、`m12_2_observation_events.csv`、`m12_2_observation_events.jsonl` 与 `m12_2_strategy_status_matrix.json`；继续保持 `paper_simulated_only=true / broker_connection=false / real_orders=false / live_execution=false / paper_trading_approval=false`。
+  - 已完成 M12.3 Visual Review Precheck，新增 `config/examples/m12_visual_review_precheck.json`、`scripts/m12_visual_review_precheck_lib.py`、`scripts/run_m12_visual_review_precheck.py`、`visual_review/m12_3_precheck/` 与 M12.3 单测。
+  - M12.3 覆盖 `M10-PA-008/009` 优先复核、`M10-PA-003/011/013` 观察名单、`M10-PA-004/007` 定义问题辅助证据；其中 `M10-PA-013` 明确为无 visual pack 的既有 Wave B candidate。
+  - M12.3 当前生成 `7` 条 strategy rows 与 `30` 条 case rows；当前 main worktree 缺 local-only Brooks 图片，但旧 M10 worktree 中 30/30 个本阶段所需 case 图片存在且 checksum 全部匹配。
+  - M12.3 只是 agent 预审和人工复核包，不关闭人工 visual judgment，不批准 paper trading，不接 broker、不下单。
 
 ## 当前阻塞
 
@@ -367,8 +371,8 @@
 
 ## 下一步
 
-- 进入 M12.3 Visual Review Precheck：复用 M10.2 visual golden cases、M10.10 visual gate 与旧 M10 worktree 中 local-only Brooks evidence，整理图形策略预审和人工复核包；仍不替代人工 visual judgment。
-- M12.5 Liquid Universe Scanner 等 M12.2/M12.3 产物提交后从干净 main 继续分支推进，第一版只接 Tier A：`M10-PA-001/002/012`。
+- 进入 M12.4 Definition Fix and Retest：优先处理 `M10-PA-005`，再处理 `M10-PA-004/007`；只能基于 Brooks v2 / YouTube / notes 和结构化定义修正，不能按收益曲线调参。
+- M12.5 Liquid Universe Scanner 等 M12.4 完成后从干净 main 继续分支推进，第一版只接 Tier A：`M10-PA-001/002/012`。
 - M11 paper gate 当前关闭；必须先完成只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和人工业务审批，才允许重新评估 paper trading。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
