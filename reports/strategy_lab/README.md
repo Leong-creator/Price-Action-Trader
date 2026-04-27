@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M11 Paper Gate`，当前阶段分支为 `codex/m11-paper-gate`，集成基线为 `codex/m10-price-action-strategy-refresh`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12 Read-only Observation & Scanner`，当前阶段分支为 `codex/m12-4-definition-fix-and-retest`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -67,6 +67,21 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_paper_gate_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_candidate_strategy_list.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_risk_and_pause_policy.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_0_auth_preflight/m12_0_longbridge_readonly_auth_check.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_readonly_feed_manifest.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_bar_close_observation_ledger.jsonl`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_feed_health_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_2_daily_observation/m12_2_daily_observation_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_2_daily_observation/m12_2_observation_events.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_2_daily_observation/m12_2_strategy_status_matrix.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_user_review_packet.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_gate_recommendation.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_definition_fix_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_before_after_metrics.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_definition_fix_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_retest_client_summary.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -89,6 +104,7 @@
 - M12.1 已完成 Longbridge read-only feed：生成 `16` 条 `SPY/QQQ/NVDA/TSLA x 1d/1h/15m/5m` 只读 bar-close feed ledger；该阶段只生成输入，不运行策略、不生成交易/账户字段、不输出盈亏结论。
 - M12.2 已完成 core strategy daily observation：生成 `32` 条 Tier A 只读观察记录；由于 M12.1 feed 只有单根 latest bar，当前全部记录为 `skip_no_trade`，不伪造策略触发、不批准 paper trading。
 - M12.3 已完成 visual review precheck：复用 M10.2/M10.10 现有图例与 gate 产物，生成 `7` 条 strategy rows 与 `30` 条 case rows；本阶段只做 agent 预审和人工复核包，不替代人工图形判断。
+- M12.4 已完成 definition fix and retest：`M10-PA-005` 有复测 before/after 数字但仍未解除 `needs_definition_fix`；`M10-PA-004/007` 仅登记定义字段缺口和图例证据，不伪造交易结果。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -99,8 +115,8 @@
 
 ## 先看哪个分支
 
-- 当前 M11 阶段分支在：`codex/m11-paper-gate`
-- M10 集成基线在：`codex/m10-price-action-strategy-refresh`
+- 当前 M12.4 阶段分支在：`codex/m12-4-definition-fix-and-retest`
+- 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 
 如果你的目标是判断“项目现在做到哪里了，以及下一步最该提炼/测试什么策略”，应优先查看 M10 目录，不要把 M9 `PA-SC-*` 或 `SF-*` 当作当前策略先验。
