@@ -308,6 +308,10 @@
   - M10.6 当前生成 `108640` 条 observation ledger row：`73619` 条 candidate event、`35021` 条 skip/no-trade；ledger 只用于检查输入、schema、bar-close 记录和人工复核流程。
   - M10.6 未输出策略有效、盈利、保留、推广、paper gate 或实盘能力结论；M11 paper gate 继续关闭。
   - M10.6 已通过 `validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、M10.1/M10.3/M10.4/M10.5/M10.6 单测、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.7 Business Metric Policy，新增 `m10_7_business_metric_policy.md`、`m10_7_capital_model.json`、`m10_7_client_report_template.md`。
+  - M10.7 固定后续甲方报告默认口径：初始本金 `100,000 USD`、单笔风险当前权益 `0.5%`、不使用杠杆、每条 strategy/timeframe/symbol 先独立账户测试、成本压力 `1 / 2 / 5 bps`。
+  - M10.7 只冻结后续模拟资金曲线和成绩单口径；未运行新回测，未批准 paper trading，未接 broker、真实账户或订单通道。
+  - M10.7 已通过新增 business metric policy 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
   - M10 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
 
 ## 当前阻塞
@@ -317,7 +321,7 @@
 
 ## 下一步
 
-- 下一步可进入 `M10.7 Observation Ledger QA / Definition Review`：只复核 M10.6 ledger 质量、bar-close 语义、definition breadth 和人工 review 队列，不接 broker、不下单。
+- 下一步进入 `M10.8 Wave A Capital Backtest`：把 `M10-PA-001/002/005/012` 的 Wave A pilot 从 R 值事件链路转成甲方可读资金曲线、交易明细、胜率、回撤和分标的/分周期成绩单。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 仍关闭，只有后续真实只读观察、visual review 和人工复核都达标后才讨论。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
 - M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。

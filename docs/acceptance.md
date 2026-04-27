@@ -1116,6 +1116,12 @@
   - 数据缺失时只能写入 `m10_6_deferred_inputs.json`，不得生成 synthetic observation event。
   - M10.6 summary / report 不得输出收益证明、paper gate approval、live-ready 或策略状态升级结论。
   - M10.6 不得修改 `src/risk/`、`src/execution/`、`src/broker/` 的 live 行为。
+- M10.7 Business Metric Policy 必须满足：
+  - 必须生成 `m10_7_business_metric_policy.md`、`m10_7_capital_model.json`、`m10_7_client_report_template.md`。
+  - capital model 必须固定币种 `USD`、初始本金 `100000.00`、单笔风险当前权益 `0.50%`、不使用杠杆、允许 fractional shares 保持模拟确定性。
+  - 成本压力必须固定为 baseline `1 bps`、stress low `2 bps`、stress high `5 bps`。
+  - 后续甲方成绩单必备指标必须包括 initial capital、final equity、net profit、return percent、trade count、win rate、profit factor、max drawdown、max consecutive losses、average holding bars。
+  - M10.7 只冻结后续资金曲线模拟口径，不运行新回测，不接 broker、不接真实账户、不下单、不批准 paper trading。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。

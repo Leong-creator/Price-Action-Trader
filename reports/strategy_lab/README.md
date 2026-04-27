@@ -36,6 +36,9 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_deferred_inputs.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_7_business_metric_policy.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_7_capital_model.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_7_client_report_template.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -46,6 +49,7 @@
 - M10.5 已把 `M10-PA-005` 的 `1h / 15m / 5m` 标记为 `definition_breadth_review`；这只是定义宽度复核，不是收益或实盘结论。
 - M10.6 已完成 recorded replay observation ledger：当前 `event_count=108640`、`candidate_event_count=73619`、`skip_no_trade_count=35021`、`deferred_input_count=0`。
 - M10.6 ledger 只用于输入/schema/bar-close 记录与人工复核流程；不是实时行情观察，不证明策略有效或盈利。
+- M10.7 已冻结甲方报告口径：后续资金曲线测试默认使用 `100,000 USD` 初始本金、`0.5%` 单笔风险、`1 / 2 / 5 bps` 成本压力；本阶段未运行新回测，也未批准 paper trading。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
