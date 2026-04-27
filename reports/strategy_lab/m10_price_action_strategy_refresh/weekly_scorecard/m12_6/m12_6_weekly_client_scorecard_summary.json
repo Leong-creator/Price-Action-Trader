@@ -1,0 +1,109 @@
+{
+  "current_week_status_counts": {
+    "continue_read_only_observation": 3,
+    "definition_fix_required": 3,
+    "manual_visual_review_required": 2,
+    "not_current_week_focus": 2,
+    "not_independent_trigger": 4,
+    "watchlist_after_priority_cases": 2
+  },
+  "daily_observation": {
+    "candidate_event_count": 0,
+    "event_count": 32,
+    "skip_no_trade_count": 32,
+    "tier_a_strategy_ids": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012"
+    ]
+  },
+  "definition_fix": {
+    "pa005_definition_cleared": false,
+    "strategy_ids": [
+      "M10-PA-005",
+      "M10-PA-004",
+      "M10-PA-007"
+    ]
+  },
+  "generated_at": "2026-04-27T00:00:00Z",
+  "historical_capital_status_counts": {
+    "completed_capital_test": 8,
+    "needs_definition_fix": 3,
+    "research_only": 2,
+    "supporting_rule": 2,
+    "visual_only_not_backtestable": 1
+  },
+  "input_refs": {
+    "m10_12_decision_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_strategy_decision_matrix.json",
+    "m10_12_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_all_strategy_scorecard_summary.json",
+    "m12_2_status_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_2_daily_observation/m12_2_strategy_status_matrix.json",
+    "m12_3_visual_precheck": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json",
+    "m12_4_definition_fix_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_definition_fix_summary.json",
+    "m12_5_scanner_candidates": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_candidates.csv",
+    "m12_5_scanner_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_summary.json"
+  },
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6",
+  "portfolio_proxy": {
+    "average_strategy_return_percent": "5.7282",
+    "excluded_priority_candidates": [
+      {
+        "machine_status": "needs_definition_fix",
+        "reason": "Excluded from M10.12 portfolio proxy because status is needs_definition_fix.",
+        "strategy_id": "M10-PA-005"
+      }
+    ],
+    "max_simultaneous_positions": 8,
+    "max_simultaneous_risk_percent": "4.00",
+    "not_executable_reason": "Existing artifacts are strategy-sleeve simulations, not one timestamp-synchronized portfolio order book.",
+    "portfolio_initial_capital": "100000.00",
+    "proxy_final_equity": "105728.18",
+    "proxy_method": "equal_weight_strategy_return_average_not_executable_concurrent_backtest",
+    "proxy_net_profit": "5728.18",
+    "requested_priority_order": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012",
+      "M10-PA-005",
+      "M10-PA-013",
+      "M10-PA-003",
+      "M10-PA-008",
+      "M10-PA-009",
+      "M10-PA-011"
+    ],
+    "schema_version": "m10.12.portfolio-proxy.v1",
+    "selected_strategy_ids": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012",
+      "M10-PA-013",
+      "M10-PA-003",
+      "M10-PA-008",
+      "M10-PA-009",
+      "M10-PA-011"
+    ],
+    "selection_rule": "completed_capital_test_only_in_priority_order"
+  },
+  "run_id": "m12_6_weekly_client_scorecard",
+  "scanner": {
+    "candidate_count": 12,
+    "deferred_symbol_count": 143,
+    "scanned_symbol_count": 4,
+    "strategy_candidate_counts": {
+      "M10-PA-001": 6,
+      "M10-PA-012": 6
+    },
+    "universe_symbol_count": 147
+  },
+  "schema_version": "m12.weekly-client-scorecard-summary.v1",
+  "stage": "M12.6.weekly_client_scorecard",
+  "strategy_count": 16,
+  "trading_status": "closed_not_authorized",
+  "visual_review": {
+    "case_count": 30,
+    "manual_review_pending": true,
+    "priority_strategy_ids": [
+      "M10-PA-008",
+      "M10-PA-009"
+    ]
+  }
+}
