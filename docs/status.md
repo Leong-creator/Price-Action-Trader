@@ -2,20 +2,20 @@
 
 ## 当前阶段
 
-- 稳定基线：阶段 8：可靠性验证（已完成至 `M8E.2`，位于 `main`）
-- 当前支线：阶段 9：Price Action Strategy Lab（进行中，位于 `feature/m9-wave3-robustness-validation`）
+- 稳定基线：`main`
+- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `codex/m12-0-readonly-auth-preflight`，M12.0 已完成）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M9I.2 Wave3 Holdout / Walk-forward Robustness Validation`（当前分支完成）
-- 当前子阶段：`M9A`~`M9F` 首轮已完成并已降级为 legacy / historical baseline；`M9G Full Extraction Completeness Audit v4` 已完成，`M9H Controlled Batch Backtest + Strategy Triage` 已完成 wave2 扩样本回测，`M9I.1 Freeze v0.2 Candidate Specs` 已完成，`M9I.2 Wave3 Holdout / Walk-forward Robustness Validation` 已完成
+- 当前支线 milestone：`M12.0 Longbridge Read-only Auth Preflight`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report 与 M12.0 Longbridge Read-only Auth Preflight
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m9-wave3-robustness-validation`
+- `codex/m12-0-readonly-auth-preflight`
 
 ## 已完成
 
@@ -276,21 +276,97 @@
     - `SF-003 = modify_and_retest`
     - `SF-004 = insufficient_sample`
   - `strategy_triage_matrix.json` 当前已保留 Wave2 历史，并追加 Wave3 history；`run_state.json` 已同步到 `M9I.2.wave3_robustness_validation_completed`。
+- M10 Price Action Strategy Refresh 已启动：
+  - 已从 `main` 创建独立 worktree/branch：`codex/m10-price-action-strategy-refresh`。
+  - 已落盘 `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`，把现有 M8/M9 worktrees、`PA-SC-*`、`SF-*`、旧 catalog/specs/triage 全部登记为 legacy-only。
+  - 已导入 Brooks v2 manual transcript 到 `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/`，当前包含 `191` 个 `units/*.md`、`191` 个 `evidence/*.md` 和本地 `assets/evidence/` 图片资产；图片按 `.gitignore` local-only 管理，校验和写入 `assets_evidence_checksums.sha256`。
+  - 已新增 Brooks v2、ChatGPT share、Codex thread 的 source page；ChatGPT share 和 Codex thread 均标记为 reference-only，不作为策略 source of truth。
+  - 已更新 source/chunk/atom/callable builder，使 `brooks_v2_manual_transcript`、`fangfangtu_youtube_transcript`、`fangfangtu_notes` 可独立检索；当前 source coverage 为 `total_registered=11 / parsed=10 / partial=1 / blocked=0`。
+  - 已生成 clean-room `M10-PA-*` 初版 catalog，共 `16` 个策略/规则条目，输出到 `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`。
+  - 已生成 `source_support_matrix_m10.json`、`chatgpt_bpa_comparison.json`、`legacy_comparison_m10.json`、`visual_gap_ledger.json`、`backtest_eligibility_matrix.json` 与 `m10_test_plan.md`。
+  - 已完成 M10.1 目录复审与测试承接，新增 `m10_catalog_review.md`、`strategy_catalog_m10_frozen.json`、`m10_strategy_test_queue.json`。
+  - M10.1 当前冻结 `16` 条策略/规则：`M10-PA-001/002/005/012` 进入 Backtest Wave A，`M10-PA-013` 进入 Wave B candidate，`M10-PA-003/004/007/008/009/010/011` 进入 Visual golden case first，`M10-PA-014/015` 为 supporting rules，`M10-PA-006/016` 为 research-only。
+  - Visual golden case 不是所有策略的统一门槛，只针对上述强图形依赖策略；supporting / research 条目不走普通 visual review，也不作为独立 trigger。
+  - 已完成 M10.2 Visual Golden Case Pack，新增 `visual_golden_cases/`、`m10_visual_golden_case_index.json`、`m10_visual_case_selection_ledger.json`、`m10_2_visual_review_summary.md`、`m10_3_backtest_spec_handoff.md`。
+  - M10.2 当前 `ready_count=7 / blocked_count=0`；每个 visual strategy 均有 `3` 个 Brooks v2 正例、`1` 个反例、`1` 个边界例，且 evidence image logical path / checksum 可解析。
+  - `visual_pack_ready` 只表示图例包证据完整，仍需人工 visual review；不代表策略有效、盈利或可进入实盘。
+  - 已完成 M10.3 Backtest Spec Freeze，新增 `backtest_specs/`、`m10_backtest_spec_index.json`、`m10_event_definition_ledger.json`、`m10_skip_rule_ledger.json`、`m10_cost_sample_gate_policy.json`、`m10_3_backtest_spec_freeze_summary.md`。
+  - M10.3 当前只覆盖 Wave A：`M10-PA-001/002/005` 测 `1d / 1h / 15m / 5m`，`M10-PA-012` 测 `15m / 5m`；未把 visual-first、supporting、research-only 条目放入 Wave A spec。
+  - M10.3 只冻结事件识别、entry/stop/target、skip 规则、成本敏感性和样本门槛；未运行 historical backtest，未输出收益、`retain/promote` 或实盘能力结论。
+  - 已完成 M10.4 Historical Backtest Pilot，新增 `scripts/m10_historical_pilot_lib.py`、`scripts/run_m10_historical_pilot.py`、`config/examples/m10_wave_a_historical_pilot.json` 与 `reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/`。
+  - M10.4 使用 sibling main worktree 的本地 Longbridge cache：`1d` 固定长窗口为 `2010-06-29 ~ 2026-04-21`，`5m` 使用 `2024-04-01 ~ 2026-04-21` intraday cache，`15m / 1h` 从 `5m` 聚合并记录 `derived_from_5m`。
+  - M10.4 当前 `available_count=16 / deferred_count=0`，覆盖 `SPY / QQQ / NVDA / TSLA`、Wave A 共 `14` 个 strategy/timeframe 组合；每个组合都输出 candidate events、skip/no-trade ledger、source ledger、成本敏感性、per-symbol、per-regime 与 failure-mode notes。
+  - M10.4 当前所有组合 outcome 均为 `continue_testing`；这只表示样本门槛和链路检查继续可测，不代表策略有效、盈利、可保留、可推广或可实盘。
+  - M10.4 已通过 `validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、M10.1/M10.3/M10.4 单测、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.5 Read-only Observation Plan，新增 `m10_5_pilot_quality_review.md`、`m10_5_observation_candidate_queue.json`、`m10_5_read_only_observation_plan.md`、`m10_5_observation_event_schema.json`、`m10_5_paper_gate_handoff.md`。
+  - M10.5 只把 Wave A 转成只读观察候选队列：`M10-PA-001/002/005` 保留 `1d / 1h / 15m / 5m`，`M10-PA-012` 只保留 `15m / 5m`；visual-first、Wave B、supporting-only、research-only 均未进入队列。
+  - M10.5 当前实时只读输入状态为 `observation_input_deferred`，未启动 observation runner；`1d` 只允许规划为收盘后观察，`1h / 15m / 5m` 只允许规划为 regular-session bar close 后记录。
+  - M10.5 已把 `M10-PA-005` 的 `1h / 15m / 5m` 标记为 `definition_breadth_review`，该标记只代表定义宽度需复核，不代表 PnL 结论。
+  - M10.5 已通过 `validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、M10.1/M10.3/M10.4/M10.5 单测、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.6 Read-only Observation Input / Ledger Prototype，新增 `config/examples/m10_read_only_observation_replay.json`、`scripts/m10_read_only_observation_lib.py`、`scripts/run_m10_read_only_observation.py` 与 `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/`。
+  - M10.6 使用本地 cached OHLCV recorded replay，当前 `deferred_input_count=0`，`lineage_counts={"native_cache": 8, "derived_from_5m": 8}`；未接实时行情订阅、broker、真实账户或订单通道。
+  - M10.6 当前生成 `108640` 条 observation ledger row：`73619` 条 candidate event、`35021` 条 skip/no-trade；ledger 只用于检查输入、schema、bar-close 记录和人工复核流程。
+  - M10.6 未输出策略有效、盈利、保留、推广、paper gate 或实盘能力结论；M11 paper gate 继续关闭。
+  - M10.6 已通过 `validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、M10.1/M10.3/M10.4/M10.5/M10.6 单测、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.7 Business Metric Policy，新增 `m10_7_business_metric_policy.md`、`m10_7_capital_model.json`、`m10_7_client_report_template.md`。
+  - M10.7 固定后续甲方报告默认口径：初始本金 `100,000 USD`、单笔风险当前权益 `0.5%`、不使用杠杆、每条 strategy/timeframe/symbol 先独立账户测试、成本压力 `1 / 2 / 5 bps`。
+  - M10.7 只冻结后续模拟资金曲线和成绩单口径；未运行新回测，未批准 paper trading，未接 broker、真实账户或订单通道。
+  - M10.7 已通过新增 business metric policy 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.8 Wave A Capital Backtest，新增 `scripts/m10_capital_backtest_lib.py`、`scripts/run_m10_wave_a_capital_backtest.py`、`capital_backtest/m10_8_wave_a/` 与 M10.8 单测。
+  - M10.8 使用 M10.4 candidate events 重新按 M10.7 资本模型计算仓位、成本、权益、胜率和回撤；未重新发明信号，未读取旧 `PA-SC-*` / `SF-*` 作为策略来源。
+  - M10.8 当前生成 baseline trade ledger `73619` 行、all-cost simulated rows `220857` 行、metrics `222` 行，并输出 baseline equity curve CSV/SVG。
+  - M10.8 baseline strategy results：`M10-PA-001` 净利润 `395723.86` / 收益 `24.7327%` / 胜率 `0.3584`；`M10-PA-002` 净利润 `52496.28` / 收益 `3.2810%` / 胜率 `0.3492`；`M10-PA-005` 净利润 `-147665.89` / 收益 `-9.2291%` / 胜率 `0.3401`；`M10-PA-012` 净利润 `215141.29` / 收益 `26.8927%` / 胜率 `0.3815`。
+  - M10.8 继续把 `M10-PA-005` 标记为 `needs_definition_fix`，资本结果不得覆盖其 `definition_breadth_review` 问题。
+  - M10.8 已通过新增 Wave A capital backtest 单测、M10.7 policy 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.9 Definition Tightening，新增 `scripts/m10_definition_tightening_lib.py`、`scripts/run_m10_definition_tightening.py`、`definition_tightening/m10_9_pa_005/` 与 M10.9 单测。
+  - M10.9 只处理 `M10-PA-005`：先移除同一确认 bar 的重复候选，再对 `1h / 15m / 5m` 同标的同方向失败突破施加 20-bar 冷却；该逻辑不读取 PnL、资金曲线、胜率或 profit factor。
+  - M10.9 baseline retest：`1d` 交易数 `1481 -> 1188`、净利润 `-34130.96 -> -22855.77`；`1h` `1469 -> 950`、`-613.09 -> 4527.65`；`15m` `7511 -> 2966`、`50820.21 -> 14707.57`；`5m` `23881 -> 8007`、`-163742.05 -> -107134.41`。
+  - M10.9 明确记录上游缺口：M10.4 candidate events 未持久化 `range_high/range_low/range_midpoint/breakout_extreme/reentry_confirmation_index`；因此 `M10-PA-005` 仍保持 `needs_definition_fix`，不能升级为已修好策略。
+  - M10.9 已通过新增 definition tightening 单测、M10.7/M10.8/M10.9 组合单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.10 Visual Wave B Gate，新增 `scripts/m10_visual_wave_b_gate_lib.py`、`scripts/run_m10_visual_wave_b_gate.py`、`visual_wave_b_gate/m10_10/` 与 M10.10 单测。
+  - M10.10 当前 Wave B queue 为 `M10-PA-013/003/008/009/011`；其中 `M10-PA-003/008/009/011` 来自 visual gate，`M10-PA-013` 为既有 Wave B candidate。
+  - M10.10 暂不进入自动回测的视觉策略：`M10-PA-004` 与 `M10-PA-007` 标记 `needs_definition_fix`，`M10-PA-010` 标记 `visual_only_not_backtestable`。
+  - M10.10 已通过新增 visual Wave B gate 单测、M10 strategy refresh 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.11 Wave B Capital Backtest，新增 `scripts/m10_wave_b_capital_backtest_lib.py`、`scripts/run_m10_wave_b_capital_backtest.py`、`capital_backtest/m10_11_wave_b/` 与 M10.11 单测。
+  - M10.11 覆盖 `M10-PA-013/003/008/009/011`，当前生成 baseline trade ledger `20055` 行、metrics `270` 行、candidate events `20055` 行，并输出 baseline equity curve CSV/SVG。
+  - M10.11 baseline strategy results：`M10-PA-003` 净利润 `-54431.35` / 收益 `-4.5359%` / 胜率 `0.3391`；`M10-PA-008` 净利润 `64057.47` / 收益 `4.0036%` / 胜率 `0.3541`；`M10-PA-009` 净利润 `16277.18` / 收益 `1.0173%` / 胜率 `0.3395`；`M10-PA-011` 净利润 `-13014.18` / 收益 `-1.6268%` / 胜率 `0.2881`；`M10-PA-013` 净利润 `-127027.54` / 收益 `-7.9392%` / 胜率 `0.3255`。
+  - M10.11 视觉策略结果来自 OHLCV 近似规则，仍需人工图形复核；不得解释为策略批准、paper trading 准入或实盘能力。
+  - M10.11 已通过新增 Wave B capital backtest 单测、M10.10 visual gate 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.12 All Strategy Scorecard，新增 `scripts/m10_all_strategy_scorecard_lib.py`、`scripts/run_m10_all_strategy_scorecard.py`、`all_strategy_scorecard/m10_12/` 与 M10.12 单测。
+  - M10.12 当前覆盖全部 `16` 条 `M10-PA-*`：`8` 条完成资金测试、`3` 条需要定义修正、`1` 条图形复核保留、`2` 条只能辅助、`2` 条 research-only。
+  - M10.12 portfolio proxy 使用 `100,000 USD` 初始本金、最大同时风险 `4%`、最多同时持仓 `8`，只纳入 `completed_capital_test` 策略，并排除仍需定义修正的 `M10-PA-005`；当前 proxy final equity 为 `105728.18 USD`、proxy net profit 为 `5728.18 USD`，该结果不是按真实时间戳合并订单的可执行组合回测。
+  - M10.12 输出 `m10_12_all_strategy_metrics.csv`、`m10_12_strategy_decision_matrix.json`、`m10_12_portfolio_simulation_report.md`、`m10_12_client_final_report.md` 与结构化 summary；仍不批准 paper trading，不接 broker、不下单。
+  - M10.12 已通过新增 all-strategy scorecard 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.13 Read-only Observation Runbook，新增 `scripts/m10_read_only_runbook_lib.py`、`scripts/run_m10_read_only_runbook.py`、`read_only_observation/m10_13/` 与 M10.13 单测。
+  - M10.13 主观察队列为 `M10-PA-001/002/012/008/009`，覆盖 `13` 个策略周期；筛选规则为 completed capital test、整体收益为正、且进入观察的 timeframe 收益为正；其中 `M10-PA-008/009` 来自 M10.11/M10.12 后续筛选，必须保留人工图形语境复核。
+  - M10.13 明确排除 `M10-PA-005`，直到 range-geometry 定义修正完成；`M10-PA-003/011/013` 保留 watchlist/deferred，不进入主观察队列。
+  - M10.13 输出 `m10_13_observation_candidate_queue.json`、`m10_13_read_only_observation_runbook.md`、`m10_13_weekly_observation_template.md` 与结构化 summary；仍不启动 observation runner，不接 broker、不下单。
+  - M10.13 已通过新增 read-only observation runbook 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M11 Paper Gate，新增 `scripts/m11_paper_gate_lib.py`、`scripts/run_m11_paper_gate.py`、`paper_gate/m11/` 与 M11 单测。
+  - M11 候选池来自 M10.13 主观察队列：`M10-PA-001/002/012/008/009`；其中 `M10-PA-001/002/012` 是 Tier A 核心观察候选，`M10-PA-008/009` 是 Tier B 视觉条件候选，必须先关闭人工图形语境复核。
+  - M11 gate decision 为 `not_approved`，所有候选当前都标记为 `counts_as_gate_evidence_now=false`；当前没有任何策略可作为 paper trading approval evidence。
+  - M11 明确阻塞项：尚无真实只读观察周报闭环、缺少人工业务审批、视觉候选仍需人工图形复核、broker/order 路径必须继续禁用。
+  - M11 输出 `m11_paper_gate_report.md`、`m11_candidate_strategy_list.json`、`m11_risk_and_pause_policy.md` 与结构化 summary；仍不启动 observation runner，不接 broker、不接真实账户、不下单、不批准 paper trading。
+  - M10/M11 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
+  - 已完成 M12.0 Longbridge Read-only Auth Preflight，新增 `scripts/m12_readonly_auth_preflight_lib.py`、`scripts/run_m12_readonly_auth_preflight.py`、`m12_read_only_pipeline/m12_0_auth_preflight/` 与 M12.0 单测。
+  - M12.0 当前 auth status 为 `valid_readonly_market_data`，说明本地 Longbridge CLI、token、quote snapshot 与 latest K-line 只读探针可用；下一步可进入 M12.1 只读 bar-close feed。
+  - M12.0 只允许 `check / quote / kline / subscriptions` 行情检查命令；交易、账户、资产、持仓、现金、融资、订单相关命令均未调用，且继续保持 `broker_connection=false / real_orders=false / live_execution=false / paper_trading_approval=false`。
 
 ## 当前阻塞
 
 - 当前无阻塞
-- 真实 broker / live 重新评估仍冻结，直到 M8 完成且用户另行批准；这不阻塞当前 M8 主线
+- 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- 当前不自动进入下一波 batch backtest；`M9I.2` 已完成，下一步应在 `paper shadow`、`再次修改并重测`、`继续补 SF-005 evidence` 三者中决策，而不是自动继续扩大回测。
-- 若进入下一阶段，只允许基于已冻结的 `SF-*` catalog、`cross_source_corroboration_final.json` 与 `unresolved_strategy_extraction_gaps.json` 决定候选，不得回退到 legacy `PA-SC-*` 作为 seed。
-- `SF-005` 当前继续保持 deferred，除非单独完成 family 边界澄清与 corroboration 风险处理，否则不得进入下一波。
-- `SF-001 ~ SF-004` 当前都已完成 `Wave3`；其中 `SF-001 ~ SF-003` 仍为 `modify_and_retest`，`SF-004` 为 `insufficient_sample`。由于当前没有严格 post-freeze holdout，这四个策略都不能直接升格为 `retain_candidate`。
+- 进入 M12.1 Longbridge Read-only Feed：把 M10.6 recorded replay 输入升级为 Longbridge 只读 quote/K-line bar-close 输入原型。
+- M11 paper gate 当前关闭；必须先完成只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和人工业务审批，才允许重新评估 paper trading。
+- M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
+- M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
+- M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。
 - 若 repo config、`plans/active-plan.md`、`docs/status.md`、`docs/acceptance.md` 的 provider contract 不一致，必须先修正文档/配置一致性，停止任何后续提炼或回测。
 - heartbeat / 自动推进若继续扩展，恢复状态只允许依赖 ledgers + `run_state.json.resume_cursor`。
-- M9 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger，`knowledge/raw` 仍不修改。
+- M10 期间继续保持 trigger 逻辑不变，`statement` 仍不进入 trigger；Brooks v2 raw 导入只用于知识来源登记和策略提炼，不进入 live execution。
 - 当前长期稳定基线仍是 `main`，继续保持 `paper / simulated` 与 `no-go` 边界。
 - `feature/m7-broker-api-assessment` 继续保留为历史阶段/里程碑分支，不再作为未来默认合并目标。
-- M9 不是 broker/live 扩展；当前仍不重新评估真实 broker、真实账户、live execution 或付费 API。
+- M10 不是 broker/live 扩展；当前仍不重新评估真实 broker、真实账户、live execution 或付费 API。

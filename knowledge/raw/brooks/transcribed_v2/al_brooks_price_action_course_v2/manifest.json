@@ -1,0 +1,30 @@
+{
+  "schema_version": "m10.brooks-v2-import.v1",
+  "generated_at": "2026-04-26T04:21:48Z",
+  "external_source_root": "/home/hgl/projects/Al Brooks extra/knowledge_base_v2",
+  "raw_root": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2",
+  "included": {
+    "readme": true,
+    "units": 191,
+    "evidence_pages": 191,
+    "assets_evidence_copied": true,
+    "assets_evidence_files": 9041,
+    "assets_evidence_bytes": 2128719315
+  },
+  "git_tracking_policy": {
+    "text_units_and_evidence": "tracked",
+    "assets_evidence": "local_only_ignored_by_git",
+    "asset_checksums": "tracked"
+  },
+  "source_priority_role": "highest_priority_strategy_source_for_m10",
+  "tracked_text_checksums": {
+    "file_count": 383,
+    "total_bytes": 3371905,
+    "checksum_path": "checksums.sha256"
+  },
+  "asset_checksums": {
+    "file_count": 9041,
+    "total_bytes": 2128719315,
+    "checksum_path": "assets_evidence_checksums.sha256"
+  }
+}

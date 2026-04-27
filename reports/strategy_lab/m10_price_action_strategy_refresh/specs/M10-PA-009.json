@@ -1,0 +1,165 @@
+{
+  "schema_version": "m10.strategy-spec.v1",
+  "strategy": {
+    "strategy_id": "M10-PA-009",
+    "namespace": "M10-PA",
+    "title": "Wedge Reversal and Wedge Flag",
+    "status": "visual_review_then_backtest",
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "confidence": "high",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "source_refs": [
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024B_wedges_imperfect_channels_variations_context.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_024B_wedges_imperfect_channels_variations_context.md"
+        },
+        "title": "Video 24B: Wedges - Imperfect Shapes, Channels, Variations, and Context",
+        "matched_keywords": [
+          "wedge",
+          "楔形",
+          "三推"
+        ]
+      },
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_024A_wedges_definition_flags_mtr_climax_probability.md"
+        },
+        "title": "Video 24A: Wedges - Definition, Flags, MTRs, Climaxes, and Reversal Probability",
+        "matched_keywords": [
+          "wedge",
+          "楔形",
+          "三推"
+        ]
+      },
+      {
+        "source_family": "brooks_v2_manual_transcript",
+        "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md",
+        "locator": {
+          "kind": "markdown_unit",
+          "path": "units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md"
+        },
+        "title": "Video 24D: Wedges - Parabolic Wedges and Bad Wedges in Strong Trends",
+        "matched_keywords": [
+          "wedge",
+          "parabolic wedge",
+          "楔形",
+          "三推"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_youtube_transcript",
+        "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 4
+        },
+        "title": "fangfangtu YouTube transcript p4",
+        "matched_keywords": [
+          "楔形",
+          "三推"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_youtube_transcript",
+        "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 7
+        },
+        "title": "fangfangtu YouTube transcript p7",
+        "matched_keywords": [
+          "楔形",
+          "三推"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_notes",
+        "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 1
+        },
+        "title": "方方土视频笔记 - 楔形 p1",
+        "matched_keywords": [
+          "wedge",
+          "楔形",
+          "三推"
+        ]
+      },
+      {
+        "source_family": "fangfangtu_notes",
+        "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+        "locator": {
+          "kind": "pdf_page",
+          "page_no": 4
+        },
+        "title": "方方土视频笔记 - 楔形 p4",
+        "matched_keywords": [
+          "wedge",
+          "楔形",
+          "三推"
+        ]
+      }
+    ],
+    "source_families": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "market_context": [
+      "wedge",
+      "three pushes",
+      "climax or flag"
+    ],
+    "timeframes": [
+      "1d",
+      "1h",
+      "15m",
+      "5m"
+    ],
+    "direction": "both",
+    "entry_logic": [
+      "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+      "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+    ],
+    "stop_logic": [
+      "Protect beyond the third push extreme."
+    ],
+    "target_logic": [
+      "Target two-legged correction or measured move from wedge height depending on context."
+    ],
+    "invalidation": [
+      "Failed wedge breakout with follow-through in the original direction."
+    ],
+    "no_trade_conditions": [
+      "Forcing wedge labels onto overlapping noise."
+    ],
+    "visual_dependency": "high",
+    "backtest_eligibility": {
+      "ohlcv_approximable": true,
+      "eligible_for_historical_backtest": true,
+      "route": "visual_golden_case_then_historical_backtest"
+    },
+    "clean_room_guard": {
+      "legacy_ids_used_in_extraction": [],
+      "forbidden_legacy_inputs": [
+        "knowledge/wiki/strategy_cards",
+        "reports/strategy_lab/strategy_catalog.json",
+        "reports/strategy_lab/specs",
+        "reports/strategy_lab/strategy_triage_matrix.json",
+        "reports/strategy_lab/cards"
+      ]
+    },
+    "chatgpt_bpa_reference_overlap": [
+      "BPA-010"
+    ]
+  },
+  "paper_simulated_only": true
+}

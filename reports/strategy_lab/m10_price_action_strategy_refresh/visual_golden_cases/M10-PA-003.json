@@ -1,0 +1,195 @@
+{
+  "schema_version": "m10.visual-golden-case-pack.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "strategy_id": "M10-PA-003",
+  "title": "Tight Channel Trend Continuation",
+  "pack_status": "visual_pack_ready",
+  "review_status": "agent_selected_pending_manual_review",
+  "case_counts": {
+    "positive": 3,
+    "counterexample": 1,
+    "boundary": 1
+  },
+  "requirements": {
+    "positive_cases": 3,
+    "counterexamples": 1,
+    "boundary_cases": 1,
+    "brooks_v2_images_are_local_only": true
+  },
+  "source_policy": {
+    "primary_case_source": "brooks_v2_manual_transcript_assets",
+    "youtube_notes_role": "terminology_or_explanation_only_not_visual_case_replacement",
+    "legacy_pa_sc_sf_role": "forbidden_as_case_source"
+  },
+  "cases": [
+    {
+      "case_id": "M10-PA-003-positive-001",
+      "strategy_id": "M10-PA-003",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+      "evidence_video_id": "video_014E",
+      "evidence_page": 987,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp",
+      "evidence_image_checksum": "4e144c108b54b00ff88d42670a4fd1ec1e033ad9b65ddfc210c7292f9831f703",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "tight channel",
+        "higher time frame",
+        "only look",
+        "紧密通道"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Tight Channel: Trade Like a Breakout Sometimes difficult to know if breakout (BO) or Tight Channel • Assume BO and trade it like one • Tight Channel is a BO on a higher time frame ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-003-positive-002",
+      "strategy_id": "M10-PA-003",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+      "evidence_video_id": "video_014E",
+      "evidence_page": 988,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp",
+      "evidence_image_checksum": "deac227fc8af343f8e468b05fc9914e74681f10fdf2971719367855bd901331f",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "tight channel",
+        "higher time frame",
+        "紧密通道"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Tight Channel: It Is Higher Time Frame BO 5 min Tight Channel Tight channel is \"weak\" trend compared to BO It can still be almost as strong as BO When it is, trade it like BO Only ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-003-positive-003",
+      "strategy_id": "M10-PA-003",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+      "evidence_video_id": "video_017A",
+      "evidence_page": 1397,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp",
+      "evidence_image_checksum": "37513cb3b7351297cfa67bf7c9c84f53b3555504f9d0de25c5654a27934add3d",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "tight channel",
+        "higher time frame",
+        "only look",
+        "紧密通道"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Tight Channel: Breakout on Higher Time Frame 5 min Tight Channel +••06'~ +1,1014 Trade it like a breakout, and only look to buy! t ~ is a 30 min breakout BrooksTradingCourse.com Br",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-003-counterexample-001",
+      "strategy_id": "M10-PA-003",
+      "case_type": "counterexample",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+      "evidence_video_id": "video_014C",
+      "evidence_page": 936,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp",
+      "evidence_image_checksum": "5949eddec903130363cc4632f8883707b2a39de3b4519a8de6cdb5f6cc3e4a9e",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "trading range",
+        "broad"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "■ Spike and Channel (almost every chart at some point) ■ Trend from the Open (about once/week) ■ Trending Trading Range Day (a couple/week) ■ Trend Resumption Day (about once/month",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-003-boundary-001",
+      "strategy_id": "M10-PA-003",
+      "case_type": "boundary",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+      "evidence_video_id": "video_014C",
+      "evidence_page": 942,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp",
+      "evidence_image_checksum": "c33e909786922da8316ca2194cb5310df22e59a2d619567ed061527d26f3ac3d",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "usually",
+        "sometimes",
+        "sometimes",
+        "usually",
+        "可能",
+        "通常"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Every Bull Trend: Usually Contains Spike and Channel • One type is usually dominant • Trends begin with BO (spike) • Then has pullback, that leads to channel • All trends have at l",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Clear channel break followed by opposite follow-through."
+      ],
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    }
+  ],
+  "gap_notes": []
+}

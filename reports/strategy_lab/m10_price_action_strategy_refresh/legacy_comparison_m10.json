@@ -1,0 +1,72 @@
+{
+  "schema_version": "m10.legacy-comparison.v1",
+  "comparison_phase": "after_clean_room_catalog_generation",
+  "legacy_policy": "inventory_and_diff_only_no_feedback_into_m10_catalog",
+  "legacy_records": [
+    {
+      "path": "knowledge/wiki/strategy_cards",
+      "exists": true,
+      "file_count": 14,
+      "ids": [
+        "PA-SC-001",
+        "PA-SC-002",
+        "PA-SC-003",
+        "PA-SC-004",
+        "PA-SC-005",
+        "PA-SC-006",
+        "PA-SC-007",
+        "PA-SC-008",
+        "PA-SC-009",
+        "PA-SC-010"
+      ]
+    },
+    {
+      "path": "reports/strategy_lab/strategy_catalog.json",
+      "exists": true,
+      "file_count": 1,
+      "ids": [
+        "SF-001",
+        "SF-002",
+        "SF-003",
+        "SF-004",
+        "SF-005"
+      ]
+    },
+    {
+      "path": "reports/strategy_lab/cards",
+      "exists": true,
+      "file_count": 5,
+      "ids": [
+        "SF-001",
+        "SF-002",
+        "SF-003",
+        "SF-004",
+        "SF-005"
+      ]
+    },
+    {
+      "path": "reports/strategy_lab/specs",
+      "exists": true,
+      "file_count": 9,
+      "ids": [
+        "SF-001",
+        "SF-002",
+        "SF-003",
+        "SF-004",
+        "SF-005"
+      ]
+    },
+    {
+      "path": "reports/strategy_lab/strategy_triage_matrix.json",
+      "exists": true,
+      "file_count": 1,
+      "ids": [
+        "SF-001",
+        "SF-002",
+        "SF-003",
+        "SF-004",
+        "SF-005"
+      ]
+    }
+  ]
+}

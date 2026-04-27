@@ -1,0 +1,188 @@
+{
+  "schema_version": "m10.visual-golden-case-pack.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "strategy_id": "M10-PA-009",
+  "title": "Wedge Reversal and Wedge Flag",
+  "pack_status": "visual_pack_ready",
+  "review_status": "agent_selected_pending_manual_review",
+  "case_counts": {
+    "positive": 3,
+    "counterexample": 1,
+    "boundary": 1
+  },
+  "requirements": {
+    "positive_cases": 3,
+    "counterexamples": 1,
+    "boundary_cases": 1,
+    "brooks_v2_images_are_local_only": true
+  },
+  "source_policy": {
+    "primary_case_source": "brooks_v2_manual_transcript_assets",
+    "youtube_notes_role": "terminology_or_explanation_only_not_visual_case_replacement",
+    "legacy_pa_sc_sf_role": "forbidden_as_case_source"
+  },
+  "cases": [
+    {
+      "case_id": "M10-PA-009-positive-001",
+      "strategy_id": "M10-PA-009",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024B_wedges_imperfect_channels_variations_context.md",
+      "evidence_video_id": "video_024B",
+      "evidence_page": 583,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/part2_p0583_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/part2_p0583.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/part2_p0583_crop.webp",
+      "evidence_image_checksum": "e9ef1dada24929238458827daa5286e3a52d6cd40bd76971f5378271b3cc3155",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "wedge",
+        "楔形"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Wedge Reversals: Common in Trading Ranges Bull flag can have Wedge shape Bull flag is small bear trend (or TR) Can end in Wedge Bottom Wedge Bull Flag Wedge Top t Wedge Bear Flag W",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-009-positive-002",
+      "strategy_id": "M10-PA-009",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "evidence_video_id": "video_024A",
+      "evidence_page": 576,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0576_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0576.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0576_crop.webp",
+      "evidence_image_checksum": "bec7733847799c4cf4e8a96c996690c9a5239e07596be2bc89df42a7a6caea21",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "wedge",
+        "triangle",
+        "楔形"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Wedge Bull & Bear Flags: Tops and Bottoms Are Common Wedge Top Wedge Bear Flag Wedge Bull Flag Triangle Wedge Bottom Wedges are common (at least 6 here) Perfect Wedges are rare Mos",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-009-positive-003",
+      "strategy_id": "M10-PA-009",
+      "case_type": "positive",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "evidence_video_id": "video_024A",
+      "evidence_page": 567,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0567_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0567.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0567_crop.webp",
+      "evidence_image_checksum": "05a569d373f1bd8c98804794e7bd6408660f16bbbfef160579de44e95d01f7ca",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "wedge",
+        "triangle",
+        "楔形"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Wedge Top Reversal: Factors Can Increase Reliability Wedge Top is Triangle that is sloped up (3 legs up, both lines rising) Wedge shaped (convergent lines) channel Rising Wedge is ",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-009-counterexample-001",
+      "strategy_id": "M10-PA-009",
+      "case_type": "counterexample",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "evidence_video_id": "video_024A",
+      "evidence_page": 575,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0575_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0575.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0575_crop.webp",
+      "evidence_image_checksum": "4c77a142c91a32e26383fd103a398b64b94f7f37dbf41d8a0c3c3208f2477e32",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "failed"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Wedges Are Triangles: Same Forces Triangle or Wedge? Does not matter Sell failed bull BO Look for BO or failed BO -------,r-------, Failed bear BO? • Breakout Pullback Not failed b",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    },
+    {
+      "case_id": "M10-PA-009-boundary-001",
+      "strategy_id": "M10-PA-009",
+      "case_type": "boundary",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "evidence_video_id": "video_024A",
+      "evidence_page": 573,
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0573_crop.webp",
+      "page_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0573.webp",
+      "crop_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0573_crop.webp",
+      "evidence_image_checksum": "1fc4994f0d8cc5c6986bcb18a4bd847936f61db9c82c958c4cfff592bc4a1ef6",
+      "evidence_exists": true,
+      "checksum_resolved": true,
+      "matched_terms": [
+        "if",
+        "可能",
+        "如果"
+      ],
+      "selection_reason": "term_match",
+      "raw_text_excerpt": "Type of Triangle that is sloped up or down Three strong pushes with reversals Channel More reliable if converging lines, but not necessary ~160, o❖❖,t9.o•, o.o *• ❖ '+o•+ O~'° + If",
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Failed wedge breakout with follow-through in the original direction."
+      ],
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "review_status": "agent_selected_pending_manual_review"
+    }
+  ],
+  "gap_notes": []
+}

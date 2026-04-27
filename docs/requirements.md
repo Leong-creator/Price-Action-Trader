@@ -225,7 +225,8 @@ OHLCV 最小字段：
 
 最小要求：
 
-- 策略卡必须保留真实 `source_refs`，并显式区分 transcript、Brooks PPT、用户 notes 的证据优先级。
+- 策略卡 / catalog 必须保留真实 `source_refs`，并显式区分 Brooks v2 manual transcript、方方土 YouTube transcript、用户 notes 的证据优先级。
+- M10 之后的策略刷新必须遵守 `brooks_v2_manual_transcript > fangfangtu_youtube_transcript > fangfangtu_notes`；Brooks v2 或 YouTube 单源支撑不得仅因缺少三源齐全而自动拒绝，notes-only 必须降级。
 - 每张策略卡都必须包含可测试的入场、止损、出场、失效条件与禁止交易条件；证据不足时必须明确写出。
 - 系统必须支持记录策略当前结论：`draft / candidate / tested / promoted / rejected`。
 - 系统必须支持为策略写独立测试计划，包括标的、周期、历史窗口、成本/滑点、样本切分、最低交易数、通过/淘汰标准。

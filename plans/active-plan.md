@@ -27,8 +27,25 @@
 - M8E.1：Validation Gap Closure 已完成，当前已把 checked-in `summary.json` / `report.md` 的路径元数据统一为 repo-relative logical path，给 `m8c1_long_horizon_daily_validation` 增加 `sample_adequacy`，并补齐 golden catalog smoke test 与 artifact portability 回归。
 - M8E.2：Longer-Window Daily Validation 已完成，当前已新增 `config/examples/public_history_backtest_longer_window.json`，并生成 checked-in run `reports/backtests/m8e2_longer_window_daily_validation/`，覆盖 `2018-01-01 ~ 2026-04-17`、`NVDA / TSLA / SPY`、`1d` 的更长窗口 daily validation。
 - M8E.3 当前继续延后：在每个标的至少具备 `30` 个完整 regular session 之前，不启动 intraday 更长窗口扩展。
-- 已从 `main` 切出 `feature/m9-price-action-strategy-lab` 作为新支线，当前目标是把知识来源系统性提炼为 strategy cards、测试计划与可回测候选，而不是扩展 trigger、risk、execution 或 broker。
-- M9 的来源优先级固定为：`fangfangtu_transcript > al_brooks_ppt > fangfangtu_notes`。
+- M9 Strategy Lab / Strategy Factory 已降级为 legacy / historical baseline，不再作为后续策略提炼默认工作面。
+- 已从 `main` 切出 `codex/m10-price-action-strategy-refresh` 作为 M10 新支线，目标是基于 Brooks v2 手工转录、方方土 YouTube transcript、方方土 notes 重新提炼策略目录与测试规划。
+- M10 的来源优先级固定为：`brooks_v2_manual_transcript > fangfangtu_youtube_transcript > fangfangtu_notes`。
+- M10 clean-room 提炼阶段禁止读取或参考旧 `PA-SC-*`、`SF-*`、旧 strategy cards、旧 specs、旧 triage 或旧 catalog；旧内容只允许在新 catalog 生成后做 comparison / legacy inventory。
+- M10.1 已完成 catalog 复审与测试承接：当前冻结 `16` 条 `M10-PA-*` 策略/规则条目，并把策略分流为 `backtest_wave_a`、`backtest_wave_b_candidate`、`visual_golden_case_first`、`supporting_rule`、`research_only`。
+- M10.2 已完成 Visual Golden Case Pack：`M10-PA-003/004/007/008/009/010/011` 均已生成 3 正例、1 反例、1 边界例的 Brooks v2 图例包；该状态只表示证据包完整，仍不代表策略有效或盈利。
+- M10.3 已完成 Backtest Spec Freeze：为 Wave A 的 `M10-PA-001/002/005/012` 冻结可执行 backtest specs、event definition ledger、skip rule ledger、成本/样本门槛 policy。
+- M10.4 已完成 Historical Backtest Pilot：使用本地 Longbridge daily 长窗口与 5m intraday cache 跑通 Wave A specs、dataset inventory、candidate events、skip/no-trade、source ledger、成本敏感性、per-symbol、per-regime 与 failure-mode 输出链路；该阶段只验证规格和测试链路，不证明盈利，也不输出 `retain/promote`。
+- M10.5 已完成 Read-only Observation Plan：把 M10.4 Wave A pilot 转成只读观察队列、事件 schema、pilot quality review 与 M11 paper gate handoff；本阶段不启动实时观察 runner，不接 broker，不下单，不批准 paper trading。
+- M10.6 已完成 Read-only Observation Input / Ledger Prototype：使用本地 cached OHLCV 做 recorded replay，只生成只读 observation ledger 与输入 manifest，不接 broker、不接真实账户、不做实时订阅、不生成执行或盈亏结论。
+- M10.7 已完成 Business Metric Policy：冻结后续甲方报告的资金口径、资本模型、成本敏感性、必备指标与报告模板；本阶段只定义模拟测试成绩单口径，不输出策略收益结论或 paper trading 批准。
+- M10.8 已完成 Wave A Capital Backtest：把 `M10-PA-001/002/005/012` 的 M10.4 candidate events 转成甲方可读模拟资金曲线、交易明细、胜率、回撤、分标的/分周期与成本压力成绩单；结果仍仅为 historical simulation，不批准 paper trading。
+- M10.9 已完成 Definition Tightening：只对 `M10-PA-005` 做重复确认去重与日内 20-bar 冷却复测，触发密度下降但因 range geometry 字段缺失仍保留 `needs_definition_fix`。
+- M10.10 已完成 Visual Wave B Gate：`M10-PA-003/008/009/011` 与既有 `M10-PA-013` 进入 Wave B queue；`M10-PA-004/007/010` 暂不进入自动回测。
+- M10.11 已完成 Wave B Capital Backtest：对 `M10-PA-013/003/008/009/011` 输出第二批模拟资金曲线成绩单；视觉策略仍保留 OHLCV proxy / 人工图形复核边界。
+- M10.12 已完成 All Strategy Scorecard：把 16 条 `M10-PA-*` 汇总为甲方状态矩阵、资金测试成绩和 portfolio proxy；该 proxy 只用于业务视角汇总，不是可执行组合回测，不批准 paper trading。
+- M10.13 已完成 Read-only Observation Runbook：把通过筛选的 `M10-PA-001/002/012/008/009` 整理为只读观察队列、周报模板和暂停条件；本阶段不启动真实观察，不接 broker，不批准 paper trading。
+- M11 已完成 Paper Gate 当前检查点：输出 paper gate report、候选策略清单和风险暂停规则；`M10-PA-001/002/012` 只是 Tier A 核心观察候选，`M10-PA-008/009` 只是 Tier B 视觉条件候选，当前 gate decision 为 `not_approved`，不批准 paper trading。
+- M12.0 已完成 Longbridge Read-only Auth Preflight：确认本地 Longbridge CLI 可用且当前 token/quote/K 线只读探针可用；本阶段只允许 `check / quote / kline / subscriptions` 行情检查命令，不调用交易、账户、资产、持仓或订单命令，不批准 paper/live。
 
 ## 2. 执行总原则
 
@@ -898,3 +915,111 @@
   - 因新字段与目录引入 KB 校验漂移。
 - 回退点：
   - 本支线初始回退点固定为 `main@d9ef8a73ff8bdb4e08605b13cd64233d95ade6dc`。
+
+## 21. M10：Price Action Strategy Refresh
+
+- 分支：`codex/m10-price-action-strategy-refresh`
+- 当前状态：进行中，已完成 source ingestion、clean-room catalog refresh、comparison artifacts、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan，以及 M10.6 Read-only Observation Input / Ledger Prototype。
+- 目标：
+  - 从 `main` 启动新阶段，避免继续叠加 M9 杂项状态。
+  - 先做 workspace / worktree / branch audit，并把旧 M8/M9、`PA-SC-*`、`SF-*`、旧 reports/specs/catalog 全部登记为 legacy-only。
+  - 从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼 `M10-PA-*` 策略目录。
+  - ChatGPT share 只作为 reference-only comparison，不作为策略 source of truth。
+- 来源优先级：
+  - `brooks_v2_manual_transcript`
+  - `fangfangtu_youtube_transcript`
+  - `fangfangtu_notes`
+- 入选规则：
+  - Brooks v2 单源支撑不得因缺少 YouTube/notes 交叉验证而自动拒绝。
+  - FangFangTu YouTube 单源支撑不得因缺少 Brooks/notes 交叉验证而自动拒绝。
+  - 多来源验证只提升 confidence、priority、visual review 顺序和测试顺序。
+  - notes-only 策略只能进入 `research_only` 或 `needs_corroboration`，不得直接提升为高优先级回测候选。
+- 关键产物：
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/`
+  - `knowledge/wiki/sources/al-brooks-price-action-course-v2-manual-transcript.md`
+  - `knowledge/wiki/sources/chatgpt-bpa-reference-share.md`
+  - `knowledge/wiki/sources/codex-brooks-v2-transcription-thread.md`
+  - `scripts/import_brooks_v2_source.py`
+  - `scripts/generate_m10_strategy_refresh.py`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/source_support_matrix_m10.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/chatgpt_bpa_comparison.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/legacy_comparison_m10.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_gap_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/backtest_eligibility_matrix.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_test_plan.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_catalog_review.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10_frozen.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_strategy_test_queue.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_visual_golden_case_index.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_visual_case_selection_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_2_visual_review_summary.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_3_backtest_spec_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs/`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_backtest_spec_index.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_event_definition_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_skip_rule_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_cost_sample_gate_policy.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_3_backtest_spec_freeze_summary.md`
+  - `config/examples/m10_wave_a_historical_pilot.json`
+  - `scripts/m10_historical_pilot_lib.py`
+  - `scripts/run_m10_historical_pilot.py`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_data_availability.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_dataset_inventory.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_wave_a_pilot_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_wave_a_pilot_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_pilot_quality_review.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_observation_candidate_queue.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_read_only_observation_plan.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_observation_event_schema.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_5_paper_gate_handoff.md`
+  - `config/examples/m10_read_only_observation_replay.json`
+  - `scripts/m10_read_only_observation_lib.py`
+  - `scripts/run_m10_read_only_observation.py`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_input_manifest.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_deferred_inputs.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
+- 测试规划：
+  - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
+  - `backtest_wave_a` 固定为 `M10-PA-001`、`M10-PA-002`、`M10-PA-005`、`M10-PA-012`；其中 `001/002/005` 测 `1d / 1h / 15m / 5m`，`012` 测 `15m / 5m`。
+  - `M10-PA-013` 保留为 `backtest_wave_b_candidate`，不在 M10.1 执行。
+  - `visual_golden_case_first` 固定为 `M10-PA-003`、`004`、`007`、`008`、`009`、`010`、`011`；Visual golden case 不是所有策略的统一门槛。
+  - `M10-PA-014`、`M10-PA-015` 是 supporting rules，不得生成独立 entry trigger。
+  - `M10-PA-006`、`M10-PA-016` 保持 research-only。
+  - M10.2 图例包当前 `ready_count=7 / blocked_count=0`；`visual_pack_ready` 只表示 Brooks v2 evidence image logical path 与 checksum 完整，仍需人工 visual review。
+  - M10.3 已冻结 Wave A backtest spec：`M10-PA-001/002/005` 测 `1d / 1h / 15m / 5m`，`M10-PA-012` 只测 `15m / 5m`；每份 spec 必须输出 candidate events、skip/no-trade ledger、source ledger、成本/滑点敏感性、per-symbol、per-regime 与 failure-mode notes。
+  - M10.3 成本/样本门槛固定为 baseline `1 bps`、stress low `2 bps`、stress high `5 bps`；每个 strategy/timeframe 至少 `30` 个 candidate events 且 skip 后至少 `10` 个 executed trades 才允许解释测试质量。
+  - M10.4 已执行 Wave A historical pilot：`M10-PA-001/002/005` 跑 `1d / 1h / 15m / 5m`，`M10-PA-012` 跑 `15m / 5m`，共 `14` 个 strategy/timeframe 组合。
+  - M10.4 daily 数据窗口固定为 `2010-06-29 ~ 2026-04-21`；实际标的若晚于该日期才有数据，必须写入 `m10_4_dataset_inventory.json`。
+  - M10.4 `5m` 使用 sibling main worktree 的本地 Longbridge intraday cache；`15m / 1h` 从 `5m` 聚合，并在 inventory 中记录 `derived_from_5m`。
+  - M10.4 当前解析 `16` 个 dataset，`available_count=16 / deferred_count=0`；所有 strategy/timeframe 当前只允许维持 `continue_testing` 等 M10.3 允许 outcome，不得解释为盈利结论。
+  - M10.5 已把 Wave A 转成只读观察候选队列：`M10-PA-001/002/005` 观察 `1d / 1h / 15m / 5m`，`M10-PA-012` 只观察 `15m / 5m`。
+  - M10.5 明确 `1d` 只做收盘后观察，`1h / 15m / 5m` 只在 regular-session bar close 后记录；当前实时只读输入状态为 `observation_input_deferred`，不得补假事件。
+  - M10.5 对 candidate density 设置 `100 events / 1000 bars` 的 definition breadth review 阈值；`M10-PA-005` 的 `1h / 15m / 5m` 已标记为 `definition_breadth_review`，但不因 PnL 自动拒绝。
+  - M10.6 已把 M10.5 queue 转成 recorded replay ledger：输入只来自本地 cached OHLCV，当前 `deferred_input_count=0`，`lineage_counts={"native_cache": 8, "derived_from_5m": 8}`。
+  - M10.6 当前输出 `108640` 条 observation ledger row，其中 `73619` 条 candidate event、`35021` 条 skip/no-trade；ledger 只记录 hypothetical entry/stop/target 与 review status，不生成执行、仓位、现金或盈亏结论。
+  - M10.6 继续保持 `M10-PA-005` 的 `1h / 15m / 5m` 为 `needs_definition_fix` / `definition_breadth_review` 路径，不做自动升级。
+  - 阶段顺序固定为 historical backtest -> realtime read-only observation -> paper trading -> live approval；M10 不进入真实下单。
+- 后续承接：
+  - 当前 M11 gate 继续关闭；只有完成真实只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和明确人工业务审批后，才允许重新评估 paper trading gate。
+- 当前边界：
+  - 继续保持 `paper / simulated`。
+  - 不接真实账户，不连真实 broker，不自动下单。
+  - 不修改 `src/risk/`、`src/execution/`、`src/broker/` 的 live 行为。
+- 验收前提：
+  - `python scripts/validate_kb.py`
+  - `python scripts/validate_kb_coverage.py`
+  - `python scripts/validate_knowledge_atoms.py`
+  - `python -m unittest tests/unit/test_m10_strategy_refresh.py -v`
+  - `python -m unittest tests/unit/test_m10_backtest_spec_freeze.py -v`
+  - `python -m unittest tests/unit/test_m10_historical_pilot.py -v`
+  - `python -m unittest tests/unit/test_m10_read_only_observation_plan.py -v`
+  - `python -m unittest tests/unit/test_m10_read_only_observation_replay.py -v`
+  - `python -m unittest discover -s tests/unit -v`
+  - `python -m unittest discover -s tests/reliability -v`
+  - `git diff --check`

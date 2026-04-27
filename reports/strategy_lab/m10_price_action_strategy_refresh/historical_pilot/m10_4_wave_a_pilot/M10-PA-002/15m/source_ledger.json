@@ -1,0 +1,122 @@
+{
+  "schema_version": "m10.4.source-ledger.v1",
+  "strategy_id": "M10-PA-002",
+  "source_ledger_ref": "source_ledgers/M10-PA-002.json",
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015D_breakouts_second_leg_traps_strong_breakouts.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015D_breakouts_second_leg_traps_strong_breakouts.md"
+      },
+      "title": "Video 15D: Breakouts - Second Leg Traps, Strong Breakout Signs, and Failure Decisions",
+      "matched_keywords": [
+        "breakout",
+        "follow-through",
+        "2nd bar",
+        "strong breakout",
+        "突破",
+        "后续",
+        "跟进"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015A_breakouts_definition_80_rule_reversal_tr.md"
+      },
+      "title": "Video 15A: Breakouts - Definition, 80% Rule, Reversal, and Trading Range Breakouts",
+      "matched_keywords": [
+        "breakout",
+        "follow-through",
+        "strong breakout",
+        "突破",
+        "后续"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015B_breakouts_follow_through_reversal_small_start.md"
+      },
+      "title": "Video 15B: Breakouts - Follow-Through, Failed Reversals, and Small Starts",
+      "matched_keywords": [
+        "breakout",
+        "follow-through",
+        "2nd bar",
+        "strong breakout",
+        "突破",
+        "后续",
+        "跟进"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 7
+      },
+      "title": "fangfangtu YouTube transcript p7",
+      "matched_keywords": [
+        "breakout",
+        "突破"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 11
+      },
+      "title": "fangfangtu YouTube transcript p11",
+      "matched_keywords": [
+        "突破"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 1
+      },
+      "title": "方方土视频笔记-突破 p1",
+      "matched_keywords": [
+        "突破",
+        "后续"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 2
+      },
+      "title": "方方土视频笔记-突破 p2",
+      "matched_keywords": [
+        "突破"
+      ]
+    }
+  ],
+  "supporting_rules": [
+    {
+      "strategy_id": "M10-PA-014",
+      "usage": "target_labels_and_measured_move_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "usage": "structural_stop_actual_risk_and_position_sizing_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    }
+  ],
+  "legacy_policy": "PA-SC and SF artifacts are forbidden as M10.4 signal sources"
+}

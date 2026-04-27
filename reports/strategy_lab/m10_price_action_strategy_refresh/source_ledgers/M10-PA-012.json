@@ -1,0 +1,80 @@
+{
+  "schema_version": "m10.strategy-source-ledger.v1",
+  "strategy_id": "M10-PA-012",
+  "title": "Opening Range Breakout",
+  "source_priority": [
+    "brooks_v2_manual_transcript",
+    "fangfangtu_youtube_transcript",
+    "fangfangtu_notes"
+  ],
+  "support_summary": {
+    "strategy_id": "M10-PA-012",
+    "title": "Opening Range Breakout",
+    "support_counts": {
+      "brooks_v2_manual_transcript": 3,
+      "fangfangtu_youtube_transcript": 0,
+      "fangfangtu_notes": 0
+    },
+    "supported_families": [
+      "brooks_v2_manual_transcript"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "support_level": "high_priority_supported",
+    "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+    "brooks_or_youtube_only_allowed": true,
+    "notes_only_downgraded": false
+  },
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048D_breakout_mode_opening_range.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_048D_breakout_mode_opening_range.md"
+      },
+      "title": "Video 48D: Trading the Open",
+      "matched_keywords": [
+        "breakout mode",
+        "trading the open",
+        "开盘区间",
+        "突破模式"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008C_candles_ttr_ii_ioi_breakout_mode.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_008C_candles_ttr_ii_ioi_breakout_mode.md"
+      },
+      "title": "Video 8C: Candles, Setups, and Signal Bars - Tight Trading Ranges, ii, ioi, and Breakout Mode",
+      "matched_keywords": [
+        "breakout mode",
+        "突破模式"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_026A_triangles_ttr_wedges_flags_reversal_or_continuation.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_026A_triangles_ttr_wedges_flags_reversal_or_continuation.md"
+      },
+      "title": "Video 26A: Triangles - TTR, Wedges, Flags, and Breakout Mode",
+      "matched_keywords": [
+        "breakout mode",
+        "突破模式"
+      ]
+    }
+  ],
+  "legacy_influence": {
+    "legacy_ids_used_in_extraction": [],
+    "forbidden_legacy_inputs": [
+      "knowledge/wiki/strategy_cards",
+      "reports/strategy_lab/strategy_catalog.json",
+      "reports/strategy_lab/specs",
+      "reports/strategy_lab/strategy_triage_matrix.json",
+      "reports/strategy_lab/cards"
+    ]
+  }
+}

@@ -1,0 +1,281 @@
+{
+  "schema_version": "m10.backtest-spec.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "artifact_type": "executable_backtest_spec_no_results",
+  "strategy_id": "M10-PA-001",
+  "title": "Trend Pullback Second-Entry Continuation",
+  "timeframes": [
+    "1d",
+    "1h",
+    "15m",
+    "5m"
+  ],
+  "timeframe_policy": {
+    "independent_test_lines": true,
+    "daily_is_not_intraday_filter": true,
+    "session_required": false
+  },
+  "paper_simulated_only": true,
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md"
+      },
+      "title": "Video 9A: Pullbacks and Bar Counting - Pullback Definition, Implied Pullbacks, 50% Pullbacks, and High/Low 1-2",
+      "matched_keywords": [
+        "pullback",
+        "high 2",
+        "low 2",
+        "h2",
+        "l2",
+        "two legs",
+        "回调",
+        "第二"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md"
+      },
+      "title": "Video 9C: Pullbacks and Bar Counting - Endless Pullbacks, Time Frames, and Countertrend Exits",
+      "matched_keywords": [
+        "pullback",
+        "high 2",
+        "low 2",
+        "h2",
+        "l2",
+        "回调",
+        "第二",
+        "二次入场"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_014E_trends_tight_channel_small_pullback.md"
+      },
+      "title": "Video 14E: Trends - Tight Channel and Small Pullback Trend",
+      "matched_keywords": [
+        "pullback",
+        "low 2",
+        "回调"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 4
+      },
+      "title": "fangfangtu YouTube transcript p4",
+      "matched_keywords": [
+        "h2",
+        "回调"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 2
+      },
+      "title": "fangfangtu YouTube transcript p2",
+      "matched_keywords": [
+        "回调"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 1
+      },
+      "title": "方方土视频笔记 - 回调&数K线 p1",
+      "matched_keywords": [
+        "回调"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 3
+      },
+      "title": "方方土视频笔记 - 市场周期 p3",
+      "matched_keywords": [
+        "回调"
+      ]
+    }
+  ],
+  "source_ledger_ref": "source_ledgers/M10-PA-001.json",
+  "source_policy": {
+    "source_priority": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "uses_only_m10_clean_room_sources": true,
+    "legacy_pa_sc_sf_not_used": true,
+    "chatgpt_role": "reference_only_not_source_of_truth"
+  },
+  "supporting_rules": [
+    {
+      "strategy_id": "M10-PA-014",
+      "usage": "target_labels_and_measured_move_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "usage": "structural_stop_actual_risk_and_position_sizing_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    }
+  ],
+  "event_definition": {
+    "event_name": "trend_pullback_second_entry_continuation",
+    "ohlcv_approximation": "Trend, pullback, and second-entry are approximated from swing sequence, bar closes, and a 20-bar simple moving average.",
+    "trend_context": {
+      "lookback_bars": 20,
+      "long_tests": [
+        "higher_high_higher_low_sequence_or_close_above_20_sma",
+        "most_recent_impulse_leg_has_directional_close"
+      ],
+      "short_tests": [
+        "lower_high_lower_low_sequence_or_close_below_20_sma",
+        "most_recent_impulse_leg_has_directional_close"
+      ]
+    },
+    "pullback": {
+      "min_countertrend_bars": 2,
+      "allow_implied_pullback": true,
+      "must_not_break_trend_invalidation_extreme": true
+    },
+    "second_entry": {
+      "approximation": "After the first pullback attempt fails to reverse the trend, require a second signal in the trend direction before creating a candidate event.",
+      "long_trigger_structure": "H2_or_second_higher_low_signal_after_pullback",
+      "short_trigger_structure": "L2_or_second_lower_high_signal_after_pullback"
+    },
+    "signal_bar": {
+      "long": "bull_signal_bar_or_close_above_prior_bar_high_after_second_entry",
+      "short": "bear_signal_bar_or_close_below_prior_bar_low_after_second_entry"
+    }
+  },
+  "entry_rules": [
+    "Create a long candidate when price closes above the signal-bar high after a valid second-entry pullback in an uptrend.",
+    "Create a short candidate when price closes below the signal-bar low after a valid second-entry pullback in a downtrend.",
+    "M10.4 fill convention must use next-bar-open after the trigger bar unless the pilot runner explicitly logs a different deterministic convention."
+  ],
+  "stop_rules": [
+    "Initial structural stop is beyond the pullback extreme.",
+    "If signal-bar extreme is farther than the pullback extreme, log both and use the wider structural stop for risk notes."
+  ],
+  "target_rules": [
+    "Record 1R and 2R targets for sensitivity.",
+    "Record prior swing high/low and measured-leg objective as non-promotional target labels.",
+    "Do not treat target hit frequency as a retain/promote conclusion in M10.3."
+  ],
+  "skip_rules": [
+    {
+      "skip_code": "m10_001_no_clear_trend",
+      "reason": "20-bar context does not show trend sequence or clear close relative to 20 SMA."
+    },
+    {
+      "skip_code": "m10_001_tight_trading_range",
+      "reason": "Pullback occurs inside a narrow overlapping range with no trend resumption evidence."
+    },
+    {
+      "skip_code": "m10_001_opposite_breakout",
+      "reason": "Strong opposite breakout with follow-through cancels the continuation premise."
+    },
+    {
+      "skip_code": "m10_001_insufficient_bar_count",
+      "reason": "Not enough bars to evaluate trend, pullback, and second-entry sequence."
+    }
+  ],
+  "cost_model_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#cost_model_policy",
+    "policy_basis": "sensitivity_policy_only_no_broker_fee_claim",
+    "price_impact_model": "fixed_bps_per_entry_and_exit_for_m10_4_pilot_sensitivity",
+    "sensitivity_tiers": [
+      {
+        "tier": "baseline",
+        "slippage_bps": 1,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_low",
+        "slippage_bps": 2,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_high",
+        "slippage_bps": 5,
+        "fee_per_order": 0
+      }
+    ],
+    "m10_3_limit": "freeze_policy_only_do_not_run_or_interpret_backtest_results"
+  },
+  "sample_gate_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#sample_gate_policy",
+    "minimum_candidate_events_per_strategy_timeframe": 30,
+    "minimum_executed_trades_after_skips_per_strategy_timeframe": 10,
+    "below_gate_allowed_outcomes": [
+      "continue_testing",
+      "needs_definition_fix"
+    ],
+    "allowed_outcomes_after_gate": [
+      "needs_definition_fix",
+      "needs_visual_review",
+      "continue_testing",
+      "reject_for_now"
+    ],
+    "retain_or_promote_allowed": false,
+    "interpretation_rule": "sample_gate_permits_quality_interpretation_only_not_profitability_claims"
+  },
+  "outputs_required": [
+    "candidate_events",
+    "skip_no_trade_ledger",
+    "source_ledger",
+    "cost_slippage_sensitivity",
+    "per_symbol_breakdown",
+    "per_regime_breakdown",
+    "failure_mode_notes"
+  ],
+  "allowed_outcomes": [
+    "needs_definition_fix",
+    "needs_visual_review",
+    "continue_testing",
+    "reject_for_now"
+  ],
+  "not_allowed": [
+    "retain",
+    "promote",
+    "live_execution",
+    "broker_connection",
+    "real_orders"
+  ],
+  "backtest_started": false,
+  "backtest_conclusions": [],
+  "retain_or_promote_allowed": false,
+  "m10_4_handoff": {
+    "runner_must_emit_candidate_events": true,
+    "runner_must_emit_skip_no_trade_ledger": true,
+    "runner_must_emit_source_ledger": true,
+    "runner_must_emit_cost_slippage_sensitivity": true,
+    "runner_must_emit_per_symbol_and_per_regime_breakdowns": true,
+    "runner_must_emit_failure_mode_notes": true
+  }
+}

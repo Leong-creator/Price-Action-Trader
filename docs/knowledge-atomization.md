@@ -10,7 +10,8 @@
 - 不进入 broker / live / real-money / real-account
 - 不修改 `knowledge/raw/`
 - 不把 source-level 或 statement-level callable 包装成 executable strategy rule
-- `M9 strategy cards` 只允许消费上述层的 evidence / traceability，不得把 statement、source_note 或 bundle support 直接升格为 trigger
+- `M10-PA-*` 策略目录只允许消费 source-level / statement-level / curated 层的 evidence / traceability，不得把 statement、source_note 或 bundle support 直接升格为 trigger
+- M10 已追加 `brooks_v2_manual_transcript` markdown-tree source family；该来源可进入 source/chunk/atom/callable index，但仍不自动成为 executable rule
 
 ## 四层结构
 
@@ -218,7 +219,7 @@
 
 命中任一条件即停在 `M8B.2a`：
 
-- 10 个 in-scope source 中 `blocked >= 4`
+- in-scope source 中 `blocked >= 4`
 - 关键 curated atoms 无法形成稳定 evidence-backed atom
 - `statement` 抽取无法稳定回溯证据
 

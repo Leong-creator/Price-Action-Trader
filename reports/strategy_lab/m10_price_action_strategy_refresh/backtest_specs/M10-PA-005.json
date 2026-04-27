@@ -1,0 +1,237 @@
+{
+  "schema_version": "m10.backtest-spec.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "artifact_type": "executable_backtest_spec_no_results",
+  "strategy_id": "M10-PA-005",
+  "title": "Trading Range Failed Breakout Reversal",
+  "timeframes": [
+    "1d",
+    "1h",
+    "15m",
+    "5m"
+  ],
+  "timeframe_policy": {
+    "independent_test_lines": true,
+    "daily_is_not_intraday_filter": true,
+    "session_required": false
+  },
+  "paper_simulated_only": true,
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_048G_trading_the_middle_look_for_change.md"
+      },
+      "title": "Video 48G: Trading the Middle of the Day",
+      "matched_keywords": [
+        "trading range",
+        "失败突破",
+        "交易区间"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+      },
+      "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions",
+      "matched_keywords": [
+        "trading range",
+        "失败突破",
+        "交易区间"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md"
+      },
+      "title": "Video 18F: Trading Ranges - Do Not Bet on Breakouts and Early Signs of a TR Day",
+      "matched_keywords": [
+        "trading range",
+        "fade breakout",
+        "失败突破",
+        "交易区间",
+        "区间边缘"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 1
+      },
+      "title": "方方土视频笔记 - 信号K线 & 入场 p1",
+      "matched_keywords": [
+        "trading range"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 2
+      },
+      "title": "方方土视频笔记 - 市场周期 p2",
+      "matched_keywords": [
+        "trading range"
+      ]
+    }
+  ],
+  "source_ledger_ref": "source_ledgers/M10-PA-005.json",
+  "source_policy": {
+    "source_priority": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "uses_only_m10_clean_room_sources": true,
+    "legacy_pa_sc_sf_not_used": true,
+    "chatgpt_role": "reference_only_not_source_of_truth"
+  },
+  "supporting_rules": [
+    {
+      "strategy_id": "M10-PA-014",
+      "usage": "target_labels_and_measured_move_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "usage": "structural_stop_actual_risk_and_position_sizing_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    }
+  ],
+  "event_definition": {
+    "event_name": "trading_range_failed_breakout_reversal",
+    "ohlcv_approximation": "Trading range and failed breakout are approximated from a 20-bar overlapping range, outside-edge attempt, and close back inside within 1-3 bars.",
+    "trading_range": {
+      "min_bars": 20,
+      "requires_overlapping_high_low_structure": true,
+      "no_sustained_close_outside_range": true
+    },
+    "breakout_attempt": {
+      "long_failure_setup": "price_trades_or_closes_above_range_high",
+      "short_failure_setup": "price_trades_or_closes_below_range_low"
+    },
+    "failure_confirmation": {
+      "window_bars": 3,
+      "long_failure_short_entry_context": "close_back_inside_range_after_upside_breakout_attempt",
+      "short_failure_long_entry_context": "close_back_inside_range_after_downside_breakout_attempt"
+    }
+  },
+  "entry_rules": [
+    "Create a short candidate when an upside range breakout fails and price closes back inside the range within 1-3 bars.",
+    "Create a long candidate when a downside range breakout fails and price closes back inside the range within 1-3 bars.",
+    "M10.4 fill convention must use next-bar-open after the re-entry confirmation bar."
+  ],
+  "stop_rules": [
+    "Initial structural stop is beyond the failed breakout extreme.",
+    "Log range edge and failed breakout extreme separately for failure-mode review."
+  ],
+  "target_rules": [
+    "Primary target label is the range midpoint.",
+    "Opposite range side is a runner label only and must not be required for candidate validity.",
+    "Record 1R and 2R targets for sensitivity."
+  ],
+  "skip_rules": [
+    {
+      "skip_code": "m10_005_no_mature_range",
+      "reason": "Range has fewer than 20 bars or does not show overlapping two-sided structure."
+    },
+    {
+      "skip_code": "m10_005_breakout_not_failed",
+      "reason": "Breakout has follow-through or does not close back inside within 1-3 bars."
+    },
+    {
+      "skip_code": "m10_005_ambiguous_range_bounds",
+      "reason": "Range high/low cannot be determined from OHLCV without after-the-fact selection."
+    },
+    {
+      "skip_code": "m10_005_range_height_unsuitable",
+      "reason": "Range is too narrow for costs or too wide for the configured risk budget."
+    }
+  ],
+  "cost_model_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#cost_model_policy",
+    "policy_basis": "sensitivity_policy_only_no_broker_fee_claim",
+    "price_impact_model": "fixed_bps_per_entry_and_exit_for_m10_4_pilot_sensitivity",
+    "sensitivity_tiers": [
+      {
+        "tier": "baseline",
+        "slippage_bps": 1,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_low",
+        "slippage_bps": 2,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_high",
+        "slippage_bps": 5,
+        "fee_per_order": 0
+      }
+    ],
+    "m10_3_limit": "freeze_policy_only_do_not_run_or_interpret_backtest_results"
+  },
+  "sample_gate_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#sample_gate_policy",
+    "minimum_candidate_events_per_strategy_timeframe": 30,
+    "minimum_executed_trades_after_skips_per_strategy_timeframe": 10,
+    "below_gate_allowed_outcomes": [
+      "continue_testing",
+      "needs_definition_fix"
+    ],
+    "allowed_outcomes_after_gate": [
+      "needs_definition_fix",
+      "needs_visual_review",
+      "continue_testing",
+      "reject_for_now"
+    ],
+    "retain_or_promote_allowed": false,
+    "interpretation_rule": "sample_gate_permits_quality_interpretation_only_not_profitability_claims"
+  },
+  "outputs_required": [
+    "candidate_events",
+    "skip_no_trade_ledger",
+    "source_ledger",
+    "cost_slippage_sensitivity",
+    "per_symbol_breakdown",
+    "per_regime_breakdown",
+    "failure_mode_notes"
+  ],
+  "allowed_outcomes": [
+    "needs_definition_fix",
+    "needs_visual_review",
+    "continue_testing",
+    "reject_for_now"
+  ],
+  "not_allowed": [
+    "retain",
+    "promote",
+    "live_execution",
+    "broker_connection",
+    "real_orders"
+  ],
+  "backtest_started": false,
+  "backtest_conclusions": [],
+  "retain_or_promote_allowed": false,
+  "m10_4_handoff": {
+    "runner_must_emit_candidate_events": true,
+    "runner_must_emit_skip_no_trade_ledger": true,
+    "runner_must_emit_source_ledger": true,
+    "runner_must_emit_cost_slippage_sensitivity": true,
+    "runner_must_emit_per_symbol_and_per_regime_breakdowns": true,
+    "runner_must_emit_failure_mode_notes": true
+  }
+}

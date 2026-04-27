@@ -1,0 +1,308 @@
+{
+  "schema_version": "m10.source-support-matrix.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "source_priority": [
+    "brooks_v2_manual_transcript",
+    "fangfangtu_youtube_transcript",
+    "fangfangtu_notes"
+  ],
+  "matrix": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "title": "Tight Channel Trend Continuation",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "title": "Broad Channel Boundary Reversal",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 0,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-006",
+      "title": "Trading Range BLSHS Limit-Order Framework",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "title": "Second-Leg Trap Reversal",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "title": "Final Flag or Climax TBTL Reversal",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 1,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "title": "Opening Reversal",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 1
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 0,
+        "fangfangtu_notes": 0
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "title": "Support and Resistance Failed Test",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 0,
+        "fangfangtu_notes": 0
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-014",
+      "title": "Measured Move Target Engine",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 0,
+        "fangfangtu_notes": 0
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "title": "Protective Stops and Position Sizing",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    },
+    {
+      "strategy_id": "M10-PA-016",
+      "title": "Trading Range Scaling-In Research",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_youtube_transcript": 2,
+        "fangfangtu_notes": 2
+      },
+      "supported_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "brooks_or_youtube_only_allowed": true,
+      "notes_only_downgraded": false
+    }
+  ]
+}

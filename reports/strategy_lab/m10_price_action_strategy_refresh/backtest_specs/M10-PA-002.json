@@ -1,0 +1,272 @@
+{
+  "schema_version": "m10.backtest-spec.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "artifact_type": "executable_backtest_spec_no_results",
+  "strategy_id": "M10-PA-002",
+  "title": "Breakout Follow-Through Continuation",
+  "timeframes": [
+    "1d",
+    "1h",
+    "15m",
+    "5m"
+  ],
+  "timeframe_policy": {
+    "independent_test_lines": true,
+    "daily_is_not_intraday_filter": true,
+    "session_required": false
+  },
+  "paper_simulated_only": true,
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015D_breakouts_second_leg_traps_strong_breakouts.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015D_breakouts_second_leg_traps_strong_breakouts.md"
+      },
+      "title": "Video 15D: Breakouts - Second Leg Traps, Strong Breakout Signs, and Failure Decisions",
+      "matched_keywords": [
+        "breakout",
+        "follow-through",
+        "2nd bar",
+        "strong breakout",
+        "突破",
+        "后续",
+        "跟进"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015A_breakouts_definition_80_rule_reversal_tr.md"
+      },
+      "title": "Video 15A: Breakouts - Definition, 80% Rule, Reversal, and Trading Range Breakouts",
+      "matched_keywords": [
+        "breakout",
+        "follow-through",
+        "strong breakout",
+        "突破",
+        "后续"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_015B_breakouts_follow_through_reversal_small_start.md"
+      },
+      "title": "Video 15B: Breakouts - Follow-Through, Failed Reversals, and Small Starts",
+      "matched_keywords": [
+        "breakout",
+        "follow-through",
+        "2nd bar",
+        "strong breakout",
+        "突破",
+        "后续",
+        "跟进"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 7
+      },
+      "title": "fangfangtu YouTube transcript p7",
+      "matched_keywords": [
+        "breakout",
+        "突破"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_youtube_transcript",
+      "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 11
+      },
+      "title": "fangfangtu YouTube transcript p11",
+      "matched_keywords": [
+        "突破"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 1
+      },
+      "title": "方方土视频笔记-突破 p1",
+      "matched_keywords": [
+        "突破",
+        "后续"
+      ]
+    },
+    {
+      "source_family": "fangfangtu_notes",
+      "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+      "locator": {
+        "kind": "pdf_page",
+        "page_no": 2
+      },
+      "title": "方方土视频笔记-突破 p2",
+      "matched_keywords": [
+        "突破"
+      ]
+    }
+  ],
+  "source_ledger_ref": "source_ledgers/M10-PA-002.json",
+  "source_policy": {
+    "source_priority": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "uses_only_m10_clean_room_sources": true,
+    "legacy_pa_sc_sf_not_used": true,
+    "chatgpt_role": "reference_only_not_source_of_truth"
+  },
+  "supporting_rules": [
+    {
+      "strategy_id": "M10-PA-014",
+      "usage": "target_labels_and_measured_move_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "usage": "structural_stop_actual_risk_and_position_sizing_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    }
+  ],
+  "event_definition": {
+    "event_name": "breakout_follow_through_continuation",
+    "ohlcv_approximation": "Breakout and follow-through are approximated from a prior 20-bar range, breakout-bar body size, close location, and next 1-2 bars.",
+    "breakout_range": {
+      "lookback_bars": 20,
+      "long_level": "prior_20_bar_high",
+      "short_level": "prior_20_bar_low"
+    },
+    "breakout_bar": {
+      "must_close_outside_prior_range": true,
+      "body_to_true_range_min": 0.5,
+      "directional_close_zone": "outer_third_of_bar_range"
+    },
+    "follow_through": {
+      "window_bars": 2,
+      "long": "at_least_one_follow_through_close_above_breakout_level_and_no_close_back_inside_range",
+      "short": "at_least_one_follow_through_close_below_breakout_level_and_no_close_back_inside_range"
+    }
+  },
+  "entry_rules": [
+    "Create a long candidate after a qualified upside breakout bar and follow-through confirmation within the next 1-2 bars.",
+    "Create a short candidate after a qualified downside breakout bar and follow-through confirmation within the next 1-2 bars.",
+    "M10.4 fill convention must use next-bar-open after follow-through confirmation."
+  ],
+  "stop_rules": [
+    "Initial structural stop is the opposite extreme of the breakout bar.",
+    "Also record breakout-leg extreme when it is wider than the breakout-bar stop."
+  ],
+  "target_rules": [
+    "Record 1R and 2R targets for sensitivity.",
+    "Record measured move from prior 20-bar range height.",
+    "Record prior support/resistance magnets when available from OHLCV-derived swing levels."
+  ],
+  "skip_rules": [
+    {
+      "skip_code": "m10_002_weak_breakout_bar",
+      "reason": "Breakout bar body is below 50% of true range or close is not in the directional third."
+    },
+    {
+      "skip_code": "m10_002_no_follow_through",
+      "reason": "No confirmation close within the next 1-2 bars."
+    },
+    {
+      "skip_code": "m10_002_immediate_range_reentry",
+      "reason": "Price closes back inside the prior range before confirmation."
+    },
+    {
+      "skip_code": "m10_002_range_too_narrow_for_costs",
+      "reason": "Prior range height is too small to evaluate after cost/slippage tiers."
+    }
+  ],
+  "cost_model_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#cost_model_policy",
+    "policy_basis": "sensitivity_policy_only_no_broker_fee_claim",
+    "price_impact_model": "fixed_bps_per_entry_and_exit_for_m10_4_pilot_sensitivity",
+    "sensitivity_tiers": [
+      {
+        "tier": "baseline",
+        "slippage_bps": 1,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_low",
+        "slippage_bps": 2,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_high",
+        "slippage_bps": 5,
+        "fee_per_order": 0
+      }
+    ],
+    "m10_3_limit": "freeze_policy_only_do_not_run_or_interpret_backtest_results"
+  },
+  "sample_gate_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#sample_gate_policy",
+    "minimum_candidate_events_per_strategy_timeframe": 30,
+    "minimum_executed_trades_after_skips_per_strategy_timeframe": 10,
+    "below_gate_allowed_outcomes": [
+      "continue_testing",
+      "needs_definition_fix"
+    ],
+    "allowed_outcomes_after_gate": [
+      "needs_definition_fix",
+      "needs_visual_review",
+      "continue_testing",
+      "reject_for_now"
+    ],
+    "retain_or_promote_allowed": false,
+    "interpretation_rule": "sample_gate_permits_quality_interpretation_only_not_profitability_claims"
+  },
+  "outputs_required": [
+    "candidate_events",
+    "skip_no_trade_ledger",
+    "source_ledger",
+    "cost_slippage_sensitivity",
+    "per_symbol_breakdown",
+    "per_regime_breakdown",
+    "failure_mode_notes"
+  ],
+  "allowed_outcomes": [
+    "needs_definition_fix",
+    "needs_visual_review",
+    "continue_testing",
+    "reject_for_now"
+  ],
+  "not_allowed": [
+    "retain",
+    "promote",
+    "live_execution",
+    "broker_connection",
+    "real_orders"
+  ],
+  "backtest_started": false,
+  "backtest_conclusions": [],
+  "retain_or_promote_allowed": false,
+  "m10_4_handoff": {
+    "runner_must_emit_candidate_events": true,
+    "runner_must_emit_skip_no_trade_ledger": true,
+    "runner_must_emit_source_ledger": true,
+    "runner_must_emit_cost_slippage_sensitivity": true,
+    "runner_must_emit_per_symbol_and_per_regime_breakdowns": true,
+    "runner_must_emit_failure_mode_notes": true
+  }
+}

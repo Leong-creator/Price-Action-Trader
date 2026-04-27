@@ -178,3 +178,20 @@
 - 结论：wave2 runner 必须按数据集逐个生成 signals/backtest，再在 variant 层做聚合统计；禁止把不同 symbol 的 bars 直接拼接成一个时间序列后再跑 setup 逻辑。
 - 结论：wave2 的样本覆盖当前已把 `SF-001 ~ SF-004` 推到 `robust_candidate`，但 triage 结论当前冻结为：`SF-001=modify_and_retest`、`SF-002=modify_and_retest`、`SF-003=modify_and_retest`、`SF-004=modify_and_retest`、`SF-005=deferred_single_source_risk`。这表示样本更充分后，四个已测 family 仍需要收紧到 `quality_filter` 指向的更紧 executable spec，再决定是否进入更正式的下一波重测。
 - 结论：`robust_candidate` 只代表 wave2 的样本覆盖门槛，不代表稳定盈利、实盘 readiness 或可自动交易能力。
+
+## D-0035 M10 Price Action Strategy Refresh 边界冻结
+
+- 日期：2026-04-26
+- 结论：M10 从 `main` 新建 `codex/m10-price-action-strategy-refresh`，不继续叠加 M9 工作面。M8/M9、`PA-SC-*`、`SF-*`、旧 reports/specs/catalog/triage 只允许登记为 legacy，并且只能在 clean-room catalog 生成后用于 comparison。
+- 结论：M10 来源优先级固定为 `brooks_v2_manual_transcript > fangfangtu_youtube_transcript > fangfangtu_notes`。Brooks v2 单源或 FangFangTu YouTube 单源支撑不得因缺少三源齐全而被自动拒绝；notes-only 条目必须降级为 `research_only` 或 `needs_corroboration`。
+- 结论：ChatGPT share 与 Codex thread 只作为 reference-only。它们可以提供 comparison、来源优先级讨论、visual gap 和测试阶段建议，但不得作为策略 source of truth，也不得反向修改 clean-room `M10-PA-*` catalog。
+- 结论：Brooks v2 manual transcript 可导入 `knowledge/raw/brooks/transcribed_v2/`；`units/` 与 `evidence/` 文本进入 source/chunk/atom/callable 管线，`assets/evidence/` 图片按 local-only + checksum 管理，不默认进入普通 Git 跟踪。
+- 结论：M10 测试顺序固定为 historical backtest -> realtime read-only observation -> paper trading -> live approval。M10 不进入真实 broker、真实账户、live execution 或自动实盘下单。
+
+## D-0036 M10.2 Visual Golden Case Pack 边界冻结
+
+- 日期：2026-04-26
+- 结论：M10.2 只为 `M10-PA-003/004/007/008/009/010/011` 建立 Brooks v2 visual golden case pack，不对全部策略设置统一 visual gate。
+- 结论：每个 `visual_pack_ready` 只表示 3 正例、1 反例、1 边界例的 evidence image logical path 与 checksum 完整；该状态不代表策略有效、盈利、可自动执行或可进入实盘。
+- 结论：Brooks v2 图片资产继续 local-only；tracked artifact 只保存 source ref、logical path、checksum、decision points、disqualifiers 与 OHLCV approximation risk。
+- 结论：M10.2 不启动回测，不生成正式 backtest spec，不输出 `retain/promote`。`m10_3_backtest_spec_handoff.md` 只允许为 Wave A 的 `M10-PA-001/002/005/012` 留出 spec freeze 承接。

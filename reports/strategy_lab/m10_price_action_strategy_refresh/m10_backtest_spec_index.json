@@ -1,0 +1,115 @@
+{
+  "schema_version": "m10.backtest-spec-index.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "spec_count": 4,
+  "wave_a_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-005",
+    "M10-PA-012"
+  ],
+  "excluded_strategy_ids": [
+    "M10-PA-013",
+    "M10-PA-003",
+    "M10-PA-004",
+    "M10-PA-007",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-010",
+    "M10-PA-011",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-006",
+    "M10-PA-016"
+  ],
+  "boundaries": {
+    "paper_simulated_only": true,
+    "backtest_started": false,
+    "daily_1h_15m_5m_are_independent_lines": true,
+    "daily_is_not_5m_filter": true,
+    "retain_or_promote_allowed": false,
+    "broker_connection": false,
+    "live_execution": false
+  },
+  "specs": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "spec_json": "backtest_specs/M10-PA-001.json",
+      "spec_markdown": "backtest_specs/M10-PA-001.md",
+      "allowed_outcomes": [
+        "needs_definition_fix",
+        "needs_visual_review",
+        "continue_testing",
+        "reject_for_now"
+      ],
+      "backtest_started": false,
+      "retain_or_promote_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "spec_json": "backtest_specs/M10-PA-002.json",
+      "spec_markdown": "backtest_specs/M10-PA-002.md",
+      "allowed_outcomes": [
+        "needs_definition_fix",
+        "needs_visual_review",
+        "continue_testing",
+        "reject_for_now"
+      ],
+      "backtest_started": false,
+      "retain_or_promote_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "title": "Trading Range Failed Breakout Reversal",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "spec_json": "backtest_specs/M10-PA-005.json",
+      "spec_markdown": "backtest_specs/M10-PA-005.md",
+      "allowed_outcomes": [
+        "needs_definition_fix",
+        "needs_visual_review",
+        "continue_testing",
+        "reject_for_now"
+      ],
+      "backtest_started": false,
+      "retain_or_promote_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "spec_json": "backtest_specs/M10-PA-012.json",
+      "spec_markdown": "backtest_specs/M10-PA-012.md",
+      "allowed_outcomes": [
+        "needs_definition_fix",
+        "needs_visual_review",
+        "continue_testing",
+        "reject_for_now"
+      ],
+      "backtest_started": false,
+      "retain_or_promote_allowed": false
+    }
+  ]
+}

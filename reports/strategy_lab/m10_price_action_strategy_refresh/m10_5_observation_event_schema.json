@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "m10.read-only-observation-event-schema.v1",
+  "title": "M10.5 Read-only Observation Event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "stage",
+    "paper_simulated_only",
+    "broker_connection",
+    "real_orders",
+    "live_execution",
+    "strategy_id",
+    "symbol",
+    "timeframe",
+    "bar_timestamp",
+    "event_or_skip",
+    "hypothetical_trade",
+    "source_refs",
+    "spec_ref",
+    "data_source",
+    "review_status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "m10.read-only-observation-event.v1"},
+    "stage": {"const": "M10.5.read_only_observation"},
+    "paper_simulated_only": {"const": true},
+    "broker_connection": {"const": false},
+    "real_orders": {"const": false},
+    "live_execution": {"const": false},
+    "strategy_id": {"enum": ["M10-PA-001", "M10-PA-002", "M10-PA-005", "M10-PA-012"]},
+    "symbol": {"type": "string", "minLength": 1},
+    "timeframe": {"enum": ["1d", "1h", "15m", "5m"]},
+    "bar_timestamp": {"type": "string", "format": "date-time"},
+    "event_or_skip": {
+      "type": "object",
+      "required": ["kind", "code", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["candidate_event", "skip_no_trade"]},
+        "code": {"type": "string", "minLength": 1},
+        "notes": {"type": "string"}
+      }
+    },
+    "hypothetical_trade": {
+      "type": "object",
+      "required": ["direction", "entry_price", "stop_price", "target_price"],
+      "additionalProperties": false,
+      "properties": {
+        "direction": {"enum": ["long", "short", "none"]},
+        "entry_price": {"type": ["string", "null"]},
+        "stop_price": {"type": ["string", "null"]},
+        "target_price": {"type": ["string", "null"]}
+      }
+    },
+    "source_refs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "spec_ref": {"type": "string", "minLength": 1},
+    "data_source": {
+      "type": "object",
+      "required": ["provider", "lineage", "timeframe_source"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {"type": "string"},
+        "lineage": {"enum": ["native_cache", "derived_from_5m", "observation_input_deferred"]},
+        "timeframe_source": {"type": "string"}
+      }
+    },
+    "review_status": {
+      "enum": [
+        "needs_definition_fix",
+        "needs_visual_review",
+        "continue_testing",
+        "reject_for_now",
+        "continue_observation"
+      ]
+    }
+  },
+  "timeframe_constraints": {
+    "M10-PA-012": ["15m", "5m"],
+    "M10-PA-001": ["1d", "1h", "15m", "5m"],
+    "M10-PA-002": ["1d", "1h", "15m", "5m"],
+    "M10-PA-005": ["1d", "1h", "15m", "5m"]
+  }
+}

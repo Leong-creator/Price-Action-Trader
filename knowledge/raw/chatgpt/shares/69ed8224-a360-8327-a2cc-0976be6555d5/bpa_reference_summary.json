@@ -1,0 +1,39 @@
+{
+  "schema_version": "m10.chatgpt-bpa-reference-summary.v1",
+  "source_url": "https://chatgpt.com/share/69ed8224-a360-8327-a2cc-0976be6555d5",
+  "role": "external_reference_only_not_source_of_truth",
+  "captured_at": "2026-04-26",
+  "important_constraints": [
+    "ChatGPT BPA 提炼主要覆盖 Brooks v2 手工转录，不包含方方土 YouTube transcript 与 notes 的完整交叉提炼。",
+    "M10 可以吸收其合理测试建议，但不得把 BPA 列表作为 clean-room catalog 的输入或入选依据。",
+    "来源优先级、visual gap 和测试阶段建议可在 clean-room 提炼完成后用于 comparison。"
+  ],
+  "bpa_reference_pack": [
+    {"bpa_id": "BPA-001", "title": "趋势中两腿回调顺势入场"},
+    {"bpa_id": "BPA-002", "title": "强突破 + 跟进顺势入场"},
+    {"bpa_id": "BPA-003", "title": "紧密通道顺势策略"},
+    {"bpa_id": "BPA-004", "title": "宽通道边界反转策略"},
+    {"bpa_id": "BPA-005", "title": "交易区间顶部失败突破做空"},
+    {"bpa_id": "BPA-006", "title": "交易区间底部失败突破做多"},
+    {"bpa_id": "BPA-007", "title": "交易区间 BLSHS 限价单策略"},
+    {"bpa_id": "BPA-008", "title": "强第二腿陷阱反转策略"},
+    {"bpa_id": "BPA-009", "title": "主要趋势反转 MTR 策略"},
+    {"bpa_id": "BPA-010", "title": "楔形反转 / 楔形旗形策略"},
+    {"bpa_id": "BPA-011", "title": "双顶双底失败后反向策略"},
+    {"bpa_id": "BPA-012", "title": "Final Flag 末端旗形反转策略"},
+    {"bpa_id": "BPA-013", "title": "高潮后 TBTL 策略"},
+    {"bpa_id": "BPA-014", "title": "Opening Reversal 开盘反转策略"},
+    {"bpa_id": "BPA-015", "title": "Opening Range Breakout 开盘区间突破策略"},
+    {"bpa_id": "BPA-016", "title": "尾盘趋势恢复 / 尾盘突破策略"},
+    {"bpa_id": "BPA-017", "title": "支撑阻力失败测试策略"},
+    {"bpa_id": "BPA-018", "title": "Measured Move 目标与止盈策略"},
+    {"bpa_id": "BPA-019", "title": "保护性止损与仓位缩放规则"},
+    {"bpa_id": "BPA-020", "title": "交易区间加仓策略，暂时只研究不执行"}
+  ],
+  "testing_suggestions_to_consider_after_clean_room": [
+    "高视觉依赖策略进入 visual review / golden-case 队列。",
+    "OHLCV 近似可量化策略进入历史回测队列。",
+    "阶段顺序保持为历史回测、实时只读观察、paper trading、实盘审批。",
+    "Brooks v2 或 FangFangTu YouTube 单源支撑不应因缺少三源齐全而自动拒绝。"
+  ]
+}

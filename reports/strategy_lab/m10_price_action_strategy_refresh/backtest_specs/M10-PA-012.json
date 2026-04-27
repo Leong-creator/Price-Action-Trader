@@ -1,0 +1,210 @@
+{
+  "schema_version": "m10.backtest-spec.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.3.backtest_spec_freeze",
+  "artifact_type": "executable_backtest_spec_no_results",
+  "strategy_id": "M10-PA-012",
+  "title": "Opening Range Breakout",
+  "timeframes": [
+    "15m",
+    "5m"
+  ],
+  "timeframe_policy": {
+    "independent_test_lines": true,
+    "daily_is_not_intraday_filter": true,
+    "session_required": true
+  },
+  "paper_simulated_only": true,
+  "source_refs": [
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048D_breakout_mode_opening_range.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_048D_breakout_mode_opening_range.md"
+      },
+      "title": "Video 48D: Trading the Open",
+      "matched_keywords": [
+        "breakout mode",
+        "trading the open",
+        "开盘区间",
+        "突破模式"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008C_candles_ttr_ii_ioi_breakout_mode.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_008C_candles_ttr_ii_ioi_breakout_mode.md"
+      },
+      "title": "Video 8C: Candles, Setups, and Signal Bars - Tight Trading Ranges, ii, ioi, and Breakout Mode",
+      "matched_keywords": [
+        "breakout mode",
+        "突破模式"
+      ]
+    },
+    {
+      "source_family": "brooks_v2_manual_transcript",
+      "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_026A_triangles_ttr_wedges_flags_reversal_or_continuation.md",
+      "locator": {
+        "kind": "markdown_unit",
+        "path": "units/video_026A_triangles_ttr_wedges_flags_reversal_or_continuation.md"
+      },
+      "title": "Video 26A: Triangles - TTR, Wedges, Flags, and Breakout Mode",
+      "matched_keywords": [
+        "breakout mode",
+        "突破模式"
+      ]
+    }
+  ],
+  "source_ledger_ref": "source_ledgers/M10-PA-012.json",
+  "source_policy": {
+    "source_priority": [
+      "brooks_v2_manual_transcript",
+      "fangfangtu_youtube_transcript",
+      "fangfangtu_notes"
+    ],
+    "source_priority_basis": "brooks_v2_manual_transcript",
+    "uses_only_m10_clean_room_sources": true,
+    "legacy_pa_sc_sf_not_used": true,
+    "chatgpt_role": "reference_only_not_source_of_truth"
+  },
+  "supporting_rules": [
+    {
+      "strategy_id": "M10-PA-014",
+      "usage": "target_labels_and_measured_move_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "usage": "structural_stop_actual_risk_and_position_sizing_reference_only_not_entry_trigger",
+      "standalone_trigger_allowed": false
+    }
+  ],
+  "event_definition": {
+    "event_name": "opening_range_breakout",
+    "ohlcv_approximation": "Opening range breakout uses regular-session OHLCV, first 30 minutes of the session, breakout strength, and next 1-2 bars of follow-through.",
+    "session": {
+      "regular_session_only": true,
+      "opening_range_minutes": 30,
+      "5m_opening_range_bars": 6,
+      "15m_opening_range_bars": 2,
+      "requires_complete_session_metadata": true
+    },
+    "breakout_bar": {
+      "must_close_outside_opening_range": true,
+      "body_to_true_range_min": 0.5,
+      "directional_close_zone": "outer_third_of_bar_range"
+    },
+    "follow_through": {
+      "window_bars": 2,
+      "must_hold_outside_or_extend_opening_range": true
+    }
+  },
+  "entry_rules": [
+    "Create a long candidate when price closes above the first-30-minute opening range and confirms within the next 1-2 bars.",
+    "Create a short candidate when price closes below the first-30-minute opening range and confirms within the next 1-2 bars.",
+    "M10.4 fill convention must use next-bar-open after follow-through confirmation."
+  ],
+  "stop_rules": [
+    "Initial structural stop is back inside the opening range or beyond the breakout-leg extreme, whichever is structurally wider.",
+    "Log opening range high/low and breakout-leg extreme separately."
+  ],
+  "target_rules": [
+    "Primary target label is opening range height measured move.",
+    "Record 1R and 2R targets for sensitivity.",
+    "Prior-day magnets may be recorded only when the pilot data source provides prior-session levels."
+  ],
+  "skip_rules": [
+    {
+      "skip_code": "m10_012_incomplete_session",
+      "reason": "Missing regular-session open, timezone, or first-30-minute bars."
+    },
+    {
+      "skip_code": "m10_012_range_too_narrow_for_costs",
+      "reason": "Opening range is too narrow for cost/slippage tiers."
+    },
+    {
+      "skip_code": "m10_012_range_too_wide_for_risk",
+      "reason": "Opening range stop distance exceeds the pilot risk budget."
+    },
+    {
+      "skip_code": "m10_012_failed_orb_routed_elsewhere",
+      "reason": "Failed ORB is routed to Opening Reversal or Trading Range Failed Breakout queues, not executed here."
+    }
+  ],
+  "cost_model_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#cost_model_policy",
+    "policy_basis": "sensitivity_policy_only_no_broker_fee_claim",
+    "price_impact_model": "fixed_bps_per_entry_and_exit_for_m10_4_pilot_sensitivity",
+    "sensitivity_tiers": [
+      {
+        "tier": "baseline",
+        "slippage_bps": 1,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_low",
+        "slippage_bps": 2,
+        "fee_per_order": 0
+      },
+      {
+        "tier": "stress_high",
+        "slippage_bps": 5,
+        "fee_per_order": 0
+      }
+    ],
+    "m10_3_limit": "freeze_policy_only_do_not_run_or_interpret_backtest_results"
+  },
+  "sample_gate_policy": {
+    "policy_ref": "m10_cost_sample_gate_policy.json#sample_gate_policy",
+    "minimum_candidate_events_per_strategy_timeframe": 30,
+    "minimum_executed_trades_after_skips_per_strategy_timeframe": 10,
+    "below_gate_allowed_outcomes": [
+      "continue_testing",
+      "needs_definition_fix"
+    ],
+    "allowed_outcomes_after_gate": [
+      "needs_definition_fix",
+      "needs_visual_review",
+      "continue_testing",
+      "reject_for_now"
+    ],
+    "retain_or_promote_allowed": false,
+    "interpretation_rule": "sample_gate_permits_quality_interpretation_only_not_profitability_claims"
+  },
+  "outputs_required": [
+    "candidate_events",
+    "skip_no_trade_ledger",
+    "source_ledger",
+    "cost_slippage_sensitivity",
+    "per_symbol_breakdown",
+    "per_regime_breakdown",
+    "failure_mode_notes"
+  ],
+  "allowed_outcomes": [
+    "needs_definition_fix",
+    "needs_visual_review",
+    "continue_testing",
+    "reject_for_now"
+  ],
+  "not_allowed": [
+    "retain",
+    "promote",
+    "live_execution",
+    "broker_connection",
+    "real_orders"
+  ],
+  "backtest_started": false,
+  "backtest_conclusions": [],
+  "retain_or_promote_allowed": false,
+  "m10_4_handoff": {
+    "runner_must_emit_candidate_events": true,
+    "runner_must_emit_skip_no_trade_ledger": true,
+    "runner_must_emit_source_ledger": true,
+    "runner_must_emit_cost_slippage_sensitivity": true,
+    "runner_must_emit_per_symbol_and_per_regime_breakdowns": true,
+    "runner_must_emit_failure_mode_notes": true
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "schema_version": "m10.visual-golden-case-index.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "stage": "M10.2.visual_golden_case_pack",
+  "visual_strategy_ids": [
+    "M10-PA-003",
+    "M10-PA-004",
+    "M10-PA-007",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-010",
+    "M10-PA-011"
+  ],
+  "excluded_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-005",
+    "M10-PA-012",
+    "M10-PA-013",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-006",
+    "M10-PA-016"
+  ],
+  "brooks_v2_images_git_policy": "local_only_ignored_by_git_checksums_tracked",
+  "ready_count": 7,
+  "blocked_count": 0,
+  "packs": [
+    {
+      "strategy_id": "M10-PA-003",
+      "title": "Tight Channel Trend Continuation",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-003.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-003.md"
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "title": "Broad Channel Boundary Reversal",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-004.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-004.md"
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "title": "Second-Leg Trap Reversal",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-007.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-007.md"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-008.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-008.md"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-009.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-009.md"
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "title": "Final Flag or Climax TBTL Reversal",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-010.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-010.md"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "title": "Opening Reversal",
+      "pack_status": "visual_pack_ready",
+      "review_status": "agent_selected_pending_manual_review",
+      "case_counts": {
+        "positive": 3,
+        "counterexample": 1,
+        "boundary": 1
+      },
+      "evidence_complete": true,
+      "case_pack_json": "visual_golden_cases/M10-PA-011.json",
+      "case_pack_markdown": "visual_golden_cases/M10-PA-011.md"
+    }
+  ]
+}

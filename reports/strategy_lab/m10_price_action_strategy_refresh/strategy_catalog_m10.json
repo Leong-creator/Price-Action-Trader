@@ -1,0 +1,2343 @@
+{
+  "schema_version": "m10.strategy-catalog.v1",
+  "generated_at": "2026-04-26T09:17:01Z",
+  "strategies": [
+    {
+      "strategy_id": "M10-PA-001",
+      "namespace": "M10-PA",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "status": "backtest_candidate",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md"
+          },
+          "title": "Video 9A: Pullbacks and Bar Counting - Pullback Definition, Implied Pullbacks, 50% Pullbacks, and High/Low 1-2",
+          "matched_keywords": [
+            "pullback",
+            "high 2",
+            "low 2",
+            "h2",
+            "l2",
+            "two legs",
+            "回调",
+            "第二"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md"
+          },
+          "title": "Video 9C: Pullbacks and Bar Counting - Endless Pullbacks, Time Frames, and Countertrend Exits",
+          "matched_keywords": [
+            "pullback",
+            "high 2",
+            "low 2",
+            "h2",
+            "l2",
+            "回调",
+            "第二",
+            "二次入场"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014E_trends_tight_channel_small_pullback.md"
+          },
+          "title": "Video 14E: Trends - Tight Channel and Small Pullback Trend",
+          "matched_keywords": [
+            "pullback",
+            "low 2",
+            "回调"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "fangfangtu YouTube transcript p4",
+          "matched_keywords": [
+            "h2",
+            "回调"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "fangfangtu YouTube transcript p2",
+          "matched_keywords": [
+            "回调"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "title": "方方土视频笔记 - 回调&数K线 p1",
+          "matched_keywords": [
+            "回调"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "方方土视频笔记 - 市场周期 p3",
+          "matched_keywords": [
+            "回调"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "trend",
+        "pullback",
+        "always-in direction"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Only trade in the active trend direction after a pullback has formed a second-entry structure.",
+        "Prefer signal bars near the moving average, prior breakout point, or channel support/resistance."
+      ],
+      "stop_logic": [
+        "Protect beyond the pullback extreme or signal-bar extreme."
+      ],
+      "target_logic": [
+        "Initial target uses prior swing test or measured leg; runner can trail under higher lows/lower highs."
+      ],
+      "invalidation": [
+        "A strong opposite breakout with follow-through cancels the continuation premise."
+      ],
+      "no_trade_conditions": [
+        "Tight trading range without trend resumption evidence.",
+        "Second entry against a strong channel without reversal proof."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "historical_backtest_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-001"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "namespace": "M10-PA",
+      "title": "Breakout Follow-Through Continuation",
+      "status": "backtest_candidate",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015D_breakouts_second_leg_traps_strong_breakouts.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_015D_breakouts_second_leg_traps_strong_breakouts.md"
+          },
+          "title": "Video 15D: Breakouts - Second Leg Traps, Strong Breakout Signs, and Failure Decisions",
+          "matched_keywords": [
+            "breakout",
+            "follow-through",
+            "2nd bar",
+            "strong breakout",
+            "突破",
+            "后续",
+            "跟进"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_015A_breakouts_definition_80_rule_reversal_tr.md"
+          },
+          "title": "Video 15A: Breakouts - Definition, 80% Rule, Reversal, and Trading Range Breakouts",
+          "matched_keywords": [
+            "breakout",
+            "follow-through",
+            "strong breakout",
+            "突破",
+            "后续"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_015B_breakouts_follow_through_reversal_small_start.md"
+          },
+          "title": "Video 15B: Breakouts - Follow-Through, Failed Reversals, and Small Starts",
+          "matched_keywords": [
+            "breakout",
+            "follow-through",
+            "2nd bar",
+            "strong breakout",
+            "突破",
+            "后续",
+            "跟进"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 7
+          },
+          "title": "fangfangtu YouTube transcript p7",
+          "matched_keywords": [
+            "breakout",
+            "突破"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "title": "fangfangtu YouTube transcript p11",
+          "matched_keywords": [
+            "突破"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "title": "方方土视频笔记-突破 p1",
+          "matched_keywords": [
+            "突破",
+            "后续"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记-突破 p2",
+          "matched_keywords": [
+            "突破"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "breakout",
+        "trend resumption",
+        "breakout mode"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Enter with the breakout only when the breakout bar is strong and at least one follow-through bar supports it.",
+        "A small-start breakout is acceptable if subsequent bars create a tight channel or higher-timeframe trend bar."
+      ],
+      "stop_logic": [
+        "Use the breakout leg extreme or a volatility-adjusted stop; reduce size when stop distance is large."
+      ],
+      "target_logic": [
+        "Use measured move from the breakout range and partial exits at prior support/resistance magnets."
+      ],
+      "invalidation": [
+        "Follow-through bar reverses strongly or closes back inside the breakout range."
+      ],
+      "no_trade_conditions": [
+        "Weak breakout in a trading range with no second bar confirmation."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "historical_backtest_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-002",
+        "BPA-015"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "namespace": "M10-PA",
+      "title": "Tight Channel Trend Continuation",
+      "status": "backtest_candidate",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014E_trends_tight_channel_small_pullback.md"
+          },
+          "title": "Video 14E: Trends - Tight Channel and Small Pullback Trend",
+          "matched_keywords": [
+            "tight channel",
+            "small pullback",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_017A_tight_channels_micro_channels_definitions.md"
+          },
+          "title": "Video 17A: Tight Channels and Micro Channels - Definitions, Measurements, and Trading Direction",
+          "matched_keywords": [
+            "tight channel",
+            "micro channel",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014C_trends_types_spike_channel_traps.md"
+          },
+          "title": "Video 14C: Trends - Types, Spike and Channel, Traps and Breakouts",
+          "matched_keywords": [
+            "tight channel",
+            "small pullback",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "fangfangtu YouTube transcript p2",
+          "matched_keywords": [
+            "channel"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "title": "fangfangtu YouTube transcript p11",
+          "matched_keywords": [
+            "channel"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "title": "方方土视频笔记 - 市场周期 p1",
+          "matched_keywords": [
+            "tight channel",
+            "channel"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 市场周期 p2",
+          "matched_keywords": [
+            "channel"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "tight channel",
+        "trend",
+        "small pullback trend"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "stop_logic": [
+        "Protect beyond the recent channel pullback extreme; avoid oversizing because channels can accelerate."
+      ],
+      "target_logic": [
+        "Trail with channel structure; initial target at prior extreme or measured channel leg."
+      ],
+      "invalidation": [
+        "Clear channel break followed by opposite follow-through."
+      ],
+      "no_trade_conditions": [
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-003"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "namespace": "M10-PA",
+      "title": "Broad Channel Boundary Reversal",
+      "status": "visual_review_then_backtest",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014A_trends_higher_lows_lower_highs.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014A_trends_higher_lows_lower_highs.md"
+          },
+          "title": "Video 14A: Trends - Higher Lows and Lower Highs",
+          "matched_keywords": [
+            "channel line",
+            "higher low",
+            "lower high"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md"
+          },
+          "title": "Video 16F: Channels - Limit Orders, Start-of-Trend Breakouts, Reversal Targets, Broad Channels, and TR Channels",
+          "matched_keywords": [
+            "broad channel",
+            "lower high",
+            "通道边界"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_046D_broad_bear_channels_lhs_second_leg_trap_bulls_buy_lows.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_046D_broad_bear_channels_lhs_second_leg_trap_bulls_buy_lows.md"
+          },
+          "title": "Video 46D: Trading Broad Bear Channels - Lower Highs, Second Leg Traps, Buying Below Lows, Wide Stops, and Scaling In",
+          "matched_keywords": [
+            "second leg trap",
+            "lower high",
+            "第二腿陷阱"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "title": "fangfangtu YouTube transcript p11",
+          "matched_keywords": [
+            "宽通道"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "fangfangtu YouTube transcript p3",
+          "matched_keywords": [
+            "宽通道"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "方方土视频笔记 - 市场周期 p3",
+          "matched_keywords": [
+            "宽通道"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 市场周期 p2",
+          "matched_keywords": [
+            "宽通道"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "broad channel",
+        "two-sided trading",
+        "boundary test"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "stop_logic": [
+        "Protect beyond the tested channel extreme."
+      ],
+      "target_logic": [
+        "Target midline, prior swing, or opposite broad-channel boundary depending on volatility."
+      ],
+      "invalidation": [
+        "Strong breakout beyond the boundary with follow-through."
+      ],
+      "no_trade_conditions": [
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-004"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "namespace": "M10-PA",
+      "title": "Trading Range Failed Breakout Reversal",
+      "status": "backtest_candidate",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "medium",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048G_trading_the_middle_look_for_change.md"
+          },
+          "title": "Video 48G: Trading the Middle of the Day",
+          "matched_keywords": [
+            "trading range",
+            "失败突破",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+          },
+          "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions",
+          "matched_keywords": [
+            "trading range",
+            "失败突破",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md"
+          },
+          "title": "Video 18F: Trading Ranges - Do Not Bet on Breakouts and Early Signs of a TR Day",
+          "matched_keywords": [
+            "trading range",
+            "fade breakout",
+            "失败突破",
+            "交易区间",
+            "区间边缘"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "title": "方方土视频笔记 - 信号K线 & 入场 p1",
+          "matched_keywords": [
+            "trading range"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 市场周期 p2",
+          "matched_keywords": [
+            "trading range"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "trading range",
+        "failed breakout",
+        "range edge"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Fade failed breakouts at the range edge after price returns inside the range and the breakout lacks follow-through.",
+        "Prefer entries when breakout traders are trapped and there is enough room back toward the range midpoint."
+      ],
+      "stop_logic": [
+        "Protect beyond the failed breakout extreme."
+      ],
+      "target_logic": [
+        "Use range midpoint first, then opposite side if two-sided pressure persists."
+      ],
+      "invalidation": [
+        "Successful breakout with follow-through and measured-move projection."
+      ],
+      "no_trade_conditions": [
+        "Early fade before the breakout has actually failed."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "historical_backtest_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-005",
+        "BPA-006",
+        "BPA-017"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-006",
+      "namespace": "M10-PA",
+      "title": "Trading Range BLSHS Limit-Order Framework",
+      "status": "research_only",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048G_trading_the_middle_look_for_change.md"
+          },
+          "title": "Video 48G: Trading the Middle of the Day",
+          "matched_keywords": [
+            "blshs",
+            "limit order",
+            "trading range",
+            "限价单",
+            "低买高卖",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md"
+          },
+          "title": "Video 18F: Trading Ranges - Do Not Bet on Breakouts and Early Signs of a TR Day",
+          "matched_keywords": [
+            "blshs",
+            "trading range",
+            "限价单",
+            "低买高卖",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+          },
+          "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions",
+          "matched_keywords": [
+            "trading range",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "title": "fangfangtu YouTube transcript p11",
+          "matched_keywords": [
+            "限价单"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 6
+          },
+          "title": "fangfangtu YouTube transcript p6",
+          "matched_keywords": [
+            "限价单"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 市场周期 p2",
+          "matched_keywords": [
+            "blshs",
+            "buy low sell high scalp",
+            "trading range"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 楔形 p2",
+          "matched_keywords": [
+            "limit order",
+            "限价单"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "trading range",
+        "limit order market",
+        "scalping"
+      ],
+      "timeframes": [
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "In a mature trading range, buy low and sell high with limit-order logic rather than breakout-chasing.",
+        "Only research this as a framework until range maturity and transaction-cost assumptions are frozen."
+      ],
+      "stop_logic": [
+        "Protect beyond the range edge or abandon if the range converts to a trend."
+      ],
+      "target_logic": [
+        "Scalp toward the range midpoint or opposite edge; costs and slippage are first-order constraints."
+      ],
+      "invalidation": [
+        "Breakout converts into trend with follow-through."
+      ],
+      "no_trade_conditions": [
+        "Immature range, news shock, or insufficient spread/cost margin."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": false,
+        "eligible_for_historical_backtest": false,
+        "route": "research_or_visual_review_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-007",
+        "BPA-020"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "namespace": "M10-PA",
+      "title": "Second-Leg Trap Reversal",
+      "status": "visual_review_then_backtest",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md"
+          },
+          "title": "Video 18B: Trading Ranges - Buy/Sell Setups, Breakout Mode, and Second Leg Traps",
+          "matched_keywords": [
+            "second leg trap",
+            "trap",
+            "陷阱"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_047C_trading_ranges_second_leg_traps_fade_breakouts_reversal_entries_scaling.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_047C_trading_ranges_second_leg_traps_fade_breakouts_reversal_entries_scaling.md"
+          },
+          "title": "Video 47C: Trading in Trading Ranges - Second Leg Traps, Fading Breakouts, Reversal Entries, Wide Stops, and Scaling In",
+          "matched_keywords": [
+            "second leg trap",
+            "trap",
+            "trapped",
+            "第二腿陷阱",
+            "陷阱"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md"
+          },
+          "title": "Video 15G: Breakouts - Tick Traps, Pip Traps, and Fading Weak Setups",
+          "matched_keywords": [
+            "trap",
+            "陷阱"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 13
+          },
+          "title": "fangfangtu YouTube transcript p13",
+          "matched_keywords": [
+            "trap",
+            "陷阱"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 14
+          },
+          "title": "fangfangtu YouTube transcript p14",
+          "matched_keywords": [
+            "trap",
+            "陷阱"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "方方土视频笔记 - 楔形 p4",
+          "matched_keywords": [
+            "trap",
+            "陷阱"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "方方土视频笔记-突破 p3",
+          "matched_keywords": [
+            "trap",
+            "陷阱"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "trap",
+        "two-legged move",
+        "failed continuation"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "stop_logic": [
+        "Protect beyond the trap extreme."
+      ],
+      "target_logic": [
+        "Target prior swing or measured move back through the failed leg."
+      ],
+      "invalidation": [
+        "Second leg resumes strongly with follow-through."
+      ],
+      "no_trade_conditions": [
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-008"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "namespace": "M10-PA",
+      "title": "Major Trend Reversal",
+      "status": "visual_review_then_backtest",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md"
+          },
+          "title": "Video 22A: Major Trend Reversals - Requirements, Minor Reversals, and MTR Probability",
+          "matched_keywords": [
+            "major trend reversal",
+            "mtr",
+            "trend reversal",
+            "主要趋势反转",
+            "反转"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_021A_reversals_definition_minor_major_breakouts.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_021A_reversals_definition_minor_major_breakouts.md"
+          },
+          "title": "Video 21A: Reversals - Definition, Minor/Major Reversals, and Breakout Origins",
+          "matched_keywords": [
+            "mtr",
+            "主要趋势反转",
+            "反转"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022D_mtr_bottoms_head_shoulders_failed_mtr.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_022D_mtr_bottoms_head_shoulders_failed_mtr.md"
+          },
+          "title": "Video 22D: Major Trend Reversals - Bottoms, Head-and-Shoulders, and Failed MTRs",
+          "matched_keywords": [
+            "major trend reversal",
+            "mtr",
+            "trend reversal",
+            "主要趋势反转",
+            "反转"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "fangfangtu YouTube transcript p3",
+          "matched_keywords": [
+            "反转"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "fangfangtu YouTube transcript p4",
+          "matched_keywords": [
+            "反转"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "方方土视频笔记 - 楔形 p4",
+          "matched_keywords": [
+            "反转"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "方方土视频笔记 - 市场周期 p3",
+          "matched_keywords": [
+            "反转"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "trend exhaustion",
+        "major reversal",
+        "support resistance"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Require a prior trend, a break of trendline/channel, and a test forming a credible higher low/lower high or failed final push.",
+        "Do not treat the first countertrend bar as sufficient proof."
+      ],
+      "stop_logic": [
+        "Protect beyond the reversal extreme; wider initial risk may be required."
+      ],
+      "target_logic": [
+        "Minimum target is the prior major swing or measured move; partials before major support/resistance."
+      ],
+      "invalidation": [
+        "Original trend resumes with strong breakout and follow-through."
+      ],
+      "no_trade_conditions": [
+        "Minor reversal inside a tight channel."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-009"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "namespace": "M10-PA",
+      "title": "Wedge Reversal and Wedge Flag",
+      "status": "visual_review_then_backtest",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024B_wedges_imperfect_channels_variations_context.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_024B_wedges_imperfect_channels_variations_context.md"
+          },
+          "title": "Video 24B: Wedges - Imperfect Shapes, Channels, Variations, and Context",
+          "matched_keywords": [
+            "wedge",
+            "楔形",
+            "三推"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_024A_wedges_definition_flags_mtr_climax_probability.md"
+          },
+          "title": "Video 24A: Wedges - Definition, Flags, MTRs, Climaxes, and Reversal Probability",
+          "matched_keywords": [
+            "wedge",
+            "楔形",
+            "三推"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_024D_wedges_parabolic_wedge_strong_trends_bad_wedges.md"
+          },
+          "title": "Video 24D: Wedges - Parabolic Wedges and Bad Wedges in Strong Trends",
+          "matched_keywords": [
+            "wedge",
+            "parabolic wedge",
+            "楔形",
+            "三推"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "fangfangtu YouTube transcript p4",
+          "matched_keywords": [
+            "楔形",
+            "三推"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 7
+          },
+          "title": "fangfangtu YouTube transcript p7",
+          "matched_keywords": [
+            "楔形",
+            "三推"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "title": "方方土视频笔记 - 楔形 p1",
+          "matched_keywords": [
+            "wedge",
+            "楔形",
+            "三推"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "方方土视频笔记 - 楔形 p4",
+          "matched_keywords": [
+            "wedge",
+            "楔形",
+            "三推"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "wedge",
+        "three pushes",
+        "climax or flag"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "stop_logic": [
+        "Protect beyond the third push extreme."
+      ],
+      "target_logic": [
+        "Target two-legged correction or measured move from wedge height depending on context."
+      ],
+      "invalidation": [
+        "Failed wedge breakout with follow-through in the original direction."
+      ],
+      "no_trade_conditions": [
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-010"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "namespace": "M10-PA",
+      "title": "Final Flag or Climax TBTL Reversal",
+      "status": "visual_review_then_backtest",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md"
+          },
+          "title": "Video 29A: Climaxes - Breakouts, Exhaustion, Vacuums, and Support/Resistance",
+          "matched_keywords": [
+            "final flag",
+            "climax",
+            "exhaustion",
+            "高潮"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md"
+          },
+          "title": "Video 29C: Climaxes - Climactic Reversals, Exhaustion Gaps, and Measuring Gaps",
+          "matched_keywords": [
+            "climax",
+            "tbtl",
+            "exhaustion",
+            "高潮"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md"
+          },
+          "title": "Video 29E: Climaxes - Options Firms and Failed Consecutive Climaxes",
+          "matched_keywords": [
+            "climax",
+            "tbtl",
+            "exhaustion",
+            "高潮"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 7
+          },
+          "title": "fangfangtu YouTube transcript p7",
+          "matched_keywords": [
+            "exhaustion"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 5
+          },
+          "title": "方方土视频笔记 - 楔形 p5",
+          "matched_keywords": [
+            "climax"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 新手篇 p2",
+          "matched_keywords": [
+            "tbtl"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "late trend",
+        "climax",
+        "final flag"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+        "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+      ],
+      "stop_logic": [
+        "Protect beyond the climax/final-flag extreme."
+      ],
+      "target_logic": [
+        "Target two legs or a test of the prior breakout point."
+      ],
+      "invalidation": [
+        "Climax continues as a strong trend without reversal follow-through."
+      ],
+      "no_trade_conditions": [
+        "Countertrend entry before the trend shows exhaustion."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-012",
+        "BPA-013"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "namespace": "M10-PA",
+      "title": "Opening Reversal",
+      "status": "visual_review_then_backtest",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048F_gap_openings_early_flags.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048F_gap_openings_early_flags.md"
+          },
+          "title": "Video 48F: Trading the Open",
+          "matched_keywords": [
+            "trading the open",
+            "opening reversal",
+            "yesterday",
+            "gap opening",
+            "开盘",
+            "开盘反转"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048A_trading_the_open_overview.md"
+          },
+          "title": "Video 48A: Trading the Open",
+          "matched_keywords": [
+            "trading the open",
+            "opening reversal",
+            "开盘",
+            "开盘反转"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_049A_swing_trading_day_examples.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_049A_swing_trading_day_examples.md"
+          },
+          "title": "Video 49A: Swing Trading Examples",
+          "matched_keywords": [
+            "opening reversal",
+            "yesterday",
+            "开盘",
+            "开盘反转"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 10
+          },
+          "title": "fangfangtu YouTube transcript p10",
+          "matched_keywords": [
+            "开盘"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 9
+          },
+          "title": "fangfangtu YouTube transcript p9",
+          "matched_keywords": [
+            "开盘",
+            "开盘反转"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 4
+          },
+          "title": "方方土视频笔记 - 楔形 p4",
+          "matched_keywords": [
+            "开盘",
+            "开盘反转"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "session open",
+        "gap or prior-day test",
+        "opening reversal"
+      ],
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "stop_logic": [
+        "Protect beyond opening extreme or failed test level."
+      ],
+      "target_logic": [
+        "Target opening range midpoint, prior-day level, or measured opening swing."
+      ],
+      "invalidation": [
+        "Opening trend breakout with follow-through."
+      ],
+      "no_trade_conditions": [
+        "No clean prior-day or opening-range context."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "visual_golden_case_then_historical_backtest"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-014"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "namespace": "M10-PA",
+      "title": "Opening Range Breakout",
+      "status": "backtest_candidate",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "medium",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048D_breakout_mode_opening_range.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048D_breakout_mode_opening_range.md"
+          },
+          "title": "Video 48D: Trading the Open",
+          "matched_keywords": [
+            "breakout mode",
+            "trading the open",
+            "开盘区间",
+            "突破模式"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008C_candles_ttr_ii_ioi_breakout_mode.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_008C_candles_ttr_ii_ioi_breakout_mode.md"
+          },
+          "title": "Video 8C: Candles, Setups, and Signal Bars - Tight Trading Ranges, ii, ioi, and Breakout Mode",
+          "matched_keywords": [
+            "breakout mode",
+            "突破模式"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_026A_triangles_ttr_wedges_flags_reversal_or_continuation.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_026A_triangles_ttr_wedges_flags_reversal_or_continuation.md"
+          },
+          "title": "Video 26A: Triangles - TTR, Wedges, Flags, and Breakout Mode",
+          "matched_keywords": [
+            "breakout mode",
+            "突破模式"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "market_context": [
+        "session open",
+        "opening range",
+        "breakout mode"
+      ],
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Define the opening range first, then require breakout strength and follow-through before continuation entry.",
+        "Failed opening range breakouts route to the Opening Reversal or Trading Range failed-breakout queue."
+      ],
+      "stop_logic": [
+        "Protect back inside the opening range or beyond the breakout leg."
+      ],
+      "target_logic": [
+        "Use opening range height and prior-day magnets."
+      ],
+      "invalidation": [
+        "Breakout fails back into the range without follow-through."
+      ],
+      "no_trade_conditions": [
+        "Range too narrow for costs or too wide for risk budget."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "historical_backtest_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-015"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "namespace": "M10-PA",
+      "title": "Support and Resistance Failed Test",
+      "status": "backtest_candidate",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "medium",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_019A_support_resistance_definitions_news_monthly_stops_precision.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_019A_support_resistance_definitions_news_monthly_stops_precision.md"
+          },
+          "title": "Video 19A: Support and Resistance - Definitions, News, Monthly Stops, and Precision",
+          "matched_keywords": [
+            "支撑",
+            "阻力"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_019C_support_resistance_monthly_magnets_round_numbers_list.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_019C_support_resistance_monthly_magnets_round_numbers_list.md"
+          },
+          "title": "Video 19C: Support and Resistance - Monthly Magnets, Round Numbers, and Complete S/R List",
+          "matched_keywords": [
+            "magnet",
+            "支撑",
+            "阻力"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018E_trading_ranges_vacuum_effect_perverse_logic_fade_bo.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_018E_trading_ranges_vacuum_effect_perverse_logic_fade_bo.md"
+          },
+          "title": "Video 18E: Trading Ranges - Vacuum Effect and Perverse Logic to Fade Breakouts",
+          "matched_keywords": [
+            "支撑",
+            "阻力"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "market_context": [
+        "support resistance",
+        "failed test",
+        "magnet"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Use prior high/low, round number, moving average, or measured-move level as the test area.",
+        "Enter only after the test fails and price returns with a signal bar or follow-through."
+      ],
+      "stop_logic": [
+        "Protect beyond the failed test extreme."
+      ],
+      "target_logic": [
+        "Target next magnet, range midpoint, or measured-move objective."
+      ],
+      "invalidation": [
+        "Clean breakout through the level with follow-through."
+      ],
+      "no_trade_conditions": [
+        "Level selected after the fact or too imprecise for a test rule."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": true,
+        "route": "historical_backtest_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-017"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-014",
+      "namespace": "M10-PA",
+      "title": "Measured Move Target Engine",
+      "status": "supporting_rule",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "medium",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034B_small_actual_risk_profit_targets_sampling_error.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_034B_small_actual_risk_profit_targets_sampling_error.md"
+          },
+          "title": "Video 34B: Actual Risk - Small Actual Risk, Profit Targets, and Sampling Error",
+          "matched_keywords": [
+            "measured move",
+            "target",
+            "profit target",
+            "测量移动",
+            "目标"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_020A_measured_moves_leg1_equals_leg2_prior_leg.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_020A_measured_moves_leg1_equals_leg2_prior_leg.md"
+          },
+          "title": "Video 20A: Measured Moves - Leg 1 Equals Leg 2 and Prior-Leg Projections",
+          "matched_keywords": [
+            "measured move",
+            "leg 1 equals leg 2",
+            "测量移动",
+            "目标"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_036B_profit_taking_defaults_big_profit_targets.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_036B_profit_taking_defaults_big_profit_targets.md"
+          },
+          "title": "Video 36B: Trade Management and Taking Profits - Profit Taking Defaults and Big Targets",
+          "matched_keywords": [
+            "measured move",
+            "target",
+            "测量移动",
+            "目标"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "market_context": [
+        "targeting",
+        "trade management",
+        "measured move"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "This is a target/risk module attached to eligible setup strategies, not a standalone entry."
+      ],
+      "stop_logic": [
+        "No independent stop; inherits parent setup risk."
+      ],
+      "target_logic": [
+        "Compute leg-based, range-height, and breakout-height measured move objectives."
+      ],
+      "invalidation": [
+        "Parent setup invalidates or measured move conflicts with closer major magnet."
+      ],
+      "no_trade_conditions": [
+        "Do not use as an entry trigger."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": false,
+        "route": "supporting_rule_attached_to_parent_setups"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-018"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "namespace": "M10-PA",
+      "title": "Protective Stops and Position Sizing",
+      "status": "supporting_rule",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034A_actual_risk_traders_equation_profit_targets.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_034A_actual_risk_traders_equation_profit_targets.md"
+          },
+          "title": "Video 34A: Actual Risk - Trader's Equation, Perfect Stop, and Profit Targets",
+          "matched_keywords": [
+            "actual risk",
+            "risk",
+            "止损",
+            "风险"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034B_small_actual_risk_profit_targets_sampling_error.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_034B_small_actual_risk_profit_targets_sampling_error.md"
+          },
+          "title": "Video 34B: Actual Risk - Small Actual Risk, Profit Targets, and Sampling Error",
+          "matched_keywords": [
+            "actual risk",
+            "risk",
+            "止损",
+            "仓位",
+            "风险"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_033F_measured_moves_support_resistance_small_signal_bar_big_stop.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_033F_measured_moves_support_resistance_small_signal_bar_big_stop.md"
+          },
+          "title": "Video 33F: Measured Moves, Support/Resistance, Small Signal Bars, and Big Stops",
+          "matched_keywords": [
+            "protective stop",
+            "wide stop",
+            "止损",
+            "仓位",
+            "风险"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 9
+          },
+          "title": "fangfangtu YouTube transcript p9",
+          "matched_keywords": [
+            "risk",
+            "仓位"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 8
+          },
+          "title": "fangfangtu YouTube transcript p8",
+          "matched_keywords": [
+            "risk",
+            "仓位"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "方方土视频笔记 - 新手篇 p3",
+          "matched_keywords": [
+            "仓位"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "title": "方方土视频笔记 - 市场周期 p3",
+          "matched_keywords": [
+            "仓位"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "risk",
+        "trade management",
+        "position sizing"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "This is a risk-control module required before any historical backtest is promoted."
+      ],
+      "stop_logic": [
+        "Stops must be structurally valid first, then sized to fixed risk budget."
+      ],
+      "target_logic": [
+        "Targets must be evaluated against actual risk and cost assumptions."
+      ],
+      "invalidation": [
+        "If structural stop exceeds risk budget, strategy must skip or reduce size."
+      ],
+      "no_trade_conditions": [
+        "No trade when stop is arbitrary or position size would exceed risk limits."
+      ],
+      "visual_dependency": "medium",
+      "backtest_eligibility": {
+        "ohlcv_approximable": true,
+        "eligible_for_historical_backtest": false,
+        "route": "supporting_rule_attached_to_parent_setups"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-019"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-016",
+      "namespace": "M10-PA",
+      "title": "Trading Range Scaling-In Research",
+      "status": "research_only",
+      "source_priority_basis": "brooks_v2_manual_transcript",
+      "support_level": "high_priority_supported",
+      "confidence": "high",
+      "policy_decision": "eligible_from_brooks_v2_without_cross_source_requirement",
+      "source_refs": [
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048G_trading_the_middle_look_for_change.md"
+          },
+          "title": "Video 48G: Trading the Middle of the Day",
+          "matched_keywords": [
+            "scaling in",
+            "scale in",
+            "trading range",
+            "加仓",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_035A_scaling_in_who_scales_winning_positions.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_035A_scaling_in_who_scales_winning_positions.md"
+          },
+          "title": "Video 35A: Scaling In - Who Scales In and Adding to Winning Positions",
+          "matched_keywords": [
+            "scaling in",
+            "scale in",
+            "加仓",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+          },
+          "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions",
+          "matched_keywords": [
+            "trading range",
+            "交易区间"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 9
+          },
+          "title": "fangfangtu YouTube transcript p9",
+          "matched_keywords": [
+            "加仓"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 12
+          },
+          "title": "fangfangtu YouTube transcript p12",
+          "matched_keywords": [
+            "加仓"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "title": "方方土视频笔记 - 信号K线 & 入场 p1",
+          "matched_keywords": [
+            "trading range"
+          ]
+        },
+        {
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "title": "方方土视频笔记 - 市场周期 p2",
+          "matched_keywords": [
+            "trading range"
+          ]
+        }
+      ],
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "market_context": [
+        "trading range",
+        "scaling in",
+        "risk research"
+      ],
+      "timeframes": [
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "direction": "both",
+      "entry_logic": [
+        "Only document scaling-in behavior as research until hard risk, capital, and range-maturity limits are specified."
+      ],
+      "stop_logic": [
+        "Requires explicit maximum loss and no averaging-down path before any simulation."
+      ],
+      "target_logic": [
+        "Research target only; no execution queue in M10."
+      ],
+      "invalidation": [
+        "Any path that increases exposure without bounded loss remains blocked."
+      ],
+      "no_trade_conditions": [
+        "All live, broker, or real-money usage is out of scope."
+      ],
+      "visual_dependency": "high",
+      "backtest_eligibility": {
+        "ohlcv_approximable": false,
+        "eligible_for_historical_backtest": false,
+        "route": "research_or_visual_review_queue"
+      },
+      "clean_room_guard": {
+        "legacy_ids_used_in_extraction": [],
+        "forbidden_legacy_inputs": [
+          "knowledge/wiki/strategy_cards",
+          "reports/strategy_lab/strategy_catalog.json",
+          "reports/strategy_lab/specs",
+          "reports/strategy_lab/strategy_triage_matrix.json",
+          "reports/strategy_lab/cards"
+        ]
+      },
+      "chatgpt_bpa_reference_overlap": [
+        "BPA-020"
+      ]
+    }
+  ]
+}

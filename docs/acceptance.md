@@ -283,8 +283,8 @@
   - `scripts/build_callable_index.py`
   - `scripts/validate_kb_coverage.py`
   - `scripts/validate_knowledge_atoms.py`
-- 10 个 in-scope source 都必须存在 machine-readable source record。
-- `:Zone.Identifier` 必须被过滤并进入 `coverage_summary.filtered_files`，不得被误判为 source。
+- M8B.2a 初始 10 个 in-scope source 都必须存在 machine-readable source record；后续 milestone 可追加新 source，但不得破坏原 source 可解析性。
+- 若存在 `:Zone.Identifier` sidecar，必须被过滤并进入 `coverage_summary.filtered_files`，不得被误判为 source。
 - 每个 source 都要么可解析进 chunk/atom，要么明确进入 `blocked / partial` 并写明原因。
 - `statement` atom 必须存在，并且每条都具备：
   - `atom_id`
@@ -313,7 +313,7 @@
   - `tests/reliability/test_callable_access.py`
 - 本轮不得修改 strategy / explanation / review / report 接线，不得修改 trigger 逻辑，不得触碰 broker/live/real-money/real-account。
 - 当前完成事实：
-  - `source_manifest.json` 当前结果为 `parsed=9 / partial=1 / blocked=0`
+  - `source_manifest.json` 初始 M8B.2a 结果为 `parsed=9 / partial=1 / blocked=0`
   - 当前 partial source 为 `方方土视频笔记 - 楔形.pdf`
   - 当前未触发熔断
   - 关键 curated atoms 已形成 evidence-backed atom
@@ -1006,4 +1006,187 @@
   - `python scripts/validate_kb.py`
   - `python -m unittest discover -s tests/unit -v`
   - `python -m unittest tests/reliability/test_strategy_factory_pipeline.py -v`
+  - `git diff --check`
+
+## 阶段 10：Price Action Strategy Refresh
+
+完成条件：
+
+- 必须从 `main` 创建独立分支 / worktree：`codex/m10-price-action-strategy-refresh`。
+- 必须先完成 workspace / worktree / branch audit，并把旧 M8/M9、`PA-SC-*`、`SF-*`、旧 reports/specs/catalog/triage 登记为 legacy-only。
+- Clean-room extraction 阶段不得读取或参考：
+  - `knowledge/wiki/strategy_cards/`
+  - `reports/strategy_lab/strategy_catalog.json`
+  - `reports/strategy_lab/cards/`
+  - `reports/strategy_lab/specs/`
+  - `reports/strategy_lab/strategy_triage_matrix.json`
+- 新策略 namespace 固定为 `M10-PA-*`。
+- 来源优先级固定为：
+  - `brooks_v2_manual_transcript`
+  - `fangfangtu_youtube_transcript`
+  - `fangfangtu_notes`
+- Brooks v2 单源支撑不得仅因缺少 YouTube/notes 交叉验证而被拒绝。
+- FangFangTu YouTube 单源支撑不得仅因缺少 Brooks/notes 交叉验证而被拒绝。
+- Notes-only 条目必须降级为 `research_only` 或 `needs_corroboration`。
+- 必须登记 ChatGPT share 与 Codex thread 为 reference-only，不得作为策略 source of truth。
+- 必须导入 / 登记 Brooks v2 manual transcript：
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/README.md`
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/`
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/evidence/`
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/manifest.json`
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/checksums.sha256`
+  - `knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets_evidence_checksums.sha256`
+- 图片资产 `assets/evidence/` 必须按 local-only + checksum 管理，不得默认纳入普通 Git 跟踪。
+- 必须更新 source manifest / chunk / atom / callable builder，使 Brooks v2、YouTube transcript、notes 可独立检索。
+- 必须生成：
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/source_support_matrix_m10.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/chatgpt_bpa_comparison.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/legacy_comparison_m10.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_gap_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/backtest_eligibility_matrix.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_test_plan.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_catalog_review.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10_frozen.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_strategy_test_queue.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_visual_golden_case_index.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_visual_case_selection_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_2_visual_review_summary.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/m10_3_backtest_spec_handoff.md`
+- M10.1 catalog freeze 必须满足：
+  - 当前 frozen catalog 共 `16` 条 `M10-PA-*` 策略/规则条目。
+  - `backtest_wave_a` 只能包含 `M10-PA-001`、`M10-PA-002`、`M10-PA-005`、`M10-PA-012`。
+  - `backtest_wave_b_candidate` 当前只能包含 `M10-PA-013`；高视觉策略只有通过 M10.2 visual golden case 后才可进入 Wave B。
+  - `visual_golden_case_first` 只能包含 `M10-PA-003`、`M10-PA-004`、`M10-PA-007`、`M10-PA-008`、`M10-PA-009`、`M10-PA-010`、`M10-PA-011`。
+  - `supporting_rule` 只能包含 `M10-PA-014`、`M10-PA-015`，且不得生成独立 entry trigger。
+  - `research_only` 只能包含 `M10-PA-006`、`M10-PA-016`。
+  - Visual golden case 不是所有策略的统一前置门槛；只对 `visual_golden_case_first` 队列生效。
+  - `strategy_catalog_m10_frozen.json` 不得出现旧 `PA-SC-*` 或 `SF-*` 策略 ID。
+- M10.1 Wave A 测试队列必须满足：
+  - `M10-PA-001`、`M10-PA-002`、`M10-PA-005` 测试线为 `1d / 1h / 15m / 5m`。
+  - `M10-PA-012` 测试线为 `15m / 5m`。
+  - 每条必须规划 candidate events、skip/no-trade ledger、source ledger、成本/滑点敏感性、per-symbol、per-regime、failure-mode notes。
+  - M10.1 不允许输出 `retain/promote`；只允许 `needs_definition_fix`、`needs_visual_review`、`continue_testing`、`reject_for_now`。
+- M10.2 Visual Golden Case Pack 必须满足：
+  - visual pack 只覆盖 `M10-PA-003`、`M10-PA-004`、`M10-PA-007`、`M10-PA-008`、`M10-PA-009`、`M10-PA-010`、`M10-PA-011`。
+  - 每个 `visual_pack_ready` 策略至少包含 `3` 个 Brooks v2 正例、`1` 个反例、`1` 个边界例。
+  - 每个 case 必须包含 `strategy_id`、`case_type`、Brooks unit ref、evidence image logical path、checksum、pattern decision points、disqualifiers、OHLCV approximation risk、review status。
+  - Brooks v2 图片资产必须继续按 local-only + checksum 管理；tracked artifact 只保存 logical path 和 checksum。
+  - `M10-PA-001/002/005/012/013/014/015/006/016` 不得进入 visual golden case pack。
+  - `m10_3_backtest_spec_handoff.md` 只能记录 Wave A spec freeze 承接，不得生成正式 backtest spec、回测结论或 `retain/promote`。
+- M10.3 Backtest Spec Freeze 必须满足：
+  - 只生成 `M10-PA-001`、`M10-PA-002`、`M10-PA-005`、`M10-PA-012` 四条 Wave A backtest specs。
+  - `M10-PA-001/002/005` 的测试周期必须为 `1d / 1h / 15m / 5m`；`M10-PA-012` 必须只允许 `15m / 5m`。
+  - 每份 spec 必须包含 `schema_version = m10.backtest-spec.v1`、`stage = M10.3.backtest_spec_freeze`、`strategy_id`、`title`、`timeframes`、`paper_simulated_only`、`source_refs`、`source_ledger_ref`、`event_definition`、`entry_rules`、`stop_rules`、`target_rules`、`skip_rules`、`cost_model_policy`、`sample_gate_policy`、`outputs_required`、`allowed_outcomes`、`not_allowed`。
+  - `allowed_outcomes` 只能是 `needs_definition_fix`、`needs_visual_review`、`continue_testing`、`reject_for_now`。
+  - spec、index、event ledger、skip ledger、policy artifact 中不得出现 legacy `PA-SC-*` 或 `SF-*`。
+  - `M10-PA-014/015` 只能作为 supporting rules 被引用，不得生成独立 entry trigger。
+  - `M10-PA-003/004/007/008/009/010/011`、`M10-PA-013`、`M10-PA-006/016` 不得进入 Wave A spec index。
+  - 成本敏感性 policy 必须固定 baseline `1 bps`、stress low `2 bps`、stress high `5 bps`。
+  - 样本门槛必须固定为每个 strategy/timeframe 至少 `30` 个 candidate events，且 skip 后至少 `10` 个 executed trades；低于门槛只能标记 `continue_testing` 或 `needs_definition_fix`。
+  - M10.3 不得运行 historical backtest，不得输出收益结论、`retain/promote`、broker connection、live execution 或 real orders。
+- M10.4 Historical Backtest Pilot 必须满足：
+  - 只运行 Wave A：`M10-PA-001/002/005` 的 `1d / 1h / 15m / 5m`，以及 `M10-PA-012` 的 `15m / 5m`。
+  - 不运行 visual-first、Wave B candidate、supporting-only 或 research-only 条目作为 entry trigger。
+  - Daily 默认窗口必须为 `2010-06-29 ~ 2026-04-21`，不得回退到短窗口；若某标的实际数据起点更晚，必须写入 dataset inventory。
+  - 数据解析顺序必须优先当前 worktree `local_data/`，其次 sibling main worktree `/home/hgl/projects/Price-Action-Trader/local_data/`；本地仍缺失时只能生成 `data_unavailable_deferred`，不得伪造事件或交易。
+  - `15m / 1h` 若从 `5m` 聚合，必须在 dataset inventory 中记录 `derived_from_5m` lineage。
+  - 必须输出 `m10_4_data_availability.json`、`m10_4_dataset_inventory.json`、`m10_4_wave_a_pilot_summary.json`、`m10_4_wave_a_pilot_report.md`，以及每个 strategy/timeframe 的 candidate events、skip/no-trade ledger、source ledger、成本敏感性、per-symbol、per-regime、failure-mode notes。
+  - outcome 只能是 `needs_definition_fix`、`needs_visual_review`、`continue_testing`、`reject_for_now`。
+  - 不得输出 `retain/promote`、收益证明、broker connection、live execution 或 real orders。
+- M10.5 Read-only Observation Plan 必须满足：
+  - 只制定只读观察方案，不启动实时观察 runner，不接 broker，不下单，不批准 paper trading。
+  - observation queue 只能包含 `M10-PA-001`、`M10-PA-002`、`M10-PA-005`、`M10-PA-012`。
+  - `M10-PA-001/002/005` 只能规划 `1d / 1h / 15m / 5m`；`M10-PA-012` 只能规划 `15m / 5m`。
+  - visual-first、Wave B candidate、supporting-only、research-only 条目不得进入 read-only queue。
+  - `1d` 必须规划为 regular session close 后观察；`1h / 15m / 5m` 必须规划为 regular-session bar close 后记录。
+  - event schema 必须包含 strategy、symbol、timeframe、bar timestamp、event/skip、hypothetical entry/stop/target、source/spec refs、data source、review status，并强制 `paper_simulated_only=true`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+  - M10.4 daily 长窗口 `2010-06-29 ~ 2026-04-21` 与 `15m / 1h = derived_from_5m` lineage 必须在 M10.5 artifacts 中被引用。
+  - candidate density 过高的 strategy/timeframe 必须标记 `definition_breadth_review`；该标记不得基于 PnL 自动拒绝策略。
+  - 若没有实时只读输入方案，必须写入 `observation_input_deferred`，不得补假事件。
+  - M10.5 artifacts 不得出现 legacy `PA-SC-*` 或 `SF-*` 策略 ID 污染。
+- M10.6 Read-only Observation Input / Ledger Prototype 必须满足：
+  - 只使用本地 cached OHLCV 做 recorded replay，不接 broker、不接真实账户、不订阅实时行情、不下单。
+  - 必须只加载 M10.5 observation queue 中的 `M10-PA-001/002/005/012`；`M10-PA-012` 只能生成 `15m / 5m` ledger。
+  - visual-first、Wave B candidate、supporting-only、research-only 条目不得进入 M10.6 ledger。
+  - `1d` ledger 必须按收盘后观察语义生成；`1h / 15m / 5m` ledger 必须按 regular-session bar-close 语义生成。
+  - ledger row 必须符合 `m10_5_observation_event_schema.json`，并强制 `paper_simulated_only=true`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+  - `15m / 1h` 从 `5m` 派生时，input manifest 与 summary 必须记录 `derived_from_5m` lineage。
+  - 数据缺失时只能写入 `m10_6_deferred_inputs.json`，不得生成 synthetic observation event。
+  - M10.6 summary / report 不得输出收益证明、paper gate approval、live-ready 或策略状态升级结论。
+  - M10.6 不得修改 `src/risk/`、`src/execution/`、`src/broker/` 的 live 行为。
+- M10.7 Business Metric Policy 必须满足：
+  - 必须生成 `m10_7_business_metric_policy.md`、`m10_7_capital_model.json`、`m10_7_client_report_template.md`。
+  - capital model 必须固定币种 `USD`、初始本金 `100000.00`、单笔风险当前权益 `0.50%`、不使用杠杆、允许 fractional shares 保持模拟确定性。
+  - 成本压力必须固定为 baseline `1 bps`、stress low `2 bps`、stress high `5 bps`。
+  - 后续甲方成绩单必备指标必须包括 initial capital、final equity、net profit、return percent、trade count、win rate、profit factor、max drawdown、max consecutive losses、average holding bars。
+  - M10.7 只冻结后续资金曲线模拟口径，不运行新回测，不接 broker、不接真实账户、不下单、不批准 paper trading。
+- M10.8 Wave A Capital Backtest 必须满足：
+  - 只覆盖 `M10-PA-001`、`M10-PA-002`、`M10-PA-005`、`M10-PA-012`；`M10-PA-012` 只能覆盖 `15m / 5m`。
+  - 必须使用 M10.4 candidate events 的 `entry/stop/exit` 字段按 M10.7 capital model 重新计算仓位、成本、权益、胜率和回撤，不得直接把 R 值当作资金曲线。
+  - 必须输出 `m10_8_wave_a_metrics.csv`、`m10_8_wave_a_trade_ledger.csv`、`m10_8_wave_a_strategy_scorecard.md`、`m10_8_wave_a_client_report.md`、`m10_8_wave_a_capital_summary.json` 与 `m10_8_wave_a_equity_curves/`。
+  - metrics 必须覆盖 strategy、strategy/timeframe、strategy/timeframe/symbol 与 cost tier 粒度，并包含 M10.7 必备甲方指标。
+  - trade ledger 必须包含 `event_id`、`trade_id`、risk budget、risk-budget quantity、notional-cap quantity、gross/cost/net PnL、equity before/after 与 source/spec refs。
+  - `M10-PA-005` 的 `1h / 15m / 5m` 必须保留 `definition_breadth_review` / `needs_definition_fix`，不得因资金结果自动升级。
+  - M10.8 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.9 Definition Tightening 必须满足：
+  - 只覆盖 `M10-PA-005`，不得修改其他 Wave A 策略定义或资金口径。
+  - 收紧依据只能是结构性清理：重复确认去重、同标的同方向日内 20-bar 冷却；不得使用 PnL、资金曲线、胜率或 profit factor 做调参依据。
+  - 必须输出 `m10_9_definition_filter_ledger.json`、`m10_9_before_after_metrics.csv`、`m10_9_retest_summary.json`、`m10_9_definition_fix_report.md`、`m10_9_wave_a_retest_client_summary.md`。
+  - 必须明确记录 M10.4 candidate events 缺少 `range_high/range_low/range_midpoint/breakout_extreme/reentry_confirmation_index`，因此 `M10-PA-005` 不能解除 `needs_definition_fix`。
+  - M10.9 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.10 Visual Wave B Gate 必须满足：
+  - 只复核 `M10-PA-003/004/007/008/009/010/011` 的 visual golden case pack。
+  - 必须输出 `m10_10_visual_strategy_review.md`、`m10_10_wave_b_entry_queue.json`、`m10_10_visual_client_summary.md` 与结构化 summary。
+  - Wave B queue 只能包含 gate 通过的视觉策略与既有 `M10-PA-013` candidate；Wave A、supporting-only、research-only 策略不得进入 queue。
+  - `M10-PA-011` 只能进入 `15m / 5m`，不得扩成 daily 或 `1h`。
+  - M10.10 不得运行回测，不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.11 Wave B Capital Backtest 必须满足：
+  - 只覆盖 M10.10 queue 中的 `M10-PA-013/003/008/009/011`，不得跑未通过 visual gate 的策略。
+  - 必须输出 `m10_11_wave_b_metrics.csv`、`m10_11_wave_b_trade_ledger.csv`、`m10_11_wave_b_strategy_scorecard.md`、`m10_11_wave_b_client_report.md`、`m10_11_wave_b_capital_summary.json` 与 `m10_11_wave_b_equity_curves/`。
+  - 必须沿用 M10.7 资本模型和三档成本压力，trade ledger 必须包含 entry/stop/target/exit、risk budget、gross/cost/net PnL、equity before/after 与 source/spec refs。
+  - `M10-PA-011` 只能输出 `15m / 5m`，`15m / 1h` 数据 lineage 必须保留 `derived_from_5m`。
+  - M10.11 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.12 All Strategy Scorecard 必须满足：
+  - 必须覆盖 16 条 `M10-PA-*` clean-room 策略/规则，不得引入 legacy `PA-SC-*` 或 `SF-*`。
+  - 必须输出 `m10_12_all_strategy_metrics.csv`、`m10_12_strategy_decision_matrix.json`、`m10_12_portfolio_simulation_report.md`、`m10_12_client_final_report.md` 与结构化 summary。
+  - 每条策略必须有明确状态：完成资金测试、需要定义修正、图形复核保留、只能辅助、research-only 或暂不继续。
+  - portfolio proxy 必须沿用 `100,000 USD` 初始本金、最大同时风险 `4%`、最多同时持仓 `8` 的业务口径，只纳入 `completed_capital_test` 策略，并明确不是可执行组合回测。
+  - M10.12 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.13 Read-only Observation Runbook 必须满足：
+  - 必须输出 `m10_13_observation_candidate_queue.json`、`m10_13_read_only_observation_runbook.md`、`m10_13_weekly_observation_template.md` 与结构化 summary。
+  - 主观察队列只能包含完成资金测试、整体收益为正、且被选入周期收益为正的策略周期。
+  - M10.13 可在 M10.5 Wave A 观察计划基础上纳入 M10.11/M10.12 筛选通过的 Wave B 策略，但视觉策略必须保留人工图形语境复核。
+  - `M10-PA-005` 在 range-geometry 定义修正完成前不得进入主观察队列。
+  - 周报模板必须覆盖本周触发策略、策略和标的分布、资金曲线偏离、暂停条件和人工复核结论。
+  - M10.13 不得启动真实观察 runner，不接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M11 Paper Gate 必须满足：
+  - 必须输出 `m11_paper_gate_report.md`、`m11_candidate_strategy_list.json`、`m11_risk_and_pause_policy.md` 与结构化 summary。
+  - candidate list 只能来自 M10.13 主观察队列：`M10-PA-001/002/012/008/009`。
+  - `M10-PA-001/002/012` 必须标记为 Tier A 核心观察候选；`M10-PA-008/009` 必须标记为 Tier B 视觉条件候选，并保留 `manual_visual_context_review_required`。
+  - 当前 gate decision 必须为 `not_approved`，所有候选当前都不得计为 paper trading approval evidence。
+  - `M10-PA-005`、`needs_definition_fix`、`visual_only_not_backtestable`、supporting-only、research-only、non-positive/watchlist 策略不得进入可批准候选池。
+  - risk/pause policy 必须保留 M10.13 的暂停红线，并新增未完成真实只读观察、缺少人工业务审批和候选状态降级的 gate 阻塞项。
+  - M11 不得启动真实观察 runner，不接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 live-ready 或 real execution 能力结论。
+- 测试规划必须明确：
+  - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
+  - OHLCV 可近似量化策略进入 historical backtest queue。
+  - 高视觉依赖策略进入 visual review / golden-case queue。
+  - 阶段顺序为 historical backtest -> realtime read-only observation -> paper trading -> live approval。
+- 本阶段不得：
+  - 接真实 broker
+  - 接真实账户
+  - 自动实盘下单
+  - 修改 live execution / risk / broker 行为
+  - 把 M9 legacy 结果作为 M10 入选先验
+- 至少通过：
+  - `python scripts/validate_kb.py`
+  - `python scripts/validate_kb_coverage.py`
+  - `python scripts/validate_knowledge_atoms.py`
+  - `python -m unittest tests/unit/test_m10_strategy_refresh.py tests/unit/test_m10_backtest_spec_freeze.py tests/reliability/test_kb_coverage.py -v`
+  - `python -m unittest tests/unit/test_m10_historical_pilot.py -v`
+  - `python -m unittest tests/unit/test_m10_read_only_observation_plan.py -v`
+  - `python -m unittest tests/unit/test_m10_read_only_observation_replay.py -v`
+  - `python -m unittest tests/unit/test_m11_paper_gate.py -v`
   - `git diff --check`

@@ -1,0 +1,218 @@
+{
+  "schema_version": "m10.chatgpt-bpa-comparison.v1",
+  "comparison_role": "external_reference_only_not_source_of_truth",
+  "chatgpt_share_url": "https://chatgpt.com/share/69ed8224-a360-8327-a2cc-0976be6555d5",
+  "m10_to_bpa": [
+    {
+      "strategy_id": "M10-PA-001",
+      "m10_title": "Trend Pullback Second-Entry Continuation",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-001",
+          "title": "趋势中两腿回调顺势入场"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "m10_title": "Breakout Follow-Through Continuation",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-002",
+          "title": "强突破 + 跟进顺势入场"
+        },
+        {
+          "bpa_id": "BPA-015",
+          "title": "Opening Range Breakout 开盘区间突破策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "m10_title": "Tight Channel Trend Continuation",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-003",
+          "title": "紧密通道顺势策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "m10_title": "Broad Channel Boundary Reversal",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-004",
+          "title": "宽通道边界反转策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "m10_title": "Trading Range Failed Breakout Reversal",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-005",
+          "title": "交易区间顶部失败突破做空"
+        },
+        {
+          "bpa_id": "BPA-006",
+          "title": "交易区间底部失败突破做多"
+        },
+        {
+          "bpa_id": "BPA-017",
+          "title": "支撑阻力失败测试策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-006",
+      "m10_title": "Trading Range BLSHS Limit-Order Framework",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-007",
+          "title": "交易区间 BLSHS 限价单策略"
+        },
+        {
+          "bpa_id": "BPA-020",
+          "title": "交易区间加仓策略，暂时只研究不执行"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "m10_title": "Second-Leg Trap Reversal",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-008",
+          "title": "强第二腿陷阱反转策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "m10_title": "Major Trend Reversal",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-009",
+          "title": "主要趋势反转 MTR 策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "m10_title": "Wedge Reversal and Wedge Flag",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-010",
+          "title": "楔形反转 / 楔形旗形策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "m10_title": "Final Flag or Climax TBTL Reversal",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-012",
+          "title": "Final Flag 末端旗形反转策略"
+        },
+        {
+          "bpa_id": "BPA-013",
+          "title": "高潮后 TBTL 策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "m10_title": "Opening Reversal",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-014",
+          "title": "Opening Reversal 开盘反转策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "m10_title": "Opening Range Breakout",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-015",
+          "title": "Opening Range Breakout 开盘区间突破策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "m10_title": "Support and Resistance Failed Test",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-017",
+          "title": "支撑阻力失败测试策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-014",
+      "m10_title": "Measured Move Target Engine",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-018",
+          "title": "Measured Move 目标与止盈策略"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "m10_title": "Protective Stops and Position Sizing",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-019",
+          "title": "保护性止损与仓位缩放规则"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    },
+    {
+      "strategy_id": "M10-PA-016",
+      "m10_title": "Trading Range Scaling-In Research",
+      "bpa_refs": [
+        {
+          "bpa_id": "BPA-020",
+          "title": "交易区间加仓策略，暂时只研究不执行"
+        }
+      ],
+      "decision": "compare_only_no_retrofit_to_clean_room_catalog"
+    }
+  ],
+  "bpa_not_directly_split_in_m10": [
+    {
+      "bpa_id": "BPA-011",
+      "title": "双顶双底失败后反向策略"
+    },
+    {
+      "bpa_id": "BPA-016",
+      "title": "尾盘趋势恢复 / 尾盘突破策略"
+    }
+  ],
+  "absorbed_testing_suggestions": [
+    "Separate visual-heavy strategies into golden-case review before promotion.",
+    "Treat source priority as Brooks v2 first, FangFangTu YouTube second, notes third.",
+    "Historical backtest precedes read-only observation, paper trading, and any future live approval."
+  ]
+}

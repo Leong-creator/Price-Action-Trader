@@ -1,0 +1,90 @@
+{
+  "schema_version": "m10.7.capital-model.v1",
+  "generated_at": "2026-04-27T00:00:00Z",
+  "stage": "M10.7.business_metric_policy",
+  "title": "M10 Client-Facing Capital Model",
+  "purpose": "Freeze the client-facing simulation metric policy before capital backtest reporting.",
+  "currency": "USD",
+  "account_scope": "independent_account_per_strategy_timeframe_symbol",
+  "initial_capital": "100000.00",
+  "risk_per_trade_percent_of_equity": "0.50",
+  "max_notional_percent_of_equity": "100.00",
+  "leverage_allowed": false,
+  "fractional_shares_allowed": true,
+  "commission_per_order": "0.00",
+  "cost_sensitivity_bps": [
+    {
+      "tier": "baseline",
+      "slippage_bps": 1,
+      "fee_per_order": "0.00"
+    },
+    {
+      "tier": "stress_low",
+      "slippage_bps": 2,
+      "fee_per_order": "0.00"
+    },
+    {
+      "tier": "stress_high",
+      "slippage_bps": 5,
+      "fee_per_order": "0.00"
+    }
+  ],
+  "position_sizing": {
+    "method": "risk_budget_divided_by_stop_distance",
+    "risk_budget_formula": "current_equity * 0.005",
+    "quantity_formula": "risk_budget / abs(entry_price - stop_price)",
+    "notional_cap_formula": "current_equity * 1.0",
+    "quantity_cap_formula": "notional_cap / entry_price",
+    "final_quantity_formula": "min(risk_budget_quantity, notional_cap_quantity)",
+    "skip_when": [
+      "entry_price_missing",
+      "stop_price_missing",
+      "exit_price_missing",
+      "non_positive_stop_distance",
+      "non_positive_entry_price",
+      "non_positive_quantity_after_notional_cap"
+    ]
+  },
+  "required_metrics": [
+    "initial_capital",
+    "final_equity",
+    "net_profit",
+    "return_percent",
+    "trade_count",
+    "win_rate",
+    "profit_factor",
+    "max_drawdown",
+    "max_drawdown_percent",
+    "max_consecutive_losses",
+    "average_win",
+    "average_loss",
+    "average_holding_bars",
+    "best_symbol",
+    "worst_symbol",
+    "best_timeframe",
+    "worst_timeframe"
+  ],
+  "reporting_grain": [
+    "strategy",
+    "strategy_timeframe",
+    "strategy_timeframe_symbol",
+    "cost_tier"
+  ],
+  "boundaries": {
+    "paper_simulated_only": true,
+    "historical_simulation_only": true,
+    "broker_connection": false,
+    "real_account": false,
+    "real_orders": false,
+    "automatic_execution": false,
+    "profitability_claim_allowed": false,
+    "strategy_status_upgrade_allowed": false,
+    "paper_trading_approval": false
+  },
+  "simulation_assumptions": [
+    "Short trades are simulated without borrow fees or locate constraints.",
+    "Fractional shares are allowed to keep risk budgeting deterministic.",
+    "Costs are modeled only through the configured bps sensitivity tiers.",
+    "Results are client-facing simulation reports, not investment advice or execution approval."
+  ]
+}

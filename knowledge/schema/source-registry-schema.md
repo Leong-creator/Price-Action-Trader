@@ -33,6 +33,9 @@
 - `page_count`
 - `non_empty_pages`
 - `empty_pages`
+- `unit_count`（markdown-tree source）
+- `evidence_file_count`（markdown-tree source）
+- `asset_directory_present`（markdown-tree source）
 
 ## 字段约束
 
@@ -41,10 +44,12 @@
   - `fangfangtu_notes`
   - `fangfangtu_transcript`
   - `al_brooks_ppt`
+  - `brooks_v2_manual_transcript`
 - `source_type`：首轮固定支持
   - `note_pdf`
   - `transcript_pdf`
   - `ppt_pdf`
+  - `manual_transcript_md_tree`
 - `parse_status`：首轮固定支持
   - `parsed`
   - `partial`

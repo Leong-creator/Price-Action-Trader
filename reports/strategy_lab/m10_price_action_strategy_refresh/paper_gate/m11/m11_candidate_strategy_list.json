@@ -1,0 +1,498 @@
+{
+  "schema_version": "m11.candidate-strategy-list.v1",
+  "generated_at": "2026-04-27T00:00:00Z",
+  "stage": "M11.paper_gate",
+  "input_refs": {
+    "m10_12_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_all_strategy_scorecard_summary.json",
+    "m10_13_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_observation_candidate_queue.json",
+    "m10_13_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_read_only_observation_runbook_summary.json"
+  },
+  "boundaries": {
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "broker_connection": false,
+    "real_orders": false,
+    "live_execution": false
+  },
+  "m10_12_portfolio_proxy": {
+    "schema_version": "m10.12.portfolio-proxy.v1",
+    "portfolio_initial_capital": "100000.00",
+    "max_simultaneous_risk_percent": "4.00",
+    "max_simultaneous_positions": 8,
+    "selection_rule": "completed_capital_test_only_in_priority_order",
+    "requested_priority_order": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012",
+      "M10-PA-005",
+      "M10-PA-013",
+      "M10-PA-003",
+      "M10-PA-008",
+      "M10-PA-009",
+      "M10-PA-011"
+    ],
+    "selected_strategy_ids": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012",
+      "M10-PA-013",
+      "M10-PA-003",
+      "M10-PA-008",
+      "M10-PA-009",
+      "M10-PA-011"
+    ],
+    "excluded_priority_candidates": [
+      {
+        "strategy_id": "M10-PA-005",
+        "machine_status": "needs_definition_fix",
+        "reason": "Excluded from M10.12 portfolio proxy because status is needs_definition_fix."
+      }
+    ],
+    "proxy_method": "equal_weight_strategy_return_average_not_executable_concurrent_backtest",
+    "average_strategy_return_percent": "5.7282",
+    "proxy_final_equity": "105728.18",
+    "proxy_net_profit": "5728.18",
+    "not_executable_reason": "Existing artifacts are strategy-sleeve simulations, not one timestamp-synchronized portfolio order book."
+  },
+  "m10_13_primary_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M10-PA-008",
+    "M10-PA-009"
+  ],
+  "candidate_groups": {
+    "tier_a_core_after_read_only_observation": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012"
+    ],
+    "tier_b_conditional_visual_after_review": [
+      "M10-PA-008",
+      "M10-PA-009"
+    ],
+    "watchlist_deferred": [
+      "M10-PA-003",
+      "M10-PA-011",
+      "M10-PA-013"
+    ],
+    "blocked_definition_fix": [
+      "M10-PA-004",
+      "M10-PA-005",
+      "M10-PA-007"
+    ],
+    "not_independent_trigger_or_not_backtestable": [
+      "M10-PA-006",
+      "M10-PA-010",
+      "M10-PA-014",
+      "M10-PA-015",
+      "M10-PA-016"
+    ]
+  },
+  "gate_evidence_policy": {
+    "current_gate_evidence_accepted": false,
+    "tier_a_can_be_reconsidered_after": [
+      "completed_real_read_only_observation_window",
+      "weekly_pause_redlines_checked",
+      "human_business_approval"
+    ],
+    "tier_b_extra_requirements": [
+      "manual_visual_context_review_closed",
+      "visual_context_unresolved_not_triggered"
+    ]
+  },
+  "candidate_strategies": [
+    {
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "candidate_tier": "paper_gate_candidate_after_read_only_observation",
+      "client_gate_tier": "tier_a_core_after_read_only_observation",
+      "gate_evidence_status": "not_evidence_until_real_read_only_observation_is_reviewed",
+      "counts_as_gate_evidence_now": false,
+      "timeframes": [
+        "1d",
+        "15m",
+        "5m"
+      ],
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "historical_metric_snapshot": {
+        "return_percent": "24.7327",
+        "net_profit": "395723.86",
+        "trade_count": "19312",
+        "win_rate": "0.3584",
+        "max_drawdown": "546852.09",
+        "metric_completeness": "full_m10_7_required_metrics"
+      },
+      "selected_timeframe_metrics": [
+        {
+          "timeframe": "1d",
+          "return_percent": "25.1631",
+          "trade_count": "1518",
+          "win_rate": "0.3768",
+          "max_drawdown": "73595.14",
+          "lineage": "native_cache",
+          "cadence": "after_regular_session_close_only"
+        },
+        {
+          "timeframe": "15m",
+          "return_percent": "37.3973",
+          "trade_count": "4331",
+          "win_rate": "0.3653",
+          "max_drawdown": "174805.43",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        },
+        {
+          "timeframe": "5m",
+          "return_percent": "40.8602",
+          "trade_count": "12452",
+          "win_rate": "0.3562",
+          "max_drawdown": "214986.75",
+          "lineage": "native_cache",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "reserve_timeframes": [
+        {
+          "timeframe": "1h",
+          "return_percent": "-4.4896",
+          "trade_count": "1011",
+          "win_rate": "0.3274",
+          "max_drawdown": "83464.77",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "requires_visual_review_context": false,
+      "gate_status": "not_approved_pending_read_only_observation",
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading"
+      ],
+      "risk_notes": [
+        "历史模拟收益为正，但回撤金额较高，且 1h reserve 为负；进入任何后续 gate 前必须先观察回撤和连续亏损。"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "candidate_tier": "paper_gate_candidate_after_read_only_observation",
+      "client_gate_tier": "tier_a_core_after_read_only_observation",
+      "gate_evidence_status": "not_evidence_until_real_read_only_observation_is_reviewed",
+      "counts_as_gate_evidence_now": false,
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m"
+      ],
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "historical_metric_snapshot": {
+        "return_percent": "3.2810",
+        "net_profit": "52496.28",
+        "trade_count": "16303",
+        "win_rate": "0.3492",
+        "max_drawdown": "376946.88",
+        "metric_completeness": "full_m10_7_required_metrics"
+      },
+      "selected_timeframe_metrics": [
+        {
+          "timeframe": "1d",
+          "return_percent": "7.5386",
+          "trade_count": "1196",
+          "win_rate": "0.3537",
+          "max_drawdown": "50092.68",
+          "lineage": "native_cache",
+          "cadence": "after_regular_session_close_only"
+        },
+        {
+          "timeframe": "1h",
+          "return_percent": "3.1337",
+          "trade_count": "814",
+          "win_rate": "0.3587",
+          "max_drawdown": "56948.30",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        },
+        {
+          "timeframe": "15m",
+          "return_percent": "17.2484",
+          "trade_count": "3534",
+          "win_rate": "0.3645",
+          "max_drawdown": "85620.49",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "reserve_timeframes": [
+        {
+          "timeframe": "5m",
+          "return_percent": "-14.7966",
+          "trade_count": "10759",
+          "win_rate": "0.3430",
+          "max_drawdown": "184285.41",
+          "lineage": "native_cache",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "requires_visual_review_context": false,
+      "gate_status": "not_approved_pending_read_only_observation",
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading"
+      ],
+      "risk_notes": [
+        "历史模拟优势较薄，且 5m reserve 为负；只适合作为观察候选，不可直接批准 paper trading。"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "candidate_tier": "paper_gate_candidate_after_read_only_observation",
+      "client_gate_tier": "tier_a_core_after_read_only_observation",
+      "gate_evidence_status": "not_evidence_until_real_read_only_observation_is_reviewed",
+      "counts_as_gate_evidence_now": false,
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "historical_metric_snapshot": {
+        "return_percent": "26.8927",
+        "net_profit": "215141.29",
+        "trade_count": "3662",
+        "win_rate": "0.3815",
+        "max_drawdown": "101931.67",
+        "metric_completeness": "full_m10_7_required_metrics"
+      },
+      "selected_timeframe_metrics": [
+        {
+          "timeframe": "15m",
+          "return_percent": "23.2989",
+          "trade_count": "1762",
+          "win_rate": "0.3768",
+          "max_drawdown": "48665.45",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        },
+        {
+          "timeframe": "5m",
+          "return_percent": "30.4864",
+          "trade_count": "1900",
+          "win_rate": "0.3858",
+          "max_drawdown": "53266.22",
+          "lineage": "native_cache",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "reserve_timeframes": [],
+      "requires_visual_review_context": false,
+      "gate_status": "not_approved_pending_read_only_observation",
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading"
+      ],
+      "risk_notes": [
+        "只覆盖 15m / 5m 开盘区间场景；15m 仍保留 derived_from_5m lineage，需要按 bar-close 节奏复核。"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "candidate_tier": "paper_gate_candidate_after_visual_review",
+      "client_gate_tier": "tier_b_conditional_visual_after_review",
+      "gate_evidence_status": "not_evidence_until_read_only_observation_and_manual_visual_review_are_closed",
+      "counts_as_gate_evidence_now": false,
+      "timeframes": [
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "historical_metric_snapshot": {
+        "return_percent": "4.0036",
+        "net_profit": "64057.47",
+        "trade_count": "4375",
+        "win_rate": "0.3541",
+        "max_drawdown": "148490.98",
+        "metric_completeness": "full_m10_7_required_metrics"
+      },
+      "selected_timeframe_metrics": [
+        {
+          "timeframe": "1h",
+          "return_percent": "3.6672",
+          "trade_count": "223",
+          "win_rate": "0.3767",
+          "max_drawdown": "25031.95",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        },
+        {
+          "timeframe": "15m",
+          "return_percent": "7.1777",
+          "trade_count": "941",
+          "win_rate": "0.3624",
+          "max_drawdown": "43524.32",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        },
+        {
+          "timeframe": "5m",
+          "return_percent": "6.4549",
+          "trade_count": "2917",
+          "win_rate": "0.3528",
+          "max_drawdown": "54077.79",
+          "lineage": "native_cache",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "reserve_timeframes": [
+        {
+          "timeframe": "1d",
+          "return_percent": "-1.2854",
+          "trade_count": "294",
+          "win_rate": "0.3231",
+          "max_drawdown": "25856.92",
+          "lineage": "native_cache",
+          "cadence": "after_regular_session_close_only"
+        }
+      ],
+      "requires_visual_review_context": true,
+      "gate_status": "not_approved_pending_read_only_observation",
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "manual_visual_context_review_required"
+      ],
+      "risk_notes": [
+        "视觉语境策略，必须完成人工图形复核；1d reserve 为负，不能把 OHLCV proxy 结果直接当作 gate evidence。"
+      ]
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "candidate_tier": "paper_gate_candidate_after_visual_review",
+      "client_gate_tier": "tier_b_conditional_visual_after_review",
+      "gate_evidence_status": "not_evidence_until_read_only_observation_and_manual_visual_review_are_closed",
+      "counts_as_gate_evidence_now": false,
+      "timeframes": [
+        "1h",
+        "15m"
+      ],
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "historical_metric_snapshot": {
+        "return_percent": "1.0173",
+        "net_profit": "16277.18",
+        "trade_count": "4256",
+        "win_rate": "0.3395",
+        "max_drawdown": "146528.66",
+        "metric_completeness": "full_m10_7_required_metrics"
+      },
+      "selected_timeframe_metrics": [
+        {
+          "timeframe": "1h",
+          "return_percent": "3.5393",
+          "trade_count": "212",
+          "win_rate": "0.3774",
+          "max_drawdown": "20298.64",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        },
+        {
+          "timeframe": "15m",
+          "return_percent": "9.2239",
+          "trade_count": "901",
+          "win_rate": "0.3552",
+          "max_drawdown": "31576.31",
+          "lineage": "derived_from_5m",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "reserve_timeframes": [
+        {
+          "timeframe": "1d",
+          "return_percent": "-0.3838",
+          "trade_count": "286",
+          "win_rate": "0.3357",
+          "max_drawdown": "29241.22",
+          "lineage": "native_cache",
+          "cadence": "after_regular_session_close_only"
+        },
+        {
+          "timeframe": "5m",
+          "return_percent": "-8.3101",
+          "trade_count": "2857",
+          "win_rate": "0.3322",
+          "max_drawdown": "65412.49",
+          "lineage": "native_cache",
+          "cadence": "regular_session_bar_close_only"
+        }
+      ],
+      "requires_visual_review_context": true,
+      "gate_status": "not_approved_pending_read_only_observation",
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "manual_visual_context_review_required"
+      ],
+      "risk_notes": [
+        "正收益幅度最弱，reserve 负周期为 1d / 5m；必须先完成视觉复核和只读观察。"
+      ]
+    }
+  ],
+  "excluded_from_gate": {
+    "definition_not_closed": [
+      "M10-PA-005"
+    ],
+    "non_positive_or_watchlist_only": [
+      "M10-PA-003",
+      "M10-PA-011",
+      "M10-PA-013"
+    ],
+    "visual_only_not_backtestable": [
+      "M10-PA-010"
+    ],
+    "supporting_only": [
+      "M10-PA-014",
+      "M10-PA-015"
+    ],
+    "research_only": [
+      "M10-PA-006",
+      "M10-PA-016"
+    ],
+    "needs_definition_fix": [
+      "M10-PA-004",
+      "M10-PA-007"
+    ]
+  },
+  "blocking_conditions": [
+    "no_completed_real_read_only_observation_window",
+    "no_human_business_approval_for_paper_trading",
+    "visual_context_review_still_required_for_visual_candidates",
+    "broker_connection_and_order_path_must_remain_disabled"
+  ]
+}

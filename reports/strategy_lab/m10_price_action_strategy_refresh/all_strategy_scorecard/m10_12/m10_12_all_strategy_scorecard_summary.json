@@ -1,0 +1,58 @@
+{
+  "schema_version": "m10.12.all-strategy-scorecard-summary.v1",
+  "generated_at": "2026-04-27T00:00:00Z",
+  "stage": "M10.12.all_strategy_scorecard",
+  "strategy_count": 16,
+  "paper_simulated_only": true,
+  "broker_connection": false,
+  "real_orders": false,
+  "paper_trading_approval": false,
+  "status_counts": {
+    "completed_capital_test": 8,
+    "needs_definition_fix": 3,
+    "research_only": 2,
+    "visual_only_not_backtestable": 1,
+    "supporting_rule": 2
+  },
+  "portfolio_proxy": {
+    "schema_version": "m10.12.portfolio-proxy.v1",
+    "portfolio_initial_capital": "100000.00",
+    "max_simultaneous_risk_percent": "4.00",
+    "max_simultaneous_positions": 8,
+    "selection_rule": "completed_capital_test_only_in_priority_order",
+    "requested_priority_order": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012",
+      "M10-PA-005",
+      "M10-PA-013",
+      "M10-PA-003",
+      "M10-PA-008",
+      "M10-PA-009",
+      "M10-PA-011"
+    ],
+    "selected_strategy_ids": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012",
+      "M10-PA-013",
+      "M10-PA-003",
+      "M10-PA-008",
+      "M10-PA-009",
+      "M10-PA-011"
+    ],
+    "excluded_priority_candidates": [
+      {
+        "strategy_id": "M10-PA-005",
+        "machine_status": "needs_definition_fix",
+        "reason": "Excluded from M10.12 portfolio proxy because status is needs_definition_fix."
+      }
+    ],
+    "proxy_method": "equal_weight_strategy_return_average_not_executable_concurrent_backtest",
+    "average_strategy_return_percent": "5.7282",
+    "proxy_final_equity": "105728.18",
+    "proxy_net_profit": "5728.18",
+    "not_executable_reason": "Existing artifacts are strategy-sleeve simulations, not one timestamp-synchronized portfolio order book."
+  },
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12"
+}
