@@ -1,0 +1,21 @@
+{
+  "blocking_condition_count": 6,
+  "broker_connection": false,
+  "candidate_strategy_count": 5,
+  "candidate_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M10-PA-008",
+    "M10-PA-009"
+  ],
+  "gate_decision": "not_approved",
+  "generated_at": "2026-04-27T00:00:00Z",
+  "live_execution": false,
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck",
+  "paper_trading_approval": false,
+  "real_orders": false,
+  "run_id": "m11_5_paper_gate_recheck",
+  "schema_version": "m11.5.paper-gate-recheck-summary.v1",
+  "stage": "M11.5.paper_gate_recheck"
+}

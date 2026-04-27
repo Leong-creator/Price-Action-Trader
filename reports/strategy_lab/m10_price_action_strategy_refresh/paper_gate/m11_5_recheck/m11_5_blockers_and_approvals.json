@@ -1,0 +1,48 @@
+{
+  "approval_state": "not_approved",
+  "approval_summary": {
+    "definition_blockers_closed": false,
+    "human_business_approval": false,
+    "scanner_has_candidates": true,
+    "scanner_universe_cache_coverage_complete": false,
+    "tier_a_has_completed_real_read_only_window": false,
+    "tier_a_has_historical_capital_tests": true,
+    "visual_review_closed": false
+  },
+  "approvals_granted": [],
+  "approvals_required_before_next_gate": [
+    "completed_real_read_only_observation_window",
+    "manual_visual_review_closed_for_m10_pa_008_009",
+    "definition_blockers_closed_or_formally_deferred",
+    "scanner_cache_coverage_plan_or_deferred_scope_approval",
+    "human_business_approval_for_paper_trading"
+  ],
+  "blocking_condition_counts": {
+    "m12_2_has_no_completed_strategy_candidate_events": 5,
+    "manual_visual_review_still_pending": 2,
+    "no_completed_real_read_only_observation_window": 5,
+    "no_human_business_approval_for_paper_trading": 5,
+    "scanner_universe_cache_coverage_incomplete": 5,
+    "unresolved_definition_blockers": 5
+  },
+  "blocking_conditions": [
+    "m12_2_has_no_completed_strategy_candidate_events",
+    "manual_visual_review_still_pending",
+    "no_completed_real_read_only_observation_window",
+    "no_human_business_approval_for_paper_trading",
+    "scanner_universe_cache_coverage_incomplete",
+    "unresolved_definition_blockers"
+  ],
+  "broker_connection": false,
+  "generated_at": "2026-04-27T00:00:00Z",
+  "input_refs": {
+    "m11_candidate_strategy_list": "reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_candidate_strategy_list.json",
+    "m12_6_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_strategy_dashboard.csv",
+    "m12_6_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_weekly_client_scorecard_summary.json"
+  },
+  "live_execution": false,
+  "paper_trading_approval": false,
+  "real_orders": false,
+  "schema_version": "m11.5.blockers-and-approvals.v1",
+  "stage": "M11.5.paper_gate_recheck"
+}

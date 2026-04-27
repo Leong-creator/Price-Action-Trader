@@ -1,0 +1,154 @@
+{
+  "candidate_groups": {
+    "tier_a_core_after_read_only_observation": [
+      "M10-PA-001",
+      "M10-PA-002",
+      "M10-PA-012"
+    ],
+    "tier_b_conditional_visual_after_review": [
+      "M10-PA-008",
+      "M10-PA-009"
+    ]
+  },
+  "candidate_strategies": [
+    {
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "m12_2_has_no_completed_strategy_candidate_events",
+        "scanner_universe_cache_coverage_incomplete",
+        "unresolved_definition_blockers"
+      ],
+      "client_gate_tier": "tier_a_core_after_read_only_observation",
+      "counts_as_gate_evidence_now": false,
+      "current_week_status": "continue_read_only_observation",
+      "daily_candidate_events": 0,
+      "daily_observation_events": 12,
+      "historical_max_drawdown_percent": "34.1783",
+      "historical_return_percent": "24.7327",
+      "historical_win_rate": "0.3584",
+      "next_required_action": "carry_scanner_candidates_into_weekly_review",
+      "paper_gate_recheck_status": "not_approved_blocked_by_open_gate_conditions",
+      "prior_m11_gate_evidence_status": "not_evidence_until_real_read_only_observation_is_reviewed",
+      "prior_m11_gate_status": "not_approved_pending_read_only_observation",
+      "scanner_candidates": 6,
+      "strategy_id": "M10-PA-001",
+      "title": "Trend Pullback Second-Entry Continuation",
+      "visual_pending_review_count": 0
+    },
+    {
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "m12_2_has_no_completed_strategy_candidate_events",
+        "scanner_universe_cache_coverage_incomplete",
+        "unresolved_definition_blockers"
+      ],
+      "client_gate_tier": "tier_a_core_after_read_only_observation",
+      "counts_as_gate_evidence_now": false,
+      "current_week_status": "continue_read_only_observation",
+      "daily_candidate_events": 0,
+      "daily_observation_events": 12,
+      "historical_max_drawdown_percent": "23.5592",
+      "historical_return_percent": "3.2810",
+      "historical_win_rate": "0.3492",
+      "next_required_action": "keep_bar_close_observation_running",
+      "paper_gate_recheck_status": "not_approved_blocked_by_open_gate_conditions",
+      "prior_m11_gate_evidence_status": "not_evidence_until_real_read_only_observation_is_reviewed",
+      "prior_m11_gate_status": "not_approved_pending_read_only_observation",
+      "scanner_candidates": 0,
+      "strategy_id": "M10-PA-002",
+      "title": "Breakout Follow-Through Continuation",
+      "visual_pending_review_count": 0
+    },
+    {
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "m12_2_has_no_completed_strategy_candidate_events",
+        "scanner_universe_cache_coverage_incomplete",
+        "unresolved_definition_blockers"
+      ],
+      "client_gate_tier": "tier_a_core_after_read_only_observation",
+      "counts_as_gate_evidence_now": false,
+      "current_week_status": "continue_read_only_observation",
+      "daily_candidate_events": 0,
+      "daily_observation_events": 8,
+      "historical_max_drawdown_percent": "12.7415",
+      "historical_return_percent": "26.8927",
+      "historical_win_rate": "0.3815",
+      "next_required_action": "carry_scanner_candidates_into_weekly_review",
+      "paper_gate_recheck_status": "not_approved_blocked_by_open_gate_conditions",
+      "prior_m11_gate_evidence_status": "not_evidence_until_real_read_only_observation_is_reviewed",
+      "prior_m11_gate_status": "not_approved_pending_read_only_observation",
+      "scanner_candidates": 6,
+      "strategy_id": "M10-PA-012",
+      "title": "Opening Range Breakout",
+      "visual_pending_review_count": 0
+    },
+    {
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "m12_2_has_no_completed_strategy_candidate_events",
+        "manual_visual_review_still_pending",
+        "scanner_universe_cache_coverage_incomplete",
+        "unresolved_definition_blockers"
+      ],
+      "client_gate_tier": "tier_b_conditional_visual_after_review",
+      "counts_as_gate_evidence_now": false,
+      "current_week_status": "manual_visual_review_required",
+      "daily_candidate_events": 0,
+      "daily_observation_events": 0,
+      "historical_max_drawdown_percent": "9.2807",
+      "historical_return_percent": "4.0036",
+      "historical_win_rate": "0.3541",
+      "next_required_action": "user_review_priority_visual_cases",
+      "paper_gate_recheck_status": "not_approved_pending_manual_visual_review",
+      "prior_m11_gate_evidence_status": "not_evidence_until_read_only_observation_and_manual_visual_review_are_closed",
+      "prior_m11_gate_status": "not_approved_pending_read_only_observation",
+      "scanner_candidates": 0,
+      "strategy_id": "M10-PA-008",
+      "title": "Major Trend Reversal",
+      "visual_pending_review_count": 5
+    },
+    {
+      "approval_blockers": [
+        "no_completed_real_read_only_observation_window",
+        "no_human_business_approval_for_paper_trading",
+        "m12_2_has_no_completed_strategy_candidate_events",
+        "manual_visual_review_still_pending",
+        "scanner_universe_cache_coverage_incomplete",
+        "unresolved_definition_blockers"
+      ],
+      "client_gate_tier": "tier_b_conditional_visual_after_review",
+      "counts_as_gate_evidence_now": false,
+      "current_week_status": "manual_visual_review_required",
+      "daily_candidate_events": 0,
+      "daily_observation_events": 0,
+      "historical_max_drawdown_percent": "9.1580",
+      "historical_return_percent": "1.0173",
+      "historical_win_rate": "0.3395",
+      "next_required_action": "user_review_priority_visual_cases",
+      "paper_gate_recheck_status": "not_approved_pending_manual_visual_review",
+      "prior_m11_gate_evidence_status": "not_evidence_until_read_only_observation_and_manual_visual_review_are_closed",
+      "prior_m11_gate_status": "not_approved_pending_read_only_observation",
+      "scanner_candidates": 0,
+      "strategy_id": "M10-PA-009",
+      "title": "Wedge Reversal and Wedge Flag",
+      "visual_pending_review_count": 5
+    }
+  ],
+  "gate_evidence_policy": {
+    "current_gate_evidence_accepted": false,
+    "reason": "M12.6 has no completed real read-only observation window, no human business approval, visual review remains pending, and definition blockers are still open."
+  },
+  "generated_at": "2026-04-27T00:00:00Z",
+  "input_refs": {
+    "m11_candidate_strategy_list": "reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_candidate_strategy_list.json",
+    "m12_6_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_strategy_dashboard.csv",
+    "m12_6_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_weekly_client_scorecard_summary.json"
+  },
+  "schema_version": "m11.5.candidate-strategy-list.v1",
+  "stage": "M11.5.paper_gate_recheck"
+}

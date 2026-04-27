@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12 Read-only Observation & Scanner`，当前阶段分支为 `feature/m12-6-weekly-client-scorecard`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M11.5 Paper Gate Recheck`，当前阶段分支为 `feature/m11-5-paper-gate-recheck`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -94,6 +94,12 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_next_week_action_plan.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_weekly_client_scorecard_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_candidate_strategy_list.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -119,6 +125,7 @@
 - M12.4 已完成 definition fix and retest：`M10-PA-005` 有复测 before/after 数字但仍未解除 `needs_definition_fix`；`M10-PA-004/007` 仅登记定义字段缺口和图例证据，不伪造交易结果。
 - M12.5 已完成 liquid universe scanner：股票/ETF seed 共 `147` 只，当前本地 cache 实际扫描 `4` 只，输出 `12` 条 Tier A 候选；缺数据的 `143` 只 seed 全部 deferred，等待后续补齐只读 K 线缓存或受控读取计划。
 - M12.6 已完成 weekly client scorecard：输出 `16` 条策略 dashboard，周报汇总历史资金测试、每日只读观察、scanner 候选、图形复核和定义修正；当前交易状态仍为 `closed_not_authorized`。
+- M11.5 已完成 paper gate recheck：复查 `M10-PA-001/002/012/008/009` 后仍为 `not_approved`；当前必须先补齐真实只读观察窗口、completed candidate events、`M10-PA-008/009` 人工图形复核、`M10-PA-005/004/007` definition blocker 关闭或正式降级、scanner cache 覆盖计划和人工业务审批。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -129,7 +136,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.6 阶段分支在：`feature/m12-6-weekly-client-scorecard`
+- 当前 M11.5 阶段分支在：`feature/m11-5-paper-gate-recheck`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 
