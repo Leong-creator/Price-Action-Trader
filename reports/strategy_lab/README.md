@@ -88,6 +88,7 @@
 - M12.0 已完成 Longbridge read-only auth preflight：本地 Longbridge CLI 与当前 token 的 quote/K 线只读探针可用，且 artifact 明确保持 `broker_connection=false / real_orders=false / live_execution=false / paper_trading_approval=false`。
 - M12.1 已完成 Longbridge read-only feed：生成 `16` 条 `SPY/QQQ/NVDA/TSLA x 1d/1h/15m/5m` 只读 bar-close feed ledger；该阶段只生成输入，不运行策略、不生成交易/账户字段、不输出盈亏结论。
 - M12.2 已完成 core strategy daily observation：生成 `32` 条 Tier A 只读观察记录；由于 M12.1 feed 只有单根 latest bar，当前全部记录为 `skip_no_trade`，不伪造策略触发、不批准 paper trading。
+- M12.3 已完成 visual review precheck：复用 M10.2/M10.10 现有图例与 gate 产物，生成 `7` 条 strategy rows 与 `30` 条 case rows；本阶段只做 agent 预审和人工复核包，不替代人工图形判断。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。

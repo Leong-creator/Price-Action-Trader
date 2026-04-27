@@ -1,0 +1,15 @@
+{
+  "title": "M12.3 Visual Review Precheck",
+  "run_id": "m12_3_visual_review_precheck",
+  "visual_case_index_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_visual_golden_case_index.json",
+  "visual_gate_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_visual_gate_summary.json",
+  "visual_gate_queue_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_wave_b_entry_queue.json",
+  "visual_case_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases",
+  "old_m10_worktree_root": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck",
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "broker_connection": false,
+  "real_orders": false,
+  "live_execution": false
+}
