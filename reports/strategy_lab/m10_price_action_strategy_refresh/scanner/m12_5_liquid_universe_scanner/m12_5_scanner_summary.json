@@ -1,0 +1,57 @@
+{
+  "artifacts": {
+    "cache_inventory": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_cache_inventory.json",
+    "deferred_inputs": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_deferred_inputs.json",
+    "scanner_candidates": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_candidates.csv",
+    "scanner_report": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_report.md",
+    "scanner_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_summary.json",
+    "universe_definition": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_universe_definition.json"
+  },
+  "candidate_count": 12,
+  "candidate_status_counts": {
+    "trigger_candidate": 6,
+    "watch_candidate": 6
+  },
+  "deferred_symbol_count": 143,
+  "excluded_strategy_ids": [
+    "M10-PA-003",
+    "M10-PA-004",
+    "M10-PA-005",
+    "M10-PA-006",
+    "M10-PA-007",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-010",
+    "M10-PA-011",
+    "M10-PA-013",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
+  "generated_at": "2026-04-27T11:18:36Z",
+  "lineage_counts": {
+    "derived_from_5m": 16,
+    "native_5m_cache": 8,
+    "native_daily_cache": 8
+  },
+  "request_policy": {
+    "live_requests_used": 0,
+    "max_live_request_symbols": 0,
+    "missing_data_behavior": "deferred_no_fake_candidate"
+  },
+  "run_id": "m12_5_liquid_universe_scanner",
+  "scan_attempt_count": 32,
+  "scanned_symbol_count": 4,
+  "schema_version": "m12.scanner-summary.v1",
+  "stage": "M12.5.liquid_universe_scanner",
+  "strategy_candidate_counts": {
+    "M10-PA-001": 6,
+    "M10-PA-012": 6
+  },
+  "strategy_scope": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012"
+  ],
+  "universe_symbol_count": 147
+}

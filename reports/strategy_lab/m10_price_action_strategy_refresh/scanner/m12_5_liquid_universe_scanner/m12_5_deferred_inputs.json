@@ -1,0 +1,864 @@
+{
+  "items": [
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "IWM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "DIA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "VTI"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "VOO"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "IVV"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLK"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLF"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLV"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLY"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLI"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLP"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLU"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLC"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XLB"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SMH"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SOXX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TQQQ"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SQQQ"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GLD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SLV"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "USO"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TLT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "HYG"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LQD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "EEM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "EFA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ARKK"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AAPL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MSFT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AMZN"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GOOGL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GOOG"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "META"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AVGO"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AMD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "INTC"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MU"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "QCOM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ORCL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CRM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ADBE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "NOW"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SNOW"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PLTR"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PANW"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CRWD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "NET"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "DDOG"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MDB"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TEAM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SHOP"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "UBER"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ABNB"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "NFLX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "DIS"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CMCSA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "WBD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PARA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "T"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "VZ"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TMUS"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "COST"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "WMT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TGT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "HD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LOW"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "NKE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SBUX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MCD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CMG"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "YUM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "KO"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PEP"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MNST"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PG"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "KMB"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "EL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LULU"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "JPM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "BAC"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "WFC"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "C"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GS"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MS"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SCHW"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "BLK"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AXP"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "V"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PYPL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "COIN"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "HOOD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "UNH"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LLY"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "JNJ"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MRK"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PFE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ABBV"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AMGN"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GILD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "BMY"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CVS"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "HUM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TMO"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ISRG"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "BA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CAT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "DE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "RTX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LMT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "NOC"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "HON"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "UPS"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "FDX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "XOM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "CVX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "COP"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SLB"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "OXY"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "F"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "GM"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "RIVN"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LCID"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "BABA"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "PDD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "JD"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "BIDU"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "NIO"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LI"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "SE"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MELI"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ENPH"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "FSLR"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "MRVL"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "ADI"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TXN"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "AMAT"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "LRCX"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "KLAC"
+    },
+    {
+      "action": "deferred_no_fake_candidate",
+      "reason": "symbol_unscanned_no_local_cache",
+      "scope": "symbol",
+      "symbol": "TSM"
+    }
+  ],
+  "schema_version": "m12.scanner-deferred-inputs.v1",
+  "stage": "M12.5.liquid_universe_scanner"
+}
