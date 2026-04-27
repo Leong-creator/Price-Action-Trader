@@ -49,6 +49,7 @@
 - M12.1 已完成 Longbridge Read-only Feed 原型：使用 Longbridge quote 作为健康检查、K 线轮询作为只读 bar-close 输入，输出 `16` 条 `SPY/QQQ/NVDA/TSLA x 1d/1h/15m/5m` feed ledger；该阶段只生成输入，不运行策略、不生成交易/账户字段、不输出盈亏结论。
 - M12.2 已完成 Core Strategy Daily Observation：只消费 M12.1 feed ledger 与 M10.13/M11 Tier A 候选，生成 `32` 条只读观察记录；由于 M12.1 feed 只有单根 latest bar，本阶段诚实写入 `skip_no_trade` 而不伪造完整策略触发。
 - M12.3 已完成 Visual Review Precheck：复用 M10.2 visual packs 与 M10.10 visual gate，整理 `7` 条策略、`30` 个图例 case 的预审包；Brooks 图片仍 local-only，当前通过旧 M10 worktree 解析且 checksum 全部匹配，仍不替代人工图形判断。
+- M12.4 已完成 Definition Fix and Retest：`M10-PA-005` 复用 M10.9 definition tightening 的 before/after 复测指标；`M10-PA-004/007` 只沉淀可执行字段缺口和图例证据，不生成假交易结果；本阶段没有按收益曲线调参，也不批准 paper trading。
 
 ## 2. 执行总原则
 
