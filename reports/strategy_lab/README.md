@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh`，当前阶段分支为 `codex/m10-12-all-strategy-scorecard`，集成基线为 `codex/m10-price-action-strategy-refresh`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh`，当前阶段分支为 `codex/m10-13-read-only-observation-runbook`，集成基线为 `codex/m10-price-action-strategy-refresh`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -61,6 +61,9 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_strategy_decision_matrix.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_portfolio_simulation_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_client_final_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_observation_candidate_queue.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_read_only_observation_runbook.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_weekly_observation_template.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -77,6 +80,7 @@
 - M10.10 已完成 visual Wave B gate：`M10-PA-003/008/009/011` 进入 Wave B，`M10-PA-013` 作为既有 Wave B 候选并入；`M10-PA-004/007/010` 暂不进入自动回测。
 - M10.11 已完成 Wave B capital backtest：`M10-PA-013/003/008/009/011` 已输出 baseline trade ledger、三档成本 metrics、strategy scorecard、client report 和 equity curve CSV/SVG。
 - M10.12 已完成 all-strategy scorecard：16 条 `M10-PA-*` 汇总为最终状态矩阵，当前为 `8` 条完成资金测试、`3` 条需要定义修正、`1` 条图形复核保留、`2` 条 supporting-only、`2` 条 research-only；portfolio proxy 只纳入已完成资金测试策略，排除仍需定义修正的 `M10-PA-005`，final equity 为 `105728.18 USD`，但不是可执行组合回测。
+- M10.13 已完成 read-only observation runbook：主观察队列为 `M10-PA-001/002/012/008/009`，覆盖 `13` 个策略周期；`M10-PA-005` 因定义未闭合排除，`M10-PA-003/011/013` 进入 watchlist/deferred。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -87,7 +91,7 @@
 
 ## 先看哪个分支
 
-- 当前 M10 阶段分支在：`codex/m10-12-all-strategy-scorecard`
+- 当前 M10 阶段分支在：`codex/m10-13-read-only-observation-runbook`
 - M10 集成基线在：`codex/m10-price-action-strategy-refresh`
 - 长期稳定基线仍是：`main`
 

@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，当前阶段分支 `codex/m10-12-all-strategy-scorecard`）
+- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，当前阶段分支 `codex/m10-13-read-only-observation-runbook`）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：`M10 Price Action Strategy Refresh`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest 与 M10.12 All Strategy Scorecard
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard 与 M10.13 Read-only Observation Runbook
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m10-12-all-strategy-scorecard`
+- `codex/m10-13-read-only-observation-runbook`
 
 ## 已完成
 
@@ -337,6 +337,11 @@
   - M10.12 portfolio proxy 使用 `100,000 USD` 初始本金、最大同时风险 `4%`、最多同时持仓 `8`，只纳入 `completed_capital_test` 策略，并排除仍需定义修正的 `M10-PA-005`；当前 proxy final equity 为 `105728.18 USD`、proxy net profit 为 `5728.18 USD`，该结果不是按真实时间戳合并订单的可执行组合回测。
   - M10.12 输出 `m10_12_all_strategy_metrics.csv`、`m10_12_strategy_decision_matrix.json`、`m10_12_portfolio_simulation_report.md`、`m10_12_client_final_report.md` 与结构化 summary；仍不批准 paper trading，不接 broker、不下单。
   - M10.12 已通过新增 all-strategy scorecard 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.13 Read-only Observation Runbook，新增 `scripts/m10_read_only_runbook_lib.py`、`scripts/run_m10_read_only_runbook.py`、`read_only_observation/m10_13/` 与 M10.13 单测。
+  - M10.13 主观察队列为 `M10-PA-001/002/012/008/009`，覆盖 `13` 个策略周期；筛选规则为 completed capital test、整体收益为正、且进入观察的 timeframe 收益为正；其中 `M10-PA-008/009` 来自 M10.11/M10.12 后续筛选，必须保留人工图形语境复核。
+  - M10.13 明确排除 `M10-PA-005`，直到 range-geometry 定义修正完成；`M10-PA-003/011/013` 保留 watchlist/deferred，不进入主观察队列。
+  - M10.13 输出 `m10_13_observation_candidate_queue.json`、`m10_13_read_only_observation_runbook.md`、`m10_13_weekly_observation_template.md` 与结构化 summary；仍不启动 observation runner，不接 broker、不下单。
+  - M10.13 已通过新增 read-only observation runbook 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
   - M10 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
 
 ## 当前阻塞
@@ -346,7 +351,7 @@
 
 ## 下一步
 
-- 下一步进入 `M10.13 Read-only Observation Runbook`：把完成资金测试且仍适合继续观察的候选整理成只读观察节奏、周报模板、暂停条件和观察队列。
+- 下一步进入 `M11 Paper Gate`：基于 M10.12/M10.13 结果准备 paper gate 报告、候选策略清单和风险暂停规则；该阶段仍不批准 paper trading。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 仍关闭，只有后续真实只读观察、visual review 和人工复核都达标后才讨论。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
 - M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。

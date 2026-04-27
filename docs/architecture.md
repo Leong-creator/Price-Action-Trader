@@ -44,6 +44,7 @@
 - M10.10 visual Wave B gate 只判断强图形策略是否具备进入后续模拟规格/回测的条件；它不运行回测、不证明策略有效，也不把 visual pack ready 解释为自动可交易。
 - M10.11 Wave B capital backtest 只对 M10.10 queue 中的策略做 OHLCV 近似 historical simulation；视觉策略结果必须保留 proxy/review 边界，不得解释为策略批准或 paper trading 准入。
 - M10.12 all-strategy scorecard 只汇总既有 Wave A/Wave B 资金测试、definition-fix、supporting 和 research-only 状态；portfolio proxy 不是按真实时间戳合并订单的可执行组合回测，也不进入 broker、risk 或 execution。
+- M10.13 read-only observation runbook 只定义未来观察队列、周报模板、暂停条件和人工复核节奏；它不启动 observation runner，不接实时行情，不接 broker，不下单，也不批准 paper trading。
 - M10.2 visual pack 只记录 Brooks v2 evidence image logical path 与 checksum；图片资产继续 local-only，不进入普通 Git 跟踪。
 - 本层仍属于 `paper / simulated` 研究能力，不进入 `src/risk/`、`src/execution/`、`src/broker/`。
 

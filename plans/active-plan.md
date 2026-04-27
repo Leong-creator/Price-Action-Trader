@@ -43,6 +43,7 @@
 - M10.10 已完成 Visual Wave B Gate：`M10-PA-003/008/009/011` 与既有 `M10-PA-013` 进入 Wave B queue；`M10-PA-004/007/010` 暂不进入自动回测。
 - M10.11 已完成 Wave B Capital Backtest：对 `M10-PA-013/003/008/009/011` 输出第二批模拟资金曲线成绩单；视觉策略仍保留 OHLCV proxy / 人工图形复核边界。
 - M10.12 已完成 All Strategy Scorecard：把 16 条 `M10-PA-*` 汇总为甲方状态矩阵、资金测试成绩和 portfolio proxy；该 proxy 只用于业务视角汇总，不是可执行组合回测，不批准 paper trading。
+- M10.13 已完成 Read-only Observation Runbook：把通过筛选的 `M10-PA-001/002/012/008/009` 整理为只读观察队列、周报模板和暂停条件；本阶段不启动真实观察，不接 broker，不批准 paper trading。
 
 ## 2. 执行总原则
 

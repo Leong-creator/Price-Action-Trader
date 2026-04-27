@@ -1154,6 +1154,13 @@
   - 每条策略必须有明确状态：完成资金测试、需要定义修正、图形复核保留、只能辅助、research-only 或暂不继续。
   - portfolio proxy 必须沿用 `100,000 USD` 初始本金、最大同时风险 `4%`、最多同时持仓 `8` 的业务口径，只纳入 `completed_capital_test` 策略，并明确不是可执行组合回测。
   - M10.12 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.13 Read-only Observation Runbook 必须满足：
+  - 必须输出 `m10_13_observation_candidate_queue.json`、`m10_13_read_only_observation_runbook.md`、`m10_13_weekly_observation_template.md` 与结构化 summary。
+  - 主观察队列只能包含完成资金测试、整体收益为正、且被选入周期收益为正的策略周期。
+  - M10.13 可在 M10.5 Wave A 观察计划基础上纳入 M10.11/M10.12 筛选通过的 Wave B 策略，但视觉策略必须保留人工图形语境复核。
+  - `M10-PA-005` 在 range-geometry 定义修正完成前不得进入主观察队列。
+  - 周报模板必须覆盖本周触发策略、策略和标的分布、资金曲线偏离、暂停条件和人工复核结论。
+  - M10.13 不得启动真实观察 runner，不接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。
