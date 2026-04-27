@@ -11,8 +11,10 @@ reports/backtests/*
 !reports/backtests/m8c1_long_horizon_daily_validation/
 !reports/backtests/m8c1_long_horizon_daily_validation/**
 !reports/backtests/m8c2_intraday_pilot_nvda_15m/
+reports/backtests/m8c2_intraday_pilot_nvda_15m/*
 !reports/backtests/m8c2_intraday_pilot_nvda_15m/summary.json
 !reports/backtests/m8c2_intraday_pilot_spy_15m/
+reports/backtests/m8c2_intraday_pilot_spy_15m/*
 !reports/backtests/m8c2_intraday_pilot_spy_15m/summary.json
 !reports/backtests/m8e2_longer_window_daily_validation/
 !reports/backtests/m8e2_longer_window_daily_validation/**
