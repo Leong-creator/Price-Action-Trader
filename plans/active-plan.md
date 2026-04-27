@@ -50,6 +50,7 @@
 - M12.2 已完成 Core Strategy Daily Observation：只消费 M12.1 feed ledger 与 M10.13/M11 Tier A 候选，生成 `32` 条只读观察记录；由于 M12.1 feed 只有单根 latest bar，本阶段诚实写入 `skip_no_trade` 而不伪造完整策略触发。
 - M12.3 已完成 Visual Review Precheck：复用 M10.2 visual packs 与 M10.10 visual gate，整理 `7` 条策略、`30` 个图例 case 的预审包；Brooks 图片仍 local-only，当前通过旧 M10 worktree 解析且 checksum 全部匹配，仍不替代人工图形判断。
 - M12.4 已完成 Definition Fix and Retest：`M10-PA-005` 复用 M10.9 definition tightening 的 before/after 复测指标；`M10-PA-004/007` 只沉淀可执行字段缺口和图例证据，不生成假交易结果；本阶段没有按收益曲线调参，也不批准 paper trading。
+- M12.5 已完成 Liquid Universe Scanner：第一版高流动性 US 股票/ETF seed 共 `147` 只，自动 scanner 只启用 Tier A `M10-PA-001/002/012`；当前本地 cache 实际完成 `SPY / QQQ / NVDA / TSLA` 扫描并输出 `12` 条候选，其余 `143` 只缺少本地数据的 seed 全部 deferred，不补假候选。
 
 ## 2. 执行总原则
 

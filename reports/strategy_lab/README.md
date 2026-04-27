@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12 Read-only Observation & Scanner`，当前阶段分支为 `codex/m12-4-definition-fix-and-retest`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12 Read-only Observation & Scanner`，当前阶段分支为 `codex/m12-5-liquid-universe-scanner`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -82,6 +82,13 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_definition_fix_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_retest_client_summary.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_universe_definition.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_cache_inventory.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_candidates.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_deferred_inputs.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -105,6 +112,7 @@
 - M12.2 已完成 core strategy daily observation：生成 `32` 条 Tier A 只读观察记录；由于 M12.1 feed 只有单根 latest bar，当前全部记录为 `skip_no_trade`，不伪造策略触发、不批准 paper trading。
 - M12.3 已完成 visual review precheck：复用 M10.2/M10.10 现有图例与 gate 产物，生成 `7` 条 strategy rows 与 `30` 条 case rows；本阶段只做 agent 预审和人工复核包，不替代人工图形判断。
 - M12.4 已完成 definition fix and retest：`M10-PA-005` 有复测 before/after 数字但仍未解除 `needs_definition_fix`；`M10-PA-004/007` 仅登记定义字段缺口和图例证据，不伪造交易结果。
+- M12.5 已完成 liquid universe scanner：股票/ETF seed 共 `147` 只，当前本地 cache 实际扫描 `4` 只，输出 `12` 条 Tier A 候选；缺数据的 `143` 只 seed 全部 deferred，等待后续补齐只读 K 线缓存或受控读取计划。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -115,7 +123,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.4 阶段分支在：`codex/m12-4-definition-fix-and-retest`
+- 当前 M12.5 阶段分支在：`codex/m12-5-liquid-universe-scanner`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 

@@ -1,0 +1,14 @@
+{
+  "title": "M12.5 Liquid Universe Scanner",
+  "run_id": "m12_5_liquid_universe_scanner",
+  "market": "US",
+  "universe_preset": "us_liquid_seed_v1",
+  "strategy_scope": ["M10-PA-001", "M10-PA-002", "M10-PA-012"],
+  "observation_queue_path": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_observation_candidate_queue.json",
+  "paper_gate_candidate_path": "reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_candidate_strategy_list.json",
+  "backtest_spec_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs",
+  "local_data_roots": ["local_data"],
+  "max_universe_size": 200,
+  "max_live_request_symbols": 0,
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner"
+}
