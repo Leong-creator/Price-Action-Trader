@@ -1,0 +1,108 @@
+{
+  "schema_version": "m10.10.wave-b-entry-queue.v1",
+  "generated_at": "2026-04-27T00:00:00Z",
+  "stage": "M10.10.visual_wave_b_gate",
+  "paper_simulated_only": true,
+  "broker_connection": false,
+  "real_orders": false,
+  "paper_trading_approval": false,
+  "ready_visual_strategy_ids": [
+    "M10-PA-003",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-011"
+  ],
+  "pre_existing_wave_b_candidate_ids": [
+    "M10-PA-013"
+  ],
+  "wave_b_strategy_ids": [
+    "M10-PA-013",
+    "M10-PA-003",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-011"
+  ],
+  "entries": [
+    {
+      "strategy_id": "M10-PA-013",
+      "source": "pre_existing_wave_b_candidate",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "requires_new_spec": true
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "source": "m10_10_visual_gate",
+      "timeframes": [
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "requires_new_spec": true,
+      "ohlcv_proxy_quality": "medium"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "source": "m10_10_visual_gate",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "requires_new_spec": true,
+      "ohlcv_proxy_quality": "medium"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "source": "m10_10_visual_gate",
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m",
+        "5m"
+      ],
+      "requires_new_spec": true,
+      "ohlcv_proxy_quality": "medium_low"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "source": "m10_10_visual_gate",
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "requires_new_spec": true,
+      "ohlcv_proxy_quality": "medium"
+    }
+  ],
+  "not_in_queue": [
+    {
+      "strategy_id": "M10-PA-004",
+      "decision": "needs_definition_fix"
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "decision": "needs_definition_fix"
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "decision": "visual_only_not_backtestable"
+    }
+  ],
+  "excluded_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-005",
+    "M10-PA-006",
+    "M10-PA-012",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
+  "boundary_note": "Wave B entry means eligible for a future simulated spec/backtest, not strategy approval."
+}

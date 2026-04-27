@@ -49,6 +49,9 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_before_after_metrics.csv`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_definition_fix_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_wave_a_retest_client_summary.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_wave_b_entry_queue.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_visual_strategy_review.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_visual_client_summary.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -62,6 +65,7 @@
 - M10.7 已冻结甲方报告口径：后续资金曲线测试默认使用 `100,000 USD` 初始本金、`0.5%` 单笔风险、`1 / 2 / 5 bps` 成本压力；本阶段未运行新回测，也未批准 paper trading。
 - M10.8 已完成 Wave A capital backtest：`M10-PA-001/002/005/012` 已输出 baseline trade ledger、三档成本 metrics、strategy scorecard、client report 和 equity curve CSV/SVG；`M10-PA-005` 仍为 `needs_definition_fix`。
 - M10.9 已完成 `M10-PA-005` definition tightening retest：日内 `1h / 15m / 5m` 通过重复确认去重与 20-bar 冷却降低触发密度；因 M10.4 candidate events 未持久化 range geometry，策略仍保持 `needs_definition_fix`。
+- M10.10 已完成 visual Wave B gate：`M10-PA-003/008/009/011` 进入 Wave B，`M10-PA-013` 作为既有 Wave B 候选并入；`M10-PA-004/007/010` 暂不进入自动回测。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -72,7 +76,7 @@
 
 ## 先看哪个分支
 
-- 当前 M10 阶段分支在：`codex/m10-9-definition-tightening`
+- 当前 M10 阶段分支在：`codex/m10-10-visual-wave-b-gate`
 - M10 集成基线在：`codex/m10-price-action-strategy-refresh`
 - 长期稳定基线仍是：`main`
 

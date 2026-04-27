@@ -1136,6 +1136,12 @@
   - 必须输出 `m10_9_definition_filter_ledger.json`、`m10_9_before_after_metrics.csv`、`m10_9_retest_summary.json`、`m10_9_definition_fix_report.md`、`m10_9_wave_a_retest_client_summary.md`。
   - 必须明确记录 M10.4 candidate events 缺少 `range_high/range_low/range_midpoint/breakout_extreme/reentry_confirmation_index`，因此 `M10-PA-005` 不能解除 `needs_definition_fix`。
   - M10.9 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.10 Visual Wave B Gate 必须满足：
+  - 只复核 `M10-PA-003/004/007/008/009/010/011` 的 visual golden case pack。
+  - 必须输出 `m10_10_visual_strategy_review.md`、`m10_10_wave_b_entry_queue.json`、`m10_10_visual_client_summary.md` 与结构化 summary。
+  - Wave B queue 只能包含 gate 通过的视觉策略与既有 `M10-PA-013` candidate；Wave A、supporting-only、research-only 策略不得进入 queue。
+  - `M10-PA-011` 只能进入 `15m / 5m`，不得扩成 daily 或 `1h`。
+  - M10.10 不得运行回测，不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。
