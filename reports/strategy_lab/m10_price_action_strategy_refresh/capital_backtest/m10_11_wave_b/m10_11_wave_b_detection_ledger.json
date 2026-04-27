@@ -1,0 +1,550 @@
+{
+  "schema_version": "m10.11.wave-b-detection-ledger.v1",
+  "stage": "M10.11.wave_b_capital_backtest",
+  "rows": [
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "SPY",
+      "candidate_count": 105,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "QQQ",
+      "candidate_count": 97,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "NVDA",
+      "candidate_count": 23,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "TSLA",
+      "candidate_count": 3,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 88,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 69,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 58,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 51,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 382,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 373,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 331,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 348,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 1099,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 1091,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 1047,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 1074,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 77,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 72,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 62,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 51,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 291,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 284,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 264,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 279,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 937,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 910,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 820,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 843,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "SPY",
+      "candidate_count": 77,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "QQQ",
+      "candidate_count": 74,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "NVDA",
+      "candidate_count": 69,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "TSLA",
+      "candidate_count": 74,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 53,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 59,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 57,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 54,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 237,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 226,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 241,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 237,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 714,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 742,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 735,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 726,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "SPY",
+      "candidate_count": 71,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "QQQ",
+      "candidate_count": 61,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "NVDA",
+      "candidate_count": 80,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "TSLA",
+      "candidate_count": 74,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 50,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 52,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 51,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 59,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 231,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 229,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 215,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 226,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 731,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 709,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 696,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 721,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 102,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 68,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 28,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 33,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 30,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 26,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 2,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 6,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    }
+  ]
+}

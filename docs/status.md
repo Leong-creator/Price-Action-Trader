@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，当前阶段分支 `codex/m10-10-visual-wave-b-gate`）
+- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，当前阶段分支 `codex/m10-11-wave-b-capital-backtest`）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：`M10 Price Action Strategy Refresh`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening 与 M10.10 Visual Wave B Gate
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate 与 M10.11 Wave B Capital Backtest
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m10-10-visual-wave-b-gate`
+- `codex/m10-11-wave-b-capital-backtest`
 
 ## 已完成
 
@@ -327,6 +327,11 @@
   - M10.10 当前 Wave B queue 为 `M10-PA-013/003/008/009/011`；其中 `M10-PA-003/008/009/011` 来自 visual gate，`M10-PA-013` 为既有 Wave B candidate。
   - M10.10 暂不进入自动回测的视觉策略：`M10-PA-004` 与 `M10-PA-007` 标记 `needs_definition_fix`，`M10-PA-010` 标记 `visual_only_not_backtestable`。
   - M10.10 已通过新增 visual Wave B gate 单测、M10 strategy refresh 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.11 Wave B Capital Backtest，新增 `scripts/m10_wave_b_capital_backtest_lib.py`、`scripts/run_m10_wave_b_capital_backtest.py`、`capital_backtest/m10_11_wave_b/` 与 M10.11 单测。
+  - M10.11 覆盖 `M10-PA-013/003/008/009/011`，当前生成 baseline trade ledger `20055` 行、metrics `270` 行、candidate events `20055` 行，并输出 baseline equity curve CSV/SVG。
+  - M10.11 baseline strategy results：`M10-PA-003` 净利润 `-54431.35` / 收益 `-4.5359%` / 胜率 `0.3391`；`M10-PA-008` 净利润 `64057.47` / 收益 `4.0036%` / 胜率 `0.3541`；`M10-PA-009` 净利润 `16277.18` / 收益 `1.0173%` / 胜率 `0.3395`；`M10-PA-011` 净利润 `-13014.18` / 收益 `-1.6268%` / 胜率 `0.2881`；`M10-PA-013` 净利润 `-127027.54` / 收益 `-7.9392%` / 胜率 `0.3255`。
+  - M10.11 视觉策略结果来自 OHLCV 近似规则，仍需人工图形复核；不得解释为策略批准、paper trading 准入或实盘能力。
+  - M10.11 已通过新增 Wave B capital backtest 单测、M10.10 visual gate 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
   - M10 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
 
 ## 当前阻塞
@@ -336,7 +341,7 @@
 
 ## 下一步
 
-- 下一步进入 `M10.11 Wave B Capital Backtest`：只对 M10.10 queue 中的 `M10-PA-013/003/008/009/011` 生成 Wave B 模拟资金曲线成绩单；未进入 queue 的视觉策略不跑。
+- 下一步进入 `M10.12 All Strategy Scorecard`：汇总 16 条 `M10-PA-*` 的最终状态矩阵、Wave A/Wave B 资金成绩、supporting/research-only 状态和组合视角。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 仍关闭，只有后续真实只读观察、visual review 和人工复核都达标后才讨论。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
 - M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。

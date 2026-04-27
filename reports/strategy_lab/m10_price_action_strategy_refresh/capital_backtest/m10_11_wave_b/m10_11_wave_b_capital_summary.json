@@ -1,0 +1,703 @@
+{
+  "schema_version": "m10.11.wave-b-capital-summary.v1",
+  "generated_at": "2026-04-27T00:00:00Z",
+  "stage": "M10.11.wave_b_capital_backtest",
+  "wave_b_strategy_ids": [
+    "M10-PA-013",
+    "M10-PA-003",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-011"
+  ],
+  "paper_simulated_only": true,
+  "broker_connection": false,
+  "real_orders": false,
+  "paper_trading_approval": false,
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/capital_backtest/m10_11_wave_b",
+  "trade_ledger_rows": 20055,
+  "metric_rows": 270,
+  "detection_rows": [
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "SPY",
+      "candidate_count": 105,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "QQQ",
+      "candidate_count": 97,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "NVDA",
+      "candidate_count": 23,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d",
+      "symbol": "TSLA",
+      "candidate_count": 3,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 88,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 69,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 58,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 51,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 382,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 373,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 331,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 348,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 1099,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 1091,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 1047,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 1074,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 77,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 72,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 62,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 51,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 291,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 284,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 264,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 279,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 937,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 910,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 820,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 843,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "SPY",
+      "candidate_count": 77,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "QQQ",
+      "candidate_count": 74,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "NVDA",
+      "candidate_count": 69,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d",
+      "symbol": "TSLA",
+      "candidate_count": 74,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 53,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 59,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 57,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 54,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 237,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 226,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 241,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 237,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 714,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 742,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 735,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 726,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "SPY",
+      "candidate_count": 71,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "QQQ",
+      "candidate_count": 61,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "NVDA",
+      "candidate_count": 80,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d",
+      "symbol": "TSLA",
+      "candidate_count": 74,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "SPY",
+      "candidate_count": 50,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "QQQ",
+      "candidate_count": 52,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "NVDA",
+      "candidate_count": 51,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1h",
+      "symbol": "TSLA",
+      "candidate_count": 59,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 231,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 229,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 215,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 226,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 731,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 709,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 696,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 721,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "SPY",
+      "candidate_count": 102,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "QQQ",
+      "candidate_count": 68,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "NVDA",
+      "candidate_count": 28,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "15m",
+      "symbol": "TSLA",
+      "candidate_count": 33,
+      "status": "events_generated",
+      "data_lineage": "derived_from_5m"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "SPY",
+      "candidate_count": 30,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "QQQ",
+      "candidate_count": 26,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "NVDA",
+      "candidate_count": 2,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m",
+      "symbol": "TSLA",
+      "candidate_count": 6,
+      "status": "events_generated",
+      "data_lineage": "native_cache"
+    }
+  ],
+  "baseline_strategy_results": [
+    {
+      "grain": "strategy",
+      "strategy_id": "M10-PA-003",
+      "timeframe": "",
+      "symbol": "",
+      "cost_tier": "baseline",
+      "account_count": "12",
+      "initial_capital": "1200000.00",
+      "final_equity": "1145568.65",
+      "net_profit": "-54431.35",
+      "return_percent": "-4.5359",
+      "trade_count": "4890",
+      "win_rate": "0.3391",
+      "profit_factor": "0.9588",
+      "max_drawdown": "192954.17",
+      "max_drawdown_percent": "16.0795",
+      "max_consecutive_losses": "36",
+      "average_win": "764.45",
+      "average_loss": "-409.00",
+      "average_holding_bars": "256.5006",
+      "best_symbol": "NVDA",
+      "worst_symbol": "QQQ",
+      "best_timeframe": "15m",
+      "worst_timeframe": "5m",
+      "quality_flag": "normal_density_review",
+      "status": "completed_capital_test"
+    },
+    {
+      "grain": "strategy",
+      "strategy_id": "M10-PA-008",
+      "timeframe": "",
+      "symbol": "",
+      "cost_tier": "baseline",
+      "account_count": "16",
+      "initial_capital": "1600000.00",
+      "final_equity": "1664057.47",
+      "net_profit": "64057.47",
+      "return_percent": "4.0036",
+      "trade_count": "4375",
+      "win_rate": "0.3541",
+      "profit_factor": "1.0532",
+      "max_drawdown": "148490.98",
+      "max_drawdown_percent": "9.2807",
+      "max_consecutive_losses": "33",
+      "average_win": "819.41",
+      "average_loss": "-426.47",
+      "average_holding_bars": "227.1160",
+      "best_symbol": "TSLA",
+      "worst_symbol": "NVDA",
+      "best_timeframe": "15m",
+      "worst_timeframe": "1d",
+      "quality_flag": "normal_density_review",
+      "status": "completed_capital_test"
+    },
+    {
+      "grain": "strategy",
+      "strategy_id": "M10-PA-009",
+      "timeframe": "",
+      "symbol": "",
+      "cost_tier": "baseline",
+      "account_count": "16",
+      "initial_capital": "1600000.00",
+      "final_equity": "1616277.18",
+      "net_profit": "16277.18",
+      "return_percent": "1.0173",
+      "trade_count": "4256",
+      "win_rate": "0.3395",
+      "profit_factor": "1.0159",
+      "max_drawdown": "146528.66",
+      "max_drawdown_percent": "9.1580",
+      "max_consecutive_losses": "20",
+      "average_win": "720.40",
+      "average_loss": "-364.53",
+      "average_holding_bars": "199.6932",
+      "best_symbol": "SPY",
+      "worst_symbol": "NVDA",
+      "best_timeframe": "15m",
+      "worst_timeframe": "5m",
+      "quality_flag": "normal_density_review",
+      "status": "completed_capital_test"
+    },
+    {
+      "grain": "strategy",
+      "strategy_id": "M10-PA-011",
+      "timeframe": "",
+      "symbol": "",
+      "cost_tier": "baseline",
+      "account_count": "8",
+      "initial_capital": "800000.00",
+      "final_equity": "786985.82",
+      "net_profit": "-13014.18",
+      "return_percent": "-1.6268",
+      "trade_count": "295",
+      "win_rate": "0.2881",
+      "profit_factor": "0.8270",
+      "max_drawdown": "30457.88",
+      "max_drawdown_percent": "3.8072",
+      "max_consecutive_losses": "21",
+      "average_win": "732.14",
+      "average_loss": "-358.31",
+      "average_holding_bars": "66.2441",
+      "best_symbol": "NVDA",
+      "worst_symbol": "TSLA",
+      "best_timeframe": "5m",
+      "worst_timeframe": "15m",
+      "quality_flag": "normal_density_review",
+      "status": "completed_capital_test"
+    },
+    {
+      "grain": "strategy",
+      "strategy_id": "M10-PA-013",
+      "timeframe": "",
+      "symbol": "",
+      "cost_tier": "baseline",
+      "account_count": "16",
+      "initial_capital": "1600000.00",
+      "final_equity": "1472972.46",
+      "net_profit": "-127027.54",
+      "return_percent": "-7.9392",
+      "trade_count": "6239",
+      "win_rate": "0.3255",
+      "profit_factor": "0.8763",
+      "max_drawdown": "204986.93",
+      "max_drawdown_percent": "12.8117",
+      "max_consecutive_losses": "27",
+      "average_win": "443.22",
+      "average_loss": "-244.11",
+      "average_holding_bars": "35.0377",
+      "best_symbol": "NVDA",
+      "worst_symbol": "SPY",
+      "best_timeframe": "1d",
+      "worst_timeframe": "5m",
+      "quality_flag": "normal_density_review",
+      "status": "completed_capital_test"
+    }
+  ],
+  "boundary_note": "Historical simulation only; visual strategies use OHLCV proxy rules and require review."
+}

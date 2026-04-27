@@ -1142,6 +1142,12 @@
   - Wave B queue 只能包含 gate 通过的视觉策略与既有 `M10-PA-013` candidate；Wave A、supporting-only、research-only 策略不得进入 queue。
   - `M10-PA-011` 只能进入 `15m / 5m`，不得扩成 daily 或 `1h`。
   - M10.10 不得运行回测，不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.11 Wave B Capital Backtest 必须满足：
+  - 只覆盖 M10.10 queue 中的 `M10-PA-013/003/008/009/011`，不得跑未通过 visual gate 的策略。
+  - 必须输出 `m10_11_wave_b_metrics.csv`、`m10_11_wave_b_trade_ledger.csv`、`m10_11_wave_b_strategy_scorecard.md`、`m10_11_wave_b_client_report.md`、`m10_11_wave_b_capital_summary.json` 与 `m10_11_wave_b_equity_curves/`。
+  - 必须沿用 M10.7 资本模型和三档成本压力，trade ledger 必须包含 entry/stop/target/exit、risk budget、gross/cost/net PnL、equity before/after 与 source/spec refs。
+  - `M10-PA-011` 只能输出 `15m / 5m`，`15m / 1h` 数据 lineage 必须保留 `derived_from_5m`。
+  - M10.11 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。
