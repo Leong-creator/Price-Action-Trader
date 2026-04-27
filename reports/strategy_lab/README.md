@@ -85,6 +85,9 @@
 - M10.12 已完成 all-strategy scorecard：16 条 `M10-PA-*` 汇总为最终状态矩阵，当前为 `8` 条完成资金测试、`3` 条需要定义修正、`1` 条图形复核保留、`2` 条 supporting-only、`2` 条 research-only；portfolio proxy 只纳入已完成资金测试策略，排除仍需定义修正的 `M10-PA-005`，final equity 为 `105728.18 USD`，但不是可执行组合回测。
 - M10.13 已完成 read-only observation runbook：主观察队列为 `M10-PA-001/002/012/008/009`，覆盖 `13` 个策略周期；`M10-PA-005` 因定义未闭合排除，`M10-PA-003/011/013` 进入 watchlist/deferred。
 - M11 已完成 paper gate report：候选池仍来自 M10.13 主观察队列，`M10-PA-001/002/012` 为 Tier A 核心观察候选，`M10-PA-008/009` 为 Tier B 视觉条件候选；当前 gate decision 为 `not_approved`，没有任何候选可作为 paper trading approval evidence。
+- M12.0 已完成 Longbridge read-only auth preflight：本地 Longbridge CLI 与当前 token 的 quote/K 线只读探针可用，且 artifact 明确保持 `broker_connection=false / real_orders=false / live_execution=false / paper_trading_approval=false`。
+- M12.1 已完成 Longbridge read-only feed：生成 `16` 条 `SPY/QQQ/NVDA/TSLA x 1d/1h/15m/5m` 只读 bar-close feed ledger；该阶段只生成输入，不运行策略、不生成交易/账户字段、不输出盈亏结论。
+- M12.2 已完成 core strategy daily observation：生成 `32` 条 Tier A 只读观察记录；由于 M12.1 feed 只有单根 latest bar，当前全部记录为 `skip_no_trade`，不伪造策略触发、不批准 paper trading。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
