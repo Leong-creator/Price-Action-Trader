@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `codex/m12-0-readonly-auth-preflight`，M12.0 已完成）
+- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `codex/m12-1-longbridge-readonly-feed`，M12.1 已完成）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.0 Longbridge Read-only Auth Preflight`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report 与 M12.0 Longbridge Read-only Auth Preflight
+- 当前支线 milestone：`M12.1 Longbridge Read-only Feed`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight 与 M12.1 Longbridge Read-only Feed
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m12-0-readonly-auth-preflight`
+- `codex/m12-1-longbridge-readonly-feed`
 
 ## 已完成
 
@@ -351,6 +351,10 @@
   - 已完成 M12.0 Longbridge Read-only Auth Preflight，新增 `scripts/m12_readonly_auth_preflight_lib.py`、`scripts/run_m12_readonly_auth_preflight.py`、`m12_read_only_pipeline/m12_0_auth_preflight/` 与 M12.0 单测。
   - M12.0 当前 auth status 为 `valid_readonly_market_data`，说明本地 Longbridge CLI、token、quote snapshot 与 latest K-line 只读探针可用；下一步可进入 M12.1 只读 bar-close feed。
   - M12.0 只允许 `check / quote / kline / subscriptions` 行情检查命令；交易、账户、资产、持仓、现金、融资、订单相关命令均未调用，且继续保持 `broker_connection=false / real_orders=false / live_execution=false / paper_trading_approval=false`。
+  - 已完成 M12.1 Longbridge Read-only Feed，新增 `config/examples/m12_longbridge_readonly_feed.json`、`scripts/m12_readonly_feed_lib.py`、`scripts/run_m12_readonly_feed.py`、`m12_read_only_pipeline/m12_1_readonly_feed/` 与 M12.1 单测。
+  - M12.1 当前生成 `16` 条只读 feed ledger，覆盖 `SPY / QQQ / NVDA / TSLA` 与 `1d / 1h / 15m / 5m`；quote snapshot 只作为健康检查，K 线轮询作为主输入，subscriptions 只作为诊断。
+  - M12.1 strategy scope 只包含 Tier A：`M10-PA-001/002/012`；未纳入 `M10-PA-008/009` 视觉候选、definition-fix、supporting-only 或 research-only 条目。
+  - M12.1 不运行策略、不生成交易/账户字段、不输出盈亏结论，继续保持 `paper_simulated_only=true / broker_connection=false / real_orders=false / live_execution=false`。
 
 ## 当前阻塞
 
@@ -359,7 +363,7 @@
 
 ## 下一步
 
-- 进入 M12.1 Longbridge Read-only Feed：把 M10.6 recorded replay 输入升级为 Longbridge 只读 quote/K-line bar-close 输入原型。
+- 进入 M12.2 Core Strategy Daily Observation：使用 M12.1 feed ledger 和 Tier A 策略规格生成每日只读观察报告；仍不接 broker、不下单、不批准 paper trading。
 - M11 paper gate 当前关闭；必须先完成只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和人工业务审批，才允许重新评估 paper trading。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。

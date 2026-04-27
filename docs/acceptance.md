@@ -1169,6 +1169,46 @@
   - `M10-PA-005`、`needs_definition_fix`、`visual_only_not_backtestable`、supporting-only、research-only、non-positive/watchlist 策略不得进入可批准候选池。
   - risk/pause policy 必须保留 M10.13 的暂停红线，并新增未完成真实只读观察、缺少人工业务审批和候选状态降级的 gate 阻塞项。
   - M11 不得启动真实观察 runner，不接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 live-ready 或 real execution 能力结论。
+- M12.0 Longbridge Read-only Auth Preflight 必须满足：
+  - 必须输出 `m12_0_longbridge_readonly_auth_check.md` 与 `m12_0_runtime_boundary.json`。
+  - 运行时只允许 Longbridge `check / quote / kline / subscriptions` 行情检查命令；交易、账户、资产、持仓、现金、融资、订单相关命令不得被调用。
+  - 缺少 CLI、token 无效或权限不足时只能输出 deferred/blocked 状态，不得伪造行情探针成功。
+  - artifact 必须强制 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.1 Longbridge Read-only Feed 必须满足：
+  - 必须输出 `m12_1_readonly_feed_manifest.json`、`m12_1_bar_close_observation_ledger.jsonl`、`m12_1_deferred_inputs.json` 与 `m12_1_feed_health_report.md`。
+  - 必须读取 M12.0 auth preflight artifact，只有 `auth_status=valid_readonly_market_data` 时才允许生成只读 feed ledger。
+  - 只允许把 Longbridge K 线轮询作为主输入，quote snapshot 只能作为健康检查，subscriptions 只能作为诊断。
+  - feed strategy scope 只能覆盖 Tier A：`M10-PA-001/002/012`；不得把视觉候选、definition-fix、supporting-only 或 research-only 条目放入自动输入。
+  - `1d` 必须标记为收盘后观察语义；`1h / 15m / 5m` 必须标记为 regular-session bar-close 观察语义。
+  - ledger row 不得包含 order、fill、position、cash、PnL 等执行或账户字段；不得输出策略盈利或交易批准结论。
+  - artifact 必须继续强制 `paper_simulated_only=true`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.2 Core Strategy Daily Observation 必须满足：
+  - 只能使用 M12.1 feed ledger 与 M10.13/M11 Tier A 候选生成每日只读观察结果。
+  - 覆盖策略只能是 `M10-PA-001/002/012`；不得自动纳入 `M10-PA-008/009` 视觉候选。
+  - 输出必须包含策略、标的、周期、bar timestamp、假设 entry/stop/target、source/spec refs、review status 与暂停条件。
+  - 不得生成真实订单、成交、仓位、现金或实盘结论。
+- M12.3 Visual Review Precheck 必须满足：
+  - 必须复用 M10.2 visual golden case pack、source ledgers 与 M10.10 visual gate，不得重写 Brooks v2 source of truth。
+  - 必须区分 strategy-level gate decision 与 case-level manual review decision。
+  - `M10-PA-008/009` 必须保留人工图形语境复核要求；`M10-PA-013` 必须明确为无 visual pack 的既有 Wave B candidate。
+  - 预审结果只能减少人工整理工作，不得替代人工 visual judgment 或 paper gate evidence。
+- M12.4 Definition Fix and Retest 必须满足：
+  - 优先覆盖 `M10-PA-005`、`M10-PA-004`、`M10-PA-007`。
+  - 定义修正只能依据 Brooks v2 / YouTube / notes 与结构化策略逻辑，不得依据收益曲线调参。
+  - 必须输出修正前后交易数、收益、胜率、回撤和是否解除 definition review；无法解除时必须降级或保留 blocker。
+- M12.5 Liquid Universe Scanner 必须满足：
+  - 第一版股票池必须限制在约 `100-200` 只高流动性美股/ETF。
+  - 扫描策略只能先接入 Tier A：`M10-PA-001/002/012`。
+  - 输出必须包含候选股票、命中策略、周期、假设 entry/stop/target、风险等级、source/spec refs 与是否进入观察队列。
+  - scanner 不得绕过 Longbridge 请求/订阅上限，不得引入 broker/order/live 路径。
+- M12.6 Weekly Client Scorecard 必须满足：
+  - 必须汇总历史资金测试、每日只读观察、scanner 候选、图形复核和定义修正状态。
+  - 每条策略必须有甲方可读状态：继续观察、暂停、定义修正、等待图形复核、research-only 或不继续。
+  - 报告不得把只读观察或 scanner 候选解释为 paper trading approval、live-ready 或实盘能力。
+- M11.5 Paper Gate Recheck 必须满足：
+  - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
+  - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
+  - M11.5 只能输出 gate recheck report、candidate list 和 blocker/approval ledger，不得直接批准 paper trading。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。

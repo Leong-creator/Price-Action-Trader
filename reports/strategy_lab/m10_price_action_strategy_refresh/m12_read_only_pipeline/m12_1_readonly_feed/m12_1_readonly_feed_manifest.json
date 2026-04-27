@@ -1,0 +1,55 @@
+{
+  "auth_preflight_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_0_auth_preflight/m12_0_runtime_boundary.json",
+  "auth_status": "valid_readonly_market_data",
+  "broker_connection": false,
+  "deferred_count": 0,
+  "generated_at": "2026-04-27T10:00:04Z",
+  "ledger_row_count": 16,
+  "lineage": {
+    "primary_input": "readonly_kline_poll",
+    "provider": "longbridge",
+    "quote_role": "health_check_only",
+    "subscriptions_role": "diagnostic_only"
+  },
+  "live_execution": false,
+  "observation_queue_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_observation_candidate_queue.json",
+  "output_refs": {
+    "deferred": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_deferred_inputs.json",
+    "ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_bar_close_observation_ledger.jsonl",
+    "manifest": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_readonly_feed_manifest.json",
+    "report": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_feed_health_report.md"
+  },
+  "paper_simulated_only": true,
+  "quote_snapshot": {
+    "error": "",
+    "row_count": 4,
+    "status": "ok",
+    "symbols": [
+      "SPY.US",
+      "QQQ.US",
+      "NVDA.US",
+      "TSLA.US"
+    ]
+  },
+  "real_orders": false,
+  "run_id": "m12_1_longbridge_readonly_feed",
+  "schema_version": "m12.readonly-feed-manifest.v1",
+  "stage": "M12.1.longbridge_readonly_feed",
+  "strategy_scope": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012"
+  ],
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "NVDA",
+    "TSLA"
+  ],
+  "timeframes": [
+    "1d",
+    "1h",
+    "15m",
+    "5m"
+  ]
+}
