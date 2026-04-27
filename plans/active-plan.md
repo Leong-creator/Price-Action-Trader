@@ -51,6 +51,7 @@
 - M12.3 已完成 Visual Review Precheck：复用 M10.2 visual packs 与 M10.10 visual gate，整理 `7` 条策略、`30` 个图例 case 的预审包；Brooks 图片仍 local-only，当前通过旧 M10 worktree 解析且 checksum 全部匹配，仍不替代人工图形判断。
 - M12.4 已完成 Definition Fix and Retest：`M10-PA-005` 复用 M10.9 definition tightening 的 before/after 复测指标；`M10-PA-004/007` 只沉淀可执行字段缺口和图例证据，不生成假交易结果；本阶段没有按收益曲线调参，也不批准 paper trading。
 - M12.5 已完成 Liquid Universe Scanner：第一版高流动性 US 股票/ETF seed 共 `147` 只，自动 scanner 只启用 Tier A `M10-PA-001/002/012`；当前本地 cache 实际完成 `SPY / QQQ / NVDA / TSLA` 扫描并输出 `12` 条候选，其余 `143` 只缺少本地数据的 seed 全部 deferred，不补假候选。
+- M12.6 已完成 Weekly Client Scorecard：把历史资金测试、每日只读观察、scanner 候选、图形预审和定义修正合成 `16` 条策略 dashboard、客户周报和下周行动计划；当前只作为模拟观察与测试管理材料，不作为交易批准。
 
 ## 2. 执行总原则
 

@@ -1,0 +1,12 @@
+{
+  "title": "M12.6 Weekly Client Scorecard",
+  "run_id": "m12_6_weekly_client_scorecard",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6",
+  "m10_12_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_all_strategy_scorecard_summary.json",
+  "m10_12_decision_matrix_path": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_strategy_decision_matrix.json",
+  "m12_2_status_matrix_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_2_daily_observation/m12_2_strategy_status_matrix.json",
+  "m12_3_visual_precheck_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json",
+  "m12_4_definition_fix_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_4_definition_fix_and_retest/m12_4_definition_fix_summary.json",
+  "m12_5_scanner_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_summary.json",
+  "m12_5_scanner_candidates_path": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_scanner_candidates.csv"
+}

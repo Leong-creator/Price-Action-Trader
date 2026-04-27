@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `codex/m12-5-liquid-universe-scanner`，M12.5 已完成）
+- 当前支线：阶段 12：Read-only Observation & Scanner（当前阶段分支 `feature/m12-6-weekly-client-scorecard`，M12.6 已完成）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.5 Liquid Universe Scanner`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest 与 M12.5 Liquid Universe Scanner
+- 当前支线 milestone：`M12.6 Weekly Client Scorecard`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner 与 M12.6 Weekly Client Scorecard
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m12-5-liquid-universe-scanner`
+- `feature/m12-6-weekly-client-scorecard`
 
 ## 已完成
 
@@ -366,6 +366,10 @@
   - 已完成 M12.4 Definition Fix and Retest，新增 `config/examples/m12_definition_fix_and_retest.json`、`scripts/m12_definition_fix_and_retest_lib.py`、`scripts/run_m12_definition_fix_and_retest.py`、`definition_fix/m12_4_definition_fix_and_retest/` 与 M12.4 单测。
   - M12.4 只覆盖 `M10-PA-005/004/007`：`M10-PA-005` 复用 M10.9 结构性复测，`M10-PA-004/007` 只登记 M12.3/M10.10 支撑的定义字段缺口，不伪造 before/after 交易结果。
   - M12.4 当前结论为三条策略继续保持 `needs_definition_fix`；本阶段没有根据收益曲线调参，不批准 paper trading，不接 broker、不下单。
+  - 已完成 M12.5 Liquid Universe Scanner，新增 `config/examples/m12_liquid_universe_scanner.json`、`scripts/m12_liquid_universe_scanner_lib.py`、`scripts/run_m12_liquid_universe_scanner.py`、`scanner/m12_5_liquid_universe_scanner/` 与 M12.5 单测。
+  - M12.5 第一版高流动性 US 股票/ETF seed 共 `147` 只，自动 scanner 只启用 Tier A：`M10-PA-001/002/012`；当前本地 cache 实际完成 `SPY / QQQ / NVDA / TSLA` 扫描并输出 `12` 条候选，其余 `143` 只缺少本地数据的 seed 全部 deferred，不补假候选。
+  - 已完成 M12.6 Weekly Client Scorecard，新增 `config/examples/m12_weekly_client_scorecard.json`、`scripts/m12_weekly_client_scorecard_lib.py`、`scripts/run_m12_weekly_client_scorecard.py`、`weekly_scorecard/m12_6/` 与 M12.6 单测。
+  - M12.6 汇总 M10.12 历史资金测试、M12.2 每日只读观察、M12.3 图形预审、M12.4 定义修正和 M12.5 scanner，输出 `16` 条策略 dashboard、本周客户周报和下周行动计划；当前交易状态仍为 `closed_not_authorized`。
 
 ## 当前阻塞
 
@@ -374,8 +378,8 @@
 
 ## 下一步
 
-- 进入 M12.5 Liquid Universe Scanner：从干净 main 继续分支推进，第一版只接 Tier A：`M10-PA-001/002/012`。
-- M12.6 Weekly Client Scorecard 与 M11.5 Paper Gate Recheck 必须等待 M12.5 scanner artifact 完成后再串行收口。
+- M12.5 Liquid Universe Scanner 已完成并合入 main：第一版只接 Tier A：`M10-PA-001/002/012`。
+- M12.6 Weekly Client Scorecard 已完成；下一步 M11.5 Paper Gate Recheck 必须基于 M12.2-M12.6 实际 artifact 串行收口。
 - M11 paper gate 当前关闭；必须先完成只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和人工业务审批，才允许重新评估 paper trading。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
