@@ -1130,6 +1130,12 @@
   - trade ledger 必须包含 `event_id`、`trade_id`、risk budget、risk-budget quantity、notional-cap quantity、gross/cost/net PnL、equity before/after 与 source/spec refs。
   - `M10-PA-005` 的 `1h / 15m / 5m` 必须保留 `definition_breadth_review` / `needs_definition_fix`，不得因资金结果自动升级。
   - M10.8 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.9 Definition Tightening 必须满足：
+  - 只覆盖 `M10-PA-005`，不得修改其他 Wave A 策略定义或资金口径。
+  - 收紧依据只能是结构性清理：重复确认去重、同标的同方向日内 20-bar 冷却；不得使用 PnL、资金曲线、胜率或 profit factor 做调参依据。
+  - 必须输出 `m10_9_definition_filter_ledger.json`、`m10_9_before_after_metrics.csv`、`m10_9_retest_summary.json`、`m10_9_definition_fix_report.md`、`m10_9_wave_a_retest_client_summary.md`。
+  - 必须明确记录 M10.4 candidate events 缺少 `range_high/range_low/range_midpoint/breakout_extreme/reentry_confirmation_index`，因此 `M10-PA-005` 不能解除 `needs_definition_fix`。
+  - M10.9 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。

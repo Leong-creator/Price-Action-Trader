@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh`，分支为 `codex/m10-price-action-strategy-refresh`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh`，当前阶段分支为 `codex/m10-9-definition-tightening`，集成基线为 `codex/m10-price-action-strategy-refresh`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -45,6 +45,10 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/capital_backtest/m10_8_wave_a/m10_8_wave_a_strategy_scorecard.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/capital_backtest/m10_8_wave_a/m10_8_wave_a_client_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/capital_backtest/m10_8_wave_a/m10_8_wave_a_equity_curves/`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_definition_filter_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_before_after_metrics.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_definition_fix_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_wave_a_retest_client_summary.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/workspace_audit_legacy_inventory_m10.md`
 - M10.1 当前冻结 `16` 条 `M10-PA-*` 策略/规则；Visual golden case 只适用于 `M10-PA-003/004/007/008/009/010/011`，不是所有策略的统一门槛。
 - M10.2 当前已为上述 7 条策略生成 `visual_golden_cases/` 图例包，`ready_count=7 / blocked_count=0`；该状态只表示 Brooks v2 图例 evidence path 与 checksum 完整，不代表策略有效或盈利。
@@ -57,6 +61,7 @@
 - M10.6 ledger 只用于输入/schema/bar-close 记录与人工复核流程；不是实时行情观察，不证明策略有效或盈利。
 - M10.7 已冻结甲方报告口径：后续资金曲线测试默认使用 `100,000 USD` 初始本金、`0.5%` 单笔风险、`1 / 2 / 5 bps` 成本压力；本阶段未运行新回测，也未批准 paper trading。
 - M10.8 已完成 Wave A capital backtest：`M10-PA-001/002/005/012` 已输出 baseline trade ledger、三档成本 metrics、strategy scorecard、client report 和 equity curve CSV/SVG；`M10-PA-005` 仍为 `needs_definition_fix`。
+- M10.9 已完成 `M10-PA-005` definition tightening retest：日内 `1h / 15m / 5m` 通过重复确认去重与 20-bar 冷却降低触发密度；因 M10.4 candidate events 未持久化 range geometry，策略仍保持 `needs_definition_fix`。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -67,7 +72,8 @@
 
 ## 先看哪个分支
 
-- 当前 M10 策略刷新在：`codex/m10-price-action-strategy-refresh`
+- 当前 M10 阶段分支在：`codex/m10-9-definition-tightening`
+- M10 集成基线在：`codex/m10-price-action-strategy-refresh`
 - 长期稳定基线仍是：`main`
 
 如果你的目标是判断“项目现在做到哪里了，以及下一步最该提炼/测试什么策略”，应优先查看 M10 目录，不要把 M9 `PA-SC-*` 或 `SF-*` 当作当前策略先验。

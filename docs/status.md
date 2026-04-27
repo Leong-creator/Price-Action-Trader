@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，位于 `codex/m10-price-action-strategy-refresh`）
+- 当前支线：阶段 10：Price Action Strategy Refresh（进行中，当前阶段分支 `codex/m10-9-definition-tightening`）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：`M10 Price Action Strategy Refresh`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan 与 M10.6 Read-only Observation Input / Ledger Prototype
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest 与 M10.9 Definition Tightening
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m10-price-action-strategy-refresh`
+- `codex/m10-9-definition-tightening`
 
 ## 已完成
 
@@ -318,6 +318,11 @@
   - M10.8 baseline strategy results：`M10-PA-001` 净利润 `395723.86` / 收益 `24.7327%` / 胜率 `0.3584`；`M10-PA-002` 净利润 `52496.28` / 收益 `3.2810%` / 胜率 `0.3492`；`M10-PA-005` 净利润 `-147665.89` / 收益 `-9.2291%` / 胜率 `0.3401`；`M10-PA-012` 净利润 `215141.29` / 收益 `26.8927%` / 胜率 `0.3815`。
   - M10.8 继续把 `M10-PA-005` 标记为 `needs_definition_fix`，资本结果不得覆盖其 `definition_breadth_review` 问题。
   - M10.8 已通过新增 Wave A capital backtest 单测、M10.7 policy 单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
+  - 已完成 M10.9 Definition Tightening，新增 `scripts/m10_definition_tightening_lib.py`、`scripts/run_m10_definition_tightening.py`、`definition_tightening/m10_9_pa_005/` 与 M10.9 单测。
+  - M10.9 只处理 `M10-PA-005`：先移除同一确认 bar 的重复候选，再对 `1h / 15m / 5m` 同标的同方向失败突破施加 20-bar 冷却；该逻辑不读取 PnL、资金曲线、胜率或 profit factor。
+  - M10.9 baseline retest：`1d` 交易数 `1481 -> 1188`、净利润 `-34130.96 -> -22855.77`；`1h` `1469 -> 950`、`-613.09 -> 4527.65`；`15m` `7511 -> 2966`、`50820.21 -> 14707.57`；`5m` `23881 -> 8007`、`-163742.05 -> -107134.41`。
+  - M10.9 明确记录上游缺口：M10.4 candidate events 未持久化 `range_high/range_low/range_midpoint/breakout_extreme/reentry_confirmation_index`；因此 `M10-PA-005` 仍保持 `needs_definition_fix`，不能升级为已修好策略。
+  - M10.9 已通过新增 definition tightening 单测、M10.7/M10.8/M10.9 组合单测、`validate_kb.py`、`validate_kb_coverage.py`、`validate_knowledge_atoms.py`、完整 `tests/unit`、完整 `tests/reliability` 与 `git diff --check`。
   - M10 明确保持 `paper / simulated`；未接 broker、未接真实账户、未进入实盘或自动下单。
 
 ## 当前阻塞
@@ -327,7 +332,7 @@
 
 ## 下一步
 
-- 下一步进入 `M10.9 Definition Tightening`：优先处理 `M10-PA-005` 日内 `1h / 15m / 5m` 事件过密和定义偏宽问题，只允许基于 Brooks / YouTube / notes 与策略逻辑收紧定义，不按收益曲线调参。
+- 下一步进入 `M10.10 Visual Wave B Gate`：复核 `M10-PA-003/004/007/008/009/010/011` 的 visual golden cases 是否足以进入 Wave B 回测队列；未通过的策略继续保持 visual-only / blocked / needs_definition_fix。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 仍关闭，只有后续真实只读观察、visual review 和人工复核都达标后才讨论。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。
 - M9 `SF-*`、`PA-SC-*` 和历史回测结果只允许用于 comparison，不得反向修改 M10 clean-room catalog。

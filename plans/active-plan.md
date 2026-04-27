@@ -39,6 +39,7 @@
 - M10.6 已完成 Read-only Observation Input / Ledger Prototype：使用本地 cached OHLCV 做 recorded replay，只生成只读 observation ledger 与输入 manifest，不接 broker、不接真实账户、不做实时订阅、不生成执行或盈亏结论。
 - M10.7 已完成 Business Metric Policy：冻结后续甲方报告的资金口径、资本模型、成本敏感性、必备指标与报告模板；本阶段只定义模拟测试成绩单口径，不输出策略收益结论或 paper trading 批准。
 - M10.8 已完成 Wave A Capital Backtest：把 `M10-PA-001/002/005/012` 的 M10.4 candidate events 转成甲方可读模拟资金曲线、交易明细、胜率、回撤、分标的/分周期与成本压力成绩单；结果仍仅为 historical simulation，不批准 paper trading。
+- M10.9 已完成 Definition Tightening：只对 `M10-PA-005` 做重复确认去重与日内 20-bar 冷却复测，触发密度下降但因 range geometry 字段缺失仍保留 `needs_definition_fix`。
 
 ## 2. 执行总原则
 

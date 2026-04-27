@@ -1,0 +1,66 @@
+{
+  "schema_version": "m10.9.definition-filter-ledger.v1",
+  "stage": "M10.9.definition_tightening",
+  "strategy_id": "M10-PA-005",
+  "filter_basis": "non_pnl_structural_cleanup",
+  "filters": [
+    "dedupe_same_symbol_direction_signal_entry_confirmation",
+    "intraday_same_symbol_direction_20_bar_cooldown"
+  ],
+  "range_geometry_fields_available": false,
+  "upstream_gap": "M10.4 candidate_events.csv 未持久化 range_high/range_low/range_midpoint/breakout_extreme/reentry_confirmation_index，因此 M10.9 不能只靠交易行完整复核 Brooks 交易区间结构。",
+  "rows": [
+    {
+      "strategy_id": "M10-PA-005",
+      "timeframe": "1d",
+      "before_candidates": 1481,
+      "after_dedupe_candidates": 1188,
+      "after_tightening_candidates": 1188,
+      "duplicate_removed": 293,
+      "cooldown_removed": 0,
+      "cooldown_minutes": 0,
+      "range_geometry_fields_available": false,
+      "definition_tightening_status": "daily_duplicate_cleanup_only",
+      "review_note": "日线仅移除完全重复的确认事件，不应用日内冷却。"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "timeframe": "1h",
+      "before_candidates": 1469,
+      "after_dedupe_candidates": 1233,
+      "after_tightening_candidates": 950,
+      "duplicate_removed": 236,
+      "cooldown_removed": 283,
+      "cooldown_minutes": 1200,
+      "range_geometry_fields_available": false,
+      "definition_tightening_status": "definition_breadth_reduced_not_cleared",
+      "review_note": "日内复测移除重复确认事件，并对同标的同方向失败突破施加 20-bar 成熟窗口冷却；range geometry 仍需上游持久化。"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "timeframe": "15m",
+      "before_candidates": 7511,
+      "after_dedupe_candidates": 6289,
+      "after_tightening_candidates": 2966,
+      "duplicate_removed": 1222,
+      "cooldown_removed": 3323,
+      "cooldown_minutes": 300,
+      "range_geometry_fields_available": false,
+      "definition_tightening_status": "definition_breadth_reduced_not_cleared",
+      "review_note": "日内复测移除重复确认事件，并对同标的同方向失败突破施加 20-bar 成熟窗口冷却；range geometry 仍需上游持久化。"
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "timeframe": "5m",
+      "before_candidates": 23881,
+      "after_dedupe_candidates": 19740,
+      "after_tightening_candidates": 8007,
+      "duplicate_removed": 4141,
+      "cooldown_removed": 11733,
+      "cooldown_minutes": 100,
+      "range_geometry_fields_available": false,
+      "definition_tightening_status": "definition_breadth_reduced_not_cleared",
+      "review_note": "日内复测移除重复确认事件，并对同标的同方向失败突破施加 20-bar 成熟窗口冷却；range geometry 仍需上游持久化。"
+    }
+  ]
+}
