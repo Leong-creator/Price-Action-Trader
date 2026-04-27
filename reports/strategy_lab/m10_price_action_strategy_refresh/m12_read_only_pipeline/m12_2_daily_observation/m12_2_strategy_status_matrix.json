@@ -1,0 +1,135 @@
+{
+  "boundary_note": "M12.2 produces read-only observation records only; no paper trading approval, broker connection, orders, or live execution is created.",
+  "broker_connection": false,
+  "candidate_event_count": 0,
+  "event_count": 32,
+  "excluded_from_auto_observation": {
+    "definition_fix": [
+      "M10-PA-004",
+      "M10-PA-005",
+      "M10-PA-007"
+    ],
+    "supporting_or_research": [
+      "M10-PA-006",
+      "M10-PA-010",
+      "M10-PA-014",
+      "M10-PA-015",
+      "M10-PA-016"
+    ],
+    "visual_conditional": [
+      "M10-PA-008",
+      "M10-PA-009"
+    ],
+    "watchlist_or_non_positive": [
+      "M10-PA-003",
+      "M10-PA-011",
+      "M10-PA-013"
+    ]
+  },
+  "feed_snapshot": {
+    "auth_status": "valid_readonly_market_data",
+    "deferred_count": 0,
+    "ledger_row_count": 16,
+    "symbols": [
+      "SPY",
+      "QQQ",
+      "NVDA",
+      "TSLA"
+    ],
+    "timeframes": [
+      "1d",
+      "1h",
+      "15m",
+      "5m"
+    ]
+  },
+  "generated_at": "2026-04-27T10:20:07Z",
+  "input_refs": {
+    "feed_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_bar_close_observation_ledger.jsonl",
+    "feed_manifest": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_1_readonly_feed/m12_1_readonly_feed_manifest.json",
+    "observation_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_13/m10_13_observation_candidate_queue.json",
+    "paper_gate_candidates": "reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11/m11_candidate_strategy_list.json"
+  },
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "pause_condition_hits": [],
+  "profitability_claim_allowed": false,
+  "real_orders": false,
+  "run_id": "m12_2_core_strategy_daily_observation",
+  "schema_version": "m12.daily-observation-status-matrix.v1",
+  "skip_no_trade_count": 32,
+  "stage": "M12.2.core_strategy_daily_observation",
+  "strategy_statuses": [
+    {
+      "candidate_event_count": 0,
+      "event_count": 12,
+      "m11_gate_evidence_now": false,
+      "notes": "M12.2 validates daily read-only observation flow; one-bar feed rows are not treated as completed strategy triggers.",
+      "requires_visual_review_context": false,
+      "review_status": "continue_observation",
+      "skip_no_trade_count": 12,
+      "strategy_id": "M10-PA-001",
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "timeframes": [
+        "1d",
+        "15m",
+        "5m"
+      ],
+      "title": "Trend Pullback Second-Entry Continuation"
+    },
+    {
+      "candidate_event_count": 0,
+      "event_count": 12,
+      "m11_gate_evidence_now": false,
+      "notes": "M12.2 validates daily read-only observation flow; one-bar feed rows are not treated as completed strategy triggers.",
+      "requires_visual_review_context": false,
+      "review_status": "continue_observation",
+      "skip_no_trade_count": 12,
+      "strategy_id": "M10-PA-002",
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "timeframes": [
+        "1d",
+        "1h",
+        "15m"
+      ],
+      "title": "Breakout Follow-Through Continuation"
+    },
+    {
+      "candidate_event_count": 0,
+      "event_count": 8,
+      "m11_gate_evidence_now": false,
+      "notes": "M12.2 validates daily read-only observation flow; one-bar feed rows are not treated as completed strategy triggers.",
+      "requires_visual_review_context": false,
+      "review_status": "continue_observation",
+      "skip_no_trade_count": 8,
+      "strategy_id": "M10-PA-012",
+      "symbols": [
+        "SPY",
+        "QQQ",
+        "NVDA",
+        "TSLA"
+      ],
+      "timeframes": [
+        "15m",
+        "5m"
+      ],
+      "title": "Opening Range Breakout"
+    }
+  ],
+  "tier_a_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012"
+  ]
+}
