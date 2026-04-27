@@ -42,6 +42,7 @@
 - M10.9 已完成 Definition Tightening：只对 `M10-PA-005` 做重复确认去重与日内 20-bar 冷却复测，触发密度下降但因 range geometry 字段缺失仍保留 `needs_definition_fix`。
 - M10.10 已完成 Visual Wave B Gate：`M10-PA-003/008/009/011` 与既有 `M10-PA-013` 进入 Wave B queue；`M10-PA-004/007/010` 暂不进入自动回测。
 - M10.11 已完成 Wave B Capital Backtest：对 `M10-PA-013/003/008/009/011` 输出第二批模拟资金曲线成绩单；视觉策略仍保留 OHLCV proxy / 人工图形复核边界。
+- M10.12 已完成 All Strategy Scorecard：把 16 条 `M10-PA-*` 汇总为甲方状态矩阵、资金测试成绩和 portfolio proxy；该 proxy 只用于业务视角汇总，不是可执行组合回测，不批准 paper trading。
 
 ## 2. 执行总原则
 

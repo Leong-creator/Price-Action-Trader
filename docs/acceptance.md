@@ -1148,6 +1148,12 @@
   - 必须沿用 M10.7 资本模型和三档成本压力，trade ledger 必须包含 entry/stop/target/exit、risk budget、gross/cost/net PnL、equity before/after 与 source/spec refs。
   - `M10-PA-011` 只能输出 `15m / 5m`，`15m / 1h` 数据 lineage 必须保留 `derived_from_5m`。
   - M10.11 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
+- M10.12 All Strategy Scorecard 必须满足：
+  - 必须覆盖 16 条 `M10-PA-*` clean-room 策略/规则，不得引入 legacy `PA-SC-*` 或 `SF-*`。
+  - 必须输出 `m10_12_all_strategy_metrics.csv`、`m10_12_strategy_decision_matrix.json`、`m10_12_portfolio_simulation_report.md`、`m10_12_client_final_report.md` 与结构化 summary。
+  - 每条策略必须有明确状态：完成资金测试、需要定义修正、图形复核保留、只能辅助、research-only 或暂不继续。
+  - portfolio proxy 必须沿用 `100,000 USD` 初始本金、最大同时风险 `4%`、最多同时持仓 `8` 的业务口径，只纳入 `completed_capital_test` 策略，并明确不是可执行组合回测。
+  - M10.12 不得接 broker、不接真实账户、不下单、不批准 paper trading，也不得输出 real execution 能力结论。
 - 测试规划必须明确：
   - Daily、1h、15m、5m 是独立测试线；日线不是 5m 辅助过滤器。
   - OHLCV 可近似量化策略进入 historical backtest queue。
