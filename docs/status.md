@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12.10：Definition Fix and Retest（当前阶段分支 `feature/m12-10-definition-fix-and-retest`，M12.10 definition fix/retest 已完成并通过 QA / reviewer 复核，可合并回 `main`）
+- 当前支线：阶段 12.11：Read-only Trading Dashboard（当前阶段分支 `feature/m12-11-readonly-trading-dashboard`，M12.11 本地只读 Web 看板已生成，并已按 QA / reviewer 反馈补齐看板边界与报告导览）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.10 Definition Fix and Retest`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure 与 M12.10 Definition Fix and Retest
+- 当前支线 milestone：`M12.11 Read-only Trading Dashboard`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest 与 M12.11 Read-only Trading Dashboard
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m12-10-definition-fix-and-retest`
+- `feature/m12-11-readonly-trading-dashboard`
 
 ## 已完成
 
@@ -389,18 +389,21 @@
   - M12.10 为 `M10-PA-005` 重新从本地 K 线持久化 `34651` 条带 `range_high/range_low/range_height/breakout_edge/reentry_close/failed_breakout_extreme` 的几何事件记录；复测指标仍引用 M10.9 可追溯 before/after metrics，结论为 `reject_for_now_after_geometry_review`。
   - M12.10 将 `M10-PA-004/007` 正式降级为 `visual_only_not_backtestable_without_manual_labels`，不生成 before/after trade、PnL、胜率或回撤数字。
   - M12.10 继续保留 `M10-PA-008/009` 的用户图形确认阻塞，未确认前不得计入 paper gate evidence。
+  - 已完成 M12.11 Read-only Trading Dashboard，新增 `config/examples/m12_readonly_trading_dashboard.json`、`scripts/m12_readonly_trading_dashboard_lib.py`、`scripts/run_m12_readonly_trading_dashboard.py`、`dashboard/m12_11_readonly_trading_dashboard/` 与 M12.11 单测。
+  - M12.11 看板汇总 `12` 条 scanner 候选、`32` 条只读观察事件、`4` 个只读标的 latest bar close、`10` 个模拟资金曲线引用、M12.10 definition 决策和 M11.5 gate 状态。
+  - M12.11 输出字段使用 `readonly_*`、`hypothetical_*`、`simulated_*` 语义；当前仍是 `paper_trading_approval=false`、`trading_connection=false`、`real_money_actions=false`、`live_execution=false`。
 
 ## 当前阻塞
 
-- 当前 M12.10 definition fix/retest 实现已关闭实现侧阻塞，并已通过 QA / reviewer 复核，可合并回 `main`。
+- 当前 M12.11 dashboard 实现无已知实现侧阻塞；下一步从已合并 M12.11 的 `main` 切出 `feature/m12-12-daily-observation-loop`。
 - M11.5 paper gate 仍有业务准入阻塞：真实只读观察窗口、completed candidate events、`M10-PA-008/009` 人工图形复核、`M10-PA-005` 已正式 `reject_for_now_after_geometry_review`、`M10-PA-004/007` 已降级为 visual-only / manual-labeling、scanner cache 覆盖和人工业务审批仍未关闭。
 - M12.8 明确暴露 scanner cache 覆盖缺口：147 只 seed 中目前没有任何标的完整覆盖目标窗口；后续若要真实补齐，需要按 fetch plan 分批运行 Longbridge 只读 K 线下载并重新生成 coverage。
 - 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- M12.10 Definition Fix and Retest 已完成；当前不批准 paper trading。
-- 下一步应进入 M12.11 Read-only Trading Dashboard，建设本地只读 Web 看板，用甲方可读方式展示 scanner 候选、只读观察事件、hypothetical entry/stop/target、simulated PnL、策略状态和 blocker；M12.8 fetch plan 可并行安排受控只读缓存批次。
+- M12.11 Read-only Trading Dashboard 已完成实现；当前不批准 paper trading。
+- 下一步应进入 M12.12 Daily Observation Loop，把 cache、scanner、只读观察和 dashboard snapshot 串成日常更新链路；M12.8 fetch plan 可并行安排受控只读缓存批次。
 - 同时继续补齐真实只读观察窗口、scanner cache 覆盖计划、`M10-PA-008/009` 用户图形语境确认，并保持 `M10-PA-005/004/007` 不进入自动回测或 paper gate，直到后续有新检测器、人工标签或明确业务审批。
 - 后续只有在上述阻塞关闭并取得人工业务审批后，才允许再次评估 paper trading gate。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
