@@ -1,0 +1,83 @@
+{
+  "rows": [
+    {
+      "latest_test_max_drawdown_percent": "",
+      "latest_test_return_percent": "",
+      "latest_test_win_rate_percent": "",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "这是已通过历史资金测试的核心顺势策略。",
+      "queue": "每日只读测试主线",
+      "source_ref": "M12-SRC-002",
+      "status": "继续观察",
+      "strategy_id": "M10-PA-001",
+      "strategy_title": "趋势回调二次入场",
+      "today_in_dashboard": "true"
+    },
+    {
+      "latest_test_max_drawdown_percent": "",
+      "latest_test_return_percent": "",
+      "latest_test_win_rate_percent": "",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "它本身是核心策略，也能帮助判断强K线后有没有真实延续。",
+      "queue": "每日只读测试主线",
+      "source_ref": "M12-SRC-003",
+      "status": "继续观察",
+      "strategy_id": "M10-PA-002",
+      "strategy_title": "突破后续跟进",
+      "today_in_dashboard": "true"
+    },
+    {
+      "latest_test_max_drawdown_percent": "",
+      "latest_test_return_percent": "",
+      "latest_test_win_rate_percent": "",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "主线策略继续累计10个交易日记录。",
+      "queue": "每日只读测试主线",
+      "source_ref": "",
+      "status": "继续观察",
+      "strategy_id": "M10-PA-012",
+      "strategy_title": "开盘区间突破",
+      "today_in_dashboard": "true"
+    },
+    {
+      "latest_test_max_drawdown_percent": "",
+      "latest_test_return_percent": "",
+      "latest_test_win_rate_percent": "",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。",
+      "queue": "每日只读测试主线",
+      "source_ref": "M12-SRC-001",
+      "status": "继续观察",
+      "strategy_id": "M12-FTD-001",
+      "strategy_title": "方方土日线趋势顺势信号K",
+      "today_in_dashboard": "true"
+    },
+    {
+      "latest_test_max_drawdown_percent": "3.8796",
+      "latest_test_return_percent": "0.6473",
+      "latest_test_win_rate_percent": "41.15",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "M12.24 小范围历史测试为正收益且回撤可控，先加入每日观察，看后续实时只读信号是否稳定。",
+      "queue": "新增观察队列",
+      "source_ref": "M12.24",
+      "status": "进入每日观察，不进入模拟买卖准入",
+      "strategy_id": "M10-PA-007",
+      "strategy_title": "第二腿陷阱反转",
+      "today_in_dashboard": "false"
+    },
+    {
+      "latest_test_max_drawdown_percent": "4.0220",
+      "latest_test_return_percent": "-0.9580",
+      "latest_test_win_rate_percent": "34.72",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "M12.24 小范围历史测试收益为负，本轮不加入每日观察，避免拖累主线。",
+      "queue": "不进入每日观察",
+      "source_ref": "M12.24",
+      "status": "保留图形研究",
+      "strategy_id": "M10-PA-004",
+      "strategy_title": "宽通道边界反转",
+      "today_in_dashboard": "false"
+    }
+  ],
+  "schema_version": "m12.25.queue.v1"
+}
