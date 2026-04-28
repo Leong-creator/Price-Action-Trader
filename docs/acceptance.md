@@ -1272,6 +1272,17 @@
   - 若边界样例或疑似误判仍偏多，`M10-PA-004/007` 不得进入完整历史回测；必须先进入 detector tightening / rerun。
   - `M10-PA-004/007` 必须继续留在 machine detector observation；不得自动流入每日测试、paper gate evidence、paper trading candidate 或 live-ready 队列。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.23 Detector Tightening Rerun 必须满足：
+  - 必须使用独立分支 `feature/m12-23-detector-tightening-rerun`，从已合并 M12.22 的 `main` 切出。
+  - 输入基线必须沿用 M12.20 的第一批 50 只、`1d`、本地只读 cache，不得新增真实交易连接、真实资金路径或下单路径。
+  - 必须输出收紧前后对比，至少包含 raw before cap、tightened raw、retained after cap、retention rate、quality status、visual decision、分策略边界样例和疑似误判数量。
+  - 必须补 raw/capped 分布审计；不得只看 capped retained 改善就宣称检测器已经稳定。
+  - 通过门槛固定为：收紧后 `likely_false_positive` 必须低于 M12.22 的 `169`，`borderline_needs_chart_review` 必须低于 M12.22 的 `1357`，且 retained candidates 仍至少覆盖 `M10-PA-004/007` 两条策略。
+  - 若收紧后 `likely_false_positive <= 42` 且 `borderline_needs_chart_review <= 271`，可进入 M12.24 小范围历史测试准备；否则继续收紧，不得进入历史测试。
+  - 必须输出 `m12_23_detector_tightening_summary.json`、`m12_23_raw_capped_audit.json/csv`、`m12_23_tightened_detector_events.jsonl/csv`、`m12_23_tightened_quality_ledger.jsonl/csv`、`m12_23_tightened_visual_review_ledger.csv`、`m12_23_before_after_comparison.csv`、`m12_23_detector_tightening_report.md`、`m12_23_next_step.md` 与 `m12_23_handoff.md`。
+  - 复核结论只能讨论机器识别质量和能否进入 M12.24 小范围历史测试准备；不得输出盈利、胜率、最大回撤、资金曲线、订单、成交、账户、持仓、现金或模拟买卖准入结论。
+  - `M10-PA-004/007` 在 M12.23 后仍不得自动流入每日测试、paper gate evidence、paper trading candidate 或 live-ready 队列。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

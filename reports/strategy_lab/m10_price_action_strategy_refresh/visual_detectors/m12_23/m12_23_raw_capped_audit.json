@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "cap_hides_distribution_risk": "true",
+      "cap_retention_percent_after_tightening": "79.51",
+      "event_cap_per_strategy_symbol": 50,
+      "plain_note": "保留样本仍受每策略/标的上限影响，进入历史测试前必须继续看 raw/capped 分布。",
+      "raw_after_tightening": 1996,
+      "raw_before_tightening": 4582,
+      "retained_after_cap": 1587,
+      "strategy_id": "M10-PA-004",
+      "tightening_retention_percent": "43.56"
+    },
+    {
+      "cap_hides_distribution_risk": "true",
+      "cap_retention_percent_after_tightening": "48.21",
+      "event_cap_per_strategy_symbol": 50,
+      "plain_note": "保留样本仍受每策略/标的上限影响，进入历史测试前必须继续看 raw/capped 分布。",
+      "raw_after_tightening": 4984,
+      "raw_before_tightening": 20190,
+      "retained_after_cap": 2403,
+      "strategy_id": "M10-PA-007",
+      "tightening_retention_percent": "24.69"
+    }
+  ],
+  "schema_version": "m12.23.raw-capped-audit.v1"
+}
