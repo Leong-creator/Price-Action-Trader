@@ -1,0 +1,7 @@
+strategy_id,strategy_title,queue,status,today_in_dashboard,paper_trial_candidate_now,plain_reason,latest_test_return_percent,latest_test_win_rate_percent,latest_test_max_drawdown_percent,source_ref
+M10-PA-001,趋势回调二次入场,每日只读测试主线,继续观察,true,false,这是已通过历史资金测试的核心顺势策略。,,,,M12-SRC-002
+M10-PA-002,突破后续跟进,每日只读测试主线,继续观察,true,false,它本身是核心策略，也能帮助判断强K线后有没有真实延续。,,,,M12-SRC-003
+M10-PA-012,开盘区间突破,每日只读测试主线,继续观察,true,false,主线策略继续累计10个交易日记录。,,,,
+M12-FTD-001,方方土日线趋势顺势信号K,每日只读测试主线,继续观察,true,false,这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。,,,,M12-SRC-001
+M10-PA-007,第二腿陷阱反转,新增观察队列,进入每日观察，不进入模拟买卖准入,false,false,M12.24 小范围历史测试为正收益且回撤可控，先加入每日观察，看后续实时只读信号是否稳定。,0.6473,41.15,3.8796,M12.24
+M10-PA-004,宽通道边界反转,不进入每日观察,保留图形研究,false,false,M12.24 小范围历史测试收益为负，本轮不加入每日观察，避免拖累主线。,-0.9580,34.72,4.0220,M12.24

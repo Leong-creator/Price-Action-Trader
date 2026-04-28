@@ -1,0 +1,61 @@
+{
+  "paper_trial_review_ready": false,
+  "recorded_day_count": 1,
+  "recorded_trading_days": [
+    {
+      "current_5m_ready_symbols": 50,
+      "first50_ready_symbols": 50,
+      "floating_positive_percent": "23.40",
+      "ftd_baseline_max_drawdown_percent": "49.04",
+      "ftd_baseline_return_percent": "745.13",
+      "ftd_baseline_win_rate": "36.74",
+      "ftd_selected_variant": "pullback_guard",
+      "ftd_selected_variant_max_drawdown_percent": "48.38",
+      "ftd_selected_variant_return_percent": "610.44",
+      "ftd_selected_variant_win_rate": "37.36",
+      "long_history_5m_completeness": "0/50",
+      "m12_12_observation_event_count": 550,
+      "paper_trial_review_ready": false,
+      "pause_reason": "",
+      "recorded_at": "2026-04-28T08:45:43Z",
+      "source_day_generated_at": "2026-04-28T07:05:51Z",
+      "status": "continue_observation",
+      "strategy_rows": [
+        {
+          "floating_positive_percent": "0.00",
+          "opportunity_count": 25,
+          "simulated_unrealized_pnl": "0.00",
+          "strategy_id": "M10-PA-002",
+          "strategy_title": "突破后续跟进"
+        },
+        {
+          "floating_positive_percent": "0.00",
+          "opportunity_count": 11,
+          "simulated_unrealized_pnl": "-1024.95",
+          "strategy_id": "M12-FTD-001",
+          "strategy_title": "方方土日线趋势顺势信号K"
+        },
+        {
+          "floating_positive_percent": "0.00",
+          "opportunity_count": 29,
+          "simulated_unrealized_pnl": "-2031.64",
+          "strategy_id": "M10-PA-001",
+          "strategy_title": "趋势回调二次入场"
+        },
+        {
+          "floating_positive_percent": "43.42",
+          "opportunity_count": 76,
+          "simulated_unrealized_pnl": "-5425.61",
+          "strategy_id": "M10-PA-012",
+          "strategy_title": "开盘区间突破"
+        }
+      ],
+      "today_opportunity_count": 141,
+      "today_simulated_unrealized_pnl": "-8482.20",
+      "today_simulated_unrealized_return_percent": "-8.48",
+      "trade_detail_count": 141
+    }
+  ],
+  "schema_version": "m12.25.day-counter.v1",
+  "target_day_count": 10
+}

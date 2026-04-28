@@ -1292,6 +1292,15 @@
   - 允许结论只能是 `进入每日观察`、`继续收紧`、`保留图形研究`、`暂不继续` 或样本不足等价状态；不得直接进入模拟买卖试运行。
   - 必须输出 `m12_24_pa004_pa007_small_pilot_summary.json`、`m12_24_pa004_pa007_metrics.csv`、`m12_24_pa004_pa007_trade_ledger.csv`、`m12_24_pa004_pa007_skipped_events.csv`、`m12_24_pa004_pa007_failure_examples.csv`、`m12_24_pa004_pa007_decision_matrix.csv`、`m12_24_pa004_pa007_client_report.md` 与 `m12_24_handoff.md`。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.25 Daily Observation Continuity 必须满足：
+  - 必须使用独立分支 `feature/m12-25-daily-observation-continuity`，从已合并 M12.24 的 `main` 切出。
+  - 每日只读测试主线只能包含 `M10-PA-001`、`M10-PA-002`、`M10-PA-012` 与 `M12-FTD-001`；不得把未通过观察准入的图形策略混入今日机会明细。
+  - `M10-PA-007` 只能作为新增观察队列进入 M12.25，不能进入模拟买卖准入、paper gate evidence 或真实交易路径。
+  - `M10-PA-004` 必须保持不进入每日观察，状态为保留图形研究或等价降级状态。
+  - 连续交易日计数必须基于新的来源交易日；若没有新的交易日数据，不得为了凑满 `10` 天而硬加一天。
+  - 中文看板首页必须优先展示今日机会、今日估算盈亏、估算收益率、胜率、最大回撤、连续记录天数和策略队列。
+  - 必须输出 `m12_25_daily_observation_continuity_summary.json`、`m12_25_dashboard_snapshot.json/html`、`m12_25_daily_observation_ledger.jsonl`、`m12_25_today_trade_details.csv`、`m12_25_observation_day_counter.json`、`m12_25_strategy_observation_queue.json/csv`、`m12_25_daily_client_report.md` 与 `m12_25_handoff.md`。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
