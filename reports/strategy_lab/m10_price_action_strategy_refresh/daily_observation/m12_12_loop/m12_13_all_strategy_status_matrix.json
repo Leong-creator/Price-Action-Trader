@@ -1,0 +1,148 @@
+{
+  "cache_context": {
+    "current_5m_ready_symbols": 50,
+    "daily_ready_symbols": 50,
+    "first_batch_symbols": 50
+  },
+  "generated_at": "2026-04-28T07:05:51Z",
+  "items": [
+    {
+      "candidate_count_today": "29",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "50只日线可测；日内用当前5m观察",
+      "status": "已进入每日测试",
+      "strategy_id": "M10-PA-001",
+      "title": "趋势回调二次入场"
+    },
+    {
+      "candidate_count_today": "25",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "50只日线可测；日内用当前5m观察",
+      "status": "已进入每日测试",
+      "strategy_id": "M10-PA-002",
+      "title": "突破后续跟进"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "不阻塞主线，后续按图形策略排队",
+      "status": "观察名单",
+      "strategy_id": "M10-PA-003",
+      "title": "紧密通道顺势"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "缺宽通道边界、触边、反转确认、失效条件",
+      "status": "待人工标签/定义闭环",
+      "strategy_id": "M10-PA-004",
+      "title": "宽通道边界反转"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "已补几何字段，但复测结果弱，先暂停",
+      "status": "暂不进入每日测试",
+      "strategy_id": "M10-PA-005",
+      "title": "交易区间失败突破反转"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "不是独立入场策略",
+      "status": "研究项",
+      "strategy_id": "M10-PA-006",
+      "title": "BLSHS 限价框架"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "缺腿部计数、对侧失败点、陷阱确认",
+      "status": "待人工标签/定义闭环",
+      "strategy_id": "M10-PA-007",
+      "title": "第二腿陷阱反转"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "agent 已预审，确认后可进入候选队列",
+      "status": "等待你确认关键图",
+      "strategy_id": "M10-PA-008",
+      "title": "主要趋势反转 MTR"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "agent 已预审，确认后可进入候选队列",
+      "status": "等待你确认关键图",
+      "strategy_id": "M10-PA-009",
+      "title": "楔形反转 / 楔形旗形"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "图形依赖高，后续排队",
+      "status": "暂非本阶段重点",
+      "strategy_id": "M10-PA-010",
+      "title": "Final Flag / Climax / TBTL"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "不阻塞主线，后续排队",
+      "status": "观察名单",
+      "strategy_id": "M10-PA-011",
+      "title": "开盘反转"
+    },
+    {
+      "candidate_count_today": "76",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "当前5m可做日内只读观察",
+      "status": "已进入每日测试",
+      "strategy_id": "M10-PA-012",
+      "title": "开盘区间突破"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "Wave B 候选，不进入本轮自动主线",
+      "status": "观察名单",
+      "strategy_id": "M10-PA-013",
+      "title": "支撑阻力失败测试"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "只用于目标，不单独交易",
+      "status": "辅助规则",
+      "strategy_id": "M10-PA-014",
+      "title": "Measured Move 目标模块"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "只用于风险控制，不单独交易",
+      "status": "辅助规则",
+      "strategy_id": "M10-PA-015",
+      "title": "止损与仓位模块"
+    },
+    {
+      "candidate_count_today": "0",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "不进入每日自动测试",
+      "status": "研究项",
+      "strategy_id": "M10-PA-016",
+      "title": "交易区间加仓研究"
+    },
+    {
+      "candidate_count_today": "11",
+      "paper_gate_evidence_now": "false",
+      "plain_reason": "从方方土来源重新正式化，不再叫 placeholder；本轮已重测。",
+      "status": "只保留为对照或选股因子",
+      "strategy_id": "M12-FTD-001",
+      "title": "方方土日线趋势顺势信号K"
+    }
+  ],
+  "schema_version": "m12.13.all-strategy-status-matrix.v1",
+  "stage": "M12.13.all_strategy_status"
+}

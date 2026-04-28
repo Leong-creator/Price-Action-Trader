@@ -1,0 +1,51 @@
+{
+  "title": "M12.12 每日只读测试循环",
+  "run_id": "m12_12_daily_observation_loop",
+  "stage": "M12.12.daily_observation_loop",
+  "market": "US",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop",
+  "local_data_roots": [
+    "local_data"
+  ],
+  "universe_definition_path": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_universe_definition.json",
+  "first_batch_size": 50,
+  "daily_start": "2010-06-29",
+  "daily_end": "2026-04-27",
+  "intraday_full_start": "2024-04-01",
+  "intraday_current_start": "2026-04-27",
+  "intraday_end": "2026-04-27",
+  "fetch_policy": {
+    "allow_readonly_fetch": true,
+    "fetch_timeframes": [
+      "1d",
+      "5m_current"
+    ],
+    "max_native_fetches": 100,
+    "missing_data_behavior": "deferred_no_fake_data"
+  },
+  "daily_observation_strategies": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M12-FTD-001"
+  ],
+  "formal_daily_strategy": {
+    "strategy_id": "M12-FTD-001",
+    "title": "方方土日线趋势顺势信号K",
+    "starting_capital": "100000",
+    "risk_per_trade_percent": "0.5",
+    "source_refs": [
+      "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+      "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+      "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+      "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf"
+    ]
+  },
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

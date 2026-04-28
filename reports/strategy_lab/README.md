@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.11 Read-only Trading Dashboard`，当前阶段分支为 `feature/m12-11-readonly-trading-dashboard`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.12 Daily Observation Loop`，当前阶段分支为 `feature/m12-12-daily-observation-loop`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -159,7 +159,8 @@
 - M12.9 已完成 visual review closure overlay：覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略与 `30` 个 case；`M10-PA-008/009` 已完成 agent-side closure 但仍需用户确认后才可讨论 gate evidence，`M10-PA-004/007` 仍只作为 definition evidence support。
 - M12.10 已完成 definition fix/retest：`M10-PA-005` 已补齐 `34651` 条 range geometry event ledger，但复测后仍为 `reject_for_now_after_geometry_review`；`M10-PA-004/007` 正式降级为 visual-only / manual-labeling，不再进入自动回测队列。
 - M12.11 已完成 read-only trading dashboard：本地 HTML 看板汇总 `12` 条 scanner 候选、`32` 条只读观察事件、`4` 个只读标的 latest bar close、`10` 个模拟资金曲线引用、M12.10 definition 决策和 M11.5 gate 状态；看板只使用 readonly / hypothetical / simulated 语义。
-- 下一步是 `M12.12 Daily Observation Loop`：把 cache、scanner、只读观察和 dashboard snapshot 串成日常更新链路；缺少输入时继续写 deferred / unavailable，不补假信号或假收益。
+- M12.12 已完成 daily observation loop 第一版：第一批 `50` 只股票/ETF 的 `1d` 长窗口与当前交易日 `5m` 只读 K 线已补齐，生成 `141` 条每日只读候选、中文看板、全策略状态总表、`M10-PA-008/009` 图形确认包和 M11.6 模拟准入复查；长历史 `5m` 全窗口仍未补齐。
+- 下一步是连续运行 M12.12 日常更新，累计 `10` 个交易日看板记录，并同步关闭 `M10-PA-008/009` 用户图形确认；达到条件后再进入 M11.6 模拟交易试运行批准。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -170,7 +171,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.11 阶段分支在：`feature/m12-11-readonly-trading-dashboard`
+- 当前 M12.12 阶段分支在：`feature/m12-12-daily-observation-loop`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 

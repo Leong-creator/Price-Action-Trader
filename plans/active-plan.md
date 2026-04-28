@@ -58,7 +58,8 @@
 - M12.9 已完成 Visual Review Closure overlay：复用 M10.2 visual packs、M10.10 visual gate 与 M12.3 precheck，覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略、`30` 个 case；`M10-PA-008/009` 只完成 agent-side closure，仍需用户确认关键图例后才可讨论 gate evidence，`M10-PA-004/007` 仍保持 definition evidence only。
 - M12.10 已完成 Definition Fix and Retest：`M10-PA-005` 已从本地 OHLCV 重新持久化 `34651` 条带 range 几何字段的事件记录，但复测后仍为 `reject_for_now_after_geometry_review`；`M10-PA-004/007` 因缺少可执行宽通道/第二腿标签，正式降级为 `visual_only_not_backtestable_without_manual_labels`，不再占用自动回测队列。
 - M12.11 已完成 Read-only Trading Dashboard：生成本地只读 HTML 看板、dashboard JSON、snapshot 报告和 handoff，展示 scanner 候选、只读观察事件、hypothetical entry/stop/target、simulated metrics/equity curves、策略状态和 blocker；当前仍不接真实账户、订单、持仓或 live execution。
-- 下一阶段已正式列入连续交付计划：`M12.12 Daily Observation Loop`，分支为 `feature/m12-12-daily-observation-loop`，目标是把 cache、scanner、只读观察和 dashboard snapshot 串成日常更新链路；缺少输入时必须 deferred，不得补假信号或假收益。
+- M12.12 已完成 Daily Observation Loop 第一版：第一批 `50` 只股票/ETF 的 `1d` 长窗口与当前交易日 `5m` 只读 K 线已补齐，`M10-PA-001/002/012 + M12-FTD-001` 已进入每日只读测试链路，当前生成 `141` 条候选和中文看板；长历史 `5m` 全窗口仍未补齐，不得宣称两年日内历史完整。
+- 下一阶段主线是连续运行 M12.12 日常更新，累计 `10` 个交易日看板记录，并同步关闭 `M10-PA-008/009` 用户图形确认；达到数据稳定、候选记录足够、图形确认和用户审批后，M11.6 才能批准进入模拟交易试运行。
 
 ## 2. 执行总原则
 
