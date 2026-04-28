@@ -1,0 +1,62 @@
+{
+  "annotated_chart_packet_count": 467,
+  "broker_connection": false,
+  "can_enter_full_backtest_now": false,
+  "can_enter_small_pilot_after_tightening": false,
+  "generated_at": "2026-04-28T10:50:03Z",
+  "live_execution": false,
+  "m12_21_raw_detector_event_count_before_cap": {
+    "M10-PA-004": 4582,
+    "M10-PA-007": 20190
+  },
+  "m12_21_retained_event_count": 4801,
+  "m12_21_retention_rate_after_cap_percent_by_strategy": {
+    "M10-PA-004": "50.22",
+    "M10-PA-007": "12.38"
+  },
+  "m12_21_sample_count": 300,
+  "m12_21_status_count_by_strategy": {
+    "M10-PA-004": {
+      "auto_pass_high": 780,
+      "auto_pass_medium": 1165,
+      "needs_spot_check": 356
+    },
+    "M10-PA-007": {
+      "auto_pass_high": 2005,
+      "auto_pass_medium": 480,
+      "needs_spot_check": 15
+    }
+  },
+  "needs_spot_check_decision_counts": {
+    "borderline_needs_chart_review": 187,
+    "likely_false_positive": 28,
+    "looks_valid": 156
+  },
+  "needs_spot_check_reviewed_count": 371,
+  "next_step": "先收紧 M10-PA-004 的宽度/双边触碰/中轴活动阈值，并对 M10-PA-007 的反向确认延迟和两腿偏离做上限；之后重跑检测器和抽样图形复核。",
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "已检查 M12.21 抽样图形包，并对 retained candidates 做全量严格复核；边界样例偏多，检测器需要先收紧。",
+  "real_orders": false,
+  "review_scope": "all_m12_21_retained_candidates",
+  "reviewed_event_count": 4801,
+  "schema_version": "m12.22.detector-sample-visual-review-summary.v1",
+  "stage": "M12.22.detector_sample_visual_review",
+  "visual_review_decision_by_strategy": {
+    "M10-PA-004": {
+      "borderline_needs_chart_review": 390,
+      "likely_false_positive": 43,
+      "looks_valid": 1868
+    },
+    "M10-PA-007": {
+      "borderline_needs_chart_review": 967,
+      "likely_false_positive": 126,
+      "looks_valid": 1407
+    }
+  },
+  "visual_review_decision_counts": {
+    "borderline_needs_chart_review": 1357,
+    "likely_false_positive": 169,
+    "looks_valid": 3275
+  }
+}
