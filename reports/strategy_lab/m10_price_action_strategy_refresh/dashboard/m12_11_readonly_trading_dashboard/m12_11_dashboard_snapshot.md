@@ -1,15 +1,15 @@
-# M12.11 Read-only Trading Dashboard Snapshot
+# M12.11 只读交易看板快照
 
 ## 摘要
 
-- Scanner candidates: `12`
-- Read-only observation events: `32`
-- Skip/no-trade events: `32`
-- Cache present symbols: `4` / `147`
-- Target-complete cache symbols: `0`
-- Paper gate decision: `not_approved`
-- PA005 decision: `reject_for_now_after_geometry_review`
-- Simulated equity curve refs: `10`
+- 今日候选机会：`12`
+- 只读观察记录：`32`
+- 跳过次数：`32`
+- 已有本地数据的标的：`4` / `147`
+- 完整覆盖目标窗口的标的：`0`
+- 纸面交易准入：`未批准`
+- PA005 当前结论：`暂不继续`
+- 模拟资金曲线数量：`10`
 
 ## 边界
 

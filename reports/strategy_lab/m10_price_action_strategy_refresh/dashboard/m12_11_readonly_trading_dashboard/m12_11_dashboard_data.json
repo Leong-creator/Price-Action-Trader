@@ -1,6 +1,6 @@
 {
   "dashboard_mode": "local_readonly_snapshot",
-  "generated_at": "2026-04-28T05:06:22Z",
+  "generated_at": "2026-04-28T05:43:54Z",
   "input_refs": {
     "cache_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_completion_summary.json",
     "decision_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_strategy_decision_matrix.json",
@@ -974,7 +974,7 @@
       "visual_pending_review_count": "5"
     },
     {
-      "blocker_or_next_action": "Requires manual labels or a new detector before any automated retest.",
+      "blocker_or_next_action": "需要人工标注或新识别器，之后才可能自动复测。",
       "capital_test_status": "needs_definition_fix",
       "client_status": "需要定义修正",
       "dashboard_status": "visual_only_not_backtestable_without_manual_labels",
@@ -997,7 +997,7 @@
       "visual_pending_review_count": "5"
     },
     {
-      "blocker_or_next_action": "PA005 has geometry fields, but remains rejected for now after review.",
+      "blocker_or_next_action": "PA005 已补齐几何字段，但复核后仍暂不继续。",
       "capital_test_status": "needs_definition_fix",
       "client_status": "需要定义修正",
       "dashboard_status": "reject_for_now_after_geometry_review",
@@ -1043,7 +1043,7 @@
       "visual_pending_review_count": "0"
     },
     {
-      "blocker_or_next_action": "Requires manual labels or a new detector before any automated retest.",
+      "blocker_or_next_action": "需要人工标注或新识别器，之后才可能自动复测。",
       "capital_test_status": "needs_definition_fix",
       "client_status": "需要定义修正",
       "dashboard_status": "visual_only_not_backtestable_without_manual_labels",
@@ -1066,7 +1066,7 @@
       "visual_pending_review_count": "5"
     },
     {
-      "blocker_or_next_action": "Priority visual case confirmation is still required before gate evidence.",
+      "blocker_or_next_action": "关键图形样例仍需要你确认，确认前不能作为准入证据。",
       "capital_test_status": "completed_capital_test",
       "client_status": "已完成资金测试",
       "dashboard_status": "manual_visual_review_required",
@@ -1089,7 +1089,7 @@
       "visual_pending_review_count": "5"
     },
     {
-      "blocker_or_next_action": "Priority visual case confirmation is still required before gate evidence.",
+      "blocker_or_next_action": "关键图形样例仍需要你确认，确认前不能作为准入证据。",
       "capital_test_status": "completed_capital_test",
       "client_status": "已完成资金测试",
       "dashboard_status": "manual_visual_review_required",

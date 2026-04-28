@@ -41,6 +41,7 @@ class M12ReadonlyTradingDashboardTests(unittest.TestCase):
         self.assertEqual(summary["simulated_portfolio_proxy_final_equity"], "105728.18")
         self.assertNotEqual(summary["simulated_portfolio_proxy_not_executable_reason"], "unavailable")
         self.assertEqual(summary["simulated_equity_curve_count"], 10)
+        self.assertEqual(config.title, "M12.11 只读交易看板")
         for curve in dashboard["simulated_equity_curves"]:
             self.assertTrue((MODULE.ROOT / curve["simulated_equity_curve_ref"]).exists())
             self.assertEqual(curve["curve_semantics"], "simulated_historical_equity_curve")
@@ -120,6 +121,43 @@ class M12ReadonlyTradingDashboardTests(unittest.TestCase):
         self.assertEqual(rows["M10-PA-002"]["scanner_candidates"], "0")
         self.assertEqual(rows["M10-PA-006"]["display_title"], "Trading Range BLSHS Limit Framework")
         self.assertEqual(rows["M10-PA-015"]["display_title"], "Protective Stops and Risk Sizing")
+
+    def test_visible_dashboard_text_is_client_facing_chinese(self) -> None:
+        config = MODULE.load_dashboard_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            MODULE.run_m12_readonly_trading_dashboard(
+                replace(config, output_dir=output_dir),
+                generated_at="2026-04-28T00:00:00Z",
+            )
+
+            html = (output_dir / "m12_11_readonly_trading_dashboard.html").read_text(encoding="utf-8")
+            visible_html = html.split("<script", maxsplit=1)[0]
+            snapshot = (output_dir / "m12_11_dashboard_snapshot.md").read_text(encoding="utf-8")
+
+        for expected in (
+            "M12.11 只读交易看板",
+            "今日候选机会",
+            "策略状态",
+            "模拟资金曲线",
+            "只读行情参考",
+            "假设入场价",
+            "模拟收益",
+            "最大回撤",
+            "不接交易账户",
+        ):
+            self.assertIn(expected, visible_html)
+        for old_label in (
+            "Read-only Trading Dashboard",
+            "Scanner Candidates",
+            "Strategy Status",
+            "Simulated Equity Curves",
+            "Hyp Entry",
+            "Sim Net",
+        ):
+            self.assertNotIn(old_label, visible_html)
+        self.assertIn("# M12.11 只读交易看板快照", snapshot)
+        self.assertIn("今日候选机会", snapshot)
 
     def test_observation_events_do_not_convert_skips_into_triggers(self) -> None:
         config = MODULE.load_dashboard_config()

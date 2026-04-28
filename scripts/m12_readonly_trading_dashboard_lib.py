@@ -50,6 +50,29 @@ FORBIDDEN_JSON_KEYS = {
     "broker",
 }
 
+DISPLAY_LABELS = {
+    "not_approved": "未批准",
+    "continue_read_only_observation": "继续只读观察",
+    "manual_visual_review_required": "等待图形复核",
+    "reject_for_now_after_geometry_review": "暂不继续",
+    "visual_only_not_backtestable_without_manual_labels": "只做图形研究",
+    "watchlist_after_priority_cases": "观察名单",
+    "not_current_week_focus": "暂非本周重点",
+    "not_independent_trigger": "非独立策略",
+    "skip_no_trade": "跳过，未交易",
+    "continue_observation": "继续观察",
+    "long": "看涨",
+    "short": "看跌",
+    "none": "无方向",
+    "1d": "日线",
+    "1h": "1小时",
+    "15m": "15分钟",
+    "5m": "5分钟",
+    "closed": "已收盘",
+    "complete": "已完成",
+    "unavailable": "暂无",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class DashboardConfig:
@@ -225,6 +248,15 @@ def text_or_unavailable(value: str | None) -> str:
     return value if value not in (None, "") else "unavailable"
 
 
+def display_value(value: Any) -> str:
+    text = str(value)
+    return DISPLAY_LABELS.get(text, text)
+
+
+def display_number_or_na(value: Any) -> str:
+    return "暂无" if value in (None, "", "unavailable") else str(value)
+
+
 def sanitize_dashboard_text(value: str) -> str:
     return (
         value.replace("portfolio order book", "portfolio ledger")
@@ -243,6 +275,15 @@ def sanitize_dashboard_title(value: str) -> str:
         .replace("Position Sizing", "Risk Sizing")
         .replace("Position", "Risk")
     )
+
+
+def sanitize_blocker_text(value: str) -> str:
+    translations = {
+        "Requires manual labels or a new detector before any automated retest.": "需要人工标注或新识别器，之后才可能自动复测。",
+        "Priority visual case confirmation is still required before gate evidence.": "关键图形样例仍需要你确认，确认前不能作为准入证据。",
+        "PA005 has geometry fields, but remains rejected for now after review.": "PA005 已补齐几何字段，但复核后仍暂不继续。",
+    }
+    return translations.get(value, sanitize_dashboard_text(value))
 
 
 def build_readonly_quotes(feed_events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -343,13 +384,13 @@ def build_strategy_statuses(
         blocker = row["client_note"]
         if strategy_id == "M10-PA-005":
             dashboard_status = definition_summary["pa005_decision"]
-            blocker = "PA005 has geometry fields, but remains rejected for now after review."
+            blocker = "PA005 已补齐几何字段，但复核后仍暂不继续。"
         elif strategy_id in visual_decisions:
             dashboard_status = visual_decisions[strategy_id]
-            blocker = "Requires manual labels or a new detector before any automated retest."
+            blocker = "需要人工标注或新识别器，之后才可能自动复测。"
         elif strategy_id in PRIORITY_VISUAL:
             dashboard_status = "manual_visual_review_required"
-            blocker = "Priority visual case confirmation is still required before gate evidence."
+            blocker = "关键图形样例仍需要你确认，确认前不能作为准入证据。"
         rows.append(
             {
                 "strategy_id": strategy_id,
@@ -372,7 +413,7 @@ def build_strategy_statuses(
                 "scanner_watch_candidates": row["scanner_watch_candidates"],
                 "visual_pending_review_count": row["visual_pending_review_count"],
                 "definition_decision": definition_decisions.get(strategy_id, row.get("definition_status", "")),
-                "blocker_or_next_action": blocker,
+                "blocker_or_next_action": sanitize_blocker_text(blocker),
             }
         )
     return rows
@@ -477,11 +518,11 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
     data = html.escape(json.dumps(dashboard, ensure_ascii=False, sort_keys=True))
     summary = dashboard["summary"]
     cards = [
-        ("Scanner", summary["scanner_candidates"], "candidates"),
-        ("Observation", summary["readonly_observation_events"], "events"),
-        ("Skipped", summary["readonly_skip_no_trade"], "no-trade"),
-        ("Universe", f"{summary['cache_present_symbols']}/{summary['scanner_universe_symbols']}", "cached"),
-        ("Gate", summary["paper_gate_decision"], "status"),
+        ("今日候选", summary["scanner_candidates"], "扫描出的机会"),
+        ("观察记录", summary["readonly_observation_events"], "只读记录"),
+        ("跳过次数", summary["readonly_skip_no_trade"], "条件不满足"),
+        ("股票池缓存", f"{summary['cache_present_symbols']}/{summary['scanner_universe_symbols']}", "已有本地数据"),
+        ("准入状态", display_value(summary["paper_gate_decision"]), "不能纸面交易"),
     ]
     card_html = "\n".join(
         f'<section class="metric-card"><span>{html.escape(label)}</span><strong>{html.escape(str(value))}</strong><small>{html.escape(note)}</small></section>'
@@ -491,14 +532,14 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
         "<tr>"
         f"<td>{html.escape(row['symbol'])}</td>"
         f"<td>{html.escape(row['strategy_id'])}</td>"
-        f"<td>{html.escape(row['timeframe'])}</td>"
-        f"<td>{html.escape(row['signal_direction'])}</td>"
-        f"<td>{html.escape(row['hypothetical_entry_price'])}</td>"
-        f"<td>{html.escape(row['hypothetical_stop_price'])}</td>"
-        f"<td>{html.escape(row['hypothetical_target_price'])}</td>"
-        f"<td>{html.escape(row['readonly_last_price'])}</td>"
-        f"<td>{html.escape(row['hypothetical_unrealized_r'])}</td>"
-        f"<td>{html.escape(row['review_status'])}</td>"
+        f"<td>{html.escape(display_value(row['timeframe']))}</td>"
+        f"<td>{html.escape(display_value(row['signal_direction']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['hypothetical_entry_price']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['hypothetical_stop_price']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['hypothetical_target_price']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['readonly_last_price']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['hypothetical_unrealized_r']))}</td>"
+        f"<td>{html.escape(display_value(row['review_status']))}</td>"
         "</tr>"
         for row in dashboard["scanner_candidates"]
     )
@@ -506,10 +547,10 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
         "<tr>"
         f"<td>{html.escape(row['strategy_id'])}</td>"
         f"<td>{html.escape(row['display_title'])}</td>"
-        f"<td>{html.escape(row['dashboard_status'])}</td>"
-        f"<td>{html.escape(row['simulated_net_profit'])}</td>"
-        f"<td>{html.escape(row['simulated_win_rate'])}</td>"
-        f"<td>{html.escape(row['simulated_max_drawdown_percent'])}</td>"
+        f"<td>{html.escape(display_value(row['dashboard_status']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['simulated_net_profit']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['simulated_win_rate']))}</td>"
+        f"<td>{html.escape(display_number_or_na(row['simulated_max_drawdown_percent']))}</td>"
         f"<td>{html.escape(row['scanner_candidates'])}</td>"
         f"<td>{html.escape(row['blocker_or_next_action'])}</td>"
         "</tr>"
@@ -518,17 +559,17 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
     quote_rows = "\n".join(
         "<tr>"
         f"<td>{html.escape(row['symbol'])}</td>"
-        f"<td>{html.escape(row['readonly_last_price'])}</td>"
-        f"<td>{html.escape(row['readonly_last_price_timeframe'])}</td>"
+        f"<td>{html.escape(display_number_or_na(row['readonly_last_price']))}</td>"
+        f"<td>{html.escape(display_value(row['readonly_last_price_timeframe']))}</td>"
         f"<td>{html.escape(row['readonly_last_bar_timestamp'])}</td>"
-        f"<td>{html.escape(row['readonly_bar_status'])}</td>"
+        f"<td>{html.escape(display_value(row['readonly_bar_status']))}</td>"
         "</tr>"
         for row in dashboard["readonly_quotes"]
     )
     curve_cards = "\n".join(
         "<figure class=\"curve-card\">"
-        f"<img src=\"{html.escape(row['html_relative_src'])}\" alt=\"{html.escape(row['strategy_id'])} {html.escape(row['timeframe'])} simulated equity curve\">"
-        f"<figcaption>{html.escape(row['strategy_id'])} {html.escape(row['timeframe'])} simulated equity curve</figcaption>"
+        f"<img src=\"{html.escape(row['html_relative_src'])}\" alt=\"{html.escape(row['strategy_id'])} {html.escape(display_value(row['timeframe']))} 模拟资金曲线\">"
+        f"<figcaption>{html.escape(row['strategy_id'])} {html.escape(display_value(row['timeframe']))} 模拟资金曲线</figcaption>"
         "</figure>"
         for row in dashboard["simulated_equity_curves"]
     )
@@ -537,7 +578,7 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>M12.11 Read-only Trading Dashboard</title>
+  <title>M12.11 只读交易看板</title>
   <style>
     :root {{
       color-scheme: light;
@@ -666,14 +707,14 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
 <body>
   <header>
     <div>
-      <h1>M12.11 Read-only Trading Dashboard</h1>
-      <div class="sub">Snapshot {html.escape(dashboard['generated_at'])}</div>
+      <h1>M12.11 只读交易看板</h1>
+      <div class="sub">快照时间 {html.escape(dashboard['generated_at'])}</div>
     </div>
     <div class="status-line">
-      <span class="badge">paper_simulated_only=true</span>
-      <span class="badge">trading_connection=false</span>
-      <span class="badge">real_money_actions=false</span>
-      <span class="badge">live_execution=false</span>
+      <span class="badge">仅模拟</span>
+      <span class="badge">不接交易账户</span>
+      <span class="badge">不碰真实资金</span>
+      <span class="badge">不实盘执行</span>
     </div>
   </header>
   <main>
@@ -681,32 +722,32 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
       {card_html}
     </div>
     <section class="table-panel">
-      <h2>Scanner Candidates</h2>
+      <h2>今日候选机会</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Symbol</th><th>Strategy</th><th>TF</th><th>Dir</th><th>Hyp Entry</th><th>Hyp Stop</th><th>Hyp Target</th><th>Readonly Price</th><th>Hyp R</th><th>Review</th></tr></thead>
+          <thead><tr><th>标的</th><th>策略</th><th>周期</th><th>方向</th><th>假设入场价</th><th>假设止损价</th><th>假设目标价</th><th>当前参考价</th><th>假设盈亏 R</th><th>复核状态</th></tr></thead>
           <tbody>{candidate_rows}</tbody>
         </table>
       </div>
     </section>
     <section class="table-panel">
-      <h2>Strategy Status</h2>
+      <h2>策略状态</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Strategy</th><th>Status</th><th>Sim Net</th><th>Sim Win</th><th>Sim Max DD %</th><th>Scanner</th><th>Blocker / Next</th></tr></thead>
+          <thead><tr><th>ID</th><th>策略</th><th>当前状态</th><th>模拟收益</th><th>模拟胜率</th><th>最大回撤 %</th><th>候选数</th><th>阻塞 / 下一步</th></tr></thead>
           <tbody>{status_rows}</tbody>
         </table>
       </div>
     </section>
     <section class="table-panel">
-      <h2>Simulated Equity Curves</h2>
+      <h2>模拟资金曲线</h2>
       <div class="curve-grid">{curve_cards}</div>
     </section>
     <section class="table-panel">
-      <h2>Readonly Prices</h2>
+      <h2>只读行情参考</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Symbol</th><th>Readonly Last</th><th>TF</th><th>Bar Time</th><th>Status</th></tr></thead>
+          <thead><tr><th>标的</th><th>最新参考价</th><th>周期</th><th>K 线时间</th><th>状态</th></tr></thead>
           <tbody>{quote_rows}</tbody>
         </table>
       </div>
@@ -721,18 +762,18 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
 def build_snapshot_report(dashboard: dict[str, Any]) -> str:
     summary = dashboard["summary"]
     lines = [
-        "# M12.11 Read-only Trading Dashboard Snapshot",
+        "# M12.11 只读交易看板快照",
         "",
         "## 摘要",
         "",
-        f"- Scanner candidates: `{summary['scanner_candidates']}`",
-        f"- Read-only observation events: `{summary['readonly_observation_events']}`",
-        f"- Skip/no-trade events: `{summary['readonly_skip_no_trade']}`",
-        f"- Cache present symbols: `{summary['cache_present_symbols']}` / `{summary['scanner_universe_symbols']}`",
-        f"- Target-complete cache symbols: `{summary['cache_target_complete_symbols']}`",
-        f"- Paper gate decision: `{summary['paper_gate_decision']}`",
-        f"- PA005 decision: `{summary['pa005_decision']}`",
-        f"- Simulated equity curve refs: `{summary['simulated_equity_curve_count']}`",
+        f"- 今日候选机会：`{summary['scanner_candidates']}`",
+        f"- 只读观察记录：`{summary['readonly_observation_events']}`",
+        f"- 跳过次数：`{summary['readonly_skip_no_trade']}`",
+        f"- 已有本地数据的标的：`{summary['cache_present_symbols']}` / `{summary['scanner_universe_symbols']}`",
+        f"- 完整覆盖目标窗口的标的：`{summary['cache_target_complete_symbols']}`",
+        f"- 纸面交易准入：`{display_value(summary['paper_gate_decision'])}`",
+        f"- PA005 当前结论：`{display_value(summary['pa005_decision'])}`",
+        f"- 模拟资金曲线数量：`{summary['simulated_equity_curve_count']}`",
         "",
         "## 边界",
         "",
