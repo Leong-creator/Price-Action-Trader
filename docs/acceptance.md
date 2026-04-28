@@ -1243,8 +1243,15 @@
   - 看板只能消费已有只读 artifacts：M12.1 feed、M12.2 observation、M12.5 scanner、M12.6 weekly scorecard、M12.8 cache coverage、M12.10 definition decisions 与 M10/M11 策略指标。
   - 看板必须展示今日 scanner 候选、策略状态与 blocker、假设 entry/stop/target、当前只读 quote、hypothetical/simulated PnL、simulated equity curve、历史胜率/回撤和暂停原因。
   - 字段必须使用 `hypothetical_*`、`simulated_*`、`readonly_*`；不得出现真实 `order`、`fill`、`account`、`broker`、`position`、`cash` 语义。
+  - 对外看板的策略展示名必须使用只读展示别名，避免在 generated dashboard artifact 中出现容易被误解为执行/账户能力的 `order`、`position` 等词面；原始策略源目录不因此改名。
   - Web 看板只能本地只读刷新，不得连接 broker、不下单、不批准 paper/live。
   - 若缺少实时输入、quote、scanner 或 cache 覆盖，只能显示 deferred / unavailable，不得伪造行情、信号或盈亏。
+- M12.12 Daily Observation Loop 必须满足：
+  - 必须使用独立分支 `feature/m12-12-daily-observation-loop`，从已合并 M12.11 的 `main` 切出。
+  - 只能串联本地只读 cache、scanner、observation 和 dashboard snapshot；不得新增真实交易连接、真实资金路径或下单路径。
+  - `1d` 只能按收盘后语义更新；`1h / 15m / 5m` 只能按 regular-session bar close 语义更新。
+  - 数据缺失、缓存过期、Longbridge 限流或未授权时必须写 deferred / unavailable artifact，不得补假行情、假信号、假收益或假观察事件。
+  - 每日输出必须继续保留 `paper_trading_approval=false`、`trading_connection=false`、`real_money_actions=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

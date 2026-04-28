@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.10 Definition Fix and Retest`，当前阶段分支为 `feature/m12-10-definition-fix-and-retest`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.11 Read-only Trading Dashboard`，当前阶段分支为 `feature/m12-11-readonly-trading-dashboard`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -121,6 +121,10 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_pa005_geometry_events.csv`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_retest_client_summary.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/dashboard/m12_11_readonly_trading_dashboard/m12_11_dashboard_data.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/dashboard/m12_11_readonly_trading_dashboard/m12_11_readonly_trading_dashboard.html`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/dashboard/m12_11_readonly_trading_dashboard/m12_11_dashboard_snapshot.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/dashboard/m12_11_readonly_trading_dashboard/m12_11_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_handoff.md`
@@ -154,6 +158,8 @@
 - M12.8 已完成 universe cache coverage / deferred / fetch-plan：`147` 只 seed 全部入账，当前有任一 native cache 的标的是 `4` 只，完整覆盖目标窗口标的是 `0` 只，`588` 个缺口全部 deferred，`294` 个 native cache 请求进入只读 fetch plan；在真实补齐前不得宣称 full universe scanner 可用。
 - M12.9 已完成 visual review closure overlay：覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略与 `30` 个 case；`M10-PA-008/009` 已完成 agent-side closure 但仍需用户确认后才可讨论 gate evidence，`M10-PA-004/007` 仍只作为 definition evidence support。
 - M12.10 已完成 definition fix/retest：`M10-PA-005` 已补齐 `34651` 条 range geometry event ledger，但复测后仍为 `reject_for_now_after_geometry_review`；`M10-PA-004/007` 正式降级为 visual-only / manual-labeling，不再进入自动回测队列。
+- M12.11 已完成 read-only trading dashboard：本地 HTML 看板汇总 `12` 条 scanner 候选、`32` 条只读观察事件、`4` 个只读标的 latest bar close、`10` 个模拟资金曲线引用、M12.10 definition 决策和 M11.5 gate 状态；看板只使用 readonly / hypothetical / simulated 语义。
+- 下一步是 `M12.12 Daily Observation Loop`：把 cache、scanner、只读观察和 dashboard snapshot 串成日常更新链路；缺少输入时继续写 deferred / unavailable，不补假信号或假收益。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -164,7 +170,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.10 阶段分支在：`feature/m12-10-definition-fix-and-retest`
+- 当前 M12.11 阶段分支在：`feature/m12-11-readonly-trading-dashboard`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 
