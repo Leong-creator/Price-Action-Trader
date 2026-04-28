@@ -1,0 +1,98 @@
+{
+  "auto_reject_count": 0,
+  "broker_connection": false,
+  "can_enter_backtest_now": false,
+  "cap_scope_warning": "M12.20 每个 strategy/symbol 最多保留最近 50 条事件；M12.21 是 retained candidates 全量复核，不代表 raw detector 全历史分布。",
+  "chart_count": 80,
+  "generated_at": "2026-04-28T10:11:59Z",
+  "live_execution": false,
+  "machine_pass_count": 4801,
+  "machine_pass_percent": "100.00",
+  "needs_spot_check_count": 371,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "已对 M12.20 的全部机器识别候选做全量复核；这回答的是图形结构是否自洽，不是盈利能力。",
+  "quality_status_by_strategy": {
+    "M10-PA-004": {
+      "auto_pass_high": 780,
+      "auto_pass_medium": 1165,
+      "auto_reject": 0,
+      "needs_spot_check": 356
+    },
+    "M10-PA-007": {
+      "auto_pass_high": 2005,
+      "auto_pass_medium": 480,
+      "auto_reject": 0,
+      "needs_spot_check": 15
+    }
+  },
+  "quality_status_counts": {
+    "auto_pass_high": 2785,
+    "auto_pass_medium": 1645,
+    "auto_reject": 0,
+    "needs_spot_check": 371
+  },
+  "raw_detector_event_count_before_cap": {
+    "M10-PA-004": 4582,
+    "M10-PA-007": 20190
+  },
+  "real_orders": false,
+  "retained_detector_event_count_by_strategy": {
+    "M10-PA-004": 2301,
+    "M10-PA-007": 2500
+  },
+  "retention_rate_after_cap_percent_by_strategy": {
+    "M10-PA-004": "50.22",
+    "M10-PA-007": "12.38"
+  },
+  "reviewed_event_count": 4801,
+  "sample_count": 300,
+  "schema_version": "m12.21.detector-quality-summary.v1",
+  "source_event_count": 4801,
+  "source_event_scope": "retained_candidates_after_m12_20_cap",
+  "stage": "M12.21.detector_quality_review",
+  "top_symbols_by_review_count": [
+    {
+      "event_count": 100,
+      "symbol": "QQQ"
+    },
+    {
+      "event_count": 100,
+      "symbol": "IWM"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLK"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLF"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLE"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLY"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLI"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLU"
+    },
+    {
+      "event_count": 100,
+      "symbol": "XLB"
+    },
+    {
+      "event_count": 100,
+      "symbol": "SMH"
+    }
+  ],
+  "upstream_event_cap_per_strategy_symbol": 50,
+  "why_not_backtest_yet": "全量结构复核通过不等于视觉准确率；下一步要先抽样看图，确认机器没有把普通震荡误判成策略图形。"
+}
