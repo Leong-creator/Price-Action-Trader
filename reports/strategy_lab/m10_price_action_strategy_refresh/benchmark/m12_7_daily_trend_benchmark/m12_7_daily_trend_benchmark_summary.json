@@ -1,0 +1,184 @@
+{
+  "schema_version": "m12.daily-trend-benchmark-summary.v1",
+  "stage": "M12.7.daily_trend_benchmark",
+  "run_id": "m12_7_daily_trend_benchmark",
+  "generated_at": "2026-04-28T03:06:29Z",
+  "title": "M12.7 Daily Trend Momentum Benchmark",
+  "strategy_id": "M12-BENCH-001",
+  "strategy_name": "Daily Trend Momentum Baseline",
+  "legacy_reference_run": "reports/backtests/demo_public_2024h1",
+  "legacy_source_logic": "signal_bar_entry_placeholder",
+  "benchmark_signal_contract": {
+    "contract_version": "m12-bench-001.frozen-signal-bar-placeholder.v1",
+    "implementation": "scripts/m12_daily_trend_benchmark_lib.py::generate_frozen_benchmark_signals",
+    "source_refs": [
+      "wiki:knowledge/wiki/concepts/market-cycle-overview.md",
+      "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md",
+      "wiki:knowledge/wiki/rules/m3-research-reference-pack.md",
+      "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+      "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+      "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+      "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf"
+    ]
+  },
+  "clean_room_catalog_source": false,
+  "boundary": {
+    "runtime_scope": "historical_simulation_benchmark_only",
+    "benchmark_only": true,
+    "gate_evidence": false,
+    "clean_room_catalog_source": false
+  },
+  "time_range": {
+    "start": "2010-06-29",
+    "end": "2026-04-21",
+    "interval": "1d"
+  },
+  "simulation_budget": {
+    "starting_capital": "100000.00",
+    "unit_budget": "500.00",
+    "max_gross_exposure": "100000.00",
+    "max_symbol_allocation_ratio": "1.0000",
+    "session_loss_budget": "4000.00",
+    "max_loss_streak": 4
+  },
+  "core_results": {
+    "simulated_starting_capital": "100000.00",
+    "simulated_final_equity": "149786.19",
+    "simulated_net_result": "49786.19",
+    "simulated_return_percent": "49.7862",
+    "benchmark_event_count": 1165,
+    "suppressed_signal_count": 330,
+    "win_rate": "0.3622",
+    "win_rate_percent": "36.2232",
+    "profit_factor": "1.1357",
+    "simulated_drawdown": "15239.14",
+    "simulated_drawdown_percent": "12.1939"
+  },
+  "per_symbol": [
+    {
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "bars": 3976,
+      "benchmark_signal_count": 380,
+      "baseline_event_count": 363,
+      "simulated_event_count": 183,
+      "suppressed_signal_count": 180,
+      "simulated_net_result": "18310.93",
+      "win_rate": "0.3989",
+      "win_rate_percent": "39.8907",
+      "cache_csv": "local_data/longbridge_history/us_SPY_1d_2010-06-29_2026-04-21_longbridge.csv"
+    },
+    {
+      "symbol": "QQQ",
+      "label": "Invesco QQQ Trust",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "bars": 3977,
+      "benchmark_signal_count": 395,
+      "baseline_event_count": 383,
+      "simulated_event_count": 286,
+      "suppressed_signal_count": 97,
+      "simulated_net_result": "19417.11",
+      "win_rate": "0.3811",
+      "win_rate_percent": "38.1119",
+      "cache_csv": "local_data/longbridge_history/us_QQQ_1d_1990-01-01_2026-04-21_longbridge.csv"
+    },
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "bars": 3977,
+      "benchmark_signal_count": 382,
+      "baseline_event_count": 377,
+      "simulated_event_count": 354,
+      "suppressed_signal_count": 23,
+      "simulated_net_result": "23986.46",
+      "win_rate": "0.3785",
+      "win_rate_percent": "37.8531",
+      "cache_csv": "local_data/longbridge_history/us_NVDA_1d_2010-06-29_2026-04-21_longbridge.csv"
+    },
+    {
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "bars": 3977,
+      "benchmark_signal_count": 379,
+      "baseline_event_count": 372,
+      "simulated_event_count": 342,
+      "suppressed_signal_count": 30,
+      "simulated_net_result": "-11928.31",
+      "win_rate": "0.3099",
+      "win_rate_percent": "30.9942",
+      "cache_csv": "local_data/longbridge_history/us_TSLA_1d_2010-06-29_2026-04-21_longbridge.csv"
+    }
+  ],
+  "data_inventory": [
+    {
+      "symbol": "SPY",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "selected_reason": "exact_window_match",
+      "csv_path": "local_data/longbridge_history/us_SPY_1d_2010-06-29_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_history/us_SPY_1d_2010-06-29_2026-04-21_longbridge.metadata.json",
+      "cache_start": "2010-06-29",
+      "cache_end": "2026-04-21",
+      "row_count": 3976,
+      "deferred_reason": null
+    },
+    {
+      "symbol": "QQQ",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "selected_reason": "covering_window_match",
+      "csv_path": "local_data/longbridge_history/us_QQQ_1d_1990-01-01_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_history/us_QQQ_1d_1990-01-01_2026-04-21_longbridge.metadata.json",
+      "cache_start": "1990-01-01",
+      "cache_end": "2026-04-21",
+      "row_count": 3977,
+      "deferred_reason": null
+    },
+    {
+      "symbol": "NVDA",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "selected_reason": "exact_window_match",
+      "csv_path": "local_data/longbridge_history/us_NVDA_1d_2010-06-29_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_history/us_NVDA_1d_2010-06-29_2026-04-21_longbridge.metadata.json",
+      "cache_start": "2010-06-29",
+      "cache_end": "2026-04-21",
+      "row_count": 3977,
+      "deferred_reason": null
+    },
+    {
+      "symbol": "TSLA",
+      "market": "US",
+      "source": "longbridge_local_cache",
+      "selected_reason": "exact_window_match",
+      "csv_path": "local_data/longbridge_history/us_TSLA_1d_2010-06-29_2026-04-21_longbridge.csv",
+      "metadata_path": "local_data/longbridge_history/us_TSLA_1d_2010-06-29_2026-04-21_longbridge.metadata.json",
+      "cache_start": "2010-06-29",
+      "cache_end": "2026-04-21",
+      "row_count": 3977,
+      "deferred_reason": null
+    }
+  ],
+  "deferred_symbol_count": 0,
+  "benchmark_decision": "scanner_factor_candidate",
+  "benchmark_decision_reason": "长窗口样本、profit factor 与收益集中度满足 scanner 因子候选门槛。",
+  "scanner_factor_allowed": true,
+  "comparison_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012"
+  ],
+  "comparison_artifact": "reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_comparison.csv",
+  "not_allowed": [
+    "clean_room_catalog_source",
+    "gate_evidence",
+    "direct_strategy_candidate"
+  ]
+}

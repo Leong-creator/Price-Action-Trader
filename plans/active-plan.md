@@ -53,6 +53,7 @@
 - M12.5 已完成 Liquid Universe Scanner：第一版高流动性 US 股票/ETF seed 共 `147` 只，自动 scanner 只启用 Tier A `M10-PA-001/002/012`；当前本地 cache 实际完成 `SPY / QQQ / NVDA / TSLA` 扫描并输出 `12` 条候选，其余 `143` 只缺少本地数据的 seed 全部 deferred，不补假候选。
 - M12.6 已完成 Weekly Client Scorecard：把历史资金测试、每日只读观察、scanner 候选、图形预审和定义修正合成 `16` 条策略 dashboard、客户周报和下周行动计划；当前只作为模拟观察与测试管理材料，不作为交易批准。
 - M11.5 已完成 Paper Gate Recheck：基于 M12.2-M12.6 的实际 artifact 复查 `M10-PA-001/002/012/008/009`，当前 gate decision 仍为 `not_approved`；核心阻塞是没有完成真实只读观察窗口、M12.2 没有 completed candidate events、`M10-PA-008/009` 人工图形复核未关闭、`M10-PA-005/004/007` definition blocker 未关闭或未正式降级、scanner universe cache 覆盖不完整、缺少人工业务审批。
+- M12.7 已完成 Daily Trend Benchmark Reuse：把早期截图中的 `signal_bar_entry_placeholder` 日线逻辑固定为 `M12-BENCH-001 Daily Trend Momentum Baseline`，用本地 Longbridge `1d` 长窗口 `2010-06-29 ~ 2026-04-21` 重跑 `SPY / QQQ / NVDA / TSLA`；结果只作为 `scanner_factor_candidate` benchmark，不反向污染 M10 clean-room catalog，也不作为准入证据。
 
 ## 2. 执行总原则
 
