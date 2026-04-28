@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12.27：PA004 Expanded Retest + Live Read-only Snapshot（当前阶段分支 `feature/m12-27-pa004-expanded-retest-live-snapshot`，正在把 PA004 从“小范围暂不继续”改为分方向/分标的诊断复测，并记录开盘时段只读行情快照）
+- 当前支线：阶段 12.28：PA004 Long Dashboard Refresh（当前阶段分支 `feature/m12-28-pa004-long-dashboard-refresh`，正在把 PA004 做多版接入盘中只读模拟看板，并用 Longbridge 只读报价刷新当前机会盈亏）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.27 PA004 Expanded Retest + Live Read-only Snapshot`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot、M12.25 Daily Observation Continuity、M12.26 Cache Scanner Expansion 与 M12.27 PA004 Expanded Retest + Live Read-only Snapshot
+- 当前支线 milestone：`M12.28 PA004 Long Dashboard Refresh`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot、M12.25 Daily Observation Continuity、M12.26 Cache Scanner Expansion、M12.27 PA004 Expanded Retest + Live Read-only Snapshot 与 M12.28 PA004 Long Dashboard Refresh
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m12-27-pa004-expanded-retest-live-snapshot`
+- `feature/m12-28-pa004-long-dashboard-refresh`
 
 ## 已完成
 
@@ -455,21 +455,28 @@
   - M12.27 开盘时段只读快照已跑通：北京时间 `2026-04-28 21:45` 左右使用 Longbridge 只读 quote/K 线获取 `SPY/QQQ/NVDA/TSLA x 1d/1h/15m/5m` 共 `16` 条记录，缺口 `0`；这说明行情读取可用，但当前还不是常驻自动刷新。
   - M12.27 PA004 诊断复测结论：整体混合版本仍弱，收益 `-0.9580%`、胜率 `34.72%`、最大回撤 `4.0220%`；但 PA004 只做多分支转正，收益 `0.5530%`、胜率 `40.24%`、最大回撤 `2.0479%`、交易 `574` 笔，结论改为“PA004 做多版进入下一轮观察候选”。
   - M12.27 PA004 做空分支暂不进入主线：收益 `-1.5005%`、胜率 `31.43%`、最大回撤 `3.1993%`、交易 `961` 笔；下一轮不应把 PA004 做多/做空混在一起解释。
+  - 已完成 M12.28 PA004 Long Dashboard Refresh，新增 `scripts/m12_28_trading_session_dashboard_lib.py`、`scripts/run_m12_28_trading_session_dashboard.py`、`config/examples/m12_28_trading_session_dashboard.json`、`dashboard/m12_28_trading_session_dashboard/` 与 M12.28 单测。
+  - M12.28 已把 PA004 做多版接入盘中只读模拟看板：当前看板显示 `160` 条机会/观察项，其中主线策略机会 `141` 条、PA004 做多观察 `19` 条；PA004 做多观察当前快照模拟盈亏 `14499.10`。
+  - M12.28 使用 Longbridge 只读 quote 获取第一批 `50` 只股票当前价格；当前市场状态为美股常规交易时段，纽约时间 `2026-04-28 10:59:47 EDT`。
+  - M12.28 当前盘中模拟盈亏快照为 `-69888.72`，其中主线机会 `-84387.82`、PA004 做多观察 `14499.10`；这只是按当前只读价估算，不是成交、不是实盘、不是策略最终结论。
+  - M12.28 已显式标记数据对齐限制：主线候选日期仍是 `2026-04-27`，报价日期是 `2026-04-28`，当前属于 `live_quote_overlay_on_prior_candidate_set`，下一步必须把 50 只股票滚动到当前交易日重新扫描。
 
 ## 当前阻塞
 
-- 当前 M12.27 实现无代码侧阻塞；可继续日常只读测试累计到 `10` 个交易日。
+- 当前 M12.28 实现无代码侧阻塞；可继续盘中刷新看板并累计每日只读测试到 `10` 个交易日。
 - M11.6 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
 - 147 只全量 universe 还没完成缓存扩展，当前不能宣称全量 scanner 可用。
-- `M10-PA-004` 整体混合版本未达观察准入，但做多分支已转正，下一步应做成独立观察规则；`M10-PA-007` 可进入每日观察，但不得直接进入模拟买卖准入。
+- M12.28 当前是实时只读报价覆盖上一轮候选，不是今日重新全量扫描；下一步需要滚动扫描日期，避免盘中看板长期依赖旧候选。
+- `M10-PA-004` 整体混合版本未达观察准入，但做多分支已转正并已进入 M12.28 观察看板；`M10-PA-007` 可进入每日观察，但不得直接进入模拟买卖准入。
 - 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- 下一步：把 `M10-PA-004` 做多版做成独立观察规则，并继续补第一批 `50` 只的长历史 `5m` 覆盖；同时持续生成每日看板记录，满足 `10` 个交易日稳定输出后，进入 M11.6 模拟买卖试运行准入复查。
+- 下一步：把 M12.12/M12.26 的 50 只股票扫描滚动到当前交易日，让看板不只是“实时价格覆盖上一轮信号”，而是每日交易时段重新产生今日候选。
 - 同步连续运行 M12.12 每日只读循环，累计 `10` 个交易日看板记录，并把每日候选、模拟结果和数据缺口写入同一套 artifact。
-- `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版进入下一轮观察规则准备，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
+- M12.28 看板可用 `python scripts/run_m12_28_trading_session_dashboard.py` 单次刷新，或用 `--loop --interval-seconds 300` 在盘中每 5 分钟刷新；该 loop 仍是只读模拟，不接账户、不下单。
+- `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版已进入观察看板，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。
 - 满足 `50` 只数据稳定、`10` 个交易日看板连续输出、重点策略 A/B 重测可解释、以及用户业务审批后，M11.6 才能把第一批策略明确批准进入模拟交易试运行。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。

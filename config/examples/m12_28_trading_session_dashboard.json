@@ -1,0 +1,32 @@
+{
+  "title": "M12.28 盘中只读模拟看板",
+  "run_id": "m12_28_trading_session_dashboard",
+  "stage": "M12.28.trading_session_dashboard",
+  "market": "US",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/dashboard/m12_28_trading_session_dashboard",
+  "first50_universe_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop/m12_12_first50_universe.json",
+  "m12_12_dashboard_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop/m12_12_dashboard_data.json",
+  "m12_12_trade_view_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop/m12_12_dashboard_trade_view.csv",
+  "m12_27_pa004_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_27_pa004_retest_live_snapshot/m12_27_pa004_retest_live_snapshot_summary.json",
+  "pa004_detector_events_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_23/m12_23_tightened_detector_events.jsonl",
+  "fallback_live_snapshot_ledger_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_27_live_snapshot/m12_1_bar_close_observation_ledger.jsonl",
+  "quote_refresh": {
+    "enabled": true,
+    "max_symbols": 50,
+    "fallback_behavior": "use_checked_in_snapshot_or_cached_reference"
+  },
+  "dashboard_refresh_seconds": 60,
+  "pa004_long_observation": {
+    "enabled": true,
+    "max_recent_events": 20,
+    "lookback_days": 120,
+    "variant_id": "pa004_long_only_observation"
+  },
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}
