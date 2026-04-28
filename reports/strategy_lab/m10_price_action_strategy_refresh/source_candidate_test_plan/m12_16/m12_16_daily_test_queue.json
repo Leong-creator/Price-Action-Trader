@@ -1,0 +1,62 @@
+{
+  "rows": [
+    {
+      "candidate_id": "M12-SRC-001",
+      "client_note": "这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。",
+      "linked_runtime_id": "M12-FTD-001",
+      "linked_strategy": "M12-FTD-001",
+      "name": "日线趋势顺势信号K增强版",
+      "next_action": "使用 M12.15 选出的 pullback_guard 版本，先观察回撤是否比 baseline 稳定。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "pullback_guard",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008A_candles_setups_signal_bars_trend_tr_entry_bad_signal.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012A_market_cycle_four_parts_pullback_channel_trading_range.md"
+      ],
+      "status": "进入每日只读测试"
+    },
+    {
+      "candidate_id": "M12-SRC-002",
+      "client_note": "这是已通过历史资金测试的核心顺势策略。",
+      "linked_runtime_id": "M10-PA-001",
+      "linked_strategy": "M10-PA-001",
+      "name": "趋势回调二次入场",
+      "next_action": "继续作为 M10-PA-001 主线，扫描第一批50只股票。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-001.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf"
+      ],
+      "status": "进入每日只读测试"
+    },
+    {
+      "candidate_id": "M12-SRC-003",
+      "client_note": "它本身是核心策略，也能帮助判断强K线后有没有真实延续。",
+      "linked_runtime_id": "M10-PA-002",
+      "linked_strategy": "M10-PA-002",
+      "name": "突破后1-2根K线跟进",
+      "next_action": "继续作为 M10-PA-002 主线；后续可检查它能否过滤 FTD 假信号。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-002.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+        "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf"
+      ],
+      "status": "进入每日只读测试，并保留为 FTD 确认过滤器候选"
+    }
+  ],
+  "schema_version": "m12.16.daily-queue.v1"
+}

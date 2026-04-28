@@ -1,0 +1,158 @@
+{
+  "artifacts": {
+    "client_status_table": "reports/strategy_lab/m10_price_action_strategy_refresh/source_candidate_test_plan/m12_16/m12_16_source_candidate_status.md",
+    "daily_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/source_candidate_test_plan/m12_16/m12_16_daily_test_queue.json",
+    "filter_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/source_candidate_test_plan/m12_16/m12_16_filter_queue.json",
+    "observation_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/source_candidate_test_plan/m12_16/m12_16_observation_queue.json"
+  },
+  "broker_connection": false,
+  "candidate_count": 6,
+  "daily_readonly_test_count": 3,
+  "filter_or_ranking_factor_count": 2,
+  "generated_at": "2026-04-28T08:38:40Z",
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "6条来源回看候选已排队：3条进每日只读测试，2条先做过滤/排名因子，1条进反转观察队列。",
+  "real_orders": false,
+  "rows": [
+    {
+      "candidate_id": "M12-SRC-001",
+      "client_note": "这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。",
+      "linked_runtime_id": "M12-FTD-001",
+      "linked_strategy": "M12-FTD-001",
+      "name": "日线趋势顺势信号K增强版",
+      "next_action": "使用 M12.15 选出的 pullback_guard 版本，先观察回撤是否比 baseline 稳定。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "pullback_guard",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008A_candles_setups_signal_bars_trend_tr_entry_bad_signal.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012A_market_cycle_four_parts_pullback_channel_trading_range.md"
+      ],
+      "status": "进入每日只读测试"
+    },
+    {
+      "candidate_id": "M12-SRC-002",
+      "client_note": "这是已通过历史资金测试的核心顺势策略。",
+      "linked_runtime_id": "M10-PA-001",
+      "linked_strategy": "M10-PA-001",
+      "name": "趋势回调二次入场",
+      "next_action": "继续作为 M10-PA-001 主线，扫描第一批50只股票。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-001.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf"
+      ],
+      "status": "进入每日只读测试"
+    },
+    {
+      "candidate_id": "M12-SRC-003",
+      "client_note": "它本身是核心策略，也能帮助判断强K线后有没有真实延续。",
+      "linked_runtime_id": "M10-PA-002",
+      "linked_strategy": "M10-PA-002",
+      "name": "突破后1-2根K线跟进",
+      "next_action": "继续作为 M10-PA-002 主线；后续可检查它能否过滤 FTD 假信号。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-002.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+        "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf"
+      ],
+      "status": "进入每日只读测试，并保留为 FTD 确认过滤器候选"
+    },
+    {
+      "candidate_id": "M12-SRC-004",
+      "client_note": "它更像帮我们从50只里挑更强的股票，不先单独统计盈利。",
+      "linked_runtime_id": "M10-PA-003",
+      "linked_strategy": "M10-PA-003",
+      "name": "紧密通道/小回调顺势",
+      "next_action": "用于给强趋势股票加分，暂不作为独立买卖触发。",
+      "next_stage": "M12.17/M12.18",
+      "paper_gate_evidence_now": false,
+      "queue": "filter_or_ranking_factor",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-003.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md"
+      ],
+      "status": "先做选股排名因子"
+    },
+    {
+      "candidate_id": "M12-SRC-005",
+      "client_note": "它的作用是减少长回调里的差机会，不是独立策略。",
+      "linked_runtime_id": "M12-FTD-001-filter",
+      "linked_strategy": "M12-FTD-001-filter",
+      "name": "长回调保护",
+      "next_action": "已在 M12.15 验证为 pullback_guard；后续跟随 FTD 每日观察。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "filter_or_ranking_factor",
+      "selected_variant": "pullback_guard",
+      "source_refs": [
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"
+      ],
+      "status": "作为 FTD 风险过滤器"
+    },
+    {
+      "candidate_id": "M12-SRC-006",
+      "client_note": "反转机会更依赖图形语境，先观察典型机会，不和主线策略混测。",
+      "linked_runtime_id": "M10-PA-008",
+      "linked_strategy": "M10-PA-008",
+      "name": "主要趋势反转观察",
+      "next_action": "与 M10-PA-008 合并，按严格反转定义观察，不进入自动触发主线。",
+      "next_stage": "M12.18",
+      "paper_gate_evidence_now": false,
+      "queue": "strict_observation",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-008.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_021A_reversals_definition_minor_major_breakouts.md"
+      ],
+      "status": "进入反转观察队列"
+    }
+  ],
+  "schema_version": "m12.16.source-candidate-test-plan.v1",
+  "selected_ftd_variant": "pullback_guard",
+  "selected_ftd_variant_metrics": {
+    "average_holding_bars": "4.77",
+    "entry_mode": "next_open",
+    "final_equity": "710436.76",
+    "initial_capital": "100000.00",
+    "losing_symbol_count": 14,
+    "max_consecutive_losses": 56,
+    "max_drawdown_percent": "48.38",
+    "net_profit": "610436.76",
+    "overfit_concentration": "low",
+    "per_symbol_stability": "分散较好",
+    "plain_rule": "当回调拖得太久时，不再把顺势信号K当普通趋势恢复。",
+    "profit_factor": "1.09",
+    "profitable_symbol_count": 36,
+    "return_percent": "610.44",
+    "source_fields": "长回调保护",
+    "source_refs": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md | raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf | wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md",
+    "symbol": "ALL",
+    "top3_profit_share_percent": "17.98",
+    "trade_count": 22184,
+    "variant_id": "pullback_guard",
+    "variant_title": "只加长回调保护",
+    "win_rate": "37.36"
+  },
+  "stage": "M12.16.source_candidate_test_plan",
+  "strict_observation_count": 1
+}

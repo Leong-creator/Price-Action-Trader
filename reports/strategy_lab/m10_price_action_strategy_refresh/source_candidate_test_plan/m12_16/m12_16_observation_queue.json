@@ -1,0 +1,23 @@
+{
+  "rows": [
+    {
+      "candidate_id": "M12-SRC-006",
+      "client_note": "反转机会更依赖图形语境，先观察典型机会，不和主线策略混测。",
+      "linked_runtime_id": "M10-PA-008",
+      "linked_strategy": "M10-PA-008",
+      "name": "主要趋势反转观察",
+      "next_action": "与 M10-PA-008 合并，按严格反转定义观察，不进入自动触发主线。",
+      "next_stage": "M12.18",
+      "paper_gate_evidence_now": false,
+      "queue": "strict_observation",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-008.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_021A_reversals_definition_minor_major_breakouts.md"
+      ],
+      "status": "进入反转观察队列"
+    }
+  ],
+  "schema_version": "m12.16.observation-queue.v1"
+}

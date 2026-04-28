@@ -1,0 +1,40 @@
+{
+  "rows": [
+    {
+      "candidate_id": "M12-SRC-004",
+      "client_note": "它更像帮我们从50只里挑更强的股票，不先单独统计盈利。",
+      "linked_runtime_id": "M10-PA-003",
+      "linked_strategy": "M10-PA-003",
+      "name": "紧密通道/小回调顺势",
+      "next_action": "用于给强趋势股票加分，暂不作为独立买卖触发。",
+      "next_stage": "M12.17/M12.18",
+      "paper_gate_evidence_now": false,
+      "queue": "filter_or_ranking_factor",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-003.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md"
+      ],
+      "status": "先做选股排名因子"
+    },
+    {
+      "candidate_id": "M12-SRC-005",
+      "client_note": "它的作用是减少长回调里的差机会，不是独立策略。",
+      "linked_runtime_id": "M12-FTD-001-filter",
+      "linked_strategy": "M12-FTD-001-filter",
+      "name": "长回调保护",
+      "next_action": "已在 M12.15 验证为 pullback_guard；后续跟随 FTD 每日观察。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "filter_or_ranking_factor",
+      "selected_variant": "pullback_guard",
+      "source_refs": [
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"
+      ],
+      "status": "作为 FTD 风险过滤器"
+    }
+  ],
+  "schema_version": "m12.16.filter-queue.v1"
+}
