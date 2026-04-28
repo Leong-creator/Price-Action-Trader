@@ -1,0 +1,3 @@
+cap_hides_distribution_risk,cap_retention_percent_after_tightening,event_cap_per_strategy_symbol,plain_note,raw_after_tightening,raw_before_tightening,retained_after_cap,strategy_id,tightening_retention_percent
+true,79.51,50,保留样本仍受每策略/标的上限影响，进入历史测试前必须继续看 raw/capped 分布。,1996,4582,1587,M10-PA-004,43.56
+true,48.21,50,保留样本仍受每策略/标的上限影响，进入历史测试前必须继续看 raw/capped 分布。,4984,20190,2403,M10-PA-007,24.69

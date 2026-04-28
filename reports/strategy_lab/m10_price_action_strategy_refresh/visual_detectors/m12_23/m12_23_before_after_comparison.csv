@@ -1,0 +1,4 @@
+after_borderline,after_false_positive,after_valid,before_borderline,before_false_positive,before_valid,borderline_reduction,false_positive_reduction,strategy_id
+0,0,1587,390,43,1868,390,43,M10-PA-004
+73,0,2330,967,126,1407,894,126,M10-PA-007
+73,0,3917,1357,169,3275,1284,169,ALL

@@ -1,0 +1,115 @@
+{
+  "baseline_m12_20_event_count": 4801,
+  "baseline_m12_20_raw_before_cap": {
+    "M10-PA-004": 4582,
+    "M10-PA-007": 20190
+  },
+  "baseline_m12_22_visual_review_counts": {
+    "borderline_needs_chart_review": 1357,
+    "likely_false_positive": 169,
+    "looks_valid": 3275
+  },
+  "before_after_comparison": [
+    {
+      "after_borderline": 0,
+      "after_false_positive": 0,
+      "after_valid": 1587,
+      "before_borderline": 390,
+      "before_false_positive": 43,
+      "before_valid": 1868,
+      "borderline_reduction": 390,
+      "false_positive_reduction": 43,
+      "strategy_id": "M10-PA-004"
+    },
+    {
+      "after_borderline": 73,
+      "after_false_positive": 0,
+      "after_valid": 2330,
+      "before_borderline": 967,
+      "before_false_positive": 126,
+      "before_valid": 1407,
+      "borderline_reduction": 894,
+      "false_positive_reduction": 126,
+      "strategy_id": "M10-PA-007"
+    },
+    {
+      "after_borderline": 73,
+      "after_false_positive": 0,
+      "after_valid": 3917,
+      "before_borderline": 1357,
+      "before_false_positive": 169,
+      "before_valid": 3275,
+      "borderline_reduction": 1284,
+      "false_positive_reduction": 169,
+      "strategy_id": "ALL"
+    }
+  ],
+  "borderline_reduction": 1284,
+  "broker_connection": false,
+  "can_enter_full_backtest_now": false,
+  "can_enter_small_pilot_next": true,
+  "daily_cache_ready_symbols": 50,
+  "deferred_input_count": 0,
+  "false_positive_reduction": 169,
+  "generated_at": "2026-04-28T11:36:27Z",
+  "live_execution": false,
+  "next_step": "进入 M12.24：只做 PA004/PA007 的 1d 小范围历史测试，并继续保留只读/模拟边界。",
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "passed_tightening_gate_for_small_pilot": true,
+  "plain_language_result": "已收紧 M10-PA-004/007 的机器识别规则，并重跑检测、结构复核和严格图形复核；边界和疑似误判已明显下降，可进入小范围历史测试准备。",
+  "raw_capped_audit": [
+    {
+      "cap_hides_distribution_risk": "true",
+      "cap_retention_percent_after_tightening": "79.51",
+      "event_cap_per_strategy_symbol": 50,
+      "plain_note": "保留样本仍受每策略/标的上限影响，进入历史测试前必须继续看 raw/capped 分布。",
+      "raw_after_tightening": 1996,
+      "raw_before_tightening": 4582,
+      "retained_after_cap": 1587,
+      "strategy_id": "M10-PA-004",
+      "tightening_retention_percent": "43.56"
+    },
+    {
+      "cap_hides_distribution_risk": "true",
+      "cap_retention_percent_after_tightening": "48.21",
+      "event_cap_per_strategy_symbol": 50,
+      "plain_note": "保留样本仍受每策略/标的上限影响，进入历史测试前必须继续看 raw/capped 分布。",
+      "raw_after_tightening": 4984,
+      "raw_before_tightening": 20190,
+      "retained_after_cap": 2403,
+      "strategy_id": "M10-PA-007",
+      "tightening_retention_percent": "24.69"
+    }
+  ],
+  "real_orders": false,
+  "schema_version": "m12.23.detector-tightening-summary.v1",
+  "stage": "M12.23.detector_tightening_rerun",
+  "strict_quality_status_counts": {
+    "auto_pass_high": 3256,
+    "auto_pass_medium": 734,
+    "auto_reject": 0,
+    "needs_spot_check": 0
+  },
+  "strict_raw_event_count": 6980,
+  "strict_retained_event_count": 3990,
+  "strict_visual_review_by_strategy": {
+    "M10-PA-004": {
+      "borderline_needs_chart_review": 0,
+      "likely_false_positive": 0,
+      "looks_valid": 1587
+    },
+    "M10-PA-007": {
+      "borderline_needs_chart_review": 73,
+      "likely_false_positive": 0,
+      "looks_valid": 2330
+    }
+  },
+  "strict_visual_review_counts": {
+    "borderline_needs_chart_review": 73,
+    "likely_false_positive": 0,
+    "looks_valid": 3917
+  },
+  "symbols_requested": 50,
+  "timeframe": "1d"
+}
