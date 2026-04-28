@@ -1,0 +1,149 @@
+symbol,scope,reason,next_action
+AAPL,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+ADBE,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+AMD,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+AMZN,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+ARKK,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+AVGO,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+CRM,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+DIA,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+EEM,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+EFA,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+GLD,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+GOOG,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+GOOGL,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+HYG,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+INTC,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+IVV,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+IWM,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+LQD,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+META,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+MSFT,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+MU,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+NOW,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+NVDA,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+ORCL,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+PANW,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+PLTR,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+QCOM,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+QQQ,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+SLV,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+SMH,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+SNOW,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+SOXX,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+SPY,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+SQQQ,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+TLT,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+TQQQ,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+TSLA,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+USO,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+VOO,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+VTI,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLB,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLC,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLE,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLF,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLI,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLK,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLP,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLU,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLV,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+XLY,first50_long_history_5m,长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。,补齐 2024-04-01 到最新已完成 regular session 的 5m cache。
+CRWD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+NET,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+DDOG,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MDB,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+TEAM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+SHOP,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+UBER,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+ABNB,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+NFLX,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+DIS,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+CMCSA,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+WBD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+PARA,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+T,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+VZ,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+TMUS,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+COST,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+WMT,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+TGT,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+HD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LOW,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+NKE,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+SBUX,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MCD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+CMG,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+YUM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+KO,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+PEP,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MNST,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+PG,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+CL,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+KMB,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+EL,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LULU,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+JPM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+BAC,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+WFC,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+C,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+GS,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MS,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+SCHW,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+BLK,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+AXP,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+V,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MA,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+PYPL,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+COIN,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+HOOD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+UNH,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LLY,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+JNJ,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MRK,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+PFE,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+ABBV,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+AMGN,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+GILD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+BMY,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+CVS,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+HUM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+TMO,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+ISRG,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+BA,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+CAT,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+DE,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+GE,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+RTX,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LMT,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+NOC,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+HON,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+UPS,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+FDX,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+XOM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+CVX,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+COP,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+SLB,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+OXY,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+F,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+GM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+RIVN,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LCID,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+BABA,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+PDD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+JD,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+BIDU,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+NIO,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LI,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+SE,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MELI,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+ENPH,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+FSLR,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+MRVL,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+ADI,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+TXN,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+AMAT,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+LRCX,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+KLAC,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+TSM,universe147_expansion,不在第一批50只可用缓存内；不能放入 scanner 可用候选。,按 M12.8 fetch plan 分批补 1d 与 5m cache。
+ALL,m12_8_fetch_plan,M12.8 fetch plan 仍有 294 个只读缓存请求和约 23373 个分片。,分批执行只读 K 线补齐，不把缺失标的伪装为可用。

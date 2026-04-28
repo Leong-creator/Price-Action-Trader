@@ -1,0 +1,1475 @@
+{
+  "items": [
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "stale_cache",
+      "m12_8_daily_status": "stale_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "SPY"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "stale_cache",
+      "m12_8_daily_status": "stale_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "QQQ"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "IWM"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "DIA"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "VTI"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "VOO"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "IVV"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLK"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLF"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLE"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLV"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLY"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLI"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLP"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLU"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLC"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "XLB"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "SMH"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "SOXX"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "TQQQ"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "SQQQ"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "GLD"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "SLV"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "USO"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "TLT"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "HYG"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "LQD"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "EEM"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "EFA"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "ARKK"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "AAPL"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "MSFT"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "stale_cache",
+      "m12_8_daily_status": "stale_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "NVDA"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "AMZN"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "GOOGL"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "GOOG"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "META"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "stale_cache",
+      "m12_8_daily_status": "stale_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "TSLA"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "AVGO"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "AMD"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "INTC"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "MU"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "QCOM"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "ORCL"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "CRM"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "ADBE"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "NOW"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "SNOW"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "PLTR"
+    },
+    {
+      "current_5m_ready": "true",
+      "daily_ready": "true",
+      "in_first50": "true",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "daily_and_current_session",
+      "symbol": "PANW"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CRWD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "NET"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "DDOG"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MDB"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "TEAM"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "SHOP"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "UBER"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "ABNB"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "NFLX"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "DIS"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CMCSA"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "WBD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "PARA"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "T"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "VZ"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "TMUS"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "COST"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "WMT"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "TGT"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "HD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LOW"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "NKE"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "SBUX"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MCD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CMG"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "YUM"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "KO"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "PEP"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MNST"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "PG"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CL"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "KMB"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "EL"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LULU"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "JPM"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "BAC"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "WFC"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "C"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "GS"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MS"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "SCHW"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "BLK"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "AXP"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "V"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MA"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "PYPL"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "COIN"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "HOOD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "UNH"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LLY"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "JNJ"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MRK"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "PFE"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "ABBV"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "AMGN"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "GILD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "BMY"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CVS"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "HUM"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "TMO"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "ISRG"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "BA"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CAT"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "DE"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "GE"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "RTX"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LMT"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "NOC"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "HON"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "UPS"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "FDX"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "XOM"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "CVX"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "COP"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "SLB"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "OXY"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "F"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "GM"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "RIVN"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LCID"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "BABA"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "PDD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "JD"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "BIDU"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "NIO"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LI"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "SE"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MELI"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "ENPH"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "FSLR"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "MRVL"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "ADI"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "TXN"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "AMAT"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "LRCX"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "KLAC"
+    },
+    {
+      "current_5m_ready": "false",
+      "daily_ready": "false",
+      "in_first50": "false",
+      "long_5m_full_ready": "false",
+      "m12_8_5m_status": "missing_cache",
+      "m12_8_daily_status": "missing_cache",
+      "scanner_ready_scope": "deferred",
+      "symbol": "TSM"
+    }
+  ],
+  "schema_version": "m12.26.universe147-coverage.v1"
+}

@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12.25：Daily Observation Continuity（当前阶段分支 `feature/m12-25-daily-observation-continuity`，M12.25 已把 `M10-PA-007` 加入观察队列，并继续累计每日只读测试记录）
+- 当前支线：阶段 12.26：Cache Scanner Expansion（当前阶段分支 `feature/m12-26-cache-scanner-expansion`，M12.26 已合并第一批 50 只与 147 只 universe 的缓存覆盖和 scanner 候选状态）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.25 Daily Observation Continuity`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot 与 M12.25 Daily Observation Continuity
+- 当前支线 milestone：`M12.26 Cache Scanner Expansion`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot、M12.25 Daily Observation Continuity 与 M12.26 Cache Scanner Expansion
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m12-25-daily-observation-continuity`
+- `feature/m12-26-cache-scanner-expansion`
 
 ## 已完成
 
@@ -447,18 +447,23 @@
   - M12.25 当前主线每日只读机会仍为 `141` 条，今日估算盈亏 `-8482.20`、估算收益率 `-8.48%`、连续记录 `1/10`；因为没有新的交易日数据，本阶段没有硬凑第 2 天。
   - M12.25 队列结果：`M10-PA-001/002/012 + M12-FTD-001` 继续是每日测试主线；`M10-PA-007` 新增为观察队列，最近小范围测试收益 `0.6473%`、胜率 `41.15%`、最大回撤 `3.8796%`；`M10-PA-004` 保留图形研究，不进入每日观察。
   - M12.25 不批准模拟买卖试运行；`M10-PA-007` 也不进入 paper gate evidence 或真实交易路径。
+  - 已完成 M12.26 Cache Scanner Expansion，新增 `scripts/m12_26_cache_scanner_expansion_lib.py`、`scripts/run_m12_26_cache_scanner_expansion.py`、`scanner/m12_26_cache_scanner_expansion/` 与 M12.26 单测。
+  - M12.26 数据结论：第一批 `50` 只日线可用 `50` 只、当日 `5m` 可用 `50` 只，长历史 `5m` 完整覆盖仍为 `0/50`；147 只扩展还有 `97` 只缺缓存，不进入 scanner 可用候选。
+  - M12.26 scanner 结论：当前可交付候选 `141` 条，覆盖 `45` 只股票；策略命中为 `M10-PA-001` `29` 条、`M10-PA-002` `25` 条、`M10-PA-012` `76` 条、`M12-FTD-001` `11` 条。
+  - M12.26 策略边界：自动 scanner 只包含 `M10-PA-001/002/012 + M12-FTD-001`；`M10-PA-007` 仍是观察队列，不自动进入 scanner；`M10-PA-004` 保留图形研究。
 
 ## 当前阻塞
 
-- 当前 M12.25 实现无代码侧阻塞；可继续日常只读测试累计到 `10` 个交易日。
+- 当前 M12.26 实现无代码侧阻塞；可继续日常只读测试累计到 `10` 个交易日。
 - M11.6 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
+- 147 只全量 universe 还没完成缓存扩展，当前不能宣称全量 scanner 可用。
 - `M10-PA-004` 小范围测试未达观察准入，继续保留为图形研究；`M10-PA-007` 可进入每日观察，但不得直接进入模拟买卖准入。
 - 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- 下一步：进入 M12.26 数据缓存与选股扩展，先补第一批 `50` 只的长历史 `5m` 覆盖，再决定是否扩展到 `147` 只完整 universe。
+- 下一步：继续补第一批 `50` 只的长历史 `5m` 覆盖，并持续生成每日看板记录；满足 `10` 个交易日稳定输出后，进入 M11.6 模拟买卖试运行准入复查。
 - 同步连续运行 M12.12 每日只读循环，累计 `10` 个交易日看板记录，并把每日候选、模拟结果和数据缺口写入同一套 artifact。
 - `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 保留图形研究，`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。

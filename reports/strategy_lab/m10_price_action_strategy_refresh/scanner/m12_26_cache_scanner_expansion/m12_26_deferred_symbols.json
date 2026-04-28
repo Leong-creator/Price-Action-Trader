@@ -1,0 +1,893 @@
+{
+  "items": [
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "AAPL"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "ADBE"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "AMD"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "AMZN"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "ARKK"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "AVGO"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "CRM"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "DIA"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "EEM"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "EFA"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "GLD"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "GOOG"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "GOOGL"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "HYG"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "INTC"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "IVV"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "IWM"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "LQD"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "META"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "MSFT"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "MU"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "NOW"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "NVDA"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "ORCL"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "PANW"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "PLTR"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "QCOM"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "QQQ"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "SLV"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "SMH"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "SNOW"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "SOXX"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "SPY"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "SQQQ"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "TLT"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "TQQQ"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "TSLA"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "USO"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "VOO"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "VTI"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLB"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLC"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLE"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLF"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLI"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLK"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLP"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLU"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLV"
+    },
+    {
+      "next_action": "补齐 2024-04-01 到最新已完成 regular session 的 5m cache。",
+      "reason": "长历史5分钟窗口未完整覆盖；可做当日只读观察，但不能宣称两年日内历史完整。",
+      "scope": "first50_long_history_5m",
+      "symbol": "XLY"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CRWD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "NET"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "DDOG"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MDB"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "TEAM"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "SHOP"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "UBER"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "ABNB"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "NFLX"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "DIS"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CMCSA"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "WBD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "PARA"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "T"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "VZ"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "TMUS"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "COST"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "WMT"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "TGT"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "HD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LOW"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "NKE"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "SBUX"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MCD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CMG"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "YUM"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "KO"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "PEP"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MNST"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "PG"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CL"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "KMB"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "EL"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LULU"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "JPM"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "BAC"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "WFC"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "C"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "GS"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MS"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "SCHW"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "BLK"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "AXP"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "V"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MA"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "PYPL"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "COIN"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "HOOD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "UNH"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LLY"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "JNJ"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MRK"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "PFE"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "ABBV"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "AMGN"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "GILD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "BMY"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CVS"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "HUM"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "TMO"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "ISRG"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "BA"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CAT"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "DE"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "GE"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "RTX"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LMT"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "NOC"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "HON"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "UPS"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "FDX"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "XOM"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "CVX"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "COP"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "SLB"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "OXY"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "F"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "GM"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "RIVN"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LCID"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "BABA"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "PDD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "JD"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "BIDU"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "NIO"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LI"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "SE"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MELI"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "ENPH"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "FSLR"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "MRVL"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "ADI"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "TXN"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "AMAT"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "LRCX"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "KLAC"
+    },
+    {
+      "next_action": "按 M12.8 fetch plan 分批补 1d 与 5m cache。",
+      "reason": "不在第一批50只可用缓存内；不能放入 scanner 可用候选。",
+      "scope": "universe147_expansion",
+      "symbol": "TSM"
+    },
+    {
+      "next_action": "分批执行只读 K 线补齐，不把缺失标的伪装为可用。",
+      "reason": "M12.8 fetch plan 仍有 294 个只读缓存请求和约 23373 个分片。",
+      "scope": "m12_8_fetch_plan",
+      "symbol": "ALL"
+    }
+  ],
+  "schema_version": "m12.26.deferred-symbols.v1"
+}
