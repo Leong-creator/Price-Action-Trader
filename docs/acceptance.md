@@ -1301,6 +1301,14 @@
   - 中文看板首页必须优先展示今日机会、今日估算盈亏、估算收益率、胜率、最大回撤、连续记录天数和策略队列。
   - 必须输出 `m12_25_daily_observation_continuity_summary.json`、`m12_25_dashboard_snapshot.json/html`、`m12_25_daily_observation_ledger.jsonl`、`m12_25_today_trade_details.csv`、`m12_25_observation_day_counter.json`、`m12_25_strategy_observation_queue.json/csv`、`m12_25_daily_client_report.md` 与 `m12_25_handoff.md`。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.26 Cache Scanner Expansion 必须满足：
+  - 必须使用独立分支 `feature/m12-26-cache-scanner-expansion`，从已合并 M12.25 的 `main` 切出。
+  - 必须合并读取 M12.5 universe、M12.8 cache coverage、M12.12 first50 cache / daily candidates 与 M12.25 observation queue，不得伪造 K 线或候选。
+  - 必须明确第一批 `50` 只的日线可用数、当日 `5m` 可用数、长历史 `5m` 完整覆盖数。
+  - 必须明确 `147` 只扩展里哪些还缺数据；缺数据标的不得进入 scanner candidates。
+  - 自动 scanner 策略只能包含 `M10-PA-001`、`M10-PA-002`、`M10-PA-012` 与 `M12-FTD-001`；`M10-PA-007` 只能保持观察队列，`M10-PA-004` 继续保留图形研究。
+  - 必须输出 `m12_26_cache_scanner_expansion_summary.json`、`m12_26_first50_data_coverage.json/csv`、`m12_26_universe147_coverage.json/csv`、`m12_26_scanner_available_symbols.json`、`m12_26_deferred_symbols.json/csv`、`m12_26_scanner_candidates.csv`、`m12_26_strategy_hit_distribution.csv`、`m12_26_scanner_expansion_report.md` 与 `m12_26_handoff.md`。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

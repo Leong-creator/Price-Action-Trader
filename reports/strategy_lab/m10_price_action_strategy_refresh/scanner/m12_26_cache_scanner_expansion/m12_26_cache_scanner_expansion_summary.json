@@ -1,0 +1,126 @@
+{
+  "additional_deferred_symbol_count": 97,
+  "artifacts": {
+    "deferred_symbols": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_deferred_symbols.csv",
+    "first50_data_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_first50_data_coverage.csv",
+    "report": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_scanner_expansion_report.md",
+    "scanner_available_symbols": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_scanner_available_symbols.json",
+    "scanner_candidates": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_scanner_candidates.csv",
+    "universe147_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_universe147_coverage.csv"
+  },
+  "auto_scanner_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M12-FTD-001"
+  ],
+  "broker_connection": false,
+  "excluded_auto_scanner_strategy_ids": [
+    "M10-PA-003",
+    "M10-PA-004",
+    "M10-PA-005",
+    "M10-PA-006",
+    "M10-PA-007",
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-010",
+    "M10-PA-011",
+    "M10-PA-013",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
+  "first50_current_5m_ready_symbols": 50,
+  "first50_daily_ready_symbols": 50,
+  "first50_long_history_5m_ready_symbols": 0,
+  "full_147_universe_available_now": false,
+  "full_intraday_history_available_now": false,
+  "generated_at": "2026-04-28T12:08:08Z",
+  "hit_rows": [
+    {
+      "candidate_count": "14",
+      "strategy_id": "M10-PA-001",
+      "strategy_title": "趋势回调二次入场",
+      "timeframe": "1d"
+    },
+    {
+      "candidate_count": "15",
+      "strategy_id": "M10-PA-001",
+      "strategy_title": "趋势回调二次入场",
+      "timeframe": "5m"
+    },
+    {
+      "candidate_count": "11",
+      "strategy_id": "M10-PA-002",
+      "strategy_title": "突破后续跟进",
+      "timeframe": "15m"
+    },
+    {
+      "candidate_count": "6",
+      "strategy_id": "M10-PA-002",
+      "strategy_title": "突破后续跟进",
+      "timeframe": "1d"
+    },
+    {
+      "candidate_count": "8",
+      "strategy_id": "M10-PA-002",
+      "strategy_title": "突破后续跟进",
+      "timeframe": "5m"
+    },
+    {
+      "candidate_count": "36",
+      "strategy_id": "M10-PA-012",
+      "strategy_title": "开盘区间突破",
+      "timeframe": "15m"
+    },
+    {
+      "candidate_count": "40",
+      "strategy_id": "M10-PA-012",
+      "strategy_title": "开盘区间突破",
+      "timeframe": "5m"
+    },
+    {
+      "candidate_count": "11",
+      "strategy_id": "M12-FTD-001",
+      "strategy_title": "方方土日线趋势顺势信号K",
+      "timeframe": "1d"
+    }
+  ],
+  "live_execution": false,
+  "m12_8_target_complete_symbol_count": 0,
+  "observation_only_rows": [
+    {
+      "latest_test_max_drawdown_percent": "3.8796",
+      "latest_test_return_percent": "0.6473",
+      "latest_test_win_rate_percent": "41.15",
+      "paper_trial_candidate_now": "false",
+      "plain_reason": "M12.24 小范围历史测试为正收益且回撤可控，先加入每日观察，看后续实时只读信号是否稳定。",
+      "queue": "新增观察队列",
+      "source_ref": "M12.24",
+      "status": "进入每日观察，不进入模拟买卖准入",
+      "strategy_id": "M10-PA-007",
+      "strategy_title": "第二腿陷阱反转",
+      "today_in_dashboard": "false"
+    }
+  ],
+  "observation_only_strategy_ids": [
+    "M10-PA-007"
+  ],
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "第一批50只现在可做日线和当日5分钟只读扫描；147只扩展还没全量可用。本阶段没有把缺数据股票放进候选。",
+  "real_orders": false,
+  "scanner_candidate_count": 141,
+  "scanner_candidate_symbol_count": 45,
+  "scanner_expansion_allowed_now": true,
+  "schema_version": "m12.26.cache-scanner-expansion-summary.v1",
+  "stage": "M12.26.cache_scanner_expansion",
+  "strategy_candidate_counts": {
+    "M10-PA-001": 29,
+    "M10-PA-002": 25,
+    "M10-PA-012": 76,
+    "M12-FTD-001": 11
+  },
+  "strategy_hit_distribution_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_strategy_hit_distribution.csv",
+  "universe_symbol_count": 147
+}
