@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12.16：Source Candidate Test Plan（当前阶段分支 `feature/m12-16-source-candidate-test-plan`，M12.16 已把 6 条来源回看候选排成每日测试、过滤器和观察队列）
+- 当前支线：阶段 12.17：Daily Observation Continuity（当前阶段分支 `feature/m12-17-daily-observation-continuity`，M12.17 已生成每日只读测试第 1 天连续记录和中文看板快照）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.16 Source Candidate Test Plan`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest 与 M12.16 Source Candidate Test Plan
+- 当前支线 milestone：`M12.17 Daily Observation Continuity`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan 与 M12.17 Daily Observation Continuity
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m12-16-source-candidate-test-plan`
+- `feature/m12-17-daily-observation-continuity`
 
 ## 已完成
 
@@ -410,17 +410,21 @@
   - 已完成 M12.16 Source Candidate Test Plan，新增 `scripts/m12_16_source_candidate_test_plan_lib.py`、`scripts/run_m12_16_source_candidate_test_plan.py`、`source_candidate_test_plan/m12_16/` 与 M12.16 单测。
   - M12.16 已把 `6` 条来源回看候选排清楚：`M12-SRC-001/002/003` 进入每日只读测试队列，`M12-SRC-004/005` 先做选股排名/风险过滤器，`M12-SRC-006` 进入严格反转观察队列。
   - M12.16 明确 `M12-SRC-004/005` 不是独立交易策略，不能拿它们单独统计盈利；`M12-SRC-006` 与 `M10-PA-008` 合并观察，但不进入自动触发主线。
+  - 已完成 M12.17 Daily Observation Continuity，新增 `scripts/m12_17_daily_observation_continuity_lib.py`、`scripts/run_m12_17_daily_observation_continuity.py`、`daily_observation/m12_17_continuity/` 与 M12.17 单测。
+  - M12.17 当前写入第 `1/10` 个连续交易日记录：今日机会 `141` 条，今日估算盈亏 `-8482.20`，今日估算收益率 `-8.48%`，当前浮盈机会占比 `23.40%`。
+  - M12.17 看板首页已优先展示今日机会、今日估算盈亏、估算收益率、FTD增强版历史收益/胜率/最大回撤、连续记录天数；交易明细展示股票、策略、周期、方向、假设入场/止损/目标、当前价和模拟盈亏。
+  - M12.17 仍是只读观察，不是真实成交；模拟买卖试运行复查至少还差 `9` 个交易日连续记录。
 
 ## 当前阻塞
 
-- 当前 M12.16 实现无代码侧阻塞；M12.17 可直接消费每日测试队列，覆盖 `M12-FTD-001 pullback_guard`、`M10-PA-001`、`M10-PA-002` 与既有 `M10-PA-012`。
+- 当前 M12.17 实现无代码侧阻塞；每日看板已可连续落盘，但模拟买卖试运行复查还差 `9` 个交易日记录。
 - M11.6 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
 - 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- 下一步进入 M12.17：把 `M10-PA-001/002/012 + M12-FTD-001 pullback_guard` 接入连续每日只读测试，输出每日机会、模拟盈亏、胜率、最大回撤、暂停原因和看板快照。
+- 下一步进入 M12.18：把 `M10-PA-008/009` 转成严格定义观察，不混入 `M10-PA-001/002/012/FTD` 每日主线，也不直接进入模拟买卖准入。
 - 同步连续运行 M12.12 每日只读循环，累计 `10` 个交易日看板记录，并把每日候选、模拟结果和数据缺口写入同一套 artifact。
 - `M10-PA-008/009` 下一步不再等图例确认，而是进入严格定义后的反转/楔形观察测试准备；`M10-PA-004/007` 若要继续，需要单独新建图形检测器或人工标签数据集。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。

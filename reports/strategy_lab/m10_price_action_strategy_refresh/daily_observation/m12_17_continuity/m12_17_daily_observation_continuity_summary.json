@@ -1,0 +1,160 @@
+{
+  "broker_connection": false,
+  "current_day": {
+    "current_5m_ready_symbols": 50,
+    "first50_ready_symbols": 50,
+    "floating_positive_percent": "23.40",
+    "ftd_baseline_max_drawdown_percent": "49.04",
+    "ftd_baseline_return_percent": "745.13",
+    "ftd_baseline_win_rate": "36.74",
+    "ftd_selected_variant": "pullback_guard",
+    "ftd_selected_variant_max_drawdown_percent": "48.38",
+    "ftd_selected_variant_return_percent": "610.44",
+    "ftd_selected_variant_win_rate": "37.36",
+    "long_history_5m_completeness": "0/50",
+    "m12_12_observation_event_count": 550,
+    "paper_trial_review_ready": false,
+    "pause_reason": "",
+    "recorded_at": "2026-04-28T08:45:43Z",
+    "source_day_generated_at": "2026-04-28T07:05:51Z",
+    "status": "continue_observation",
+    "strategy_rows": [
+      {
+        "floating_positive_percent": "0.00",
+        "opportunity_count": 25,
+        "simulated_unrealized_pnl": "0.00",
+        "strategy_id": "M10-PA-002",
+        "strategy_title": "突破后续跟进"
+      },
+      {
+        "floating_positive_percent": "0.00",
+        "opportunity_count": 11,
+        "simulated_unrealized_pnl": "-1024.95",
+        "strategy_id": "M12-FTD-001",
+        "strategy_title": "方方土日线趋势顺势信号K"
+      },
+      {
+        "floating_positive_percent": "0.00",
+        "opportunity_count": 29,
+        "simulated_unrealized_pnl": "-2031.64",
+        "strategy_id": "M10-PA-001",
+        "strategy_title": "趋势回调二次入场"
+      },
+      {
+        "floating_positive_percent": "43.42",
+        "opportunity_count": 76,
+        "simulated_unrealized_pnl": "-5425.61",
+        "strategy_id": "M10-PA-012",
+        "strategy_title": "开盘区间突破"
+      }
+    ],
+    "today_opportunity_count": 141,
+    "today_simulated_unrealized_pnl": "-8482.20",
+    "today_simulated_unrealized_return_percent": "-8.48",
+    "trade_detail_count": 141
+  },
+  "daily_strategy_scope": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M12-FTD-001"
+  ],
+  "day_count_recorded": 1,
+  "days_remaining_for_paper_trial_review": 9,
+  "generated_at": "2026-04-28T08:45:43Z",
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "每日只读测试已形成第1个连续记录；还需要累计到10个交易日，才讨论模拟买卖试运行准入。",
+  "real_orders": false,
+  "required_day_count_for_paper_trial_review": 10,
+  "schema_version": "m12.17.daily-observation-continuity.v1",
+  "selected_ftd_variant": "pullback_guard",
+  "selected_ftd_variant_metrics": {
+    "average_holding_bars": "4.77",
+    "entry_mode": "next_open",
+    "final_equity": "710436.76",
+    "initial_capital": "100000.00",
+    "losing_symbol_count": 14,
+    "max_consecutive_losses": 56,
+    "max_drawdown_percent": "48.38",
+    "net_profit": "610436.76",
+    "overfit_concentration": "low",
+    "per_symbol_stability": "分散较好",
+    "plain_rule": "当回调拖得太久时，不再把顺势信号K当普通趋势恢复。",
+    "profit_factor": "1.09",
+    "profitable_symbol_count": 36,
+    "return_percent": "610.44",
+    "source_fields": "长回调保护",
+    "source_refs": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md | raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf | wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md",
+    "symbol": "ALL",
+    "top3_profit_share_percent": "17.98",
+    "trade_count": 22184,
+    "variant_id": "pullback_guard",
+    "variant_title": "只加长回调保护",
+    "win_rate": "37.36"
+  },
+  "source_candidate_queue_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/source_candidate_test_plan/m12_16/m12_16_daily_test_queue.json",
+  "source_daily_loop_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop/m12_12_loop_summary.json",
+  "source_dashboard_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop/m12_12_dashboard_data.json",
+  "source_queue_rows": [
+    {
+      "candidate_id": "M12-SRC-001",
+      "client_note": "这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。",
+      "linked_runtime_id": "M12-FTD-001",
+      "linked_strategy": "M12-FTD-001",
+      "name": "日线趋势顺势信号K增强版",
+      "next_action": "使用 M12.15 选出的 pullback_guard 版本，先观察回撤是否比 baseline 稳定。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "pullback_guard",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008A_candles_setups_signal_bars_trend_tr_entry_bad_signal.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012A_market_cycle_four_parts_pullback_channel_trading_range.md"
+      ],
+      "status": "进入每日只读测试"
+    },
+    {
+      "candidate_id": "M12-SRC-002",
+      "client_note": "这是已通过历史资金测试的核心顺势策略。",
+      "linked_runtime_id": "M10-PA-001",
+      "linked_strategy": "M10-PA-001",
+      "name": "趋势回调二次入场",
+      "next_action": "继续作为 M10-PA-001 主线，扫描第一批50只股票。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-001.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf"
+      ],
+      "status": "进入每日只读测试"
+    },
+    {
+      "candidate_id": "M12-SRC-003",
+      "client_note": "它本身是核心策略，也能帮助判断强K线后有没有真实延续。",
+      "linked_runtime_id": "M10-PA-002",
+      "linked_strategy": "M10-PA-002",
+      "name": "突破后1-2根K线跟进",
+      "next_action": "继续作为 M10-PA-002 主线；后续可检查它能否过滤 FTD 假信号。",
+      "next_stage": "M12.17",
+      "paper_gate_evidence_now": false,
+      "queue": "daily_readonly_test",
+      "selected_variant": "",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-002.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+        "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf"
+      ],
+      "status": "进入每日只读测试，并保留为 FTD 确认过滤器候选"
+    }
+  ],
+  "stage": "M12.17.daily_observation_continuity"
+}
