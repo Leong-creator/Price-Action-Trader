@@ -1,0 +1,865 @@
+{
+  "case_rows": [
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+      "case_id": "M10-PA-008-positive-001",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Original trend resumes with strong breakout and follow-through.",
+        "Minor reversal inside a tight channel."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "f0e7529a0b900395351fb40c44e062767af7497c7a4a46500de9ca7fdc92a488",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0478_crop.webp",
+      "evidence_page": 478,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0478_crop.webp",
+      "evidence_video_id": "video_022A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Require a prior trend, a break of trendline/channel, and a test forming a credible higher low/lower high or failed final push.",
+        "Do not treat the first countertrend bar as sufficient proof."
+      ],
+      "strategy_id": "M10-PA-008",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+      "case_id": "M10-PA-008-positive-002",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Original trend resumes with strong breakout and follow-through.",
+        "Minor reversal inside a tight channel."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "2595b30d57ac191b05ce66ea34f3171e8d43d164cb372eaf478fbb10594d37b1",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0467_crop.webp",
+      "evidence_page": 467,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0467_crop.webp",
+      "evidence_video_id": "video_022A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Require a prior trend, a break of trendline/channel, and a test forming a credible higher low/lower high or failed final push.",
+        "Do not treat the first countertrend bar as sufficient proof."
+      ],
+      "strategy_id": "M10-PA-008",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022D_mtr_bottoms_head_shoulders_failed_mtr.md",
+      "case_id": "M10-PA-008-positive-003",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Original trend resumes with strong breakout and follow-through.",
+        "Minor reversal inside a tight channel."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "9090265c6a199b85f9eca816d23258b59f605a48316a3d6f2721da70a102104a",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022D/part2_p0517_crop.webp",
+      "evidence_page": 517,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022D/part2_p0517_crop.webp",
+      "evidence_video_id": "video_022D",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Require a prior trend, a break of trendline/channel, and a test forming a credible higher low/lower high or failed final push.",
+        "Do not treat the first countertrend bar as sufficient proof."
+      ],
+      "strategy_id": "M10-PA-008",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_021A_reversals_definition_minor_major_breakouts.md",
+      "case_id": "M10-PA-008-counterexample-001",
+      "case_level_decision": "pass_as_counterexample",
+      "case_type": "counterexample",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Original trend resumes with strong breakout and follow-through.",
+        "Minor reversal inside a tight channel."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "0ae37256a4fffb0ff3155ad06d0a2beb2d7c445082fe2f3da38e7e417bdc7827",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_021A/part2_p0371_crop.webp",
+      "evidence_page": 371,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_021A/part2_p0371_crop.webp",
+      "evidence_video_id": "video_021A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Minor reversal inside a tight channel."
+      ],
+      "strategy_id": "M10-PA-008",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+      "case_id": "M10-PA-008-boundary-001",
+      "case_level_decision": "ambiguous",
+      "case_type": "boundary",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Original trend resumes with strong breakout and follow-through.",
+        "Minor reversal inside a tight channel."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "dcaa258930ff42114c1ac02427142713108f309e344a77427629c2c1713c80a3",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0465_crop.webp",
+      "evidence_page": 465,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_022A/part2_p0465_crop.webp",
+      "evidence_video_id": "video_022A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Original trend resumes with strong breakout and follow-through."
+      ],
+      "strategy_id": "M10-PA-008",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024B_wedges_imperfect_channels_variations_context.md",
+      "case_id": "M10-PA-009-positive-001",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "e9ef1dada24929238458827daa5286e3a52d6cd40bd76971f5378271b3cc3155",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/part2_p0583_crop.webp",
+      "evidence_page": 583,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024B/part2_p0583_crop.webp",
+      "evidence_video_id": "video_024B",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "strategy_id": "M10-PA-009",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "case_id": "M10-PA-009-positive-002",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "bec7733847799c4cf4e8a96c996690c9a5239e07596be2bc89df42a7a6caea21",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0576_crop.webp",
+      "evidence_page": 576,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0576_crop.webp",
+      "evidence_video_id": "video_024A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "strategy_id": "M10-PA-009",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "case_id": "M10-PA-009-positive-003",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "05a569d373f1bd8c98804794e7bd6408660f16bbbfef160579de44e95d01f7ca",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0567_crop.webp",
+      "evidence_page": 567,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0567_crop.webp",
+      "evidence_video_id": "video_024A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade a wedge only after three pushes are visible in context and the reversal signal is strong enough.",
+        "Classify whether the wedge is reversal, flag, or failed wedge before backtest eligibility."
+      ],
+      "strategy_id": "M10-PA-009",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "case_id": "M10-PA-009-counterexample-001",
+      "case_level_decision": "pass_as_counterexample",
+      "case_type": "counterexample",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "4c77a142c91a32e26383fd103a398b64b94f7f37dbf41d8a0c3c3208f2477e32",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0575_crop.webp",
+      "evidence_page": 575,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0575_crop.webp",
+      "evidence_video_id": "video_024A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "strategy_id": "M10-PA-009",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_024A_wedges_definition_flags_mtr_climax_probability.md",
+      "case_id": "M10-PA-009-boundary-001",
+      "case_level_decision": "ambiguous",
+      "case_type": "boundary",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Failed wedge breakout with follow-through in the original direction.",
+        "Forcing wedge labels onto overlapping noise."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "1fc4994f0d8cc5c6986bcb18a4bd847936f61db9c82c958c4cfff592bc4a1ef6",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0573_crop.webp",
+      "evidence_page": 573,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_024A/part2_p0573_crop.webp",
+      "evidence_video_id": "video_024A",
+      "manual_review_status": "pending_user_confirmation",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Failed wedge breakout with follow-through in the original direction."
+      ],
+      "strategy_id": "M10-PA-009",
+      "user_review_required": true
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+      "case_id": "M10-PA-003-positive-001",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "4e144c108b54b00ff88d42670a4fd1ec1e033ad9b65ddfc210c7292f9831f703",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp",
+      "evidence_page": 987,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp",
+      "evidence_video_id": "video_014E",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "strategy_id": "M10-PA-003",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+      "case_id": "M10-PA-003-positive-002",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "deac227fc8af343f8e468b05fc9914e74681f10fdf2971719367855bd901331f",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp",
+      "evidence_page": 988,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp",
+      "evidence_video_id": "video_014E",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "strategy_id": "M10-PA-003",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+      "case_id": "M10-PA-003-positive-003",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "37513cb3b7351297cfa67bf7c9c84f53b3555504f9d0de25c5654a27934add3d",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp",
+      "evidence_page": 1397,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp",
+      "evidence_video_id": "video_017A",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+        "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+      ],
+      "strategy_id": "M10-PA-003",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+      "case_id": "M10-PA-003-counterexample-001",
+      "case_level_decision": "pass_as_counterexample",
+      "case_type": "counterexample",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "5949eddec903130363cc4632f8883707b2a39de3b4519a8de6cdb5f6cc3e4a9e",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp",
+      "evidence_page": 936,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp",
+      "evidence_video_id": "video_014C",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "strategy_id": "M10-PA-003",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+      "case_id": "M10-PA-003-boundary-001",
+      "case_level_decision": "ambiguous",
+      "case_type": "boundary",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Clear channel break followed by opposite follow-through.",
+        "Late entry after a climactic channel extension without room to target."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "c33e909786922da8316ca2194cb5310df22e59a2d619567ed061527d26f3ac3d",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp",
+      "evidence_page": 942,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp",
+      "evidence_video_id": "video_014C",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Clear channel break followed by opposite follow-through."
+      ],
+      "strategy_id": "M10-PA-003",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048F_gap_openings_early_flags.md",
+      "case_id": "M10-PA-011-positive-001",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "b978f737d4849308a6b722c755ddb43de5f4ddead6e8451cb221cb2af4837d87",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0986_crop.webp",
+      "evidence_page": 986,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0986_crop.webp",
+      "evidence_video_id": "video_048F",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "strategy_id": "M10-PA-011",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048F_gap_openings_early_flags.md",
+      "case_id": "M10-PA-011-positive-002",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "651a30015fcabdf9887fd187456e82f2bc680f8dad40b8048f529f3d5a10731f",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0984_crop.webp",
+      "evidence_page": 984,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048F/advanced_p0984_crop.webp",
+      "evidence_video_id": "video_048F",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "strategy_id": "M10-PA-011",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+      "case_id": "M10-PA-011-positive-003",
+      "case_level_decision": "pass",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "c1f7c46907ff4373855c3796f9e8a773dffe4bd22d19dd84f65c7134ed5a6db0",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0896_crop.webp",
+      "evidence_page": 896,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0896_crop.webp",
+      "evidence_video_id": "video_048A",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "At the session open, require a failed test of prior-day levels, opening range, or gap context before reversal entry.",
+        "Separate this from daily strategy tests because session microstructure is primary."
+      ],
+      "strategy_id": "M10-PA-011",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+      "case_id": "M10-PA-011-counterexample-001",
+      "case_level_decision": "pass_as_counterexample",
+      "case_type": "counterexample",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "29c16f10fa5251c5e1950a0658da5e13a89f6d29131f88c41f51ad114bf1aaf4",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0894_crop.webp",
+      "evidence_page": 894,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0894_crop.webp",
+      "evidence_video_id": "video_048A",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "No clean prior-day or opening-range context."
+      ],
+      "strategy_id": "M10-PA-011",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048A_trading_the_open_overview.md",
+      "case_id": "M10-PA-011-boundary-001",
+      "case_level_decision": "ambiguous",
+      "case_type": "boundary",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Opening trend breakout with follow-through.",
+        "No clean prior-day or opening-range context."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "c381f1a0e42d81bc674c2d5cfad8fd36d63c5d982428b7f8bdaf2466a4b305a1",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0900_crop.webp",
+      "evidence_page": 900,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_048A/advanced_p0900_crop.webp",
+      "evidence_video_id": "video_048A",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Opening trend breakout with follow-through."
+      ],
+      "strategy_id": "M10-PA-011",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+      "case_id": "M10-PA-004-positive-001",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "d8c2db028982d5313cc1eabf5ec2415f9bba73de56ad9ce89f4c911fa2b8c9f6",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1382_crop.webp",
+      "evidence_page": 1382,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1382_crop.webp",
+      "evidence_video_id": "video_016F",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "strategy_id": "M10-PA-004",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_046D_broad_bear_channels_lhs_second_leg_trap_bulls_buy_lows.md",
+      "case_id": "M10-PA-004-positive-002",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "27568825c8ac1a17eaa05542c7a9bcf860445c4e9f9bcefef280d6d6fd5ca712",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/advanced_p0764_crop.webp",
+      "evidence_page": 764,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_046D/advanced_p0764_crop.webp",
+      "evidence_video_id": "video_046D",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "strategy_id": "M10-PA-004",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+      "case_id": "M10-PA-004-positive-003",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "5673cb118a0570752679f2f54d2b9905fde41b2d1c64147234afbb6c7a588476",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1365_crop.webp",
+      "evidence_page": 1365,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1365_crop.webp",
+      "evidence_video_id": "video_016F",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Fade broad-channel boundary tests only after a failed second push or trapped breakout attempt.",
+        "Require evidence that the boundary is broad and two-sided, not a tight trend channel."
+      ],
+      "strategy_id": "M10-PA-004",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_016F_channels_limit_orders_breakouts_reversals_tr_channels.md",
+      "case_id": "M10-PA-004-counterexample-001",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "counterexample",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "a0fbdc113befa0a86a1406c1daf102acfecfa598cebaad0e3e1375983b659be7",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1368_crop.webp",
+      "evidence_page": 1368,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_016F/part1_p1368_crop.webp",
+      "evidence_video_id": "video_016F",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "strategy_id": "M10-PA-004",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014A_trends_higher_lows_lower_highs.md",
+      "case_id": "M10-PA-004-boundary-001",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "boundary",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Strong breakout beyond the boundary with follow-through.",
+        "Boundary fade against a tight channel or strong always-in trend."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "812a1bea1c65b72425ab208b303e53b9b78efe224f210da0c653a9810fb58a4d",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/part1_p0891_crop.webp",
+      "evidence_page": 891,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014A/part1_p0891_crop.webp",
+      "evidence_video_id": "video_014A",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Strong breakout beyond the boundary with follow-through."
+      ],
+      "strategy_id": "M10-PA-004",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "case_id": "M10-PA-007-positive-001",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "7cc04e9f0dea283057c80d69ce7214fc1989d26f7acea50ee65302add923adf9",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0064_crop.webp",
+      "evidence_page": 64,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0064_crop.webp",
+      "evidence_video_id": "video_018B",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "strategy_id": "M10-PA-007",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "case_id": "M10-PA-007-positive-002",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "f526a437d0d21cbbfc0543caa71317308991e761329a802b4a03f2bac605dd58",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0065_crop.webp",
+      "evidence_page": 65,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0065_crop.webp",
+      "evidence_video_id": "video_018B",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "strategy_id": "M10-PA-007",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "case_id": "M10-PA-007-positive-003",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "positive",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "4f73f6af2d6092f2e0cac2a249361865acad5267509face1539a59d9932cfd03",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0073_crop.webp",
+      "evidence_page": 73,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0073_crop.webp",
+      "evidence_video_id": "video_018B",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Enter against the failed second leg when trapped traders are forced to exit and the reversal bar has context.",
+        "Prefer traps near support/resistance, moving average, or channel boundary."
+      ],
+      "strategy_id": "M10-PA-007",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018B_trading_ranges_buy_sell_setups_bom_second_leg_trap.md",
+      "case_id": "M10-PA-007-counterexample-001",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "counterexample",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "6b1bd289406236fe72c4484741b0388a968536f13cd358526653686df1623702",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0066_crop.webp",
+      "evidence_page": 66,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_018B/part2_p0066_crop.webp",
+      "evidence_video_id": "video_018B",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "strategy_id": "M10-PA-007",
+      "user_review_required": false
+    },
+    {
+      "agent_precheck_status": "agent_prechecked",
+      "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015G_breakouts_tick_pip_traps_fade_weak_setups.md",
+      "case_id": "M10-PA-007-boundary-001",
+      "case_level_decision": "pass_for_definition_evidence",
+      "case_type": "boundary",
+      "checksum_match": true,
+      "disqualifiers": [
+        "Second leg resumes strongly with follow-through.",
+        "Trap label without visible trapped-trader evidence."
+      ],
+      "evidence_exists": true,
+      "evidence_image_checksum": "ee659f8a5b633a9e9f5783c543eab07f80f03971c9a9af9ad9ce021916b8f0ef",
+      "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/part1_p1171_crop.webp",
+      "evidence_page": 1171,
+      "evidence_resolved_local_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_015G/part1_p1171_crop.webp",
+      "evidence_video_id": "video_015G",
+      "manual_review_status": "not_required_for_m12_9",
+      "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+      "paper_gate_evidence_now": false,
+      "pattern_decision_points": [
+        "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+        "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+        "Second leg resumes strongly with follow-through."
+      ],
+      "strategy_id": "M10-PA-007",
+      "user_review_required": false
+    }
+  ],
+  "generated_at": "2026-04-28T04:03:11Z",
+  "schema_version": "m12.visual-case-review-ledger.v1",
+  "stage": "M12.9.visual_review_closure"
+}
