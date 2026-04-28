@@ -1,0 +1,505 @@
+{
+  "items": [
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_SPY_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "8b9f17914f72355c9d88992bdea00f40d2b59f3f693d16deb38ee0613ba9bd60",
+      "symbol": "SPY",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_QQQ_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "0c80f162ca4e83011f71ff6ac79ef712a68f4d12b8089008fb48f518dff0da92",
+      "symbol": "QQQ",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3978",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_IWM_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "4353b51b27ddf3092f82aa09e33a871e9d7ba47b90b5dea32f39f50c442e8670",
+      "symbol": "IWM",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_DIA_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "8ae8bd165a67e607f13c1602a703060aa4eab3334fda2e9db66e0f20abd9f7f5",
+      "symbol": "DIA",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_VTI_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "a9e6499d6be5bba4adb9cb9433dffab10a36c4a871aabd99c7247a538ca7b18a",
+      "symbol": "VTI",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3930",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_VOO_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-09-09T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "2af2a6be655ed9dfb18070b7027d0eb6bc89d67852a32a71994109a49f213c42",
+      "symbol": "VOO",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_IVV_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "bdc9f185295b2266544a31ea5a5830bc8e811afd24e79f32690f800c7167dd13",
+      "symbol": "IVV",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLK_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "f1082e12733e59a39c58af942fa1f39a5b50b557fff066404fc723243edcba39",
+      "symbol": "XLK",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3978",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLF_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "064d4c89831588261eb7b40955a7517f0545cf4745505ca05b877fa80422306d",
+      "symbol": "XLF",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3978",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLE_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "427b32ec7b45fc5d6a27ca7139ef00ff1b4e2b38aa7150dbbc6b2fe9fd8ce878",
+      "symbol": "XLE",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLV_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "efaef8c05230fc5e960b1e377494a1e32682c6663310ee0c93962b5c67a80b18",
+      "symbol": "XLV",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLY_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "b446e69b57f8cba2e9966e0ef2035eaf5a10b02654b855bc9a7f1c72c8b2b25b",
+      "symbol": "XLY",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLI_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "3413d05b38b749e259c5d330eb09aa549a366fd32dcc61b63f7cc4e023594b46",
+      "symbol": "XLI",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLP_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "8fd41d9c3f52ba4433b573864f81a6f8c095f004860308c081ab3002d8cd5a2b",
+      "symbol": "XLP",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLU_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "ddf32dff7e9b0238e6fd433ec23ef34c5700213a6b9cd71976bc9957000dc739",
+      "symbol": "XLU",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "1972",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLC_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2018-06-19T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "f5578806576c60283b2a014fa1e7aa4b978ac6ad069d17f5d066b07c51cbf878",
+      "symbol": "XLC",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_XLB_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "a917156d2a51b194194ce9990b9388facdb08d8632ee015dec85f577d974d711",
+      "symbol": "XLB",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3607",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_SMH_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2011-12-20T16:00:00-05:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "22b1e3b5ae398e1dc13de0b3956cb5a828d6237f8131f71e2dec9a6ac8272d73",
+      "symbol": "SMH",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_SOXX_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "4e61eea1c1fc56952901d4027c8818531dd9ffe387f27c72a72be42fb6b3b28a",
+      "symbol": "SOXX",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_TQQQ_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "a03eee04dae7a618bd146b27dc4c792828e1d564db98905b7ef1ab4c75a33ebd",
+      "symbol": "TQQQ",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_SQQQ_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "493d6ee530385062827a41103007775603aff797ccc9bcff476a2ad4f2be0f13",
+      "symbol": "SQQQ",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_GLD_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "a7be38eec800e62b1e342b033943519a03bf7ee33d1928996ead766c276f743d",
+      "symbol": "GLD",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_SLV_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "1436353d2020ccd35a2ad5aeaead0721c709befcb8ac13636199ef8b0ce7c9da",
+      "symbol": "SLV",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_USO_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "bf385f98115c01d3368f7696bc91b158bd75ef78f724b20f3b8b823bdbe3b71b",
+      "symbol": "USO",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_TLT_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "19040f986ec2880a0b48b3eec9d34d342fbb81dbfd8dd1140a31e6c57f565945",
+      "symbol": "TLT",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_HYG_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "756b0d6062288c72d4d206001c92e76573e28a49e562d0774c218fc6276f1b03",
+      "symbol": "HYG",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_LQD_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "177377f8725ddd533fe039b0ef044d61be38459ea6db0f6a7a6551bde5578e96",
+      "symbol": "LQD",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_EEM_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "bcff2395a21d581a7d0db5544f97f41cc72a3d32a572f0b446512982bf86d4c6",
+      "symbol": "EEM",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3979",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_EFA_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "93bdfea56aefe7387fd3756cb17c1194f3d757aab6820b3a4c207d36e7edb174",
+      "symbol": "EFA",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "2877",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_ARKK_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2014-10-31T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "274bbd35878d5cf9f885c14d13aadb5ff17e121bc7b78159874120a3e69ffa28",
+      "symbol": "ARKK",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_AAPL_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "a7de4cf1bce94a8a407402bf8080a40833c0c8d0d0074b521bb3f1ce7793df44",
+      "symbol": "AAPL",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_MSFT_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "136baaff559568670b0cd97be343f24f7ea4d1074191cca4036968e25c63c568",
+      "symbol": "MSFT",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_NVDA_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "0c425d945ebf7d05100c34053787b79b82d7a2d5c7ceaa1f078a3bb0fc01c6e2",
+      "symbol": "NVDA",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_AMZN_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "644b8fce2b632a5851f31c37605bf01b0c0ec562c8fc1d8f53ccabae0eb5e2ce",
+      "symbol": "AMZN",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_GOOGL_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "b9b560ad5fe8217448b040c57bee16943fe794dfb3f4b18d335d1b56b90be22a",
+      "symbol": "GOOGL",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3039",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_GOOG_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2014-03-27T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "0514c345ae7df48c8e5b2d6ca440e5260aef9f0eb6a5cf970e79a5578707028d",
+      "symbol": "GOOG",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3504",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_META_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2012-05-18T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "3b91ca8d285701c26d2d3ea474e1f23a61ffd80b95da296f82d64cf896c3dd13",
+      "symbol": "META",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_TSLA_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "342df7bb6f7bbe9882d155d0fc323d9b4fbe4b26b7fe416df89f775624cd3fc4",
+      "symbol": "TSLA",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_AVGO_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "0005ed361acefa596f0eccff94c68b62f47c2765c9b0f0f3095e89f4fecd9a3d",
+      "symbol": "AVGO",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_AMD_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "9abcc3980bf26c40280d425b4f9c384523506445679e89c39d164983ff8317ec",
+      "symbol": "AMD",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_INTC_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "1680a662a649b59aa5a77b08b90977b605e0cff1b6b463ea2f2b82d1d3f2bb71",
+      "symbol": "INTC",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_MU_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "f9a66b86732b7a9e6b2394c1357c600de47a8ee587d871cf261daf307f91ae1c",
+      "symbol": "MU",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_QCOM_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "eec80799d6f7b71bd84998f01cf2dc7a11125e47ae4662b4bb7ae936f4cf747a",
+      "symbol": "QCOM",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_ORCL_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "4259436dce26c6aecb6afe0f4d1f97f3d76e86ea3ae3e7b51807f6f95eb1e947",
+      "symbol": "ORCL",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3980",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_CRM_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "e65052c892f02f91a2d18584af4982ebf08b5d01dbe0574c3d317fd38234ec26",
+      "symbol": "CRM",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3981",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_ADBE_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2010-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "10e12c47c34ec0b36723dbf0fdc0c4cd56fabaad1b9f47e8a3a712efa5d98e4d",
+      "symbol": "ADBE",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3473",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_NOW_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2012-06-29T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "8431c8fa76e2c2655b6d311670381b8d2012bd2b4b104c74f56562cdb2b3a287",
+      "symbol": "NOW",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "1407",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_SNOW_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2020-09-16T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "24c79c42967db54678442a88d9cc180794dbe2afaa42a63e0cf0bf337e3996e3",
+      "symbol": "SNOW",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "1397",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_PLTR_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2020-09-30T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "953b3be6f0223682bb9867069efcd0efe8c01db02d583a820563710455e69c20",
+      "symbol": "PLTR",
+      "timeframe": "1d"
+    },
+    {
+      "bar_count": "3459",
+      "data_lineage": "native_daily_cache",
+      "data_path": "local_data/longbridge_history/us_PANW_1d_2010-06-29_2026-04-27_longbridge.csv",
+      "first_bar": "2012-07-20T16:00:00-04:00",
+      "last_bar": "2026-04-27T16:00:00-04:00",
+      "source_checksum": "0851d3b9c24c545ebcbd6b64d7236e2a516746dd05efa4b13c7bf17c7cd1ee27",
+      "symbol": "PANW",
+      "timeframe": "1d"
+    }
+  ],
+  "schema_version": "m12.20.input-manifest.v1"
+}
