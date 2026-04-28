@@ -1,0 +1,111 @@
+{
+  "broker_connection": false,
+  "candidate_count": 6,
+  "candidates": [
+    {
+      "candidate_id": "M12-SRC-001",
+      "daily_test_fit": "高",
+      "linked_strategy": "M12-FTD-001",
+      "name": "日线趋势顺势信号K增强版",
+      "role": "正式策略候选",
+      "scanner_fit": "高",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008A_candles_setups_signal_bars_trend_tr_entry_bad_signal.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012A_market_cycle_four_parts_pullback_channel_trading_range.md"
+      ],
+      "test_priority": 1,
+      "test_route": "立即进入下一轮历史A/B重测，然后继续每日只读观察。",
+      "why_now": "早期策略收益强，但回撤大，最值得先做定义增强和A/B重测。"
+    },
+    {
+      "candidate_id": "M12-SRC-002",
+      "daily_test_fit": "高",
+      "linked_strategy": "M10-PA-001",
+      "name": "趋势回调二次入场",
+      "role": "正式策略候选",
+      "scanner_fit": "高",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-001.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009A_pullbacks_bar_counting_basics_high_low_1_2.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf"
+      ],
+      "test_priority": 2,
+      "test_route": "保留每日只读主线，并扩大到50只股票扫描。",
+      "why_now": "它和早期日线策略同属顺势，但比单根强K线更强调回调后的再次启动，可能更稳。"
+    },
+    {
+      "candidate_id": "M12-SRC-003",
+      "daily_test_fit": "高",
+      "linked_strategy": "M10-PA-002",
+      "name": "突破后1-2根K线跟进",
+      "role": "正式策略候选",
+      "scanner_fit": "高",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-002.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015A_breakouts_definition_80_rule_reversal_tr.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+        "raw:knowledge/raw/notes/方方土视频笔记-突破.pdf"
+      ],
+      "test_priority": 3,
+      "test_route": "保留每日只读主线，并作为 M12-FTD-001 的确认过滤器。",
+      "why_now": "它能解释强K线之后有没有真正延续，是早期策略降低假信号的直接补充。"
+    },
+    {
+      "candidate_id": "M12-SRC-004",
+      "daily_test_fit": "中高",
+      "linked_strategy": "M10-PA-003",
+      "name": "紧密通道/小回调顺势",
+      "role": "选股过滤器候选",
+      "scanner_fit": "高",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-003.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md"
+      ],
+      "test_priority": 4,
+      "test_route": "先做 scanner 排名因子，再决定是否单独回测。",
+      "why_now": "它更像筛选强趋势股票的条件，适合先提高 scanner 排名，而不是马上当独立交易触发。"
+    },
+    {
+      "candidate_id": "M12-SRC-005",
+      "daily_test_fit": "高",
+      "linked_strategy": "M12-FTD-001-filter",
+      "name": "长回调保护",
+      "role": "回撤控制过滤器",
+      "scanner_fit": "中高",
+      "source_refs": [
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"
+      ],
+      "test_priority": 5,
+      "test_route": "先叠加到 M12-FTD-001 做A/B测试。",
+      "why_now": "它专门解决早期策略回撤大的问题：趋势回调拖太久时，不再当普通顺势机会。"
+    },
+    {
+      "candidate_id": "M12-SRC-006",
+      "daily_test_fit": "中",
+      "linked_strategy": "M10-PA-008",
+      "name": "主要趋势反转观察",
+      "role": "反转观察候选",
+      "scanner_fit": "中",
+      "source_refs": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-008.json",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_022A_major_trend_reversals_requirements_minor_mtr_probability.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_021A_reversals_definition_minor_major_breakouts.md"
+      ],
+      "test_priority": 6,
+      "test_route": "先进入反转观察清单，不直接进入全自动交易触发。",
+      "why_now": "M10-PA-008 的关键图例这轮已经由 agent 关闭，不再卡人工确认；下一步可以做严格定义后的观察测试。"
+    }
+  ],
+  "generated_at": "2026-04-28T08:02:25Z",
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "plain_language_result": "回头看早期策略来源后，最值得继续看的不是一条，而是一组：顺势信号K、回调二次入场、突破跟进、紧密通道筛选、长回调保护、主要趋势反转观察。",
+  "real_orders": false,
+  "schema_version": "m12.14.source-revisit-strategy-candidates.v1",
+  "stage": "M12.14.source_strategy_closure"
+}

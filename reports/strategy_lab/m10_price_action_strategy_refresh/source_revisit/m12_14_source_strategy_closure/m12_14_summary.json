@@ -1,0 +1,57 @@
+{
+  "artifacts": {
+    "candidate_catalog": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_source_revisit_strategy_candidates.json",
+    "candidate_report": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_source_revisit_strategy_candidates.md",
+    "definition_closure": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_definition_closure.json",
+    "definition_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_early_strategy_multisource_definition_ledger.json",
+    "definition_report": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_definition_closure_report.md",
+    "upgrade_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_early_strategy_upgrade_plan.md",
+    "visual_decision_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_visual_decision_ledger.json",
+    "visual_report": "reports/strategy_lab/m10_price_action_strategy_refresh/source_revisit/m12_14_source_strategy_closure/m12_14_visual_decision_report.md"
+  },
+  "broker_connection": false,
+  "definition_blockers_closed": 3,
+  "early_strategy_result": {
+    "current_metrics": {
+      "average_holding_bars": "4.76",
+      "final_equity": "845131.37",
+      "initial_capital": "100000.00",
+      "max_drawdown_percent": "49.04",
+      "net_profit": "745131.37",
+      "profit_factor": "1.06",
+      "return_percent": "745.13",
+      "symbol": "ALL",
+      "trade_count": 41030,
+      "win_rate": "36.74"
+    },
+    "next_test": {
+      "baseline": "M12.12 简化口径",
+      "name": "M12-FTD-001 v0.2 A/B 重测",
+      "success_focus": "不是只看收益更高，而是看最大回撤、亏损连续性、分标的稳定性是否改善。",
+      "variants": [
+        "只加长回调保护",
+        "只加1-2根K线跟进确认",
+        "加行情背景分类 + 信号K质量",
+        "完整多来源增强版"
+      ]
+    },
+    "status_after_m12_14": "重点升级测试候选，不再只是 placeholder 或 benchmark。",
+    "strategy_id": "M12-FTD-001"
+  },
+  "generated_at": "2026-04-28T08:02:25Z",
+  "live_execution": false,
+  "next_delivery": [
+    "先跑 M12-FTD-001 v0.2 A/B 重测，目标是降低回撤而不是扫参数。",
+    "把 M10-PA-001/002/012 + M12-FTD-001 继续放进50只股票每日只读测试。",
+    "M10-PA-008/009 不再等图例确认，进入严格定义后的观察/复测准备。",
+    "M10-PA-005/004/007 不拖主线：005暂不进每日测试，004/007降级为图形研究。"
+  ],
+  "paper_simulated_only": true,
+  "plain_language_result": "本轮已把早期高收益策略、多来源定义、其他值得测试策略、图形确认和定义阻塞一次性收口。",
+  "real_orders": false,
+  "schema_version": "m12.14.summary.v1",
+  "source_revisit_candidate_count": 6,
+  "stage": "M12.14.source_strategy_closure",
+  "visual_cases_closed_without_user_review": 4,
+  "visual_needs_user_review_count": 0
+}

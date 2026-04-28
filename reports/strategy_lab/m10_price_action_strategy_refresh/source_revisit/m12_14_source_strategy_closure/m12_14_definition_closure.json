@@ -1,0 +1,51 @@
+{
+  "broker_connection": false,
+  "generated_at": "2026-04-28T08:02:25Z",
+  "live_execution": false,
+  "plain_language_result": "定义问题已经给出明确处理：005 已补字段但不进主线；004/007 降级为图形研究，不再等待你确认。",
+  "real_orders": false,
+  "schema_version": "m12.14.definition-closure.v1",
+  "stage": "M12.14.source_strategy_closure",
+  "strategy_rows": [
+    {
+      "current_decision": "reject_for_now_after_geometry_review",
+      "next_action": "不再拖主线；如果后续要救这条，只能作为单独研究项重做交易区间检测器。",
+      "paper_gate_evidence_now": false,
+      "plain_status": "已补几何字段并复测，但结果弱，暂不进每日测试主线。",
+      "strategy_id": "M10-PA-005",
+      "what_was_fixed": [
+        "range high/low",
+        "range height",
+        "breakout edge",
+        "re-entry close",
+        "failed breakout extreme"
+      ]
+    },
+    {
+      "current_decision": "visual_only_not_backtestable_without_manual_labels",
+      "next_action": "若要继续，下一步是新建图形检测器/人工标签数据集；不进入当前每日自动测试。",
+      "paper_gate_evidence_now": false,
+      "plain_status": "宽通道边界反转 当前不能靠普通 OHLCV 自动确认，已正式降级，不再挂“等用户确认”。",
+      "strategy_id": "M10-PA-004",
+      "what_is_missing": [
+        "boundary_touch",
+        "channel_invalidation",
+        "reversal_confirmation",
+        "wide_channel_boundary"
+      ]
+    },
+    {
+      "current_decision": "visual_only_not_backtestable_without_manual_labels",
+      "next_action": "若要继续，下一步是新建图形检测器/人工标签数据集；不进入当前每日自动测试。",
+      "paper_gate_evidence_now": false,
+      "plain_status": "第二腿陷阱反转 当前不能靠普通 OHLCV 自动确认，已正式降级，不再挂“等用户确认”。",
+      "strategy_id": "M10-PA-007",
+      "what_is_missing": [
+        "first_leg_count",
+        "opposite_failure_point",
+        "second_leg_count",
+        "trap_confirmation"
+      ]
+    }
+  ]
+}

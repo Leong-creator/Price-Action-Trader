@@ -1,0 +1,118 @@
+{
+  "broker_connection": false,
+  "current_m12_12_metrics": {
+    "average_holding_bars": "4.76",
+    "final_equity": "845131.37",
+    "initial_capital": "100000.00",
+    "max_drawdown_percent": "49.04",
+    "net_profit": "745131.37",
+    "profit_factor": "1.06",
+    "return_percent": "745.13",
+    "symbol": "ALL",
+    "trade_count": 41030,
+    "win_rate": "36.74"
+  },
+  "generated_at": "2026-04-28T08:02:25Z",
+  "live_execution": false,
+  "next_test": {
+    "baseline": "M12.12 简化口径",
+    "name": "M12-FTD-001 v0.2 A/B 重测",
+    "success_focus": "不是只看收益更高，而是看最大回撤、亏损连续性、分标的稳定性是否改善。",
+    "variants": [
+      "只加长回调保护",
+      "只加1-2根K线跟进确认",
+      "加行情背景分类 + 信号K质量",
+      "完整多来源增强版"
+    ]
+  },
+  "not_source_of_truth": [
+    "早期截图",
+    "M12-BENCH-001",
+    "signal_bar_entry_placeholder"
+  ],
+  "paper_simulated_only": true,
+  "plain_language_result": "早期策略收益确实强，应该进入下一轮重点测试；但先补背景、信号K质量、长回调保护和跟进确认，目标是保留收益能力同时压回撤。",
+  "real_orders": false,
+  "schema_version": "m12.14.early-strategy-multisource-definition-ledger.v1",
+  "source_families": [
+    "fangfangtu_notes",
+    "fangfangtu_youtube_transcript",
+    "brooks_v2_manual_transcript",
+    "al_brooks_ppt_or_supporting_source_pages"
+  ],
+  "stage": "M12.14.source_strategy_closure",
+  "strategy_id": "M12-FTD-001",
+  "strategy_name": "方方土日线趋势顺势信号K 多来源增强版",
+  "upgrade_fields": [
+    {
+      "current_problem": "旧版只说日线明显上涨或下跌，太粗，容易把震荡里的强K线也当成机会。",
+      "field": "行情背景",
+      "new_definition": "先把行情分成突破、紧密通道、宽通道、震荡区间、过渡期；只有趋势背景足够清楚时才允许顺势信号K进入测试。",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012A_market_cycle_four_parts_pullback_channel_trading_range.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md"
+      ],
+      "test_effect": "预期减少震荡里的误触发，重点观察回撤是否下降。"
+    },
+    {
+      "current_problem": "旧版只要求顺势强K线，没有拆实体、收盘位置、影线和背景是否配合。",
+      "field": "信号K质量",
+      "new_definition": "拆成实体强度、收盘位置、影线比例、是否与背景同向、下一根是否跟进；弱信号K只能观察，不能作为正式触发。",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_008A_candles_setups_signal_bars_trend_tr_entry_bad_signal.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015D_breakouts_second_leg_traps_strong_breakouts.md"
+      ],
+      "test_effect": "预期过滤差K线，候选数会下降，胜率和回撤要重新看。"
+    },
+    {
+      "current_problem": "旧版没有判断更高周期，可能在日线看起来强，但周线其实处于区间上沿。",
+      "field": "更高周期一致性",
+      "new_definition": "日线信号优先要求更高周期不处于明显阻力边缘；若更高周期是震荡区间边缘，则信号降级为观察。",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-price-action-transcript.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012A_market_cycle_four_parts_pullback_channel_trading_range.md"
+      ],
+      "test_effect": "预期减少高位追涨和低位追空。"
+    },
+    {
+      "current_problem": "旧版把趋势中的所有顺势信号都近似看待，没有区分普通回调和已经拖太久的回调。",
+      "field": "长回调保护",
+      "new_definition": "如果回调已经持续约20根K线以上，不再按普通趋势恢复处理，必须重新评估是否已经进入区间或反转。",
+      "source_refs": [
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md",
+        "raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf",
+        "wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md"
+      ],
+      "test_effect": "这是降低大回撤的第一优先过滤器。"
+    },
+    {
+      "current_problem": "旧版只看突破信号K高低点，容易把第二天无跟进的假信号也纳入。",
+      "field": "入场确认",
+      "new_definition": "区分突破信号K入场和下一根K线收盘确认；若突破后1-2根K线没有跟进，取消或降级。",
+      "source_refs": [
+        "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015B_breakouts_follow_through_reversal_small_start.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_015D_breakouts_second_leg_traps_strong_breakouts.md"
+      ],
+      "test_effect": "这是把高收益策略变得更稳的第二优先过滤器。"
+    },
+    {
+      "current_problem": "旧版固定信号K另一端止损、2R目标，解释力不够。",
+      "field": "止损和目标",
+      "new_definition": "保留信号K止损，同时记录波段止损、实际风险止损、前高前低、测量目标，回测输出多目标对比。",
+      "source_refs": [
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_020A_measured_moves_leg1_equals_leg2_prior_leg.md",
+        "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034A_actual_risk_traders_equation_profit_targets.md",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-014.json",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-015.json"
+      ],
+      "test_effect": "不是为了调参，而是为了知道收益来自哪里、回撤由什么造成。"
+    }
+  ]
+}
