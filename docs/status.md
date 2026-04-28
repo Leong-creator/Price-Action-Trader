@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12.18：Visual Strategy Observation（当前阶段分支 `feature/m12-18-visual-strategy-observation`，M12.18 已把 `M10-PA-008/009` 转入严格图形观察队列）
+- 当前支线：阶段 12.19：Visual Detector Prototypes（当前阶段分支 `feature/m12-19-visual-detector-prototypes`，M12.19 已把 `M10-PA-004/007` 改成图形检测器原型任务）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.18 Visual Strategy Observation`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity 与 M12.18 Visual Strategy Observation
+- 当前支线 milestone：`M12.19 Visual Detector Prototypes`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation 与 M12.19 Visual Detector Prototypes
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m12-18-visual-strategy-observation`
+- `feature/m12-19-visual-detector-prototypes`
 
 ## 已完成
 
@@ -417,17 +417,20 @@
   - 已完成 M12.18 Visual Strategy Observation，新增 `scripts/m12_18_visual_strategy_observation_lib.py`、`scripts/run_m12_18_visual_strategy_observation.py`、`visual_observation/m12_18/` 与 M12.18 单测。
   - M12.18 将 `M10-PA-008/009` 转入严格图形观察，不再等人工逐图确认，也不混入每日主线自动触发；当前整理出 `8631` 条观察候选，其中 `M10-PA-008` `4375` 条、`M10-PA-009` `4256` 条。
   - M12.18 严格规则：`M10-PA-008` 必须有趋势破坏、二次测试、反转确认；`M10-PA-009` 必须有三次推动、通道/三角结构、反转确认。两者都不是模拟买卖准入证据。
+  - 已完成 M12.19 Visual Detector Prototypes，新增 `scripts/m12_19_visual_detector_prototypes_lib.py`、`scripts/run_m12_19_visual_detector_prototypes.py`、`visual_detectors/m12_19/` 与 M12.19 单测。
+  - M12.19 将 `M10-PA-004/007` 从“等图例/等定义”改为检测器原型任务，整理出 `10` 个候选图例：`M10-PA-004` `5` 个，`M10-PA-007` `5` 个。
+  - M12.19 结论：两条策略当前都是 `detector_prototype_ready_not_backtest_ready`，也就是“知道机器要识别什么，但还不能拿来跑盈利回测”。后续若继续推进，需要单独实现 swing/leg/channel 检测器并补单测。
 
 ## 当前阻塞
 
-- 当前 M12.18 实现无代码侧阻塞；图形策略已进入观察清单，下一步处理 `M10-PA-004/007` 检测器原型。
+- 当前 M12.19 实现无代码侧阻塞；可继续日常只读测试累计到 `10` 个交易日，并在之后做 M11.6 模拟买卖试运行复查。
 - M11.6 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
 - 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- 下一步进入 M12.19：为 `M10-PA-004/007` 建图形检测器原型，输出候选图形、自动判定理由、关键样例和是否值得后续回测。
+- 下一步：继续跑 M12.17 每日只读测试直到累计 `10` 个交易日；同时如需推进图形研究，可单独实现 `M10-PA-004/007` 的 swing/leg/channel 检测器。
 - 同步连续运行 M12.12 每日只读循环，累计 `10` 个交易日看板记录，并把每日候选、模拟结果和数据缺口写入同一套 artifact。
 - `M10-PA-008/009` 下一步不再等图例确认，而是进入严格定义后的反转/楔形观察测试准备；`M10-PA-004/007` 若要继续，需要单独新建图形检测器或人工标签数据集。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。

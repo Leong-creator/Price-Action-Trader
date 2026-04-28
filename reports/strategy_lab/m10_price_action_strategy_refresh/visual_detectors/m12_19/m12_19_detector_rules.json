@@ -1,0 +1,43 @@
+{
+  "rules": {
+    "M10-PA-004": {
+      "machine_needs_to_detect": [
+        "宽通道",
+        "通道边界",
+        "触边",
+        "触边后反转确认",
+        "强突破失效条件"
+      ],
+      "minimum_ohlcv_fields": [
+        "swing_high_low_sequence",
+        "channel_width_proxy",
+        "boundary_touch_count",
+        "reversal_bar",
+        "breakout_follow_through"
+      ],
+      "name": "宽通道边界反转检测器原型",
+      "prototype_decision": "detector_prototype_ready_not_backtest_ready",
+      "why": "Brooks 图例足够说明要检测什么，但仅靠当前 OHLCV 近似还不能稳定判断通道画线质量。"
+    },
+    "M10-PA-007": {
+      "machine_needs_to_detect": [
+        "第一腿",
+        "第二腿",
+        "陷阱点",
+        "反向失败点",
+        "反转确认K线"
+      ],
+      "minimum_ohlcv_fields": [
+        "leg1_extreme",
+        "leg2_extreme",
+        "trap_break_level",
+        "failure_close",
+        "reversal_bar"
+      ],
+      "name": "第二腿陷阱反转检测器原型",
+      "prototype_decision": "detector_prototype_ready_not_backtest_ready",
+      "why": "Brooks 图例足够说明腿部和陷阱结构，但当前还缺稳定的腿部计数器和陷阱确认器。"
+    }
+  },
+  "schema_version": "m12.19.detector-rules.v1"
+}
