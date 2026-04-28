@@ -1309,6 +1309,15 @@
   - 自动 scanner 策略只能包含 `M10-PA-001`、`M10-PA-002`、`M10-PA-012` 与 `M12-FTD-001`；`M10-PA-007` 只能保持观察队列，`M10-PA-004` 继续保留图形研究。
   - 必须输出 `m12_26_cache_scanner_expansion_summary.json`、`m12_26_first50_data_coverage.json/csv`、`m12_26_universe147_coverage.json/csv`、`m12_26_scanner_available_symbols.json`、`m12_26_deferred_symbols.json/csv`、`m12_26_scanner_candidates.csv`、`m12_26_strategy_hit_distribution.csv`、`m12_26_scanner_expansion_report.md` 与 `m12_26_handoff.md`。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.28 PA004 Long Dashboard Refresh 必须满足：
+  - 必须使用独立分支 `feature/m12-28-pa004-long-dashboard-refresh`，从已合并 M12.27 的 `main` 切出。
+  - 必须把 `M10-PA-004` 做多版作为观察项接入盘中只读模拟看板；PA004 做空版不得进入主线。
+  - 必须使用 Longbridge 只读 quote 或已登记 fallback，只能刷新当前价格和模拟盈亏，不得接真实账户、真实资金或真实买卖。
+  - 若候选日期和报价日期不一致，HTML、Markdown、JSON 与 handoff 必须首页级提示“候选来自上一轮扫描，当前只刷新报价”，不得误导为今日全量重新扫描。
+  - 看板首页必须用中文优先展示今日机会、盘中模拟盈亏、模拟收益率、浮盈机会占比、PA004 做多状态和市场状态。
+  - `pa004_long_observation.lookback_days` 必须实际过滤 PA004 观察样本，不得成为死配置。
+  - 必须输出 `m12_28_session_dashboard_data.json`、`m12_28_session_quote_manifest.json`、`m12_28_session_trade_view.csv`、`m12_28_pa004_long_observation.csv`、`m12_28_trading_session_dashboard.html`、`m12_28_session_report.md` 与 `m12_28_handoff.md`。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
