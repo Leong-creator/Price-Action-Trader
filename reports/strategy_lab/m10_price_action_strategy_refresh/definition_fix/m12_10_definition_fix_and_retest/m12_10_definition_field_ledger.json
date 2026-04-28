@@ -1,0 +1,88 @@
+{
+  "priority_visual_gate_guard": [
+    {
+      "paper_gate_evidence_now": false,
+      "reason": "M12.9 requires user confirmation before visual strategies can count as gate evidence.",
+      "strategy_id": "M10-PA-008"
+    },
+    {
+      "paper_gate_evidence_now": false,
+      "reason": "M12.9 requires user confirmation before visual strategies can count as gate evidence.",
+      "strategy_id": "M10-PA-009"
+    }
+  ],
+  "schema_version": "m12.10.definition-field-ledger.v1",
+  "strategy_rows": [
+    {
+      "definition_decision": "reject_for_now_after_geometry_review",
+      "field_status": "geometry_fields_persisted_for_retest_review",
+      "geometry_event_count": 34651,
+      "geometry_event_count_by_timeframe": {
+        "15m": 7511,
+        "1d": 1790,
+        "1h": 1469,
+        "5m": 23881
+      },
+      "geometry_event_identity": {
+        "event_id_semantics": "one stable row per distinct failed-breakout geometry candidate",
+        "event_id_unique": true,
+        "identity_fields": [
+          "strategy_id",
+          "symbol",
+          "timeframe",
+          "direction",
+          "signal_timestamp",
+          "entry_timestamp",
+          "breakout_timestamp",
+          "range_high",
+          "range_low",
+          "range_height",
+          "breakout_edge",
+          "failed_breakout_extreme",
+          "setup_notes"
+        ]
+      },
+      "paper_gate_evidence_now": false,
+      "required_fields": {
+        "breakout_edge": "available",
+        "failed_breakout_extreme": "available",
+        "range_height": "available",
+        "range_high": "available",
+        "range_low": "available",
+        "reentry_close": "available"
+      },
+      "retest_path": "m10_9_before_after_metrics_reused_with_m12_10_geometry_event_ledger",
+      "strategy_id": "M10-PA-005"
+    },
+    {
+      "definition_decision": "visual_only_not_backtestable_without_manual_labels",
+      "field_status": "downgraded_visual_only_not_backtestable",
+      "paper_gate_evidence_now": false,
+      "required_fields": {
+        "boundary_touch": "requires_manual_or_new_detector_label",
+        "channel_invalidation": "requires_manual_or_new_detector_label",
+        "reversal_confirmation": "requires_manual_or_new_detector_label",
+        "wide_channel_boundary": "requires_manual_or_new_detector_label"
+      },
+      "retest_path": "not_rerun_no_executable_definition",
+      "source_m12_9_status": "needs_definition_fix",
+      "strategy_id": "M10-PA-004",
+      "visual_case_count": 5
+    },
+    {
+      "definition_decision": "visual_only_not_backtestable_without_manual_labels",
+      "field_status": "downgraded_visual_only_not_backtestable",
+      "paper_gate_evidence_now": false,
+      "required_fields": {
+        "first_leg_count": "requires_manual_or_new_detector_label",
+        "opposite_failure_point": "requires_manual_or_new_detector_label",
+        "second_leg_count": "requires_manual_or_new_detector_label",
+        "trap_confirmation": "requires_manual_or_new_detector_label"
+      },
+      "retest_path": "not_rerun_no_executable_definition",
+      "source_m12_9_status": "needs_definition_fix",
+      "strategy_id": "M10-PA-007",
+      "visual_case_count": 5
+    }
+  ]
+}

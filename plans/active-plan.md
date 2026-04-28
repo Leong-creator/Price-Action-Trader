@@ -56,7 +56,8 @@
 - M12.7 已完成 Daily Trend Benchmark Reuse：把早期截图中的 `signal_bar_entry_placeholder` 日线逻辑固定为 `M12-BENCH-001 Daily Trend Momentum Baseline`，用本地 Longbridge `1d` 长窗口 `2010-06-29 ~ 2026-04-21` 重跑 `SPY / QQQ / NVDA / TSLA`；结果只作为 `scanner_factor_candidate` benchmark，不反向污染 M10 clean-room catalog，也不作为准入证据。
 - M12.8 已完成 Universe Kline Cache Completion 的 coverage / deferred / fetch-plan 交付：M12.5 的 `147` 只 seed 全部入账为 `147 x 4` 个 timeframe rows；当前只有 `4` 只有任一 native cache，目标窗口完整覆盖标的为 `0`，`588` 个缺口全部进入 deferred/error ledger，`294` 个 native cache 请求进入只读 fetch plan；本阶段不伪造 K 线、不把局部缓存宣称为全 universe 可用，也不批量写入 `local_data/`。
 - M12.9 已完成 Visual Review Closure overlay：复用 M10.2 visual packs、M10.10 visual gate 与 M12.3 precheck，覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略、`30` 个 case；`M10-PA-008/009` 只完成 agent-side closure，仍需用户确认关键图例后才可讨论 gate evidence，`M10-PA-004/007` 仍保持 definition evidence only。
-- 下一阶段已正式列入连续交付计划：`M12.10 Definition Fix and Retest`，分支为 `feature/m12-10-definition-fix-and-retest`，只处理 `M10-PA-005/004/007` 的定义字段、必要复测与正式降级判断；不得按收益曲线调参，不得把 `M10-PA-008/009` 未经用户确认的图例计入 paper gate evidence。
+- M12.10 已完成 Definition Fix and Retest：`M10-PA-005` 已从本地 OHLCV 重新持久化 `34651` 条带 range 几何字段的事件记录，但复测后仍为 `reject_for_now_after_geometry_review`；`M10-PA-004/007` 因缺少可执行宽通道/第二腿标签，正式降级为 `visual_only_not_backtestable_without_manual_labels`，不再占用自动回测队列。
+- 下一阶段已正式列入连续交付计划：`M12.11 Read-only Trading Dashboard`，分支为 `feature/m12-11-readonly-trading-dashboard`，目标是建设本地只读 Web 看板，展示 scanner 候选、只读观察事件、hypothetical entry/stop/target、simulated PnL、策略状态和 blocker；不得接 broker、账户、订单或 live execution。
 
 ## 2. 执行总原则
 
@@ -1019,6 +1020,7 @@
 - 后续承接：
   - 当前 M11 gate 继续关闭；只有完成真实只读观察周报闭环、`M10-PA-008/009` 人工图形语境复核、必要 definition review 和明确人工业务审批后，才允许重新评估 paper trading gate。
   - M12.10 的执行边界固定为：优先修复或正式降级 `M10-PA-005/004/007`，只复跑受影响策略/周期，输出 before/after 交易数、模拟收益、胜率、最大回撤和 blocker 状态；若缺少可执行几何字段或图形证据，必须保留 blocker 或降级，不得补假规则。
+  - M12.11 的执行边界固定为：只读本地 dashboard，不引入真实账户、订单、持仓或 broker 字段；所有交易信息必须使用 `hypothetical_*` 或 `simulated_*` 语义。
 - 当前边界：
   - 继续保持 `paper / simulated`。
   - 不接真实账户，不连真实 broker，不自动下单。

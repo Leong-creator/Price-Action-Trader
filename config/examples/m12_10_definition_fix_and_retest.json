@@ -1,0 +1,15 @@
+{
+  "title": "M12.10 Definition Fix and Retest",
+  "run_id": "m12_10_definition_fix_and_retest",
+  "m10_4_dataset_inventory_path": "reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_dataset_inventory.json",
+  "m10_9_before_after_metrics_path": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_before_after_metrics.csv",
+  "m10_9_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_retest_summary.json",
+  "m12_9_visual_closure_index_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_closure_index.json",
+  "m12_9_case_review_ledger_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_case_review_ledger.json",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest",
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "broker_connection": false,
+  "real_orders": false,
+  "live_execution": false
+}
