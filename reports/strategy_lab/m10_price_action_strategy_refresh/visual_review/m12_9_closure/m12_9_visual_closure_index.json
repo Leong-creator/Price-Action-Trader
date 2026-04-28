@@ -1,0 +1,177 @@
+{
+  "artifacts": {
+    "case_review_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_case_review_ledger.json",
+    "closure_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_closure_index.json",
+    "handoff": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_handoff.md",
+    "user_review_packet": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_user_review_packet.md",
+    "visual_gate_closure_report": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_gate_closure_report.md"
+  },
+  "boundary_note": "M12.9 closes agent-side visual precheck only. Priority strategies still require user confirmation before paper gate evidence can be counted.",
+  "broker_connection": false,
+  "case_count": 30,
+  "decision_counts": {
+    "needs_definition_fix": 2,
+    "visual_review_closed": 4
+  },
+  "generated_at": "2026-04-28T04:03:11Z",
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "real_orders": false,
+  "run_id": "m12_9_visual_review_closure",
+  "schema_version": "m12.visual-review-closure-index.v1",
+  "source_reuse_refs": {
+    "m10_10_visual_gate_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_visual_gate_summary.json",
+    "m10_2_visual_golden_case_index": "reports/strategy_lab/m10_price_action_strategy_refresh/m10_visual_golden_case_index.json",
+    "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+  },
+  "stage": "M12.9.visual_review_closure",
+  "strategy_count": 6,
+  "strategy_rows": [
+    {
+      "agent_precheck_closed": true,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "definition_fix_required": false,
+      "evidence_complete": true,
+      "paper_gate_evidence_now": false,
+      "priority_bucket": "tier_b_priority_visual_review",
+      "recommendation": "ready_for_user_confirmation_before_gate",
+      "source_gate_decision": "ready_for_wave_b_backtest",
+      "source_refs": {
+        "case_pack_json": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-008.json",
+        "case_pack_markdown": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-008.md",
+        "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+      },
+      "strategy_id": "M10-PA-008",
+      "strategy_level_status": "visual_review_closed",
+      "user_confirmation_required_before_paper_gate": true,
+      "visual_read_notes": "Agent viewed priority MTR evidence images: cases show prior trend, repeated MTR attempts, trendline break/test, and boundary examples where insufficient pressure implies minor reversal or trading range rather than trend reversal."
+    },
+    {
+      "agent_precheck_closed": true,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "definition_fix_required": false,
+      "evidence_complete": true,
+      "paper_gate_evidence_now": false,
+      "priority_bucket": "tier_b_priority_visual_review",
+      "recommendation": "ready_for_user_confirmation_before_gate",
+      "source_gate_decision": "ready_for_wave_b_backtest",
+      "source_refs": {
+        "case_pack_json": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-009.json",
+        "case_pack_markdown": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-009.md",
+        "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+      },
+      "strategy_id": "M10-PA-009",
+      "strategy_level_status": "visual_review_closed",
+      "user_confirmation_required_before_paper_gate": true,
+      "visual_read_notes": "Agent viewed priority wedge evidence images: cases show wedge/triangle/channel overlap, three-push structure, failed breakout context, and line-drawing ambiguity that still needs user confirmation for key cases."
+    },
+    {
+      "agent_precheck_closed": true,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "definition_fix_required": false,
+      "evidence_complete": true,
+      "paper_gate_evidence_now": false,
+      "priority_bucket": "watchlist_visual_review",
+      "recommendation": "watchlist_agent_precheck_closed_not_gate_priority",
+      "source_gate_decision": "ready_for_wave_b_backtest",
+      "source_refs": {
+        "case_pack_json": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-003.json",
+        "case_pack_markdown": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-003.md",
+        "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+      },
+      "strategy_id": "M10-PA-003",
+      "strategy_level_status": "visual_review_closed",
+      "user_confirmation_required_before_paper_gate": false,
+      "visual_read_notes": "M12.3 evidence pack is complete; keep as watchlist after priority visual strategies."
+    },
+    {
+      "agent_precheck_closed": true,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "definition_fix_required": false,
+      "evidence_complete": true,
+      "paper_gate_evidence_now": false,
+      "priority_bucket": "watchlist_visual_review",
+      "recommendation": "watchlist_agent_precheck_closed_not_gate_priority",
+      "source_gate_decision": "ready_for_wave_b_backtest",
+      "source_refs": {
+        "case_pack_json": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-011.json",
+        "case_pack_markdown": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-011.md",
+        "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+      },
+      "strategy_id": "M10-PA-011",
+      "strategy_level_status": "visual_review_closed",
+      "user_confirmation_required_before_paper_gate": false,
+      "visual_read_notes": "M12.3 evidence pack is complete; opening context remains session-specific and not a paper gate input."
+    },
+    {
+      "agent_precheck_closed": false,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "definition_fix_required": true,
+      "evidence_complete": true,
+      "paper_gate_evidence_now": false,
+      "priority_bucket": "definition_fix_support",
+      "recommendation": "use_visual_cases_to_fix_definition_fields",
+      "source_gate_decision": "needs_definition_fix",
+      "source_refs": {
+        "case_pack_json": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-004.json",
+        "case_pack_markdown": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-004.md",
+        "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+      },
+      "strategy_id": "M10-PA-004",
+      "strategy_level_status": "needs_definition_fix",
+      "user_confirmation_required_before_paper_gate": false,
+      "visual_read_notes": "Use broad-channel boundary images to define channel boundary, touch, reversal confirmation, and failure fields."
+    },
+    {
+      "agent_precheck_closed": false,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "definition_fix_required": true,
+      "evidence_complete": true,
+      "paper_gate_evidence_now": false,
+      "priority_bucket": "definition_fix_support",
+      "recommendation": "use_visual_cases_to_fix_definition_fields",
+      "source_gate_decision": "needs_definition_fix",
+      "source_refs": {
+        "case_pack_json": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-007.json",
+        "case_pack_markdown": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-007.md",
+        "m12_3_precheck_index": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_3_precheck/m12_3_visual_precheck_index.json"
+      },
+      "strategy_id": "M10-PA-007",
+      "strategy_level_status": "needs_definition_fix",
+      "user_confirmation_required_before_paper_gate": false,
+      "visual_read_notes": "Use second-leg trap images to define first leg, second leg, trap confirmation, and invalidation fields."
+    }
+  ],
+  "user_review_required_case_count": 10
+}

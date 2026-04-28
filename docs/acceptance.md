@@ -1220,6 +1220,24 @@
   - 缺失、限流、权限不足或供应商异常只能写入 deferred/error ledger，不得伪造 K 线、候选或观察事件。
   - `local_data/` 不得纳入 Git；只提交 cache manifest、coverage report、deferred/error ledger、scanner 可用股票清单和必要测试。
   - Longbridge 使用仍必须停留在 quote/Kline/market-data 只读路径，不得引入 broker/order/account/cash/position 路径。
+- M12.9 Visual Review Closure 必须满足：
+  - 必须复用 M10.2 visual golden cases、M10.10 visual gate 与 M12.3 visual precheck；不得重写 Brooks v2 source of truth。
+  - 必须把 `agent_precheck` 与 `user/manual confirmation` 分开落盘；agent 预审不得替代用户视觉确认。
+  - `M10-PA-008/009` 必须作为唯一 priority visual confirmation 策略；未人工确认前不得计入 paper gate evidence。
+  - `M10-PA-003/011` 只能作为 watchlist visual closure，不得自动进入 paper gate。
+  - `M10-PA-004/007` 只能作为 definition-fix evidence support；不得出现 ready-for-wave-B、candidate strategy、before/after trade metrics 或 paper gate candidate 语义。
+  - 所有 case-level 记录必须保留 case id、case type、Brooks unit ref、logical image path、checksum、pattern decision points、disqualifiers 与 OHLCV approximation risk。
+  - 所有 M12.9 artifact 必须保持 `paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+  - M12.9 结束后，即使 `M10-PA-008/009` agent-side precheck closed，M11.5 gate 仍必须保持关闭，直到真实只读观察、scanner coverage、definition blockers 和人工业务审批全部完成。
+- M12.10 Definition Fix and Retest 必须满足：
+  - 必须使用独立分支 `feature/m12-10-definition-fix-and-retest`，从已合并 M12.9 的 `main` 切出。
+  - 覆盖范围只能是 `M10-PA-005`、`M10-PA-004`、`M10-PA-007`；不得把 `M10-PA-008/009` 的未确认图例计入 paper gate evidence。
+  - `M10-PA-005` 必须补齐或确认缺失交易区间几何字段，包括 range high/low、range height、breakout edge、re-entry close、failed breakout extreme。
+  - `M10-PA-004` 必须补齐或确认缺失宽通道边界、边界触碰、反转确认、通道失效条件。
+  - `M10-PA-007` 必须补齐或确认缺失第二腿计数、trap confirmation、反向失败点。
+  - 定义修正只能依据 Brooks v2 / YouTube / notes 与策略结构；不得依据收益曲线调参。
+  - 只能复跑受影响策略与周期，必须输出 before/after 交易数、模拟收益、胜率、最大回撤、是否解除 blocker；无法修复时必须保留 blocker 或正式降级。
+  - 所有 artifact 必须继续保持 `paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

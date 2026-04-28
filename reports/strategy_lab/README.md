@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.8 Universe Kline Cache Completion`，当前阶段分支为 `feature/m12-8-universe-kline-cache`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.9 Visual Review Closure`，当前阶段分支为 `feature/m12-9-visual-review-closure`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -111,6 +111,11 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_completion_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_coverage_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_closure_index.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_case_review_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_user_review_packet.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_gate_closure_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_handoff.md`
@@ -137,11 +142,12 @@
 - M12.2 已完成 core strategy daily observation：生成 `32` 条 Tier A 只读观察记录；由于 M12.1 feed 只有单根 latest bar，当前全部记录为 `skip_no_trade`，不伪造策略触发、不批准 paper trading。
 - M12.3 已完成 visual review precheck：复用 M10.2/M10.10 现有图例与 gate 产物，生成 `7` 条 strategy rows 与 `30` 条 case rows；本阶段只做 agent 预审和人工复核包，不替代人工图形判断。
 - M12.4 已完成 definition fix and retest：`M10-PA-005` 有复测 before/after 数字但仍未解除 `needs_definition_fix`；`M10-PA-004/007` 仅登记定义字段缺口和图例证据，不伪造交易结果。
-- M12.5 已完成 liquid universe scanner：股票/ETF seed 共 `147` 只，当前本地 cache 实际扫描 `4` 只，输出 `12` 条 Tier A 候选；缺数据的 `143` 只 seed 全部 deferred。下一步 `M12.8 Universe Kline Cache Completion` 必须补齐这 `147` 只 seed 的只读 K 线 coverage / deferred ledger；在补齐前不得把 scanner 结果描述为 full universe 可用。
+- M12.5 已完成 liquid universe scanner：股票/ETF seed 共 `147` 只，当前本地 cache 实际扫描 `4` 只，输出 `12` 条 Tier A 候选；缺数据的 `143` 只 seed 全部 deferred。M12.8 已把这 `147` 只 seed 的只读 K 线 coverage / deferred / fetch-plan 入账；在真实补齐前不得把 scanner 结果描述为 full universe 可用。
 - M12.6 已完成 weekly client scorecard：输出 `16` 条策略 dashboard，周报汇总历史资金测试、每日只读观察、scanner 候选、图形复核和定义修正；当前交易状态仍为 `closed_not_authorized`。
 - M11.5 已完成 paper gate recheck：复查 `M10-PA-001/002/012/008/009` 后仍为 `not_approved`；当前必须先补齐真实只读观察窗口、completed candidate events、`M10-PA-008/009` 人工图形复核、`M10-PA-005/004/007` definition blocker 关闭或正式降级、scanner cache 覆盖计划和人工业务审批。
 - M12.7 已完成早期日线截图策略复用：`M12-BENCH-001` 只作为 `signal_bar_entry_placeholder` 的日线 trend benchmark；长窗口结果为 `scanner_factor_candidate`，但不得作为准入证据或 M10 clean-room 策略来源。
 - M12.8 已完成 universe cache coverage / deferred / fetch-plan：`147` 只 seed 全部入账，当前有任一 native cache 的标的是 `4` 只，完整覆盖目标窗口标的是 `0` 只，`588` 个缺口全部 deferred，`294` 个 native cache 请求进入只读 fetch plan；在真实补齐前不得宣称 full universe scanner 可用。
+- M12.9 已完成 visual review closure overlay：覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略与 `30` 个 case；`M10-PA-008/009` 已完成 agent-side closure 但仍需用户确认后才可讨论 gate evidence，`M10-PA-004/007` 仍只作为 definition evidence support。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -152,7 +158,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.8 阶段分支在：`feature/m12-8-universe-kline-cache`
+- 当前 M12.9 阶段分支在：`feature/m12-9-visual-review-closure`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 
