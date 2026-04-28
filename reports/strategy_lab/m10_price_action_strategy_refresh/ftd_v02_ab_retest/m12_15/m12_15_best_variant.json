@@ -1,0 +1,32 @@
+{
+  "decision": "进入每日测试候选，先用该版本观察回撤是否稳定改善",
+  "metrics": {
+    "average_holding_bars": "4.77",
+    "entry_mode": "next_open",
+    "final_equity": "710436.76",
+    "initial_capital": "100000.00",
+    "losing_symbol_count": 14,
+    "max_consecutive_losses": 56,
+    "max_drawdown_percent": "48.38",
+    "net_profit": "610436.76",
+    "overfit_concentration": "low",
+    "per_symbol_stability": "分散较好",
+    "plain_rule": "当回调拖得太久时，不再把顺势信号K当普通趋势恢复。",
+    "profit_factor": "1.09",
+    "profitable_symbol_count": 36,
+    "return_percent": "610.44",
+    "source_fields": "长回调保护",
+    "source_refs": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_009C_pullbacks_endless_higher_lower_timeframes_countertrend_exit.md | raw:knowledge/raw/notes/方方土视频笔记 - 回调&数K线.pdf | wiki:knowledge/wiki/sources/fangfangtu-pullback-counting-bars-note.md",
+    "symbol": "ALL",
+    "top3_profit_share_percent": "17.98",
+    "trade_count": 22184,
+    "variant_id": "pullback_guard",
+    "variant_title": "只加长回调保护",
+    "win_rate": "37.36"
+  },
+  "paper_gate_evidence_now": false,
+  "schema_version": "m12.15.best-variant.v1",
+  "selected_variant_id": "pullback_guard",
+  "selected_variant_title": "只加长回调保护",
+  "selection_rule": "优先降低最大回撤和连续亏损，同时要求净利润为正、样本不少于30笔；不按最高收益直接选择。"
+}

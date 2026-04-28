@@ -1041,3 +1041,31 @@
   - `python -m unittest discover -s tests/unit -v`
   - `python -m unittest discover -s tests/reliability -v`
   - `git diff --check`
+
+## 22. M12.15-M12.19：FTD 重测、候选安排与每日测试推进
+
+- 分支节奏：
+  - `feature/m12-15-ftd-v02-ab-retest`
+  - `feature/m12-16-source-candidate-test-plan`
+  - `feature/m12-17-daily-observation-continuity`
+  - `feature/m12-18-visual-strategy-observation`
+  - `feature/m12-19-visual-detector-prototypes`
+- 当前目标：
+  - 把早期强日线策略 `M12-FTD-001` 从“收益强但回撤大”推进到可每日观察的最佳版本。
+  - 把 M12.14 回看来源后整理出的 `6` 条候选排清楚：哪些直接测、哪些做过滤器、哪些只观察。
+  - 继续推进第一批 `50` 只股票/ETF 的每日只读测试，优先看今日机会、模拟盈亏、累计收益、胜率、最大回撤和策略状态。
+  - `M10-PA-008/009` 不再等用户逐图确认，进入严格定义观察；`M10-PA-004/007` 改为图形检测器任务，不再拖每日测试主线。
+- M12.15 当前结果：
+  - 已跑 `baseline / pullback_guard / follow_through_confirm / context_signal_quality / full_v02` 共 `5` 个版本。
+  - baseline：收益 `745.13%`、胜率 `36.74%`、最大回撤 `49.04%`、交易 `41030` 笔、最大连续亏损 `65`。
+  - `pullback_guard`：收益 `610.44%`、胜率 `37.36%`、最大回撤 `48.38%`、交易 `22184` 笔、最大连续亏损 `56`。
+  - 当前最佳折中版本为 `pullback_guard`，进入 M12.17 每日只读测试候选；这不是实盘批准，也不是模拟买卖试运行批准。
+- 下一步 M12.16：
+  - `M12-SRC-001` 接 M12.15 最佳版本。
+  - `M12-SRC-002/003` 保持每日主线；`M12-SRC-003` 同时作为 FTD 确认过滤器候选。
+  - `M12-SRC-004/005` 只做排名/风险过滤器，不伪装成独立交易策略。
+  - `M12-SRC-006` 与 `M10-PA-008` 合并进入反转观察队列。
+- 验收边界：
+  - 所有报告继续只允许 `readonly_*`、`hypothetical_*`、`simulated_*` 语义。
+  - 不接真实账户、不下真实订单、不输出真实持仓、真实现金、真实成交或 live-ready 结论。
+  - 每阶段完成后必须运行新增单测、相关回归、KB validator 和 `git diff --check`，再提交。
