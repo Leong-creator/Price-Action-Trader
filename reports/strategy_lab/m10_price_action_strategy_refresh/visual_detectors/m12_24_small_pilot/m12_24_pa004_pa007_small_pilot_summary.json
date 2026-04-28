@@ -1,0 +1,109 @@
+{
+  "baseline_executed_trade_count": 3795,
+  "baseline_strategy_metrics": [
+    {
+      "account_count": "48",
+      "average_holding_bars": "40.5933",
+      "average_loss": "-473.28",
+      "average_win": "803.45",
+      "best_symbol": "MU",
+      "best_timeframe": "1d",
+      "cost_tier": "baseline",
+      "final_equity": "4754016.53",
+      "grain": "strategy",
+      "initial_capital": "4800000.00",
+      "max_consecutive_losses": "27",
+      "max_drawdown": "193053.88",
+      "max_drawdown_percent": "4.0220",
+      "net_profit": "-45983.47",
+      "profit_factor": "0.9030",
+      "quality_flag": "normal_density_review",
+      "return_percent": "-0.9580",
+      "status": "completed_capital_test",
+      "strategy_id": "M10-PA-004",
+      "symbol": "",
+      "timeframe": "",
+      "trade_count": "1535",
+      "win_rate": "0.3472",
+      "worst_symbol": "SQQQ",
+      "worst_timeframe": "1d"
+    },
+    {
+      "account_count": "50",
+      "average_holding_bars": "59.9109",
+      "average_loss": "-432.30",
+      "average_win": "653.03",
+      "best_symbol": "DIA",
+      "best_timeframe": "1d",
+      "cost_tier": "baseline",
+      "final_equity": "5032367.04",
+      "grain": "strategy",
+      "initial_capital": "5000000.00",
+      "max_consecutive_losses": "14",
+      "max_drawdown": "193978.53",
+      "max_drawdown_percent": "3.8796",
+      "net_profit": "32367.04",
+      "profit_factor": "1.0563",
+      "quality_flag": "normal_density_review",
+      "return_percent": "0.6473",
+      "status": "completed_capital_test",
+      "strategy_id": "M10-PA-007",
+      "symbol": "",
+      "timeframe": "",
+      "trade_count": "2260",
+      "win_rate": "0.4115",
+      "worst_symbol": "USO",
+      "worst_timeframe": "1d"
+    }
+  ],
+  "broker_connection": false,
+  "candidate_trade_count": 3795,
+  "capital_model": {
+    "cost_tiers": [
+      "baseline",
+      "stress_low",
+      "stress_high"
+    ],
+    "initial_capital": "100000.00",
+    "leverage": "none",
+    "risk_per_trade_percent": "0.50"
+  },
+  "decision_rows": [
+    {
+      "decision": "保留图形研究",
+      "max_drawdown_percent": "4.0220",
+      "plain_reason": "本轮小范围测试没有看到可进入每日观察的模拟结果。",
+      "profit_factor": "0.9030",
+      "return_percent": "-0.9580",
+      "strategy_id": "M10-PA-004",
+      "trade_count": "1535",
+      "win_rate": "0.3472"
+    },
+    {
+      "decision": "进入每日观察",
+      "max_drawdown_percent": "3.8796",
+      "plain_reason": "收益为正，交易次数够，回撤在小范围测试阈值内。",
+      "profit_factor": "1.0563",
+      "return_percent": "0.6473",
+      "strategy_id": "M10-PA-007",
+      "trade_count": "2260",
+      "win_rate": "0.4115"
+    }
+  ],
+  "generated_at": "2026-04-28T11:45:54Z",
+  "live_execution": false,
+  "m12_23_strict_retained_event_count": 3990,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "已对 PA004/PA007 做日线小范围历史模拟，结果只用于决定是否进入每日观察，不是模拟买卖准入。",
+  "real_orders": false,
+  "schema_version": "m12.24.pa004-pa007-small-pilot-summary.v1",
+  "skipped_event_count": 195,
+  "source_gate": "m12_23_passed_tightening_gate",
+  "stage": "M12.24.pa004_pa007_small_pilot",
+  "strategy_ids": [
+    "M10-PA-004",
+    "M10-PA-007"
+  ],
+  "timeframe": "1d"
+}

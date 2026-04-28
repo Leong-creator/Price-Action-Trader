@@ -1283,6 +1283,15 @@
   - 复核结论只能讨论机器识别质量和能否进入 M12.24 小范围历史测试准备；不得输出盈利、胜率、最大回撤、资金曲线、订单、成交、账户、持仓、现金或模拟买卖准入结论。
   - `M10-PA-004/007` 在 M12.23 后仍不得自动流入每日测试、paper gate evidence、paper trading candidate 或 live-ready 队列。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.24 PA004/PA007 Small Historical Pilot 必须满足：
+  - 必须使用独立分支 `feature/m12-24-pa004-pa007-small-pilot`，从已合并 M12.23 的 `main` 切出。
+  - 只有当 M12.23 `can_enter_small_pilot_next=true` 时才能运行；否则只能输出 deferred，不得伪造历史测试。
+  - 测试范围只能是 `M10-PA-004/007`、`1d`、第一批 50 只股票/ETF 的本地只读日线缓存；不得使用尚未完整补齐的长历史 `5m` 生成日内结论。
+  - 必须沿用 M10.7 资金口径：初始本金 `100,000 USD`、单笔风险当前权益 `0.5%`、不使用杠杆、成本压力 `1/2/5 bps`。
+  - 必须输出每条策略的本金、最终权益、收益率、胜率、最大回撤、交易次数、profit factor、分标的表现、失败样例和决策矩阵。
+  - 允许结论只能是 `进入每日观察`、`继续收紧`、`保留图形研究`、`暂不继续` 或样本不足等价状态；不得直接进入模拟买卖试运行。
+  - 必须输出 `m12_24_pa004_pa007_small_pilot_summary.json`、`m12_24_pa004_pa007_metrics.csv`、`m12_24_pa004_pa007_trade_ledger.csv`、`m12_24_pa004_pa007_skipped_events.csv`、`m12_24_pa004_pa007_failure_examples.csv`、`m12_24_pa004_pa007_decision_matrix.csv`、`m12_24_pa004_pa007_client_report.md` 与 `m12_24_handoff.md`。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
