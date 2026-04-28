@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M11.5 Paper Gate Recheck`，当前阶段分支为 `feature/m11-5-paper-gate-recheck`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.7 Daily Trend Benchmark Reuse`，当前阶段分支为 `feature/m12-7-daily-trend-benchmark`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -97,6 +97,13 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_candidate_strategy_list.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_comparison.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_simulated_events.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_equity_curve.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_deferred_inputs.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_handoff.md`
@@ -123,9 +130,10 @@
 - M12.2 已完成 core strategy daily observation：生成 `32` 条 Tier A 只读观察记录；由于 M12.1 feed 只有单根 latest bar，当前全部记录为 `skip_no_trade`，不伪造策略触发、不批准 paper trading。
 - M12.3 已完成 visual review precheck：复用 M10.2/M10.10 现有图例与 gate 产物，生成 `7` 条 strategy rows 与 `30` 条 case rows；本阶段只做 agent 预审和人工复核包，不替代人工图形判断。
 - M12.4 已完成 definition fix and retest：`M10-PA-005` 有复测 before/after 数字但仍未解除 `needs_definition_fix`；`M10-PA-004/007` 仅登记定义字段缺口和图例证据，不伪造交易结果。
-- M12.5 已完成 liquid universe scanner：股票/ETF seed 共 `147` 只，当前本地 cache 实际扫描 `4` 只，输出 `12` 条 Tier A 候选；缺数据的 `143` 只 seed 全部 deferred，等待后续补齐只读 K 线缓存或受控读取计划。
+- M12.5 已完成 liquid universe scanner：股票/ETF seed 共 `147` 只，当前本地 cache 实际扫描 `4` 只，输出 `12` 条 Tier A 候选；缺数据的 `143` 只 seed 全部 deferred。下一步 `M12.8 Universe Kline Cache Completion` 必须补齐这 `147` 只 seed 的只读 K 线 coverage / deferred ledger；在补齐前不得把 scanner 结果描述为 full universe 可用。
 - M12.6 已完成 weekly client scorecard：输出 `16` 条策略 dashboard，周报汇总历史资金测试、每日只读观察、scanner 候选、图形复核和定义修正；当前交易状态仍为 `closed_not_authorized`。
 - M11.5 已完成 paper gate recheck：复查 `M10-PA-001/002/012/008/009` 后仍为 `not_approved`；当前必须先补齐真实只读观察窗口、completed candidate events、`M10-PA-008/009` 人工图形复核、`M10-PA-005/004/007` definition blocker 关闭或正式降级、scanner cache 覆盖计划和人工业务审批。
+- M12.7 已完成早期日线截图策略复用：`M12-BENCH-001` 只作为 `signal_bar_entry_placeholder` 的日线 trend benchmark；长窗口结果为 `scanner_factor_candidate`，但不得作为准入证据或 M10 clean-room 策略来源。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -136,7 +144,7 @@
 
 ## 先看哪个分支
 
-- 当前 M11.5 阶段分支在：`feature/m11-5-paper-gate-recheck`
+- 当前 M12.7 阶段分支在：`feature/m12-7-daily-trend-benchmark`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 

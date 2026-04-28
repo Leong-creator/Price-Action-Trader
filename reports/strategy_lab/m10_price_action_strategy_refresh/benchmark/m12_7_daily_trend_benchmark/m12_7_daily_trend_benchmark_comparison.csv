@@ -1,0 +1,5 @@
+strategy_id,title,source_family,capital_test_status,simulated_starting_capital,simulated_final_equity,simulated_net_result,simulated_return_percent,win_rate,profit_factor,simulated_drawdown_percent,benchmark_event_count,gate_evidence,client_note
+M12-BENCH-001,Daily Trend Momentum Baseline,early_daily_placeholder_benchmark,scanner_factor_candidate,100000.00,149786.19,49786.19,49.7862,0.3622,1.1357,12.1939,1165,false,早期截图逻辑，只能作为日线 benchmark 或 scanner 排名因子候选。
+M10-PA-001,Trend Pullback Second-Entry Continuation,m10_clean_room_strategy,completed_capital_test,1600000.00,1995723.86,395723.86,24.7327,0.3584,1.0580,34.1783,19312,false,本周 scanner 有候选，但 M12.2 实际只读观察仍未产生完整策略触发。
+M10-PA-002,Breakout Follow-Through Continuation,m10_clean_room_strategy,completed_capital_test,1600000.00,1652496.28,52496.28,3.2810,0.3492,1.0144,23.5592,16303,false,本周 M12.2 为 skip/no-trade；继续记录 bar-close 输入。
+M10-PA-012,Opening Range Breakout,m10_clean_room_strategy,completed_capital_test,800000.00,1015141.29,215141.29,26.8927,0.3815,1.1674,12.7415,3662,false,本周 scanner 有候选，但 M12.2 实际只读观察仍未产生完整策略触发。

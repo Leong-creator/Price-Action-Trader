@@ -1205,6 +1205,21 @@
   - 必须汇总历史资金测试、每日只读观察、scanner 候选、图形复核和定义修正状态。
   - 每条策略必须有甲方可读状态：继续观察、暂停、定义修正、等待图形复核、research-only 或不继续。
   - 报告不得把只读观察或 scanner 候选解释为 paper trading approval、live-ready 或实盘能力。
+- M12.7 Daily Trend Benchmark Reuse 必须满足：
+  - 只能把早期截图逻辑固定为 `M12-BENCH-001 Daily Trend Momentum Baseline` benchmark；不得反向污染 M10 clean-room catalog。
+  - 必须使用冻结的 `signal_bar_entry_placeholder` contract，不得调用可变的当前 strategy trigger 作为 source of truth。
+  - 必须输出 summary、report、comparison、simulated event ledger、equity curve、deferred inputs 与 handoff。
+  - 比较范围只允许包含 `M12-BENCH-001` 与 M10 Tier A `M10-PA-001/002/012`。
+  - 决策只能是 `benchmark_only / scanner_factor_candidate / reject_as_overfit`；即使为 `scanner_factor_candidate`，也只能作为 scanner 排名因子候选，不得作为 paper gate evidence。
+  - artifacts 必须强制 `gate_evidence=false`，并避免真实订单、账户、持仓、成交或 live-ready 语义。
+  - 单测必须覆盖样本不足降级为 `benchmark_only`、正向结果过度集中时 `reject_as_overfit`、以及 artifact 不含 legacy `PA-SC-*` / `SF-*` 污染。
+- M12.8 Universe Kline Cache Completion 必须满足：
+  - 必须以 M12.5 的 `147` 只高流动性 US 股票/ETF seed 为缓存补齐范围，不能只扫描 `SPY/QQQ/NVDA/TSLA` 却宣称全 universe 可用。
+  - `1d` 默认从 `2010-06-29` 到最新已完成美股交易日；上市更晚的标的必须从首根可用 bar 开始并写入 inventory。
+  - `5m` 默认从 `2024-04-01` 到最新已完成 regular session；`15m / 1h` 必须从 `5m` 聚合并记录 `derived_from_5m`。
+  - 缺失、限流、权限不足或供应商异常只能写入 deferred/error ledger，不得伪造 K 线、候选或观察事件。
+  - `local_data/` 不得纳入 Git；只提交 cache manifest、coverage report、deferred/error ledger、scanner 可用股票清单和必要测试。
+  - Longbridge 使用仍必须停留在 quote/Kline/market-data 只读路径，不得引入 broker/order/account/cash/position 路径。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

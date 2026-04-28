@@ -1,0 +1,74 @@
+{
+  "title": "M12.7 Daily Trend Momentum Benchmark",
+  "run_id": "m12_7_daily_trend_benchmark",
+  "description": "Reuse the early screenshot daily signal-bar placeholder only as a long-window benchmark and scanner-factor candidate. It is not a Brooks clean-room strategy and is not paper-gate eligible.",
+  "strategy_id": "M12-BENCH-001",
+  "strategy_name": "Daily Trend Momentum Baseline",
+  "stage": "M12.7.daily_trend_benchmark",
+  "start": "2010-06-29",
+  "end": "2026-04-21",
+  "interval": "1d",
+  "cache_dir": "local_data/longbridge_history",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark",
+  "comparison_dashboard_path": "reports/strategy_lab/m10_price_action_strategy_refresh/weekly_scorecard/m12_6/m12_6_strategy_dashboard.csv",
+  "comparison_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012"
+  ],
+  "legacy_reference_run": "reports/backtests/demo_public_2024h1",
+  "runtime_scope": "historical_simulation_benchmark_only",
+  "gate_evidence": false,
+  "instruments": [
+    {
+      "ticker": "SPY",
+      "symbol": "SPY",
+      "label": "SPDR S&P 500 ETF",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "index benchmark"
+    },
+    {
+      "ticker": "QQQ",
+      "symbol": "QQQ",
+      "label": "Invesco QQQ Trust",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "growth index benchmark"
+    },
+    {
+      "ticker": "NVDA",
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "high-momentum equity"
+    },
+    {
+      "ticker": "TSLA",
+      "symbol": "TSLA",
+      "label": "Tesla",
+      "market": "US",
+      "timezone": "America/New_York",
+      "demo_role": "high-volatility equity"
+    }
+  ],
+  "simulation_budget": {
+    "starting_capital": "100000",
+    "unit_budget": "500",
+    "max_gross_exposure": "100000",
+    "max_symbol_allocation_ratio": "1.00",
+    "session_loss_budget": "4000",
+    "max_loss_streak": 4
+  },
+  "decision_policy": {
+    "allowed_decisions": [
+      "benchmark_only",
+      "scanner_factor_candidate",
+      "reject_as_overfit"
+    ],
+    "scanner_factor_min_event_count": 30,
+    "scanner_factor_min_profit_factor": "1.00",
+    "scanner_factor_max_symbol_profit_share": "0.70"
+  }
+}
