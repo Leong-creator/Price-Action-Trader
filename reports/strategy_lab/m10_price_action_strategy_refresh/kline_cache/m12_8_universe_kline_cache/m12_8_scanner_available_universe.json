@@ -1,0 +1,16 @@
+{
+  "cache_present_symbol_count": 4,
+  "cache_present_symbols": [
+    "NVDA",
+    "QQQ",
+    "SPY",
+    "TSLA"
+  ],
+  "generated_at": "2026-04-28T03:34:20Z",
+  "scanner_scope_note": "Only target_complete_symbols may be called full-window ready. cache_present_symbols can be used for limited local-cache diagnostics only.",
+  "schema_version": "m12.scanner-available-universe.v1",
+  "stage": "M12.8.universe_kline_cache_completion",
+  "target_complete_symbol_count": 0,
+  "target_complete_symbols": [],
+  "universe_symbol_count": 147
+}

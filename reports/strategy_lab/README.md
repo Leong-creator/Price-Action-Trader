@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.7 Daily Trend Benchmark Reuse`，当前阶段分支为 `feature/m12-7-daily-trend-benchmark`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.8 Universe Kline Cache Completion`，当前阶段分支为 `feature/m12-8-universe-kline-cache`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -104,6 +104,13 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_equity_curve.csv`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_daily_trend_benchmark_deferred_inputs.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/benchmark/m12_7_daily_trend_benchmark/m12_7_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_universe_cache_manifest.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_deferred_or_error_ledger.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_fetch_plan.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_scanner_available_universe.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_completion_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_coverage_report.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_handoff.md`
@@ -134,6 +141,7 @@
 - M12.6 已完成 weekly client scorecard：输出 `16` 条策略 dashboard，周报汇总历史资金测试、每日只读观察、scanner 候选、图形复核和定义修正；当前交易状态仍为 `closed_not_authorized`。
 - M11.5 已完成 paper gate recheck：复查 `M10-PA-001/002/012/008/009` 后仍为 `not_approved`；当前必须先补齐真实只读观察窗口、completed candidate events、`M10-PA-008/009` 人工图形复核、`M10-PA-005/004/007` definition blocker 关闭或正式降级、scanner cache 覆盖计划和人工业务审批。
 - M12.7 已完成早期日线截图策略复用：`M12-BENCH-001` 只作为 `signal_bar_entry_placeholder` 的日线 trend benchmark；长窗口结果为 `scanner_factor_candidate`，但不得作为准入证据或 M10 clean-room 策略来源。
+- M12.8 已完成 universe cache coverage / deferred / fetch-plan：`147` 只 seed 全部入账，当前有任一 native cache 的标的是 `4` 只，完整覆盖目标窗口标的是 `0` 只，`588` 个缺口全部 deferred，`294` 个 native cache 请求进入只读 fetch plan；在真实补齐前不得宣称 full universe scanner 可用。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -144,7 +152,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.7 阶段分支在：`feature/m12-7-daily-trend-benchmark`
+- 当前 M12.8 阶段分支在：`feature/m12-8-universe-kline-cache`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 
