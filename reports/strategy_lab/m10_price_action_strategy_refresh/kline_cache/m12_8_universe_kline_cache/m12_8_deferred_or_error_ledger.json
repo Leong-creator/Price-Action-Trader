@@ -1,0 +1,5887 @@
+{
+  "generated_at": "2026-04-28T03:34:20Z",
+  "items": [
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "SPY",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-22, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "SPY",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-22, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "SPY",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-22, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "SPY",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "QQQ",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-22, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "QQQ",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-22, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "QQQ",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-22, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "QQQ",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IWM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IWM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IWM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IWM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VTI",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VTI",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VTI",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VTI",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VOO",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VOO",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VOO",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VOO",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IVV",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IVV",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IVV",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "IVV",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLK",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLK",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLK",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLK",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLF",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLF",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLF",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLF",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLV",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLV",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLV",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLV",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLY",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLY",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLY",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLY",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLI",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLI",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLI",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLI",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLP",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLP",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLP",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLP",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLU",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLU",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLU",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLU",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLC",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLC",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLC",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLC",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLB",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLB",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLB",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XLB",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SMH",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SMH",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SMH",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SMH",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SOXX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SOXX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SOXX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SOXX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TQQQ",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TQQQ",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TQQQ",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TQQQ",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SQQQ",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SQQQ",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SQQQ",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SQQQ",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GLD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GLD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GLD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GLD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLV",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLV",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLV",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLV",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "USO",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "USO",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "USO",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "USO",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TLT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TLT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TLT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TLT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HYG",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HYG",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HYG",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HYG",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LQD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LQD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LQD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LQD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EEM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EEM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EEM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EEM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EFA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EFA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EFA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EFA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ARKK",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ARKK",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ARKK",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ARKK",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AAPL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AAPL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AAPL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AAPL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MSFT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MSFT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MSFT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MSFT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "NVDA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "NVDA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "NVDA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "NVDA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMZN",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMZN",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMZN",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMZN",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOGL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOGL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOGL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOGL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOG",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOG",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOG",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GOOG",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "META",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "META",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "META",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "META",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "TSLA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "TSLA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "TSLA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "Cache ends at 2026-04-21, before target end 2026-04-27.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "stale_cache",
+      "symbol": "TSLA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AVGO",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AVGO",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AVGO",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AVGO",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "INTC",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "INTC",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "INTC",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "INTC",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MU",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MU",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MU",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MU",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "QCOM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "QCOM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "QCOM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "QCOM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ORCL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ORCL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ORCL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ORCL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADBE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADBE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADBE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADBE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOW",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOW",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOW",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOW",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SNOW",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SNOW",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SNOW",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SNOW",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PLTR",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PLTR",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PLTR",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PLTR",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PANW",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PANW",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PANW",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PANW",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRWD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRWD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRWD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CRWD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NET",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NET",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NET",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NET",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DDOG",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DDOG",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DDOG",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DDOG",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MDB",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MDB",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MDB",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MDB",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TEAM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TEAM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TEAM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TEAM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SHOP",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SHOP",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SHOP",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SHOP",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UBER",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UBER",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UBER",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UBER",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABNB",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABNB",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABNB",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABNB",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NFLX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NFLX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NFLX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NFLX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIS",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIS",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIS",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DIS",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMCSA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMCSA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMCSA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMCSA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WBD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WBD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WBD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WBD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PARA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PARA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PARA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PARA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "T",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "T",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "T",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "T",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VZ",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VZ",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VZ",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "VZ",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMUS",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMUS",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMUS",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMUS",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COST",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COST",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COST",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COST",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WMT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WMT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WMT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WMT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TGT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TGT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TGT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TGT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LOW",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LOW",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LOW",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LOW",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NKE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NKE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NKE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NKE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SBUX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SBUX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SBUX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SBUX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MCD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MCD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MCD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MCD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMG",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMG",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMG",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CMG",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "YUM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "YUM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "YUM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "YUM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KO",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KO",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KO",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KO",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PEP",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PEP",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PEP",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PEP",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MNST",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MNST",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MNST",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MNST",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PG",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PG",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PG",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PG",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KMB",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KMB",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KMB",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KMB",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "EL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LULU",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LULU",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LULU",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LULU",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JPM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JPM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JPM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JPM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BAC",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BAC",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BAC",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BAC",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WFC",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WFC",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WFC",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "WFC",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "C",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "C",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "C",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "C",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GS",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GS",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GS",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GS",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MS",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MS",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MS",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MS",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SCHW",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SCHW",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SCHW",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SCHW",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BLK",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BLK",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BLK",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BLK",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AXP",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AXP",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AXP",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AXP",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "V",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "V",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "V",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "V",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PYPL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PYPL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PYPL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PYPL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COIN",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COIN",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COIN",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COIN",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HOOD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HOOD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HOOD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HOOD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UNH",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UNH",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UNH",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UNH",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LLY",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LLY",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LLY",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LLY",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JNJ",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JNJ",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JNJ",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JNJ",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRK",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRK",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRK",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRK",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PFE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PFE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PFE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PFE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABBV",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABBV",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABBV",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ABBV",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMGN",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMGN",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMGN",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMGN",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GILD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GILD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GILD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GILD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BMY",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BMY",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BMY",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BMY",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVS",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVS",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVS",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVS",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HUM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HUM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HUM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HUM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMO",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMO",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMO",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TMO",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ISRG",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ISRG",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ISRG",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ISRG",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CAT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CAT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CAT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CAT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "DE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RTX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RTX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RTX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RTX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LMT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LMT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LMT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LMT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOC",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOC",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOC",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NOC",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HON",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HON",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HON",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "HON",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UPS",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UPS",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UPS",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "UPS",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FDX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FDX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FDX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FDX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XOM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XOM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XOM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "XOM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "CVX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COP",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COP",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COP",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "COP",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLB",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLB",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLB",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SLB",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "OXY",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "OXY",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "OXY",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "OXY",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "F",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "F",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "F",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "F",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "GM",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RIVN",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RIVN",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RIVN",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "RIVN",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LCID",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LCID",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LCID",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LCID",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BABA",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BABA",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BABA",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BABA",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PDD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PDD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PDD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "PDD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JD",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JD",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JD",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "JD",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BIDU",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BIDU",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BIDU",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "BIDU",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NIO",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NIO",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NIO",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "NIO",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LI",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LI",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LI",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LI",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SE",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SE",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SE",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "SE",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MELI",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MELI",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MELI",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MELI",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ENPH",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ENPH",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ENPH",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ENPH",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FSLR",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FSLR",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FSLR",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "FSLR",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRVL",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRVL",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRVL",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "MRVL",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADI",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADI",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADI",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "ADI",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TXN",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TXN",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TXN",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TXN",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMAT",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMAT",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMAT",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "AMAT",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LRCX",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LRCX",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LRCX",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "LRCX",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KLAC",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KLAC",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KLAC",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "KLAC",
+      "timeframe": "1h"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TSM",
+      "timeframe": "1d"
+    },
+    {
+      "action": "fetch_or_refresh_readonly_cache",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "native_cache",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TSM",
+      "timeframe": "5m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TSM",
+      "timeframe": "15m"
+    },
+    {
+      "action": "derive_after_5m_cache_complete",
+      "detail": "No local CSV cache found for this symbol/timeframe.",
+      "fake_data_created": false,
+      "lineage": "derived_from_5m",
+      "market": "US",
+      "reason": "missing_cache",
+      "symbol": "TSM",
+      "timeframe": "1h"
+    }
+  ],
+  "schema_version": "m12.universe-cache-deferred-ledger.v1",
+  "stage": "M12.8.universe_kline_cache_completion"
+}

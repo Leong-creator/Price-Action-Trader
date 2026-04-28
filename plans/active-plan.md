@@ -54,6 +54,7 @@
 - M12.6 已完成 Weekly Client Scorecard：把历史资金测试、每日只读观察、scanner 候选、图形预审和定义修正合成 `16` 条策略 dashboard、客户周报和下周行动计划；当前只作为模拟观察与测试管理材料，不作为交易批准。
 - M11.5 已完成 Paper Gate Recheck：基于 M12.2-M12.6 的实际 artifact 复查 `M10-PA-001/002/012/008/009`，当前 gate decision 仍为 `not_approved`；核心阻塞是没有完成真实只读观察窗口、M12.2 没有 completed candidate events、`M10-PA-008/009` 人工图形复核未关闭、`M10-PA-005/004/007` definition blocker 未关闭或未正式降级、scanner universe cache 覆盖不完整、缺少人工业务审批。
 - M12.7 已完成 Daily Trend Benchmark Reuse：把早期截图中的 `signal_bar_entry_placeholder` 日线逻辑固定为 `M12-BENCH-001 Daily Trend Momentum Baseline`，用本地 Longbridge `1d` 长窗口 `2010-06-29 ~ 2026-04-21` 重跑 `SPY / QQQ / NVDA / TSLA`；结果只作为 `scanner_factor_candidate` benchmark，不反向污染 M10 clean-room catalog，也不作为准入证据。
+- M12.8 已完成 Universe Kline Cache Completion 的 coverage / deferred / fetch-plan 交付：M12.5 的 `147` 只 seed 全部入账为 `147 x 4` 个 timeframe rows；当前只有 `4` 只有任一 native cache，目标窗口完整覆盖标的为 `0`，`588` 个缺口全部进入 deferred/error ledger，`294` 个 native cache 请求进入只读 fetch plan；本阶段不伪造 K 线、不把局部缓存宣称为全 universe 可用，也不批量写入 `local_data/`。
 
 ## 2. 执行总原则
 

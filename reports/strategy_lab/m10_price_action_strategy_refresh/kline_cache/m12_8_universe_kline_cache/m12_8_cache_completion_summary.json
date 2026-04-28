@@ -1,0 +1,50 @@
+{
+  "artifacts": {
+    "cache_manifest": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_universe_cache_manifest.json",
+    "coverage_report": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_coverage_report.md",
+    "deferred_or_error_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_deferred_or_error_ledger.json",
+    "fetch_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_fetch_plan.json",
+    "handoff": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_handoff.md",
+    "scanner_available_universe": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_scanner_available_universe.json",
+    "summary": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache/m12_8_cache_completion_summary.json"
+  },
+  "cache_present_symbol_count": 4,
+  "complete_native_timeframe_rows": 0,
+  "coverage_status_counts": {
+    "missing_cache": 572,
+    "stale_cache": 16
+  },
+  "deferred_item_count": 588,
+  "derived_timeframe_rows": 294,
+  "fetch_enabled": false,
+  "fetch_plan_estimated_chunk_count": 23373,
+  "fetch_plan_request_count": 294,
+  "generated_at": "2026-04-28T03:34:20Z",
+  "local_data_git_policy": "local_data_not_tracked; checked-in artifacts record path/checksum/coverage only",
+  "market": "US",
+  "native_timeframe_rows": 294,
+  "no_fake_cache": true,
+  "run_id": "m12_8_universe_kline_cache",
+  "schema_version": "m12.universe-cache-summary.v1",
+  "stage": "M12.8.universe_kline_cache_completion",
+  "target_complete_symbol_count": 0,
+  "timeframe_status_counts": {
+    "15m": {
+      "missing_cache": 143,
+      "stale_cache": 4
+    },
+    "1d": {
+      "missing_cache": 143,
+      "stale_cache": 4
+    },
+    "1h": {
+      "missing_cache": 143,
+      "stale_cache": 4
+    },
+    "5m": {
+      "missing_cache": 143,
+      "stale_cache": 4
+    }
+  },
+  "universe_symbol_count": 147
+}

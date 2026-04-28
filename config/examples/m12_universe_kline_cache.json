@@ -1,0 +1,28 @@
+{
+  "title": "M12.8 Universe Kline Cache Completion",
+  "run_id": "m12_8_universe_kline_cache",
+  "stage": "M12.8.universe_kline_cache_completion",
+  "market": "US",
+  "universe_definition_path": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_5_liquid_universe_scanner/m12_5_universe_definition.json",
+  "local_data_roots": [
+    "local_data"
+  ],
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/kline_cache/m12_8_universe_kline_cache",
+  "daily_start": "2010-06-29",
+  "daily_end": "2026-04-27",
+  "intraday_start": "2024-04-01",
+  "intraday_end": "2026-04-27",
+  "daily_interval": "1d",
+  "intraday_interval": "5m",
+  "derived_timeframes": [
+    "15m",
+    "1h"
+  ],
+  "fetch_policy": {
+    "mode": "inventory_and_fetch_plan_only",
+    "allow_readonly_fetch": false,
+    "max_fetch_symbols": 0,
+    "max_requests_per_run": 0,
+    "write_local_data": false
+  }
+}
