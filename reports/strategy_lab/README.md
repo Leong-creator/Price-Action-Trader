@@ -159,7 +159,7 @@
 - M12.9 已完成 visual review closure overlay：覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略与 `30` 个 case；`M10-PA-008/009` 已完成 agent-side closure 但仍需用户确认后才可讨论 gate evidence，`M10-PA-004/007` 仍只作为 definition evidence support。
 - M12.10 已完成 definition fix/retest：`M10-PA-005` 已补齐 `34651` 条 range geometry event ledger，但复测后仍为 `reject_for_now_after_geometry_review`；`M10-PA-004/007` 正式降级为 visual-only / manual-labeling，不再进入自动回测队列。
 - M12.11 已完成 read-only trading dashboard：本地 HTML 看板汇总 `12` 条 scanner 候选、`32` 条只读观察事件、`4` 个只读标的 latest bar close、`10` 个模拟资金曲线引用、M12.10 definition 决策和 M11.5 gate 状态；看板只使用 readonly / hypothetical / simulated 语义。
-- M12.12 已完成 daily observation loop 第一版：第一批 `50` 只股票/ETF 的 `1d` 长窗口与当前交易日 `5m` 只读 K 线已补齐，生成 `141` 条每日只读候选、中文看板、全策略状态总表、`M10-PA-008/009` 图形确认包和 M11.6 模拟准入复查；长历史 `5m` 全窗口仍未补齐。
+- M12.12 已完成 daily observation loop 第一版：第一批 `50` 只股票/ETF 的 `1d` 长窗口与当前交易日 `5m` 只读 K 线已补齐，生成 `141` 条每日只读机会、中文看板、全策略状态总表、`M10-PA-008/009` 图形确认包和 M11.6 模拟准入复查；看板已明确机会不是成交，并新增机会估算盈亏、早期日线资金曲线和中文状态；长历史 `5m` 全窗口仍未补齐。
 - 下一步是连续运行 M12.12 日常更新，累计 `10` 个交易日看板记录，并同步关闭 `M10-PA-008/009` 用户图形确认；达到条件后再进入 M11.6 模拟交易试运行批准。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。

@@ -54,8 +54,11 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
 
         self.assertEqual(summary["first50_cache"]["symbol_count"], 50)
         self.assertFalse(summary["first50_cache"]["fake_data_created"])
-        self.assertIn("今日候选数", dashboard["top_metrics"])
-        self.assertIn("模拟总盈利", dashboard["top_metrics"])
+        self.assertIn("今日机会数", dashboard["top_metrics"])
+        self.assertIn("今日机会估算盈亏（未成交）", dashboard["top_metrics"])
+        self.assertIn("早期日线历史模拟盈利", dashboard["top_metrics"])
+        self.assertIn("today_trade_view", dashboard)
+        self.assertIn("trade_view_summary", dashboard)
         self.assertEqual(visual["needs_user_review_count"], 10)
         self.assertFalse(visual["paper_gate_evidence_now"])
         self.assertFalse(summary["paper_gate_recheck"]["approval_for_paper_trading_trial"])
@@ -67,6 +70,8 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
             "m12_12_first50_cache_summary.json",
             "m12_12_daily_report.md",
             "m12_12_readonly_daily_dashboard.html",
+            "m12_12_dashboard_trade_view.csv",
+            "m12_12_formal_daily_strategy_source_reextract.md",
             "m12_13_all_strategy_status_matrix.json",
             "m11_6_paper_gate_recheck.json",
         }
@@ -83,16 +88,24 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertIn("M12-FTD-001", gate["non_gate_daily_factor_strategies"])
         self.assertIn("你尚未明确批准进入模拟交易试运行。", gate["blockers"])
         html = (OUTPUT_DIR / "m12_12_readonly_daily_dashboard.html").read_text(encoding="utf-8")
-        for expected_text in ("今日候选机会", "模拟总盈利", "胜率", "最大回撤", "策略状态"):
+        for expected_text in ("今日机会估算视图（未成交）", "今日机会明细", "早期日线历史模拟盈利", "胜率", "最大回撤", "策略状态"):
             self.assertIn(expected_text, html)
+        self.assertIn("候选是一条“策略 x 标的 x 周期”的可观察机会", html)
+        self.assertIn("不是实际成交，不是模拟买卖试运行", html)
         self.assertIn("长历史5分钟完整度", html)
         self.assertIn("日线策略定位", html)
+        self.assertIn("早期日线资金曲线", html)
         report = (OUTPUT_DIR / "m12_12_daily_report.md").read_text(encoding="utf-8")
+        self.assertIn("候选不是已经成交的交易", report)
+        self.assertIn("今日机会估算视图（未成交）", report)
         self.assertIn("不能说“两年日内历史已完整”", report)
         self.assertIn("不作为模拟交易准入候选", report)
+        reextract = (OUTPUT_DIR / "m12_12_formal_daily_strategy_source_reextract.md").read_text(encoding="utf-8")
+        self.assertIn("当前来源是方方土", reextract)
+        self.assertIn("不能因为某个参数收益好", reextract)
         self.assertTrue((OUTPUT_DIR / "m12_12_handoff.md").exists())
         lowered = html.lower()
-        for forbidden in ("live-ready", "real_orders=true", "broker_connection=true"):
+        for forbidden in ("live-ready", "real_orders=true", "broker_connection=true", "needs_read_only_bar_close_review", "更像交易记录"):
             self.assertNotIn(forbidden, lowered)
 
 

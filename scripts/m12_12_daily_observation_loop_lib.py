@@ -52,6 +52,9 @@ PERCENT = Decimal("0.01")
 ZERO = Decimal("0")
 ONE = Decimal("1")
 HUNDRED = Decimal("100")
+DEFAULT_SIMULATED_EQUITY = Decimal("100000")
+DEFAULT_RISK_BUDGET = Decimal("500")
+QUANTITY = Decimal("0.0001")
 CSV_NAME_RE = re.compile(
     r"^(?P<market>[a-z]+)_(?P<symbol>.+)_(?P<interval>[^_]+)_(?P<start>\d{4}-\d{2}-\d{2})_(?P<end>\d{4}-\d{2}-\d{2})_(?P<source>[^.]+)\.csv$"
 )
@@ -240,11 +243,34 @@ def run_m12_12_daily_observation_loop(
     specs = load_specs()
     scanner_candidates, observation_rows, scanner_deferred = scan_daily_loop(config, symbols, specs, generated_at)
     formal_summary, formal_trades = run_formal_daily_strategy(config, symbols, generated_at)
+    dashboard_trade_rows = build_dashboard_trade_rows(scanner_candidates)
     visual_packet = build_visual_confirmation_packet(config, generated_at)
     all_strategy_status = build_all_strategy_status(config, generated_at, cache_summary, formal_summary, scanner_candidates)
     gate_recheck = build_m11_6_recheck(config, generated_at, cache_summary, formal_summary, all_strategy_status)
-    dashboard = build_dashboard(config, generated_at, cache_summary, formal_summary, scanner_candidates, observation_rows, all_strategy_status, gate_recheck)
-    summary = build_summary(config, generated_at, cache_summary, formal_summary, scanner_candidates, observation_rows, visual_packet, all_strategy_status, gate_recheck)
+    dashboard = build_dashboard(
+        config,
+        generated_at,
+        cache_summary,
+        formal_summary,
+        formal_trades,
+        scanner_candidates,
+        dashboard_trade_rows,
+        observation_rows,
+        all_strategy_status,
+        gate_recheck,
+    )
+    summary = build_summary(
+        config,
+        generated_at,
+        cache_summary,
+        formal_summary,
+        scanner_candidates,
+        dashboard_trade_rows,
+        observation_rows,
+        visual_packet,
+        all_strategy_status,
+        gate_recheck,
+    )
 
     write_json(config.output_dir / "m12_12_first50_universe.json", {
         "schema_version": "m12.12.first50-universe.v1",
@@ -271,9 +297,14 @@ def run_m12_12_daily_observation_loop(
     write_json(config.output_dir / "m12_12_formal_daily_strategy_spec.json", formal_strategy_spec(config))
     write_json(config.output_dir / "m12_12_formal_daily_strategy_summary.json", formal_summary)
     write_csv(config.output_dir / "m12_12_formal_daily_strategy_trades.csv", [formal_trade_row(row) for row in formal_trades])
+    (config.output_dir / "m12_12_formal_daily_strategy_source_reextract.md").write_text(
+        build_formal_source_reextract_md(config, formal_summary),
+        encoding="utf-8",
+    )
     write_csv(config.output_dir / "m12_12_daily_candidates.csv", scanner_candidates)
     write_jsonl(config.output_dir / "m12_12_daily_candidates.jsonl", scanner_candidates)
     write_csv(config.output_dir / "m12_12_daily_observation_events.csv", observation_rows)
+    write_csv(config.output_dir / "m12_12_dashboard_trade_view.csv", dashboard_trade_rows)
     write_json(config.output_dir / "m12_12_daily_observation_summary.json", {
         "schema_version": "m12.12.daily-observation-summary.v1",
         "stage": config.stage,
@@ -589,7 +620,8 @@ def scan_daily_loop(
                     events.append(candidate_event(row))
                 else:
                     events.append(skip_event(generated_at, symbol, strategy_id, timeframe, "当前K线未触发"))
-        formal_candidate = evaluate_formal_daily_candidate(config, symbol, bars_by_tf.get("1d", ([], "", None))[0], generated_at)
+        daily_bars, _, daily_path = bars_by_tf.get("1d", ([], "", None))
+        formal_candidate = evaluate_formal_daily_candidate(config, symbol, daily_bars, generated_at, daily_path)
         if formal_candidate:
             candidates.append(formal_candidate)
             events.append(candidate_event(formal_candidate))
@@ -613,7 +645,13 @@ def normalize_candidate_row(row: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def evaluate_formal_daily_candidate(config: M1212Config, symbol: str, bars: list[Any], generated_at: str) -> dict[str, str] | None:
+def evaluate_formal_daily_candidate(
+    config: M1212Config,
+    symbol: str,
+    bars: list[Any],
+    generated_at: str,
+    data_path: Path | None,
+) -> dict[str, str] | None:
     if len(bars) < 4:
         return None
     last = bars[-1]
@@ -656,8 +694,8 @@ def evaluate_formal_daily_candidate(config: M1212Config, symbol: str, bars: list
         "source_refs": ";".join(config.formal_daily_strategy.source_refs),
         "spec_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_12_loop/m12_12_formal_daily_strategy_spec.json",
         "data_lineage": "native_daily_cache",
-        "data_path": "",
-        "data_checksum": "",
+        "data_path": project_path(data_path) if data_path else "",
+        "data_checksum": sha256_file(data_path) if data_path else "",
         "review_status": "needs_read_only_bar_close_review",
         "notes": "日线市场周期和信号K确认同时出现；只做模拟观察。",
         "simulated_context": "readonly_observation_candidate",
@@ -907,6 +945,50 @@ def formal_strategy_spec(config: M1212Config) -> dict[str, Any]:
     }
 
 
+def build_formal_source_reextract_md(config: M1212Config, formal_summary: dict[str, Any]) -> str:
+    overall = formal_summary["overall_metrics"]
+    lines = [
+        "# M12.12 早期日线策略重新提炼说明",
+        "",
+        "## 用人话结论",
+        "",
+        "- 早期截图里的策略盈利能力值得继续挖，但不能直接照搬成正式交易策略。",
+        "- 本轮已经把它从旧的 `signal_bar_entry_placeholder` 改成 `M12-FTD-001 方方土日线趋势顺势信号K`。",
+        "- 当前来源是方方土“市场周期”和“信号K线与入场”两类资料；旧截图和 `M12-BENCH-001` 只作为历史参考，不再当来源。",
+        f"- 重测结果：模拟盈利 `{overall['net_profit']}`，收益率 `{overall['return_percent']}%`，胜率 `{overall['win_rate']}%`，最大回撤 `{overall['max_drawdown_percent']}%`，交易 `{overall['trade_count']}` 笔。",
+        "- 结论：收益强，但最大回撤太大，先进入每日只读观察和选股参考；下一步应该做来源驱动的定义收紧，而不是用收益曲线扫参数。",
+        "",
+        "## 当前重新提炼出的规则",
+        "",
+        f"- 策略：`{config.formal_daily_strategy.strategy_id}` {config.formal_daily_strategy.title}",
+        "- 先判断日线是否处在明显上涨或下跌节奏。",
+        "- 再看当天 K 线是否是顺着趋势方向的强信号 K。",
+        "- 看涨时观察突破信号 K 高点；看跌时观察跌破信号 K 低点。",
+        "- 模拟止损放在信号 K 另一端。",
+        "- 默认观察 2R 目标；这只是当前测试口径，不是最终交易管理规则。",
+        "",
+        "## 来源",
+        "",
+    ]
+    lines.extend(f"- `{ref}`" for ref in config.formal_daily_strategy.source_refs)
+    lines.extend([
+        "",
+        "## 可以继续优化的方向",
+        "",
+        "- 把“市场周期”从现在的简化三四根日线判断，改成更细的趋势、震荡、过渡期字段。",
+        "- 把“信号 K 强度”补成来源字段，例如实体大小、收盘位置、上下影线、是否顺着背景。",
+        "- 补跳过条件：背景不清、风险距离太大、连续震荡、信号 K 与大背景冲突。",
+        "- 补交易管理：是否只看 2R、是否移动止损、是否分批出场、何时放弃。",
+        "",
+        "## 不能做的事",
+        "",
+        "- 不能因为某个参数收益好，就直接把它定为规则。",
+        "- 不能把最大回撤从 49% 降下来这件事，靠盲目调阈值完成。",
+        "- 不能把旧截图或 placeholder 重新当正式来源。",
+    ])
+    return "\n".join(lines) + "\n"
+
+
 def build_visual_confirmation_packet(config: M1212Config, generated_at: str) -> dict[str, Any]:
     ledger = json.loads(VISUAL_LEDGER_PATH.read_text(encoding="utf-8"))
     priority = [row for row in ledger["case_rows"] if row["strategy_id"] in {"M10-PA-008", "M10-PA-009"}]
@@ -1045,17 +1127,171 @@ def build_m11_6_recheck(
     }
 
 
+def build_dashboard_trade_rows(candidates: list[dict[str, str]]) -> list[dict[str, str]]:
+    close_cache: dict[str, Decimal] = {}
+    rows: list[dict[str, str]] = []
+    for row in candidates:
+        entry = decimal(row["hypothetical_entry_price"])
+        stop = decimal(row["hypothetical_stop_price"])
+        target = decimal(row["hypothetical_target_price"])
+        risk = decimal(row["hypothetical_risk_per_share"])
+        current = current_reference_price(row, close_cache)
+        qty = DEFAULT_RISK_BUDGET / risk if risk > 0 else ZERO
+        if row["signal_direction"] == "long":
+            pnl = (current - entry) * qty
+            stop_distance = current - stop
+            target_distance = target - current
+        elif row["signal_direction"] == "short":
+            pnl = (entry - current) * qty
+            stop_distance = stop - current
+            target_distance = current - target
+        else:
+            pnl = ZERO
+            stop_distance = ZERO
+            target_distance = ZERO
+        rows.append({
+            "strategy_id": row["strategy_id"],
+            "strategy_title": row["strategy_title"],
+            "symbol": row["symbol"],
+            "timeframe": row["timeframe"],
+            "direction": "看涨" if row["signal_direction"] == "long" else "看跌" if row["signal_direction"] == "short" else row["signal_direction"],
+            "bar_timestamp": row["bar_timestamp"],
+            "opportunity_status": chinese_candidate_status(row.get("candidate_status", "")),
+            "hypothetical_entry_price": row["hypothetical_entry_price"],
+            "hypothetical_stop_price": row["hypothetical_stop_price"],
+            "hypothetical_target_price": row["hypothetical_target_price"],
+            "current_reference_price": money(current),
+            "risk_budget_usd": money(DEFAULT_RISK_BUDGET),
+            "hypothetical_quantity": str(qty.quantize(QUANTITY, rounding=ROUND_HALF_UP)),
+            "simulated_unrealized_pnl": money(pnl),
+            "simulated_unrealized_return_percent": pct(pnl / DEFAULT_SIMULATED_EQUITY * HUNDRED),
+            "distance_to_stop": money(stop_distance),
+            "distance_to_target": money(target_distance),
+            "risk_level": chinese_risk_level(row.get("risk_level", "")),
+            "review_status": chinese_review_status(row.get("review_status", "")),
+            "data_lineage": row.get("data_lineage", ""),
+            "source_refs": row.get("source_refs", ""),
+        })
+    return rows
+
+
+def current_reference_price(row: dict[str, str], close_cache: dict[str, Decimal]) -> Decimal:
+    data_path = row.get("data_path", "")
+    if data_path:
+        path = resolve_repo_path(data_path)
+        key = project_path(path)
+        if key not in close_cache:
+            close_cache[key] = latest_close_from_cache(path)
+        if close_cache[key] > 0:
+            return close_cache[key]
+    return decimal(row["hypothetical_entry_price"])
+
+
+def latest_close_from_cache(path: Path) -> Decimal:
+    if not path.exists():
+        return ZERO
+    last_close = ZERO
+    with path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            try:
+                last_close = decimal(row.get("close", "0"))
+            except (InvalidOperation, ValueError):
+                continue
+    return last_close
+
+
+def summarize_dashboard_trades(rows: list[dict[str, str]]) -> dict[str, Any]:
+    total = sum((decimal(row["simulated_unrealized_pnl"]) for row in rows), ZERO)
+    positive = sum(1 for row in rows if decimal(row["simulated_unrealized_pnl"]) > 0)
+    negative = sum(1 for row in rows if decimal(row["simulated_unrealized_pnl"]) < 0)
+    by_strategy: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        bucket = by_strategy.setdefault(row["strategy_id"], {
+            "strategy_id": row["strategy_id"],
+            "strategy_title": row["strategy_title"],
+            "opportunity_count": 0,
+            "simulated_unrealized_pnl": ZERO,
+            "positive_count": 0,
+        })
+        pnl = decimal(row["simulated_unrealized_pnl"])
+        bucket["opportunity_count"] += 1
+        bucket["simulated_unrealized_pnl"] += pnl
+        if pnl > 0:
+            bucket["positive_count"] += 1
+    strategy_rows = []
+    for bucket in by_strategy.values():
+        count = Decimal(bucket["opportunity_count"])
+        strategy_rows.append({
+            "strategy_id": bucket["strategy_id"],
+            "strategy_title": bucket["strategy_title"],
+            "opportunity_count": bucket["opportunity_count"],
+            "simulated_unrealized_pnl": money(bucket["simulated_unrealized_pnl"]),
+            "floating_positive_percent": pct(Decimal(bucket["positive_count"]) / count * HUNDRED if count else ZERO),
+        })
+    strategy_rows.sort(key=lambda item: (decimal(item["simulated_unrealized_pnl"]), item["opportunity_count"]), reverse=True)
+    count = Decimal(len(rows))
+    return {
+        "opportunity_count": len(rows),
+        "simulated_unrealized_pnl": money(total),
+        "simulated_unrealized_return_percent": pct(total / DEFAULT_SIMULATED_EQUITY * HUNDRED),
+        "floating_positive_count": positive,
+        "floating_negative_count": negative,
+        "floating_positive_percent": pct(Decimal(positive) / count * HUNDRED if count else ZERO),
+        "strategy_rows": strategy_rows,
+    }
+
+
+def build_equity_curve_points(trades: list[FormalTrade], starting_capital: Decimal, max_points: int = 80) -> list[dict[str, str]]:
+    points: list[dict[str, str]] = [{"timestamp": "", "equity": money(starting_capital)}]
+    equity = starting_capital
+    for trade in sorted(trades, key=lambda item: item.exit_timestamp):
+        equity += trade.simulated_profit
+        points.append({"timestamp": trade.exit_timestamp, "equity": money(equity)})
+    if len(points) <= max_points:
+        return points
+    step = max(1, len(points) // max_points)
+    sampled = points[::step]
+    if sampled[-1] != points[-1]:
+        sampled.append(points[-1])
+    return sampled
+
+
+def chinese_candidate_status(status: str) -> str:
+    return {
+        "trigger_candidate": "已触发观察",
+        "watch_candidate": "观察名单",
+    }.get(status, status or "待观察")
+
+
+def chinese_review_status(status: str) -> str:
+    return {
+        "needs_read_only_bar_close_review": "等待收盘复核",
+    }.get(status, status or "待复核")
+
+
+def chinese_risk_level(level: str) -> str:
+    return {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "unknown": "未知",
+    }.get(level, level or "未知")
+
+
 def build_dashboard(
     config: M1212Config,
     generated_at: str,
     cache_summary: dict[str, Any],
     formal_summary: dict[str, Any],
+    formal_trades: list[FormalTrade],
     candidates: list[dict[str, str]],
+    dashboard_trade_rows: list[dict[str, str]],
     events: list[dict[str, str]],
     all_strategy_status: dict[str, Any],
     gate_recheck: dict[str, Any],
 ) -> dict[str, Any]:
     overall = formal_summary["overall_metrics"]
+    trade_summary = summarize_dashboard_trades(dashboard_trade_rows)
     return {
         "schema_version": "m12.12.readonly-dashboard.v1",
         "stage": config.stage,
@@ -1065,21 +1301,28 @@ def build_dashboard(
         "real_money_actions": False,
         "live_execution": False,
         "approval_for_paper_trading_trial": gate_recheck["approval_for_paper_trading_trial"],
+        "candidate_definition": "候选是一条“策略 x 标的 x 周期”的可观察机会，不等于已经成交的交易；同一只股票可同时出现多条候选。",
         "top_metrics": {
-            "今日候选数": len(candidates),
-            "模拟总盈利": overall["net_profit"],
-            "模拟收益率": overall["return_percent"],
-            "胜率": overall["win_rate"],
-            "最大回撤": overall["max_drawdown_percent"],
+            "今日机会数": len(candidates),
+            "今日机会估算盈亏（未成交）": trade_summary["simulated_unrealized_pnl"],
+            "今日机会估算收益率（未成交）": trade_summary["simulated_unrealized_return_percent"],
+            "今日浮盈机会占比": trade_summary["floating_positive_percent"],
+            "早期日线历史模拟盈利": overall["net_profit"],
+            "早期日线历史收益率": overall["return_percent"],
+            "早期日线历史胜率": overall["win_rate"],
+            "早期日线最大回撤": overall["max_drawdown_percent"],
             "第一批可测股票": cache_summary["daily_ready_symbols"],
             "当前5分钟可观察股票": cache_summary["current_5m_ready_symbols"],
             "长历史5分钟完整度": f"{cache_summary['full_5m_target_ready_symbols']}/50",
             "日线策略定位": formal_summary["decision"],
         },
+        "trade_view_summary": trade_summary,
+        "today_trade_view": dashboard_trade_rows,
         "today_candidates": candidates,
         "strategy_status": all_strategy_status["items"],
         "observation_events": events,
         "formal_daily_metrics": formal_summary,
+        "formal_daily_equity_curve": build_equity_curve_points(formal_trades, config.formal_daily_strategy.starting_capital),
         "gate_recheck": gate_recheck,
     }
 
@@ -1090,11 +1333,13 @@ def build_summary(
     cache_summary: dict[str, Any],
     formal_summary: dict[str, Any],
     candidates: list[dict[str, str]],
+    dashboard_trade_rows: list[dict[str, str]],
     events: list[dict[str, str]],
     visual_packet: dict[str, Any],
     all_strategy_status: dict[str, Any],
     gate_recheck: dict[str, Any],
 ) -> dict[str, Any]:
+    trade_summary = summarize_dashboard_trades(dashboard_trade_rows)
     return {
         "schema_version": "m12.12.loop-summary.v1",
         "stage": config.stage,
@@ -1104,6 +1349,10 @@ def build_summary(
         "daily_loop": {
             "strategy_scope": list(DAILY_LOOP_STRATEGIES),
             "candidate_count": len(candidates),
+            "candidate_plain_language": "候选是一条策略、标的、周期组合上的可观察机会，不是已经成交的交易。",
+            "dashboard_trade_view_count": len(dashboard_trade_rows),
+            "simulated_unrealized_pnl": trade_summary["simulated_unrealized_pnl"],
+            "floating_positive_percent": trade_summary["floating_positive_percent"],
             "observation_event_count": len(events),
         },
         "visual_packet": {
@@ -1306,6 +1555,30 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
         f"<section><span>{html.escape(label)}</span><strong>{html.escape(str(value))}</strong></section>"
         for label, value in metrics.items()
     )
+    trade_rows = sorted(
+        dashboard["today_trade_view"],
+        key=lambda row: decimal(row["simulated_unrealized_pnl"]),
+        reverse=True,
+    )
+    trade_table_rows = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(row['symbol'])}</td>"
+        f"<td>{html.escape(row['strategy_id'])}</td>"
+        f"<td>{html.escape(row['timeframe'])}</td>"
+        f"<td>{html.escape(row['direction'])}</td>"
+        f"<td>{html.escape(row['hypothetical_entry_price'])}</td>"
+        f"<td>{html.escape(row['current_reference_price'])}</td>"
+        f"<td>{html.escape(row['hypothetical_stop_price'])}</td>"
+        f"<td>{html.escape(row['hypothetical_target_price'])}</td>"
+        f"<td>{html.escape(row['hypothetical_quantity'])}</td>"
+        f"<td class=\"money\">{html.escape(row['simulated_unrealized_pnl'])}</td>"
+        f"<td>{html.escape(row['risk_level'])}</td>"
+        f"<td>{html.escape(row['review_status'])}</td>"
+        "</tr>"
+        for row in trade_rows[:60]
+    )
+    strategy_chart = build_strategy_chart_html(dashboard["trade_view_summary"]["strategy_rows"])
+    equity_chart = build_equity_svg(dashboard["formal_daily_equity_curve"])
     candidate_rows = "\n".join(
         "<tr>"
         f"<td>{html.escape(row['symbol'])}</td>"
@@ -1315,7 +1588,7 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
         f"<td>{html.escape(row['hypothetical_entry_price'])}</td>"
         f"<td>{html.escape(row['hypothetical_stop_price'])}</td>"
         f"<td>{html.escape(row['hypothetical_target_price'])}</td>"
-        f"<td>{html.escape(row['review_status'])}</td>"
+        f"<td>{html.escape(chinese_review_status(row['review_status']))}</td>"
         "</tr>"
         for row in dashboard["today_candidates"]
     )
@@ -1329,7 +1602,7 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
         "</tr>"
         for row in dashboard["strategy_status"]
     )
-    data = html.escape(json.dumps(dashboard, ensure_ascii=False, sort_keys=True))
+    data = html.escape(json.dumps(dashboard_html_data(dashboard), ensure_ascii=False, sort_keys=True))
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -1337,33 +1610,63 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>M12.12 每日只读测试看板</title>
   <style>
+    :root {{ --line: #d8dde5; --muted: #5c6675; --good: #16794c; --bad: #b42318; --accent: #1f6feb; --gold: #b7791f; }}
     body {{ margin: 0; font-family: Arial, "Noto Sans SC", sans-serif; background: #f7f8fa; color: #1d2430; }}
-    header {{ padding: 20px 24px; background: #fff; border-bottom: 1px solid #d8dde5; }}
+    header {{ padding: 20px 24px; background: #fff; border-bottom: 1px solid var(--line); }}
     h1 {{ margin: 0 0 6px; font-size: 24px; }}
     main {{ padding: 18px 24px 28px; display: grid; gap: 18px; }}
     .metrics {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }}
-    section {{ background: #fff; border: 1px solid #d8dde5; border-radius: 8px; padding: 12px; }}
-    section span {{ display: block; color: #5c6675; font-size: 13px; }}
+    section, .panel {{ background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }}
+    section span {{ display: block; color: var(--muted); font-size: 13px; }}
     section strong {{ display: block; margin-top: 6px; font-size: 22px; }}
-    table {{ width: 100%; border-collapse: collapse; background: #fff; }}
-    th, td {{ border-bottom: 1px solid #d8dde5; padding: 8px; text-align: left; font-size: 13px; }}
-    th {{ color: #5c6675; }}
+    .grid2 {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }}
+    .note {{ color: var(--muted); font-size: 13px; line-height: 1.6; margin: 4px 0 0; }}
+    .table-wrap {{ overflow-x: auto; }}
+    table {{ width: 100%; border-collapse: collapse; background: #fff; min-width: 960px; }}
+    th, td {{ border-bottom: 1px solid var(--line); padding: 8px; text-align: left; font-size: 13px; white-space: nowrap; }}
+    th {{ color: var(--muted); }}
+    .money {{ font-weight: 700; }}
+    .bars {{ display: grid; gap: 9px; }}
+    .bar-row {{ display: grid; grid-template-columns: 98px 1fr 88px; gap: 8px; align-items: center; font-size: 13px; }}
+    .bar-track {{ height: 16px; background: #eef2f7; border-radius: 4px; overflow: hidden; }}
+    .bar-fill {{ height: 100%; background: var(--accent); }}
+    .bar-fill.negative {{ background: var(--bad); }}
+    svg {{ width: 100%; height: 220px; display: block; }}
+    @media (max-width: 900px) {{ .grid2 {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
   <header>
     <h1>M12.12 每日只读测试看板</h1>
-    <div>开头优先看盈利、胜率、最大回撤、今日机会和策略状态。这里仍然只是模拟观察，不碰真钱。</div>
+    <div>开头优先看今日机会、未成交估算盈亏、胜率、最大回撤和策略状态。这里没有真实成交，也没有批准模拟买卖试运行。</div>
   </header>
   <main>
     <div class="metrics">{cards}</div>
-    <div>
-      <h2>今日候选机会</h2>
-      <table><thead><tr><th>标的</th><th>策略</th><th>周期</th><th>方向</th><th>假设入场</th><th>假设止损</th><th>假设目标</th><th>状态</th></tr></thead><tbody>{candidate_rows}</tbody></table>
+    <div class="panel">
+      <h2>今日机会估算视图（未成交）</h2>
+      <p class="note">这里把“候选机会”按每笔最多亏 500 美元估算假设数量、当前参考价和估算盈亏。它不是实际成交，不是模拟买卖试运行，也没有真实账户。</p>
+      <div class="table-wrap"><table><thead><tr><th>标的</th><th>策略</th><th>周期</th><th>方向</th><th>假设入场</th><th>当前参考价</th><th>假设止损</th><th>假设目标</th><th>假设数量</th><th>机会估算盈亏（未成交）</th><th>风险</th><th>状态</th></tr></thead><tbody>{trade_table_rows}</tbody></table></div>
     </div>
-    <div>
+    <div class="grid2">
+      <div class="panel">
+        <h2>策略今日贡献</h2>
+        <p class="note">按今日所有可观察机会估算，不代表已完成交易。</p>
+        {strategy_chart}
+      </div>
+      <div class="panel">
+        <h2>早期日线资金曲线</h2>
+        <p class="note">这是历史模拟曲线，用来判断这条强收益策略是否值得继续降回撤。</p>
+        {equity_chart}
+      </div>
+    </div>
+    <div class="panel">
+      <h2>今日机会明细</h2>
+      <p class="note">{html.escape(dashboard['candidate_definition'])}</p>
+      <div class="table-wrap"><table><thead><tr><th>标的</th><th>策略</th><th>周期</th><th>方向</th><th>假设入场</th><th>假设止损</th><th>假设目标</th><th>状态</th></tr></thead><tbody>{candidate_rows}</tbody></table></div>
+    </div>
+    <div class="panel">
       <h2>策略状态</h2>
-      <table><thead><tr><th>策略</th><th>名称</th><th>当前状态</th><th>今日候选</th><th>说明</th></tr></thead><tbody>{status_rows}</tbody></table>
+      <div class="table-wrap"><table><thead><tr><th>策略</th><th>名称</th><th>当前状态</th><th>今日机会</th><th>说明</th></tr></thead><tbody>{status_rows}</tbody></table></div>
     </div>
   </main>
   <script type="application/json" id="dashboard-data">{data}</script>
@@ -1372,24 +1675,101 @@ def build_dashboard_html(dashboard: dict[str, Any]) -> str:
 """
 
 
+def dashboard_html_data(dashboard: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": dashboard["schema_version"],
+        "generated_at": dashboard["generated_at"],
+        "candidate_definition": dashboard["candidate_definition"],
+        "top_metrics": dashboard["top_metrics"],
+        "trade_view_summary": dashboard["trade_view_summary"],
+        "today_trade_view": dashboard["today_trade_view"],
+        "strategy_status": dashboard["strategy_status"],
+        "formal_daily_equity_curve": dashboard["formal_daily_equity_curve"],
+        "paper_simulated_only": dashboard["paper_simulated_only"],
+        "trading_connection": dashboard["trading_connection"],
+        "real_money_actions": dashboard["real_money_actions"],
+        "live_execution": dashboard["live_execution"],
+        "approval_for_paper_trading_trial": dashboard["approval_for_paper_trading_trial"],
+    }
+
+
+def build_strategy_chart_html(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "<div class=\"note\">暂无策略机会。</div>"
+    max_abs = max(abs(decimal(row["simulated_unrealized_pnl"])) for row in rows) or ONE
+    lines = ["<div class=\"bars\">"]
+    for row in rows:
+        pnl = decimal(row["simulated_unrealized_pnl"])
+        width = max(4, int(abs(pnl) / max_abs * Decimal("100")))
+        cls = "bar-fill negative" if pnl < 0 else "bar-fill"
+        lines.append(
+            "<div class=\"bar-row\">"
+            f"<div>{html.escape(row['strategy_id'])}</div>"
+            f"<div class=\"bar-track\"><div class=\"{cls}\" style=\"width:{width}%\"></div></div>"
+            f"<div>{html.escape(row['simulated_unrealized_pnl'])}</div>"
+            "</div>"
+        )
+    lines.append("</div>")
+    return "\n".join(lines)
+
+
+def build_equity_svg(points: list[dict[str, str]]) -> str:
+    if len(points) < 2:
+        return "<div class=\"note\">暂无资金曲线。</div>"
+    values = [decimal(point["equity"]) for point in points]
+    min_v = min(values)
+    max_v = max(values)
+    span = max(max_v - min_v, ONE)
+    width = Decimal("700")
+    height = Decimal("190")
+    coords = []
+    for index, value in enumerate(values):
+        x = Decimal(index) / Decimal(max(len(values) - 1, 1)) * width
+        y = height - ((value - min_v) / span * height)
+        coords.append(f"{pct(x)},{pct(y)}")
+    return (
+        "<svg viewBox=\"0 0 700 220\" role=\"img\" aria-label=\"早期日线策略历史模拟资金曲线\">"
+        "<rect x=\"0\" y=\"0\" width=\"700\" height=\"220\" fill=\"#ffffff\"/>"
+        "<line x1=\"0\" y1=\"190\" x2=\"700\" y2=\"190\" stroke=\"#d8dde5\"/>"
+        f"<polyline fill=\"none\" stroke=\"#16794c\" stroke-width=\"3\" points=\"{' '.join(coords)}\"/>"
+        f"<text x=\"0\" y=\"212\" font-size=\"13\" fill=\"#5c6675\">起点 {html.escape(points[0]['equity'])}</text>"
+        f"<text x=\"560\" y=\"212\" font-size=\"13\" fill=\"#5c6675\">当前 {html.escape(points[-1]['equity'])}</text>"
+        "</svg>"
+    )
+
+
 def build_daily_report_md(summary: dict[str, Any], dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
+    trade_summary = dashboard["trade_view_summary"]
     lines = [
         "# M12.12 每日只读测试报告",
         "",
         "## 先看结果",
         "",
-        f"- 今日候选数：`{metrics['今日候选数']}`",
-        f"- 正式化日线策略模拟总盈利：`{metrics['模拟总盈利']}`",
-        f"- 模拟收益率：`{metrics['模拟收益率']}%`",
-        f"- 胜率：`{metrics['胜率']}%`",
-        f"- 最大回撤：`{metrics['最大回撤']}%`",
+        f"- 今日机会数：`{metrics['今日机会数']}`",
+        f"- 今日机会估算盈亏（未成交）：`{metrics['今日机会估算盈亏（未成交）']}`",
+        f"- 今日机会估算收益率（未成交）：`{metrics['今日机会估算收益率（未成交）']}%`",
+        f"- 今日浮盈机会占比：`{metrics['今日浮盈机会占比']}%`",
+        f"- 早期日线历史模拟盈利：`{metrics['早期日线历史模拟盈利']}`",
+        f"- 早期日线历史收益率：`{metrics['早期日线历史收益率']}%`",
+        f"- 早期日线历史胜率：`{metrics['早期日线历史胜率']}%`",
+        f"- 早期日线最大回撤：`{metrics['早期日线最大回撤']}%`",
         f"- 第一批可测股票：`{metrics['第一批可测股票']}/50`",
         f"- 当前5分钟可观察股票：`{metrics['当前5分钟可观察股票']}/50`",
         "",
+        "## 候选是什么意思",
+        "",
+        f"候选不是已经成交的交易。候选是一条“策略 x 标的 x 周期”的可观察机会；同一只股票可以同时有日线机会、15分钟机会、5分钟机会，所以 `{metrics['今日机会数']}` 条不是 `{metrics['今日机会数']}` 只股票，也不是已经下了 `{metrics['今日机会数']}` 笔单。",
+        "",
+        "## 今日机会估算视图（未成交）",
+        "",
+        f"- 按每笔最多亏 `500 USD` 粗算，今日所有机会的未成交估算盈亏合计：`{trade_summary['simulated_unrealized_pnl']}`。",
+        f"- 当前浮盈机会：`{trade_summary['floating_positive_count']}` 条；当前浮亏机会：`{trade_summary['floating_negative_count']}` 条。",
+        "- 这些只是只读观察数据，没有真实成交、真实持仓或真实账户。",
+        "",
         "## 说明",
         "",
-        "本报告只做只读/模拟观察，没有真实交易动作。图形策略 `M10-PA-008/009` 已整理确认包，等待你看关键模糊图。",
+        "本报告只做只读/模拟观察，没有真实交易动作。早期日线策略收益强，但回撤也大，下一步应该按来源补定义、降回撤，而不是按收益曲线硬调参数。图形策略 `M10-PA-008/009` 已整理确认包，等待你看关键模糊图。",
         "",
         "## 必须注意",
         "",

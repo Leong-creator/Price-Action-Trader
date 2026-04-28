@@ -2,7 +2,11 @@
   "all_strategy_status_count": 17,
   "daily_loop": {
     "candidate_count": 141,
+    "candidate_plain_language": "候选是一条策略、标的、周期组合上的可观察机会，不是已经成交的交易。",
+    "dashboard_trade_view_count": 141,
+    "floating_positive_percent": "23.40",
     "observation_event_count": 550,
+    "simulated_unrealized_pnl": "-8482.20",
     "strategy_scope": [
       "M10-PA-001",
       "M10-PA-002",
