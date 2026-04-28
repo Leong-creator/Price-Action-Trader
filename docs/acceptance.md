@@ -1261,6 +1261,17 @@
   - `M10-PA-004/007` 必须继续留在 machine detector observation；不得自动流入每日测试、paper gate evidence、paper trading candidate 或 live-ready 队列。
   - 若 M12.20 事件受 per strategy/symbol cap 影响，必须明确说明 retained candidates 与 raw detector 全历史分布的区别，并把 raw/capped 分布审计列为后续条件。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.22 Detector Sample Visual Review 必须满足：
+  - 必须使用独立分支 `feature/m12-22-detector-sample-visual-review`，从已合并 M12.21 的 `main` 切出。
+  - 输入只能使用 M12.21 full quality ledger、M12.20 source detector events 与本地只读 OHLCV cache；不得新增真实交易连接、真实资金路径或下单路径。
+  - 必须覆盖全部 M12.21 `needs_spot_check` 样例，并加入通过样例对照组；不得只复核 M12.21 既有 80 张 auto-pass 图包后宣称图形复核完成。
+  - 必须对 M12.21 retained candidates 做全量严格图形代理复核，区分 `looks_valid`、`borderline_needs_chart_review`、`likely_false_positive`。
+  - 必须输出 `m12_22_sample_visual_review_summary.json`、`m12_22_sample_visual_review_ledger.csv`、`m12_22_sample_visual_review_report.md`、`m12_22_annotated_review_packet.html` 与 `m12_22_next_test_plan.md`。
+  - 标注图包必须同时覆盖 `M10-PA-004` 与 `M10-PA-007`，并至少标出宽通道 range / midpoint / event marker 或第二腿 trap level / leg1 / leg2 / confirmation marker。
+  - 复核结论只能讨论机器识别是否像目标图形、误判风险、是否需要收紧检测器；不得输出盈利、胜率、最大回撤、资金曲线、订单、成交、账户、持仓、现金或模拟买卖准入结论。
+  - 若边界样例或疑似误判仍偏多，`M10-PA-004/007` 不得进入完整历史回测；必须先进入 detector tightening / rerun。
+  - `M10-PA-004/007` 必须继续留在 machine detector observation；不得自动流入每日测试、paper gate evidence、paper trading candidate 或 live-ready 队列。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
