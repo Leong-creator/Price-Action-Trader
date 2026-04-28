@@ -1238,6 +1238,13 @@
   - 定义修正只能依据 Brooks v2 / YouTube / notes 与策略结构；不得依据收益曲线调参。
   - 只能复跑受影响策略与周期，必须输出 before/after 交易数、模拟收益、胜率、最大回撤、是否解除 blocker；无法修复时必须保留 blocker 或正式降级。
   - 所有 artifact 必须继续保持 `paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.11 Read-only Trading Dashboard 必须满足：
+  - 必须使用独立分支 `feature/m12-11-readonly-trading-dashboard`，从已合并 M12.10 的 `main` 切出。
+  - 看板只能消费已有只读 artifacts：M12.1 feed、M12.2 observation、M12.5 scanner、M12.6 weekly scorecard、M12.8 cache coverage、M12.10 definition decisions 与 M10/M11 策略指标。
+  - 看板必须展示今日 scanner 候选、策略状态与 blocker、假设 entry/stop/target、当前只读 quote、hypothetical/simulated PnL、simulated equity curve、历史胜率/回撤和暂停原因。
+  - 字段必须使用 `hypothetical_*`、`simulated_*`、`readonly_*`；不得出现真实 `order`、`fill`、`account`、`broker`、`position`、`cash` 语义。
+  - Web 看板只能本地只读刷新，不得连接 broker、不下单、不批准 paper/live。
+  - 若缺少实时输入、quote、scanner 或 cache 覆盖，只能显示 deferred / unavailable，不得伪造行情、信号或盈亏。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

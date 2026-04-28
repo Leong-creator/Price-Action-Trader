@@ -4,7 +4,7 @@
 
 ## 先看这条边界
 
-- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.9 Visual Review Closure`，当前阶段分支为 `feature/m12-9-visual-review-closure`，稳定基线为 `main`。
+- 当前新阶段是 `M10: Price Action Strategy Refresh` 到 `M12.10 Definition Fix and Retest`，当前阶段分支为 `feature/m12-10-definition-fix-and-retest`，稳定基线为 `main`。
 - M10 使用 `M10-PA-*` namespace，从 Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 重新提炼。
 - 当前 M10 重点文件：
   - `reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json`
@@ -116,6 +116,11 @@
   - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_user_review_packet.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_gate_closure_report.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_handoff.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_retest_summary.json`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_before_after_metrics.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_pa005_geometry_events.csv`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_retest_client_summary.md`
+  - `reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_handoff.md`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_blockers_and_approvals.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_paper_gate_recheck_summary.json`
   - `reports/strategy_lab/m10_price_action_strategy_refresh/paper_gate/m11_5_recheck/m11_5_handoff.md`
@@ -148,6 +153,7 @@
 - M12.7 已完成早期日线截图策略复用：`M12-BENCH-001` 只作为 `signal_bar_entry_placeholder` 的日线 trend benchmark；长窗口结果为 `scanner_factor_candidate`，但不得作为准入证据或 M10 clean-room 策略来源。
 - M12.8 已完成 universe cache coverage / deferred / fetch-plan：`147` 只 seed 全部入账，当前有任一 native cache 的标的是 `4` 只，完整覆盖目标窗口标的是 `0` 只，`588` 个缺口全部 deferred，`294` 个 native cache 请求进入只读 fetch plan；在真实补齐前不得宣称 full universe scanner 可用。
 - M12.9 已完成 visual review closure overlay：覆盖 `M10-PA-008/009/003/011/004/007` 共 `6` 条策略与 `30` 个 case；`M10-PA-008/009` 已完成 agent-side closure 但仍需用户确认后才可讨论 gate evidence，`M10-PA-004/007` 仍只作为 definition evidence support。
+- M12.10 已完成 definition fix/retest：`M10-PA-005` 已补齐 `34651` 条 range geometry event ledger，但复测后仍为 `reject_for_now_after_geometry_review`；`M10-PA-004/007` 正式降级为 visual-only / manual-labeling，不再进入自动回测队列。
 - `M10-PA-014/015` 只能作为 supporting rules，`M10-PA-006/016` 保持 research-only。
 - 自 `M9G.0` 起，旧 `PA-SC-*` strategy cards、测试计划与回测报告都只作为 legacy / historical baseline 保留。
 - M9 Strategy Factory 的 `SF-*` catalog/spec/triage 现在也只作为 legacy comparison，不再作为 M10 clean-room 提炼输入。
@@ -158,7 +164,7 @@
 
 ## 先看哪个分支
 
-- 当前 M12.9 阶段分支在：`feature/m12-9-visual-review-closure`
+- 当前 M12.10 阶段分支在：`feature/m12-10-definition-fix-and-retest`
 - 当前 M10/M12 稳定基线在：`main`
 - 长期稳定基线仍是：`main`
 

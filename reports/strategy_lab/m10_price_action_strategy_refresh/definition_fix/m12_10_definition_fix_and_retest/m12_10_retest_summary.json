@@ -1,0 +1,133 @@
+{
+  "artifacts": {
+    "client_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_retest_client_summary.md",
+    "definition_fix_report": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_definition_fix_report.md",
+    "field_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_definition_field_ledger.json",
+    "geometry_events": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_pa005_geometry_events.csv",
+    "handoff": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_handoff.md",
+    "metrics_csv": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_before_after_metrics.csv",
+    "summary_json": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix/m12_10_definition_fix_and_retest/m12_10_retest_summary.json"
+  },
+  "broker_connection": false,
+  "generated_at": "2026-04-28T04:36:18Z",
+  "live_execution": false,
+  "metrics_rows": [
+    {
+      "after_max_drawdown": "65578.87",
+      "after_net_profit": "-22855.77",
+      "after_return_percent": "-5.7139",
+      "after_trade_count": "1188",
+      "after_win_rate": "0.3232",
+      "before_max_drawdown": "85559.02",
+      "before_net_profit": "-34130.96",
+      "before_return_percent": "-8.5327",
+      "before_trade_count": "1481",
+      "before_win_rate": "0.3201",
+      "geometry_fields_available": "true",
+      "notes": "M12.10 persists range geometry fields for review, but M10.9 cleaned metrics remain weak or blocker-bearing; keep rejected for now.",
+      "paper_gate_evidence_now": "false",
+      "status": "reject_for_now_after_geometry_review",
+      "strategy_id": "M10-PA-005",
+      "timeframe": "1d",
+      "uses_profit_curve_tuning": "false"
+    },
+    {
+      "after_max_drawdown": "36366.79",
+      "after_net_profit": "4527.65",
+      "after_return_percent": "1.1319",
+      "after_trade_count": "950",
+      "after_win_rate": "0.3305",
+      "before_max_drawdown": "60231.57",
+      "before_net_profit": "-613.09",
+      "before_return_percent": "-0.1533",
+      "before_trade_count": "1469",
+      "before_win_rate": "0.3302",
+      "geometry_fields_available": "true",
+      "notes": "M12.10 persists range geometry fields for review, but M10.9 cleaned metrics remain weak or blocker-bearing; keep rejected for now.",
+      "paper_gate_evidence_now": "false",
+      "status": "reject_for_now_after_geometry_review",
+      "strategy_id": "M10-PA-005",
+      "timeframe": "1h",
+      "uses_profit_curve_tuning": "false"
+    },
+    {
+      "after_max_drawdown": "73311.91",
+      "after_net_profit": "14707.57",
+      "after_return_percent": "3.6769",
+      "after_trade_count": "2966",
+      "after_win_rate": "0.3422",
+      "before_max_drawdown": "113914.37",
+      "before_net_profit": "50820.21",
+      "before_return_percent": "12.7051",
+      "before_trade_count": "7511",
+      "before_win_rate": "0.3474",
+      "geometry_fields_available": "true",
+      "notes": "M12.10 persists range geometry fields for review, but M10.9 cleaned metrics remain weak or blocker-bearing; keep rejected for now.",
+      "paper_gate_evidence_now": "false",
+      "status": "reject_for_now_after_geometry_review",
+      "strategy_id": "M10-PA-005",
+      "timeframe": "15m",
+      "uses_profit_curve_tuning": "false"
+    },
+    {
+      "after_max_drawdown": "134862.81",
+      "after_net_profit": "-107134.41",
+      "after_return_percent": "-26.7836",
+      "after_trade_count": "8007",
+      "after_win_rate": "0.3318",
+      "before_max_drawdown": "257549.22",
+      "before_net_profit": "-163742.05",
+      "before_return_percent": "-40.9355",
+      "before_trade_count": "23881",
+      "before_win_rate": "0.3397",
+      "geometry_fields_available": "true",
+      "notes": "M12.10 persists range geometry fields for review, but M10.9 cleaned metrics remain weak or blocker-bearing; keep rejected for now.",
+      "paper_gate_evidence_now": "false",
+      "status": "reject_for_now_after_geometry_review",
+      "strategy_id": "M10-PA-005",
+      "timeframe": "5m",
+      "uses_profit_curve_tuning": "false"
+    }
+  ],
+  "pa005_decision": "reject_for_now_after_geometry_review",
+  "pa005_geometry_deferred_count": 0,
+  "pa005_geometry_event_count": 34651,
+  "pa005_geometry_event_id_unique": true,
+  "pa005_geometry_fields_available": true,
+  "pa005_previous_definition_cleared": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "priority_visual_gate_guard": [
+    {
+      "paper_gate_evidence_now": false,
+      "reason": "M12.9 requires user confirmation before visual strategies can count as gate evidence.",
+      "strategy_id": "M10-PA-008"
+    },
+    {
+      "paper_gate_evidence_now": false,
+      "reason": "M12.9 requires user confirmation before visual strategies can count as gate evidence.",
+      "strategy_id": "M10-PA-009"
+    }
+  ],
+  "real_orders": false,
+  "run_id": "m12_10_definition_fix_and_retest",
+  "schema_version": "m12.10.definition-fix-retest-summary.v1",
+  "source_refs": {
+    "m10_4_dataset_inventory": "reports/strategy_lab/m10_price_action_strategy_refresh/historical_pilot/m10_4_wave_a_pilot/m10_4_dataset_inventory.json",
+    "m10_9_metrics": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_before_after_metrics.csv",
+    "m10_9_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/definition_tightening/m10_9_pa_005/m10_9_retest_summary.json",
+    "m12_9_case_review_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_case_review_ledger.json",
+    "m12_9_visual_closure": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_review/m12_9_closure/m12_9_visual_closure_index.json"
+  },
+  "stage": "M12.10.definition_fix_and_retest",
+  "strategy_ids": [
+    "M10-PA-005",
+    "M10-PA-004",
+    "M10-PA-007"
+  ],
+  "uses_profit_curve_tuning": false,
+  "visual_definition_decisions": {
+    "M10-PA-004": "visual_only_not_backtestable_without_manual_labels",
+    "M10-PA-007": "visual_only_not_backtestable_without_manual_labels"
+  }
+}
