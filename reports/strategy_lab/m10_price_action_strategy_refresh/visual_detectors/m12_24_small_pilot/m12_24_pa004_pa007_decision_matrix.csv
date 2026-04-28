@@ -1,0 +1,3 @@
+decision,max_drawdown_percent,plain_reason,profit_factor,return_percent,strategy_id,trade_count,win_rate
+保留图形研究,4.0220,本轮小范围测试没有看到可进入每日观察的模拟结果。,0.9030,-0.9580,M10-PA-004,1535,0.3472
+进入每日观察,3.8796,收益为正，交易次数够，回撤在小范围测试阈值内。,1.0563,0.6473,M10-PA-007,2260,0.4115

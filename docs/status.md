@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：阶段 12.23：Detector Tightening Rerun（当前阶段分支 `feature/m12-23-detector-tightening-rerun`，M12.23 已收紧 `M10-PA-004/007` 检测器并重跑检测、结构复核和严格图形复核）
+- 当前支线：阶段 12.24：PA004/PA007 Small Historical Pilot（当前阶段分支 `feature/m12-24-pa004-pa007-small-pilot`，M12.24 已对通过 M12.23 的 `M10-PA-004/007` 做 `1d` 小范围历史模拟）
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：`M12.23 Detector Tightening Rerun`
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review 与 M12.23 Detector Tightening Rerun
+- 当前支线 milestone：`M12.24 PA004/PA007 Small Historical Pilot`
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun 与 M12.24 PA004/PA007 Small Historical Pilot
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `feature/m12-23-detector-tightening-rerun`
+- `feature/m12-24-pa004-pa007-small-pilot`
 
 ## 已完成
 
@@ -439,20 +439,24 @@
   - M12.23 对比 M12.22：边界样例从 `1357` 降到 `73`，疑似误判从 `169` 降到 `0`；`M10-PA-004` 收紧后清晰 `1587`、边界 `0`、疑似误判 `0`；`M10-PA-007` 收紧后清晰 `2330`、边界 `73`、疑似误判 `0`。
   - M12.23 raw/capped 审计：`M10-PA-004` 原始候选 `4582`、收紧后原始 `1996`、cap 后 `1587`；`M10-PA-007` 原始候选 `20190`、收紧后原始 `4984`、cap 后 `2403`。
   - M12.23 结论：检测器质量已足够进入 M12.24 `1d` 小范围历史测试准备，但仍不是盈利结论，也不进入模拟买卖试运行。
+  - 已完成 M12.24 PA004/PA007 Small Historical Pilot，新增 `scripts/m12_24_pa004_pa007_small_pilot_lib.py`、`scripts/run_m12_24_pa004_pa007_small_pilot.py`、`visual_detectors/m12_24_small_pilot/` 与 M12.24 单测。
+  - M12.24 将收紧后候选转成可测试交易 `3795` 条，跳过 `195` 条；测试周期只用 `1d`，不使用尚未完整补齐的长历史 `5m`。
+  - M12.24 结果：`M10-PA-004` 收益 `-0.9580%`、胜率 `34.72%`、最大回撤 `4.0220%`、交易 `1535` 笔，结论为保留图形研究；`M10-PA-007` 收益 `0.6473%`、胜率 `41.15%`、最大回撤 `3.8796%`、交易 `2260` 笔，结论为进入每日观察。
+  - M12.24 不批准模拟买卖试运行；`M10-PA-007` 只能进入 M12.25 每日观察队列，`M10-PA-004` 不进入每日观察。
 
 ## 当前阻塞
 
-- 当前 M12.23 实现无代码侧阻塞；可继续日常只读测试累计到 `10` 个交易日，并为 `M10-PA-004/007` 启动 `1d` 小范围历史测试。
+- 当前 M12.24 实现无代码侧阻塞；可继续日常只读测试累计到 `10` 个交易日，并把 `M10-PA-007` 加入 M12.25 每日观察队列。
 - M11.6 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
-- `M10-PA-004/007` 已完成检测器收紧和 raw/capped 分布审计；下一步只允许进入 M12.24 小范围历史测试，不得直接进入每日主线或模拟买卖准入。
+- `M10-PA-004` 小范围测试未达观察准入，继续保留为图形研究；`M10-PA-007` 可进入每日观察，但不得直接进入模拟买卖准入。
 - 真实 broker / live 重新评估仍冻结，直到用户另行批准；这不阻塞当前 M12 只读观察与扫描链路。
 
 ## 下一步
 
-- 下一步：继续跑 M12.17/M12.25 每日只读测试直到累计 `10` 个交易日；同时启动 M12.24，对 `M10-PA-004/007` 做 `1d` 小范围历史测试。
+- 下一步：继续跑 M12.17/M12.25 每日只读测试直到累计 `10` 个交易日；M12.25 把 `M10-PA-007` 加入观察队列，但不加入模拟买卖准入。
 - 同步连续运行 M12.12 每日只读循环，累计 `10` 个交易日看板记录，并把每日候选、模拟结果和数据缺口写入同一套 artifact。
-- `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004/007` 不再停留在“要做检测器”，检测器已收紧并通过质量复核，下一步只做小范围历史测试。
+- `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 保留图形研究，`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。
 - 满足 `50` 只数据稳定、`10` 个交易日看板连续输出、重点策略 A/B 重测可解释、以及用户业务审批后，M11.6 才能把第一批策略明确批准进入模拟交易试运行。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
