@@ -1,0 +1,182 @@
+{
+  "best_symbols": [
+    "MU",
+    "AMZN",
+    "TSLA",
+    "SLV",
+    "XLY"
+  ],
+  "broker_connection": false,
+  "cohort_count": 9,
+  "cohort_decisions": [
+    {
+      "account_count": "48",
+      "cohort_id": "all_m12_24",
+      "cohort_label": "原小范围全样本",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "4.0220",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.9030",
+      "return_percent": "-0.9580",
+      "trade_count": "1535",
+      "win_rate": "0.3472"
+    },
+    {
+      "account_count": "47",
+      "cohort_id": "long_only",
+      "cohort_label": "只看做多机会",
+      "decision": "PA004 做多版进入下一轮观察候选",
+      "max_drawdown_percent": "2.0479",
+      "plain_reason": "分方向后，做多样本转正，说明 PA004 不应被整体打掉，应继续单独验证做多版本。",
+      "profit_factor": "1.1594",
+      "return_percent": "0.5530",
+      "trade_count": "574",
+      "win_rate": "0.4024"
+    },
+    {
+      "account_count": "48",
+      "cohort_id": "short_only",
+      "cohort_label": "只看做空机会",
+      "decision": "做空版本暂不进入主线",
+      "max_drawdown_percent": "3.1993",
+      "plain_reason": "做空样本拖累明显，下一轮 PA004 不应把做空混进主线。",
+      "profit_factor": "0.7686",
+      "return_percent": "-1.5005",
+      "trade_count": "961",
+      "win_rate": "0.3143"
+    },
+    {
+      "account_count": "25",
+      "cohort_id": "stocks_only",
+      "cohort_label": "只看个股，不含 ETF",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "4.4742",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.9197",
+      "return_percent": "-0.9529",
+      "trade_count": "967",
+      "win_rate": "0.3537"
+    },
+    {
+      "account_count": "23",
+      "cohort_id": "etfs_only",
+      "cohort_label": "只看 ETF",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "3.5304",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.8751",
+      "return_percent": "-0.9635",
+      "trade_count": "568",
+      "win_rate": "0.3363"
+    },
+    {
+      "account_count": "46",
+      "cohort_id": "non_leveraged_non_inverse",
+      "cohort_label": "剔除杠杆/反向 ETF",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "3.7528",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.9337",
+      "return_percent": "-0.6338",
+      "trade_count": "1438",
+      "win_rate": "0.3547"
+    },
+    {
+      "account_count": "2",
+      "cohort_id": "leveraged_inverse_only",
+      "cohort_label": "只看杠杆/反向 ETF",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "10.2125",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.5162",
+      "return_percent": "-8.4142",
+      "trade_count": "97",
+      "win_rate": "0.2371"
+    },
+    {
+      "account_count": "48",
+      "cohort_id": "post_2018",
+      "cohort_label": "2018 年后样本",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "3.5897",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.9338",
+      "return_percent": "-0.5372",
+      "trade_count": "1256",
+      "win_rate": "0.3479"
+    },
+    {
+      "account_count": "36",
+      "cohort_id": "pre_2018",
+      "cohort_label": "2018 年前样本",
+      "decision": "暂不进入每日主线",
+      "max_drawdown_percent": "1.7461",
+      "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+      "profit_factor": "0.7723",
+      "return_percent": "-0.5511",
+      "trade_count": "279",
+      "win_rate": "0.3441"
+    }
+  ],
+  "generated_at": "2026-04-28T13:51:31Z",
+  "live_execution": false,
+  "live_readonly_snapshot": {
+    "deferred_count": 0,
+    "generated_at": "2026-04-28T13:45:40Z",
+    "meaning": "当前开盘时段只读行情/K 线能取到；这不是常驻自动刷新。",
+    "row_count": 16,
+    "status": "ok",
+    "symbols": [
+      "SPY",
+      "QQQ",
+      "NVDA",
+      "TSLA"
+    ],
+    "timeframes": [
+      "1d",
+      "1h",
+      "15m",
+      "5m"
+    ]
+  },
+  "next_action": "把 PA004 做多版做成下一轮观察规则；PA004 做空版暂不进入每日主线。",
+  "pa004_long_only_retest": {
+    "account_count": "47",
+    "cohort_id": "long_only",
+    "cohort_label": "只看做多机会",
+    "decision": "PA004 做多版进入下一轮观察候选",
+    "max_drawdown_percent": "2.0479",
+    "plain_reason": "分方向后，做多样本转正，说明 PA004 不应被整体打掉，应继续单独验证做多版本。",
+    "profit_factor": "1.1594",
+    "return_percent": "0.5530",
+    "trade_count": "574",
+    "win_rate": "0.4024"
+  },
+  "pa004_overall_retest": {
+    "account_count": "48",
+    "cohort_id": "all_m12_24",
+    "cohort_label": "原小范围全样本",
+    "decision": "暂不进入每日主线",
+    "max_drawdown_percent": "4.0220",
+    "plain_reason": "本分组没有跑出足够稳定的模拟结果。",
+    "profit_factor": "0.9030",
+    "return_percent": "-0.9580",
+    "trade_count": "1535",
+    "win_rate": "0.3472"
+  },
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "PA004 不直接拒绝；整体版本仍弱，但做多分支转正，下一步应测试 PA004 做多版，而不是继续混合做多/做空。",
+  "real_orders": false,
+  "schema_version": "m12.27.pa004-retest-live-snapshot.v1",
+  "source_stage": "M12.24.pa004_pa007_small_pilot",
+  "source_trade_count": 1535,
+  "stage": "M12.27.pa004_expanded_retest_live_snapshot",
+  "worst_symbols": [
+    "SQQQ",
+    "NVDA",
+    "QCOM",
+    "ORCL",
+    "SOXX"
+  ]
+}
