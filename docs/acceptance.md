@@ -1252,6 +1252,15 @@
   - `1d` 只能按收盘后语义更新；`1h / 15m / 5m` 只能按 regular-session bar close 语义更新。
   - 数据缺失、缓存过期、Longbridge 限流或未授权时必须写 deferred / unavailable artifact，不得补假行情、假信号、假收益或假观察事件。
   - 每日输出必须继续保留 `paper_trading_approval=false`、`trading_connection=false`、`real_money_actions=false`、`live_execution=false`。
+- M12.21 Detector Quality Review 必须满足：
+  - 必须使用独立分支 `feature/m12-21-detector-quality-review`，从已合并 M12.20 的 `main` 切出。
+  - 输入只能使用 M12.20 checked-in detector events、input manifest、本地只读 OHLCV cache 与 vendor anomaly sidecar；不得新增真实交易连接、真实资金路径或下单路径。
+  - 必须对 M12.20 retained detector events 做全量机器结构复核，并生成 sample packet；不得只抽样后宣称全量完成。
+  - 必须输出 `m12_21_detector_quality_summary.json`、`m12_21_full_quality_ledger.csv/jsonl`、`m12_21_review_sample.csv`、`m12_21_review_packet.md/html` 与后续动作说明。
+  - 复核结论只能讨论候选图形结构、质量等级、是否需要抽样看图、是否需要收紧检测器；不得输出盈利、胜率、最大回撤、资金曲线、订单、成交、账户、持仓、现金或模拟买卖准入结论。
+  - `M10-PA-004/007` 必须继续留在 machine detector observation；不得自动流入每日测试、paper gate evidence、paper trading candidate 或 live-ready 队列。
+  - 若 M12.20 事件受 per strategy/symbol cap 影响，必须明确说明 retained candidates 与 raw detector 全历史分布的区别，并把 raw/capped 分布审计列为后续条件。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
