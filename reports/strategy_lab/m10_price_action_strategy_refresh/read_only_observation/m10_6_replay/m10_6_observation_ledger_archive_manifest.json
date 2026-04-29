@@ -1,0 +1,25 @@
+{
+  "schema_version": "m10.6.large-ledger-archive.v1",
+  "stage": "M10.6.read_only_observation_replay",
+  "reason": "The raw JSONL ledger exceeds GitHub's 100 MB single-file limit, so the pushable branch stores a gzip archive plus checksums while the local backup branch keeps the original raw history.",
+  "raw_file": {
+    "path": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl",
+    "size_bytes": 150836035,
+    "line_count": 108640,
+    "sha256": "38208cb7d745b1b3abc67fc4b840cbef7f148a6b3a945e6e339fabc9c6fd1e84",
+    "git_tracking": "removed_from_pushable_history_and_ignored"
+  },
+  "archive_file": {
+    "path": "reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl.gz",
+    "size_bytes": 2247769,
+    "sha256": "37b03c6f6b7e346011f24ee043759090ca44386a788c551859b09a53b72e4ee3",
+    "compression": "gzip -cn"
+  },
+  "restore_command": "gzip -cd reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl.gz > reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl && sha256sum reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl",
+  "expected_restored_sha256": "38208cb7d745b1b3abc67fc4b840cbef7f148a6b3a945e6e339fabc9c6fd1e84",
+  "backup_ref": "backup/main-before-large-ledger-history-rewrite-20260429",
+  "paper_simulated_only": true,
+  "broker_connection": false,
+  "real_orders": false,
+  "live_execution": false
+}
