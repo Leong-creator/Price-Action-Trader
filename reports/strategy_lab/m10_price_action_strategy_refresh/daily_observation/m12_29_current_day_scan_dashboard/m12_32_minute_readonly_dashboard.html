@@ -14,22 +14,60 @@
     .metric { padding:12px; } .metric span { display:block; color:#667085; font-size:12px; } .metric strong { display:block; margin-top:8px; font-size:22px; }
     h2 { margin:0; padding:14px 16px; font-size:18px; border-bottom:1px solid #d8dee9; }
     .note { padding:12px 16px; color:#667085; line-height:1.6; }
+    .two-col { display:grid; grid-template-columns:minmax(280px,0.9fr) minmax(320px,1.1fr); gap:14px; padding:14px 16px; }
+    .mini-card { border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff; }
     table { width:100%; border-collapse:collapse; font-size:13px; } th,td { padding:9px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
     th { background:#eef2f7; } .wrap { max-height:520px; overflow:auto; }
     .good { color:#18794e; font-weight:700; } .bad { color:#b42318; font-weight:700; }
-    @media (max-width:980px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } header { display:block; } }
+    .bar-row { display:grid; grid-template-columns:150px 1fr 86px; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid #eef2f7; font-size:13px; }
+    .bar-track { height:12px; background:#eef2f7; border-radius:999px; overflow:hidden; }
+    .bar-fill { height:12px; min-width:2px; }
+    .bar-good { background:#2f9e6b; } .bar-bad { background:#d92d20; }
+    @media (max-width:980px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } header,.two-col { display:block; } }
   </style>
 </head>
 <body>
-  <header><div><h1>分钟级只读模拟看板</h1><div>更新时间：2026-04-29T02:44:53Z</div></div><div>只读行情 + 模拟盈亏，不接真实账户，不做真实买卖</div></header>
+  <header><div><h1>分钟级只读模拟看板</h1><div>更新时间：2026-04-29T04:28:06Z</div></div><div>只读行情 + 模拟盈亏，不接真实账户，不做真实买卖</div></header>
   <main>
-    <div class="grid"><section class="metric"><span>今日新机会</span><strong>122</strong></section>
+    <div class="grid"><section class="metric"><span>模拟账户权益</span><strong>100843.92</strong></section>
+<section class="metric"><span>今日新机会</span><strong>122</strong></section>
 <section class="metric"><span>盘中模拟盈亏</span><strong>843.92</strong></section>
 <section class="metric"><span>模拟收益率</span><strong>0.84</strong></section>
 <section class="metric"><span>浮盈机会占比</span><strong>26.24</strong></section>
 <section class="metric"><span>最大回撤参考</span><strong>48.38</strong></section>
-<section class="metric"><span>策略可用数</span><strong>7</strong></section></div>
-    <section class="panel"><h2>今日新机会、旧观察机会与模拟盈亏</h2><div class="note">报价每 60 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描和旧观察。</div><div class="wrap"><table><thead><tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>模拟盈亏</th><th>状态</th></tr></thead><tbody><tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SPY</td><td>15m</td><td>看跌</td><td>711.69</td><td>710.4600</td><td>712.8800</td><td>708.3700</td><td class="bad">-254.13</td><td>观察中</td></tr>
+<section class="metric"><span>策略可用数</span><strong>4</strong></section></div>
+    <section class="panel"><h2>共享模拟账户</h2><div class="note">首页按共享模拟账户展示，方便你盘中先看总盈亏；策略成绩表仍按单策略独立统计，方便判断哪条策略好坏。</div><div class="two-col"><div class="mini-card"><table><tbody><tr><td>初始模拟本金</td><td>100000.00</td></tr>
+<tr><td>当前模拟权益</td><td>100843.92</td></tr>
+<tr><td>今日模拟盈亏</td><td>843.92</td></tr>
+<tr><td>今日模拟收益率</td><td>0.84%</td></tr>
+<tr><td>今日新机会</td><td>122</td></tr>
+<tr><td>浮盈机会</td><td>37</td></tr>
+<tr><td>浮亏机会</td><td>92</td></tr>
+<tr><td>如果所有机会同时观察的理论风险预算</td><td>70500.00</td></tr></tbody></table></div><div class="mini-card"><h2>各策略今日模拟盈亏</h2><div class="bar-row"><div>M10-PA-002</div><div class="bar-track"><div class="bar-fill " style="width:4%"></div></div><div>0.00</div></div>
+<div class="bar-row"><div>M12-FTD-001</div><div class="bar-track"><div class="bar-fill bar-bad" style="width:4%"></div></div><div>-117.86</div></div>
+<div class="bar-row"><div>M10-PA-001</div><div class="bar-track"><div class="bar-fill bar-bad" style="width:9%"></div></div><div>-2460.79</div></div>
+<div class="bar-row"><div>M10-PA-012</div><div class="bar-track"><div class="bar-fill bar-bad" style="width:43%"></div></div><div>-10995.57</div></div>
+<div class="bar-row"><div>M10-PA-004</div><div class="bar-track"><div class="bar-fill bar-good" style="width:57%"></div></div><div>14418.14</div></div>
+<div class="bar-row"><div>M10-PA-007</div><div class="bar-track"><div class="bar-fill " style="width:4%"></div></div><div>0.00</div></div>
+<div class="bar-row"><div>M10-PA-008</div><div class="bar-track"><div class="bar-fill " style="width:4%"></div></div><div>0.00</div></div>
+<div class="bar-row"><div>M10-PA-009</div><div class="bar-track"><div class="bar-fill " style="width:4%"></div></div><div>0.00</div></div></div></div></section>
+    <section class="panel"><h2>策略成绩单</h2><div class="note">这里按单策略独立展示，方便判断每条策略自己的历史表现和今日表现；首页共享账户则看所有策略合并后的总效果。</div><div class="wrap"><table><thead><tr><th>策略</th><th>状态</th><th>今日机会</th><th>今日模拟盈亏</th><th>浮盈占比</th><th>历史收益</th><th>历史胜率</th><th>最大回撤</th><th>盈利因子</th><th>下一步</th></tr></thead><tbody><tr><td>M10-PA-002<br><small>Breakout Follow-Through Continuation</small></td><td>每日测试</td><td>9</td><td class="">0.00</td><td>0.00%</td><td>3.2810%</td><td>34.92%</td><td>23.5592%</td><td>1.0144</td><td>突破后跟进策略，历史资金测试完成，也可作为 FTD 确认过滤器。</td></tr>
+<tr><td>M12-FTD-001<br><small>方方土日线趋势顺势信号K</small></td><td>每日测试</td><td>2</td><td class="bad">-117.86</td><td>0.00%</td><td>610.44%</td><td>37.36%</td><td>48.38%</td><td>1.09</td><td>早期强策略已改为 pullback_guard 版本，进入每日只读测试观察回撤。</td></tr>
+<tr><td>M10-PA-001<br><small>Trend Pullback Second-Entry Continuation</small></td><td>每日测试</td><td>27</td><td class="bad">-2460.79</td><td>0.00%</td><td>24.7327%</td><td>35.84%</td><td>34.1783%</td><td>1.0580</td><td>核心顺势策略，历史资金测试完成，继续扫描 50 只。</td></tr>
+<tr><td>M10-PA-012<br><small>Opening Range Breakout</small></td><td>每日测试</td><td>84</td><td class="bad">-10995.57</td><td>27.38%</td><td>26.8927%</td><td>38.15%</td><td>12.7415%</td><td>1.1674</td><td>开盘区间突破历史资金测试表现较好，继续 15m/5m。</td></tr>
+<tr><td>M10-PA-004<br><small>Broad Channel Boundary Reversal</small></td><td>观察</td><td>19</td><td class="good">14418.14</td><td>73.68%</td><td>0.5530%</td><td>40.24%</td><td>2.0479%</td><td>1.1594</td><td>整体混合版本弱，但做多分支转正；只做多观察，做空版暂不进入主线。</td></tr>
+<tr><td>M10-PA-007<br><small>Second-Leg Trap Reversal</small></td><td>观察</td><td>0</td><td class="">0.00</td><td>0.00%</td><td>0.6473%</td><td>41.15%</td><td>3.8796%</td><td>1.0563</td><td>第二腿陷阱小范围测试为正，先观察但不进模拟买卖准入。</td></tr>
+<tr><td>M10-PA-008<br><small>Major Trend Reversal</small></td><td>观察</td><td>0</td><td class="">0.00</td><td>0.00%</td><td>4.0036%</td><td>35.41%</td><td>9.2807%</td><td>1.0532</td><td>主要趋势反转有历史资金测试，但图形语境强，先严格观察。</td></tr>
+<tr><td>M10-PA-009<br><small>Wedge Reversal and Wedge Flag</small></td><td>观察</td><td>0</td><td class="">0.00</td><td>0.00%</td><td>1.0173%</td><td>33.95%</td><td>9.1580%</td><td>1.0159</td><td>楔形反转历史测试略正，先严格观察。</td></tr></tbody></table></div></section>
+    <section class="panel"><h2>单策略下钻</h2><div class="note">这里把每条策略的今日机会、最好/最差股票、周期分布和历史参考指标放在一起；更细的每笔机会保存在 JSON 的 strategy_detail_views 里。</div><div class="wrap"><table><thead><tr><th>策略</th><th>今日机会</th><th>今日模拟盈亏</th><th>最好股票</th><th>最差股票</th><th>周期分布</th><th>历史净利润</th><th>历史最好/最差</th></tr></thead><tbody><tr><td>M10-PA-002<br><small>Breakout Follow-Through Continuation</small></td><td>9</td><td>0.00</td><td>XLP (0.00)</td><td>XLP (0.00)</td><td>15m:4，5m:5</td><td>52496.28</td><td>最好 TSLA / 15m<br>最差 SPY / 5m</td></tr>
+<tr><td>M12-FTD-001<br><small>方方土日线趋势顺势信号K</small></td><td>2</td><td>-117.86</td><td>MSFT (-41.77)</td><td>XLY (-76.09)</td><td>1d:2</td><td>610436.76</td><td>最好 暂无 / 1d<br>最差 暂无 / 1d</td></tr>
+<tr><td>M10-PA-001<br><small>Trend Pullback Second-Entry Continuation</small></td><td>27</td><td>-2460.79</td><td>CRM (0.00)</td><td>TSLA (-468.35)</td><td>1d:13，5m:14</td><td>395723.86</td><td>最好 TSLA / 5m<br>最差 NVDA / 1h</td></tr>
+<tr><td>M10-PA-012<br><small>Opening Range Breakout</small></td><td>84</td><td>-10995.57</td><td>QCOM (429.85)</td><td>TLT (-1723.84)</td><td>15m:40，5m:44</td><td>215141.29</td><td>最好 QQQ / 5m<br>最差 NVDA / 15m</td></tr>
+<tr><td>M10-PA-004<br><small>Broad Channel Boundary Reversal</small></td><td>19</td><td>14418.14</td><td>GOOG (4580.97)</td><td>NOW (-1534.44)</td><td>1d:19</td><td>25989.23</td><td>最好 MU / 1d<br>最差 SQQQ / 1d</td></tr>
+<tr><td>M10-PA-007<br><small>Second-Leg Trap Reversal</small></td><td>0</td><td>0.00</td><td>暂无</td><td>暂无</td><td>暂无</td><td>32367.04</td><td>最好 DIA / 1d<br>最差 USO / 1d</td></tr>
+<tr><td>M10-PA-008<br><small>Major Trend Reversal</small></td><td>0</td><td>0.00</td><td>暂无</td><td>暂无</td><td>暂无</td><td>64057.47</td><td>最好 TSLA / 15m<br>最差 NVDA / 1d</td></tr>
+<tr><td>M10-PA-009<br><small>Wedge Reversal and Wedge Flag</small></td><td>0</td><td>0.00</td><td>暂无</td><td>暂无</td><td>暂无</td><td>16277.18</td><td>最好 SPY / 15m<br>最差 NVDA / 5m</td></tr></tbody></table></div></section>
+    <section class="panel"><h2>今日机会明细</h2><div class="note">报价每 60 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描和旧观察。</div><div class="wrap"><table><thead><tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>模拟盈亏</th><th>状态</th></tr></thead><tbody><tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SPY</td><td>15m</td><td>看跌</td><td>711.69</td><td>710.4600</td><td>712.8800</td><td>708.3700</td><td class="bad">-254.13</td><td>观察中</td></tr>
 <tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SPY</td><td>5m</td><td>看跌</td><td>711.69</td><td>710.0890</td><td>712.8800</td><td>707.9990</td><td class="bad">-286.81</td><td>观察中</td></tr>
 <tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>QQQ</td><td>15m</td><td>看跌</td><td>657.55</td><td>654.6850</td><td>659.6400</td><td>650.3200</td><td class="bad">-289.10</td><td>观察中</td></tr>
 <tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>QQQ</td><td>5m</td><td>看跌</td><td>657.55</td><td>655.0500</td><td>659.6400</td><td>650.6850</td><td class="bad">-272.33</td><td>观察中</td></tr>

@@ -1326,6 +1326,9 @@
   - 必须把 M10 16 条、`M12-FTD-001` 与 6 条来源回看候选合并到一张中文策略收口表，每条策略只能有一个最终状态。
   - 必须明确：`M10-PA-001/002/012/M12-FTD-001` 进入每日实时只读测试；`M10-PA-004` 只保留做多观察；`M10-PA-007/008/009` 观察；辅助/过滤器/研究项不得伪装为独立触发策略。
   - 必须生成中文分钟级只读模拟看板，首页优先展示今日新机会、盘中模拟盈亏、模拟收益率、浮盈机会占比、最大回撤参考和策略状态。
+  - 看板首屏必须按“共享模拟账户”展示当前模拟权益、今日模拟盈亏、模拟收益率、今日机会数、浮盈/浮亏机会；该视角仅用于合并观察，不代表真实资金。
+  - 看板必须同时提供“策略成绩单”，按单策略独立展示历史收益、历史胜率、最大回撤、盈利因子、今日模拟盈亏和下一步状态；`M12-SRC-*` 来源回看候选不得作为独立策略重复出现在成绩单中。
+  - 看板 JSON 必须提供 `strategy_detail_views`，保留每条策略的单策略下钻、机会明细、source/spec refs、数据路径、数据 lineage 和风险等级，便于追溯每笔模拟机会。
   - 看板刷新间隔默认 `60` 秒；报价可以分钟级刷新，策略信号必须按对应 K 线收盘确认。
   - M11.6 准入复查必须用人话说明是否批准模拟交易试运行；未满连续 `10` 个交易日时不得批准，但也不得把“未批准”写成策略失败。
   - 必须输出 `m12_29_current_day_scan_summary.json`、`m12_29_today_candidates.csv/jsonl`、`m12_29_trade_view.csv`、`m12_30_strategy_closure_matrix.json/csv/md`、`m12_31_visual_definition_final_review.json/md`、`m12_32_minute_readonly_dashboard_data.json/html`、`m12_33_observation_run_status.json/md`、`m11_6_paper_trial_gate_recheck.json/md`、`m12_29_current_day_scan_report.md` 与 `m12_29_handoff.md`。

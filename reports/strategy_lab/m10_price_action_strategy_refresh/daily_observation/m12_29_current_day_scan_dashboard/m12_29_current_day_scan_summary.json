@@ -3,13 +3,13 @@
   "current_day_scan_complete": true,
   "first50_current_5m_ready_symbols": 50,
   "first50_daily_ready_symbols": 50,
-  "generated_at": "2026-04-29T02:44:53Z",
+  "generated_at": "2026-04-29T04:28:06Z",
   "live_execution": false,
   "mainline_simulated_pnl": "-13574.22",
   "market_session": {
-    "beijing_time": "2026-04-29 10:44:53 CST",
-    "new_york_date": "2026-04-28",
-    "new_york_time": "2026-04-28 22:44:53 EDT",
+    "beijing_time": "2026-04-29 12:28:06 CST",
+    "new_york_date": "2026-04-29",
+    "new_york_time": "2026-04-29 00:28:06 EDT",
     "status": "休市"
   },
   "old_candidate_count": 0,

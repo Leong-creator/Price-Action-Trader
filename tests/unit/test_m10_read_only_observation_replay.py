@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import json
 import tempfile
 import unittest
@@ -23,6 +24,34 @@ from scripts.m10_historical_pilot_lib import DatasetRecord
 
 M10_DIR = Path("reports/strategy_lab/m10_price_action_strategy_refresh")
 OUTPUT_DIR = M10_DIR / "read_only_observation" / "m10_6_replay"
+
+
+def read_checked_in_ledger_first_event(output_dir: Path) -> dict:
+    raw_path = output_dir / "m10_6_observation_ledger.jsonl"
+    if raw_path.exists():
+        return json.loads(next(line for line in raw_path.read_text(encoding="utf-8").splitlines() if line.strip()))
+    archive_path = output_dir / "m10_6_observation_ledger.jsonl.gz"
+    archive_manifest_path = output_dir / "m10_6_observation_ledger_archive_manifest.json"
+    manifest = json.loads(archive_manifest_path.read_text(encoding="utf-8"))
+    self_described_archive = Path(manifest["archive_file"]["path"])
+    self_described_raw = Path(manifest["raw_file"]["path"])
+    assert self_described_archive == archive_path
+    assert self_described_raw == raw_path
+    assert manifest["raw_file"]["git_tracking"] == "removed_from_pushable_history_and_ignored"
+    with gzip.open(archive_path, "rt", encoding="utf-8") as handle:
+        return json.loads(next(line for line in handle if line.strip()))
+
+
+def read_checked_in_ledger_sample(output_dir: Path, *, max_lines: int = 200) -> str:
+    raw_path = output_dir / "m10_6_observation_ledger.jsonl"
+    if raw_path.exists():
+        return "\n".join(raw_path.read_text(encoding="utf-8").splitlines()[:max_lines])
+    archive_path = output_dir / "m10_6_observation_ledger.jsonl.gz"
+    lines: list[str] = []
+    with gzip.open(archive_path, "rt", encoding="utf-8") as handle:
+        for _, line in zip(range(max_lines), handle):
+            lines.append(line.rstrip("\n"))
+    return "\n".join(lines)
 
 
 class M10ReadOnlyObservationReplayTests(unittest.TestCase):
@@ -108,12 +137,11 @@ class M10ReadOnlyObservationReplayTests(unittest.TestCase):
     def test_generated_artifacts_preserve_lineage_and_boundaries(self) -> None:
         summary_path = OUTPUT_DIR / "m10_6_observation_summary.json"
         manifest_path = OUTPUT_DIR / "m10_6_input_manifest.json"
-        ledger_path = OUTPUT_DIR / "m10_6_observation_ledger.jsonl"
         self.assertTrue(summary_path.exists(), "Run scripts/run_m10_read_only_observation.py before full validation")
 
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        first_event = json.loads(next(line for line in ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()))
+        first_event = read_checked_in_ledger_first_event(OUTPUT_DIR)
 
         self.assertEqual(summary["queue_strategy_ids"], list(OBSERVATION_STRATEGY_IDS))
         self.assertEqual(summary["lineage_counts"]["derived_from_5m"], 8)
@@ -126,11 +154,11 @@ class M10ReadOnlyObservationReplayTests(unittest.TestCase):
 
     def test_generated_outputs_do_not_contain_legacy_or_execution_result_claims(self) -> None:
         combined = "\n".join(
-            path.read_text(encoding="utf-8")
-            for path in [
-                OUTPUT_DIR / "m10_6_observation_ledger.jsonl",
-                OUTPUT_DIR / "m10_6_observation_summary.json",
-                OUTPUT_DIR / "m10_6_observation_report.md",
+            [
+                read_checked_in_ledger_sample(OUTPUT_DIR),
+                (OUTPUT_DIR / "m10_6_observation_ledger_archive_manifest.json").read_text(encoding="utf-8"),
+                (OUTPUT_DIR / "m10_6_observation_summary.json").read_text(encoding="utf-8"),
+                (OUTPUT_DIR / "m10_6_observation_report.md").read_text(encoding="utf-8"),
             ]
         )
         for forbidden in ("PA-SC-", "SF-", "retain", "promote", "live-ready", "order_id", "fill_price", "position", "cash", "pnl"):

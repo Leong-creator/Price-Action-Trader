@@ -3,18 +3,14 @@
     "M10-PA-001",
     "M10-PA-002",
     "M10-PA-012",
-    "M12-FTD-001",
-    "M12-SRC-001",
-    "M12-SRC-002",
-    "M12-SRC-003"
+    "M12-FTD-001"
   ],
   "live_execution": false,
   "observation_strategy_ids": [
     "M10-PA-004",
     "M10-PA-007",
     "M10-PA-008",
-    "M10-PA-009",
-    "M12-SRC-006"
+    "M10-PA-009"
   ],
   "observed_trading_days": 1,
   "paper_simulated_only": true,

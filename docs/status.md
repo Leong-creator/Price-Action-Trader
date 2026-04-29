@@ -3,12 +3,12 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：无进行中支线；M12.29 Current-day Scan + Minute Read-only Dashboard 已通过测试并合入 `main`
+- 当前支线：无进行中支线；M12.32 Dashboard Account Views 已通过测试并准备合入 `main`
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：无进行中 milestone；最新完成 milestone 为 `M12.29 Current-day Scan + Minute Read-only Dashboard`
+- 当前支线 milestone：无进行中 milestone；最新完成 milestone 为 `M12.32 Dashboard Account Views`
 - 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot、M12.25 Daily Observation Continuity、M12.26 Cache Scanner Expansion、M12.27 PA004 Expanded Retest + Live Read-only Snapshot、M12.28 PA004 Long Dashboard Refresh 与 M12.29 Current-day Scan + Minute Read-only Dashboard
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
@@ -465,12 +465,12 @@
   - M12.29 当前今日新机会 `122` 条，策略命中为 `M10-PA-001` `27`、`M10-PA-002` `9`、`M10-PA-012` `84`、`M12-FTD-001` `2`；旧候选数量为 `0`，不再把 `2026-04-27` 旧机会伪装成今日机会。
   - M12.29 当前看板共显示 `141` 条机会/观察项，其中主线今日机会 `122` 条、PA004 做多观察 `19` 条；当前模拟盈亏快照为 `843.92`，其中主线 `-13574.22`、PA004 做多观察 `14418.14`。
   - M12.30/M12.31 已把 M10 16 条、M12-FTD-001 与 6 条来源候选合并成一张中文收口表：`M10-PA-001/002/012/M12-FTD-001` 进入每日实时只读测试，`M10-PA-004` 仅做多观察，`M10-PA-007/008/009` 观察，`M10-PA-003` 过滤器/排名因子，其余辅助/研究/暂不继续，不再挂“等待用户确认”阻塞主线。
-  - M12.32 已生成中文分钟级只读模拟看板，首页优先展示今日新机会、盘中模拟盈亏、模拟收益率、浮盈机会占比、最大回撤参考和策略可用数，刷新间隔为 `60` 秒。
+  - M12.32 已优化中文分钟级只读模拟看板：首屏改为共享模拟账户总览，策略成绩单只展示真正每日测试/观察策略，来源回看候选只保留在收口表说明中；单策略下钻保留每条机会的来源、数据路径、风险等级和复盘字段。
   - M12.33/M11.6 当前准入结论：连续记录为 `1/10` 个交易日，模拟交易试运行仍未批准；原因是观察天数还不够，不是当前策略测试失败。
 
 ## 当前阻塞
 
-- 远端推送被历史大文件阻塞：`git push origin main` 因未推送历史中的 `reports/strategy_lab/m10_price_action_strategy_refresh/read_only_observation/m10_6_replay/m10_6_observation_ledger.jsonl` 超过 GitHub `100 MB` 限制而失败；需要单独制定 Git LFS 或历史清理方案。
+- 远端推送大文件阻塞已处理：M10.6 原始大 JSONL 已用 gzip archive manifest 保留可追溯，原始文件不再进入可推送历史；后续推送 `main` 不应再被该文件阻塞。
 - 当前 M12.29 实现无代码侧阻塞；可继续盘中刷新看板并累计每日只读测试到 `10` 个交易日。
 - M11.6 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。

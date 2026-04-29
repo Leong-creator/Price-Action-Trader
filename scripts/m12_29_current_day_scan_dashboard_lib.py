@@ -198,6 +198,7 @@ def run_m12_29_current_day_scan_dashboard(
     write_json(config.output_dir / "m12_31_visual_definition_final_review.json", {"schema_version": "m12.31.visual-definition-final.v1", "stage": "M12.31.visual_definition_final", "rows": visual_rows})
     (config.output_dir / "m12_31_visual_definition_final_review.md").write_text(build_visual_definition_md(visual_rows), encoding="utf-8")
     write_json(config.output_dir / "m12_32_minute_readonly_dashboard_data.json", dashboard)
+    write_csv(config.output_dir / "m12_32_strategy_scorecard.csv", dashboard["strategy_scorecard_rows"])
     (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(build_dashboard_html(config, dashboard), encoding="utf-8")
     write_json(config.output_dir / "m12_33_observation_run_status.json", run_status)
     (config.output_dir / "m12_33_observation_run_status.md").write_text(build_run_status_md(run_status), encoding="utf-8")
@@ -219,6 +220,8 @@ def run_m12_29_current_day_scan_dashboard(
 def current_us_scan_date(generated_at: str) -> date:
     ny_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
     candidate = ny_dt.date()
+    if ny_dt.weekday() < 5 and ny_dt.time() < time(9, 30):
+        candidate -= timedelta(days=1)
     while candidate.weekday() >= 5:
         candidate -= timedelta(days=1)
     return candidate
@@ -276,7 +279,17 @@ def build_trade_rows(candidates: list[dict[str, str]], quotes: dict[str, dict[st
                 "simulated_intraday_return_percent": pct(pnl / DEFAULT_EQUITY * HUNDRED),
                 "simulated_state": simulated_state(direction, latest, stop, target),
                 "bucket": "今日新扫描机会" if signal_date == scan_date.isoformat() else "旧观察机会",
+                "candidate_status": row.get("candidate_status", ""),
+                "queue_action": row.get("queue_action", ""),
                 "review_status": row.get("review_status", ""),
+                "risk_level": row.get("risk_level", ""),
+                "notes": row.get("notes", ""),
+                "data_path": row.get("data_path", ""),
+                "data_lineage": row.get("data_lineage", ""),
+                "data_checksum": row.get("data_checksum", ""),
+                "spec_ref": row.get("spec_ref", ""),
+                "simulated_context": row.get("simulated_context", ""),
+                "candidate_schema_version": row.get("schema_version", ""),
                 "source_refs": row.get("source_refs", ""),
             }
         )
@@ -332,6 +345,15 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
                 "win_rate_percent": pilot.get("win_rate_percent") or normalize_rate(pilot.get("win_rate", "")) or normalize_rate(metric.get("win_rate", "")),
                 "max_drawdown_percent": pilot.get("max_drawdown_percent") or metric.get("max_drawdown_percent", ""),
                 "trade_count": pilot.get("trade_count") or metric.get("trade_count", ""),
+                "historical_initial_capital": pilot.get("initial_capital") or metric.get("initial_capital", ""),
+                "historical_final_equity": pilot.get("final_equity") or metric.get("final_equity", ""),
+                "historical_net_profit": pilot.get("net_profit") or metric.get("net_profit", ""),
+                "historical_profit_factor": pilot.get("profit_factor") or metric.get("profit_factor", ""),
+                "historical_average_holding_bars": pilot.get("average_holding_bars") or metric.get("average_holding_bars", ""),
+                "historical_best_symbol": pilot.get("best_symbol") or metric.get("best_symbol", ""),
+                "historical_worst_symbol": pilot.get("worst_symbol") or metric.get("worst_symbol", ""),
+                "historical_best_timeframe": pilot.get("best_timeframe") or metric.get("best_timeframe", ""),
+                "historical_worst_timeframe": pilot.get("worst_timeframe") or metric.get("worst_timeframe", ""),
                 "linked_source_candidate": source_by_linked.get(strategy_id, {}).get("candidate_id", ""),
                 "plain_reason": reason,
                 "paper_trial_candidate_now": "false",
@@ -349,6 +371,15 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
             "win_rate_percent": best_ftd.get("win_rate", ""),
             "max_drawdown_percent": best_ftd.get("max_drawdown_percent", ""),
             "trade_count": str(best_ftd.get("trade_count", "")),
+            "historical_initial_capital": best_ftd.get("initial_capital", ""),
+            "historical_final_equity": best_ftd.get("final_equity", ""),
+            "historical_net_profit": best_ftd.get("net_profit", ""),
+            "historical_profit_factor": best_ftd.get("profit_factor", ""),
+            "historical_average_holding_bars": best_ftd.get("average_holding_bars", ""),
+            "historical_best_symbol": "",
+            "historical_worst_symbol": "",
+            "historical_best_timeframe": "1d",
+            "historical_worst_timeframe": "1d",
             "linked_source_candidate": "M12-SRC-001",
             "plain_reason": "早期强策略已改为 pullback_guard 版本，进入每日只读测试观察回撤。",
             "paper_trial_candidate_now": "false",
@@ -367,6 +398,15 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
                 "win_rate_percent": "",
                 "max_drawdown_percent": "",
                 "trade_count": "",
+                "historical_initial_capital": "",
+                "historical_final_equity": "",
+                "historical_net_profit": "",
+                "historical_profit_factor": "",
+                "historical_average_holding_bars": "",
+                "historical_best_symbol": "",
+                "historical_worst_symbol": "",
+                "historical_best_timeframe": "",
+                "historical_worst_timeframe": "",
                 "linked_source_candidate": source["linked_runtime_id"],
                 "plain_reason": source["client_note"],
                 "paper_trial_candidate_now": "false",
@@ -456,6 +496,10 @@ def build_summary(
 
 
 def build_dashboard_payload(config: M1229Config, generated_at: str, summary: dict[str, Any], trade_rows: list[dict[str, str]], pa004_rows: list[dict[str, str]], closure_rows: list[dict[str, str]], visual_rows: list[dict[str, str]]) -> dict[str, Any]:
+    all_rows = trade_rows + pa004_rows
+    strategy_scorecards = build_strategy_scorecards(all_rows, closure_rows)
+    shared_account = build_shared_account_view(summary, all_rows, strategy_scorecards)
+    strategy_detail_views = build_strategy_detail_views(all_rows, strategy_scorecards)
     return {
         "schema_version": "m12.32.minute-readonly-dashboard.v1",
         "stage": "M12.32.minute_readonly_dashboard",
@@ -463,13 +507,23 @@ def build_dashboard_payload(config: M1229Config, generated_at: str, summary: dic
         "title": "分钟级只读模拟看板",
         "refresh_seconds": config.dashboard_refresh_seconds,
         "top_metrics": {
+            "模拟账户权益": shared_account["current_equity"],
             "今日新机会": summary["today_candidate_count"],
             "盘中模拟盈亏": summary["total_simulated_pnl"],
             "模拟收益率": summary["total_simulated_return_percent"],
             "浮盈机会占比": summary["positive_opportunity_percent"],
             "最大回撤参考": dashboard_drawdown_reference(closure_rows),
-            "策略可用数": sum(1 for row in closure_rows if row["daily_realtime_test"] == "true"),
+            "策略可用数": shared_account["strategy_count_daily_test"],
         },
+        "dashboard_layout": {
+            "home": "共享模拟账户总览",
+            "strategy_scorecard": "单策略独立成绩",
+            "today_trade_view": "今日机会明细",
+            "single_strategy_detail": "单策略复盘入口",
+        },
+        "shared_account_view": shared_account,
+        "strategy_scorecard_rows": strategy_scorecards,
+        "strategy_detail_views": strategy_detail_views,
         "summary": summary,
         "trade_rows": trade_rows,
         "pa004_long_rows": pa004_rows,
@@ -483,6 +537,155 @@ def build_dashboard_payload(config: M1229Config, generated_at: str, summary: dic
     }
 
 
+def build_shared_account_view(summary: dict[str, Any], rows: list[dict[str, str]], scorecards: list[dict[str, str]]) -> dict[str, Any]:
+    day_pnl = money_to_decimal(summary["total_simulated_pnl"])
+    equity = DEFAULT_EQUITY + day_pnl
+    active_rows = [row for row in rows if row.get("simulated_intraday_pnl") not in ("", "暂无", None)]
+    positive_rows = [row for row in active_rows if money_to_decimal(row["simulated_intraday_pnl"]) > ZERO]
+    negative_rows = [row for row in active_rows if money_to_decimal(row["simulated_intraday_pnl"]) < ZERO]
+    paused_or_non_trigger = [
+        row for row in scorecards
+        if row["current_status"] not in {"每日测试", "观察"}
+    ]
+    return {
+        "account_name": "共享模拟账户",
+        "account_purpose": "像一个真实模拟账户一样，把所有可用策略合并看总盈亏；不代表真实资金。",
+        "starting_capital": money(DEFAULT_EQUITY),
+        "current_equity": money(equity),
+        "day_simulated_pnl": money(day_pnl),
+        "day_simulated_return_percent": pct(day_pnl / DEFAULT_EQUITY * HUNDRED),
+        "visible_opportunity_count": len(rows),
+        "today_candidate_count": summary["today_candidate_count"],
+        "floating_profit_count": len(positive_rows),
+        "floating_loss_count": len(negative_rows),
+        "floating_positive_percent": positive_percent(rows),
+        "strategy_count_daily_test": sum(1 for row in scorecards if row["current_status"] == "每日测试"),
+        "strategy_count_observation": sum(1 for row in scorecards if row["current_status"] == "观察"),
+        "strategy_count_paused_or_non_trigger": len(paused_or_non_trigger),
+        "risk_budget_per_opportunity": money(DEFAULT_RISK_BUDGET),
+        "theoretical_risk_budget_if_all_opportunities_active": money(DEFAULT_RISK_BUDGET * Decimal(len(rows))),
+        "plain_language_note": "首页按共享模拟账户展示，方便你盘中先看总盈亏；策略成绩表仍按单策略独立统计，方便判断哪条策略好坏。",
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_strategy_scorecards(rows: list[dict[str, str]], closure_rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        grouped.setdefault(row["strategy_id"], []).append(row)
+    closure_by_id = {row["strategy_id"]: row for row in closure_rows}
+    strategy_ids = [
+        row["strategy_id"] for row in closure_rows
+        if (row["daily_realtime_test"] == "true" or row["observation_queue"] == "true")
+        and not row["strategy_id"].startswith("M12-SRC-")
+    ]
+    cards: list[dict[str, str]] = []
+    for strategy_id in strategy_ids:
+        closure = closure_by_id[strategy_id]
+        strategy_rows = grouped.get(strategy_id, [])
+        pnl = sum((money_to_decimal(row.get("simulated_intraday_pnl", "")) for row in strategy_rows), ZERO)
+        active = [row for row in strategy_rows if row.get("simulated_intraday_pnl") not in ("", "暂无", None)]
+        symbols = sorted({row["symbol"] for row in strategy_rows})
+        status = "每日测试" if closure["daily_realtime_test"] == "true" else "观察"
+        cards.append(
+            {
+                "strategy_id": strategy_id,
+                "strategy_title": closure["strategy_title"],
+                "current_status": status,
+                "today_opportunity_count": str(len(strategy_rows)),
+                "unique_symbol_count": str(len(symbols)),
+                "simulated_pnl_today": money(pnl),
+                "simulated_return_today_percent": pct(pnl / DEFAULT_EQUITY * HUNDRED),
+                "floating_positive_percent": positive_percent(strategy_rows),
+                "historical_return_percent": closure.get("return_percent", ""),
+                "historical_win_rate_percent": closure.get("win_rate_percent", ""),
+                "historical_max_drawdown_percent": closure.get("max_drawdown_percent", ""),
+                "historical_trade_count": closure.get("trade_count", ""),
+                "historical_initial_capital": closure.get("historical_initial_capital", ""),
+                "historical_final_equity": closure.get("historical_final_equity", ""),
+                "historical_net_profit": closure.get("historical_net_profit", ""),
+                "historical_profit_factor": closure.get("historical_profit_factor", ""),
+                "historical_average_holding_bars": closure.get("historical_average_holding_bars", ""),
+                "historical_best_symbol": closure.get("historical_best_symbol", ""),
+                "historical_worst_symbol": closure.get("historical_worst_symbol", ""),
+                "historical_best_timeframe": closure.get("historical_best_timeframe", ""),
+                "historical_worst_timeframe": closure.get("historical_worst_timeframe", ""),
+                "average_simulated_pnl_per_opportunity": money(pnl / Decimal(len(active))) if active else "0.00",
+                "top_symbols": ", ".join(symbols[:8]),
+                "plain_next_action": closure["plain_reason"],
+                "paper_trial_candidate_now": "false",
+            }
+        )
+    cards.sort(key=lambda row: (0 if row["current_status"] == "每日测试" else 1, -money_to_decimal(row["simulated_pnl_today"])))
+    return cards
+
+
+def build_strategy_detail_views(rows: list[dict[str, str]], scorecards: list[dict[str, str]]) -> dict[str, Any]:
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        grouped.setdefault(row["strategy_id"], []).append(row)
+    details: dict[str, Any] = {}
+    for card in scorecards:
+        strategy_id = card["strategy_id"]
+        opportunity_rows = grouped.get(strategy_id, [])
+        symbol_pnl = aggregate_pnl(opportunity_rows, "symbol")
+        timeframe_pnl = aggregate_pnl(opportunity_rows, "timeframe")
+        bucket_counts = Counter(row.get("bucket", "") for row in opportunity_rows)
+        timeframe_counts = Counter(row.get("timeframe", "") for row in opportunity_rows)
+        details[strategy_id] = {
+            "summary": {
+                "strategy_id": strategy_id,
+                "strategy_title": card["strategy_title"],
+                "current_status": card["current_status"],
+                "today_opportunity_count": card["today_opportunity_count"],
+                "unique_symbol_count": card["unique_symbol_count"],
+                "today_simulated_pnl": card["simulated_pnl_today"],
+                "positive_opportunity_percent": card["floating_positive_percent"],
+                "top_symbol_today": best_key_by_pnl(symbol_pnl, reverse=True),
+                "worst_symbol_today": best_key_by_pnl(symbol_pnl, reverse=False),
+                "timeframe_breakdown": dict(sorted(timeframe_counts.items())),
+                "bucket_breakdown": dict(sorted(bucket_counts.items())),
+                "historical_return_percent": card["historical_return_percent"],
+                "historical_win_rate_percent": card["historical_win_rate_percent"],
+                "historical_max_drawdown_percent": card["historical_max_drawdown_percent"],
+                "historical_trade_count": card["historical_trade_count"],
+                "historical_profit_factor": card["historical_profit_factor"],
+                "historical_net_profit": card["historical_net_profit"],
+                "historical_final_equity": card["historical_final_equity"],
+                "historical_best_symbol": card["historical_best_symbol"],
+                "historical_worst_symbol": card["historical_worst_symbol"],
+                "historical_best_timeframe": card["historical_best_timeframe"],
+                "historical_worst_timeframe": card["historical_worst_timeframe"],
+                "today_pnl_by_timeframe": {key: money(value) for key, value in sorted(timeframe_pnl.items())},
+                "plain_next_action": card["plain_next_action"],
+                "paper_trial_candidate_now": "false",
+            },
+            "opportunity_rows": opportunity_rows,
+        }
+    return details
+
+
+def aggregate_pnl(rows: list[dict[str, str]], key: str) -> dict[str, Decimal]:
+    totals: dict[str, Decimal] = {}
+    for row in rows:
+        value = row.get(key, "")
+        if not value:
+            continue
+        totals[value] = totals.get(value, ZERO) + money_to_decimal(row.get("simulated_intraday_pnl", ""))
+    return totals
+
+
+def best_key_by_pnl(values: dict[str, Decimal], *, reverse: bool) -> str:
+    if not values:
+        return ""
+    key, value = sorted(values.items(), key=lambda item: item[1], reverse=reverse)[0]
+    return f"{key} ({money(value)})"
+
+
 def build_run_status(config: M1229Config, summary: dict[str, Any], closure_rows: list[dict[str, str]]) -> dict[str, Any]:
     observed_days = 1 if summary["current_day_scan_complete"] else 0
     return {
@@ -491,8 +694,8 @@ def build_run_status(config: M1229Config, summary: dict[str, Any], closure_rows:
         "observed_trading_days": observed_days,
         "required_trading_days": config.min_observation_days_for_trial,
         "ready_for_m11_6_review": observed_days >= config.min_observation_days_for_trial,
-        "daily_realtime_strategy_ids": [row["strategy_id"] for row in closure_rows if row["daily_realtime_test"] == "true"],
-        "observation_strategy_ids": [row["strategy_id"] for row in closure_rows if row["observation_queue"] == "true"],
+        "daily_realtime_strategy_ids": runtime_strategy_ids(closure_rows, "daily_realtime_test"),
+        "observation_strategy_ids": runtime_strategy_ids(closure_rows, "observation_queue"),
         "plain_language_result": "今日扫描已入账，但还没有连续 10 个交易日记录，不能进入模拟交易试运行。",
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -513,7 +716,7 @@ def build_gate_recheck(config: M1229Config, summary: dict[str, Any], run_status:
             if ready else
             "当前已能盘中扫描和看板刷新，但还没满 10 个交易日，暂不能批准模拟交易试运行。"
         ),
-        "candidate_strategy_ids": [row["strategy_id"] for row in closure_rows if row["daily_realtime_test"] == "true"],
+        "candidate_strategy_ids": runtime_strategy_ids(closure_rows, "daily_realtime_test"),
         "blocking_items": [] if ready else ["连续交易日记录不足 10 天", "仍需继续验证每日扫描稳定性"],
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -521,6 +724,13 @@ def build_gate_recheck(config: M1229Config, summary: dict[str, Any], run_status:
         "live_execution": False,
         "paper_trading_approval": ready,
     }
+
+
+def runtime_strategy_ids(closure_rows: list[dict[str, str]], flag: str) -> list[str]:
+    return [
+        row["strategy_id"] for row in closure_rows
+        if row.get(flag) == "true" and not row["strategy_id"].startswith("M12-SRC-")
+    ]
 
 
 def build_report_md(summary: dict[str, Any]) -> str:
@@ -554,10 +764,27 @@ def build_visual_definition_md(rows: list[dict[str, str]]) -> str:
 
 def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
+    shared = dashboard["shared_account_view"]
     cards = "\n".join(
         f"<section class=\"metric\"><span>{html.escape(k)}</span><strong>{html.escape(str(v))}</strong></section>"
         for k, v in metrics.items()
     )
+    account_rows = "\n".join(
+        f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
+        for label, value in [
+            ("初始模拟本金", shared["starting_capital"]),
+            ("当前模拟权益", shared["current_equity"]),
+            ("今日模拟盈亏", shared["day_simulated_pnl"]),
+            ("今日模拟收益率", shared["day_simulated_return_percent"] + "%"),
+            ("今日新机会", shared["today_candidate_count"]),
+            ("浮盈机会", shared["floating_profit_count"]),
+            ("浮亏机会", shared["floating_loss_count"]),
+            ("如果所有机会同时观察的理论风险预算", shared["theoretical_risk_budget_if_all_opportunities_active"]),
+        ]
+    )
+    strategy_scorecard_rows = "\n".join(strategy_scorecard_html(row) for row in dashboard["strategy_scorecard_rows"])
+    pnl_bars = "\n".join(strategy_pnl_bar_html(row) for row in dashboard["strategy_scorecard_rows"])
+    strategy_detail_rows = "\n".join(strategy_detail_summary_html(view["summary"]) for view in dashboard["strategy_detail_views"].values())
     today_rows = "\n".join(trade_row_html(row) for row in dashboard["trade_rows"][:180])
     pa004_rows = "\n".join(trade_row_html(row) for row in dashboard["pa004_long_rows"][:40])
     status_rows = "\n".join(
@@ -580,17 +807,26 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     .metric {{ padding:12px; }} .metric span {{ display:block; color:#667085; font-size:12px; }} .metric strong {{ display:block; margin-top:8px; font-size:22px; }}
     h2 {{ margin:0; padding:14px 16px; font-size:18px; border-bottom:1px solid #d8dee9; }}
     .note {{ padding:12px 16px; color:#667085; line-height:1.6; }}
+    .two-col {{ display:grid; grid-template-columns:minmax(280px,0.9fr) minmax(320px,1.1fr); gap:14px; padding:14px 16px; }}
+    .mini-card {{ border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff; }}
     table {{ width:100%; border-collapse:collapse; font-size:13px; }} th,td {{ padding:9px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }}
     th {{ background:#eef2f7; }} .wrap {{ max-height:520px; overflow:auto; }}
     .good {{ color:#18794e; font-weight:700; }} .bad {{ color:#b42318; font-weight:700; }}
-    @media (max-width:980px) {{ .grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} header {{ display:block; }} }}
+    .bar-row {{ display:grid; grid-template-columns:150px 1fr 86px; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid #eef2f7; font-size:13px; }}
+    .bar-track {{ height:12px; background:#eef2f7; border-radius:999px; overflow:hidden; }}
+    .bar-fill {{ height:12px; min-width:2px; }}
+    .bar-good {{ background:#2f9e6b; }} .bar-bad {{ background:#d92d20; }}
+    @media (max-width:980px) {{ .grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} header,.two-col {{ display:block; }} }}
   </style>
 </head>
 <body>
   <header><div><h1>分钟级只读模拟看板</h1><div>更新时间：{html.escape(dashboard['generated_at'])}</div></div><div>只读行情 + 模拟盈亏，不接真实账户，不做真实买卖</div></header>
   <main>
     <div class="grid">{cards}</div>
-    <section class="panel"><h2>今日新机会、旧观察机会与模拟盈亏</h2><div class="note">报价每 {config.dashboard_refresh_seconds} 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描和旧观察。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
+    <section class="panel"><h2>共享模拟账户</h2><div class="note">{html.escape(shared['plain_language_note'])}</div><div class="two-col"><div class="mini-card"><table><tbody>{account_rows}</tbody></table></div><div class="mini-card"><h2>各策略今日模拟盈亏</h2>{pnl_bars}</div></div></section>
+    <section class="panel"><h2>策略成绩单</h2><div class="note">这里按单策略独立展示，方便判断每条策略自己的历史表现和今日表现；首页共享账户则看所有策略合并后的总效果。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
+    <section class="panel"><h2>单策略下钻</h2><div class="note">这里把每条策略的今日机会、最好/最差股票、周期分布和历史参考指标放在一起；更细的每笔机会保存在 JSON 的 strategy_detail_views 里。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
+    <section class="panel"><h2>今日机会明细</h2><div class="note">报价每 {config.dashboard_refresh_seconds} 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描和旧观察。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
     <section class="panel"><h2>PA004 做多观察</h2><div class="note">只做多版进入观察，不代表自动买卖准入。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{pa004_rows}</tbody></table></div></section>
     <section class="panel"><h2>策略状态</h2><div class="wrap"><table><thead><tr><th>策略</th><th>名称</th><th>状态</th><th>说明</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
   </main>
@@ -601,6 +837,66 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
 
 def table_head() -> str:
     return "<tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>模拟盈亏</th><th>状态</th></tr>"
+
+
+def strategy_scorecard_head() -> str:
+    return "<tr><th>策略</th><th>状态</th><th>今日机会</th><th>今日模拟盈亏</th><th>浮盈占比</th><th>历史收益</th><th>历史胜率</th><th>最大回撤</th><th>盈利因子</th><th>下一步</th></tr>"
+
+
+def strategy_scorecard_html(row: dict[str, str]) -> str:
+    pnl = row["simulated_pnl_today"]
+    cls = "good" if money_to_decimal(pnl) > ZERO else "bad" if money_to_decimal(pnl) < ZERO else ""
+    return (
+        "<tr>"
+        f"<td>{html.escape(row['strategy_id'])}<br><small>{html.escape(row['strategy_title'])}</small></td>"
+        f"<td>{html.escape(row['current_status'])}</td>"
+        f"<td>{html.escape(row['today_opportunity_count'])}</td>"
+        f"<td class=\"{cls}\">{html.escape(pnl)}</td>"
+        f"<td>{html.escape(row['floating_positive_percent'])}%</td>"
+        f"<td>{html.escape(row['historical_return_percent'])}%</td>"
+        f"<td>{html.escape(row['historical_win_rate_percent'])}%</td>"
+        f"<td>{html.escape(row['historical_max_drawdown_percent'])}%</td>"
+        f"<td>{html.escape(row['historical_profit_factor'])}</td>"
+        f"<td>{html.escape(row['plain_next_action'])}</td>"
+        "</tr>"
+    )
+
+
+def strategy_detail_head() -> str:
+    return "<tr><th>策略</th><th>今日机会</th><th>今日模拟盈亏</th><th>最好股票</th><th>最差股票</th><th>周期分布</th><th>历史净利润</th><th>历史最好/最差</th></tr>"
+
+
+def strategy_detail_summary_html(row: dict[str, Any]) -> str:
+    timeframe = "，".join(f"{key}:{value}" for key, value in row["timeframe_breakdown"].items()) or "暂无"
+    historical_edges = (
+        f"最好 {html.escape(row['historical_best_symbol'] or '暂无')} / {html.escape(row['historical_best_timeframe'] or '暂无')}"
+        f"<br>最差 {html.escape(row['historical_worst_symbol'] or '暂无')} / {html.escape(row['historical_worst_timeframe'] or '暂无')}"
+    )
+    return (
+        "<tr>"
+        f"<td>{html.escape(row['strategy_id'])}<br><small>{html.escape(row['strategy_title'])}</small></td>"
+        f"<td>{html.escape(row['today_opportunity_count'])}</td>"
+        f"<td>{html.escape(row['today_simulated_pnl'])}</td>"
+        f"<td>{html.escape(row['top_symbol_today'] or '暂无')}</td>"
+        f"<td>{html.escape(row['worst_symbol_today'] or '暂无')}</td>"
+        f"<td>{html.escape(timeframe)}</td>"
+        f"<td>{html.escape(row['historical_net_profit'])}</td>"
+        f"<td>{historical_edges}</td>"
+        "</tr>"
+    )
+
+
+def strategy_pnl_bar_html(row: dict[str, str]) -> str:
+    pnl = money_to_decimal(row["simulated_pnl_today"])
+    width = min(100, max(4, int(abs(pnl) / Decimal("250")))) if pnl != ZERO else 4
+    cls = "bar-good" if pnl > ZERO else "bar-bad" if pnl < ZERO else ""
+    return (
+        "<div class=\"bar-row\">"
+        f"<div>{html.escape(row['strategy_id'])}</div>"
+        f"<div class=\"bar-track\"><div class=\"bar-fill {cls}\" style=\"width:{width}%\"></div></div>"
+        f"<div>{html.escape(row['simulated_pnl_today'])}</div>"
+        "</div>"
+    )
 
 
 def trade_row_html(row: dict[str, str]) -> str:
@@ -637,8 +933,8 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "```yaml\n"
         "task_id: M12.29-current-day-scan-dashboard\n"
         "role: main-agent\n"
-        "branch_or_worktree: feature/m12-29-current-day-scan-dashboard\n"
-        "objective: 滚动到当前美股交易日重新扫描第一批50只，并生成分钟级只读模拟看板与策略收口产物\n"
+        "branch_or_worktree: feature/m12-32-dashboard-account-views\n"
+        "objective: 滚动到当前美股交易日重新扫描第一批50只，并优化分钟级只读模拟看板的共享账户、单策略成绩单和单策略下钻\n"
         "status: success\n"
         "files_changed:\n"
         "  - config/examples/m12_29_current_day_scan_dashboard.json\n"
@@ -648,10 +944,11 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "  - reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/*\n"
         "interfaces_changed: []\n"
         "commands_run:\n"
-        "  - git push origin main  # failed: GitHub 100MB large-file limit on historical M10.6 ledger\n"
-        "  - python scripts/run_m12_29_current_day_scan_dashboard.py\n"
+        "  - python scripts/run_m12_29_current_day_scan_dashboard.py --no-fetch\n"
         "tests_run:\n"
         "  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py -v\n"
+        "  - python -m unittest discover -s tests/unit -v\n"
+        "  - python -m unittest discover -s tests/reliability -v\n"
         "verification_results:\n"
         f"  - scan_date: {summary['scan_date']}\n"
         f"  - today_candidate_count: {summary['today_candidate_count']}\n"
@@ -659,12 +956,12 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "assumptions:\n"
         "  - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单\n"
         "risks:\n"
-        "  - 远端推送被历史大文件阻塞，需要单独做 Git 历史/LFS 清理方案\n"
+        "  - 看板仍是只读行情和模拟盈亏，连续交易日样本仍只有 1/10\n"
         "qa_focus:\n"
         "  - 检查候选日期是否等于当前美股交易日，检查看板中文和只读边界\n"
         "rollback_notes:\n"
         "  - 回滚本阶段提交即可撤回 M12.29-M11.6 产物\n"
-        "next_recommended_action: 继续累计10个真实交易日的只读模拟看板记录\n"
+        "next_recommended_action: 继续累计10个真实交易日的只读模拟看板记录，并在看板稳定后做模拟交易试运行准入复查\n"
         "needs_user_decision: false\n"
         "user_decision_needed: ''\n"
         "```\n"

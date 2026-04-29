@@ -3,7 +3,7 @@
     "M10-PA-004 缺宽通道边界、触边、反转确认、通道失效标签。",
     "M10-PA-007 缺第一腿、第二腿、对侧失败点、陷阱确认标签。"
   ],
-  "generated_at": "2026-04-29T02:44:53Z",
+  "generated_at": "2026-04-29T04:28:06Z",
   "needs_user_review_count": 10,
   "packet_title": "M10-PA-008/009 图形确认包",
   "paper_gate_evidence_now": false,
