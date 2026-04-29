@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-29T02:44:53Z",
+  "generated_at": "2026-04-29T04:28:06Z",
   "schema_version": "m12.12.first50-universe.v1",
   "selection_rule": "M12.5 static seed order first 50; not a live liquidity ranking.",
   "stage": "M12.12.daily_observation_loop",
