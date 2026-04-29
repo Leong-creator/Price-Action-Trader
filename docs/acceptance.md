@@ -1318,6 +1318,18 @@
   - `pa004_long_observation.lookback_days` 必须实际过滤 PA004 观察样本，不得成为死配置。
   - 必须输出 `m12_28_session_dashboard_data.json`、`m12_28_session_quote_manifest.json`、`m12_28_session_trade_view.csv`、`m12_28_pa004_long_observation.csv`、`m12_28_trading_session_dashboard.html`、`m12_28_session_report.md` 与 `m12_28_handoff.md`。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`。
+- M12.29 Current-day Scan + Minute Read-only Dashboard 必须满足：
+  - 必须使用独立分支 `feature/m12-29-current-day-scan-dashboard`，从已合并 M12.28 的 `main` 切出。
+  - 必须先尝试保存并推送当前 `main`；若远端因历史大文件拒绝推送，必须记录失败原因，不得伪造“已推送”。
+  - 必须把 M12.12 的扫描日期滚动到当前美股交易日，重新生成第一批 `50` 只股票的今日候选，不得继续把旧候选伪装成今日机会。
+  - 必须输出候选日期、报价日期、今日新机会数、旧观察机会数和 PA004 做多观察数；若候选日期与报价日期不一致，必须首页级提示。
+  - 必须把 M10 16 条、`M12-FTD-001` 与 6 条来源回看候选合并到一张中文策略收口表，每条策略只能有一个最终状态。
+  - 必须明确：`M10-PA-001/002/012/M12-FTD-001` 进入每日实时只读测试；`M10-PA-004` 只保留做多观察；`M10-PA-007/008/009` 观察；辅助/过滤器/研究项不得伪装为独立触发策略。
+  - 必须生成中文分钟级只读模拟看板，首页优先展示今日新机会、盘中模拟盈亏、模拟收益率、浮盈机会占比、最大回撤参考和策略状态。
+  - 看板刷新间隔默认 `60` 秒；报价可以分钟级刷新，策略信号必须按对应 K 线收盘确认。
+  - M11.6 准入复查必须用人话说明是否批准模拟交易试运行；未满连续 `10` 个交易日时不得批准，但也不得把“未批准”写成策略失败。
+  - 必须输出 `m12_29_current_day_scan_summary.json`、`m12_29_today_candidates.csv/jsonl`、`m12_29_trade_view.csv`、`m12_30_strategy_closure_matrix.json/csv/md`、`m12_31_visual_definition_final_review.json/md`、`m12_32_minute_readonly_dashboard_data.json/html`、`m12_33_observation_run_status.json/md`、`m11_6_paper_trial_gate_recheck.json/md`、`m12_29_current_day_scan_report.md` 与 `m12_29_handoff.md`。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`，不得出现真实账户、真实订单、真实持仓或真实资金语义。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

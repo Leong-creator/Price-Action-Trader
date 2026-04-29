@@ -1,0 +1,15 @@
+{
+  "candidate_count": 122,
+  "deferred": [],
+  "deferred_count": 0,
+  "generated_at": "2026-04-29T02:44:53Z",
+  "observation_event_count": 550,
+  "schema_version": "m12.12.daily-observation-summary.v1",
+  "stage": "M12.12.daily_observation_loop",
+  "strategy_scope": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M12-FTD-001"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "entry": "上涨时观察突破信号K高点；下跌时观察跌破信号K低点。",
+  "not_source_of_truth": [
+    "M12-BENCH-001",
+    "early screenshot placeholder",
+    "wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md"
+  ],
+  "paper_gate_evidence_now": false,
+  "paper_simulated_only": true,
+  "plain_language_rule": "先判断日线处在明显上涨或下跌节奏，再要求当天K线本身也顺着这个方向收得足够强；只在下一根日线确认时模拟观察。",
+  "schema_version": "m12.12.formal-daily-strategy-spec.v1",
+  "skip": [
+    "日线背景不清楚",
+    "信号K实体太弱",
+    "信号K方向与市场周期相反",
+    "风险距离为零或数据不足"
+  ],
+  "source_refs": [
+    "wiki:knowledge/wiki/sources/fangfangtu-market-cycle-note.md",
+    "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+    "wiki:knowledge/wiki/sources/fangfangtu-signal-bar-entry-note.md",
+    "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf"
+  ],
+  "stage": "M12.12.daily_observation_loop",
+  "stop": "使用信号K另一端作为模拟止损。",
+  "strategy_id": "M12-FTD-001",
+  "target": "默认观察 2R 目标。",
+  "title": "方方土日线趋势顺势信号K"
+}
