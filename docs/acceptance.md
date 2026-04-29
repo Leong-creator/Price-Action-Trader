@@ -1333,6 +1333,16 @@
   - M11.6 准入复查必须用人话说明是否批准模拟交易试运行；未满连续 `10` 个交易日时不得批准，但也不得把“未批准”写成策略失败。
   - 必须输出 `m12_29_current_day_scan_summary.json`、`m12_29_today_candidates.csv/jsonl`、`m12_29_trade_view.csv`、`m12_30_strategy_closure_matrix.json/csv/md`、`m12_31_visual_definition_final_review.json/md`、`m12_32_minute_readonly_dashboard_data.json/html`、`m12_33_observation_run_status.json/md`、`m11_6_paper_trial_gate_recheck.json/md`、`m12_29_current_day_scan_report.md` 与 `m12_29_handoff.md`。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`，不得出现真实账户、真实订单、真实持仓或真实资金语义。
+- M12.34-M12.39 Intraday Observer Dashboard 必须满足：
+  - 必须使用独立分支 `feature/m12-34-39-intraday-observer-dashboard`，从已合并 M12.32/M12.33 的 `main` 切出。
+  - 观察策略必须进入每日只读测试 lane；`M10-PA-004` 只能以做多观察版参与，`M10-PA-007/008/009` 必须输出当日触发或无触发结果，不得只挂“观察中”空状态。
+  - 看板必须提供 `timeframe_views`，并按 `1d / 1h / 15m / 5m` 分组展示机会数、模拟盈亏、胜率/浮盈占比、回撤参考、命中策略和交易明细。
+  - `M12-FTD-001` 必须有独立重点监控卡，展示历史收益、历史胜率、历史最大回撤、今日触发股票、今日模拟盈亏、连续亏损参考和风险标记。
+  - 自动运行器必须支持单次刷新与美股常规交易时段 60 秒循环刷新；信号更新必须遵守对应 K 线收盘确认语义，不能用未收盘波动生成正式信号。
+  - Codex 观察员必须输出中文人话摘要，至少包括当前模拟权益、今日模拟盈亏、今日机会、活跃周期、FTD001 风险、数据缺失或时间戳异常提醒。
+  - 必须输出 `m12_34_observation_test_lane.json/csv/md`、`m12_35_timeframe_readonly_dashboard_data.json`、`m12_35_timeframe_views.json/md`、`m12_36_ftd001_monitor.json/md`、`m12_37_auto_runner_manifest.json`、`m12_38_codex_observer_latest.json`、`m12_38_codex_observer_inbox.jsonl`。
+  - systemd/cron 只能作为示例配置或显式启用步骤，不得偷偷启动真实交易或长期后台下单路径。
+  - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`，不得出现真实账户、真实订单、真实持仓或真实资金语义。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。

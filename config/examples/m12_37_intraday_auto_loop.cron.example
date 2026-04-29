@@ -1,0 +1,5 @@
+# M12.37 readonly simulated intraday refresh example.
+# This only refreshes readonly market data, simulated opportunities and Codex observer inbox.
+# It does not connect to a real account and does not place real trades.
+* * * * 1-5 cd /home/hgl/projects/Price-Action-Trader && python scripts/run_m12_37_intraday_auto_loop.py --once --config config/examples/m12_37_intraday_auto_loop.json >> reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_37_auto_runner.log 2>&1
+

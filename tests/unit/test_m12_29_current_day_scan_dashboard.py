@@ -72,11 +72,16 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("共享模拟账户", html)
         self.assertIn("策略成绩单", html)
         self.assertIn("单策略下钻", html)
+        self.assertIn("按周期分组测试", html)
+        self.assertIn("FTD001 重点观察", html)
         self.assertIn("今日机会明细", html)
         self.assertIn("最大回撤参考", html)
         self.assertIn("不接真实账户", html)
+        self.assertIn("M12.35 分钟级只读模拟看板", html)
+        self.assertNotIn("<h2>PA004 做多观察</h2>", html)
         self.assertEqual(dashboard["refresh_seconds"], 60)
         self.assertEqual(dashboard["dashboard_layout"]["home"], "共享模拟账户总览")
+        self.assertEqual(dashboard["dashboard_layout"]["timeframe_views"], "按周期分组测试")
         self.assertIn("shared_account_view", dashboard)
         self.assertEqual(dashboard["shared_account_view"]["starting_capital"], "100000.00")
         self.assertTrue(dashboard["shared_account_view"]["account_purpose"].startswith("像一个真实模拟账户一样"))
@@ -93,6 +98,12 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(by_strategy["M10-PA-004"]["historical_return_percent"], "0.5530")
         self.assertEqual(by_strategy["M10-PA-007"]["historical_return_percent"], "0.6473")
         self.assertEqual(by_strategy["M12-FTD-001"]["historical_return_percent"], "610.44")
+        self.assertIn("observation_test_lane", dashboard)
+        observation_rows = {row["strategy_id"]: row for row in dashboard["observation_test_lane"]["rows"]}
+        self.assertEqual(set(observation_rows), {"M10-PA-004", "M10-PA-007", "M10-PA-008", "M10-PA-009"})
+        self.assertEqual(observation_rows["M10-PA-004"]["test_lane"], "低准入每日观察测试")
+        self.assertIn("今日有触发", observation_rows["M10-PA-004"]["daily_result_plain"])
+        self.assertIn("今日没有触发", observation_rows["M10-PA-007"]["daily_result_plain"])
         for key in ["historical_profit_factor", "historical_net_profit", "historical_final_equity", "historical_best_symbol", "historical_worst_symbol"]:
             self.assertIn(key, by_strategy["M10-PA-001"])
         self.assertFalse(dashboard["trading_connection"])
@@ -104,6 +115,46 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(gate["candidate_strategy_ids"], list(MAINLINE_STRATEGIES))
         self.assertEqual(result["run_status"]["daily_realtime_strategy_ids"], list(MAINLINE_STRATEGIES))
         self.assertFalse(any(strategy_id.startswith("M12-SRC-") for strategy_id in gate["candidate_strategy_ids"]))
+
+    def test_timeframe_views_and_ftd_monitor_are_written(self):
+        _, result, output_dir = self.run_stage()
+        dashboard = result["dashboard"]
+        self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "1h", "15m", "5m"])
+        views = dashboard["timeframe_views"]["views"]
+        self.assertEqual(set(views), {"1d", "1h", "15m", "5m"})
+        self.assertGreater(views["1d"]["opportunity_count"], 0)
+        self.assertIn("M12-FTD-001", views["1d"]["active_strategy_ids"])
+        for timeframe in ["1h", "15m", "5m"]:
+            self.assertNotIn("M12-FTD-001", views[timeframe]["active_strategy_ids"])
+        self.assertEqual(views["1d"]["observation_opportunity_count"], len(dashboard["pa004_long_rows"]))
+        monitor = dashboard["ftd001_monitor"]
+        self.assertEqual(monitor["strategy_id"], "M12-FTD-001")
+        self.assertEqual(monitor["historical_return_percent"], "610.44")
+        self.assertEqual(monitor["historical_win_rate_percent"], "37.36")
+        self.assertEqual(monitor["historical_max_drawdown_percent"], "48.38")
+        self.assertEqual(monitor["today_timeframes"], ["1d"])
+        self.assertIn("历史最大回撤高", monitor["risk_flags"])
+        self.assertIn("FTD001", monitor["plain_language_summary"])
+        self.assertTrue((output_dir / "m12_35_timeframe_views.json").exists())
+        self.assertTrue((output_dir / "m12_35_timeframe_readonly_dashboard_data.json").exists())
+        self.assertTrue((output_dir / "m12_36_ftd001_monitor.json").exists())
+
+    def test_codex_observer_inbox_is_human_readable(self):
+        _, result, output_dir = self.run_stage()
+        observer = result["dashboard"]["codex_observer"]
+        self.assertEqual(observer["schema_version"], "m12.38.codex-observer.v1")
+        self.assertEqual(observer["observer_interval_minutes"], 15)
+        self.assertIn("当前模拟权益", observer["plain_language_summary"])
+        self.assertIn("FTD001", observer["recommended_codex_message"])
+        self.assertFalse(observer["trading_connection"])
+        self.assertFalse(observer["real_money_actions"])
+        latest = output_dir / "m12_38_codex_observer_latest.json"
+        inbox = output_dir / "m12_38_codex_observer_inbox.jsonl"
+        self.assertTrue(latest.exists())
+        self.assertTrue(inbox.exists())
+        lines = [line for line in inbox.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertGreaterEqual(len(lines), 1)
+        self.assertIn("FTD001", lines[-1])
 
     def test_dashboard_account_strategy_and_detail_views_are_consistent(self):
         _, result, output_dir = self.run_stage()
@@ -120,6 +171,10 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(
             summary["visible_opportunity_count"],
             len(dashboard["trade_rows"]) + len(dashboard["pa004_long_rows"]),
+        )
+        self.assertEqual(
+            summary["visible_opportunity_count"],
+            sum(view["opportunity_count"] for view in dashboard["timeframe_views"]["views"].values()),
         )
         detail_views = dashboard["strategy_detail_views"]
         self.assertEqual(set(detail_views), {row["strategy_id"] for row in scorecards})
