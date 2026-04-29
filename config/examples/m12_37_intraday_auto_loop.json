@@ -1,0 +1,27 @@
+{
+  "title": "M12.37 自动盘中只读模拟运行器",
+  "run_id": "m12_37_intraday_auto_loop",
+  "stage": "M12.37.intraday_auto_loop",
+  "source_m12_29_config_path": "config/examples/m12_29_current_day_scan_dashboard.json",
+  "refresh_seconds": 60,
+  "observer_interval_minutes": 15,
+  "market_timezone": "America/New_York",
+  "timeframe_signal_close_rules": {
+    "1d": "美股收盘后更新正式信号",
+    "1h": "每根 1h K 线收盘后更新正式信号",
+    "15m": "每根 15m K 线收盘后更新正式信号",
+    "5m": "每根 5m K 线收盘后更新正式信号"
+  },
+  "codex_observer": {
+    "enabled": true,
+    "mode": "heartbeat_or_file_inbox",
+    "inbox_file": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_38_codex_observer_inbox.jsonl"
+  },
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

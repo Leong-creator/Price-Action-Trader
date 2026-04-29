@@ -40,6 +40,13 @@ DEFAULT_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
 MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001")
 OBSERVATION_STRATEGIES = ("M10-PA-004-long", "M10-PA-007", "M10-PA-008", "M10-PA-009")
+TIMEFRAME_ORDER = ("1d", "1h", "15m", "5m")
+TIMEFRAME_LABELS = {
+    "1d": "1d 日线测试",
+    "1h": "1h 小时线测试",
+    "15m": "15m 十五分钟测试",
+    "5m": "5m 五分钟测试",
+}
 FORBIDDEN_OUTPUT_TEXT = (
     "PA-SC-",
     "SF-",
@@ -198,8 +205,18 @@ def run_m12_29_current_day_scan_dashboard(
     write_json(config.output_dir / "m12_31_visual_definition_final_review.json", {"schema_version": "m12.31.visual-definition-final.v1", "stage": "M12.31.visual_definition_final", "rows": visual_rows})
     (config.output_dir / "m12_31_visual_definition_final_review.md").write_text(build_visual_definition_md(visual_rows), encoding="utf-8")
     write_json(config.output_dir / "m12_32_minute_readonly_dashboard_data.json", dashboard)
+    write_json(config.output_dir / "m12_35_timeframe_readonly_dashboard_data.json", dashboard)
     write_csv(config.output_dir / "m12_32_strategy_scorecard.csv", dashboard["strategy_scorecard_rows"])
     (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(build_dashboard_html(config, dashboard), encoding="utf-8")
+    write_json(config.output_dir / "m12_34_observation_test_lane.json", dashboard["observation_test_lane"])
+    write_csv(config.output_dir / "m12_34_observation_strategy_rows.csv", dashboard["observation_test_lane"]["rows"])
+    (config.output_dir / "m12_34_observation_test_lane.md").write_text(build_observation_test_lane_md(dashboard["observation_test_lane"]), encoding="utf-8")
+    write_json(config.output_dir / "m12_35_timeframe_views.json", dashboard["timeframe_views"])
+    (config.output_dir / "m12_35_timeframe_dashboard.md").write_text(build_timeframe_views_md(dashboard["timeframe_views"]), encoding="utf-8")
+    write_json(config.output_dir / "m12_36_ftd001_monitor.json", dashboard["ftd001_monitor"])
+    (config.output_dir / "m12_36_ftd001_monitor.md").write_text(build_ftd001_monitor_md(dashboard["ftd001_monitor"]), encoding="utf-8")
+    write_json(config.output_dir / "m12_38_codex_observer_latest.json", dashboard["codex_observer"])
+    append_jsonl(config.output_dir / "m12_38_codex_observer_inbox.jsonl", dashboard["codex_observer"])
     write_json(config.output_dir / "m12_33_observation_run_status.json", run_status)
     (config.output_dir / "m12_33_observation_run_status.md").write_text(build_run_status_md(run_status), encoding="utf-8")
     write_json(config.output_dir / "m11_6_paper_trial_gate_recheck.json", gate)
@@ -500,9 +517,13 @@ def build_dashboard_payload(config: M1229Config, generated_at: str, summary: dic
     strategy_scorecards = build_strategy_scorecards(all_rows, closure_rows)
     shared_account = build_shared_account_view(summary, all_rows, strategy_scorecards)
     strategy_detail_views = build_strategy_detail_views(all_rows, strategy_scorecards)
+    observation_test_lane = build_observation_test_lane(strategy_scorecards, strategy_detail_views)
+    timeframe_views = build_timeframe_views(all_rows, strategy_scorecards)
+    ftd001_monitor = build_ftd001_monitor(strategy_scorecards, strategy_detail_views)
+    codex_observer = build_codex_observer(config, summary, shared_account, timeframe_views, ftd001_monitor, observation_test_lane)
     return {
-        "schema_version": "m12.32.minute-readonly-dashboard.v1",
-        "stage": "M12.32.minute_readonly_dashboard",
+        "schema_version": "m12.35.timeframe-readonly-dashboard.v1",
+        "stage": "M12.35.timeframe_readonly_dashboard",
         "generated_at": generated_at,
         "title": "分钟级只读模拟看板",
         "refresh_seconds": config.dashboard_refresh_seconds,
@@ -514,9 +535,12 @@ def build_dashboard_payload(config: M1229Config, generated_at: str, summary: dic
             "浮盈机会占比": summary["positive_opportunity_percent"],
             "最大回撤参考": dashboard_drawdown_reference(closure_rows),
             "策略可用数": shared_account["strategy_count_daily_test"],
+            "FTD001 状态": ftd001_monitor["current_plain_status"],
         },
         "dashboard_layout": {
             "home": "共享模拟账户总览",
+            "timeframe_views": "按周期分组测试",
+            "ftd001_focus": "FTD001 重点观察",
             "strategy_scorecard": "单策略独立成绩",
             "today_trade_view": "今日机会明细",
             "single_strategy_detail": "单策略复盘入口",
@@ -524,6 +548,10 @@ def build_dashboard_payload(config: M1229Config, generated_at: str, summary: dic
         "shared_account_view": shared_account,
         "strategy_scorecard_rows": strategy_scorecards,
         "strategy_detail_views": strategy_detail_views,
+        "observation_test_lane": observation_test_lane,
+        "timeframe_views": timeframe_views,
+        "ftd001_monitor": ftd001_monitor,
+        "codex_observer": codex_observer,
         "summary": summary,
         "trade_rows": trade_rows,
         "pa004_long_rows": pa004_rows,
@@ -669,6 +697,264 @@ def build_strategy_detail_views(rows: list[dict[str, str]], scorecards: list[dic
     return details
 
 
+def build_observation_test_lane(scorecards: list[dict[str, str]], detail_views: dict[str, Any]) -> dict[str, Any]:
+    rows: list[dict[str, str]] = []
+    for card in scorecards:
+        if card["current_status"] != "观察":
+            continue
+        detail = detail_views.get(card["strategy_id"], {})
+        events = detail.get("opportunity_rows", [])
+        has_event = len(events) > 0
+        rows.append(
+            {
+                "strategy_id": card["strategy_id"],
+                "strategy_title": card["strategy_title"],
+                "test_lane": "低准入每日观察测试",
+                "today_opportunity_count": card["today_opportunity_count"],
+                "unique_symbol_count": card["unique_symbol_count"],
+                "today_simulated_pnl": card["simulated_pnl_today"],
+                "positive_opportunity_percent": card["floating_positive_percent"],
+                "historical_return_percent": card["historical_return_percent"],
+                "historical_win_rate_percent": card["historical_win_rate_percent"],
+                "historical_max_drawdown_percent": card["historical_max_drawdown_percent"],
+                "timeframes_today": ", ".join(sorted({row.get("timeframe", "") for row in events if row.get("timeframe")})),
+                "symbols_today": card["top_symbols"],
+                "daily_result_plain": (
+                    "今日有触发，已进入只读模拟盈亏统计。"
+                    if has_event else
+                    "今日没有触发，这也是观察结果；继续等待符合定义的机会。"
+                ),
+                "upgrade_or_downgrade_hint": observation_hint(card, has_event),
+                "paper_trial_candidate_now": "false",
+            }
+        )
+    return {
+        "schema_version": "m12.34.observation-test-lane.v1",
+        "stage": "M12.34.observation_strategy_test_lane",
+        "plain_language_result": "观察策略已进入每日只读测试链路；没有触发时也记录为当日观察结果，不再只是挂状态。",
+        "rows": rows,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def observation_hint(card: dict[str, str], has_event: bool) -> str:
+    if card["strategy_id"] == "M10-PA-004":
+        return "只做多版继续观察；做空版暂停，不单独展示成一条割裂策略。"
+    if not has_event:
+        return "继续自动观察，等真实触发样本积累后再决定升级或降级。"
+    pnl = money_to_decimal(card["simulated_pnl_today"])
+    if pnl > ZERO:
+        return "今日样本暂时为正，继续观察，不直接升级。"
+    if pnl < ZERO:
+        return "今日样本暂时为负，继续看是否连续偏弱。"
+    return "今日触发但盈亏接近持平，继续观察。"
+
+
+def build_timeframe_views(rows: list[dict[str, str]], scorecards: list[dict[str, str]]) -> dict[str, Any]:
+    status_by_strategy = {card["strategy_id"]: card["current_status"] for card in scorecards}
+    title_by_strategy = {card["strategy_id"]: card["strategy_title"] for card in scorecards}
+    views: dict[str, Any] = {}
+    for timeframe in TIMEFRAME_ORDER:
+        tf_rows = [row for row in rows if row.get("timeframe") == timeframe]
+        strategy_ids = sorted({row["strategy_id"] for row in tf_rows})
+        mainline_rows = [row for row in tf_rows if status_by_strategy.get(row["strategy_id"]) == "每日测试"]
+        observation_rows = [row for row in tf_rows if status_by_strategy.get(row["strategy_id"]) == "观察"]
+        pnl = sum((money_to_decimal(row.get("simulated_intraday_pnl", "")) for row in tf_rows), ZERO)
+        symbol_counts = Counter(row["symbol"] for row in tf_rows)
+        strategy_rows: list[dict[str, str]] = []
+        for strategy_id in strategy_ids:
+            strategy_tf_rows = [row for row in tf_rows if row["strategy_id"] == strategy_id]
+            strategy_pnl = sum((money_to_decimal(row.get("simulated_intraday_pnl", "")) for row in strategy_tf_rows), ZERO)
+            strategy_rows.append(
+                {
+                    "strategy_id": strategy_id,
+                    "strategy_title": title_by_strategy.get(strategy_id, strategy_id),
+                    "status": status_by_strategy.get(strategy_id, ""),
+                    "opportunity_count": str(len(strategy_tf_rows)),
+                    "simulated_pnl": money(strategy_pnl),
+                    "positive_opportunity_percent": positive_percent(strategy_tf_rows),
+                    "symbols": ", ".join(sorted({row["symbol"] for row in strategy_tf_rows})[:12]),
+                }
+            )
+        views[timeframe] = {
+            "timeframe": timeframe,
+            "display_name": TIMEFRAME_LABELS[timeframe],
+            "opportunity_count": len(tf_rows),
+            "mainline_opportunity_count": len(mainline_rows),
+            "observation_opportunity_count": len(observation_rows),
+            "simulated_pnl": money(pnl),
+            "simulated_return_percent": pct(pnl / DEFAULT_EQUITY * HUNDRED),
+            "positive_opportunity_percent": positive_percent(tf_rows),
+            "strategy_count": len(strategy_ids),
+            "top_symbols": [symbol for symbol, _ in symbol_counts.most_common(12)],
+            "active_strategy_ids": strategy_ids,
+            "strategy_rows": strategy_rows,
+            "opportunity_rows": tf_rows,
+            "plain_language_note": timeframe_note(timeframe, tf_rows),
+        }
+    return {
+        "schema_version": "m12.35.timeframe-views.v1",
+        "stage": "M12.35.timeframe_grouped_dashboard",
+        "timeframe_order": list(TIMEFRAME_ORDER),
+        "views": views,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def timeframe_note(timeframe: str, rows: list[dict[str, str]]) -> str:
+    if timeframe == "1d":
+        return "日线只在收盘后确认新信号；盘中只更新当前价和模拟盈亏。"
+    if timeframe in {"1h", "15m", "5m"}:
+        return f"{TIMEFRAME_LABELS[timeframe]}只在对应 K 线收盘后更新正式信号，盘中波动不当作新信号。"
+    return "按对应周期收盘确认。"
+
+
+def build_ftd001_monitor(scorecards: list[dict[str, str]], detail_views: dict[str, Any]) -> dict[str, Any]:
+    card = next((row for row in scorecards if row["strategy_id"] == "M12-FTD-001"), None)
+    detail = detail_views.get("M12-FTD-001", {})
+    rows = detail.get("opportunity_rows", [])
+    today_pnl = money_to_decimal(card["simulated_pnl_today"]) if card else ZERO
+    historical_drawdown = decimal_or_none(card.get("historical_max_drawdown_percent", "")) if card else None
+    historical_profit_factor = decimal_or_none(card.get("historical_profit_factor", "")) if card else None
+    risk_flags: list[str] = []
+    if historical_drawdown is not None and historical_drawdown >= Decimal("40"):
+        risk_flags.append("历史最大回撤高")
+    if historical_profit_factor is not None and historical_profit_factor <= Decimal("1.10"):
+        risk_flags.append("盈利因子偏薄")
+    if today_pnl < ZERO:
+        risk_flags.append("今日暂时亏损")
+    if len(rows) > 10:
+        risk_flags.append("触发过密")
+    if len({row["symbol"] for row in rows}) <= 2 and rows:
+        risk_flags.append("信号集中度偏高")
+    if not risk_flags:
+        risk_flags.append("继续观察")
+    return {
+        "schema_version": "m12.36.ftd001-monitor.v1",
+        "stage": "M12.36.ftd001_focus_monitor",
+        "strategy_id": "M12-FTD-001",
+        "strategy_title": card["strategy_title"] if card else "方方土日线趋势顺势信号K",
+        "current_status": card["current_status"] if card else "每日测试",
+        "historical_return_percent": card["historical_return_percent"] if card else "",
+        "historical_win_rate_percent": card["historical_win_rate_percent"] if card else "",
+        "historical_max_drawdown_percent": card["historical_max_drawdown_percent"] if card else "",
+        "historical_profit_factor": card["historical_profit_factor"] if card else "",
+        "today_opportunity_count": len(rows),
+        "today_symbols": sorted({row["symbol"] for row in rows}),
+        "today_timeframes": sorted({row["timeframe"] for row in rows}),
+        "today_simulated_pnl": money(today_pnl),
+        "today_positive_opportunity_percent": positive_percent(rows),
+        "current_consecutive_loss_proxy": consecutive_loss_proxy(rows),
+        "risk_flags": risk_flags,
+        "drawdown_watch": "true" if "历史最大回撤高" in risk_flags else "false",
+        "current_plain_status": f"FTD001：{risk_flags[0]}",
+        "plain_language_summary": build_ftd_plain_summary(card, rows, today_pnl, risk_flags),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def consecutive_loss_proxy(rows: list[dict[str, str]]) -> int:
+    streak = 0
+    for row in sorted(rows, key=lambda item: item.get("signal_time", ""), reverse=True):
+        if money_to_decimal(row.get("simulated_intraday_pnl", "")) < ZERO:
+            streak += 1
+            continue
+        break
+    return streak
+
+
+def build_ftd_plain_summary(card: dict[str, str] | None, rows: list[dict[str, str]], today_pnl: Decimal, risk_flags: list[str]) -> str:
+    if card is None:
+        return "FTD001 暂无成绩卡，不能解读。"
+    direction = "盈利" if today_pnl > ZERO else "亏损" if today_pnl < ZERO else "持平"
+    symbols = ", ".join(sorted({row["symbol"] for row in rows})[:8]) or "暂无"
+    return (
+        f"FTD001 历史收益 {card['historical_return_percent']}%，胜率 {card['historical_win_rate_percent']}%，"
+        f"最大回撤 {card['historical_max_drawdown_percent']}%。今天触发 {len(rows)} 条，股票：{symbols}，"
+        f"当前模拟{direction} {money(today_pnl)}。重点风险：{'，'.join(risk_flags)}。"
+    )
+
+
+def build_codex_observer(
+    config: M1229Config,
+    summary: dict[str, Any],
+    shared_account: dict[str, Any],
+    timeframe_views: dict[str, Any],
+    ftd001_monitor: dict[str, Any],
+    observation_test_lane: dict[str, Any],
+) -> dict[str, Any]:
+    active_timeframes = [
+        view["display_name"] for view in timeframe_views["views"].values()
+        if view["opportunity_count"] > 0
+    ]
+    alerts = observer_alerts(summary, shared_account, ftd001_monitor, observation_test_lane)
+    plain_summary = (
+        f"当前模拟权益 {shared_account['current_equity']}，今日模拟盈亏 {shared_account['day_simulated_pnl']}，"
+        f"今日机会 {shared_account['visible_opportunity_count']} 条。活跃周期：{', '.join(active_timeframes) or '暂无'}。"
+        f"{ftd001_monitor['plain_language_summary']}"
+    )
+    return {
+        "schema_version": "m12.38.codex-observer.v1",
+        "stage": "M12.38.codex_observer",
+        "generated_at": summary["generated_at"],
+        "observer_mode": "codex_heartbeat_or_file_inbox",
+        "observer_interval_minutes": 15,
+        "dashboard_refresh_seconds": config.dashboard_refresh_seconds,
+        "market_session": summary["market_session"],
+        "plain_language_summary": plain_summary,
+        "active_timeframes": active_timeframes,
+        "alerts": alerts,
+        "recommended_codex_message": build_recommended_codex_message(summary, shared_account, ftd001_monitor, alerts),
+        "latest_dashboard_json": project_path(config.output_dir / "m12_32_minute_readonly_dashboard_data.json"),
+        "latest_dashboard_html": project_path(config.output_dir / "m12_32_minute_readonly_dashboard.html"),
+        "observer_inbox": project_path(config.output_dir / "m12_38_codex_observer_inbox.jsonl"),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def observer_alerts(summary: dict[str, Any], shared_account: dict[str, Any], ftd001_monitor: dict[str, Any], observation_test_lane: dict[str, Any]) -> list[dict[str, str]]:
+    alerts: list[dict[str, str]] = []
+    if money_to_decimal(shared_account["day_simulated_pnl"]) < ZERO:
+        alerts.append({"level": "注意", "message": "今日总模拟盈亏暂时为负，需要看是否集中在单一策略或周期。"})
+    if ftd001_monitor["risk_flags"] and ftd001_monitor["risk_flags"] != ["继续观察"]:
+        alerts.append({"level": "重点", "message": "FTD001 触发风险观察：" + "，".join(ftd001_monitor["risk_flags"])})
+    if summary["candidate_date_warning"]:
+        alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
+    if not summary["current_day_scan_complete"]:
+        alerts.append({"level": "数据", "message": "第一批 50 只股票当日数据未全部可用。"})
+    observed_with_events = [row["strategy_id"] for row in observation_test_lane["rows"] if row["today_opportunity_count"] != "0"]
+    if observed_with_events:
+        alerts.append({"level": "观察策略", "message": "观察策略今日已有触发：" + "，".join(observed_with_events)})
+    if not alerts:
+        alerts.append({"level": "正常", "message": "当前没有明显数据异常或重点风险。"})
+    return alerts
+
+
+def build_recommended_codex_message(summary: dict[str, Any], shared_account: dict[str, Any], ftd001_monitor: dict[str, Any], alerts: list[dict[str, str]]) -> str:
+    alert_text = "；".join(f"{row['level']}：{row['message']}" for row in alerts)
+    return (
+        f"盘中观察：市场状态 {summary['market_session']['status']}，今日机会 {shared_account['visible_opportunity_count']} 条，"
+        f"今日模拟盈亏 {shared_account['day_simulated_pnl']}，当前模拟权益 {shared_account['current_equity']}。"
+        f"{ftd001_monitor['plain_language_summary']} 当前提醒：{alert_text}"
+    )
+
+
 def aggregate_pnl(rows: list[dict[str, str]], key: str) -> dict[str, Decimal]:
     totals: dict[str, Decimal] = {}
     for row in rows:
@@ -762,9 +1048,66 @@ def build_visual_definition_md(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def build_observation_test_lane_md(lane: dict[str, Any]) -> str:
+    lines = [
+        "# M12.34 观察策略每日测试",
+        "",
+        "## 用人话结论",
+        "",
+        f"- {lane['plain_language_result']}",
+        "- 观察策略不是空挂状态；当天没有触发，也会记录为“没有符合条件的机会”。",
+        "",
+        "| 策略 | 今日机会 | 今日模拟盈亏 | 浮盈占比 | 说明 | 下一步 |",
+        "|---|---:|---:|---:|---|---|",
+    ]
+    for row in lane["rows"]:
+        lines.append(
+            f"| {row['strategy_id']} {row['strategy_title']} | {row['today_opportunity_count']} | {row['today_simulated_pnl']} | {row['positive_opportunity_percent']}% | {row['daily_result_plain']} | {row['upgrade_or_downgrade_hint']} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def build_timeframe_views_md(timeframe_views: dict[str, Any]) -> str:
+    lines = [
+        "# M12.35 按周期分组看板",
+        "",
+        "| 周期 | 今日机会 | 主线机会 | 观察机会 | 模拟盈亏 | 浮盈占比 | 命中策略 |",
+        "|---|---:|---:|---:|---:|---:|---|",
+    ]
+    for timeframe in timeframe_views["timeframe_order"]:
+        view = timeframe_views["views"][timeframe]
+        lines.append(
+            f"| {view['display_name']} | {view['opportunity_count']} | {view['mainline_opportunity_count']} | {view['observation_opportunity_count']} | {view['simulated_pnl']} | {view['positive_opportunity_percent']}% | {', '.join(view['active_strategy_ids']) or '暂无'} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
+    lines = [
+        "# M12.36 FTD001 重点监控",
+        "",
+        "## 用人话结论",
+        "",
+        f"- {monitor['plain_language_summary']}",
+        "",
+        "| 指标 | 数值 |",
+        "|---|---:|",
+        f"| 历史收益 | {monitor['historical_return_percent']}% |",
+        f"| 历史胜率 | {monitor['historical_win_rate_percent']}% |",
+        f"| 历史最大回撤 | {monitor['historical_max_drawdown_percent']}% |",
+        f"| 今日机会 | {monitor['today_opportunity_count']} |",
+        f"| 今日模拟盈亏 | {monitor['today_simulated_pnl']} |",
+        f"| 当前连续亏损参考 | {monitor['current_consecutive_loss_proxy']} |",
+        f"| 风险标记 | {'，'.join(monitor['risk_flags'])} |",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
     shared = dashboard["shared_account_view"]
+    timeframe_views = dashboard["timeframe_views"]["views"]
+    ftd = dashboard["ftd001_monitor"]
     cards = "\n".join(
         f"<section class=\"metric\"><span>{html.escape(k)}</span><strong>{html.escape(str(v))}</strong></section>"
         for k, v in metrics.items()
@@ -785,8 +1128,21 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     strategy_scorecard_rows = "\n".join(strategy_scorecard_html(row) for row in dashboard["strategy_scorecard_rows"])
     pnl_bars = "\n".join(strategy_pnl_bar_html(row) for row in dashboard["strategy_scorecard_rows"])
     strategy_detail_rows = "\n".join(strategy_detail_summary_html(view["summary"]) for view in dashboard["strategy_detail_views"].values())
-    today_rows = "\n".join(trade_row_html(row) for row in dashboard["trade_rows"][:180])
-    pa004_rows = "\n".join(trade_row_html(row) for row in dashboard["pa004_long_rows"][:40])
+    all_rows = dashboard["trade_rows"] + dashboard["pa004_long_rows"]
+    today_rows = "\n".join(trade_row_html(row) for row in all_rows[:220])
+    timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in TIMEFRAME_ORDER)
+    ftd_rows = "\n".join(
+        f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
+        for label, value in [
+            ("历史收益", ftd["historical_return_percent"] + "%"),
+            ("历史胜率", ftd["historical_win_rate_percent"] + "%"),
+            ("历史最大回撤", ftd["historical_max_drawdown_percent"] + "%"),
+            ("今日触发股票", ", ".join(ftd["today_symbols"]) or "暂无"),
+            ("今日模拟盈亏", ftd["today_simulated_pnl"]),
+            ("当前连续亏损参考", ftd["current_consecutive_loss_proxy"]),
+            ("风险标记", "，".join(ftd["risk_flags"])),
+        ]
+    )
     status_rows = "\n".join(
         f"<tr><td>{html.escape(row['strategy_id'])}</td><td>{html.escape(row['strategy_title'])}</td><td>{html.escape(row['final_status'])}</td><td>{html.escape(row['plain_reason'])}</td></tr>"
         for row in dashboard["strategy_status_rows"]
@@ -797,7 +1153,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="{config.dashboard_refresh_seconds}">
-  <title>M12.32 分钟级只读模拟看板</title>
+  <title>M12.35 分钟级只读模拟看板</title>
   <style>
     body {{ margin:0; font-family:Arial,"Noto Sans SC",sans-serif; background:#f6f7f9; color:#1f2933; letter-spacing:0; }}
     header {{ padding:18px 22px; background:#fff; border-bottom:1px solid #d8dee9; display:flex; justify-content:space-between; gap:18px; }}
@@ -812,11 +1168,16 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     table {{ width:100%; border-collapse:collapse; font-size:13px; }} th,td {{ padding:9px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }}
     th {{ background:#eef2f7; }} .wrap {{ max-height:520px; overflow:auto; }}
     .good {{ color:#18794e; font-weight:700; }} .bad {{ color:#b42318; font-weight:700; }}
+    .timeframes {{ display:grid; grid-template-columns:repeat(2,minmax(260px,1fr)); gap:14px; padding:14px 16px; }}
+    .timeframe-card {{ border:1px solid #d8dee9; border-radius:8px; background:#fff; overflow:hidden; }}
+    .timeframe-card h3 {{ margin:0; padding:12px 14px; background:#f2f4f7; font-size:16px; }}
+    .timeframe-card .stats {{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:10px 14px; }}
+    .timeframe-card .stats div {{ border:1px solid #eef2f7; border-radius:6px; padding:8px; }}
     .bar-row {{ display:grid; grid-template-columns:150px 1fr 86px; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid #eef2f7; font-size:13px; }}
     .bar-track {{ height:12px; background:#eef2f7; border-radius:999px; overflow:hidden; }}
     .bar-fill {{ height:12px; min-width:2px; }}
     .bar-good {{ background:#2f9e6b; }} .bar-bad {{ background:#d92d20; }}
-    @media (max-width:980px) {{ .grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} header,.two-col {{ display:block; }} }}
+    @media (max-width:980px) {{ .grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} header,.two-col,.timeframes {{ display:block; }} }}
   </style>
 </head>
 <body>
@@ -824,10 +1185,11 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   <main>
     <div class="grid">{cards}</div>
     <section class="panel"><h2>共享模拟账户</h2><div class="note">{html.escape(shared['plain_language_note'])}</div><div class="two-col"><div class="mini-card"><table><tbody>{account_rows}</tbody></table></div><div class="mini-card"><h2>各策略今日模拟盈亏</h2>{pnl_bars}</div></div></section>
+    <section class="panel"><h2>FTD001 重点观察</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="two-col"><div class="mini-card"><table><tbody>{ftd_rows}</tbody></table></div><div class="mini-card"><h2>当前判断</h2><div class="note">{html.escape(ftd['current_plain_status'])}</div></div></div></section>
+    <section class="panel"><h2>按周期分组测试</h2><div class="note">信号按各自 K 线收盘确认：日线收盘后更新，1h / 15m / 5m 只在对应周期收盘后更新。盘中每 60 秒只刷新当前价和模拟盈亏。</div><div class="timeframes">{timeframe_sections}</div></section>
     <section class="panel"><h2>策略成绩单</h2><div class="note">这里按单策略独立展示，方便判断每条策略自己的历史表现和今日表现；首页共享账户则看所有策略合并后的总效果。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
     <section class="panel"><h2>单策略下钻</h2><div class="note">这里把每条策略的今日机会、最好/最差股票、周期分布和历史参考指标放在一起；更细的每笔机会保存在 JSON 的 strategy_detail_views 里。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
-    <section class="panel"><h2>今日机会明细</h2><div class="note">报价每 {config.dashboard_refresh_seconds} 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描和旧观察。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
-    <section class="panel"><h2>PA004 做多观察</h2><div class="note">只做多版进入观察，不代表自动买卖准入。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{pa004_rows}</tbody></table></div></section>
+    <section class="panel"><h2>今日机会明细</h2><div class="note">报价每 {config.dashboard_refresh_seconds} 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描、旧观察和 PA004 做多观察。PA004 已统一放在总表和周期分组里，不再单独割裂展示。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
     <section class="panel"><h2>策略状态</h2><div class="wrap"><table><thead><tr><th>策略</th><th>名称</th><th>状态</th><th>说明</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
   </main>
 </body>
@@ -841,6 +1203,33 @@ def table_head() -> str:
 
 def strategy_scorecard_head() -> str:
     return "<tr><th>策略</th><th>状态</th><th>今日机会</th><th>今日模拟盈亏</th><th>浮盈占比</th><th>历史收益</th><th>历史胜率</th><th>最大回撤</th><th>盈利因子</th><th>下一步</th></tr>"
+
+
+def timeframe_view_html(view: dict[str, Any]) -> str:
+    strategy_rows = "".join(
+        "<tr>"
+        f"<td>{html.escape(row['strategy_id'])}</td>"
+        f"<td>{html.escape(row['status'])}</td>"
+        f"<td>{html.escape(row['opportunity_count'])}</td>"
+        f"<td>{html.escape(row['simulated_pnl'])}</td>"
+        f"<td>{html.escape(row['positive_opportunity_percent'])}%</td>"
+        "</tr>"
+        for row in view["strategy_rows"]
+    )
+    strategy_rows = strategy_rows or "<tr><td colspan=\"5\">暂无触发</td></tr>"
+    return (
+        "<section class=\"timeframe-card\">"
+        f"<h3>{html.escape(view['display_name'])}</h3>"
+        "<div class=\"stats\">"
+        f"<div><small>机会</small><strong>{html.escape(str(view['opportunity_count']))}</strong></div>"
+        f"<div><small>模拟盈亏</small><strong>{html.escape(view['simulated_pnl'])}</strong></div>"
+        f"<div><small>浮盈占比</small><strong>{html.escape(view['positive_opportunity_percent'])}%</strong></div>"
+        "</div>"
+        f"<div class=\"note\">{html.escape(view['plain_language_note'])}</div>"
+        "<table><thead><tr><th>策略</th><th>状态</th><th>机会</th><th>模拟盈亏</th><th>浮盈占比</th></tr></thead>"
+        f"<tbody>{strategy_rows}</tbody></table>"
+        "</section>"
+    )
 
 
 def strategy_scorecard_html(row: dict[str, str]) -> str:
@@ -931,22 +1320,26 @@ def build_gate_md(gate: dict[str, Any]) -> str:
 def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
     return (
         "```yaml\n"
-        "task_id: M12.29-current-day-scan-dashboard\n"
+        "task_id: M12.34-M12.39-intraday-observer-dashboard\n"
         "role: main-agent\n"
-        "branch_or_worktree: feature/m12-32-dashboard-account-views\n"
-        "objective: 滚动到当前美股交易日重新扫描第一批50只，并优化分钟级只读模拟看板的共享账户、单策略成绩单和单策略下钻\n"
+        "branch_or_worktree: feature/m12-34-39-intraday-observer-dashboard\n"
+        "objective: 让观察策略进入每日测试，按周期重排看板，重点监控 FTD001，并提供自动运行器与 Codex 观察员摘要\n"
         "status: success\n"
         "files_changed:\n"
         "  - config/examples/m12_29_current_day_scan_dashboard.json\n"
+        "  - config/examples/m12_37_intraday_auto_loop.json\n"
         "  - scripts/m12_29_current_day_scan_dashboard_lib.py\n"
         "  - scripts/run_m12_29_current_day_scan_dashboard.py\n"
+        "  - scripts/run_m12_37_intraday_auto_loop.py\n"
         "  - tests/unit/test_m12_29_current_day_scan_dashboard.py\n"
+        "  - tests/unit/test_m12_37_intraday_auto_loop.py\n"
         "  - reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/*\n"
         "interfaces_changed: []\n"
         "commands_run:\n"
-        "  - python scripts/run_m12_29_current_day_scan_dashboard.py --no-fetch\n"
+        "  - python scripts/run_m12_37_intraday_auto_loop.py --once --no-fetch\n"
         "tests_run:\n"
         "  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py -v\n"
+        "  - python -m unittest tests/unit/test_m12_37_intraday_auto_loop.py -v\n"
         "  - python -m unittest discover -s tests/unit -v\n"
         "  - python -m unittest discover -s tests/reliability -v\n"
         "verification_results:\n"
@@ -957,11 +1350,12 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "  - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单\n"
         "risks:\n"
         "  - 看板仍是只读行情和模拟盈亏，连续交易日样本仍只有 1/10\n"
+        "  - systemd/cron 示例已提交，但本阶段没有偷偷启用系统级长期后台任务\n"
         "qa_focus:\n"
-        "  - 检查候选日期是否等于当前美股交易日，检查看板中文和只读边界\n"
+        "  - 检查观察策略测试 lane、周期分组、FTD001 监控、Codex 观察员摘要和只读边界\n"
         "rollback_notes:\n"
-        "  - 回滚本阶段提交即可撤回 M12.29-M11.6 产物\n"
-        "next_recommended_action: 继续累计10个真实交易日的只读模拟看板记录，并在看板稳定后做模拟交易试运行准入复查\n"
+        "  - 回滚本阶段提交即可撤回 M12.34-M12.39 产物\n"
+        "next_recommended_action: 美股常规交易时段运行自动刷新，累计10个真实交易日的只读模拟看板记录，并在看板稳定后做模拟交易试运行准入复查\n"
         "needs_user_decision: false\n"
         "user_decision_needed: ''\n"
         "```\n"
@@ -1008,6 +1402,12 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def append_jsonl(path: Path, row: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def load_json(path: Path) -> dict[str, Any]:
