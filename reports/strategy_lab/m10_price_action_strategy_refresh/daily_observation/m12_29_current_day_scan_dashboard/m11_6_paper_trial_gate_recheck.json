@@ -1,0 +1,24 @@
+{
+  "blocking_items": [
+    "连续交易日记录不足 10 天",
+    "仍需继续验证每日扫描稳定性"
+  ],
+  "candidate_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-012",
+    "M12-FTD-001",
+    "M12-SRC-001",
+    "M12-SRC-002",
+    "M12-SRC-003"
+  ],
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "paper_trial_approval": false,
+  "plain_language_result": "当前已能盘中扫描和看板刷新，但还没满 10 个交易日，暂不能批准模拟交易试运行。",
+  "real_money_actions": false,
+  "schema_version": "m11.6.paper-trial-gate-recheck.v1",
+  "stage": "M11.6.paper_trial_gate_recheck",
+  "trading_connection": false
+}

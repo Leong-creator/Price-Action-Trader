@@ -1,0 +1,23 @@
+{
+  "title": "M12.29 当日扫描与分钟级只读模拟看板",
+  "run_id": "m12_29_current_day_scan_dashboard",
+  "stage": "M12.29.current_day_scan_dashboard",
+  "market": "US",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard",
+  "source_m12_12_config_path": "config/examples/m12_12_daily_observation_loop.json",
+  "m12_16_source_candidate_plan_path": "reports/strategy_lab/m10_price_action_strategy_refresh/source_candidate_test_plan/m12_16/m12_16_source_candidate_test_plan.json",
+  "m10_12_all_strategy_metrics_path": "reports/strategy_lab/m10_price_action_strategy_refresh/all_strategy_scorecard/m10_12/m10_12_all_strategy_metrics.csv",
+  "m12_24_small_pilot_metrics_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_24_small_pilot/m12_24_pa004_pa007_metrics.csv",
+  "m12_27_pa004_long_metrics_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_27_pa004_retest_live_snapshot/m12_27_pa004_retest_metrics.csv",
+  "m12_15_best_variant_path": "reports/strategy_lab/m10_price_action_strategy_refresh/ftd_v02_ab_retest/m12_15/m12_15_best_variant.json",
+  "dashboard_refresh_seconds": 60,
+  "first_batch_size": 50,
+  "min_observation_days_for_trial": 10,
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

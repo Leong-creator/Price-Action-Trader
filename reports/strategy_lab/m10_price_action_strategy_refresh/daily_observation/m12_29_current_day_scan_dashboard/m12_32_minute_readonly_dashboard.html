@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="60">
+  <title>M12.32 分钟级只读模拟看板</title>
+  <style>
+    body { margin:0; font-family:Arial,"Noto Sans SC",sans-serif; background:#f6f7f9; color:#1f2933; letter-spacing:0; }
+    header { padding:18px 22px; background:#fff; border-bottom:1px solid #d8dee9; display:flex; justify-content:space-between; gap:18px; }
+    h1 { margin:0; font-size:24px; } main { padding:18px 22px; display:grid; gap:18px; }
+    .grid { display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:10px; }
+    .metric,.panel { background:#fff; border:1px solid #d8dee9; border-radius:8px; }
+    .metric { padding:12px; } .metric span { display:block; color:#667085; font-size:12px; } .metric strong { display:block; margin-top:8px; font-size:22px; }
+    h2 { margin:0; padding:14px 16px; font-size:18px; border-bottom:1px solid #d8dee9; }
+    .note { padding:12px 16px; color:#667085; line-height:1.6; }
+    table { width:100%; border-collapse:collapse; font-size:13px; } th,td { padding:9px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+    th { background:#eef2f7; } .wrap { max-height:520px; overflow:auto; }
+    .good { color:#18794e; font-weight:700; } .bad { color:#b42318; font-weight:700; }
+    @media (max-width:980px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } header { display:block; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>分钟级只读模拟看板</h1><div>更新时间：2026-04-29T02:44:53Z</div></div><div>只读行情 + 模拟盈亏，不接真实账户，不做真实买卖</div></header>
+  <main>
+    <div class="grid"><section class="metric"><span>今日新机会</span><strong>122</strong></section>
+<section class="metric"><span>盘中模拟盈亏</span><strong>843.92</strong></section>
+<section class="metric"><span>模拟收益率</span><strong>0.84</strong></section>
+<section class="metric"><span>浮盈机会占比</span><strong>26.24</strong></section>
+<section class="metric"><span>最大回撤参考</span><strong>48.38</strong></section>
+<section class="metric"><span>策略可用数</span><strong>7</strong></section></div>
+    <section class="panel"><h2>今日新机会、旧观察机会与模拟盈亏</h2><div class="note">报价每 60 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描和旧观察。</div><div class="wrap"><table><thead><tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>模拟盈亏</th><th>状态</th></tr></thead><tbody><tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SPY</td><td>15m</td><td>看跌</td><td>711.69</td><td>710.4600</td><td>712.8800</td><td>708.3700</td><td class="bad">-254.13</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SPY</td><td>5m</td><td>看跌</td><td>711.69</td><td>710.0890</td><td>712.8800</td><td>707.9990</td><td class="bad">-286.81</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>QQQ</td><td>15m</td><td>看跌</td><td>657.55</td><td>654.6850</td><td>659.6400</td><td>650.3200</td><td class="bad">-289.10</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>QQQ</td><td>5m</td><td>看跌</td><td>657.55</td><td>655.0500</td><td>659.6400</td><td>650.6850</td><td class="bad">-272.33</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>IWM</td><td>5m</td><td>看涨</td><td>273.91</td><td>273.9700</td><td>273.2700</td><td>275.3700</td><td class="bad">-42.86</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>IWM</td><td>15m</td><td>看跌</td><td>273.91</td><td>274.5400</td><td>276.9700</td><td>272.5200</td><td class="good">129.63</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>IWM</td><td>5m</td><td>看跌</td><td>273.91</td><td>274.7600</td><td>276.9700</td><td>272.7400</td><td class="good">192.31</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>DIA</td><td>15m</td><td>看跌</td><td>491.42</td><td>491.1800</td><td>493.8200</td><td>489.4400</td><td class="bad">-45.45</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>DIA</td><td>5m</td><td>看跌</td><td>491.42</td><td>491.9100</td><td>493.8200</td><td>490.1700</td><td class="good">128.27</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>VTI</td><td>15m</td><td>看跌</td><td>350.63</td><td>350.4800</td><td>351.6000</td><td>349.4000</td><td class="bad">-66.96</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>VTI</td><td>5m</td><td>看跌</td><td>350.63</td><td>350.4800</td><td>351.6000</td><td>349.4000</td><td class="bad">-66.96</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>VOO</td><td>15m</td><td>看跌</td><td>654.26</td><td>653.2050</td><td>655.3600</td><td>651.2750</td><td class="bad">-244.78</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>VOO</td><td>5m</td><td>看跌</td><td>654.26</td><td>652.7600</td><td>655.3600</td><td>650.8300</td><td class="bad">-288.46</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>IVV</td><td>15m</td><td>看跌</td><td>714.96</td><td>713.8100</td><td>716.1700</td><td>711.7100</td><td class="bad">-243.64</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>IVV</td><td>5m</td><td>看跌</td><td>714.96</td><td>713.3100</td><td>716.1700</td><td>711.2100</td><td class="bad">-288.46</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLK</td><td>15m</td><td>看跌</td><td>157.85</td><td>156.6100</td><td>158.6400</td><td>154.6200</td><td class="bad">-305.42</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLK</td><td>5m</td><td>看跌</td><td>157.85</td><td>156.6400</td><td>158.6400</td><td>154.6500</td><td class="bad">-302.50</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLF</td><td>15m</td><td>看跌</td><td>51.85</td><td>51.9000</td><td>52.3900</td><td>51.5250</td><td class="good">51.02</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLF</td><td>5m</td><td>看跌</td><td>51.85</td><td>52.0000</td><td>52.3900</td><td>51.6250</td><td class="good">192.31</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLE</td><td>1d</td><td>看涨</td><td>57.71</td><td>58.0500</td><td>53.4100</td><td>67.3300</td><td class="bad">-36.64</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLE</td><td>15m</td><td>看涨</td><td>57.71</td><td>57.9100</td><td>57.3750</td><td>58.4250</td><td class="bad">-186.92</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLE</td><td>5m</td><td>看涨</td><td>57.71</td><td>57.9100</td><td>57.3750</td><td>58.4250</td><td class="bad">-186.92</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLV</td><td>1d</td><td>看跌</td><td>143.84</td><td>143.2800</td><td>149.1150</td><td>131.6100</td><td class="bad">-47.99</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLV</td><td>15m</td><td>看跌</td><td>143.84</td><td>144.0100</td><td>144.8600</td><td>143.2100</td><td class="good">100.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLV</td><td>5m</td><td>看跌</td><td>143.84</td><td>144.0100</td><td>144.8600</td><td>143.2100</td><td class="good">100.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLY</td><td>15m</td><td>看跌</td><td>117.01</td><td>117.1450</td><td>117.7800</td><td>116.5150</td><td class="good">106.30</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLY</td><td>5m</td><td>看跌</td><td>117.01</td><td>117.1450</td><td>117.7800</td><td>116.5150</td><td class="good">106.30</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M12-FTD-001<br><small>方方土日线趋势顺势信号K</small></td><td>XLY</td><td>1d</td><td>看跌</td><td>117.01</td><td>116.87</td><td>117.79</td><td>115.03</td><td class="bad">-76.09</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLI</td><td>1d</td><td>看跌</td><td>170.98</td><td>169.5400</td><td>175.1300</td><td>158.3600</td><td class="bad">-128.80</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLI</td><td>5m</td><td>看涨</td><td>170.98</td><td>171.0700</td><td>170.6300</td><td>171.9500</td><td class="bad">-102.27</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLI</td><td>15m</td><td>看跌</td><td>170.98</td><td>170.0850</td><td>171.8600</td><td>168.4950</td><td class="bad">-252.11</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLI</td><td>5m</td><td>看跌</td><td>170.98</td><td>170.0850</td><td>171.8600</td><td>168.4950</td><td class="bad">-252.11</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>XLP</td><td>5m</td><td>看涨</td><td>83.08</td><td>83.0800</td><td>82.9850</td><td>83.2700</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLP</td><td>15m</td><td>看跌</td><td>83.08</td><td>82.7650</td><td>83.6500</td><td>81.9650</td><td class="bad">-177.97</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLP</td><td>5m</td><td>看跌</td><td>83.08</td><td>82.8100</td><td>83.6500</td><td>82.0100</td><td class="bad">-160.71</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLU</td><td>1d</td><td>看跌</td><td>46.25</td><td>46.0400</td><td>46.4950</td><td>45.1300</td><td class="bad">-230.77</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLC</td><td>1d</td><td>看跌</td><td>115.75</td><td>115.3200</td><td>119.4800</td><td>107.0000</td><td class="bad">-51.68</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>XLB</td><td>5m</td><td>看涨</td><td>51.40</td><td>51.4550</td><td>51.3350</td><td>51.6950</td><td class="bad">-229.17</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLB</td><td>15m</td><td>看跌</td><td>51.40</td><td>51.1550</td><td>51.9600</td><td>50.4250</td><td class="bad">-152.17</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>XLB</td><td>5m</td><td>看跌</td><td>51.40</td><td>51.1550</td><td>51.9600</td><td>50.4250</td><td class="bad">-152.17</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SMH</td><td>5m</td><td>看跌</td><td>491.21</td><td>483.9500</td><td>496.6600</td><td>472.6100</td><td class="bad">-285.60</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SOXX</td><td>5m</td><td>看跌</td><td>438.71</td><td>433.7940</td><td>446.1400</td><td>421.9140</td><td class="bad">-199.09</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>TQQQ</td><td>15m</td><td>看跌</td><td>60.74</td><td>59.9250</td><td>61.3300</td><td>58.6940</td><td class="bad">-290.04</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>TQQQ</td><td>5m</td><td>看跌</td><td>60.74</td><td>60.0350</td><td>61.3300</td><td>58.8040</td><td class="bad">-272.20</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SQQQ</td><td>15m</td><td>看涨</td><td>54.05</td><td>54.7500</td><td>53.5800</td><td>55.7800</td><td class="bad">-299.15</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SQQQ</td><td>5m</td><td>看涨</td><td>54.05</td><td>54.6200</td><td>53.5800</td><td>55.6500</td><td class="bad">-274.04</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>GLD</td><td>1d</td><td>看跌</td><td>421.91</td><td>418.4000</td><td>448.7000</td><td>357.8000</td><td class="bad">-57.92</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>GLD</td><td>15m</td><td>看跌</td><td>421.91</td><td>419.4900</td><td>421.7200</td><td>417.4400</td><td class="bad">-542.60</td><td>触及止损参考</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>GLD</td><td>5m</td><td>看跌</td><td>421.91</td><td>419.3050</td><td>421.7200</td><td>417.2550</td><td class="bad">-539.34</td><td>触及止损参考</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>SLV</td><td>1d</td><td>看跌</td><td>66.20</td><td>65.3700</td><td>75.1600</td><td>45.7900</td><td class="bad">-42.39</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SLV</td><td>15m</td><td>看涨</td><td>66.20</td><td>66.2500</td><td>65.5150</td><td>66.9400</td><td class="bad">-34.01</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SLV</td><td>5m</td><td>看涨</td><td>66.20</td><td>66.2500</td><td>65.5150</td><td>66.9400</td><td class="bad">-34.01</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>USO</td><td>1d</td><td>看涨</td><td>139.60</td><td>140.4000</td><td>110.3450</td><td>200.5100</td><td class="bad">-13.31</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>USO</td><td>15m</td><td>看涨</td><td>139.60</td><td>139.8600</td><td>138.0200</td><td>141.2300</td><td class="bad">-70.65</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>USO</td><td>5m</td><td>看涨</td><td>139.60</td><td>140.2600</td><td>138.0200</td><td>142.2400</td><td class="bad">-147.32</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>TLT</td><td>1d</td><td>看跌</td><td>86.37</td><td>85.9400</td><td>87.2100</td><td>83.4000</td><td class="bad">-169.29</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>TLT</td><td>5m</td><td>看涨</td><td>86.37</td><td>86.3700</td><td>86.2800</td><td>86.5500</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>TLT</td><td>15m</td><td>看涨</td><td>86.37</td><td>86.3700</td><td>86.2900</td><td>86.5300</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>TLT</td><td>5m</td><td>看涨</td><td>86.37</td><td>86.3700</td><td>86.3220</td><td>86.4660</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>TLT</td><td>15m</td><td>看跌</td><td>86.37</td><td>86.0200</td><td>86.2200</td><td>85.8300</td><td class="bad">-875.00</td><td>触及止损参考</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>TLT</td><td>5m</td><td>看跌</td><td>86.37</td><td>86.0050</td><td>86.2200</td><td>85.8150</td><td class="bad">-848.84</td><td>触及止损参考</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>HYG</td><td>5m</td><td>看涨</td><td>80.40</td><td>80.4100</td><td>80.3550</td><td>80.5200</td><td class="bad">-90.91</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>LQD</td><td>1d</td><td>看跌</td><td>109.34</td><td>108.9500</td><td>110.2900</td><td>106.2700</td><td class="bad">-145.52</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>LQD</td><td>5m</td><td>看涨</td><td>109.34</td><td>109.3400</td><td>109.2030</td><td>109.6140</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>LQD</td><td>15m</td><td>看涨</td><td>109.34</td><td>109.3400</td><td>109.2400</td><td>109.5400</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>LQD</td><td>5m</td><td>看涨</td><td>109.34</td><td>109.3400</td><td>109.2800</td><td>109.4600</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>LQD</td><td>15m</td><td>看涨</td><td>109.34</td><td>109.1650</td><td>109.0200</td><td>109.3000</td><td class="good">603.45</td><td>触及目标参考</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>LQD</td><td>5m</td><td>看跌</td><td>109.34</td><td>108.9800</td><td>109.1550</td><td>108.8450</td><td class="bad">-1028.57</td><td>触及止损参考</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>EEM</td><td>5m</td><td>看跌</td><td>62.99</td><td>62.5800</td><td>63.1150</td><td>62.1100</td><td class="bad">-383.18</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>EFA</td><td>5m</td><td>看涨</td><td>100.96</td><td>100.9700</td><td>100.8750</td><td>101.1600</td><td class="bad">-52.63</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>EFA</td><td>15m</td><td>看跌</td><td>100.96</td><td>100.7300</td><td>101.1300</td><td>100.3500</td><td class="bad">-287.50</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>EFA</td><td>5m</td><td>看跌</td><td>100.96</td><td>100.6700</td><td>101.1300</td><td>100.2900</td><td class="bad">-315.22</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>ARKK</td><td>5m</td><td>看跌</td><td>75.45</td><td>74.7600</td><td>76.2000</td><td>73.3680</td><td class="bad">-239.58</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>MSFT</td><td>15m</td><td>看涨</td><td>429.25</td><td>428.4950</td><td>421.9000</td><td>434.6750</td><td class="good">57.24</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>MSFT</td><td>5m</td><td>看涨</td><td>429.25</td><td>428.1450</td><td>421.9000</td><td>434.3250</td><td class="good">88.47</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M12-FTD-001<br><small>方方土日线趋势顺势信号K</small></td><td>MSFT</td><td>1d</td><td>看涨</td><td>429.25</td><td>429.92</td><td>421.90</td><td>445.96</td><td class="bad">-41.77</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>NVDA</td><td>15m</td><td>看涨</td><td>213.17</td><td>213.1450</td><td>208.2000</td><td>217.5950</td><td class="good">2.53</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>NVDA</td><td>5m</td><td>看涨</td><td>213.17</td><td>213.2100</td><td>208.2000</td><td>217.6600</td><td class="bad">-3.99</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>AMZN</td><td>15m</td><td>看涨</td><td>259.70</td><td>260.5700</td><td>256.6500</td><td>264.0600</td><td class="bad">-110.97</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>AMZN</td><td>5m</td><td>看涨</td><td>259.70</td><td>260.5700</td><td>256.6500</td><td>264.0600</td><td class="bad">-110.97</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>GOOGL</td><td>15m</td><td>看涨</td><td>349.78</td><td>350.2300</td><td>346.1200</td><td>353.7100</td><td class="bad">-54.74</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>GOOGL</td><td>5m</td><td>看涨</td><td>349.78</td><td>350.1500</td><td>346.1200</td><td>353.6300</td><td class="bad">-45.91</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>GOOG</td><td>15m</td><td>看涨</td><td>347.50</td><td>347.9500</td><td>344.2800</td><td>351.3900</td><td class="bad">-61.31</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>GOOG</td><td>5m</td><td>看涨</td><td>347.50</td><td>347.8600</td><td>344.2800</td><td>351.3000</td><td class="bad">-50.28</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>META</td><td>15m</td><td>看跌</td><td>671.34</td><td>668.3500</td><td>678.1800</td><td>660.0600</td><td class="bad">-152.09</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>META</td><td>5m</td><td>看跌</td><td>671.34</td><td>669.2450</td><td>678.1800</td><td>660.9550</td><td class="bad">-117.24</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>TSLA</td><td>5m</td><td>看涨</td><td>376.02</td><td>376.7600</td><td>375.9700</td><td>378.3400</td><td class="bad">-468.35</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>TSLA</td><td>15m</td><td>看涨</td><td>376.02</td><td>381.0700</td><td>372.5400</td><td>388.4100</td><td class="bad">-296.01</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>TSLA</td><td>5m</td><td>看涨</td><td>376.02</td><td>381.8000</td><td>372.5400</td><td>389.1400</td><td class="bad">-312.10</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>AVGO</td><td>15m</td><td>看跌</td><td>399.83</td><td>396.8500</td><td>405.5000</td><td>388.4510</td><td class="bad">-172.25</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>AVGO</td><td>5m</td><td>看跌</td><td>399.83</td><td>396.8350</td><td>405.5000</td><td>388.4360</td><td class="bad">-172.82</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>AMD</td><td>15m</td><td>看涨</td><td>323.21</td><td>325.9600</td><td>310.0000</td><td>341.5450</td><td class="bad">-86.15</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>AMD</td><td>5m</td><td>看涨</td><td>323.21</td><td>326.1000</td><td>310.0000</td><td>341.6850</td><td class="bad">-89.75</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>INTC</td><td>5m</td><td>看涨</td><td>84.52</td><td>84.5800</td><td>83.4400</td><td>86.8600</td><td class="bad">-26.32</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>INTC</td><td>15m</td><td>看涨</td><td>84.52</td><td>83.6250</td><td>80.8000</td><td>86.3850</td><td class="good">158.41</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>INTC</td><td>5m</td><td>看涨</td><td>84.52</td><td>83.7200</td><td>80.8000</td><td>86.4800</td><td class="good">136.99</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>MU</td><td>15m</td><td>看跌</td><td>504.29</td><td>494.9180</td><td>518.8330</td><td>473.0850</td><td class="bad">-195.94</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>MU</td><td>5m</td><td>看跌</td><td>504.29</td><td>496.1350</td><td>518.8330</td><td>474.3020</td><td class="bad">-179.64</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>QCOM</td><td>1d</td><td>看跌</td><td>150.00</td><td>144.0000</td><td>161.0000</td><td>110.0000</td><td class="bad">-176.47</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>QCOM</td><td>15m</td><td>看涨</td><td>150.00</td><td>148.2700</td><td>144.0000</td><td>151.9300</td><td class="good">202.58</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>QCOM</td><td>5m</td><td>看涨</td><td>150.00</td><td>148.1250</td><td>144.0000</td><td>151.7850</td><td class="good">227.27</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>CRM</td><td>5m</td><td>看跌</td><td>181.32</td><td>181.3200</td><td>182.4200</td><td>179.1200</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>CRM</td><td>15m</td><td>看跌</td><td>181.32</td><td>181.3200</td><td>182.1900</td><td>179.5800</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>CRM</td><td>5m</td><td>看跌</td><td>181.32</td><td>181.3200</td><td>181.9900</td><td>179.9800</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>CRM</td><td>15m</td><td>看跌</td><td>181.32</td><td>181.6300</td><td>184.4200</td><td>178.8700</td><td class="good">55.56</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>CRM</td><td>5m</td><td>看跌</td><td>181.32</td><td>181.5500</td><td>184.4200</td><td>178.7900</td><td class="good">40.07</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>ADBE</td><td>5m</td><td>看跌</td><td>243.20</td><td>243.0800</td><td>243.7700</td><td>241.7000</td><td class="bad">-86.96</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>ADBE</td><td>15m</td><td>看涨</td><td>243.20</td><td>244.8800</td><td>241.2150</td><td>248.4650</td><td class="bad">-229.20</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>ADBE</td><td>5m</td><td>看涨</td><td>243.20</td><td>244.8800</td><td>241.2150</td><td>248.4650</td><td class="bad">-229.20</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>NOW</td><td>5m</td><td>看跌</td><td>90.49</td><td>90.4600</td><td>90.9400</td><td>89.5000</td><td class="bad">-31.25</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>NOW</td><td>15m</td><td>看跌</td><td>90.49</td><td>90.9700</td><td>93.0000</td><td>88.9500</td><td class="good">118.23</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>NOW</td><td>5m</td><td>看跌</td><td>90.49</td><td>90.9700</td><td>93.0000</td><td>88.9500</td><td class="good">118.23</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SNOW</td><td>15m</td><td>看跌</td><td>142.56</td><td>142.1950</td><td>146.3600</td><td>138.0450</td><td class="bad">-43.82</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>SNOW</td><td>5m</td><td>看跌</td><td>142.56</td><td>142.0000</td><td>146.3600</td><td>137.8500</td><td class="bad">-64.22</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>PLTR</td><td>1d</td><td>看跌</td><td>141.18</td><td>140.4200</td><td>152.6800</td><td>115.9000</td><td class="bad">-31.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>PLTR</td><td>5m</td><td>看跌</td><td>141.18</td><td>141.1020</td><td>141.7700</td><td>139.7660</td><td class="bad">-58.38</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>PANW</td><td>1d</td><td>看涨</td><td>180.99</td><td>186.0000</td><td>165.2000</td><td>227.6000</td><td class="bad">-120.43</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-001<br><small>趋势回调二次入场</small></td><td>PANW</td><td>5m</td><td>看跌</td><td>180.99</td><td>180.9000</td><td>183.2100</td><td>176.2800</td><td class="bad">-19.48</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>PANW</td><td>15m</td><td>看跌</td><td>180.99</td><td>180.9900</td><td>182.2500</td><td>178.4700</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-002<br><small>突破后续跟进</small></td><td>PANW</td><td>5m</td><td>看跌</td><td>180.99</td><td>180.9900</td><td>181.5900</td><td>179.7900</td><td class="">0.00</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>PANW</td><td>15m</td><td>看跌</td><td>180.99</td><td>182.0700</td><td>186.0000</td><td>178.6730</td><td class="good">137.40</td><td>观察中</td></tr>
+<tr><td>今日新扫描机会</td><td>M10-PA-012<br><small>开盘区间突破</small></td><td>PANW</td><td>5m</td><td>看跌</td><td>180.99</td><td>182.2750</td><td>186.0000</td><td>178.8780</td><td class="good">172.48</td><td>观察中</td></tr></tbody></table></div></section>
+    <section class="panel"><h2>PA004 做多观察</h2><div class="note">只做多版进入观察，不代表自动买卖准入。</div><div class="wrap"><table><thead><tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>模拟盈亏</th><th>状态</th></tr></thead><tbody><tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>PLTR</td><td>1d</td><td>看涨</td><td>141.18</td><td>134.43</td><td>126.23</td><td>150.82</td><td class="good">411.59</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>TSLA</td><td>1d</td><td>看涨</td><td>376.02</td><td>350.06</td><td>337.24</td><td>375.72</td><td class="good">1012.48</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>GOOG</td><td>1d</td><td>看涨</td><td>347.50</td><td>288.99</td><td>271.54</td><td>323.89</td><td class="good">1676.50</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>ORCL</td><td>1d</td><td>看涨</td><td>165.96</td><td>149.09</td><td>135.25</td><td>176.77</td><td class="good">609.47</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>SOXX</td><td>1d</td><td>看涨</td><td>438.71</td><td>333.49</td><td>316.22</td><td>368.03</td><td class="good">3046.32</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>ADBE</td><td>1d</td><td>看涨</td><td>243.20</td><td>241.67</td><td>233.79</td><td>257.43</td><td class="good">97.08</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>CRM</td><td>1d</td><td>看涨</td><td>181.32</td><td>184.90</td><td>174.57</td><td>205.56</td><td class="bad">-173.28</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>PANW</td><td>1d</td><td>看涨</td><td>180.99</td><td>155.03</td><td>139.57</td><td>185.95</td><td class="good">839.59</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>GOOG</td><td>1d</td><td>看涨</td><td>347.50</td><td>305.88</td><td>296.70</td><td>324.22</td><td class="good">2266.88</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>GOOGL</td><td>1d</td><td>看涨</td><td>349.78</td><td>306.17</td><td>296.25</td><td>326.01</td><td class="good">2198.08</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>TQQQ</td><td>1d</td><td>看涨</td><td>60.74</td><td>49.44</td><td>46.42</td><td>55.48</td><td class="good">1870.86</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>ADBE</td><td>1d</td><td>看涨</td><td>243.20</td><td>271.51</td><td>244.28</td><td>325.97</td><td class="bad">-519.83</td><td>触及止损参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>MSFT</td><td>1d</td><td>看涨</td><td>429.25</td><td>404.71</td><td>383.10</td><td>447.93</td><td class="good">567.79</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>SNOW</td><td>1d</td><td>看涨</td><td>142.56</td><td>178.44</td><td>155.38</td><td>224.56</td><td class="bad">-777.97</td><td>触及止损参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>AMD</td><td>1d</td><td>看涨</td><td>323.21</td><td>214.82</td><td>190.72</td><td>263.02</td><td class="good">2248.76</td><td>触及目标参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>NOW</td><td>1d</td><td>看涨</td><td>90.49</td><td>101.63</td><td>98.00</td><td>108.89</td><td class="bad">-1534.44</td><td>触及止损参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>TSLA</td><td>1d</td><td>看涨</td><td>376.02</td><td>412.15</td><td>387.53</td><td>461.39</td><td class="bad">-733.75</td><td>触及止损参考</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>GOOG</td><td>1d</td><td>看涨</td><td>347.50</td><td>319.14</td><td>296.90</td><td>363.62</td><td class="good">637.59</td><td>观察中</td></tr>
+<tr><td>PA004 做多观察</td><td>M10-PA-004<br><small>宽通道边界反转（只做多观察版）</small></td><td>GOOGL</td><td>1d</td><td>看涨</td><td>349.78</td><td>319.04</td><td>296.25</td><td>364.64</td><td class="good">674.42</td><td>观察中</td></tr></tbody></table></div></section>
+    <section class="panel"><h2>策略状态</h2><div class="wrap"><table><thead><tr><th>策略</th><th>名称</th><th>状态</th><th>说明</th></tr></thead><tbody><tr><td>M10-PA-001</td><td>Trend Pullback Second-Entry Continuation</td><td>进入每日实时只读测试</td><td>核心顺势策略，历史资金测试完成，继续扫描 50 只。</td></tr>
+<tr><td>M10-PA-002</td><td>Breakout Follow-Through Continuation</td><td>进入每日实时只读测试</td><td>突破后跟进策略，历史资金测试完成，也可作为 FTD 确认过滤器。</td></tr>
+<tr><td>M10-PA-003</td><td>Tight Channel Trend Continuation</td><td>过滤器/排名因子</td><td>紧密通道更适合作为强趋势股票加分项，暂不作为独立买卖触发。</td></tr>
+<tr><td>M10-PA-004</td><td>Broad Channel Boundary Reversal</td><td>观察队列：只做多版</td><td>整体混合版本弱，但做多分支转正；只做多观察，做空版暂不进入主线。</td></tr>
+<tr><td>M10-PA-005</td><td>Trading Range Failed Breakout Reversal</td><td>研究项：定义仍弱</td><td>交易区间失败突破复测仍弱，几何定义不能稳定改善，不拖主线。</td></tr>
+<tr><td>M10-PA-006</td><td>Trading Range BLSHS Limit-Order Framework</td><td>研究项</td><td>BLSHS 限价框架不是独立触发。</td></tr>
+<tr><td>M10-PA-007</td><td>Second-Leg Trap Reversal</td><td>观察队列</td><td>第二腿陷阱小范围测试为正，先观察但不进模拟买卖准入。</td></tr>
+<tr><td>M10-PA-008</td><td>Major Trend Reversal</td><td>观察队列</td><td>主要趋势反转有历史资金测试，但图形语境强，先严格观察。</td></tr>
+<tr><td>M10-PA-009</td><td>Wedge Reversal and Wedge Flag</td><td>观察队列</td><td>楔形反转历史测试略正，先严格观察。</td></tr>
+<tr><td>M10-PA-010</td><td>Final Flag or Climax TBTL Reversal</td><td>研究项</td><td>Final Flag/Climax/TBTL 过于复合，不作为单独触发。</td></tr>
+<tr><td>M10-PA-011</td><td>Opening Reversal</td><td>暂不进入主线</td><td>开盘反转历史资金测试偏弱，保留复核。</td></tr>
+<tr><td>M10-PA-012</td><td>Opening Range Breakout</td><td>进入每日实时只读测试</td><td>开盘区间突破历史资金测试表现较好，继续 15m/5m。</td></tr>
+<tr><td>M10-PA-013</td><td>Support and Resistance Failed Test</td><td>暂不进入主线</td><td>支撑阻力失败测试历史资金测试偏弱，暂不加入实时主线。</td></tr>
+<tr><td>M10-PA-014</td><td>Measured Move Target Engine</td><td>辅助规则</td><td>Measured Move 只作为目标/止盈模块。</td></tr>
+<tr><td>M10-PA-015</td><td>Protective Stops and Position Sizing</td><td>辅助规则</td><td>止损与仓位模块，不是入场触发。</td></tr>
+<tr><td>M10-PA-016</td><td>Trading Range Scaling-In Research</td><td>研究项</td><td>交易区间加仓研究不作为独立触发。</td></tr>
+<tr><td>M12-FTD-001</td><td>方方土日线趋势顺势信号K</td><td>进入每日实时只读测试</td><td>早期强策略已改为 pullback_guard 版本，进入每日只读测试观察回撤。</td></tr>
+<tr><td>M12-SRC-001</td><td>日线趋势顺势信号K增强版</td><td>已合并到 M12-FTD-001</td><td>这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。</td></tr>
+<tr><td>M12-SRC-002</td><td>趋势回调二次入场</td><td>已合并到 M10-PA-001</td><td>这是已通过历史资金测试的核心顺势策略。</td></tr>
+<tr><td>M12-SRC-003</td><td>突破后1-2根K线跟进</td><td>已合并到 M10-PA-002</td><td>它本身是核心策略，也能帮助判断强K线后有没有真实延续。</td></tr>
+<tr><td>M12-SRC-004</td><td>紧密通道/小回调顺势</td><td>已合并到 M10-PA-003</td><td>它更像帮我们从50只里挑更强的股票，不先单独统计盈利。</td></tr>
+<tr><td>M12-SRC-005</td><td>长回调保护</td><td>已合并到 M12-FTD-001-filter</td><td>它的作用是减少长回调里的差机会，不是独立策略。</td></tr>
+<tr><td>M12-SRC-006</td><td>主要趋势反转观察</td><td>已合并到 M10-PA-008</td><td>反转机会更依赖图形语境，先观察典型机会，不和主线策略混测。</td></tr></tbody></table></div></section>
+  </main>
+</body>
+</html>
