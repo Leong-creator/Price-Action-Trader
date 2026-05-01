@@ -1,0 +1,15 @@
+{
+  "candidate_count": 61,
+  "first50_coverage_rows": 250,
+  "first50_symbol_count": 50,
+  "generated_at": "2026-05-01T01:15:02Z",
+  "live_execution": false,
+  "news_tagged_candidate_count": 2,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "第一批股票池 50 只，当前候选 61 条，其中 2 条带新闻/财报事件字段。",
+  "real_money_actions": false,
+  "schema_version": "m12.44.data-scanner-news-expansion.v1",
+  "stage": "M12.44.data_scanner_news_expansion",
+  "trading_connection": false
+}

@@ -1,0 +1,48 @@
+{
+  "title": "M12.40-M11.7 News Earnings Impact Pipeline",
+  "output_root": "reports/strategy_lab/m10_price_action_strategy_refresh",
+  "dashboard_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard",
+  "trade_view_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_29_trade_view.csv",
+  "today_candidates_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_29_today_candidates.csv",
+  "dashboard_json_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+  "first50_universe_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_12_current_day_source/m12_12_first50_universe.json",
+  "ftd_trade_ledger_path": "reports/strategy_lab/m10_price_action_strategy_refresh/ftd_v02_ab_retest/m12_15/m12_15_trade_ledger.csv",
+  "ftd_variant_metrics_path": "reports/strategy_lab/m10_price_action_strategy_refresh/ftd_v02_ab_retest/m12_15/m12_15_variant_metrics.csv",
+  "strategy_closure_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_30_strategy_closure_matrix.csv",
+  "cache_coverage_path": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_first50_data_coverage.csv",
+  "universe147_coverage_path": "reports/strategy_lab/m10_price_action_strategy_refresh/scanner/m12_26_cache_scanner_expansion/m12_26_universe147_coverage.csv",
+  "event_window_days": 1,
+  "gap_threshold_percent": "3",
+  "event_seed": [
+    {
+      "event_id": "alphabet-q1-2026-earnings-postmarket",
+      "event_type": "earnings",
+      "event_title": "Alphabet Q1 2026 earnings post-market gap",
+      "event_date": "2026-04-29",
+      "symbols": [
+        "GOOG",
+        "GOOGL"
+      ],
+      "event_direction": "positive",
+      "session": "post_market",
+      "severity": "high",
+      "symbol_moves": {
+        "GOOG": "7.05",
+        "GOOGL": "7.17"
+      },
+      "source_refs": [
+        "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000043/googexhibit991q12026.htm",
+        "local:longbridge_quote_post_market_snapshot_2026-04-29"
+      ],
+      "notes": "Manual seed from official earnings release plus readonly Longbridge post-market quote snapshot; used only for simulated tagging."
+    }
+  ],
+  "macro_event_seed": [],
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

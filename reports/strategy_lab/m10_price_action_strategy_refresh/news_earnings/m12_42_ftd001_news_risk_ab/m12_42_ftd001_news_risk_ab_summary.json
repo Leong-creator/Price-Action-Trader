@@ -1,0 +1,96 @@
+{
+  "best_variant": {
+    "reason": "在当前可用样本下，最大回撤 25.07%，收益 1136.15%；baseline 回撤 48.65%。",
+    "variant_id": "loss_streak_guard"
+  },
+  "generated_at": "2026-05-01T01:14:24Z",
+  "live_execution": false,
+  "metric_rows": [
+    {
+      "final_equity": "710436.65",
+      "group": "baseline",
+      "max_consecutive_losses": 57,
+      "max_drawdown_percent": "48.65",
+      "net_profit": "610436.65",
+      "profit_factor": "1.09",
+      "return_percent": "610.44",
+      "sample_note": "可直接用历史交易序列评估",
+      "trade_count": 22184,
+      "variant_id": "baseline",
+      "win_rate": "37.36"
+    },
+    {
+      "final_equity": "710436.65",
+      "group": "earnings_pause",
+      "max_consecutive_losses": 57,
+      "max_drawdown_percent": "48.65",
+      "net_profit": "610436.65",
+      "profit_factor": "1.09",
+      "return_percent": "610.44",
+      "sample_note": "新闻覆盖样本有限",
+      "trade_count": 22184,
+      "variant_id": "earnings_pause",
+      "win_rate": "37.36"
+    },
+    {
+      "final_equity": "100000.00",
+      "group": "news_alignment_only",
+      "max_consecutive_losses": 0,
+      "max_drawdown_percent": "0.00",
+      "net_profit": "0.00",
+      "profit_factor": "0.00",
+      "return_percent": "0.00",
+      "sample_note": "新闻覆盖样本有限",
+      "trade_count": 0,
+      "variant_id": "news_alignment_only",
+      "win_rate": "0.00"
+    },
+    {
+      "final_equity": "710436.65",
+      "group": "macro_risk_pause",
+      "max_consecutive_losses": 57,
+      "max_drawdown_percent": "48.65",
+      "net_profit": "610436.65",
+      "profit_factor": "1.09",
+      "return_percent": "610.44",
+      "sample_note": "新闻覆盖样本有限",
+      "trade_count": 22184,
+      "variant_id": "macro_risk_pause",
+      "win_rate": "37.36"
+    },
+    {
+      "final_equity": "1236150.29",
+      "group": "loss_streak_guard",
+      "max_consecutive_losses": 43,
+      "max_drawdown_percent": "25.07",
+      "net_profit": "1136150.29",
+      "profit_factor": "1.19",
+      "return_percent": "1136.15",
+      "sample_note": "可直接用历史交易序列评估",
+      "trade_count": 19515,
+      "variant_id": "loss_streak_guard",
+      "win_rate": "39.48"
+    },
+    {
+      "final_equity": "1236150.29",
+      "group": "combined_guard",
+      "max_consecutive_losses": 43,
+      "max_drawdown_percent": "25.07",
+      "net_profit": "1136150.29",
+      "profit_factor": "1.19",
+      "return_percent": "1136.15",
+      "sample_note": "可直接用历史交易序列评估",
+      "trade_count": 19515,
+      "variant_id": "combined_guard",
+      "win_rate": "39.48"
+    }
+  ],
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "FTD001 baseline 收益 610.44%，最大回撤 48.65%；当前最佳折中版本为 loss_streak_guard。",
+  "real_money_actions": false,
+  "schema_version": "m12.42.ftd001-news-risk-ab.v1",
+  "stage": "M12.42.ftd001_news_risk_ab",
+  "trading_connection": false,
+  "variant_count": 6
+}

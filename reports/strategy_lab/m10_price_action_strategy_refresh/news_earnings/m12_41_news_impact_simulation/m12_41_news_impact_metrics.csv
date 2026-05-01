@@ -1,0 +1,7 @@
+group,trade_count,net_profit,return_percent,win_rate,profit_factor,max_drawdown_percent
+all_signals,61,-1994.79,-1.99,34.43,0.75,3.77
+event_tagged,2,-764.64,-0.76,0.00,0.00,0.76
+no_event,59,-1230.15,-1.23,35.59,0.83,3.02
+event_aligned,0,0.00,0.00,0.00,0.00,0.00
+event_opposite,2,-764.64,-0.76,0.00,0.00,0.76
+earnings_gap,2,-764.64,-0.76,0.00,0.00,0.76

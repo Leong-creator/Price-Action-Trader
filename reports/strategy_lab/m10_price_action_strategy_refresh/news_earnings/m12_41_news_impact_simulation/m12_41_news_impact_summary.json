@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-05-01T01:14:05Z",
+  "live_execution": false,
+  "metric_rows": [
+    {
+      "group": "all_signals",
+      "max_drawdown_percent": "3.77",
+      "net_profit": "-1994.79",
+      "profit_factor": "0.75",
+      "return_percent": "-1.99",
+      "trade_count": 61,
+      "win_rate": "34.43"
+    },
+    {
+      "group": "event_tagged",
+      "max_drawdown_percent": "0.76",
+      "net_profit": "-764.64",
+      "profit_factor": "0.00",
+      "return_percent": "-0.76",
+      "trade_count": 2,
+      "win_rate": "0.00"
+    },
+    {
+      "group": "no_event",
+      "max_drawdown_percent": "3.02",
+      "net_profit": "-1230.15",
+      "profit_factor": "0.83",
+      "return_percent": "-1.23",
+      "trade_count": 59,
+      "win_rate": "35.59"
+    },
+    {
+      "group": "event_aligned",
+      "max_drawdown_percent": "0.00",
+      "net_profit": "0.00",
+      "profit_factor": "0.00",
+      "return_percent": "0.00",
+      "trade_count": 0,
+      "win_rate": "0.00"
+    },
+    {
+      "group": "event_opposite",
+      "max_drawdown_percent": "0.76",
+      "net_profit": "-764.64",
+      "profit_factor": "0.00",
+      "return_percent": "-0.76",
+      "trade_count": 2,
+      "win_rate": "0.00"
+    },
+    {
+      "group": "earnings_gap",
+      "max_drawdown_percent": "0.76",
+      "net_profit": "-764.64",
+      "profit_factor": "0.00",
+      "return_percent": "-0.76",
+      "trade_count": 2,
+      "win_rate": "0.00"
+    }
+  ],
+  "overall_conclusion": "risk_filter_only",
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "新闻/财报分组样本 2 条，事件组模拟盈亏 -764.64；当前结论为 risk_filter_only。",
+  "real_money_actions": false,
+  "schema_version": "m12.41.news-impact-simulation.v1",
+  "stage": "M12.41.news_impact_simulation",
+  "trading_connection": false
+}

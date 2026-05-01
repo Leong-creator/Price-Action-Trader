@@ -1,0 +1,23 @@
+{
+  "event_effect_counts": {
+    "earnings_gap_opposite": 2,
+    "none": 59
+  },
+  "event_seed_count": 2,
+  "event_symbol_counts": {
+    "GOOG": 1,
+    "GOOGL": 1
+  },
+  "event_tagged_signal_count": 2,
+  "generated_at": "2026-05-01T01:13:46Z",
+  "google_case_detected": true,
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "已给 61 条只读候选打新闻/财报标签，其中 2 条带事件背景；Google/Alphabet 相关 2 条。",
+  "real_money_actions": false,
+  "schema_version": "m12.40.news-earnings-event-tags.v1",
+  "signal_count": 61,
+  "stage": "M12.40.news_earnings_event_tags",
+  "trading_connection": false
+}
