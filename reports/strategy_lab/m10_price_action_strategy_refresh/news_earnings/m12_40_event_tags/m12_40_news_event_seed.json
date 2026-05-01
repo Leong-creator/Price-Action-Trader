@@ -1,0 +1,28 @@
+[
+  {
+    "event_date": "2026-04-29",
+    "event_direction": "positive",
+    "event_id": "alphabet-q1-2026-earnings-postmarket",
+    "event_title": "Alphabet Q1 2026 earnings post-market gap",
+    "event_type": "earnings",
+    "move_percent": "7.05",
+    "notes": "Manual seed from official earnings release plus readonly Longbridge post-market quote snapshot; used only for simulated tagging.",
+    "session": "post_market",
+    "severity": "high",
+    "source_refs": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000043/googexhibit991q12026.htm | local:longbridge_quote_post_market_snapshot_2026-04-29",
+    "symbol": "GOOG"
+  },
+  {
+    "event_date": "2026-04-29",
+    "event_direction": "positive",
+    "event_id": "alphabet-q1-2026-earnings-postmarket",
+    "event_title": "Alphabet Q1 2026 earnings post-market gap",
+    "event_type": "earnings",
+    "move_percent": "7.17",
+    "notes": "Manual seed from official earnings release plus readonly Longbridge post-market quote snapshot; used only for simulated tagging.",
+    "session": "post_market",
+    "severity": "high",
+    "source_refs": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000043/googexhibit991q12026.htm | local:longbridge_quote_post_market_snapshot_2026-04-29",
+    "symbol": "GOOGL"
+  }
+]

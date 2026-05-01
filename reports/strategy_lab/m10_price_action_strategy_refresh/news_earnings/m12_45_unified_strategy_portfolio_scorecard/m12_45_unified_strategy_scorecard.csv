@@ -1,0 +1,24 @@
+strategy_id,strategy_title,final_status,client_status,today_opportunity_count,today_simulated_pnl,historical_return_percent,historical_win_rate_percent,historical_max_drawdown_percent,news_event_signal_count,upgrade_pause_suggestion
+M10-PA-001,Trend Pullback Second-Entry Continuation,进入每日实时只读测试,每日测试中,13,-1936.52,24.7327,35.84,34.1783,0,继续每日测试
+M10-PA-002,Breakout Follow-Through Continuation,进入每日实时只读测试,每日测试中,2,-8.33,3.2810,34.92,23.5592,0,继续每日测试
+M10-PA-003,Tight Channel Trend Continuation,过滤器/排名因子,只做过滤器,0,0.00,-4.5359,,16.0795,0,不进入每日触发
+M10-PA-004,Broad Channel Boundary Reversal,观察队列：只做多版,观察测试中,19,18623.42,0.5530,40.24,2.0479,0,继续低准入观察
+M10-PA-005,Trading Range Failed Breakout Reversal,研究项：定义仍弱,研究项,0,0.00,-6.9222,,,0,不进入每日触发
+M10-PA-006,Trading Range BLSHS Limit-Order Framework,研究项,研究项,0,0.00,,,,0,不进入每日触发
+M10-PA-007,Second-Leg Trap Reversal,观察队列,观察测试中,0,0.00,0.6473,41.15,3.8796,0,继续低准入观察
+M10-PA-008,Major Trend Reversal,观察队列,观察测试中,0,0.00,4.0036,35.41,9.2807,0,继续低准入观察
+M10-PA-009,Wedge Reversal and Wedge Flag,观察队列,观察测试中,0,0.00,1.0173,33.95,9.1580,0,继续低准入观察
+M10-PA-010,Final Flag or Climax TBTL Reversal,研究项,研究项,0,0.00,,,,0,不进入每日触发
+M10-PA-011,Opening Reversal,暂不进入主线,暂不继续,0,0.00,-1.6268,,3.8072,0,不进入每日触发
+M10-PA-012,Opening Range Breakout,进入每日实时只读测试,每日测试中,42,265.80,26.8927,38.15,12.7415,2,加入新闻影响复盘
+M10-PA-013,Support and Resistance Failed Test,暂不进入主线,暂不继续,0,0.00,-7.9392,,12.8117,0,不进入每日触发
+M10-PA-014,Measured Move Target Engine,辅助规则,只做辅助规则,0,0.00,,,,0,不进入每日触发
+M10-PA-015,Protective Stops and Position Sizing,辅助规则,只做辅助规则,0,0.00,,,,0,不进入每日触发
+M10-PA-016,Trading Range Scaling-In Research,研究项,研究项,0,0.00,,,,0,不进入每日触发
+M12-FTD-001,方方土日线趋势顺势信号K,进入每日实时只读测试,每日测试中,4,-315.74,610.44,37.36,48.38,0,重点做回撤和新闻过滤优化
+M12-SRC-001,日线趋势顺势信号K增强版,已合并到 M12-FTD-001,暂不继续,0,0.00,,,,0,不进入每日触发
+M12-SRC-002,趋势回调二次入场,已合并到 M10-PA-001,暂不继续,0,0.00,,,,0,不进入每日触发
+M12-SRC-003,突破后1-2根K线跟进,已合并到 M10-PA-002,暂不继续,0,0.00,,,,0,不进入每日触发
+M12-SRC-004,紧密通道/小回调顺势,已合并到 M10-PA-003,暂不继续,0,0.00,,,,0,不进入每日触发
+M12-SRC-005,长回调保护,已合并到 M12-FTD-001-filter,暂不继续,0,0.00,,,,0,不进入每日触发
+M12-SRC-006,主要趋势反转观察,已合并到 M10-PA-008,暂不继续,0,0.00,,,,0,不进入每日触发

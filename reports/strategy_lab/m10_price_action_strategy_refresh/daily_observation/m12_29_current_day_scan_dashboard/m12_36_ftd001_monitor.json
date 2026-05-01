@@ -1,5 +1,5 @@
 {
-  "current_consecutive_loss_proxy": 2,
+  "current_consecutive_loss_proxy": 4,
   "current_plain_status": "FTD001：历史最大回撤高",
   "current_status": "每日测试",
   "drawdown_watch": "true",
@@ -10,24 +10,25 @@
   "live_execution": false,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_summary": "FTD001 历史收益 610.44%，胜率 37.36%，最大回撤 48.38%。今天触发 2 条，股票：MSFT, XLY，当前模拟亏损 -117.86。重点风险：历史最大回撤高，盈利因子偏薄，今日暂时亏损，信号集中度偏高。",
+  "plain_language_summary": "FTD001 历史收益 610.44%，胜率 37.36%，最大回撤 48.38%。今天触发 4 条，股票：MSFT, NVDA, QCOM, XLE，当前模拟亏损 -315.74。重点风险：历史最大回撤高，盈利因子偏薄，今日暂时亏损。",
   "real_money_actions": false,
   "risk_flags": [
     "历史最大回撤高",
     "盈利因子偏薄",
-    "今日暂时亏损",
-    "信号集中度偏高"
+    "今日暂时亏损"
   ],
   "schema_version": "m12.36.ftd001-monitor.v1",
   "stage": "M12.36.ftd001_focus_monitor",
   "strategy_id": "M12-FTD-001",
   "strategy_title": "方方土日线趋势顺势信号K",
-  "today_opportunity_count": 2,
+  "today_opportunity_count": 4,
   "today_positive_opportunity_percent": "0.00",
-  "today_simulated_pnl": "-117.86",
+  "today_simulated_pnl": "-315.74",
   "today_symbols": [
     "MSFT",
-    "XLY"
+    "NVDA",
+    "QCOM",
+    "XLE"
   ],
   "today_timeframes": [
     "1d"

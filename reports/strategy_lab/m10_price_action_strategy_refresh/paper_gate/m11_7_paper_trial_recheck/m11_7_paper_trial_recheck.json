@@ -1,0 +1,24 @@
+{
+  "approved_strategy_ids": [],
+  "blockers": [
+    "只读观察还没满 10 个真实交易日，当前约 1/10"
+  ],
+  "continue_observation_strategy_ids": [
+    "M10-PA-001",
+    "M12-FTD-001",
+    "M10-PA-004",
+    "M10-PA-007",
+    "M10-PA-008",
+    "M10-PA-009"
+  ],
+  "generated_at": "2026-05-01T01:15:46Z",
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "paper_trial_approval": false,
+  "plain_language_result": "暂不进入模拟交易试运行：只读观察还没满 10 个真实交易日，当前约 1/10",
+  "real_money_actions": false,
+  "schema_version": "m11.7.paper-trial-recheck.v1",
+  "stage": "M11.7.paper_trial_recheck",
+  "trading_connection": false
+}

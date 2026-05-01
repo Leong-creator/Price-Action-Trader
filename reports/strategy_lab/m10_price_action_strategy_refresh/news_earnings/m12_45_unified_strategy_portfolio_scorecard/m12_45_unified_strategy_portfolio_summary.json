@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-05-01T01:15:22Z",
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "统一策略表覆盖 23 条策略：每日测试 4 条，观察测试 4 条；组合代理模拟盈亏 1031.71。",
+  "portfolio_metrics": {
+    "group": "shared_capital_portfolio",
+    "max_drawdown_percent": "2.83",
+    "net_profit": "1031.71",
+    "profit_factor": "1.20",
+    "return_percent": "1.03",
+    "trade_count": 45,
+    "win_rate": "46.67"
+  },
+  "real_money_actions": false,
+  "schema_version": "m12.45.unified-strategy-portfolio-scorecard.v1",
+  "stage": "M12.45.unified_strategy_portfolio_scorecard",
+  "strategy_count": 23,
+  "trading_connection": false
+}

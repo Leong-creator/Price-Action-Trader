@@ -1,0 +1,7 @@
+group,trade_count,net_profit,return_percent,win_rate,profit_factor,max_drawdown_percent,variant_id,final_equity,max_consecutive_losses,sample_note
+baseline,22184,610436.65,610.44,37.36,1.09,48.65,baseline,710436.65,57,可直接用历史交易序列评估
+earnings_pause,22184,610436.65,610.44,37.36,1.09,48.65,earnings_pause,710436.65,57,新闻覆盖样本有限
+news_alignment_only,0,0.00,0.00,0.00,0.00,0.00,news_alignment_only,100000.00,0,新闻覆盖样本有限
+macro_risk_pause,22184,610436.65,610.44,37.36,1.09,48.65,macro_risk_pause,710436.65,57,新闻覆盖样本有限
+loss_streak_guard,19515,1136150.29,1136.15,39.48,1.19,25.07,loss_streak_guard,1236150.29,43,可直接用历史交易序列评估
+combined_guard,19515,1136150.29,1136.15,39.48,1.19,25.07,combined_guard,1236150.29,43,可直接用历史交易序列评估
