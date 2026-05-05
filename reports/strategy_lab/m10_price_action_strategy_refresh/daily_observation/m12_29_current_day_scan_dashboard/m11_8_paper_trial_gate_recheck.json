@@ -1,0 +1,22 @@
+{
+  "blocking_items": [
+    "连续纽约真实交易日不足 10 天",
+    "仍需继续验证主线/实验账户的每日稳定入账"
+  ],
+  "candidate_strategy_ids": [
+    "M10-PA-001",
+    "M10-PA-002",
+    "M10-PA-004",
+    "M10-PA-012",
+    "M12-FTD-001"
+  ],
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "paper_trial_approval": false,
+  "plain_language_result": "当前已经是账户化实时测试，但还没满 10 个纽约真实交易日，先继续累计。",
+  "real_money_actions": false,
+  "schema_version": "m11.8.paper-trial-gate.v1",
+  "stage": "M11.8.paper_trial_gate_recheck",
+  "trading_connection": false
+}

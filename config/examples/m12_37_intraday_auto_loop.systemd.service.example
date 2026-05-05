@@ -2,7 +2,6 @@
 Description=Price Action Trader M12.37 readonly simulated intraday loop
 
 [Service]
-Type=oneshot
+Type=simple
 WorkingDirectory=/home/hgl/projects/Price-Action-Trader
-ExecStart=/usr/bin/env python scripts/run_m12_37_intraday_auto_loop.py --once --config config/examples/m12_37_intraday_auto_loop.json
-
+ExecStart=/usr/bin/env python scripts/run_m12_37_intraday_auto_loop.py --session --config config/examples/m12_37_intraday_auto_loop.json

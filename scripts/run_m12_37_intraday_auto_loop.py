@@ -134,12 +134,36 @@ def run_once(
     }
 
 
+def session_refresh_policy(market_status: str, *, no_fetch: bool, no_refresh_quotes: bool) -> dict[str, bool]:
+    if market_status == "美股常规交易时段":
+        return {
+            "execute_fetch": not no_fetch,
+            "refresh_quotes": not no_refresh_quotes,
+            "continue_session": True,
+            "entered_regular_session": True,
+        }
+    if market_status == "盘前":
+        return {
+            "execute_fetch": False,
+            "refresh_quotes": False,
+            "continue_session": True,
+            "entered_regular_session": False,
+        }
+    return {
+        "execute_fetch": False,
+        "refresh_quotes": False,
+        "continue_session": False,
+        "entered_regular_session": False,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run M12.37 readonly simulated intraday auto loop.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH), help="Path to M12.37 auto-loop config JSON.")
     parser.add_argument("--generated-at", default=None, help="UTC ISO timestamp override, e.g. 2026-04-29T14:00:00Z.")
     parser.add_argument("--once", action="store_true", help="Run one refresh and exit. This is the default safe mode.")
     parser.add_argument("--loop", action="store_true", help="Refresh repeatedly during regular US trading session.")
+    parser.add_argument("--session", action="store_true", help="Start before open, preheat during pre-market, then loop through the regular session until close.")
     parser.add_argument("--max-iterations", type=int, default=0, help="Optional loop limit for smoke tests.")
     parser.add_argument("--no-fetch", action="store_true", help="Do not call readonly Longbridge kline fetch; use existing cache only.")
     parser.add_argument("--max-native-fetches", type=int, default=None, help="Limit readonly native fetch calls.")
@@ -151,14 +175,29 @@ def main() -> int:
     args = parse_args()
     config = load_auto_config(args.config)
     loop_enabled = args.loop and not args.once
+    session_enabled = args.session and not args.once
     iteration = 0
+    entered_regular_session = False
     while True:
+        generated_at = args.generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        market = market_session_status(generated_at)
+        if session_enabled:
+            policy = session_refresh_policy(
+                market["status"],
+                no_fetch=args.no_fetch,
+                no_refresh_quotes=args.no_refresh_quotes,
+            )
+            execute_fetch = policy["execute_fetch"]
+            refresh_quotes = policy["refresh_quotes"]
+        else:
+            execute_fetch = not args.no_fetch
+            refresh_quotes = not args.no_refresh_quotes
         outcome = run_once(
             config,
-            generated_at=args.generated_at,
-            execute_fetch=not args.no_fetch,
+            generated_at=generated_at,
+            execute_fetch=execute_fetch,
             max_native_fetches=args.max_native_fetches,
-            refresh_quotes=not args.no_refresh_quotes,
+            refresh_quotes=refresh_quotes,
         )
         manifest = outcome["manifest"]
         print(json.dumps({
@@ -168,11 +207,18 @@ def main() -> int:
             "summary": manifest["plain_language_result"],
         }, ensure_ascii=False, indent=2, sort_keys=True))
         iteration += 1
-        if not loop_enabled:
+        if not loop_enabled and not session_enabled:
             break
         if args.max_iterations and iteration >= args.max_iterations:
             break
-        if not manifest["loop_can_continue_now"]:
+        if session_enabled:
+            if market["status"] == "美股常规交易时段":
+                entered_regular_session = True
+            elif entered_regular_session:
+                break
+            elif not policy["continue_session"]:
+                break
+        elif not manifest["loop_can_continue_now"]:
             break
         time.sleep(config.refresh_seconds)
     return 0

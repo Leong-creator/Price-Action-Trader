@@ -9,7 +9,7 @@
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：M12.46-M11.8 全策略账户化测试，主线与实验线同时推进
-- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot、M12.25 Daily Observation Continuity、M12.26 Cache Scanner Expansion、M12.27 PA004 Expanded Retest + Live Read-only Snapshot、M12.28 PA004 Long Dashboard Refresh、M12.29 Current-day Scan + Minute Read-only Dashboard；当前正在把 M12.29/M12.37 从“机会当前价估值”升级为 M12.46 的“20,000 USD 独立模拟账户 + 主线/实验分栏 + 1d/5m 主视图 + 纽约交易日累计”。
+- 当前子阶段：已完成 M10 workspace/worktree audit、Brooks v2 source ingestion、clean-room `M10-PA-*` catalog refresh、ChatGPT BPA comparison、legacy comparison、M10 test plan 初版、M10.1 catalog review / frozen catalog / test queue、M10.2 Visual Golden Case Pack、M10.3 Backtest Spec Freeze、M10.4 Historical Backtest Pilot、M10.5 Read-only Observation Plan、M10.6 Read-only Observation Input / Ledger Prototype、M10.7 Business Metric Policy、M10.8 Wave A Capital Backtest、M10.9 Definition Tightening、M10.10 Visual Wave B Gate、M10.11 Wave B Capital Backtest、M10.12 All Strategy Scorecard、M10.13 Read-only Observation Runbook、M11 Paper Gate Report、M12.0 Longbridge Read-only Auth Preflight、M12.1 Longbridge Read-only Feed、M12.2 Core Strategy Daily Observation、M12.3 Visual Review Precheck、M12.4 Definition Fix and Retest、M12.5 Liquid Universe Scanner、M12.6 Weekly Client Scorecard、M11.5 Paper Gate Recheck、M12.7 Daily Trend Benchmark Reuse、M12.8 Universe Kline Cache Completion、M12.9 Visual Review Closure、M12.10 Definition Fix and Retest、M12.11 Read-only Trading Dashboard、M12.12 Daily Observation Loop、M12.14 Source Strategy Closure、M12.15 FTD v0.2 A/B Retest、M12.16 Source Candidate Test Plan、M12.17 Daily Observation Continuity、M12.18 Visual Strategy Observation、M12.19 Visual Detector Prototypes、M12.20 Visual Detector Implementation、M12.21 Detector Quality Review、M12.22 Detector Sample Visual Review、M12.23 Detector Tightening Rerun、M12.24 PA004/PA007 Small Historical Pilot、M12.25 Daily Observation Continuity、M12.26 Cache Scanner Expansion、M12.27 PA004 Expanded Retest + Live Read-only Snapshot、M12.28 PA004 Long Dashboard Refresh、M12.29 Current-day Scan + Minute Read-only Dashboard；当前正在把 M12.29/M12.37 从“机会当前价估值”升级为 M12.46 的“20,000 USD 独立模拟账户 + 主线/实验分栏 + 1d/5m 主视图 + 纽约交易日累计 + 交易日前预热/盘中自动会话”。
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
@@ -470,7 +470,7 @@
   - M12.34 已把观察策略变成真实每日测试 lane：`M10-PA-004` 做多版今日有 `19` 条观察机会，`M10-PA-007/008/009` 今日无触发但已记录为“当日无符合条件机会”，不再只是挂“观察中”状态。
   - M12.35 已把看板按周期重排为 `1d / 1h / 15m / 5m` 四组；当前 `1d` 机会 `34` 条、`15m` 机会 `44` 条、`5m` 机会 `63` 条、`1h` 暂无触发。信号更新语义固定为各自 K 线收盘后确认，盘中 60 秒只刷新当前价和模拟盈亏。
   - M12.36 已新增 `M12-FTD-001` 重点监控卡：历史收益 `610.44%`、历史胜率 `37.36%`、历史最大回撤 `48.38%`；今日触发 `2` 条，当前模拟盈亏 `-117.86`，风险标记为“历史最大回撤高 / 盈利因子偏薄 / 今日暂时亏损 / 信号集中度偏高”。
-  - M12.37 已新增自动盘中只读模拟运行器 `scripts/run_m12_37_intraday_auto_loop.py` 与 systemd/cron 示例配置；当前默认安全模式为单次刷新，`--loop` 可在美股常规交易时段按 60 秒循环刷新。
+  - M12.37 已新增自动盘中只读模拟运行器 `scripts/run_m12_37_intraday_auto_loop.py` 与 systemd/cron 示例配置；当前除 `--once`、`--loop` 外，已新增 `--session`：可从盘前预热开始，进入美股常规交易时段后每 60 秒刷新，收盘后自动退出。
   - M12.38 已新增 Codex 观察员文件层：每次刷新会写入 `m12_38_codex_observer_latest.json` 和 `m12_38_codex_observer_inbox.jsonl`，内容是中文人话摘要，包含当前模拟权益、今日模拟盈亏、活跃周期、FTD001 风险和数据异常提醒；同时已创建 Codex App 当前线程心跳自动化 `m12`，现在只在北京时间美股交易相关窗口运行，21:30 前做开盘预热，开盘时运行 `python scripts/run_m12_37_intraday_auto_loop.py --once` 刷新只读 K 线、报价、策略机会和看板，非交易时段不再 24 小时每 15 分钟轮询。
   - M12.39 当前继续累计真实交易日观察；本轮没有硬凑交易日，仍是 `1/10`，后续需要实际连续运行到 `10/10` 后再做 M11.6 模拟交易试运行准入复查。
   - 已完成 M12.40 News/Earnings Event Tags，新增新闻/财报 sidecar 脚本和报告；当前基于 2026-04-30 只读候选共标注 `61` 条候选，其中 `2` 条带 Google/Alphabet 财报事件标签，`GOOG/GOOGL` 均已命中；新闻层不改策略定义、不触发真实交易。
@@ -481,6 +481,9 @@
   - 已完成 M12.44 Data Scanner News Expansion：第一批 `50` 只股票池保留，当前候选 `61` 条，其中 `2` 条带新闻/财报字段；scanner 增加 `news_priority`、`high_risk_pause` 等字段，缺新闻数据不伪造“无风险”。
   - 已完成 M12.45 Unified Strategy Portfolio Scorecard：统一策略表覆盖 `23` 条策略/候选，当前每日测试 `4` 条、观察测试 `4` 条；共用 `100,000 USD` 模拟本金组合代理模拟盈亏 `1031.71`、胜率 `46.67%`、最大回撤 `2.83%`。
   - 已完成 M11.7 Paper Trial Recheck 第一版：当前仍未批准模拟交易试运行，原因是只读观察还没满 `10` 个真实交易日，当前约 `1/10`；未批准不是策略失败，而是观察期和业务审批条件未满足。
+  - M12.46 当前已修复两类核心口径错误：盘后 UTC 跨日平仓现在按纽约交易日记入当日已平仓/当日盈亏；同一纽约交易日先成功入账、后续降级重跑时，不再把 `observed_trading_days` 回写倒退。
+  - M12.46 当前已把 `M10-PA-004 long-only` 纳入正式主线账户，`M10-PA-005/007/008/009/011/013` 纳入实验账户，`M12-FTD-001 baseline / loss_streak_guard` 保持双账户并行；所有独立账户起始本金统一为 `20,000 USD`。
+  - M12.46 当前已在当前用户 `crontab` 安装工作日 `21:25` 自动启动的 `--session` 会话：北京时间开盘前预热，盘中每分钟刷新，收盘后自动退出；若运行环境缺少 `systemd --user`，默认用该 `cron` 路径接管自动运行。
 
 ## 当前阻塞
 
@@ -495,9 +498,9 @@
 
 ## 下一步
 
-- 下一步：在美股常规交易时段运行 `python scripts/run_m12_37_intraday_auto_loop.py --loop --no-fetch`，让看板每 60 秒刷新报价、模拟盈亏、周期分组和 Codex 观察员摘要。
+- 下一步：继续让 `cron` 每个工作日 `21:25` 自动启动 `python scripts/run_m12_37_intraday_auto_loop.py --session --config config/examples/m12_37_intraday_auto_loop.json`，由脚本自行完成盘前预热、盘中每分钟刷新和收盘后退出。
 - 同步连续运行 M12.37/M12.39 每日只读循环，累计 `10` 个真实交易日看板记录，并把每日候选、模拟结果、数据缺口、FTD001 风险和 Codex 摘要写入同一套 artifact。
-- 单次刷新可用 `python scripts/run_m12_37_intraday_auto_loop.py --once --no-fetch`；该刷新仍是只读模拟，不接账户、不下单。
+- 单次刷新可用 `python scripts/run_m12_37_intraday_auto_loop.py --once --no-fetch`；整段交易日自动会话可用 `python scripts/run_m12_37_intraday_auto_loop.py --session`；两者都仍是只读模拟，不接账户、不下单。
 - `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版已进入观察看板，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。
 - 满足 `50` 只数据稳定、`10` 个交易日看板连续输出、重点策略 A/B 重测可解释、以及用户业务审批后，M11.6 才能把第一批策略明确批准进入模拟交易试运行。

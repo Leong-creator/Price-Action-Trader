@@ -1,11 +1,10 @@
 [Unit]
-Description=Run Price Action Trader M12.37 readonly simulated dashboard every minute during user session
+Description=Start Price Action Trader M12.37 readonly simulated intraday session before US market open
 
 [Timer]
-OnCalendar=*-*-* 09:30:00 America/New_York
-OnUnitActiveSec=60s
+OnCalendar=Mon..Fri *-*-* 09:25:00 America/New_York
 Unit=m12_37_intraday_auto_loop.service
+Persistent=true
 
 [Install]
 WantedBy=timers.target
-

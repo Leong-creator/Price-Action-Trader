@@ -271,6 +271,8 @@ def run_m12_29_current_day_scan_dashboard(
     (config.output_dir / "m12_33_observation_run_status.md").write_text(build_run_status_md(run_status), encoding="utf-8")
     write_json(config.output_dir / "m11_6_paper_trial_gate_recheck.json", gate)
     (config.output_dir / "m11_6_paper_trial_gate_recheck.md").write_text(build_gate_md(gate), encoding="utf-8")
+    write_json(config.output_dir / "m11_8_paper_trial_gate_recheck.json", gate)
+    (config.output_dir / "m11_8_paper_trial_gate_recheck.md").write_text(build_gate_md(gate), encoding="utf-8")
     (config.output_dir / "m12_29_current_day_scan_report.md").write_text(build_report_md(summary), encoding="utf-8")
     (config.output_dir / "m12_29_handoff.md").write_text(build_handoff_md(config, summary), encoding="utf-8")
     assert_no_forbidden_output(config.output_dir)
@@ -314,6 +316,16 @@ def market_session_status(generated_at: str) -> dict[str, str]:
         "new_york_time": ny_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "beijing_time": utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
     }
+
+
+def iso_to_ny_trading_date(value: str) -> date | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return parse_iso_date(value)
+    return dt.astimezone(ZoneInfo("America/New_York")).date()
 
 
 def build_trade_rows(candidates: list[dict[str, str]], quotes: dict[str, dict[str, str]], scan_date: date) -> list[dict[str, str]]:
@@ -808,7 +820,10 @@ def recalc_account_metrics(account: dict[str, Any], scan_date: date) -> None:
     wins = [trade for trade in account["closed_trades"] if money_to_decimal(trade.get("realized_pnl", "0")) > ZERO]
     today_key = scan_date.isoformat()
     today_opened = [position for position in open_positions if position.get("signal_date") == today_key]
-    today_closed = [trade for trade in account["closed_trades"] if trade.get("event_time", "").startswith(today_key)]
+    today_closed = [
+        trade for trade in account["closed_trades"]
+        if iso_to_ny_trading_date(trade.get("event_time", "")) == scan_date
+    ]
     today_realized = sum((money_to_decimal(trade.get("realized_pnl", "0")) for trade in today_closed), ZERO)
     account["realized_pnl"] = money(realized)
     account["unrealized_pnl"] = money(unrealized)
@@ -876,11 +891,15 @@ def advance_account_runtime(
             experimental_accounts.append(account_view)
     registry = state["trading_day_registry"]
     registry_key = scan_date.isoformat()
+    previous = registry.get(registry_key, {})
+    counted_now = current_day_complete and bool(mainline_accounts) and bool(experimental_accounts)
     registry[registry_key] = {
-        "counted": current_day_complete and bool(mainline_accounts) and bool(experimental_accounts),
+        "counted": bool(previous.get("counted")) or counted_now,
         "generated_at": generated_at,
-        "mainline_progressed": bool(mainline_accounts),
-        "experimental_progressed": bool(experimental_accounts),
+        "first_counted_at": previous.get("first_counted_at") or (generated_at if counted_now else ""),
+        "mainline_progressed": bool(previous.get("mainline_progressed")) or bool(mainline_accounts),
+        "experimental_progressed": bool(previous.get("experimental_progressed")) or bool(experimental_accounts),
+        "last_run_complete": counted_now,
     }
     write_json(config.output_dir / "m12_46_account_runtime_state.json", state)
     if new_ledger_rows:
@@ -2258,7 +2277,7 @@ def build_run_status_md(status: dict[str, Any]) -> str:
 
 
 def build_gate_md(gate: dict[str, Any]) -> str:
-    lines = ["# M11.6 模拟交易试运行准入复查", "", f"- 结论：{gate['plain_language_result']}", f"- 是否批准：`{str(gate['paper_trial_approval']).lower()}`", ""]
+    lines = ["# M11.8 模拟交易试运行准入复查", "", f"- 结论：{gate['plain_language_result']}", f"- 是否批准：`{str(gate['paper_trial_approval']).lower()}`", ""]
     if gate["blocking_items"]:
         lines.append("## 还差什么")
         for item in gate["blocking_items"]:
@@ -2269,10 +2288,10 @@ def build_gate_md(gate: dict[str, Any]) -> str:
 def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
     return (
         "```yaml\n"
-        "task_id: M12.34-M12.39-intraday-observer-dashboard\n"
+        "task_id: M12.46-M11.8-accountized-testing\n"
         "role: main-agent\n"
-        "branch_or_worktree: feature/m12-34-39-intraday-observer-dashboard\n"
-        "objective: 让观察策略进入每日测试，按周期重排看板，重点监控 FTD001，并提供自动运行器与 Codex 观察员摘要\n"
+        "branch_or_worktree: codex/m12-46-accountized-testing\n"
+        "objective: 把只读实时测试升级为 20,000 USD 独立模拟账户，按 1d/5m 分栏运行主线和实验策略，并修复纽约交易日累计口径\n"
         "status: success\n"
         "files_changed:\n"
         "  - config/examples/m12_29_current_day_scan_dashboard.json\n"
@@ -2289,8 +2308,9 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "tests_run:\n"
         "  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py -v\n"
         "  - python -m unittest tests/unit/test_m12_37_intraday_auto_loop.py -v\n"
-        "  - python -m unittest discover -s tests/unit -v\n"
-        "  - python -m unittest discover -s tests/reliability -v\n"
+        "  - python -m unittest tests/unit/test_m12_46_runtime_accounts.py -v\n"
+        "  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py tests/unit/test_m12_37_intraday_auto_loop.py tests/unit/test_m12_46_runtime_accounts.py tests/unit/test_m12_17_daily_observation_continuity.py tests/unit/test_m12_25_daily_observation_continuity.py -v\n"
+        "  - git diff --check\n"
         "verification_results:\n"
         f"  - scan_date: {summary['scan_date']}\n"
         f"  - today_candidate_count: {summary['today_candidate_count']}\n"
@@ -2298,13 +2318,13 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "assumptions:\n"
         "  - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单\n"
         "risks:\n"
-        "  - 看板仍是只读行情和模拟盈亏，连续交易日样本仍只有 1/10\n"
-        "  - systemd/cron 示例已提交，但本阶段没有偷偷启用系统级长期后台任务\n"
+        "  - 实验账户仍需累计更多真实交易日，当前还不能直接当作稳定结论\n"
+        "  - 自动运行需要显式启用 systemd/cron 或 Codex automation，当前 handoff 只记录实现状态\n"
         "qa_focus:\n"
-        "  - 检查观察策略测试 lane、周期分组、FTD001 监控、Codex 观察员摘要和只读边界\n"
+        "  - 检查纽约交易日累计、主线/实验账户隔离、FTD001 双版本并行和只读边界\n"
         "rollback_notes:\n"
-        "  - 回滚本阶段提交即可撤回 M12.34-M12.39 产物\n"
-        "next_recommended_action: 美股常规交易时段运行自动刷新，累计10个真实交易日的只读模拟看板记录，并在看板稳定后做模拟交易试运行准入复查\n"
+        "  - 回滚本阶段提交即可撤回 M12.46 账户化实时测试产物\n"
+        "next_recommended_action: 启用交易日会话自动运行，累计 10 个纽约真实交易日的主线/实验账户结果，再做 M11.8 模拟交易试运行复查\n"
         "needs_user_decision: false\n"
         "user_decision_needed: ''\n"
         "```\n"

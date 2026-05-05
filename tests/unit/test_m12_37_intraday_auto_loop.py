@@ -8,6 +8,7 @@ from scripts.run_m12_37_intraday_auto_loop import (
     M1237AutoLoopConfig,
     load_auto_config,
     run_once,
+    session_refresh_policy,
 )
 
 
@@ -86,6 +87,18 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertTrue(outcome["manifest"]["loop_can_continue_now"])
             self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
             self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
+
+    def test_session_refresh_policy_only_fetches_during_regular_session(self):
+        premarket = session_refresh_policy("盘前", no_fetch=False, no_refresh_quotes=False)
+        regular = session_refresh_policy("美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
+        closed = session_refresh_policy("休市", no_fetch=False, no_refresh_quotes=False)
+        self.assertFalse(premarket["execute_fetch"])
+        self.assertFalse(premarket["refresh_quotes"])
+        self.assertTrue(premarket["continue_session"])
+        self.assertTrue(regular["execute_fetch"])
+        self.assertTrue(regular["refresh_quotes"])
+        self.assertTrue(regular["continue_session"])
+        self.assertFalse(closed["continue_session"])
 
 
 if __name__ == "__main__":

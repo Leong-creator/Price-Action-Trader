@@ -2,11 +2,16 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
 from scripts.m12_29_current_day_scan_dashboard_lib import (
+    ACCOUNT_SPECS,
     DEFAULT_ACCOUNT_EQUITY,
+    advance_account_runtime,
+    bootstrap_account_state,
+    build_accountized_run_status,
     current_us_scan_date,
     load_config,
     run_m12_29_current_day_scan_dashboard,
@@ -126,6 +131,86 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             _, result_next_day, _ = self.run_stage(output_dir=output_dir, generated_at="2026-04-30T14:00:00Z")
         self.assertEqual(result_same_day["run_status"]["observed_trading_days"], 1)
         self.assertEqual(result_next_day["run_status"]["observed_trading_days"], 2)
+
+    def test_success_then_degraded_rerun_does_not_roll_back_observed_trading_days(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_29"
+            config, _, _ = self.run_stage(output_dir=output_dir, generated_at="2026-04-29T14:00:00Z")
+            degraded_runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T18:00:00Z",
+                scan_date=date.fromisoformat("2026-04-29"),
+                trade_rows=[],
+                pa004_rows=[],
+                closure_rows=[],
+                current_day_complete=False,
+            )
+            state = json.loads((output_dir / "m12_46_account_runtime_state.json").read_text(encoding="utf-8"))
+        self.assertEqual(build_accountized_run_status(config, degraded_runtime)["observed_trading_days"], 1)
+        self.assertTrue(state["trading_day_registry"]["2026-04-29"]["counted"])
+        self.assertFalse(state["trading_day_registry"]["2026-04-29"]["last_run_complete"])
+
+    def test_today_closed_count_uses_new_york_trading_day_not_utc_calendar_day(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_29"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            spec = next(item for item in ACCOUNT_SPECS if item["account_id"] == "M10-PA-001-1d")
+            account = bootstrap_account_state(spec)
+            account["cash"] = "19000.00"
+            account["open_positions"] = [
+                {
+                    "position_id": "manual-close-test",
+                    "signal_id": "manual-close-test",
+                    "strategy_id": spec["strategy_id"],
+                    "runtime_id": spec["account_id"],
+                    "display_name": spec["display_name"],
+                    "lane": spec["lane"],
+                    "timeframe": spec["timeframe"],
+                    "symbol": "SPY",
+                    "direction": "long",
+                    "signal_time": "2026-04-28T19:30:00Z",
+                    "signal_date": "2026-04-28",
+                    "opened_at": "2026-04-28T19:35:00Z",
+                    "entry_price": "100.00",
+                    "stop_price": "97.00",
+                    "target_price": "108.00",
+                    "latest_price": "95.00",
+                    "quantity": "10.0000",
+                    "reserved_notional": "1000.00",
+                    "current_pnl": "0.00",
+                    "current_state": "持仓中",
+                    "review_status": "test",
+                    "risk_level": "medium",
+                    "source_refs": "manual",
+                    "spec_ref": "manual",
+                }
+            ]
+            state = {
+                "schema_version": "m12.46.account-runtime-state.v1",
+                "stage": "M12.46.accountized_realtime_testing",
+                "starting_capital": "20000.00",
+                "risk_rate": "0.005",
+                "accounts": {spec["account_id"]: account},
+                "trading_day_registry": {},
+            }
+            (output_dir / "m12_46_account_runtime_state.json").write_text(
+                json.dumps(state, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T01:05:00Z",
+                scan_date=date.fromisoformat("2026-04-28"),
+                trade_rows=[],
+                pa004_rows=[],
+                closure_rows=[],
+                current_day_complete=False,
+            )
+        row = next(item for item in runtime["account_rows"] if item["runtime_id"] == spec["account_id"])
+        self.assertEqual(row["today_closed_count"], "1")
+        self.assertEqual(row["today_realized_pnl"], "-50.00")
+        self.assertEqual(row["today_total_pnl"], "-50.00")
 
 
 if __name__ == "__main__":
