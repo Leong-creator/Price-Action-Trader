@@ -1,6 +1,6 @@
 candidate_count_today,paper_gate_evidence_now,plain_reason,status,strategy_id,title
-13,false,50只日线可测；日内用当前5m观察,已进入每日测试,M10-PA-001,趋势回调二次入场
-2,false,50只日线可测；日内用当前5m观察,已进入每日测试,M10-PA-002,突破后续跟进
+17,false,50只日线可测；日内用当前5m观察,已进入每日测试,M10-PA-001,趋势回调二次入场
+4,false,50只日线可测；日内用当前5m观察,已进入每日测试,M10-PA-002,突破后续跟进
 0,false,不阻塞主线，后续按图形策略排队,观察名单,M10-PA-003,紧密通道顺势
 0,false,缺宽通道边界、触边、反转确认、失效条件,待人工标签/定义闭环,M10-PA-004,宽通道边界反转
 0,false,已补几何字段，但复测结果弱，先暂停,暂不进入每日测试,M10-PA-005,交易区间失败突破反转
@@ -10,9 +10,9 @@ candidate_count_today,paper_gate_evidence_now,plain_reason,status,strategy_id,ti
 0,false,agent 已预审，确认后可进入候选队列,等待你确认关键图,M10-PA-009,楔形反转 / 楔形旗形
 0,false,图形依赖高，后续排队,暂非本阶段重点,M10-PA-010,Final Flag / Climax / TBTL
 0,false,不阻塞主线，后续排队,观察名单,M10-PA-011,开盘反转
-42,false,当前5m可做日内只读观察,已进入每日测试,M10-PA-012,开盘区间突破
+44,false,当前5m可做日内只读观察,已进入每日测试,M10-PA-012,开盘区间突破
 0,false,Wave B 候选，不进入本轮自动主线,观察名单,M10-PA-013,支撑阻力失败测试
 0,false,只用于目标，不单独交易,辅助规则,M10-PA-014,Measured Move 目标模块
 0,false,只用于风险控制，不单独交易,辅助规则,M10-PA-015,止损与仓位模块
 0,false,不进入每日自动测试,研究项,M10-PA-016,交易区间加仓研究
-4,false,从方方土来源重新正式化，不再叫 placeholder；本轮已重测。,只保留为对照或选股因子,M12-FTD-001,方方土日线趋势顺势信号K
+13,false,从方方土来源重新正式化，不再叫 placeholder；本轮已重测。,只保留为对照或选股因子,M12-FTD-001,方方土日线趋势顺势信号K

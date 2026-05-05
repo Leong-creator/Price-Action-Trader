@@ -13,7 +13,6 @@ from scripts.run_m12_37_intraday_auto_loop import (
 
 class M1237IntradayAutoLoopTest(unittest.TestCase):
     def make_config(self, output_dir: Path) -> M1237AutoLoopConfig:
-        source_config = replace(load_m12_29_config(), output_dir=output_dir)
         source_config_path = output_dir / "m12_29_config.json"
         source_config_path.write_text(
             """
@@ -62,6 +61,7 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertEqual(manifest["refresh_seconds"], 60)
             self.assertEqual(manifest["observer_interval_minutes"], 15)
             self.assertFalse(manifest["loop_can_continue_now"])
+            self.assertIn("主线权益", manifest["plain_language_result"])
             self.assertIn("FTD001", manifest["plain_language_result"])
             self.assertFalse(manifest["trading_connection"])
             self.assertFalse(manifest["real_money_actions"])
@@ -81,8 +81,11 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
                 execute_fetch=False,
                 refresh_quotes=False,
             )
+            dashboard = outcome["result"]["dashboard"]
             self.assertEqual(outcome["manifest"]["market_session"]["status"], "美股常规交易时段")
             self.assertTrue(outcome["manifest"]["loop_can_continue_now"])
+            self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
+            self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
 
 
 if __name__ == "__main__":

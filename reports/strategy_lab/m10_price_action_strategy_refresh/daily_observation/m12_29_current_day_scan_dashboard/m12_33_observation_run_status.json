@@ -2,24 +2,27 @@
   "daily_realtime_strategy_ids": [
     "M10-PA-001",
     "M10-PA-002",
+    "M10-PA-004",
     "M10-PA-012",
     "M12-FTD-001"
   ],
-  "live_execution": false,
-  "observation_strategy_ids": [
-    "M10-PA-004",
+  "experimental_strategy_ids": [
+    "M10-PA-005",
     "M10-PA-007",
     "M10-PA-008",
-    "M10-PA-009"
+    "M10-PA-009",
+    "M10-PA-011",
+    "M10-PA-013"
   ],
+  "live_execution": false,
   "observed_trading_days": 1,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "今日扫描已入账，但还没有连续 10 个交易日记录，不能进入模拟交易试运行。",
-  "ready_for_m11_6_review": false,
+  "plain_language_result": "主线和实验账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。",
+  "ready_for_m11_8_review": false,
   "real_money_actions": false,
   "required_trading_days": 10,
-  "schema_version": "m12.33.observation-run-status.v1",
-  "stage": "M12.33.observation_run_status",
+  "schema_version": "m12.46.trading-day-registry.v1",
+  "stage": "M12.46.trading_day_registry",
   "trading_connection": false
 }

@@ -22,8 +22,8 @@ tests_run:
   - python -m unittest discover -s tests/unit -v
   - python -m unittest discover -s tests/reliability -v
 verification_results:
-  - scan_date: 2026-04-30
-  - today_candidate_count: 61
+  - scan_date: 2026-05-04
+  - today_candidate_count: 78
   - current_day_scan_complete: true
 assumptions:
   - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单
