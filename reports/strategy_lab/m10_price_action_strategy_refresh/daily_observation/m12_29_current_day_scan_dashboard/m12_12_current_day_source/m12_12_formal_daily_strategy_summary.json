@@ -2,7 +2,7 @@
   "decision": "只保留为对照或选股因子",
   "deferred": [],
   "formalization_note": "从方方土市场周期与信号K来源重提炼为日线策略；不再把旧截图逻辑当正式来源。",
-  "generated_at": "2026-05-05T16:27:58Z",
+  "generated_at": "2026-05-05T17:15:30Z",
   "legacy_reference_metrics": {
     "max_drawdown_percent": "12.19",
     "return_percent": "49.79",

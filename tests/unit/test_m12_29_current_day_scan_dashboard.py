@@ -63,7 +63,9 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("主线正式账户", html)
         self.assertIn("实验账户", html)
         self.assertIn("FTD001 双版本对照", html)
-        self.assertIn("信号观察清单", html)
+        self.assertIn("正式信号清单", html)
+        self.assertIn("北京时间最后更新", html)
+        self.assertIn("运行状态", html)
         self.assertNotIn("1h 小时线测试", html)
         self.assertNotIn("15m 十五分钟测试", html)
         mainline = dashboard["mainline_account_view"]
@@ -75,6 +77,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         first_account = dashboard["mainline_accounts"][0]
         self.assertEqual(first_account["starting_capital"], "20000.00")
         self.assertEqual(Decimal(first_account["starting_capital"]), DEFAULT_ACCOUNT_EQUITY)
+        self.assertIn("CST", dashboard["update_status"]["beijing_time"])
 
     def test_mainline_and_experimental_accounts_are_separated(self):
         _, result, _ = self.run_stage()
@@ -123,6 +126,27 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("runtime_id", text)
         self.assertNotIn("account_id", text)
 
+    def test_pa004_mainline_uses_formal_detector_input_and_reference_rows_stay_outside_runtime_watchlist(self):
+        _, result, output_dir = self.run_stage()
+        dashboard = result["dashboard"]
+        audit_rows = {row["runtime_id"]: row for row in dashboard["account_input_audit"]["rows"]}
+        self.assertEqual(audit_rows["M10-PA-004-long-1d"]["input_source_type"], "formal_detector_entry")
+        self.assertEqual(audit_rows["M10-PA-004-long-1d"]["formal_input_stream"], "true")
+        runtime_watchlist = dashboard["signal_watchlist"]
+        self.assertTrue(all(row.get("signal_source_type") != "reference_observation" for row in runtime_watchlist))
+        self.assertTrue(all("观察版" not in row.get("review_status", "") for row in runtime_watchlist if row["strategy_id"] == "M10-PA-004"))
+        reference_watchlist = dashboard["reference_watchlist"]
+        self.assertTrue(all(row.get("signal_source_type") == "reference_observation" for row in reference_watchlist))
+        audit_path = output_dir / "m12_46_account_input_audit.json"
+        self.assertTrue(audit_path.exists())
+
+    def test_all_runtime_accounts_are_marked_as_formal_input_streams(self):
+        _, result, _ = self.run_stage()
+        rows = result["dashboard"]["account_input_audit"]["rows"]
+        self.assertEqual(len(rows), len(ACCOUNT_SPECS))
+        self.assertTrue(all(row["formal_input_stream"] == "true" for row in rows))
+        self.assertTrue(all(row["watchlist_only"] == "false" for row in rows))
+
     def test_observed_trading_days_accumulate_by_new_york_trading_date(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "m12_29"
@@ -141,7 +165,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 generated_at="2026-04-29T18:00:00Z",
                 scan_date=date.fromisoformat("2026-04-29"),
                 trade_rows=[],
-                pa004_rows=[],
+                pa004_formal_rows=[],
                 closure_rows=[],
                 current_day_complete=False,
             )
@@ -203,7 +227,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 generated_at="2026-04-29T01:05:00Z",
                 scan_date=date.fromisoformat("2026-04-28"),
                 trade_rows=[],
-                pa004_rows=[],
+                pa004_formal_rows=[],
                 closure_rows=[],
                 current_day_complete=False,
             )

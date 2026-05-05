@@ -106,7 +106,7 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
                         "spec_ref": "spec-c",
                     },
                 ],
-                pa004_rows=[],
+                pa004_formal_rows=[],
                 closure_rows=[],
                 current_day_complete=True,
             )

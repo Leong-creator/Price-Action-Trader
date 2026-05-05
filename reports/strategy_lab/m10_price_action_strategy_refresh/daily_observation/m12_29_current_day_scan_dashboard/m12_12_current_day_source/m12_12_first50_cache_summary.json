@@ -114,7 +114,7 @@
   "full_5m_target_ready_symbol_list": [],
   "full_5m_target_ready_symbols": 0,
   "full_intraday_target_note": "5m_full_target is the long historical intraday window; current_5m is enough for today's readonly bar-close dashboard but not enough for long historical intraday claims.",
-  "generated_at": "2026-05-05T16:27:58Z",
+  "generated_at": "2026-05-05T17:15:30Z",
   "local_data_git_policy": "local_data_not_tracked; checked-in reports record only path, checksum, coverage, and gaps",
   "schema_version": "m12.12.first50-cache-summary.v1",
   "stage": "M12.12.daily_observation_loop",
