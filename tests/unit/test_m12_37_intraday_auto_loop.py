@@ -88,16 +88,22 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
             self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
 
-    def test_session_refresh_policy_only_fetches_during_regular_session(self):
-        premarket = session_refresh_policy("盘前", no_fetch=False, no_refresh_quotes=False)
-        regular = session_refresh_policy("美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
-        closed = session_refresh_policy("休市", no_fetch=False, no_refresh_quotes=False)
-        self.assertFalse(premarket["execute_fetch"])
+    def test_session_refresh_policy_prefetches_preopen_and_fetches_only_on_5m_boundaries(self):
+        premarket = session_refresh_policy("2026-04-29T13:25:00Z", "盘前", no_fetch=False, no_refresh_quotes=False)
+        regular_boundary = session_refresh_policy("2026-04-29T14:00:00Z", "美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
+        regular_midbar = session_refresh_policy("2026-04-29T14:01:00Z", "美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
+        closed = session_refresh_policy("2026-04-29T01:00:00Z", "休市", no_fetch=False, no_refresh_quotes=False)
+        self.assertTrue(premarket["execute_fetch"])
         self.assertFalse(premarket["refresh_quotes"])
+        self.assertEqual(premarket["max_native_fetches"], 3)
         self.assertTrue(premarket["continue_session"])
-        self.assertTrue(regular["execute_fetch"])
-        self.assertTrue(regular["refresh_quotes"])
-        self.assertTrue(regular["continue_session"])
+        self.assertTrue(regular_boundary["execute_fetch"])
+        self.assertTrue(regular_boundary["refresh_quotes"])
+        self.assertEqual(regular_boundary["max_native_fetches"], 1)
+        self.assertTrue(regular_boundary["continue_session"])
+        self.assertFalse(regular_midbar["execute_fetch"])
+        self.assertTrue(regular_midbar["refresh_quotes"])
+        self.assertEqual(regular_midbar["max_native_fetches"], 0)
         self.assertFalse(closed["continue_session"])
 
 

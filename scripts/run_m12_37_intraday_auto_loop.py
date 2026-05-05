@@ -6,9 +6,10 @@ import json
 import sys
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time as wall_time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,24 +135,38 @@ def run_once(
     }
 
 
-def session_refresh_policy(market_status: str, *, no_fetch: bool, no_refresh_quotes: bool) -> dict[str, bool]:
+def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: bool, no_refresh_quotes: bool) -> dict[str, Any]:
+    ny_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
+    preopen_window = market_status == "盘前" and wall_time(9, 25) <= ny_dt.time() < wall_time(9, 30)
+    kline_refresh_due = market_status == "美股常规交易时段" and ny_dt.minute % 5 == 0
     if market_status == "美股常规交易时段":
         return {
-            "execute_fetch": not no_fetch,
+            "execute_fetch": (not no_fetch) and kline_refresh_due,
             "refresh_quotes": not no_refresh_quotes,
+            "max_native_fetches": 1 if (not no_fetch) and kline_refresh_due else 0,
             "continue_session": True,
             "entered_regular_session": True,
+        }
+    if preopen_window:
+        return {
+            "execute_fetch": not no_fetch,
+            "refresh_quotes": False,
+            "max_native_fetches": 3 if not no_fetch else 0,
+            "continue_session": True,
+            "entered_regular_session": False,
         }
     if market_status == "盘前":
         return {
             "execute_fetch": False,
             "refresh_quotes": False,
+            "max_native_fetches": 0,
             "continue_session": True,
             "entered_regular_session": False,
         }
     return {
         "execute_fetch": False,
         "refresh_quotes": False,
+        "max_native_fetches": 0,
         "continue_session": False,
         "entered_regular_session": False,
     }
@@ -183,20 +198,23 @@ def main() -> int:
         market = market_session_status(generated_at)
         if session_enabled:
             policy = session_refresh_policy(
+                generated_at,
                 market["status"],
                 no_fetch=args.no_fetch,
                 no_refresh_quotes=args.no_refresh_quotes,
             )
             execute_fetch = policy["execute_fetch"]
             refresh_quotes = policy["refresh_quotes"]
+            max_native_fetches = policy["max_native_fetches"]
         else:
             execute_fetch = not args.no_fetch
             refresh_quotes = not args.no_refresh_quotes
+            max_native_fetches = args.max_native_fetches
         outcome = run_once(
             config,
             generated_at=generated_at,
             execute_fetch=execute_fetch,
-            max_native_fetches=args.max_native_fetches,
+            max_native_fetches=max_native_fetches,
             refresh_quotes=refresh_quotes,
         )
         manifest = outcome["manifest"]

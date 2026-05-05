@@ -33,6 +33,7 @@ ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 DEFAULT_ACCOUNT_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
+LONGRIDGE_QUOTE_TIMEOUT_SECONDS = 6
 FORBIDDEN_OUTPUT_TEXT = (
     "PA-SC-",
     "SF-",
@@ -249,7 +250,13 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
     lb_symbols = [build_longbridge_symbol(symbol, market) for symbol in symbols]
     command = ["quote", *lb_symbols, "--format", "json"]
     _assert_readonly_command(command)
-    completed = subprocess.run([cli_path, *command], capture_output=True, text=True, check=False, timeout=45)
+    completed = subprocess.run(
+        [cli_path, *command],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
+    )
     if completed.returncode != 0:
         detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
         raise RuntimeError(detail or f"longbridge quote failed with {completed.returncode}")

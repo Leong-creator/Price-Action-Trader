@@ -24,8 +24,8 @@ tests_run:
   - git diff --check
 verification_results:
   - scan_date: 2026-05-05
-  - today_candidate_count: 0
-  - current_day_scan_complete: false
+  - today_candidate_count: 77
+  - current_day_scan_complete: true
 assumptions:
   - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单
 risks:
