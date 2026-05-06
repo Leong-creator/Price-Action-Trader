@@ -1,16 +1,25 @@
 {
   "coverage_status_counts": {
-    "stale_cache": 250
+    "complete_for_target_window": 9,
+    "stale_cache": 239,
+    "start_after_target_or_availability_gap": 2
   },
-  "current_5m_ready_symbol_list": [],
-  "current_5m_ready_symbols": 0,
-  "daily_ready_symbol_list": [],
-  "daily_ready_symbols": 0,
+  "current_5m_ready_symbol_list": [
+    "QQQ",
+    "SPY"
+  ],
+  "current_5m_ready_symbols": 2,
+  "daily_ready_symbol_list": [
+    "IWM",
+    "QQQ",
+    "SPY"
+  ],
+  "daily_ready_symbols": 3,
   "fake_data_created": false,
   "full_5m_target_ready_symbol_list": [],
   "full_5m_target_ready_symbols": 0,
   "full_intraday_target_note": "5m_full_target is the long historical intraday window; current_5m is enough for today's readonly bar-close dashboard but not enough for long historical intraday claims.",
-  "generated_at": "2026-05-06T14:00:00Z",
+  "generated_at": "2026-05-06T14:42:39Z",
   "local_data_git_policy": "local_data_not_tracked; checked-in reports record only path, checksum, coverage, and gaps",
   "schema_version": "m12.12.first50-cache-summary.v1",
   "stage": "M12.12.daily_observation_loop",

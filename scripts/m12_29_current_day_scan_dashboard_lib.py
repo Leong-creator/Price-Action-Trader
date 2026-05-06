@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+import os
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -49,6 +50,7 @@ DEFAULT_ACCOUNT_RISK_RATE = Decimal("0.005")
 DEFAULT_ACCOUNT_RISK_BUDGET = (DEFAULT_ACCOUNT_EQUITY * DEFAULT_ACCOUNT_RISK_RATE).quantize(MONEY)
 DEFAULT_EQUITY = DEFAULT_ACCOUNT_EQUITY
 DEFAULT_RISK_BUDGET = DEFAULT_ACCOUNT_RISK_BUDGET
+MAX_GENERATED_AT_FUTURE_SKEW_SECONDS = 90
 MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-004", "M10-PA-012", "M12-FTD-001")
 EXPERIMENTAL_STRATEGIES = ("M10-PA-005", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013")
 PRIMARY_TIMEFRAME_ORDER = ("1d", "5m")
@@ -209,6 +211,7 @@ def run_m12_29_current_day_scan_dashboard(
     config = config or load_config()
     validate_config(config)
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    validate_generated_at_for_artifacts(generated_at)
     config.output_dir.mkdir(parents=True, exist_ok=True)
     market = market_session_status(generated_at)
     scan_date = current_us_scan_date(generated_at)
@@ -321,6 +324,17 @@ def run_m12_29_current_day_scan_dashboard(
         "gate_recheck": gate,
         "runtime": runtime,
     }
+
+
+def validate_generated_at_for_artifacts(generated_at: str) -> None:
+    if os.environ.get("M12_ALLOW_FUTURE_GENERATED_AT") == "1":
+        return
+    generated = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    now = datetime.now(UTC)
+    if generated > now + timedelta(seconds=MAX_GENERATED_AT_FUTURE_SKEW_SECONDS):
+        raise ValueError(
+            f"generated_at_is_in_the_future: {generated_at}; refusing to write production dashboard artifacts"
+        )
 
 
 def current_us_scan_date(generated_at: str) -> date:
@@ -1613,6 +1627,15 @@ def build_accountized_codex_observer(
 def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], refresh_seconds: int) -> dict[str, str]:
     market = summary["market_session"]
     status = market["status"]
+    now_dt = datetime.now(UTC).replace(microsecond=0)
+    generated_dt = datetime.fromisoformat(summary["generated_at"].replace("Z", "+00:00"))
+    dashboard_age = int((now_dt - generated_dt).total_seconds())
+    if dashboard_age < -90:
+        freshness_state = "future_timestamp_error"
+    elif dashboard_age <= refresh_seconds * 3:
+        freshness_state = "fresh"
+    else:
+        freshness_state = "stale"
     if status == "美股常规交易时段":
         runtime_status = f"交易时段自动运行中，每 {refresh_seconds} 秒刷新报价，5m 收盘更新信号。"
     elif status == "盘前":
@@ -1623,6 +1646,7 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
         runtime_status = "非交易时段快照，当前不会生成新正式交易。"
     supervisor_path = config.output_dir / "m12_47_session_supervisor_status.json"
     session_liveness = "unknown"
+    supervisor_process_alive = "unknown"
     last_heartbeat_at_utc = ""
     last_heartbeat_beijing_time = ""
     heartbeat_age_seconds = ""
@@ -1631,15 +1655,18 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
         supervisor = load_json(supervisor_path)
         last_heartbeat_at_utc = supervisor.get("supervisor_generated_at", "")
         last_heartbeat_beijing_time = supervisor.get("beijing_time", "")
+        supervisor_alive = supervisor_pid_alive(supervisor)
+        supervisor_process_alive = str(supervisor_alive).lower()
         child_running = bool(supervisor.get("child_running"))
         supervisor_market_status = supervisor.get("market_status", "")
         if last_heartbeat_at_utc:
             try:
-                now_dt = datetime.fromisoformat(summary["generated_at"].replace("Z", "+00:00"))
                 heartbeat_dt = datetime.fromisoformat(last_heartbeat_at_utc.replace("Z", "+00:00"))
                 heartbeat_age = int((now_dt - heartbeat_dt).total_seconds())
                 heartbeat_age_seconds = str(max(heartbeat_age, 0))
-                if child_running and heartbeat_age <= refresh_seconds * 3:
+                if not supervisor_alive:
+                    session_liveness = "stopped"
+                elif child_running and heartbeat_age <= refresh_seconds * 3:
                     session_liveness = "alive"
                 elif child_running:
                     session_liveness = "stale"
@@ -1653,16 +1680,34 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
             session_liveness = "alive"
     return {
         "generated_at_utc": summary["generated_at"],
+        "wall_clock_beijing_time": now_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "dashboard_age_seconds": str(dashboard_age),
+        "freshness_state": freshness_state,
         "beijing_time": market["beijing_time"],
         "new_york_time": market["new_york_time"],
         "market_status": status,
         "runtime_status": runtime_status,
         "session_liveness": session_liveness,
+        "supervisor_process_alive": supervisor_process_alive,
         "last_heartbeat_at_utc": last_heartbeat_at_utc,
         "last_heartbeat_beijing_time": last_heartbeat_beijing_time,
         "heartbeat_age_seconds": heartbeat_age_seconds,
         "stale_after_seconds": stale_after_seconds,
     }
+
+
+def supervisor_pid_alive(supervisor: dict[str, Any]) -> bool:
+    try:
+        pid = int(supervisor.get("supervisor_pid") or 0)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
 
 
 def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -> dict[str, Any]:
@@ -2477,7 +2522,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   </style>
 </head>
 <body>
-  <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
+  <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>当前电脑时间：{html.escape(update_status['wall_clock_beijing_time'])} ｜ 看板新鲜度：{html.escape(update_status['freshness_state'])} ｜ 看板延迟秒数：{html.escape(update_status['dashboard_age_seconds'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 守护器进程：{html.escape(update_status['supervisor_process_alive'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
   <main>
     <div class="grid">{cards}</div>
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>

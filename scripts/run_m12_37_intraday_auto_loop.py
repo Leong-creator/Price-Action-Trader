@@ -21,6 +21,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     market_session_status,
     project_path,
     run_m12_29_current_day_scan_dashboard,
+    validate_generated_at_for_artifacts,
     write_json,
 )
 
@@ -194,8 +195,19 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_generated_at(value: str | None) -> None:
+    if not value:
+        return
+    validate_generated_at_for_artifacts(value)
+
+
 def main() -> int:
     args = parse_args()
+    try:
+        validate_generated_at(args.generated_at)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     config = load_auto_config(args.config)
     loop_enabled = args.loop and not args.once
     session_enabled = args.session and not args.once

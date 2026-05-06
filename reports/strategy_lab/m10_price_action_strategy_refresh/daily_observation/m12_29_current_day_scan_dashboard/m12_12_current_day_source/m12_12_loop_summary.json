@@ -1,12 +1,12 @@
 {
   "all_strategy_status_count": 17,
   "daily_loop": {
-    "candidate_count": 75,
+    "candidate_count": 73,
     "candidate_plain_language": "候选是一条策略、标的、周期组合上的可观察机会，不是已经成交的交易。",
-    "dashboard_trade_view_count": 75,
-    "floating_positive_percent": "36.00",
+    "dashboard_trade_view_count": 73,
+    "floating_positive_percent": "35.62",
     "observation_event_count": 550,
-    "simulated_unrealized_pnl": "250.17",
+    "simulated_unrealized_pnl": "43.95",
     "strategy_scope": [
       "M10-PA-001",
       "M10-PA-002",
@@ -16,17 +16,26 @@
   },
   "first50_cache": {
     "coverage_status_counts": {
-      "stale_cache": 250
+      "complete_for_target_window": 9,
+      "stale_cache": 239,
+      "start_after_target_or_availability_gap": 2
     },
-    "current_5m_ready_symbol_list": [],
-    "current_5m_ready_symbols": 0,
-    "daily_ready_symbol_list": [],
-    "daily_ready_symbols": 0,
+    "current_5m_ready_symbol_list": [
+      "QQQ",
+      "SPY"
+    ],
+    "current_5m_ready_symbols": 2,
+    "daily_ready_symbol_list": [
+      "IWM",
+      "QQQ",
+      "SPY"
+    ],
+    "daily_ready_symbols": 3,
     "fake_data_created": false,
     "full_5m_target_ready_symbol_list": [],
     "full_5m_target_ready_symbols": 0,
     "full_intraday_target_note": "5m_full_target is the long historical intraday window; current_5m is enough for today's readonly bar-close dashboard but not enough for long historical intraday claims.",
-    "generated_at": "2026-05-06T14:00:00Z",
+    "generated_at": "2026-05-06T14:42:39Z",
     "local_data_git_policy": "local_data_not_tracked; checked-in reports record only path, checksum, coverage, and gaps",
     "schema_version": "m12.12.first50-cache-summary.v1",
     "stage": "M12.12.daily_observation_loop",
@@ -36,7 +45,7 @@
     "decision": "只保留为对照或选股因子",
     "deferred": [],
     "formalization_note": "从方方土市场周期与信号K来源重提炼为日线策略；不再把旧截图逻辑当正式来源。",
-    "generated_at": "2026-05-06T14:00:00Z",
+    "generated_at": "2026-05-06T14:42:39Z",
     "legacy_reference_metrics": {
       "max_drawdown_percent": "12.19",
       "return_percent": "49.79",
@@ -47,12 +56,12 @@
     },
     "overall_metrics": {
       "average_holding_bars": "4.76",
-      "final_equity": "847815.35",
+      "final_equity": "848222.34",
       "initial_capital": "100000.00",
       "max_drawdown_percent": "49.04",
-      "net_profit": "747815.35",
+      "net_profit": "748222.34",
       "profit_factor": "1.06",
-      "return_percent": "747.82",
+      "return_percent": "748.22",
       "symbol": "ALL",
       "trade_count": 41076,
       "win_rate": "36.75"
@@ -74,12 +83,12 @@
       },
       {
         "average_holding_bars": "4.90",
-        "final_equity": "141323.11",
+        "final_equity": "141730.10",
         "initial_capital": "100000.00",
         "max_drawdown_percent": "10.01",
-        "net_profit": "41323.11",
-        "profit_factor": "1.14",
-        "return_percent": "41.32",
+        "net_profit": "41730.10",
+        "profit_factor": "1.15",
+        "return_percent": "41.73",
         "symbol": "QQQ",
         "trade_count": 936,
         "win_rate": "38.14"
@@ -672,7 +681,7 @@
     "strategy_id": "M12-FTD-001",
     "title": "方方土日线趋势顺势信号K"
   },
-  "generated_at": "2026-05-06T14:00:00Z",
+  "generated_at": "2026-05-06T14:42:39Z",
   "paper_gate_recheck": {
     "approval_for_paper_trading_trial": false,
     "approval_rule": "50只数据可用、每日看板连续10个交易日稳定输出、候选记录足够、关键图形完成确认后，才批准模拟交易试运行。",
@@ -688,7 +697,7 @@
       "M10-PA-002",
       "M10-PA-012"
     ],
-    "generated_at": "2026-05-06T14:00:00Z",
+    "generated_at": "2026-05-06T14:42:39Z",
     "non_gate_daily_factor_strategies": [
       "M12-FTD-001"
     ],

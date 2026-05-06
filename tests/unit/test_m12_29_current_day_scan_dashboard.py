@@ -18,6 +18,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     load_config,
     run_m12_29_current_day_scan_dashboard,
 )
+from scripts.run_m12_29_current_day_scan_dashboard import validate_generated_at
 
 
 class M1229CurrentDayScanDashboardTest(unittest.TestCase):
@@ -46,6 +47,10 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(current_us_scan_date("2026-04-29T12:00:00Z").isoformat(), "2026-04-28")
         self.assertEqual(current_us_scan_date("2026-04-29T14:00:00Z").isoformat(), "2026-04-29")
 
+    def test_cli_generated_at_guard_rejects_future_timestamp(self):
+        with self.assertRaises(ValueError):
+            validate_generated_at("2999-01-01T00:00:00Z")
+
     def test_strategy_closure_reflects_mainline_experimental_and_supporting_lanes(self):
         _, result, _ = self.run_stage()
         rows = {row["strategy_id"]: row for row in result["strategy_closure_rows"] if not row["strategy_id"].startswith("M12-SRC-")}
@@ -70,6 +75,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("运行状态", html)
         self.assertIn("自动会话", html)
         self.assertIn("盘前 / 盘后异动", html)
+        self.assertIn("看板新鲜度", html)
         self.assertNotIn("1h 小时线测试", html)
         self.assertNotIn("15m 十五分钟测试", html)
         mainline = dashboard["mainline_account_view"]
@@ -83,6 +89,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(Decimal(first_account["starting_capital"]), DEFAULT_ACCOUNT_EQUITY)
         self.assertIn("CST", dashboard["update_status"]["beijing_time"])
         self.assertIn("session_liveness", dashboard["update_status"])
+        self.assertIn("freshness_state", dashboard["update_status"])
 
     def test_mainline_and_experimental_accounts_are_separated(self):
         _, result, _ = self.run_stage()

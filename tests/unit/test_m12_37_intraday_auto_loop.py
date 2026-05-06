@@ -9,6 +9,7 @@ from scripts.run_m12_37_intraday_auto_loop import (
     load_auto_config,
     run_once,
     session_refresh_policy,
+    validate_generated_at,
 )
 
 
@@ -109,6 +110,10 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
         self.assertTrue(postmarket["continue_session"])
         self.assertEqual(regular_midbar["max_native_fetches"], 0)
         self.assertFalse(closed["continue_session"])
+
+    def test_cli_generated_at_guard_rejects_future_timestamp(self):
+        with self.assertRaises(ValueError):
+            validate_generated_at("2999-01-01T00:00:00Z")
 
 
 if __name__ == "__main__":

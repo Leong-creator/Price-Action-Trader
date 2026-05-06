@@ -173,6 +173,10 @@ def status_path(config: SupervisorConfig) -> Path:
     return config.output_dir / "m12_47_session_supervisor_status.json"
 
 
+def failure_dossier_path(config: SupervisorConfig) -> Path:
+    return config.output_dir / "m12_47_session_failure_dossier.json"
+
+
 def log_path(config: SupervisorConfig) -> Path:
     return config.output_dir / "m12_47_session_supervisor.log"
 
@@ -225,11 +229,14 @@ def build_status_payload(
     *,
     phase: dict[str, str],
     supervisor_pid: int,
+    supervisor_process_alive: bool,
     child_pid: int | None,
     child_running: bool,
     child_started_at: str,
     child_last_exit_code: int | None,
     restart_count: int,
+    failure_state: str = "",
+    failure_reason: str = "",
 ) -> dict[str, Any]:
     dashboard = read_json_if_exists(dashboard_json_path(config))
     dashboard_generated_at = dashboard.get("generated_at", "")
@@ -239,6 +246,7 @@ def build_status_payload(
         "stage": config.stage,
         "title": config.title,
         "supervisor_pid": supervisor_pid,
+        "supervisor_process_alive": supervisor_process_alive,
         "supervisor_generated_at": phase["generated_at"],
         "new_york_time": phase["new_york_time"],
         "beijing_time": phase["beijing_time"],
@@ -249,12 +257,22 @@ def build_status_payload(
         "child_started_at": child_started_at,
         "child_last_exit_code": "" if child_last_exit_code is None else str(child_last_exit_code),
         "restart_count": restart_count,
+        "failure_state": failure_state,
+        "failure_reason": failure_reason,
         "next_session_start_new_york": phase["next_session_start_new_york"],
         "next_session_start_beijing": phase["next_session_start_beijing"],
         "latest_dashboard_generated_at": dashboard_generated_at,
         "latest_dashboard_beijing_time": dashboard_update.get("beijing_time", ""),
         "latest_dashboard_runtime_status": dashboard_update.get("runtime_status", ""),
-        "plain_language_result": build_plain_language_status(phase, child_running, child_pid, dashboard_generated_at),
+        "plain_language_result": build_plain_language_status(
+            phase,
+            supervisor_process_alive,
+            child_running,
+            child_pid,
+            dashboard_generated_at,
+            failure_state,
+            failure_reason,
+        ),
         "paper_simulated_only": True,
         "trading_connection": False,
         "real_money_actions": False,
@@ -263,7 +281,25 @@ def build_status_payload(
     }
 
 
-def build_plain_language_status(phase: dict[str, str], child_running: bool, child_pid: int | None, dashboard_generated_at: str) -> str:
+def build_plain_language_status(
+    phase: dict[str, str],
+    supervisor_process_alive: bool,
+    child_running: bool,
+    child_pid: int | None,
+    dashboard_generated_at: str,
+    failure_state: str = "",
+    failure_reason: str = "",
+) -> str:
+    if failure_state == "failed":
+        return (
+            f"自动调度器已熔断：{failure_reason or '连续失败'}；当前市场状态 {phase['market_status']}，"
+            f"最近面板刷新 {dashboard_generated_at or '暂无'}。"
+        )
+    if not supervisor_process_alive:
+        return (
+            f"自动调度器没有运行；当前市场状态 {phase['market_status']}，"
+            f"最近面板刷新 {dashboard_generated_at or '暂无'}。"
+        )
     if child_running:
         return (
             f"自动调度器正在运行；当前市场状态 {phase['market_status']}，"
@@ -278,6 +314,37 @@ def build_plain_language_status(phase: dict[str, str], child_running: bool, chil
 def write_status(config: SupervisorConfig, payload: dict[str, Any]) -> None:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(status_path(config), payload)
+
+
+def write_failure_dossier(config: SupervisorConfig, payload: dict[str, Any]) -> None:
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    write_json(failure_dossier_path(config), payload)
+
+
+def build_failure_payload(
+    config: SupervisorConfig,
+    *,
+    phase: dict[str, str],
+    consecutive_failures: int,
+    child_last_exit_code: int | None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "m12.47.session-failure-dossier.v1",
+        "stage": config.stage,
+        "generated_at": phase["generated_at"],
+        "failure_reason": f"M12.37 子会话连续 {consecutive_failures} 次非零退出，已停止自动重启。",
+        "consecutive_failures": consecutive_failures,
+        "last_exit_code": child_last_exit_code,
+        "market_status": phase["market_status"],
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+    }
+
+
+def should_trip_failure_breaker(consecutive_failures: int) -> bool:
+    return consecutive_failures >= 3
 
 
 def write_pid(config: SupervisorConfig, pid: int) -> None:
@@ -321,6 +388,9 @@ def run_foreground(config: SupervisorConfig) -> int:
     child_started_at = ""
     child_last_exit_code: int | None = None
     restart_count = 0
+    consecutive_failures = 0
+    failure_state = ""
+    failure_reason = ""
     shutting_down = False
 
     def handle_term(signum, frame):  # type: ignore[no-untyped-def]
@@ -337,7 +407,22 @@ def run_foreground(config: SupervisorConfig) -> int:
             child_running = child is not None and child.poll() is None
             if child is not None and not child_running:
                 child_last_exit_code = child.poll()
+                if child_last_exit_code not in (None, 0):
+                    consecutive_failures += 1
+                else:
+                    consecutive_failures = 0
                 child = None
+            if should_run and should_trip_failure_breaker(consecutive_failures):
+                failure_state = "failed"
+                failure_payload = build_failure_payload(
+                    config,
+                    phase=phase,
+                    consecutive_failures=consecutive_failures,
+                    child_last_exit_code=child_last_exit_code,
+                )
+                failure_reason = failure_payload["failure_reason"]
+                write_failure_dossier(config, failure_payload)
+                should_run = False
             if should_run and not child_running:
                 child = spawn_m1237_session(config)
                 child_started_at = phase["generated_at"]
@@ -356,11 +441,14 @@ def run_foreground(config: SupervisorConfig) -> int:
                     config,
                     phase=phase,
                     supervisor_pid=os.getpid(),
+                    supervisor_process_alive=True,
                     child_pid=child.pid if child_running and child else None,
                     child_running=child_running,
                     child_started_at=child_started_at,
                     child_last_exit_code=child_last_exit_code,
                     restart_count=restart_count,
+                    failure_state=failure_state,
+                    failure_reason=failure_reason,
                 ),
             )
             time.sleep(config.check_interval_seconds)
@@ -377,11 +465,14 @@ def run_foreground(config: SupervisorConfig) -> int:
                 config,
                 phase=phase,
                 supervisor_pid=os.getpid(),
+                supervisor_process_alive=True,
                 child_pid=None,
                 child_running=False,
                 child_started_at=child_started_at,
                 child_last_exit_code=child_last_exit_code,
                 restart_count=restart_count,
+                failure_state=failure_state,
+                failure_reason=failure_reason,
             ),
         )
         return 0
@@ -394,6 +485,7 @@ def start_daemon(config: SupervisorConfig, config_path: str | Path) -> int:
     if process_alive(existing):
         print(f"supervisor_already_running pid={existing}")
         return 0
+    remove_pid_file(config)
     log_path(config).parent.mkdir(parents=True, exist_ok=True)
     with log_path(config).open("a", encoding="utf-8") as handle:
         proc = subprocess.Popen(
@@ -416,17 +508,23 @@ def start_daemon(config: SupervisorConfig, config_path: str | Path) -> int:
 
 
 def print_status(config: SupervisorConfig) -> int:
-    payload = read_json_if_exists(status_path(config))
-    if not payload:
+    stored = read_json_if_exists(status_path(config))
+    stored_pid = int(stored.get("supervisor_pid") or read_existing_pid(config) or 0) if stored else (read_existing_pid(config) or 0)
+    supervisor_alive = process_alive(stored_pid)
+    if stored and supervisor_alive:
+        payload = dict(stored)
+        payload["supervisor_process_alive"] = True
+    else:
         payload = build_status_payload(
             config,
             phase=build_window_state(config),
-            supervisor_pid=0,
+            supervisor_pid=stored_pid,
+            supervisor_process_alive=False,
             child_pid=None,
             child_running=False,
             child_started_at="",
             child_last_exit_code=None,
-            restart_count=0,
+            restart_count=int(stored.get("restart_count", 0)) if stored else 0,
         )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0

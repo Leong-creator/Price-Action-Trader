@@ -5,9 +5,11 @@ from dataclasses import replace
 from pathlib import Path
 
 from scripts.run_m12_47_session_supervisor import (
+    build_failure_payload,
     build_status_payload,
     build_window_state,
     load_config,
+    should_trip_failure_breaker,
 )
 
 
@@ -48,6 +50,7 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 config,
                 phase=phase,
                 supervisor_pid=123,
+                supervisor_process_alive=True,
                 child_pid=456,
                 child_running=True,
                 child_started_at="2026-05-05T13:25:00Z",
@@ -57,7 +60,39 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(payload["latest_dashboard_generated_at"], "2026-05-05T17:15:30Z")
         self.assertEqual(payload["child_pid"], 456)
         self.assertTrue(payload["child_running"])
+        self.assertTrue(payload["supervisor_process_alive"])
         self.assertIn("自动调度器正在运行", payload["plain_language_result"])
+
+    def test_status_payload_marks_dead_supervisor_plainly(self):
+        config = load_config()
+        phase = build_window_state(config, "2026-05-05T14:00:00Z")
+        payload = build_status_payload(
+            config,
+            phase=phase,
+            supervisor_pid=999999,
+            supervisor_process_alive=False,
+            child_pid=None,
+            child_running=False,
+            child_started_at="",
+            child_last_exit_code=None,
+            restart_count=0,
+        )
+        self.assertFalse(payload["supervisor_process_alive"])
+        self.assertIn("自动调度器没有运行", payload["plain_language_result"])
+
+    def test_failure_breaker_trips_after_three_child_failures(self):
+        config = load_config()
+        phase = build_window_state(config, "2026-05-05T14:00:00Z")
+        self.assertFalse(should_trip_failure_breaker(2))
+        self.assertTrue(should_trip_failure_breaker(3))
+        payload = build_failure_payload(
+            config,
+            phase=phase,
+            consecutive_failures=3,
+            child_last_exit_code=1,
+        )
+        self.assertIn("连续 3 次", payload["failure_reason"])
+        self.assertFalse(payload["live_execution"])
 
 
 if __name__ == "__main__":
