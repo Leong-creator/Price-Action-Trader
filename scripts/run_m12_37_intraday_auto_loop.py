@@ -27,6 +27,8 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
 
 
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_37_intraday_auto_loop.json"
+PREOPEN_NATIVE_FETCH_BUDGET = 100
+REGULAR_NATIVE_FETCH_BUDGET = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,7 +146,7 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
         return {
             "execute_fetch": (not no_fetch) and kline_refresh_due,
             "refresh_quotes": not no_refresh_quotes,
-            "max_native_fetches": 1 if (not no_fetch) and kline_refresh_due else 0,
+            "max_native_fetches": REGULAR_NATIVE_FETCH_BUDGET if (not no_fetch) and kline_refresh_due else 0,
             "continue_session": True,
             "entered_regular_session": True,
         }
@@ -152,7 +154,7 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
         return {
             "execute_fetch": not no_fetch,
             "refresh_quotes": not no_refresh_quotes,
-            "max_native_fetches": 3 if not no_fetch else 0,
+            "max_native_fetches": PREOPEN_NATIVE_FETCH_BUDGET if not no_fetch else 0,
             "continue_session": True,
             "entered_regular_session": False,
         }

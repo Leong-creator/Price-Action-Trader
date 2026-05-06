@@ -83,7 +83,7 @@
 - M11.7 当前复查仍为未批准：新闻/财报 sidecar、FTD001 优化和财报跳空原型已具备，但只读观察仍为约 `1/10` 个真实交易日，未满 10 天，不进入模拟交易试运行。
 - M12.46 当前进行中：已从 `main` 切出 `codex/m12-46-accountized-testing`，把 M12.29/M12.37 从“机会当前价估值”升级为“20,000 USD 独立模拟账户”；当前已落下主线/实验账户分栏、`1d / 5m` 主视图、`M10-PA-004 long-only` 主线化、`M12-FTD-001 baseline / loss_streak_guard` 并行账户、纽约交易日累计修复，并已新增对应单测；下一步继续补回归、同步文档并把自动盘中测试正式切到新账户口径。
 - M12.48 当前进行中：已从 `codex/m12-47-realtime-session-supervisor` 切出 `codex/m12-48-premarket-afterhours-monitor`，把 Longbridge `pre_market_quote / post_market_quote` 接入分钟级账户看板和 Codex 观察摘要；当前目标是补齐盘前 quote 刷新、盘后延时 quote 刷新、盘前/盘后异动榜，以及 AMD / 谷歌 / 半导体 / 存储芯片重点关注股提示，且继续保持只读/模拟边界。
-- M12.49 当前进行中：已从 `codex/m12-48-premarket-afterhours-monitor` 切出 `codex/m12-49-dashboard-runtime-hardening`，目标是修复看板未来时间、守护器死进程旧心跳、自动会话未完整覆盖交易时段等运行层 blocker；当前已加未来时间库层/CLI 双门禁、看板新鲜度/心跳/进程状态显示，以及 M12.47 连续 3 次失败熔断。
+- M12.49 当前进行中：已从 `codex/m12-48-premarket-afterhours-monitor` 切出 `codex/m12-49-dashboard-runtime-hardening`，目标是修复看板未来时间、守护器死进程旧心跳、自动会话未完整覆盖交易时段等运行层 blocker；当前已加未来时间库层/CLI 双门禁、看板新鲜度/心跳/进程状态显示、M12.47 连续 3 次失败熔断、PA004 `看涨/long` 方向兼容，以及 M12.37 盘前/盘中 K 线补数预算提升。
 - Git 远端推送阻塞已处理：原始 M10.6 大 JSONL 通过 gzip archive manifest 保留可追溯，未把超过 GitHub 单文件限制的原始 blob 推送到远端；`main` 已可推送。
 - 下一阶段主线是继续用 `scripts/run_m12_37_intraday_auto_loop.py --session` 在美股开盘相关时段自动预热并持续刷新看板和 Codex 摘要，累计每日看板到 `10` 个真实交易日；同时继续扩充新闻/财报事件样本和第一批 `50` 只长历史 `5m`，长历史 `5m` 仍用于后续完整日内回测，不阻塞当前盘中只读看板。
 

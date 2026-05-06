@@ -465,7 +465,7 @@ def build_pa004_formal_rows(
             source_checksum=checksum,
         )
         for event in events:
-            if event.get("direction") != "long":
+            if not pa004_event_is_long(event):
                 continue
             event_date = iso_to_ny_trading_date(event.get("bar_timestamp", ""))
             if event_date is None:
@@ -521,6 +521,10 @@ def build_pa004_formal_rows(
             )
     rows.sort(key=lambda row: (row["signal_time"], row["symbol"]), reverse=True)
     return rows
+
+
+def pa004_event_is_long(event: dict[str, Any]) -> bool:
+    return event.get("direction") in {"long", "看涨"}
 
 
 def build_pa004_reference_rows(quotes: dict[str, dict[str, str]], generated_at: str) -> list[dict[str, str]]:

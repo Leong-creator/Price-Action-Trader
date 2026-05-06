@@ -16,6 +16,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     build_accountized_run_status,
     current_us_scan_date,
     load_config,
+    pa004_event_is_long,
     run_m12_29_current_day_scan_dashboard,
 )
 from scripts.run_m12_29_current_day_scan_dashboard import validate_generated_at
@@ -151,6 +152,12 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertTrue(all(row.get("signal_source_type") == "reference_observation" for row in reference_watchlist))
         audit_path = output_dir / "m12_46_account_input_audit.json"
         self.assertTrue(audit_path.exists())
+
+    def test_pa004_formal_detector_accepts_chinese_and_english_long_direction(self):
+        self.assertTrue(pa004_event_is_long({"direction": "long"}))
+        self.assertTrue(pa004_event_is_long({"direction": "看涨"}))
+        self.assertFalse(pa004_event_is_long({"direction": "short"}))
+        self.assertFalse(pa004_event_is_long({"direction": "看跌"}))
 
     def test_all_runtime_accounts_are_marked_as_formal_input_streams(self):
         _, result, _ = self.run_stage()
