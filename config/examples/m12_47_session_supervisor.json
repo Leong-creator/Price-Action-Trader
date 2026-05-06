@@ -1,0 +1,20 @@
+{
+  "title": "M12.47 交易时段常驻调度器",
+  "run_id": "m12_47_session_supervisor",
+  "stage": "M12.47.session_supervisor",
+  "source_m12_37_config_path": "config/examples/m12_37_intraday_auto_loop.json",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard",
+  "check_interval_seconds": 30,
+  "market_timezone": "America/New_York",
+  "preopen_start_time": "09:25",
+  "regular_session_start_time": "09:30",
+  "regular_session_end_time": "16:00",
+  "postclose_grace_minutes": 10,
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

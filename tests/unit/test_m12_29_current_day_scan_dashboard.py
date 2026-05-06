@@ -66,6 +66,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("正式信号清单", html)
         self.assertIn("北京时间最后更新", html)
         self.assertIn("运行状态", html)
+        self.assertIn("自动会话", html)
         self.assertNotIn("1h 小时线测试", html)
         self.assertNotIn("15m 十五分钟测试", html)
         mainline = dashboard["mainline_account_view"]
@@ -78,6 +79,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(first_account["starting_capital"], "20000.00")
         self.assertEqual(Decimal(first_account["starting_capital"]), DEFAULT_ACCOUNT_EQUITY)
         self.assertIn("CST", dashboard["update_status"]["beijing_time"])
+        self.assertIn("session_liveness", dashboard["update_status"])
 
     def test_mainline_and_experimental_accounts_are_separated(self):
         _, result, _ = self.run_stage()

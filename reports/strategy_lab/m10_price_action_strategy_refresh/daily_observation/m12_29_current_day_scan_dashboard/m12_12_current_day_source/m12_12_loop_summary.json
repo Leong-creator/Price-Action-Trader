@@ -130,7 +130,7 @@
     "full_5m_target_ready_symbol_list": [],
     "full_5m_target_ready_symbols": 0,
     "full_intraday_target_note": "5m_full_target is the long historical intraday window; current_5m is enough for today's readonly bar-close dashboard but not enough for long historical intraday claims.",
-    "generated_at": "2026-05-05T17:15:30Z",
+    "generated_at": "2026-05-06T01:29:59Z",
     "local_data_git_policy": "local_data_not_tracked; checked-in reports record only path, checksum, coverage, and gaps",
     "schema_version": "m12.12.first50-cache-summary.v1",
     "stage": "M12.12.daily_observation_loop",
@@ -140,7 +140,7 @@
     "decision": "只保留为对照或选股因子",
     "deferred": [],
     "formalization_note": "从方方土市场周期与信号K来源重提炼为日线策略；不再把旧截图逻辑当正式来源。",
-    "generated_at": "2026-05-05T17:15:30Z",
+    "generated_at": "2026-05-06T01:29:59Z",
     "legacy_reference_metrics": {
       "max_drawdown_percent": "12.19",
       "return_percent": "49.79",
@@ -776,7 +776,7 @@
     "strategy_id": "M12-FTD-001",
     "title": "方方土日线趋势顺势信号K"
   },
-  "generated_at": "2026-05-05T17:15:30Z",
+  "generated_at": "2026-05-06T01:29:59Z",
   "paper_gate_recheck": {
     "approval_for_paper_trading_trial": false,
     "approval_rule": "50只数据可用、每日看板连续10个交易日稳定输出、候选记录足够、关键图形完成确认后，才批准模拟交易试运行。",
@@ -790,7 +790,7 @@
       "M10-PA-002",
       "M10-PA-012"
     ],
-    "generated_at": "2026-05-05T17:15:30Z",
+    "generated_at": "2026-05-06T01:29:59Z",
     "non_gate_daily_factor_strategies": [
       "M12-FTD-001"
     ],

@@ -1357,7 +1357,7 @@ def build_accountized_dashboard_payload(
     ftd001_monitor = build_ftd_account_monitor(runtime["mainline_accounts"])
     codex_observer = build_accountized_codex_observer(config, summary, mainline_overview, experimental_overview, timeframe_views, ftd001_monitor)
     trade_ledger_rows = build_trade_ledger_rows(runtime["account_rows"], runtime["state"])
-    update_status = build_dashboard_update_status(summary, config.dashboard_refresh_seconds)
+    update_status = build_dashboard_update_status(config, summary, config.dashboard_refresh_seconds)
     return {
         "schema_version": "m12.46.accountized-readonly-dashboard.v1",
         "stage": "M12.46.accountized_realtime_dashboard",
@@ -1494,7 +1494,7 @@ def build_accountized_codex_observer(
     }
 
 
-def build_dashboard_update_status(summary: dict[str, Any], refresh_seconds: int) -> dict[str, str]:
+def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], refresh_seconds: int) -> dict[str, str]:
     market = summary["market_session"]
     status = market["status"]
     if status == "美股常规交易时段":
@@ -1505,12 +1505,47 @@ def build_dashboard_update_status(summary: dict[str, Any], refresh_seconds: int)
         runtime_status = "盘后快照，等待下一交易日继续自动运行。"
     else:
         runtime_status = "非交易时段快照，当前不会生成新正式交易。"
+    supervisor_path = config.output_dir / "m12_47_session_supervisor_status.json"
+    session_liveness = "unknown"
+    last_heartbeat_at_utc = ""
+    last_heartbeat_beijing_time = ""
+    heartbeat_age_seconds = ""
+    stale_after_seconds = str(refresh_seconds * 3)
+    if supervisor_path.exists():
+        supervisor = load_json(supervisor_path)
+        last_heartbeat_at_utc = supervisor.get("supervisor_generated_at", "")
+        last_heartbeat_beijing_time = supervisor.get("beijing_time", "")
+        child_running = bool(supervisor.get("child_running"))
+        supervisor_market_status = supervisor.get("market_status", "")
+        if last_heartbeat_at_utc:
+            try:
+                now_dt = datetime.fromisoformat(summary["generated_at"].replace("Z", "+00:00"))
+                heartbeat_dt = datetime.fromisoformat(last_heartbeat_at_utc.replace("Z", "+00:00"))
+                heartbeat_age = int((now_dt - heartbeat_dt).total_seconds())
+                heartbeat_age_seconds = str(max(heartbeat_age, 0))
+                if child_running and heartbeat_age <= refresh_seconds * 3:
+                    session_liveness = "alive"
+                elif child_running:
+                    session_liveness = "stale"
+                elif supervisor_market_status in {"等待开盘前预热", "等待下一交易日", "非交易日等待", "收盘后收尾窗口"}:
+                    session_liveness = "idle"
+                else:
+                    session_liveness = "stopped"
+            except ValueError:
+                session_liveness = "unknown"
+        elif child_running:
+            session_liveness = "alive"
     return {
         "generated_at_utc": summary["generated_at"],
         "beijing_time": market["beijing_time"],
         "new_york_time": market["new_york_time"],
         "market_status": status,
         "runtime_status": runtime_status,
+        "session_liveness": session_liveness,
+        "last_heartbeat_at_utc": last_heartbeat_at_utc,
+        "last_heartbeat_beijing_time": last_heartbeat_beijing_time,
+        "heartbeat_age_seconds": heartbeat_age_seconds,
+        "stale_after_seconds": stale_after_seconds,
     }
 
 
@@ -2321,7 +2356,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   </style>
 </head>
 <body>
-  <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
+  <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
   <main>
     <div class="grid">{cards}</div>
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>

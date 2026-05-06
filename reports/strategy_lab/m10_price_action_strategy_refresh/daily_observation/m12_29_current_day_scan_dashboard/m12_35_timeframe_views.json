@@ -512,11 +512,11 @@
           "winning_trade_count": "1"
         },
         {
-          "cash": "17385.80",
-          "closed_trade_count": "8",
-          "cumulative_return_percent": "-7.56",
+          "cash": "3313.28",
+          "closed_trade_count": "10",
+          "cumulative_return_percent": "-8.51",
           "display_name": "M10-PA-012 五分钟账户",
-          "equity": "18487.83",
+          "equity": "18298.72",
           "historical_average_holding_bars": "488.3762",
           "historical_final_equity": "1015141.29",
           "historical_initial_capital": "800000.00",
@@ -526,26 +526,26 @@
           "historical_return_percent": "26.8927",
           "historical_win_rate_percent": "38.15",
           "lane": "mainline",
-          "losing_trade_count": "7",
-          "max_drawdown_percent": "7.56",
-          "open_position_count": "2",
+          "losing_trade_count": "9",
+          "max_drawdown_percent": "8.51",
+          "open_position_count": "3",
           "paper_trial_candidate_now": "false",
-          "realized_pnl": "-1511.50",
+          "realized_pnl": "-1724.72",
           "runtime_id": "M10-PA-012-5m",
           "starting_capital": "20000.00",
           "strategy_id": "M10-PA-012",
-          "symbols": "DIA, IVV, IWM, QQQ, SPY, VOO, VTI, XLK",
+          "symbols": "DIA, IVV, IWM, QQQ, SPY, VOO, VTI, XLE, XLF, XLK",
           "timeframe": "5m",
-          "today_closed_count": "8",
-          "today_opened_count": "2",
-          "today_realized_pnl": "-1511.50",
-          "today_signal_count": "2",
-          "today_total_pnl": "-1512.17",
-          "today_unrealized_pnl": "-0.67",
-          "unrealized_pnl": "-0.67",
+          "today_closed_count": "10",
+          "today_opened_count": "3",
+          "today_realized_pnl": "-1724.72",
+          "today_signal_count": "3",
+          "today_total_pnl": "-1701.28",
+          "today_unrealized_pnl": "23.44",
+          "unrealized_pnl": "23.44",
           "variant_id": "base",
           "variant_label": "",
-          "win_rate_percent": "12.50",
+          "win_rate_percent": "10.00",
           "winning_trade_count": "1"
         },
         {
@@ -661,8 +661,8 @@
         }
       ],
       "timeframe": "5m",
-      "today_total_pnl": "-2131.09",
-      "win_rate_percent": "15.38"
+      "today_total_pnl": "-2320.20",
+      "win_rate_percent": "13.33"
     }
   }
 }
