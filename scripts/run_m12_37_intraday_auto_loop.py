@@ -150,7 +150,7 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
     if preopen_window:
         return {
             "execute_fetch": not no_fetch,
-            "refresh_quotes": False,
+            "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": 3 if not no_fetch else 0,
             "continue_session": True,
             "entered_regular_session": False,
@@ -158,10 +158,18 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
     if market_status == "盘前":
         return {
             "execute_fetch": False,
-            "refresh_quotes": False,
+            "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": 0,
             "continue_session": True,
             "entered_regular_session": False,
+        }
+    if market_status == "盘后":
+        return {
+            "execute_fetch": False,
+            "refresh_quotes": not no_refresh_quotes,
+            "max_native_fetches": 0,
+            "continue_session": True,
+            "entered_regular_session": True,
         }
     return {
         "execute_fetch": False,

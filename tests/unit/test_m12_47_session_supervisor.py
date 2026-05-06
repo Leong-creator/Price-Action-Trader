@@ -21,7 +21,8 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(preopen["session_should_run"], "true")
         self.assertEqual(regular["market_status"], "美股常规交易时段")
         self.assertEqual(regular["session_should_run"], "true")
-        self.assertIn(after["market_status"], {"收盘后收尾窗口", "等待下一交易日"})
+        self.assertEqual(after["market_status"], "收盘后收尾窗口")
+        self.assertEqual(after["session_should_run"], "true")
 
     def test_status_payload_reads_latest_dashboard_timestamp(self):
         with tempfile.TemporaryDirectory() as temp_dir:

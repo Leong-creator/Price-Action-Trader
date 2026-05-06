@@ -57,6 +57,19 @@ TIMEFRAME_LABELS = {
     "1d": "1d 日线测试",
     "5m": "5m 五分钟测试",
 }
+EXTENDED_SESSION_MOVE_THRESHOLD = Decimal("3")
+EXTENDED_SESSION_FOCUS_LABELS = {
+    "AMD": "AMD / AI 芯片",
+    "NVDA": "英伟达 / AI 芯片",
+    "QCOM": "高通 / 芯片",
+    "TSM": "台积电 / 晶圆代工",
+    "MU": "存储芯片",
+    "WDC": "存储芯片",
+    "SOXX": "半导体 ETF",
+    "SMH": "半导体 ETF",
+    "GOOG": "谷歌 / 财报观察",
+    "GOOGL": "谷歌 / 财报观察",
+}
 ACCOUNT_SPECS = (
     {"account_id": "M10-PA-001-1d", "strategy_id": "M10-PA-001", "timeframe": "1d", "lane": "mainline", "display_name": "M10-PA-001 日线账户", "variant_id": "base"},
     {"account_id": "M10-PA-001-5m", "strategy_id": "M10-PA-001", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-001 五分钟账户", "variant_id": "base"},
@@ -221,6 +234,7 @@ def run_m12_29_current_day_scan_dashboard(
     cache_summary = load_json(source_dir / "m12_12_first50_cache_summary.json")
     quote_config = load_m12_28_config()
     quotes, quote_manifest = build_quotes(quote_config, first50, generated_at, enabled=refresh_quotes)
+    extended_session_monitor = build_extended_session_monitor(quotes)
     trade_rows = build_trade_rows(candidates, quotes, scan_date)
     pa004_formal_rows = build_pa004_formal_rows(first50, quotes, generated_at, scan_date)
     pa004_reference_rows = build_pa004_reference_rows(quotes, generated_at)
@@ -244,6 +258,7 @@ def run_m12_29_current_day_scan_dashboard(
         source_summary,
         cache_summary,
         quote_manifest,
+        extended_session_monitor,
         trade_rows,
         pa004_formal_rows,
         pa004_reference_rows,
@@ -254,6 +269,7 @@ def run_m12_29_current_day_scan_dashboard(
         generated_at,
         summary,
         runtime,
+        extended_session_monitor,
         closure_rows,
         visual_rows,
         pa004_reference_rows,
@@ -262,6 +278,7 @@ def run_m12_29_current_day_scan_dashboard(
     gate = build_accountized_gate_recheck(config, summary, run_status)
 
     write_json(config.output_dir / "m12_29_current_day_scan_summary.json", summary)
+    write_json(config.output_dir / "m12_48_extended_session_monitor.json", extended_session_monitor)
     write_csv(config.output_dir / "m12_29_today_candidates.csv", candidates)
     write_jsonl(config.output_dir / "m12_29_today_candidates.jsonl", candidates)
     write_csv(config.output_dir / "m12_29_trade_view.csv", dashboard["trade_rows"])
@@ -1229,6 +1246,80 @@ def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[s
     }
 
 
+def build_extended_session_monitor(quotes: dict[str, dict[str, str]]) -> dict[str, Any]:
+    premarket_rows = build_extended_session_rows(quotes, "pre_market", "盘前")
+    postmarket_rows = build_extended_session_rows(quotes, "post_market", "盘后")
+    focus_hits = [
+        row for row in (premarket_rows + postmarket_rows)
+        if row["symbol"] in EXTENDED_SESSION_FOCUS_LABELS and row["threshold_hit"] == "true"
+    ]
+    summary_parts: list[str] = []
+    if premarket_rows:
+        summary_parts.append(f"盘前异动 {len(premarket_rows)} 条，最强 {extended_mover_label(premarket_rows[0])}")
+    if postmarket_rows:
+        summary_parts.append(f"盘后异动 {len(postmarket_rows)} 条，最强 {extended_mover_label(postmarket_rows[0])}")
+    if focus_hits:
+        summary_parts.append("重点关注股命中：" + "，".join(extended_mover_label(row) for row in focus_hits[:6]))
+    if not summary_parts:
+        summary_parts.append("当前没有超过 3% 的盘前/盘后异动。")
+    return {
+        "schema_version": "m12.48.extended-session-monitor.v1",
+        "stage": "M12.48.extended_session_monitor",
+        "threshold_percent": pct(EXTENDED_SESSION_MOVE_THRESHOLD),
+        "premarket_rows": premarket_rows[:12],
+        "postmarket_rows": postmarket_rows[:12],
+        "focus_hits": focus_hits[:12],
+        "premarket_count": len(premarket_rows),
+        "postmarket_count": len(postmarket_rows),
+        "focus_hit_count": len(focus_hits),
+        "plain_language_summary": "；".join(summary_parts),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_extended_session_rows(
+    quotes: dict[str, dict[str, str]],
+    prefix: str,
+    session_display: str,
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for symbol, quote in quotes.items():
+        extended_price = decimal_or_none(quote.get(f"{prefix}_last"))
+        reference_close = decimal_or_none(quote.get(f"{prefix}_reference_close"))
+        move_percent = decimal_or_none(quote.get(f"{prefix}_move_percent"))
+        if extended_price in (None, ZERO) or reference_close in (None, ZERO) or move_percent is None:
+            continue
+        move_amount = decimal_or_none(quote.get(f"{prefix}_move_amount")) or ZERO
+        rows.append(
+            {
+                "symbol": symbol,
+                "session": session_display,
+                "theme": EXTENDED_SESSION_FOCUS_LABELS.get(symbol, ""),
+                "quote_timestamp": quote.get(f"{prefix}_timestamp", ""),
+                "reference_close": money(reference_close),
+                "extended_price": money(extended_price),
+                "move_amount": money(move_amount),
+                "move_percent": pct(move_percent),
+                "move_direction": "上涨" if move_percent > ZERO else "下跌" if move_percent < ZERO else "持平",
+                "threshold_hit": "true" if abs(move_percent) >= EXTENDED_SESSION_MOVE_THRESHOLD else "false",
+                "quote_source": quote.get("quote_source", ""),
+                "quote_status": quote.get("quote_status", ""),
+            }
+        )
+    rows = [row for row in rows if row["threshold_hit"] == "true"]
+    rows.sort(key=lambda row: abs(money_to_decimal(row["move_percent"])), reverse=True)
+    return rows
+
+
+def extended_mover_label(row: dict[str, str]) -> str:
+    theme = f"（{row['theme']}）" if row.get("theme") else ""
+    return f"{row['symbol']}{theme} {row['move_percent']}%"
+
+
 def build_trade_ledger_rows(account_rows: list[dict[str, str]], state: dict[str, Any]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for account_row in account_rows:
@@ -1289,6 +1380,7 @@ def build_accountized_summary(
     source_summary: dict[str, Any],
     cache_summary: dict[str, Any],
     quote_manifest: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
     trade_rows: list[dict[str, str]],
     pa004_formal_rows: list[dict[str, str]],
     pa004_reference_rows: list[dict[str, str]],
@@ -1315,6 +1407,9 @@ def build_accountized_summary(
         "signal_watchlist_count": len(runtime["signal_watchlist"]),
         "reference_watchlist_count": len(pa004_reference_rows),
         "pa004_formal_signal_count": len(pa004_formal_rows),
+        "premarket_mover_count": extended_session_monitor["premarket_count"],
+        "postmarket_mover_count": extended_session_monitor["postmarket_count"],
+        "focus_mover_count": extended_session_monitor["focus_hit_count"],
         "mainline_today_pnl": mainline["day_pnl"],
         "experimental_today_pnl": experimental["day_pnl"],
         "mainline_current_equity": mainline["current_equity"],
@@ -1329,6 +1424,7 @@ def build_accountized_summary(
             f"主线正式账户当前权益 {mainline['current_equity']}，今日盈亏 {mainline['day_pnl']}；"
             f"实验账户当前权益 {experimental['current_equity']}，今日盈亏 {experimental['day_pnl']}。"
             f"PA004 正式信号 {len(pa004_formal_rows)} 条，历史参考样例 {len(pa004_reference_rows)} 条（不入账）。"
+            f"{extended_session_monitor['plain_language_summary']}"
         ),
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -1347,6 +1443,7 @@ def build_accountized_dashboard_payload(
     generated_at: str,
     summary: dict[str, Any],
     runtime: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
     closure_rows: list[dict[str, str]],
     visual_rows: list[dict[str, str]],
     pa004_reference_rows: list[dict[str, str]],
@@ -1355,7 +1452,15 @@ def build_accountized_dashboard_payload(
     experimental_overview = build_account_overview("实验账户", runtime["experimental_accounts"])
     timeframe_views = build_accountized_timeframe_views(runtime["account_rows"])
     ftd001_monitor = build_ftd_account_monitor(runtime["mainline_accounts"])
-    codex_observer = build_accountized_codex_observer(config, summary, mainline_overview, experimental_overview, timeframe_views, ftd001_monitor)
+    codex_observer = build_accountized_codex_observer(
+        config,
+        summary,
+        mainline_overview,
+        experimental_overview,
+        timeframe_views,
+        ftd001_monitor,
+        extended_session_monitor,
+    )
     trade_ledger_rows = build_trade_ledger_rows(runtime["account_rows"], runtime["state"])
     update_status = build_dashboard_update_status(config, summary, config.dashboard_refresh_seconds)
     return {
@@ -1374,6 +1479,7 @@ def build_accountized_dashboard_payload(
             "今日新开仓": mainline_overview["today_opened_count"],
             "今日已平仓": mainline_overview["today_closed_count"],
             "FTD001 对照": ftd001_monitor["current_plain_status"],
+            "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
             "北京时间更新": update_status["beijing_time"],
             "运行状态": update_status["runtime_status"],
         },
@@ -1382,6 +1488,7 @@ def build_accountized_dashboard_payload(
             "experimental": "实验账户总览",
             "timeframe_views": "按 1d / 5m 分组测试",
             "ftd001_focus": "FTD001 双版本对照",
+            "extended_session_monitor": "盘前 / 盘后异动",
             "trade_ledger": "模拟交易明细",
             "signal_watchlist": "信号观察清单",
         },
@@ -1413,6 +1520,7 @@ def build_accountized_dashboard_payload(
         },
         "timeframe_views": timeframe_views,
         "ftd001_monitor": ftd001_monitor,
+        "extended_session_monitor": extended_session_monitor,
         "codex_observer": codex_observer,
         "summary": summary,
         "trade_rows": trade_ledger_rows,
@@ -1447,6 +1555,7 @@ def build_accountized_codex_observer(
     experimental: dict[str, Any],
     timeframe_views: dict[str, Any],
     ftd001_monitor: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
 ) -> dict[str, Any]:
     active_timeframes = [
         timeframe_views["views"][timeframe]["display_name"]
@@ -1460,6 +1569,10 @@ def build_accountized_codex_observer(
         alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
     if not summary["current_day_scan_complete"]:
         alerts.append({"level": "数据", "message": "第一批 50 只股票当日数据未全部齐。"})
+    if extended_session_monitor["premarket_count"] > 0:
+        alerts.append({"level": "盘前", "message": extended_session_monitor["plain_language_summary"]})
+    elif extended_session_monitor["postmarket_count"] > 0:
+        alerts.append({"level": "盘后", "message": extended_session_monitor["plain_language_summary"]})
     if not alerts:
         alerts.append({"level": "正常", "message": "当前主线和实验账户都已刷新，没有明显数据阻塞。"})
     return {
@@ -1473,13 +1586,16 @@ def build_accountized_codex_observer(
         "plain_language_summary": (
             f"主线模拟权益 {mainline['current_equity']}，主线今日盈亏 {mainline['day_pnl']}；"
             f"实验账户权益 {experimental['current_equity']}，实验今日盈亏 {experimental['day_pnl']}。"
-            f"活跃周期：{', '.join(active_timeframes) or '暂无'}。{ftd001_monitor['plain_language_summary']}"
+            f"活跃周期：{', '.join(active_timeframes) or '暂无'}。"
+            f"{extended_session_monitor['plain_language_summary']} "
+            f"{ftd001_monitor['plain_language_summary']}"
         ),
         "active_timeframes": active_timeframes,
         "alerts": alerts,
         "recommended_codex_message": (
             f"盘中只读模拟：主线权益 {mainline['current_equity']}，今日 {mainline['day_pnl']}；"
             f"实验账户今日 {experimental['day_pnl']}。"
+            f"{extended_session_monitor['plain_language_summary']} "
             f"{ftd001_monitor['plain_language_summary']} 当前提醒："
             + "；".join(f"{row['level']}：{row['message']}" for row in alerts)
         ),
@@ -1500,9 +1616,9 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
     if status == "美股常规交易时段":
         runtime_status = f"交易时段自动运行中，每 {refresh_seconds} 秒刷新报价，5m 收盘更新信号。"
     elif status == "盘前":
-        runtime_status = "开盘前预热中，等待常规交易时段正式刷新。"
+        runtime_status = f"盘前异动监控中，每 {refresh_seconds} 秒刷新只读报价；正式信号仍等常规交易时段确认。"
     elif status == "盘后":
-        runtime_status = "盘后快照，等待下一交易日继续自动运行。"
+        runtime_status = f"盘后异动监控中，每 {refresh_seconds} 秒刷新只读报价；正式信号不在夜盘确认。"
     else:
         runtime_status = "非交易时段快照，当前不会生成新正式交易。"
     supervisor_path = config.output_dir / "m12_47_session_supervisor_status.json"
@@ -1527,7 +1643,7 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
                     session_liveness = "alive"
                 elif child_running:
                     session_liveness = "stale"
-                elif supervisor_market_status in {"等待开盘前预热", "等待下一交易日", "非交易日等待", "收盘后收尾窗口"}:
+                elif supervisor_market_status in {"等待开盘前预热", "等待下一交易日", "非交易日等待"}:
                     session_liveness = "idle"
                 else:
                     session_liveness = "stopped"
@@ -2190,6 +2306,7 @@ def build_report_md(summary: dict[str, Any]) -> str:
         f"- 主线正式账户今日盈亏：`{summary['mainline_today_pnl']}`，当前权益：`{summary['mainline_current_equity']}`。\n"
         f"- 实验账户今日盈亏：`{summary['experimental_today_pnl']}`，当前权益：`{summary['experimental_current_equity']}`。\n"
         f"- 今日新信号 `{summary['today_candidate_count']}` 条，信号观察清单总数 `{summary['signal_watchlist_count']}` 条。\n"
+        f"- 盘前异动 `{summary['premarket_mover_count']}` 条，盘后异动 `{summary['postmarket_mover_count']}` 条，重点关注股命中 `{summary['focus_mover_count']}` 条。\n"
         f"- 50 只股票日线可用 `{summary['first50_daily_ready_symbols']}` 只，当日 5m 可用 `{summary['first50_current_5m_ready_symbols']}` 只。{warning}\n"
         "- 这不是实盘，也不是自动买卖；只是只读行情和模拟盈亏。\n"
     )
@@ -2310,6 +2427,10 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     reference_rows = "\n".join(signal_watchlist_html(row) for row in dashboard["reference_watchlist"][:80])
     timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in PRIMARY_TIMEFRAME_ORDER)
     ftd_rows = "".join(ftd_account_row_html(row) for row in ftd["accounts"])
+    extended_monitor = dashboard["extended_session_monitor"]
+    premarket_rows = "\n".join(extended_session_row_html(row) for row in extended_monitor["premarket_rows"])
+    postmarket_rows = "\n".join(extended_session_row_html(row) for row in extended_monitor["postmarket_rows"])
+    focus_rows = "\n".join(extended_session_row_html(row) for row in extended_monitor["focus_hits"])
     status_rows = "\n".join(
         f"<tr><td>{html.escape(row['strategy_id'])}</td><td>{html.escape(row['strategy_title'])}</td><td>{html.escape(row['final_status'])}</td><td>{html.escape(row['plain_reason'])}</td></tr>"
         for row in dashboard["strategy_status_rows"]
@@ -2362,6 +2483,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
     <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
     <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>历史收益</th><th>胜率</th><th>最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
+    <section class="panel"><h2>盘前 / 盘后异动</h2><div class="note">{html.escape(extended_monitor['plain_language_summary'])}</div><div class="two-col"><div class="mini-card"><h2>盘前超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{premarket_rows}</tbody></table></div></div><div class="mini-card"><h2>盘后超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{postmarket_rows}</tbody></table></div></div></div><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{focus_rows}</tbody></table></div></section>
     <section class="panel"><h2>按 1d / 5m 分组测试</h2><div class="note">当前主计划只保留 1d 与 5m。信号按各自周期收盘确认，盘中每 60 秒只刷新报价和持仓盈亏。</div><div class="timeframes">{timeframe_sections}</div></section>
     <section class="panel"><h2>账户成绩单</h2><div class="note">每条独立账户都看得到本金、权益、今日盈亏、胜率和最大回撤；主线和实验分层展示，但都真实入账。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
     <section class="panel"><h2>账户下钻</h2><div class="note">这里看每个账户的当前状态、开平仓数量、可用现金和历史参考指标。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
@@ -2485,6 +2607,26 @@ def signal_watchlist_html(row: dict[str, str]) -> str:
         f"<td>{html.escape(row['symbol'])}</td><td>{html.escape(row['timeframe'])}</td><td>{html.escape(row.get('direction', ''))}</td>"
         f"<td>{html.escape(row['latest_price'])}</td><td>{html.escape(row['hypothetical_entry_price'])}</td><td>{html.escape(row['hypothetical_stop_price'])}</td><td>{html.escape(row['hypothetical_target_price'])}</td>"
         f"<td>{html.escape(row.get('signal_time', ''))}</td><td>{html.escape(row.get('review_status', ''))}</td></tr>"
+    )
+
+
+def extended_session_head() -> str:
+    return "<tr><th>时段</th><th>股票</th><th>主题</th><th>现价</th><th>参考收盘</th><th>涨跌额</th><th>涨跌幅</th><th>时间</th></tr>"
+
+
+def extended_session_row_html(row: dict[str, str]) -> str:
+    cls = "good" if money_to_decimal(row["move_percent"]) > ZERO else "bad" if money_to_decimal(row["move_percent"]) < ZERO else ""
+    return (
+        "<tr>"
+        f"<td>{html.escape(row['session'])}</td>"
+        f"<td>{html.escape(row['symbol'])}</td>"
+        f"<td>{html.escape(row.get('theme', '') or '普通监控')}</td>"
+        f"<td>{html.escape(row['extended_price'])}</td>"
+        f"<td>{html.escape(row['reference_close'])}</td>"
+        f"<td class=\"{cls}\">{html.escape(row['move_amount'])}</td>"
+        f"<td class=\"{cls}\">{html.escape(row['move_percent'])}%</td>"
+        f"<td>{html.escape(row['quote_timestamp'])}</td>"
+        "</tr>"
     )
 
 

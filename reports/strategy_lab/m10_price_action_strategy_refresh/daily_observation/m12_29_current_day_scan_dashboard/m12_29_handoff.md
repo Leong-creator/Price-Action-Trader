@@ -23,9 +23,9 @@ tests_run:
   - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py tests/unit/test_m12_37_intraday_auto_loop.py tests/unit/test_m12_46_runtime_accounts.py tests/unit/test_m12_17_daily_observation_continuity.py tests/unit/test_m12_25_daily_observation_continuity.py -v
   - git diff --check
 verification_results:
-  - scan_date: 2026-05-05
-  - today_candidate_count: 77
-  - current_day_scan_complete: true
+  - scan_date: 2026-05-06
+  - today_candidate_count: 0
+  - current_day_scan_complete: false
 assumptions:
   - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单
 risks:

@@ -15,4 +15,4 @@ candidate_count_today,paper_gate_evidence_now,plain_reason,status,strategy_id,ti
 0,false,只用于目标，不单独交易,辅助规则,M10-PA-014,Measured Move 目标模块
 0,false,只用于风险控制，不单独交易,辅助规则,M10-PA-015,止损与仓位模块
 0,false,不进入每日自动测试,研究项,M10-PA-016,交易区间加仓研究
-6,false,从方方土来源重新正式化，不再叫 placeholder；本轮已重测。,只保留为对照或选股因子,M12-FTD-001,方方土日线趋势顺势信号K
+4,false,从方方土来源重新正式化，不再叫 placeholder；本轮已重测。,只保留为对照或选股因子,M12-FTD-001,方方土日线趋势顺势信号K

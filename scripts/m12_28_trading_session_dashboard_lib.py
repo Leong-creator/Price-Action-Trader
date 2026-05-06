@@ -270,7 +270,7 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
         symbol = str(row.get("symbol", "")).split(".")[0]
         if not symbol:
             continue
-        quotes[symbol] = {
+        quote_row = {
             "symbol": symbol,
             "latest_price": str(row.get("last", "")),
             "previous_close": str(row.get("prev_close", "")),
@@ -282,6 +282,10 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
             "quote_timestamp": generated_at,
             "quote_source": "longbridge_quote_readonly",
         }
+        apply_extended_session_quote(quote_row, row, "pre_market", "pre_market_quote")
+        apply_extended_session_quote(quote_row, row, "post_market", "post_market_quote")
+        apply_extended_session_quote(quote_row, row, "overnight", "overnight_quote")
+        quotes[symbol] = quote_row
     return quotes
 
 
@@ -343,6 +347,28 @@ def quote_manifest(
         "trading_connection": False,
         "real_money_actions": False,
     }
+
+
+def apply_extended_session_quote(target: dict[str, str], raw_row: dict[str, Any], prefix: str, field_name: str) -> None:
+    payload = raw_row.get(field_name)
+    if not isinstance(payload, dict):
+        return
+    last = decimal_or_none(payload.get("last"))
+    reference = decimal_or_none(payload.get("prev_close"))
+    move_amount = ZERO
+    move_percent = ZERO
+    if last is not None and reference not in (None, ZERO):
+        move_amount = last - reference
+        move_percent = (move_amount / reference) * HUNDRED
+    target[f"{prefix}_last"] = str(payload.get("last", ""))
+    target[f"{prefix}_reference_close"] = str(payload.get("prev_close", ""))
+    target[f"{prefix}_high"] = str(payload.get("high", ""))
+    target[f"{prefix}_low"] = str(payload.get("low", ""))
+    target[f"{prefix}_volume"] = str(payload.get("volume", ""))
+    target[f"{prefix}_turnover"] = str(payload.get("turnover", ""))
+    target[f"{prefix}_timestamp"] = str(payload.get("timestamp", ""))
+    target[f"{prefix}_move_amount"] = money(move_amount)
+    target[f"{prefix}_move_percent"] = pct(move_percent)
 
 
 def build_session_trade_rows(source_rows: list[dict[str, str]], quotes: dict[str, dict[str, str]]) -> list[dict[str, str]]:

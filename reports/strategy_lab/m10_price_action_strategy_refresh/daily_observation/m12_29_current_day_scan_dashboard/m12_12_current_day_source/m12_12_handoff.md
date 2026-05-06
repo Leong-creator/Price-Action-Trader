@@ -41,8 +41,8 @@ next_recommended_action: Run the daily loop for 10 trading days, complete priori
 needs_user_decision: false
 user_decision_needed:
 summary:
-  first50_daily_ready: 50
-  first50_current_5m_ready: 50
+  first50_daily_ready: 0
+  first50_current_5m_ready: 0
   first50_full_5m_target_ready: 0
-  daily_candidate_count: 77
+  daily_candidate_count: 75
   paper_gate_approval: False

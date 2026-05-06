@@ -1,10 +1,10 @@
 {
   "cache_context": {
-    "current_5m_ready_symbols": 50,
-    "daily_ready_symbols": 50,
+    "current_5m_ready_symbols": 0,
+    "daily_ready_symbols": 0,
     "first_batch_symbols": 50
   },
-  "generated_at": "2026-05-06T01:29:59Z",
+  "generated_at": "2026-05-06T14:00:00Z",
   "items": [
     {
       "candidate_count_today": "13",
@@ -135,7 +135,7 @@
       "title": "交易区间加仓研究"
     },
     {
-      "candidate_count_today": "6",
+      "candidate_count_today": "4",
       "paper_gate_evidence_now": "false",
       "plain_reason": "从方方土来源重新正式化，不再叫 placeholder；本轮已重测。",
       "status": "只保留为对照或选股因子",

@@ -9,7 +9,7 @@
   "preopen_start_time": "09:25",
   "regular_session_start_time": "09:30",
   "regular_session_end_time": "16:00",
-  "postclose_grace_minutes": 10,
+  "postclose_grace_minutes": 240,
   "boundary": {
     "paper_simulated_only": true,
     "trading_connection": false,

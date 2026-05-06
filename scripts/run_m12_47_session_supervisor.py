@@ -159,7 +159,7 @@ def build_window_state(config: SupervisorConfig, generated_at: str | None = None
         "market_date": market_dt.date().isoformat(),
         "new_york_time": market_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "beijing_time": utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
-        "session_should_run": str(phase in {"开盘前预热窗口", "美股常规交易时段"}).lower(),
+        "session_should_run": str(phase in {"开盘前预热窗口", "美股常规交易时段", "收盘后收尾窗口"}).lower(),
         "next_session_start_new_york": next_session_market_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "next_session_start_beijing": next_session_market_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
     }

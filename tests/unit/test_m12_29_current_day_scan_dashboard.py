@@ -5,12 +5,14 @@ from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.m12_29_current_day_scan_dashboard_lib import (
     ACCOUNT_SPECS,
     DEFAULT_ACCOUNT_EQUITY,
     advance_account_runtime,
     bootstrap_account_state,
+    build_extended_session_monitor,
     build_accountized_run_status,
     current_us_scan_date,
     load_config,
@@ -67,6 +69,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("北京时间最后更新", html)
         self.assertIn("运行状态", html)
         self.assertIn("自动会话", html)
+        self.assertIn("盘前 / 盘后异动", html)
         self.assertNotIn("1h 小时线测试", html)
         self.assertNotIn("15m 十五分钟测试", html)
         mainline = dashboard["mainline_account_view"]
@@ -237,6 +240,65 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(row["today_closed_count"], "1")
         self.assertEqual(row["today_realized_pnl"], "-50.00")
         self.assertEqual(row["today_total_pnl"], "-50.00")
+
+    def test_extended_session_monitor_detects_premarket_and_postmarket_focus_movers(self):
+        quotes = {
+            "AMD": {
+                "quote_source": "longbridge_quote_readonly",
+                "quote_status": "Normal",
+                "pre_market_last": "425.58",
+                "pre_market_reference_close": "355.26",
+                "pre_market_move_amount": "70.32",
+                "pre_market_move_percent": "19.79",
+                "pre_market_timestamp": "2026-05-06 11:00:45",
+                "post_market_last": "414.00",
+                "post_market_reference_close": "355.26",
+                "post_market_move_amount": "58.74",
+                "post_market_move_percent": "16.53",
+                "post_market_timestamp": "2026-05-05 23:59:59",
+            },
+            "MU": {
+                "quote_source": "longbridge_quote_readonly",
+                "quote_status": "Normal",
+                "pre_market_last": "675.72",
+                "pre_market_reference_close": "640.20",
+                "pre_market_move_amount": "35.52",
+                "pre_market_move_percent": "5.55",
+                "pre_market_timestamp": "2026-05-06 11:00:45",
+            },
+        }
+        monitor = build_extended_session_monitor(quotes)
+        self.assertEqual(monitor["premarket_count"], 2)
+        self.assertEqual(monitor["postmarket_count"], 1)
+        self.assertGreaterEqual(monitor["focus_hit_count"], 2)
+        self.assertIn("AMD", monitor["plain_language_summary"])
+
+    def test_dashboard_includes_extended_session_monitor_from_live_quotes(self):
+        live_quotes = {
+            "AMD": {
+                "symbol": "AMD",
+                "latest_price": "355.26",
+                "previous_close": "341.54",
+                "open": "351.51",
+                "high": "359.57",
+                "low": "344.88",
+                "volume": "64235117",
+                "quote_status": "Normal",
+                "quote_timestamp": "2026-05-06T14:00:00Z",
+                "quote_source": "longbridge_quote_readonly",
+                "pre_market_last": "425.58",
+                "pre_market_reference_close": "355.26",
+                "pre_market_move_amount": "70.32",
+                "pre_market_move_percent": "19.79",
+                "pre_market_timestamp": "2026-05-06 11:00:45",
+            }
+        }
+        with patch("scripts.m12_29_current_day_scan_dashboard_lib.build_quotes", return_value=(live_quotes, {"quote_source": "longbridge_quote_readonly", "quote_count": 1})):
+            _, result, output_dir = self.run_stage(generated_at="2026-05-06T14:00:00Z")
+        monitor = result["dashboard"]["extended_session_monitor"]
+        self.assertEqual(monitor["premarket_count"], 1)
+        self.assertEqual(monitor["premarket_rows"][0]["symbol"], "AMD")
+        self.assertTrue((output_dir / "m12_48_extended_session_monitor.json").exists())
 
 
 if __name__ == "__main__":

@@ -7,27 +7,39 @@
     {
       "level": "注意",
       "message": "主线账户今日暂时为负，先看是否集中在 M10-PA-012 或 FTD001。"
+    },
+    {
+      "level": "数据",
+      "message": "仍有 75 条旧日期候选留在观察信号里，不能当作今日新开仓。"
+    },
+    {
+      "level": "数据",
+      "message": "第一批 50 只股票当日数据未全部齐。"
+    },
+    {
+      "level": "盘前",
+      "message": "盘前异动 14 条，最强 AMD（AMD / AI 芯片） 19.34%；盘后异动 3 条，最强 AMD（AMD / AI 芯片） 16.53%；重点关注股命中：AMD（AMD / AI 芯片） 19.34%，QCOM（高通 / 芯片） 6.28%，MU（存储芯片） 5.95%，SOXX（半导体 ETF） 4.62%，SMH（半导体 ETF） 4.15%，AMD（AMD / AI 芯片） 16.53%"
     }
   ],
   "dashboard_refresh_seconds": 60,
-  "generated_at": "2026-05-06T01:29:59Z",
+  "generated_at": "2026-05-06T14:00:00Z",
   "latest_dashboard_html": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard.html",
   "latest_dashboard_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
   "live_execution": false,
   "market_session": {
-    "beijing_time": "2026-05-06 09:29:59 CST",
-    "new_york_date": "2026-05-05",
-    "new_york_time": "2026-05-05 21:29:59 EDT",
-    "status": "休市"
+    "beijing_time": "2026-05-06 22:00:00 CST",
+    "new_york_date": "2026-05-06",
+    "new_york_time": "2026-05-06 10:00:00 EDT",
+    "status": "美股常规交易时段"
   },
   "observer_inbox": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_38_codex_observer_inbox.jsonl",
   "observer_interval_minutes": 15,
   "observer_mode": "codex_heartbeat_or_file_inbox",
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_summary": "主线模拟权益 155055.54，主线今日盈亏 -4944.46；实验账户权益 180000.00，实验今日盈亏 0.00。活跃周期：1d 日线测试, 5m 五分钟测试。FTD001 原版今日 -103.62，连亏保护版今日 -103.62；重点看回撤、连亏和是否过度触发。",
+  "plain_language_summary": "主线模拟权益 154659.05，主线今日盈亏 -464.84；实验账户权益 180000.00，实验今日盈亏 0.00。活跃周期：1d 日线测试, 5m 五分钟测试。盘前异动 14 条，最强 AMD（AMD / AI 芯片） 19.34%；盘后异动 3 条，最强 AMD（AMD / AI 芯片） 16.53%；重点关注股命中：AMD（AMD / AI 芯片） 19.34%，QCOM（高通 / 芯片） 6.28%，MU（存储芯片） 5.95%，SOXX（半导体 ETF） 4.62%，SMH（半导体 ETF） 4.15%，AMD（AMD / AI 芯片） 16.53% FTD001 原版今日 -126.07，连亏保护版今日 -126.07；重点看回撤、连亏和是否过度触发。",
   "real_money_actions": false,
-  "recommended_codex_message": "盘中只读模拟：主线权益 155055.54，今日 -4944.46；实验账户今日 0.00。FTD001 原版今日 -103.62，连亏保护版今日 -103.62；重点看回撤、连亏和是否过度触发。 当前提醒：注意：主线账户今日暂时为负，先看是否集中在 M10-PA-012 或 FTD001。",
+  "recommended_codex_message": "盘中只读模拟：主线权益 154659.05，今日 -464.84；实验账户今日 0.00。盘前异动 14 条，最强 AMD（AMD / AI 芯片） 19.34%；盘后异动 3 条，最强 AMD（AMD / AI 芯片） 16.53%；重点关注股命中：AMD（AMD / AI 芯片） 19.34%，QCOM（高通 / 芯片） 6.28%，MU（存储芯片） 5.95%，SOXX（半导体 ETF） 4.62%，SMH（半导体 ETF） 4.15%，AMD（AMD / AI 芯片） 16.53% FTD001 原版今日 -126.07，连亏保护版今日 -126.07；重点看回撤、连亏和是否过度触发。 当前提醒：注意：主线账户今日暂时为负，先看是否集中在 M10-PA-012 或 FTD001。；数据：仍有 75 条旧日期候选留在观察信号里，不能当作今日新开仓。；数据：第一批 50 只股票当日数据未全部齐。；盘前：盘前异动 14 条，最强 AMD（AMD / AI 芯片） 19.34%；盘后异动 3 条，最强 AMD（AMD / AI 芯片） 16.53%；重点关注股命中：AMD（AMD / AI 芯片） 19.34%，QCOM（高通 / 芯片） 6.28%，MU（存储芯片） 5.95%，SOXX（半导体 ETF） 4.62%，SMH（半导体 ETF） 4.15%，AMD（AMD / AI 芯片） 16.53%",
   "schema_version": "m12.46.codex-observer.v1",
   "stage": "M12.46.codex_observer",
   "trading_connection": false
