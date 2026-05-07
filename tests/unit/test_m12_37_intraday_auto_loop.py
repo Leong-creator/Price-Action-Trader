@@ -63,8 +63,11 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertEqual(manifest["refresh_seconds"], 60)
             self.assertEqual(manifest["observer_interval_minutes"], 15)
             self.assertFalse(manifest["loop_can_continue_now"])
+            self.assertFalse(manifest["session_monitoring_active_now"])
+            self.assertFalse(manifest["regular_session_active_now"])
             self.assertIn("主线权益", manifest["plain_language_result"])
             self.assertIn("FTD001", manifest["plain_language_result"])
+            self.assertIn("休市快照", manifest["plain_language_result"])
             self.assertFalse(manifest["trading_connection"])
             self.assertFalse(manifest["real_money_actions"])
             self.assertFalse(manifest["live_execution"])
@@ -86,6 +89,8 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             dashboard = outcome["result"]["dashboard"]
             self.assertEqual(outcome["manifest"]["market_session"]["status"], "美股常规交易时段")
             self.assertTrue(outcome["manifest"]["loop_can_continue_now"])
+            self.assertTrue(outcome["manifest"]["session_monitoring_active_now"])
+            self.assertTrue(outcome["manifest"]["regular_session_active_now"])
             self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
             self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
 

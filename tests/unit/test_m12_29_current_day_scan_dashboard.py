@@ -163,8 +163,33 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         _, result, _ = self.run_stage()
         rows = result["dashboard"]["account_input_audit"]["rows"]
         self.assertEqual(len(rows), len(ACCOUNT_SPECS))
-        self.assertTrue(all(row["formal_input_stream"] == "true" for row in rows))
         self.assertTrue(all(row["watchlist_only"] == "false" for row in rows))
+        mainline_rows = [row for row in rows if row["lane"] == "mainline"]
+        experimental_rows = [row for row in rows if row["lane"] == "experimental"]
+        self.assertTrue(all(row["formal_input_stream"] == "true" for row in mainline_rows))
+        self.assertTrue(all(row["current_scanner_connected"] == "true" for row in mainline_rows))
+        self.assertTrue(all(row["formal_input_stream"] == "false" for row in experimental_rows))
+        self.assertTrue(all(row["current_scanner_connected"] == "false" for row in experimental_rows))
+        self.assertTrue(all(row["input_status"] == "not_connected_to_current_scanner" for row in experimental_rows))
+
+    def test_postmarket_runtime_uses_postmarket_wording_and_runtime_ready_note(self):
+        _, result, _ = self.run_stage(generated_at="2026-05-06T23:59:17Z")
+        summary = result["summary"]
+        dashboard = result["dashboard"]
+        observer = dashboard["codex_observer"]
+        self.assertEqual(summary["market_session"]["status"], "盘后")
+        self.assertTrue(summary["current_day_runtime_ready"])
+        self.assertFalse(summary["current_day_scan_complete"])
+        self.assertIn("当前有 3 只日线因本轮禁抓取而沿用上一份 cache", summary["runtime_readiness_note"])
+        self.assertIn("盘后异动", summary["plain_language_result"])
+        self.assertNotIn("盘前异动 6 条", observer["recommended_codex_message"])
+        self.assertIn("盘后只读快照", observer["recommended_codex_message"])
+        self.assertEqual(dashboard["extended_session_monitor"]["active_session"], "盘后")
+
+    def test_observation_lane_does_not_claim_unwired_experimental_accounts_are_running(self):
+        _, result, _ = self.run_stage()
+        lane = result["dashboard"]["observation_test_lane"]
+        self.assertIn("还没接上正式当日扫描输入", lane["plain_language_result"])
 
     def test_observed_trading_days_accumulate_by_new_york_trading_date(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -186,7 +211,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 trade_rows=[],
                 pa004_formal_rows=[],
                 closure_rows=[],
-                current_day_complete=False,
+                current_day_runtime_ready=False,
             )
             state = json.loads((output_dir / "m12_46_account_runtime_state.json").read_text(encoding="utf-8"))
         self.assertEqual(build_accountized_run_status(config, degraded_runtime)["observed_trading_days"], 1)
@@ -248,7 +273,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 trade_rows=[],
                 pa004_formal_rows=[],
                 closure_rows=[],
-                current_day_complete=False,
+                current_day_runtime_ready=False,
             )
         row = next(item for item in runtime["account_rows"] if item["runtime_id"] == spec["account_id"])
         self.assertEqual(row["today_closed_count"], "1")
@@ -281,9 +306,10 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "pre_market_timestamp": "2026-05-06 11:00:45",
             },
         }
-        monitor = build_extended_session_monitor(quotes)
+        monitor = build_extended_session_monitor(quotes, "盘前")
         self.assertEqual(monitor["premarket_count"], 2)
         self.assertEqual(monitor["postmarket_count"], 1)
+        self.assertEqual(monitor["active_session"], "盘前")
         self.assertGreaterEqual(monitor["focus_hit_count"], 2)
         self.assertIn("AMD", monitor["plain_language_summary"])
 
@@ -311,6 +337,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             _, result, output_dir = self.run_stage(generated_at="2026-05-06T14:00:00Z")
         monitor = result["dashboard"]["extended_session_monitor"]
         self.assertEqual(monitor["premarket_count"], 1)
+        self.assertEqual(monitor["active_session"], "盘前")
         self.assertEqual(monitor["premarket_rows"][0]["symbol"], "AMD")
         self.assertTrue((output_dir / "m12_48_extended_session_monitor.json").exists())
 

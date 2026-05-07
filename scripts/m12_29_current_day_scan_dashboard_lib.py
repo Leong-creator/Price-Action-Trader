@@ -53,6 +53,7 @@ DEFAULT_RISK_BUDGET = DEFAULT_ACCOUNT_RISK_BUDGET
 MAX_GENERATED_AT_FUTURE_SKEW_SECONDS = 90
 MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-004", "M10-PA-012", "M12-FTD-001")
 EXPERIMENTAL_STRATEGIES = ("M10-PA-005", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013")
+CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES)
 PRIMARY_TIMEFRAME_ORDER = ("1d", "5m")
 TIMEFRAME_ORDER = PRIMARY_TIMEFRAME_ORDER
 TIMEFRAME_LABELS = {
@@ -235,15 +236,16 @@ def run_m12_29_current_day_scan_dashboard(
     first50 = load_json(source_dir / "m12_12_first50_universe.json")["symbols"]
     candidates = read_csv(source_dir / "m12_12_daily_candidates.csv")
     cache_summary = load_json(source_dir / "m12_12_first50_cache_summary.json")
+    fetch_results = load_json(source_dir / "m12_12_cache_fetch_results.json")
     quote_config = load_m12_28_config()
     quotes, quote_manifest = build_quotes(quote_config, first50, generated_at, enabled=refresh_quotes)
-    extended_session_monitor = build_extended_session_monitor(quotes)
+    extended_session_monitor = build_extended_session_monitor(quotes, market["status"])
     trade_rows = build_trade_rows(candidates, quotes, scan_date)
     pa004_formal_rows = build_pa004_formal_rows(first50, quotes, generated_at, scan_date)
     pa004_reference_rows = build_pa004_reference_rows(quotes, generated_at)
     closure_rows = build_strategy_closure_rows(config)
     visual_rows = build_visual_definition_rows(closure_rows)
-    current_day_complete = cache_summary["daily_ready_symbols"] == config.first_batch_size and cache_summary["current_5m_ready_symbols"] == config.first_batch_size
+    runtime_readiness = build_runtime_readiness(config, cache_summary, fetch_results)
     runtime = advance_account_runtime(
         config,
         generated_at,
@@ -251,7 +253,7 @@ def run_m12_29_current_day_scan_dashboard(
         trade_rows,
         pa004_formal_rows,
         closure_rows,
-        current_day_complete,
+        runtime_readiness["runtime_ready"],
     )
     summary = build_accountized_summary(
         config,
@@ -259,7 +261,7 @@ def run_m12_29_current_day_scan_dashboard(
         market,
         scan_date,
         source_summary,
-        cache_summary,
+        runtime_readiness,
         quote_manifest,
         extended_session_monitor,
         trade_rows,
@@ -730,6 +732,49 @@ def runtime_signal_rows(
     ]
 
 
+def build_runtime_readiness(
+    config: M1229Config,
+    cache_summary: dict[str, Any],
+    fetch_results: dict[str, Any],
+) -> dict[str, Any]:
+    daily_ready = int(cache_summary["daily_ready_symbols"])
+    current_5m_ready = int(cache_summary["current_5m_ready_symbols"])
+    strict_complete = daily_ready == config.first_batch_size and current_5m_ready == config.first_batch_size
+    deferred_daily_symbols = sorted(
+        {
+            str(item.get("symbol", ""))
+            for item in fetch_results.get("items", [])
+            if item.get("timeframe") == "1d"
+            and item.get("status") == "deferred"
+            and item.get("skipped_reason") == "fetch_disabled"
+        }
+    )
+    effective_daily_ready = min(config.first_batch_size, daily_ready + len(deferred_daily_symbols))
+    runtime_ready = current_5m_ready == config.first_batch_size and effective_daily_ready >= config.first_batch_size
+    if strict_complete:
+        plain_reason = "第一批 50 只股票当日数据已齐。"
+    elif runtime_ready:
+        symbol_text = "、".join(deferred_daily_symbols[:5]) or "少量日线"
+        plain_reason = (
+            f"当前有 {len(deferred_daily_symbols)} 只日线因本轮禁抓取而沿用上一份 cache：{symbol_text}；"
+            "这不影响当前只读账户刷新，但会让严格“50/50 当日全齐”口径显示未完成。"
+        )
+    else:
+        plain_reason = (
+            f"第一批 50 只股票仍有缺口：日线 {daily_ready}/{config.first_batch_size}，"
+            f"当日 5m {current_5m_ready}/{config.first_batch_size}。"
+        )
+    return {
+        "strict_complete": strict_complete,
+        "runtime_ready": runtime_ready,
+        "daily_ready_symbols": daily_ready,
+        "current_5m_ready_symbols": current_5m_ready,
+        "effective_daily_ready_symbols": effective_daily_ready,
+        "deferred_daily_symbols": deferred_daily_symbols,
+        "plain_reason": plain_reason,
+    }
+
+
 def bootstrap_account_state(spec: dict[str, str]) -> dict[str, Any]:
     return {
         "runtime_id": spec["account_id"],
@@ -1002,7 +1047,7 @@ def advance_account_runtime(
     trade_rows: list[dict[str, str]],
     pa004_formal_rows: list[dict[str, str]],
     closure_rows: list[dict[str, str]],
-    current_day_complete: bool,
+    current_day_runtime_ready: bool,
 ) -> dict[str, Any]:
     state = load_account_runtime_state(config)
     history_lookup = build_account_history_lookup(config, closure_rows)
@@ -1041,16 +1086,21 @@ def advance_account_runtime(
             mainline_accounts.append(account_view)
         else:
             experimental_accounts.append(account_view)
+    account_input_audit_rows = build_account_input_audit_rows(scan_date, trade_rows, pa004_formal_rows)
     registry = state["trading_day_registry"]
     registry_key = scan_date.isoformat()
     previous = registry.get(registry_key, {})
-    counted_now = current_day_complete and bool(mainline_accounts) and bool(experimental_accounts)
+    experimental_input_connected = any(
+        row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+        for row in account_input_audit_rows
+    )
+    counted_now = current_day_runtime_ready and bool(mainline_accounts)
     registry[registry_key] = {
         "counted": bool(previous.get("counted")) or counted_now,
         "generated_at": generated_at,
         "first_counted_at": previous.get("first_counted_at") or (generated_at if counted_now else ""),
         "mainline_progressed": bool(previous.get("mainline_progressed")) or bool(mainline_accounts),
-        "experimental_progressed": bool(previous.get("experimental_progressed")) or bool(experimental_accounts),
+        "experimental_progressed": bool(previous.get("experimental_progressed")) or experimental_input_connected,
         "last_run_complete": counted_now,
     }
     write_json(config.output_dir / "m12_46_account_runtime_state.json", state)
@@ -1063,7 +1113,7 @@ def advance_account_runtime(
         "experimental_accounts": experimental_accounts,
         "supporting_rule_rows": build_supporting_rule_rows(mainline_accounts, experimental_accounts),
         "signal_watchlist": trade_rows + pa004_formal_rows,
-        "account_input_audit_rows": build_account_input_audit_rows(scan_date, trade_rows, pa004_formal_rows),
+        "account_input_audit_rows": account_input_audit_rows,
         "new_trade_ledger_rows": new_ledger_rows,
     }
 
@@ -1093,6 +1143,7 @@ def build_account_input_audit_rows(
 ) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for spec in ACCOUNT_SPECS:
+        scanner_connected = spec["strategy_id"] in CONNECTED_RUNTIME_STRATEGIES
         if spec["strategy_id"] == "M10-PA-004":
             source_rows = [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]
             source_type = "formal_detector_entry"
@@ -1104,6 +1155,15 @@ def build_account_input_audit_rows(
             ]
             source_type = "formal_scan"
         today_formal_count = sum(1 for row in source_rows if row.get("signal_date") == scan_date.isoformat())
+        if not scanner_connected:
+            input_status = "not_connected_to_current_scanner"
+            plain_language_result = "账户已建，但当前扫描器还没有给这条策略接正式信号流；今天的 0 开仓不能当成已完成实时测试。"
+        elif today_formal_count > 0:
+            input_status = "connected_with_signal_today"
+            plain_language_result = "今日有正式账户输入。"
+        else:
+            input_status = "connected_zero_signal_today"
+            plain_language_result = "当前账户已接入正式信号流；只是今天没有形成可入账信号。"
         rows.append(
             {
                 "runtime_id": spec["account_id"],
@@ -1111,15 +1171,13 @@ def build_account_input_audit_rows(
                 "lane": spec["lane"],
                 "timeframe": spec["timeframe"],
                 "input_source_type": source_type,
-                "formal_input_stream": "true",
+                "formal_input_stream": str(scanner_connected).lower(),
+                "current_scanner_connected": str(scanner_connected).lower(),
+                "input_status": input_status,
                 "today_formal_signal_count": str(today_formal_count),
                 "source_row_count": str(len(source_rows)),
                 "watchlist_only": "false",
-                "plain_language_result": (
-                    "今日有正式账户输入。"
-                    if today_formal_count > 0 else
-                    "当前账户源已对齐为正式输入流；若今日无信号，会如实显示 0 开仓。"
-                ),
+                "plain_language_result": plain_language_result,
             }
         )
     return rows
@@ -1165,6 +1223,26 @@ def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict
         "variant_label": history.get("variant_label", ""),
         "paper_trial_candidate_now": "false",
     }
+
+
+def market_observer_prefix(status: str) -> str:
+    if status == "美股常规交易时段":
+        return "盘中只读模拟"
+    if status == "盘前":
+        return "盘前预热快照"
+    if status == "盘后":
+        return "盘后只读快照"
+    return "休市快照"
+
+
+def experimental_lane_plain_reason(audit_rows: list[dict[str, str]]) -> str:
+    experimental_rows = [row for row in audit_rows if row.get("lane") == "experimental"]
+    connected_rows = [row for row in experimental_rows if row.get("current_scanner_connected") == "true"]
+    if not experimental_rows:
+        return "当前没有实验账户。"
+    if connected_rows:
+        return "实验账户里已接入正式输入流的策略会正常入账；未接入的策略不会再被包装成‘已经在实时测试’。"
+    return "实验账户已建，但当前这批实验策略还没接上正式当日扫描输入；现在看到的 0 开仓只是账户空转，不是有效实时测试。"
 
 
 def build_account_overview(name: str, accounts: list[dict[str, str]]) -> dict[str, Any]:
@@ -1264,31 +1342,52 @@ def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[s
     }
 
 
-def build_extended_session_monitor(quotes: dict[str, dict[str, str]]) -> dict[str, Any]:
+def build_extended_session_monitor(quotes: dict[str, dict[str, str]], market_status: str) -> dict[str, Any]:
     premarket_rows = build_extended_session_rows(quotes, "pre_market", "盘前")
     postmarket_rows = build_extended_session_rows(quotes, "post_market", "盘后")
+    if market_status == "盘后":
+        active_rows = postmarket_rows
+        active_session = "盘后"
+        hidden_rows = premarket_rows
+    elif market_status == "盘前":
+        active_rows = premarket_rows
+        active_session = "盘前"
+        hidden_rows = postmarket_rows
+    elif market_status == "美股常规交易时段":
+        active_rows = premarket_rows
+        active_session = "盘前"
+        hidden_rows = postmarket_rows
+    else:
+        active_rows = []
+        active_session = "休市"
+        hidden_rows = premarket_rows + postmarket_rows
     focus_hits = [
-        row for row in (premarket_rows + postmarket_rows)
+        row for row in active_rows
         if row["symbol"] in EXTENDED_SESSION_FOCUS_LABELS and row["threshold_hit"] == "true"
     ]
     summary_parts: list[str] = []
-    if premarket_rows:
-        summary_parts.append(f"盘前异动 {len(premarket_rows)} 条，最强 {extended_mover_label(premarket_rows[0])}")
-    if postmarket_rows:
-        summary_parts.append(f"盘后异动 {len(postmarket_rows)} 条，最强 {extended_mover_label(postmarket_rows[0])}")
+    if active_rows:
+        summary_parts.append(f"{active_session}异动 {len(active_rows)} 条，最强 {extended_mover_label(active_rows[0])}")
     if focus_hits:
         summary_parts.append("重点关注股命中：" + "，".join(extended_mover_label(row) for row in focus_hits[:6]))
+    if hidden_rows:
+        summary_parts.append(f"另有 {len(hidden_rows)} 条非当前时段快照已隐藏，不作为当前 headline。")
     if not summary_parts:
         summary_parts.append("当前没有超过 3% 的盘前/盘后异动。")
     return {
         "schema_version": "m12.48.extended-session-monitor.v1",
         "stage": "M12.48.extended_session_monitor",
         "threshold_percent": pct(EXTENDED_SESSION_MOVE_THRESHOLD),
+        "market_status": market_status,
+        "active_session": active_session,
+        "active_rows": active_rows[:12],
         "premarket_rows": premarket_rows[:12],
         "postmarket_rows": postmarket_rows[:12],
         "focus_hits": focus_hits[:12],
         "premarket_count": len(premarket_rows),
         "postmarket_count": len(postmarket_rows),
+        "active_count": len(active_rows),
+        "hidden_non_current_count": len(hidden_rows),
         "focus_hit_count": len(focus_hits),
         "plain_language_summary": "；".join(summary_parts),
         "paper_simulated_only": True,
@@ -1396,7 +1495,7 @@ def build_accountized_summary(
     market: dict[str, str],
     scan_date: date,
     source_summary: dict[str, Any],
-    cache_summary: dict[str, Any],
+    runtime_readiness: dict[str, Any],
     quote_manifest: dict[str, Any],
     extended_session_monitor: dict[str, Any],
     trade_rows: list[dict[str, str]],
@@ -1408,7 +1507,6 @@ def build_accountized_summary(
     old_rows = [row for row in trade_rows if row["is_current_scan_date"] != "true"]
     mainline = build_account_overview("主线正式账户", runtime["mainline_accounts"])
     experimental = build_account_overview("实验账户", runtime["experimental_accounts"])
-    current_day_complete = cache_summary["daily_ready_symbols"] == config.first_batch_size and cache_summary["current_5m_ready_symbols"] == config.first_batch_size
     return {
         "schema_version": "m12.46.accountized-summary.v1",
         "stage": "M12.46.accountized_realtime_testing",
@@ -1434,14 +1532,17 @@ def build_accountized_summary(
         "experimental_current_equity": experimental["current_equity"],
         "mainline_return_percent": mainline["cumulative_return_percent"],
         "experimental_return_percent": experimental["cumulative_return_percent"],
-        "current_day_scan_complete": current_day_complete,
+        "current_day_scan_complete": runtime_readiness["strict_complete"],
+        "current_day_runtime_ready": runtime_readiness["runtime_ready"],
         "candidate_date_warning": "" if not old_rows else f"仍有 {len(old_rows)} 条旧日期候选留在观察信号里，不能当作今日新开仓。",
-        "first50_daily_ready_symbols": cache_summary["daily_ready_symbols"],
-        "first50_current_5m_ready_symbols": cache_summary["current_5m_ready_symbols"],
+        "first50_daily_ready_symbols": runtime_readiness["daily_ready_symbols"],
+        "first50_current_5m_ready_symbols": runtime_readiness["current_5m_ready_symbols"],
+        "runtime_readiness_note": runtime_readiness["plain_reason"],
         "plain_language_result": (
             f"主线正式账户当前权益 {mainline['current_equity']}，今日盈亏 {mainline['day_pnl']}；"
             f"实验账户当前权益 {experimental['current_equity']}，今日盈亏 {experimental['day_pnl']}。"
             f"PA004 正式信号 {len(pa004_formal_rows)} 条，历史参考样例 {len(pa004_reference_rows)} 条（不入账）。"
+            f"{runtime_readiness['plain_reason']} "
             f"{extended_session_monitor['plain_language_summary']}"
         ),
         "paper_simulated_only": True,
@@ -1473,6 +1574,7 @@ def build_accountized_dashboard_payload(
     codex_observer = build_accountized_codex_observer(
         config,
         summary,
+        runtime,
         mainline_overview,
         experimental_overview,
         timeframe_views,
@@ -1481,6 +1583,7 @@ def build_accountized_dashboard_payload(
     )
     trade_ledger_rows = build_trade_ledger_rows(runtime["account_rows"], runtime["state"])
     update_status = build_dashboard_update_status(config, summary, config.dashboard_refresh_seconds)
+    experimental_lane_note = experimental_lane_plain_reason(runtime["account_input_audit_rows"])
     return {
         "schema_version": "m12.46.accountized-readonly-dashboard.v1",
         "stage": "M12.46.accountized_realtime_dashboard",
@@ -1528,7 +1631,7 @@ def build_accountized_dashboard_payload(
         "observation_test_lane": {
             "schema_version": "m12.46.experimental-account-lane.v1",
             "stage": "M12.46.experimental_account_lane",
-            "plain_language_result": "实验策略也已经进入独立账户测试；即使没有触发，也会保留零触发记录，不再空挂。",
+            "plain_language_result": experimental_lane_note,
             "rows": runtime["experimental_accounts"],
             "paper_simulated_only": True,
             "trading_connection": False,
@@ -1569,6 +1672,7 @@ def build_account_detail_views(state: dict[str, Any], account_rows: list[dict[st
 def build_accountized_codex_observer(
     config: M1229Config,
     summary: dict[str, Any],
+    runtime: dict[str, Any],
     mainline: dict[str, Any],
     experimental: dict[str, Any],
     timeframe_views: dict[str, Any],
@@ -1585,14 +1689,23 @@ def build_accountized_codex_observer(
         alerts.append({"level": "注意", "message": "主线账户今日暂时为负，先看是否集中在 M10-PA-012 或 FTD001。"})
     if summary["candidate_date_warning"]:
         alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
-    if not summary["current_day_scan_complete"]:
-        alerts.append({"level": "数据", "message": "第一批 50 只股票当日数据未全部齐。"})
-    if extended_session_monitor["premarket_count"] > 0:
+    if not summary["current_day_runtime_ready"]:
+        alerts.append({"level": "数据", "message": "第一批 50 只股票当前运行数据仍有真实缺口。"})
+    elif not summary["current_day_scan_complete"]:
+        alerts.append({"level": "数据", "message": summary["runtime_readiness_note"]})
+    experimental_connected = [
+        row for row in runtime["account_input_audit_rows"]
+        if row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+    ]
+    if not experimental_connected:
+        alerts.append({"level": "实验线", "message": "实验账户目前还没接入正式当日扫描输入，今天的 0 开仓不能解读成这些策略已经跑过实时测试。"})
+    if extended_session_monitor.get("active_session") == "盘前" and extended_session_monitor["premarket_count"] > 0:
         alerts.append({"level": "盘前", "message": extended_session_monitor["plain_language_summary"]})
-    elif extended_session_monitor["postmarket_count"] > 0:
+    if extended_session_monitor.get("active_session") == "盘后" and extended_session_monitor["postmarket_count"] > 0:
         alerts.append({"level": "盘后", "message": extended_session_monitor["plain_language_summary"]})
     if not alerts:
         alerts.append({"level": "正常", "message": "当前主线和实验账户都已刷新，没有明显数据阻塞。"})
+    prefix = market_observer_prefix(summary["market_session"]["status"])
     return {
         "schema_version": "m12.46.codex-observer.v1",
         "stage": "M12.46.codex_observer",
@@ -1611,7 +1724,7 @@ def build_accountized_codex_observer(
         "active_timeframes": active_timeframes,
         "alerts": alerts,
         "recommended_codex_message": (
-            f"盘中只读模拟：主线权益 {mainline['current_equity']}，今日 {mainline['day_pnl']}；"
+            f"{prefix}：主线权益 {mainline['current_equity']}，今日 {mainline['day_pnl']}；"
             f"实验账户今日 {experimental['day_pnl']}。"
             f"{extended_session_monitor['plain_language_summary']} "
             f"{ftd001_monitor['plain_language_summary']} 当前提醒："
@@ -1717,6 +1830,10 @@ def supervisor_pid_alive(supervisor: dict[str, Any]) -> bool:
 def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -> dict[str, Any]:
     registry = runtime["state"]["trading_day_registry"]
     observed_days = sum(1 for value in registry.values() if value.get("counted"))
+    experimental_connected = any(
+        row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+        for row in runtime["account_input_audit_rows"]
+    )
     return {
         "schema_version": "m12.46.trading-day-registry.v1",
         "stage": "M12.46.trading_day_registry",
@@ -1726,9 +1843,14 @@ def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -
         "daily_realtime_strategy_ids": runtime_strategy_ids_from_specs("mainline"),
         "experimental_strategy_ids": runtime_strategy_ids_from_specs("experimental"),
         "plain_language_result": (
-            "主线和实验账户已按纽约交易日累计。"
+            "主线账户已按纽约交易日累计；当前已接线的实验账户也会同步累计。"
             if observed_days >= config.min_observation_days_for_trial else
-            "主线和实验账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。"
+            (
+                "主线账户已经开始按交易日累计，但还没满 10 个纽约真实交易日；"
+                "实验账户里尚未接线的策略不会被误算成已完成实时测试。"
+                if not experimental_connected else
+                "主线和已接线实验账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。"
+            )
         ),
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -1739,7 +1861,14 @@ def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -
 
 
 def build_accountized_gate_recheck(config: M1229Config, summary: dict[str, Any], run_status: dict[str, Any]) -> dict[str, Any]:
-    ready = run_status["ready_for_m11_8_review"] and summary["current_day_scan_complete"]
+    ready = run_status["ready_for_m11_8_review"] and summary["current_day_runtime_ready"]
+    blockers: list[str] = []
+    if not run_status["ready_for_m11_8_review"]:
+        blockers.append("连续纽约真实交易日不足 10 天")
+    if not summary["current_day_runtime_ready"]:
+        blockers.append("当前只读账户运行数据仍有真实缺口")
+    if not summary["current_day_scan_complete"]:
+        blockers.append("严格 50/50 当日全齐口径尚未满足，但这不等于当前账户运行中断")
     return {
         "schema_version": "m11.8.paper-trial-gate.v1",
         "stage": "M11.8.paper_trial_gate_recheck",
@@ -1750,7 +1879,7 @@ def build_accountized_gate_recheck(config: M1229Config, summary: dict[str, Any],
             "当前已经是账户化实时测试，但还没满 10 个纽约真实交易日，先继续累计。"
         ),
         "candidate_strategy_ids": runtime_strategy_ids_from_specs("mainline"),
-        "blocking_items": [] if ready else ["连续纽约真实交易日不足 10 天", "仍需继续验证主线/实验账户的每日稳定入账"],
+        "blocking_items": [] if ready else blockers,
         "paper_simulated_only": True,
         "trading_connection": False,
         "real_money_actions": False,

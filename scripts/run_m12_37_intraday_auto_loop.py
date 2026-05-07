@@ -110,6 +110,7 @@ def run_once(
     )
     market = market_session_status(generated_at)
     observer = result["dashboard"]["codex_observer"]
+    monitoring_active = market["status"] in {"盘前", "美股常规交易时段", "盘后"}
     manifest = {
         "schema_version": "m12.37.auto-runner-manifest.v1",
         "stage": config.stage,
@@ -119,7 +120,9 @@ def run_once(
         "observer_interval_minutes": config.observer_interval_minutes,
         "codex_observer_enabled": config.codex_observer_enabled,
         "codex_observer_mode": config.codex_observer_mode,
-        "loop_can_continue_now": market["status"] == "美股常规交易时段",
+        "loop_can_continue_now": monitoring_active,
+        "session_monitoring_active_now": monitoring_active,
+        "regular_session_active_now": market["status"] == "美股常规交易时段",
         "latest_dashboard_json": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard_data.json"),
         "latest_dashboard_html": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard.html"),
         "latest_observer_json": project_path(m12_29_config.output_dir / "m12_38_codex_observer_latest.json"),

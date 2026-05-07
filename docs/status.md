@@ -497,6 +497,8 @@
 - M12.49 当前已给 M12.47 加入连续失败熔断：M12.37 子会话连续 `3` 次非零退出后停止无限重启，并输出 `m12_47_session_failure_dossier.json`；避免坏进程反复刷半成品看板。
 - M12.49 当前已修复 PA004 正式账户方向字段兼容问题：PA004 检测器输出为中文 `看涨 / 看跌`，正式账户入口现在同时接受 `long / 看涨`，避免未来 PA004 做多信号被误过滤；2026-05-06 当天 PA004 做多仍为 `0` 条，原因是当天命中的 PA004 事件为做空方向，而 PA004 做空版仍冻结。
 - M12.49 当前已提高 M12.37 只读 K 线补数预算：盘前预热最多补 `100` 个 native fetch，盘中 5 分钟边界最多补 `20` 个 native fetch，避免 50 只股票长期只补到少数标的；报价刷新仍保持每 `60` 秒。
+- M12.49 当前已修复三类看板口径失真：`codex observer / auto runner manifest` 现在会按 `盘前 / 盘中 / 盘后 / 休市` 输出对应文案，不再把盘后快照说成“盘中只读模拟”；盘前/盘后异动 headline 只展示当前时段数据，非当前时段快照会显式隐藏；`m12_29_current_day_scan_summary.json` 新增 `current_day_runtime_ready` 与 `runtime_readiness_note`，把“严格 50/50 全齐”和“当前可运行”区分开来。
+- M12.49 当前已修复实验账户误报推进：`m12_46_account_input_audit.json` 新增 `current_scanner_connected / input_status`，未接入正式当日扫描输入的实验策略不再被写成 `formal_input_stream=true`；看板“实验账户”说明和 `m12_33_observation_run_status.json` 也同步改成真实口径，避免再把“0 开仓空转账户”误报成已完成实时测试。
 
 ## 当前阻塞
 
