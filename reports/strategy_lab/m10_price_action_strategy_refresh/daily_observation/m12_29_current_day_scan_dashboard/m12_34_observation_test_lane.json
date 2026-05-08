@@ -2,7 +2,7 @@
   "live_execution": false,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "实验策略也已经进入独立账户测试；即使没有触发，也会保留零触发记录，不再空挂。",
+  "plain_language_result": "实验账户已建，但当前这批实验策略还没接上正式当日扫描输入；现在看到的 0 开仓只是账户空转，不是有效实时测试。",
   "real_money_actions": false,
   "rows": [
     {
