@@ -1,15 +1,15 @@
 blocker_states,challenge_status,close_count,display_name,goal_blocked,ledger_state_count,module_role,next_action,open_count,required_for_goal,risk_blocked_count,runtime_account_count,signal_count,strategy_id,test_states
-,ready_for_10_day_challenge,1,Trend pullback runtime,false,2,independent_runtime,Keep daily ledger running and score from immutable account operations.,2,true,0,2,20,M10-PA-001,"signal_generated,zero_signal"
-,ready_for_10_day_challenge,0,Breakout runtime,false,2,independent_runtime,Keep daily ledger running and score from immutable account operations.,0,true,0,2,1,M10-PA-002,"signal_generated,zero_signal"
+,ready_for_10_day_challenge,0,Trend pullback runtime,false,2,independent_runtime,Keep daily ledger running and score from immutable account operations.,0,true,0,2,0,M10-PA-001,zero_signal
+,ready_for_10_day_challenge,1,Breakout runtime,false,2,independent_runtime,Keep daily ledger running and score from immutable account operations.,0,true,0,2,0,M10-PA-002,zero_signal
 ,ready_for_10_day_challenge,0,Broad channel boundary reversal long-only runtime,false,1,independent_runtime,"Require daily audit trail explaining open, close, zero_signal, or blocked.",0,true,0,1,0,M10-PA-004,zero_signal
-not_connected,blocked_before_challenge,0,Range geometry experimental runtime,true,2,independent_runtime,Attach a minimum testable detector adapter or mark detector_missing with evidence.,0,true,0,2,0,M10-PA-005,not_connected
-not_connected,blocked_before_challenge,0,Second leg visual detector runtime,true,1,independent_runtime,Connect retained detector output to formal daily signal rows.,0,true,0,1,0,M10-PA-007,not_connected
-not_connected,blocked_before_challenge,0,Visual strategy 008 experimental runtime,true,1,independent_runtime,Build or explicitly block the minimum detector adapter.,0,true,0,1,0,M10-PA-008,not_connected
-not_connected,blocked_before_challenge,0,Visual strategy 009 experimental runtime,true,1,independent_runtime,Build or explicitly block the minimum detector adapter.,0,true,0,1,0,M10-PA-009,not_connected
-not_connected,blocked_before_challenge,0,Session microstructure experimental runtime,true,2,independent_runtime,Separate session detector requirements from current core scanner and ledger blocker.,0,true,0,2,0,M10-PA-011,not_connected
-,ready_for_10_day_challenge,4,Opening range breakout runtime,false,1,independent_runtime,Keep daily ledger running and score from immutable account operations.,1,true,0,1,0,M10-PA-012,zero_signal
-not_connected,blocked_before_challenge,0,Visual strategy 013 experimental runtime,true,2,independent_runtime,Build or explicitly block the minimum detector adapter.,0,true,0,2,0,M10-PA-013,not_connected
-,ready_for_10_day_challenge,7,Formal daily trend runtime,false,2,independent_runtime,Run baseline and loss_streak_guard as a daily challenge pair.,9,true,0,2,10,M12-FTD-001,signal_generated
+,ready_for_10_day_challenge,0,Range geometry experimental runtime,false,2,independent_runtime,Run as a high-risk experimental account only; historical weakness still requires 10-day ledger evidence before any promote/modify/reject decision.,0,true,0,2,0,M10-PA-005,zero_signal
+,ready_for_10_day_challenge,0,Second leg visual detector runtime,false,1,independent_runtime,Run the M12.23 tightened detector through daily experimental account ledger.,3,true,0,1,3,M10-PA-007,signal_generated
+,ready_for_10_day_challenge,0,Visual strategy 008 experimental runtime,false,1,independent_runtime,Run M10.11 Wave B proxy detector in the 10-day experimental account challenge.,0,true,0,1,0,M10-PA-008,zero_signal
+,ready_for_10_day_challenge,0,Visual strategy 009 experimental runtime,false,1,independent_runtime,Run M10.11 Wave B proxy detector in the 10-day experimental account challenge.,0,true,0,1,0,M10-PA-009,zero_signal
+,ready_for_10_day_challenge,0,Session microstructure experimental runtime,false,1,independent_runtime,Run only 5m opening-reversal account coverage; do not treat daily bars as a valid opening-reversal test.,0,true,0,1,0,M10-PA-011,zero_signal
+,ready_for_10_day_challenge,0,Opening range breakout runtime,false,1,independent_runtime,Keep daily ledger running and score from immutable account operations.,0,true,0,1,0,M10-PA-012,zero_signal
+,ready_for_10_day_challenge,0,Visual strategy 013 experimental runtime,false,2,independent_runtime,Run M10.11 Wave B proxy detector in the 10-day experimental account challenge.,0,true,0,2,0,M10-PA-013,zero_signal
+,ready_for_10_day_challenge,2,Formal daily trend runtime,false,2,independent_runtime,Run baseline and loss_streak_guard as a daily challenge pair.,0,true,0,2,0,M12-FTD-001,zero_signal
 ,plugin_ab_ledger,0,Filter and ranking module,false,1,plugin_filter,"Attach as A/B filter ledger, not as an independent account.",0,true,0,0,0,M10-PA-003,plugin_ab_attached
 ,plugin_ab_ledger,0,BLSHS limit filter,false,1,plugin_filter,"Attach as A/B filter ledger, not as an independent account.",0,true,0,0,0,M10-PA-006,plugin_ab_attached
 ,plugin_ab_ledger,0,Target module,false,1,plugin_filter,Attach as A/B target module ledger.,0,true,0,0,0,M10-PA-014,plugin_ab_attached

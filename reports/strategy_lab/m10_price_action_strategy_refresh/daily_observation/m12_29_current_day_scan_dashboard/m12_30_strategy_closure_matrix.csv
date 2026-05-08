@@ -9,7 +9,7 @@ false,true,实验账户测试,59.9109,DIA,1d,5032367.04,5000000.00,32367.04,1.05
 false,true,实验账户测试,227.1160,TSLA,15m,1664057.47,1600000.00,64057.47,1.0532,NVDA,1d,M12-SRC-006,9.2807,false,false,主要趋势反转进入 1d 实验账户，继续用账户结果决定升降级。,4.0036,M10-PA-008,Major Trend Reversal,false,4375,35.41
 false,true,实验账户测试,199.6932,SPY,15m,1616277.18,1600000.00,16277.18,1.0159,NVDA,5m,,9.1580,false,false,楔形反转进入 1d 实验账户。,1.0173,M10-PA-009,Wedge Reversal and Wedge Flag,false,4256,33.95
 false,false,研究项,,,,,,,,,,,,false,false,Final Flag/Climax/TBTL 过于复合，不作为单独触发。,,M10-PA-010,Final Flag or Climax TBTL Reversal,true,,
-false,true,实验账户测试,66.2441,NVDA,5m,786985.82,800000.00,-13014.18,0.8270,TSLA,15m,,3.8072,false,false,开盘反转不并入主线，但进入 1d + 5m 实验账户继续测。,-1.6268,M10-PA-011,Opening Reversal,false,295,28.81
+false,true,实验账户测试,66.2441,NVDA,5m,786985.82,800000.00,-13014.18,0.8270,TSLA,15m,,3.8072,false,false,开盘反转不并入主线，只按 5m 实验账户继续测；不再用日线伪装开盘策略测试。,-1.6268,M10-PA-011,Opening Reversal,false,295,28.81
 true,false,主线正式账户,488.3762,QQQ,5m,1015141.29,800000.00,215141.29,1.1674,NVDA,15m,,12.7415,false,false,开盘区间突破继续作为 5m 主线正式账户。,26.8927,M10-PA-012,Opening Range Breakout,false,3662,38.15
 false,true,实验账户测试,35.0377,NVDA,1d,1472972.46,1600000.00,-127027.54,0.8763,SPY,5m,,12.8117,false,false,支撑阻力失败测试进入 1d + 5m 实验账户继续测。,-7.9392,M10-PA-013,Support and Resistance Failed Test,false,6239,32.55
 false,false,挂件 A/B,,,,,,,,,,,,false,false,Measured Move 只作为目标/止盈模块。,,M10-PA-014,Measured Move Target Engine,true,,

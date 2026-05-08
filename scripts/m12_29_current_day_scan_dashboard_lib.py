@@ -26,6 +26,7 @@ from scripts.m12_12_daily_observation_loop_lib import (  # noqa: E402
 from scripts.m12_20_visual_detector_implementation_lib import (  # noqa: E402
     best_cache_file,
     detect_broad_channel_boundary_reversal,
+    detect_second_leg_trap_reversal,
     file_sha256,
     load_config as load_m12_20_config,
 )
@@ -35,7 +36,13 @@ from scripts.m12_28_trading_session_dashboard_lib import (  # noqa: E402
     load_config as load_m12_28_config,
     pa004_candidate_from_event,
 )
+from scripts.m10_historical_pilot_lib import detect_m10_pa_005  # noqa: E402
+from scripts.m10_wave_b_capital_backtest_lib import (  # noqa: E402
+    candidate_from_event as wave_b_candidate_from_event,
+    detect_wave_b_events,
+)
 from scripts.m12_liquid_universe_scanner_lib import load_bars  # noqa: E402
+from src.data import OhlcvRow  # noqa: E402
 
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
@@ -53,7 +60,9 @@ DEFAULT_RISK_BUDGET = DEFAULT_ACCOUNT_RISK_BUDGET
 MAX_GENERATED_AT_FUTURE_SKEW_SECONDS = 90
 MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-004", "M10-PA-012", "M12-FTD-001")
 EXPERIMENTAL_STRATEGIES = ("M10-PA-005", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013")
-CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES)
+EXPERIMENTAL_ADAPTER_STRATEGIES = frozenset(EXPERIMENTAL_STRATEGIES)
+CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES) | EXPERIMENTAL_ADAPTER_STRATEGIES
+WAVE_B_ADAPTER_STRATEGIES = frozenset({"M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013"})
 PRIMARY_TIMEFRAME_ORDER = ("1d", "5m")
 TIMEFRAME_ORDER = PRIMARY_TIMEFRAME_ORDER
 TIMEFRAME_LABELS = {
@@ -87,7 +96,6 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-007-1d", "strategy_id": "M10-PA-007", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-007 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-008-1d", "strategy_id": "M10-PA-008", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-008 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-009-1d", "strategy_id": "M10-PA-009", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-009 日线实验账户", "variant_id": "base"},
-    {"account_id": "M10-PA-011-1d", "strategy_id": "M10-PA-011", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-011 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-011-5m", "strategy_id": "M10-PA-011", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-011 五分钟实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-013-1d", "strategy_id": "M10-PA-013", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-013 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-013-5m", "strategy_id": "M10-PA-013", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-013 五分钟实验账户", "variant_id": "base"},
@@ -242,6 +250,8 @@ def run_m12_29_current_day_scan_dashboard(
     extended_session_monitor = build_extended_session_monitor(quotes, market["status"])
     trade_rows = build_trade_rows(candidates, quotes, scan_date)
     pa004_formal_rows = build_pa004_formal_rows(first50, quotes, generated_at, scan_date)
+    experimental_adapter_rows = build_experimental_adapter_rows(first50, quotes, generated_at, scan_date)
+    runtime_trade_rows = trade_rows + experimental_adapter_rows
     pa004_reference_rows = build_pa004_reference_rows(quotes, generated_at)
     closure_rows = build_strategy_closure_rows(config)
     visual_rows = build_visual_definition_rows(closure_rows)
@@ -250,7 +260,7 @@ def run_m12_29_current_day_scan_dashboard(
         config,
         generated_at,
         scan_date,
-        trade_rows,
+        runtime_trade_rows,
         pa004_formal_rows,
         closure_rows,
         runtime_readiness["runtime_ready"],
@@ -264,7 +274,7 @@ def run_m12_29_current_day_scan_dashboard(
         runtime_readiness,
         quote_manifest,
         extended_session_monitor,
-        trade_rows,
+        runtime_trade_rows,
         pa004_formal_rows,
         pa004_reference_rows,
         runtime,
@@ -525,6 +535,310 @@ def build_pa004_formal_rows(
     return rows
 
 
+def build_experimental_adapter_rows(
+    first50: list[str],
+    quotes: dict[str, dict[str, str]],
+    generated_at: str,
+    scan_date: date,
+) -> list[dict[str, str]]:
+    detector_config = load_m12_20_config()
+    daily_start = parse_iso_date(str(detector_config.daily_start)) or date(2010, 6, 29)
+    rows: list[dict[str, str]] = []
+    for spec in ACCOUNT_SPECS:
+        if spec["lane"] != "experimental" or not scanner_connected_for_spec(spec):
+            continue
+        timeframe = spec["timeframe"]
+        start_date = daily_start if timeframe == "1d" else scan_date
+        for symbol in first50:
+            cache_path = best_cache_file(detector_config.local_data_roots, symbol, timeframe, start_date, scan_date)
+            if cache_path is None or not cache_path.exists():
+                continue
+            bars = load_bars(cache_path)
+            if not bars:
+                continue
+            checksum = file_sha256(cache_path)
+            rows.extend(
+                experimental_rows_for_spec(
+                    spec=spec,
+                    symbol=symbol,
+                    bars=bars,
+                    cache_path=cache_path,
+                    checksum=checksum,
+                    quotes=quotes,
+                    generated_at=generated_at,
+                    scan_date=scan_date,
+                )
+            )
+    rows.sort(key=lambda row: (row["signal_time"], row["strategy_id"], row["symbol"]), reverse=True)
+    return rows
+
+
+def scanner_connected_for_spec(spec: dict[str, str]) -> bool:
+    strategy_id = spec["strategy_id"]
+    if strategy_id in MAINLINE_STRATEGIES:
+        return True
+    if strategy_id == "M10-PA-011":
+        return spec["timeframe"] in {"5m", "15m"}
+    return strategy_id in EXPERIMENTAL_ADAPTER_STRATEGIES
+
+
+def experimental_rows_for_spec(
+    *,
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    generated_at: str,
+    scan_date: date,
+) -> list[dict[str, str]]:
+    strategy_id = spec["strategy_id"]
+    if strategy_id == "M10-PA-005":
+        return pa005_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
+    if strategy_id == "M10-PA-007":
+        return pa007_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, generated_at, scan_date)
+    if strategy_id in WAVE_B_ADAPTER_STRATEGIES:
+        return wave_b_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
+    return []
+
+
+def pa005_adapter_rows(
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    scan_date: date,
+) -> list[dict[str, str]]:
+    events, _ = detect_m10_pa_005(bars_to_ohlcv_rows(bars), spec["strategy_id"])
+    rows: list[dict[str, str]] = []
+    for event in events:
+        signal_date = iso_to_ny_trading_date(event.entry_timestamp.isoformat())
+        if signal_date != scan_date:
+            continue
+        rows.append(
+            experimental_adapter_trade_row(
+                strategy_id=spec["strategy_id"],
+                strategy_title="交易区间失败突破反转（实验账户）",
+                symbol=symbol,
+                timeframe=spec["timeframe"],
+                direction=event.direction,
+                signal_time=event.entry_timestamp.isoformat(),
+                signal_date=scan_date,
+                entry=event.entry_price,
+                stop=event.stop_price,
+                target=event.target_price,
+                latest=quote_latest_or_entry(quotes, symbol, event.entry_price),
+                latest_price_source=quotes.get(symbol, {}).get("quote_source", "candidate_reference_fallback"),
+                cache_path=cache_path,
+                checksum=checksum,
+                spec_ref="reports/strategy_lab/m10_price_action_strategy_refresh/backtest_specs/M10-PA-005.json",
+                source_refs="reports/strategy_lab/m10_price_action_strategy_refresh/definition_fix_retest/m12_10/m12_10_definition_fix_retest_summary.json",
+                context="m13_pa005_failed_breakout_adapter",
+                review_status="M10-PA-005 已接入实验账户输入流；历史结论仍弱，当前只用于真实每日账本测试，不作为升级或批准依据。",
+                risk_level="高",
+            )
+        )
+    return rows
+
+
+def pa007_adapter_rows(
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    generated_at: str,
+    scan_date: date,
+) -> list[dict[str, str]]:
+    events = detect_second_leg_trap_reversal(
+        generated_at=generated_at,
+        symbol=symbol,
+        bars=bars,
+        data_path=cache_path,
+        source_checksum=checksum,
+    )
+    rows: list[dict[str, str]] = []
+    for event in events:
+        event_date = iso_to_ny_trading_date(event.get("bar_timestamp", ""))
+        if event_date is None or next_us_trading_date(event_date) != scan_date:
+            continue
+        entry = money_to_decimal(str(event.get("failure_close", "")))
+        stop = money_to_decimal(str(event.get("trap_break_level", "")))
+        direction = str(event.get("direction", ""))
+        risk = entry - stop if direction == "看涨" else stop - entry
+        if entry <= ZERO or stop <= ZERO or risk <= ZERO:
+            continue
+        target = entry + risk * Decimal("2") if direction == "看涨" else entry - risk * Decimal("2")
+        rows.append(
+            experimental_adapter_trade_row(
+                strategy_id=spec["strategy_id"],
+                strategy_title="第二腿陷阱反转（实验账户）",
+                symbol=symbol,
+                timeframe=spec["timeframe"],
+                direction=direction,
+                signal_time=str(event.get("bar_timestamp", "")),
+                signal_date=scan_date,
+                entry=entry,
+                stop=stop,
+                target=target,
+                latest=quote_latest_or_entry(quotes, symbol, entry),
+                latest_price_source=quotes.get(symbol, {}).get("quote_source", "candidate_reference_fallback"),
+                cache_path=cache_path,
+                checksum=checksum,
+                spec_ref=str(event.get("spec_ref", "")),
+                source_refs=";".join(event.get("source_refs", [])),
+                context="m13_pa007_second_leg_adapter",
+                review_status="M10-PA-007 已复用 M12.23 收紧后的第二腿检测器进入实验账户输入流。",
+                risk_level="中高",
+            )
+        )
+    return rows
+
+
+def wave_b_adapter_rows(
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    scan_date: date,
+) -> list[dict[str, str]]:
+    ohlcv_rows = bars_to_ohlcv_rows(bars)
+    drafts = detect_wave_b_events(spec["strategy_id"], ohlcv_rows)
+    rows: list[dict[str, str]] = []
+    for draft in drafts:
+        candidate = wave_b_candidate_from_event(draft, ohlcv_rows)
+        if candidate is None:
+            continue
+        signal_date = iso_to_ny_trading_date(str(candidate.entry_timestamp))
+        if signal_date != scan_date:
+            continue
+        rows.append(
+            experimental_adapter_trade_row(
+                strategy_id=spec["strategy_id"],
+                strategy_title=experimental_strategy_title(spec["strategy_id"]),
+                symbol=symbol,
+                timeframe=spec["timeframe"],
+                direction=candidate.direction,
+                signal_time=str(candidate.entry_timestamp),
+                signal_date=scan_date,
+                entry=candidate.entry_price,
+                stop=candidate.stop_price,
+                target=candidate.target_price,
+                latest=quote_latest_or_entry(quotes, symbol, candidate.entry_price),
+                latest_price_source=quotes.get(symbol, {}).get("quote_source", "candidate_reference_fallback"),
+                cache_path=cache_path,
+                checksum=checksum,
+                spec_ref=f"reports/strategy_lab/m10_price_action_strategy_refresh/visual_wave_b_gate/m10_10/m10_10_wave_b_entry_queue.json#{spec['strategy_id']}",
+                source_refs=f"reports/strategy_lab/m10_price_action_strategy_refresh/capital_backtest/m10_11_wave_b/m10_11_wave_b_capital_summary.json#{spec['strategy_id']}",
+                context=f"m13_{spec['strategy_id'].lower().replace('-', '_')}_wave_b_adapter",
+                review_status=f"{spec['strategy_id']} 已复用 M10.11 Wave B proxy detector 进入实验账户输入流；仍需用 10 个真实交易日账本决定 promote/modify/reject。",
+                risk_level="中高",
+            )
+        )
+    return rows
+
+
+def bars_to_ohlcv_rows(bars: list[Any]) -> list[OhlcvRow]:
+    rows: list[OhlcvRow] = []
+    for bar in bars:
+        rows.append(
+            OhlcvRow(
+                symbol=bar.symbol,
+                market=bar.market,
+                timeframe=bar.timeframe,
+                timestamp=datetime.fromisoformat(str(bar.timestamp).replace("Z", "+00:00")),
+                timezone=bar.timezone,
+                open=bar.open,
+                high=bar.high,
+                low=bar.low,
+                close=bar.close,
+                volume=bar.volume,
+            )
+        )
+    return rows
+
+
+def experimental_strategy_title(strategy_id: str) -> str:
+    titles = {
+        "M10-PA-008": "主要趋势反转（实验账户）",
+        "M10-PA-009": "楔形反转（实验账户）",
+        "M10-PA-011": "开盘反转（实验账户）",
+        "M10-PA-013": "支撑阻力失败测试（实验账户）",
+    }
+    return titles.get(strategy_id, f"{strategy_id} 实验账户")
+
+
+def quote_latest_or_entry(quotes: dict[str, dict[str, str]], symbol: str, entry: Decimal) -> Decimal:
+    return decimal_or_none(quotes.get(symbol, {}).get("latest_price")) or entry
+
+
+def experimental_adapter_trade_row(
+    *,
+    strategy_id: str,
+    strategy_title: str,
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    signal_time: str,
+    signal_date: date,
+    entry: Decimal,
+    stop: Decimal,
+    target: Decimal,
+    latest: Decimal,
+    latest_price_source: str,
+    cache_path: Path,
+    checksum: str,
+    spec_ref: str,
+    source_refs: str,
+    context: str,
+    review_status: str,
+    risk_level: str,
+) -> dict[str, str]:
+    direction_label = direction if direction in {"看涨", "看跌"} else direction_zh(direction)
+    qty = quantity_from_prices(entry, stop)
+    pnl = simulated_pnl(direction_label, latest, entry, qty)
+    return {
+        "strategy_id": strategy_id,
+        "variant_id": "m13_experimental_adapter",
+        "strategy_title": strategy_title,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "direction": direction_label,
+        "signal_time": signal_time,
+        "signal_date": signal_date.isoformat(),
+        "is_current_scan_date": "true",
+        "latest_price": money(latest),
+        "latest_price_source": latest_price_source,
+        "hypothetical_entry_price": money(entry),
+        "hypothetical_stop_price": money(stop),
+        "hypothetical_target_price": money(target),
+        "hypothetical_quantity": str(qty.quantize(Decimal("0.0001"))),
+        "simulated_intraday_pnl": money(pnl),
+        "simulated_intraday_return_percent": pct(pnl / DEFAULT_EQUITY * HUNDRED),
+        "simulated_state": simulated_state(direction_label, latest, stop, target),
+        "bucket": "M13 实验账户输入",
+        "candidate_status": "experimental_detector_entry",
+        "queue_action": "open_runtime_account_if_scan_date_matches",
+        "review_status": review_status,
+        "risk_level": risk_level,
+        "notes": "M13 最小 detector/adapter 接线产物，只用于只读模拟账户账本，不代表 paper/live 批准。",
+        "data_path": project_path(cache_path),
+        "data_lineage": "m13_experimental_adapter",
+        "data_checksum": checksum,
+        "spec_ref": spec_ref,
+        "simulated_context": context,
+        "candidate_schema_version": "m13.experimental-adapter-row.v1",
+        "source_refs": source_refs,
+        "signal_source_type": "experimental_detector_entry",
+    }
+
+
 def pa004_event_is_long(event: dict[str, Any]) -> bool:
     return event.get("direction") in {"long", "看涨"}
 
@@ -556,7 +870,7 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
         "M10-PA-008": ("实验账户测试", "主要趋势反转进入 1d 实验账户，继续用账户结果决定升降级。"),
         "M10-PA-009": ("实验账户测试", "楔形反转进入 1d 实验账户。"),
         "M10-PA-010": ("研究项", "Final Flag/Climax/TBTL 过于复合，不作为单独触发。"),
-        "M10-PA-011": ("实验账户测试", "开盘反转不并入主线，但进入 1d + 5m 实验账户继续测。"),
+        "M10-PA-011": ("实验账户测试", "开盘反转不并入主线，只按 5m 实验账户继续测；不再用日线伪装开盘策略测试。"),
         "M10-PA-012": ("主线正式账户", "开盘区间突破继续作为 5m 主线正式账户。"),
         "M10-PA-013": ("实验账户测试", "支撑阻力失败测试进入 1d + 5m 实验账户继续测。"),
         "M10-PA-014": ("挂件 A/B", "Measured Move 只作为目标/止盈模块。"),
@@ -1168,7 +1482,7 @@ def build_account_input_audit_rows(
 ) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for spec in ACCOUNT_SPECS:
-        scanner_connected = spec["strategy_id"] in CONNECTED_RUNTIME_STRATEGIES
+        scanner_connected = scanner_connected_for_spec(spec)
         if spec["strategy_id"] == "M10-PA-004":
             source_rows = [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]
             source_type = "formal_detector_entry"
@@ -1178,7 +1492,7 @@ def build_account_input_audit_rows(
                 for row in trade_rows
                 if row.get("strategy_id") == spec["strategy_id"] and row.get("timeframe") == spec["timeframe"]
             ]
-            source_type = "formal_scan"
+            source_type = source_rows[0].get("signal_source_type", input_source_type_for_spec(spec)) if source_rows else input_source_type_for_spec(spec)
         today_formal_count = sum(1 for row in source_rows if row.get("signal_date") == scan_date.isoformat())
         if not scanner_connected:
             input_status = "not_connected_to_current_scanner"
@@ -1206,6 +1520,12 @@ def build_account_input_audit_rows(
             }
         )
     return rows
+
+
+def input_source_type_for_spec(spec: dict[str, str]) -> str:
+    if spec["strategy_id"] in EXPERIMENTAL_ADAPTER_STRATEGIES:
+        return "experimental_detector_entry"
+    return "formal_scan"
 
 
 def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict[str, str]:

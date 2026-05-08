@@ -62,63 +62,62 @@
       "strategy_id": "M10-PA-005",
       "display_name": "Range geometry experimental runtime",
       "module_role": "independent_runtime",
-      "detector_id": "m13_adapter_pending",
-      "detector_status": "not_connected",
+      "detector_id": "m13_pa005_failed_breakout_adapter",
+      "detector_status": "connected",
       "required_for_goal": true,
       "runtime_accounts": [
         {"runtime_id": "M10-PA-005-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"},
         {"runtime_id": "M10-PA-005-5m", "timeframe": "5m", "lane": "experimental", "variant_id": "base"}
       ],
-      "next_action": "Attach a minimum testable detector adapter or mark detector_missing with evidence."
+      "next_action": "Run as a high-risk experimental account only; historical weakness still requires 10-day ledger evidence before any promote/modify/reject decision."
     },
     {
       "strategy_id": "M10-PA-007",
       "display_name": "Second leg visual detector runtime",
       "module_role": "independent_runtime",
-      "detector_id": "m12_23_visual_detector_retained_candidates",
-      "detector_status": "not_connected",
+      "detector_id": "m13_pa007_second_leg_adapter",
+      "detector_status": "connected",
       "required_for_goal": true,
       "runtime_accounts": [
         {"runtime_id": "M10-PA-007-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"}
       ],
-      "next_action": "Connect retained detector output to formal daily signal rows."
+      "next_action": "Run the M12.23 tightened detector through daily experimental account ledger."
     },
     {
       "strategy_id": "M10-PA-008",
       "display_name": "Visual strategy 008 experimental runtime",
       "module_role": "independent_runtime",
-      "detector_id": "m13_adapter_pending",
-      "detector_status": "not_connected",
+      "detector_id": "m13_wave_b_major_trend_reversal_adapter",
+      "detector_status": "connected",
       "required_for_goal": true,
       "runtime_accounts": [
         {"runtime_id": "M10-PA-008-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"}
       ],
-      "next_action": "Build or explicitly block the minimum detector adapter."
+      "next_action": "Run M10.11 Wave B proxy detector in the 10-day experimental account challenge."
     },
     {
       "strategy_id": "M10-PA-009",
       "display_name": "Visual strategy 009 experimental runtime",
       "module_role": "independent_runtime",
-      "detector_id": "m13_adapter_pending",
-      "detector_status": "not_connected",
+      "detector_id": "m13_wave_b_wedge_reversal_adapter",
+      "detector_status": "connected",
       "required_for_goal": true,
       "runtime_accounts": [
         {"runtime_id": "M10-PA-009-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"}
       ],
-      "next_action": "Build or explicitly block the minimum detector adapter."
+      "next_action": "Run M10.11 Wave B proxy detector in the 10-day experimental account challenge."
     },
     {
       "strategy_id": "M10-PA-011",
       "display_name": "Session microstructure experimental runtime",
       "module_role": "independent_runtime",
-      "detector_id": "m13_adapter_pending",
-      "detector_status": "not_connected",
+      "detector_id": "m13_wave_b_opening_reversal_5m_adapter",
+      "detector_status": "connected",
       "required_for_goal": true,
       "runtime_accounts": [
-        {"runtime_id": "M10-PA-011-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"},
         {"runtime_id": "M10-PA-011-5m", "timeframe": "5m", "lane": "experimental", "variant_id": "base"}
       ],
-      "next_action": "Separate session detector requirements from current core scanner and ledger blocker."
+      "next_action": "Run only 5m opening-reversal account coverage; do not treat daily bars as a valid opening-reversal test."
     },
     {
       "strategy_id": "M10-PA-012",
@@ -136,14 +135,14 @@
       "strategy_id": "M10-PA-013",
       "display_name": "Visual strategy 013 experimental runtime",
       "module_role": "independent_runtime",
-      "detector_id": "m13_adapter_pending",
-      "detector_status": "not_connected",
+      "detector_id": "m13_wave_b_support_resistance_failed_test_adapter",
+      "detector_status": "connected",
       "required_for_goal": true,
       "runtime_accounts": [
         {"runtime_id": "M10-PA-013-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"},
         {"runtime_id": "M10-PA-013-5m", "timeframe": "5m", "lane": "experimental", "variant_id": "base"}
       ],
-      "next_action": "Build or explicitly block the minimum detector adapter."
+      "next_action": "Run M10.11 Wave B proxy detector in the 10-day experimental account challenge."
     },
     {
       "strategy_id": "M12-FTD-001",

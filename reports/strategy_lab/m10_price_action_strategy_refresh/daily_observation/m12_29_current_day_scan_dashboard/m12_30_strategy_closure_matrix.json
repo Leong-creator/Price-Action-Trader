@@ -267,7 +267,7 @@
       "max_drawdown_percent": "3.8072",
       "observation_queue": "false",
       "paper_trial_candidate_now": "false",
-      "plain_reason": "开盘反转不并入主线，但进入 1d + 5m 实验账户继续测。",
+      "plain_reason": "开盘反转不并入主线，只按 5m 实验账户继续测；不再用日线伪装开盘策略测试。",
       "return_percent": "-1.6268",
       "strategy_id": "M10-PA-011",
       "strategy_title": "Opening Reversal",

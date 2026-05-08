@@ -12,7 +12,7 @@
 | M10-PA-008 Major Trend Reversal | 实验账户测试 | 4.0036 | 35.41 | 9.2807 | 主要趋势反转进入 1d 实验账户，继续用账户结果决定升降级。 |
 | M10-PA-009 Wedge Reversal and Wedge Flag | 实验账户测试 | 1.0173 | 33.95 | 9.1580 | 楔形反转进入 1d 实验账户。 |
 | M10-PA-010 Final Flag or Climax TBTL Reversal | 研究项 |  |  |  | Final Flag/Climax/TBTL 过于复合，不作为单独触发。 |
-| M10-PA-011 Opening Reversal | 实验账户测试 | -1.6268 | 28.81 | 3.8072 | 开盘反转不并入主线，但进入 1d + 5m 实验账户继续测。 |
+| M10-PA-011 Opening Reversal | 实验账户测试 | -1.6268 | 28.81 | 3.8072 | 开盘反转不并入主线，只按 5m 实验账户继续测；不再用日线伪装开盘策略测试。 |
 | M10-PA-012 Opening Range Breakout | 主线正式账户 | 26.8927 | 38.15 | 12.7415 | 开盘区间突破继续作为 5m 主线正式账户。 |
 | M10-PA-013 Support and Resistance Failed Test | 实验账户测试 | -7.9392 | 32.55 | 12.8117 | 支撑阻力失败测试进入 1d + 5m 实验账户继续测。 |
 | M10-PA-014 Measured Move Target Engine | 挂件 A/B |  |  |  | Measured Move 只作为目标/止盈模块。 |

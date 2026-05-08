@@ -82,9 +82,9 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         mainline = dashboard["mainline_account_view"]
         experimental = dashboard["experimental_account_view"]
         self.assertEqual(mainline["strategy_account_count"], "8")
-        self.assertEqual(experimental["strategy_account_count"], "9")
+        self.assertEqual(experimental["strategy_account_count"], "8")
         self.assertEqual(mainline["starting_capital"], "160000.00")
-        self.assertEqual(experimental["starting_capital"], "180000.00")
+        self.assertEqual(experimental["starting_capital"], "160000.00")
         first_account = dashboard["mainline_accounts"][0]
         self.assertEqual(first_account["starting_capital"], "20000.00")
         self.assertEqual(Decimal(first_account["starting_capital"]), DEFAULT_ACCOUNT_EQUITY)
@@ -168,9 +168,11 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         experimental_rows = [row for row in rows if row["lane"] == "experimental"]
         self.assertTrue(all(row["formal_input_stream"] == "true" for row in mainline_rows))
         self.assertTrue(all(row["current_scanner_connected"] == "true" for row in mainline_rows))
-        self.assertTrue(all(row["formal_input_stream"] == "false" for row in experimental_rows))
-        self.assertTrue(all(row["current_scanner_connected"] == "false" for row in experimental_rows))
-        self.assertTrue(all(row["input_status"] == "not_connected_to_current_scanner" for row in experimental_rows))
+        self.assertTrue(all(row["formal_input_stream"] == "true" for row in experimental_rows))
+        self.assertTrue(all(row["current_scanner_connected"] == "true" for row in experimental_rows))
+        self.assertTrue(
+            all(row["input_status"] in {"connected_with_signal_today", "connected_zero_signal_today"} for row in experimental_rows)
+        )
 
     def test_postmarket_runtime_uses_postmarket_wording_and_runtime_ready_note(self):
         _, result, _ = self.run_stage(generated_at="2026-05-06T23:59:17Z")
@@ -189,7 +191,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
     def test_observation_lane_does_not_claim_unwired_experimental_accounts_are_running(self):
         _, result, _ = self.run_stage()
         lane = result["dashboard"]["observation_test_lane"]
-        self.assertIn("还没接上正式当日扫描输入", lane["plain_language_result"])
+        self.assertIn("已接入正式输入流", lane["plain_language_result"])
 
     def test_observed_trading_days_accumulate_by_new_york_trading_date(self):
         with tempfile.TemporaryDirectory() as temp_dir:

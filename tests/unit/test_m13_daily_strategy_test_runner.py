@@ -111,10 +111,10 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 for row in result["signal_ledger_rows"]
             }
             self.assertEqual(states[("M10-PA-004", "M10-PA-004-long-1d")], "zero_signal")
-            self.assertEqual(states[("M10-PA-005", "M10-PA-005-1d")], "not_connected")
+            self.assertEqual(states[("M10-PA-005", "M10-PA-005-1d")], "zero_signal")
             self.assertEqual(states[("M12-FTD-001", "M12-FTD-001-baseline-1d")], "signal_generated")
 
-    def test_not_connected_strategy_blocks_reliable_testing_goal(self):
+    def test_connected_required_scope_is_ready_for_reliable_testing_goal(self):
         temp, config = self.build_fixture()
         with temp:
             result = run_m13_daily_strategy_test_runner(
@@ -122,9 +122,9 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 generated_at="2026-05-07T20:30:00Z",
                 trading_date="2026-05-07",
             )
-            self.assertFalse(result["summary"]["ready_for_complete_reliable_testing"])
-            self.assertIn("M10-PA-005", result["summary"]["blocked_strategy_ids"])
-            self.assertTrue(result["goal_status"]["continue_without_stopping"])
+            self.assertTrue(result["summary"]["ready_for_complete_reliable_testing"])
+            self.assertEqual(result["summary"]["blocked_strategy_ids"], [])
+            self.assertFalse(result["goal_status"]["continue_without_stopping"])
 
     def test_account_ledger_counts_open_and_close_from_trade_ledger(self):
         temp, config = self.build_fixture()

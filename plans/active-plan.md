@@ -84,9 +84,9 @@
 - M12.46 当前进行中：已从 `main` 切出 `codex/m12-46-accountized-testing`，把 M12.29/M12.37 从“机会当前价估值”升级为“20,000 USD 独立模拟账户”；当前已落下主线/实验账户分栏、`1d / 5m` 主视图、`M10-PA-004 long-only` 主线化、`M12-FTD-001 baseline / loss_streak_guard` 并行账户、纽约交易日累计修复，并已新增对应单测；下一步继续补回归、同步文档并把自动盘中测试正式切到新账户口径。
 - M12.48 当前进行中：已从 `codex/m12-47-realtime-session-supervisor` 切出 `codex/m12-48-premarket-afterhours-monitor`，把 Longbridge `pre_market_quote / post_market_quote` 接入分钟级账户看板和 Codex 观察摘要；当前目标是补齐盘前 quote 刷新、盘后延时 quote 刷新、盘前/盘后异动榜，以及 AMD / 谷歌 / 半导体 / 存储芯片重点关注股提示，且继续保持只读/模拟边界。
 - M12.49 已完成并推送运行产物归档：`codex/m12-49-dashboard-runtime-hardening` 已提交 `d6c730f m12.49: archive latest runtime artifacts`，保留最新 M12.12/M12.29/M12.46/M12.48 运行报告和 `2026-05-01` 至 `2026-05-07` 盘后新闻复盘证据。
-- M13 当前进行中：已从 `origin/main` 切出 `codex/m13-real-strategy-test-loop`，并合入 M12.49 作为前置基线；当前已新增 `M13 strategy_runtime_registry`、`daily_strategy_test_runner`、策略信号账本、账户操作账本、goal 状态和 AI-Trader 外部研究边界；M12.46 的 `today_signal_count / today_opened_count / today_closed_count` 已改为从当日交易账本统计。
+- M13 当前进行中：已从 `origin/main` 切出 `codex/m13-real-strategy-test-loop`，并合入 M12.49 作为前置基线；当前已新增 `M13 strategy_runtime_registry`、`daily_strategy_test_runner`、策略信号账本、账户操作账本、goal 状态和 AI-Trader 外部研究边界；M12.46 的 `today_signal_count / today_opened_count / today_closed_count` 已改为从当日交易账本统计；`M10-PA-005/007/008/009/011/013` 已接入最小 detector/adapter 进入实验账户账本，其中 `M10-PA-011` 只保留 `5m` 开盘反转账户，不用日线伪装测试。
 - Git 远端推送阻塞已处理：原始 M10.6 大 JSONL 通过 gzip archive manifest 保留可追溯，未把超过 GitHub 单文件限制的原始 blob 推送到远端；`main` 已可推送。
-- 下一阶段主线是继续用 `scripts/run_m12_37_intraday_auto_loop.py --session` 在美股开盘相关时段自动预热并持续刷新看板和 Codex 摘要，然后运行 `scripts/run_m13_daily_strategy_test_runner.py` 固化每日 ledger；在 M13 goal 完成前不得把未接线策略的 0 开仓解释成已测试完成。当前首轮 M13 样本显示所有 required 策略已有账本状态，但 `M10-PA-005/007/008/009/011/013` 仍为 `not_connected` blocker，下一步优先接入这些最小 detector/adapter。
+- 下一阶段主线是继续用 `scripts/run_m12_37_intraday_auto_loop.py --session` 在美股开盘相关时段自动预热并持续刷新看板和 Codex 摘要，然后运行 `scripts/run_m13_daily_strategy_test_runner.py` 固化每日 ledger；M13 最新样本 `2026-05-08` 已显示所有 required 策略/模块都有有效账本状态且无 `not_connected` blocker，下一步进入 `10` 个纽约真实交易日 challenge，在完成 promote/modify/reject 前不得把单日结果解释成可投入使用。
 
 ## 2. 执行总原则
 

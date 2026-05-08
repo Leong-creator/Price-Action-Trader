@@ -9,13 +9,13 @@
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：M13 真实每日策略测试闭环
-- 当前子阶段：已归档并推送 M12.49 最新运行产物；已从 `origin/main` 创建 `codex/m13-real-strategy-test-loop`，并合入 M12.49 运行硬化基线作为 M13 前置。M13 当前已新增 strategy runtime registry、daily strategy test runner、策略信号账本、账户操作账本、goal 状态和 AI-Trader 外部研究边界；当前 goal 仍未完成，阻塞项是 `M10-PA-005/007/008/009/011/013` 尚未接入正式当日 scanner/detector 输入流。
+- 当前子阶段：已归档并推送 M12.49 最新运行产物；已从 `origin/main` 创建 `codex/m13-real-strategy-test-loop`，并合入 M12.49 运行硬化基线作为 M13 前置。M13 当前已新增 strategy runtime registry、daily strategy test runner、策略信号账本、账户操作账本、goal 状态和 AI-Trader 外部研究边界；`M10-PA-005/007/008/009/011/013` 已接入最小 detector/adapter 并进入每日实验账户账本，下一步是累计 `10` 个纽约真实交易日 challenge。
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m12-49-dashboard-runtime-hardening`
+- `codex/m13-real-strategy-test-loop`
 
 ## 已完成
 
@@ -503,13 +503,15 @@
 - M13 当前已新增 `config/examples/m13_strategy_runtime_registry.json`，把 `M10-PA-001/002/004/005/007/008/009/011/012/013/M12-FTD-001` 定义为独立 runtime，把 `M10-PA-003/006/014/015/016` 定义为 plugin/filter A/B ledger，把 `M10-PA-010` 保持 research-only，并把 `AI-TRADER-EXTERNAL` 固定为外部研究源。
 - M13 当前已新增 `scripts/run_m13_daily_strategy_test_runner.py` 与 `scripts/m13_daily_strategy_test_runner_lib.py`，只读消费 M12.46 的 `account_input_audit / account_trade_ledger / scorecards`，输出 `m13_strategy_signal_ledger.jsonl`、`m13_account_operation_ledger.jsonl`、`m13_daily_strategy_scorecard.*` 与 `m13_goal_status.json`。
 - M13 当前已修复 M12.46 scorecard 语义：`today_signal_count / today_opened_count / today_closed_count` 改为从当日交易账本统计，避免“今日开仓后又平仓”的账户被当前持仓快照误报为 0 信号。
-- M13 首次 runner 样本使用 `2026-05-07` 纽约交易日，输出 `24` 条策略/账户信号账本事件、`44` 条账户操作账本事件、`12` 次 open、`12` 次 close；所有 required 策略都有账本状态，但 `M10-PA-005/007/008/009/011/013` 仍为 `not_connected` blocker，因此 `m13_goal_status.json` 中 `goal_complete=false`、`continue_without_stopping=true`。
+- M13 首次 runner 样本使用 `2026-05-07` 纽约交易日，输出 `24` 条策略/账户信号账本事件、`44` 条账户操作账本事件、`12` 次 open、`12` 次 close；该样本保留为接线前对照，当时 `M10-PA-005/007/008/009/011/013` 仍为 `not_connected` blocker。
+- M13 当前已接入实验策略最小 adapter：`M10-PA-005` 复用失败突破 range adapter，`M10-PA-007` 复用 M12.23 第二腿检测器，`M10-PA-008/009/013` 复用 M10.11 Wave B proxy detector，`M10-PA-011` 只保留 `5m` 开盘反转账户，不再用日线伪装开盘策略测试。
+- M13 最新 runner 样本使用 `2026-05-08` 纽约交易日，输出 `23` 条策略/账户信号账本事件、`25` 条账户操作账本事件、`3` 次 open、`3` 次 close；所有 required 策略都有账本状态且 `blocked_strategy_ids=[]`，`m13_goal_status.json` 中 `goal_complete=true`、`continue_without_stopping=false`。该结果只表示真实每日测试闭环已跑通，不代表 paper/live 批准。
 - M13 当前已明确 AI-Trader 边界：表现优秀的 AI-Trader agent/signal 只能作为公开或用户授权的外部候选信号源进入只读影子测试，不得 copy-trading、不得直接执行、不得把外部信号包装成自有策略。
 
 ## 当前阻塞
 
 - 远端推送大文件阻塞已处理：M10.6 原始大 JSONL 已用 gzip archive manifest 保留可追溯，原始文件不再进入可推送历史；后续推送 `main` 不应再被该文件阻塞。
-- 当前 M13 已把“是否真的测试过”升级为账本口径；主要 blocker 变为实验策略输入流未接入：`M10-PA-005/007/008/009/011/013` 当前都有账本状态，但仍是 `not_connected`，不能算可靠测试完成。
+- 当前 M13 已把“是否真的测试过”升级为账本口径；主要 blocker 已从实验策略未接线转为 `10` 个纽约真实交易日 challenge 尚未累计完成。任何单日 open/close 或 zero_signal 都只能作为当日账本事实，不得直接解释成策略可投入使用。
 - M12.49 运行层 blocker 和 PA004 方向兼容 bug 已修复；可继续用 M12.47 守护器自动拉起 M12.37，盘前/盘中/盘后刷新看板，并在每次刷新后运行 M13 runner 把结果固化到账本。
 - M11.7 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 新闻/财报当前仍是 sidecar 第一版：Google 案例已覆盖，但生产级新闻/财报历史事件集尚未建立，不能把当前 `2` 条事件样本解释成完整新闻感知回测。
@@ -521,8 +523,8 @@
 ## 下一步
 
 - 下一步：在 M12.47 守护器每个工作日自动拉起 `python scripts/run_m12_37_intraday_auto_loop.py --session --config config/examples/m12_37_intraday_auto_loop.json` 后，追加运行 `python3 scripts/run_m13_daily_strategy_test_runner.py`，让每个纽约交易日都生成 M13 signal/account ledger 与 goal status。
-- 优先接入 `M10-PA-005/007/008/009/011/013` 的最小 detector/adapter；在接入前，M13 必须继续把这些策略显示为 `not_connected` blocker，不能把 0 开仓解释成测试通过。
 - 同步连续运行 M12.37/M12.39/M13 每日只读循环，累计 `10` 个真实交易日看板和账本记录，并把每日候选、模拟结果、数据缺口、FTD001 风险、Codex 摘要和 M13 goal status 写入同一套 artifact。
+- 每日 challenge 结束后按收益、回撤、胜率、期望、交易频率、滑点敏感性输出 `promote / modify / reject`，但在用户业务审批前仍不得进入真实账户、真实下单或 paper/live 批准。
 - 单次刷新可用 `python scripts/run_m12_37_intraday_auto_loop.py --once --no-fetch`；整段交易日自动会话可用 `python scripts/run_m12_37_intraday_auto_loop.py --session`；两者都仍是只读模拟，不接账户、不下单。
 - `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版现已进入正式主线账户，历史样例只留作参考不入账，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。

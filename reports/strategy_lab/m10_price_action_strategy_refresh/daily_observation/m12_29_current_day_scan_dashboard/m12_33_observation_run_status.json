@@ -18,7 +18,7 @@
   "observed_trading_days": 4,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "主线账户已经开始按交易日累计，但还没满 10 个纽约真实交易日；实验账户里尚未接线的策略不会被误算成已完成实时测试。",
+  "plain_language_result": "主线和已接线实验账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。",
   "ready_for_m11_8_review": false,
   "real_money_actions": false,
   "required_trading_days": 10,
