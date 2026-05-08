@@ -12,6 +12,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     DEFAULT_ACCOUNT_EQUITY,
     advance_account_runtime,
     bootstrap_account_state,
+    build_dashboard_data_freshness_warning,
     build_extended_session_monitor,
     build_accountized_run_status,
     current_us_scan_date,
@@ -51,6 +52,29 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
     def test_cli_generated_at_guard_rejects_future_timestamp(self):
         with self.assertRaises(ValueError):
             validate_generated_at("2999-01-01T00:00:00Z")
+
+    def test_data_freshness_warning_marks_fallback_or_no_fetch_as_not_ready(self):
+        warning = build_dashboard_data_freshness_warning(
+            quote_source="fallback_quotes_only",
+            current_day_runtime_ready=False,
+            current_day_scan_complete=False,
+            daily_ready_symbols=0,
+            current_5m_ready_symbols=0,
+            runtime_readiness_note="fixture",
+        )
+        self.assertIn("看板数据未刷新", warning)
+        self.assertIn("fallback quotes / no-fetch", warning)
+        self.assertEqual(
+            build_dashboard_data_freshness_warning(
+                quote_source="longbridge_quote_readonly",
+                current_day_runtime_ready=True,
+                current_day_scan_complete=True,
+                daily_ready_symbols=50,
+                current_5m_ready_symbols=50,
+                runtime_readiness_note="ready",
+            ),
+            "",
+        )
 
     def test_strategy_closure_reflects_mainline_experimental_and_supporting_lanes(self):
         _, result, _ = self.run_stage()

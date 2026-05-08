@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：`codex/m13-real-strategy-test-loop`
+- 当前支线：`codex/m14-strategy-challenge-paper-gate`
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
-- 当前支线 milestone：M13 真实每日策略测试闭环
-- 当前子阶段：已归档并推送 M12.49 最新运行产物；已从 `origin/main` 创建 `codex/m13-real-strategy-test-loop`，并合入 M12.49 运行硬化基线作为 M13 前置。M13 当前已新增 strategy runtime registry、daily strategy test runner、策略信号账本、账户操作账本、goal 状态和 AI-Trader 外部研究边界；`M10-PA-005/007/008/009/011/013` 已接入最小 detector/adapter 并进入每日实验账户账本，下一步是累计 `10` 个纽约真实交易日 challenge。
+- 当前支线 milestone：M14 稳定策略测试、自动调参决策与内部模拟准入
+- 当前子阶段：已从 M13 前置基线创建 `codex/m14-strategy-challenge-paper-gate`。M14 当前已新增 append-only challenge ledger、strategy decision ledger、internal paper trial gate、M14 dashboard 和内部模拟桥接；`2026-05-08` 样本已写入 `23` 条 challenge rows 和 `18` 条 decision rows，但因 M12 看板为 `fallback_quotes_only / current_day_runtime_ready=false / 第一批 50 只 0/50`，当前所有策略均未获准进入内部模拟成交。
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m13-real-strategy-test-loop`
+- `codex/m14-strategy-challenge-paper-gate`
 
 ## 已完成
 
@@ -507,11 +507,16 @@
 - M13 当前已接入实验策略最小 adapter：`M10-PA-005` 复用失败突破 range adapter，`M10-PA-007` 复用 M12.23 第二腿检测器，`M10-PA-008/009/013` 复用 M10.11 Wave B proxy detector，`M10-PA-011` 只保留 `5m` 开盘反转账户，不再用日线伪装开盘策略测试。
 - M13 最新 runner 样本使用 `2026-05-08` 纽约交易日，输出 `23` 条策略/账户信号账本事件、`25` 条账户操作账本事件、`3` 次 open、`3` 次 close；所有 required 策略都有账本状态且 `blocked_strategy_ids=[]`，`m13_goal_status.json` 中 `goal_complete=true`、`continue_without_stopping=false`。该结果只表示真实每日测试闭环已跑通，不代表 paper/live 批准。
 - M13 当前已明确 AI-Trader 边界：表现优秀的 AI-Trader agent/signal 只能作为公开或用户授权的外部候选信号源进入只读影子测试，不得 copy-trading、不得直接执行、不得把外部信号包装成自有策略。
+- M14 当前已新增 `config/examples/m14_strategy_challenge_gate.json`、`scripts/run_m14_strategy_challenge_gate.py` 与 `scripts/m14_strategy_challenge_gate_lib.py`，把 M13 当日账本滚入 append-only `m14_challenge_day_ledger.jsonl`，再输出 `m14_strategy_decision_ledger.jsonl`、`m14_paper_trial_gate.json`、`m14_strategy_challenge_summary.json`、`m14_goal_status.json` 与 `m14_strategy_challenge_dashboard.html`。
+- M14 当前已把策略决策固定为 `promote / modify / reject / continue_testing`；默认不满 `10` 个纽约交易日不得调策略定义，只有至少 `3` 个 signal days 后触发 `-2R`、`>3%` 最大回撤、风险拦截占比过高或重复数据缺口时才提前冻结/改版。
+- M14 当前已实现内部模拟桥接：只有 `paper_trial_gate=approved_internal_sim_only` 的策略才会把 ledger open event 转成 `ExecutionRequest`，并按 `src.risk.evaluate_order_request` -> `src.execution.PaperBrokerAdapter` 的顺序写入模拟执行账本；当前样本无策略获批，因此 `m14_internal_paper_execution_ledger.jsonl` 为空。
+- M12.29/M12.46 看板 HTML 当前已新增“数据刷新告警”，当 `fallback_quotes_only`、`--no-fetch`、`--no-refresh-quotes` 或 `current_day_runtime_ready=false` 时，会在页面顶部明确显示“看板数据未刷新 / fallback quotes / no-fetch”，避免把降级快照误判为完整策略测试。
+- M14 当前已新增单测与集成测试，覆盖 append-only challenge、fallback/no-fetch 不批准、亏损 baseline 创建新 variant、风险检查先于模拟成交、M13 daily ledger 滚入 M14 summary 与 dashboard 聚合一致。
 
 ## 当前阻塞
 
 - 远端推送大文件阻塞已处理：M10.6 原始大 JSONL 已用 gzip archive manifest 保留可追溯，原始文件不再进入可推送历史；后续推送 `main` 不应再被该文件阻塞。
-- 当前 M13 已把“是否真的测试过”升级为账本口径；主要 blocker 已从实验策略未接线转为 `10` 个纽约真实交易日 challenge 尚未累计完成。任何单日 open/close 或 zero_signal 都只能作为当日账本事实，不得直接解释成策略可投入使用。
+- 当前 M14 已把“是否真的测试过”升级为 challenge/gate 口径；主要 blocker 是 `10` 个纽约真实交易日 challenge 尚未累计完成，且最近样本的 M12 看板仍是 fallback/no-fetch 降级数据。任何单日 open/close、zero_signal 或 M13 goal complete 都不能直接解释成可投入使用或可盈利。
 - M12.49 运行层 blocker 和 PA004 方向兼容 bug 已修复；可继续用 M12.47 守护器自动拉起 M12.37，盘前/盘中/盘后刷新看板，并在每次刷新后运行 M13 runner 把结果固化到账本。
 - M11.7 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 新闻/财报当前仍是 sidecar 第一版：Google 案例已覆盖，但生产级新闻/财报历史事件集尚未建立，不能把当前 `2` 条事件样本解释成完整新闻感知回测。
@@ -522,9 +527,9 @@
 
 ## 下一步
 
-- 下一步：在 M12.47 守护器每个工作日自动拉起 `python scripts/run_m12_37_intraday_auto_loop.py --session --config config/examples/m12_37_intraday_auto_loop.json` 后，追加运行 `python3 scripts/run_m13_daily_strategy_test_runner.py`，让每个纽约交易日都生成 M13 signal/account ledger 与 goal status。
-- 同步连续运行 M12.37/M12.39/M13 每日只读循环，累计 `10` 个真实交易日看板和账本记录，并把每日候选、模拟结果、数据缺口、FTD001 风险、Codex 摘要和 M13 goal status 写入同一套 artifact。
-- 每日 challenge 结束后按收益、回撤、胜率、期望、交易频率、滑点敏感性输出 `promote / modify / reject`，但在用户业务审批前仍不得进入真实账户、真实下单或 paper/live 批准。
+- 下一步：在 M12.47 守护器每个工作日自动拉起 `python scripts/run_m12_37_intraday_auto_loop.py --session --config config/examples/m12_37_intraday_auto_loop.json` 后，追加运行 `python3 scripts/run_m13_daily_strategy_test_runner.py` 和 `python3 scripts/run_m14_strategy_challenge_gate.py`，让每个纽约交易日都生成 M13 signal/account ledger 与 M14 challenge/gate artifact。
+- 同步连续运行 M12.37/M12.39/M13/M14 每日只读循环，累计 `10` 个真实交易日看板和账本记录，并把每日候选、模拟结果、数据缺口、FTD001 风险、Codex 摘要、M13 goal status 与 M14 paper gate 写入同一套 artifact。
+- 每日 challenge 结束后按收益、回撤、胜率、期望、交易频率、滑点敏感性输出 `promote / modify / reject / continue_testing`；只有 gate 为 `approved_internal_sim_only` 才能进入内部模拟账户，且在用户另行批准前仍不得进入 broker paper、真实账户、真实下单或 live。
 - 单次刷新可用 `python scripts/run_m12_37_intraday_auto_loop.py --once --no-fetch`；整段交易日自动会话可用 `python scripts/run_m12_37_intraday_auto_loop.py --session`；两者都仍是只读模拟，不接账户、不下单。
 - `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版现已进入正式主线账户，历史样例只留作参考不入账，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。

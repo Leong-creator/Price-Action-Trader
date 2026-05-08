@@ -1852,6 +1852,14 @@ def build_accountized_summary(
     old_rows = [row for row in trade_rows if row["is_current_scan_date"] != "true"]
     mainline = build_account_overview("主线正式账户", runtime["mainline_accounts"])
     experimental = build_account_overview("实验账户", runtime["experimental_accounts"])
+    data_freshness_warning = build_dashboard_data_freshness_warning(
+        quote_source=str(quote_manifest.get("quote_source", "")),
+        current_day_runtime_ready=bool(runtime_readiness["runtime_ready"]),
+        current_day_scan_complete=bool(runtime_readiness["strict_complete"]),
+        daily_ready_symbols=runtime_readiness["daily_ready_symbols"],
+        current_5m_ready_symbols=runtime_readiness["current_5m_ready_symbols"],
+        runtime_readiness_note=str(runtime_readiness["plain_reason"]),
+    )
     return {
         "schema_version": "m12.46.accountized-summary.v1",
         "stage": "M12.46.accountized_realtime_testing",
@@ -1883,6 +1891,7 @@ def build_accountized_summary(
         "first50_daily_ready_symbols": runtime_readiness["daily_ready_symbols"],
         "first50_current_5m_ready_symbols": runtime_readiness["current_5m_ready_symbols"],
         "runtime_readiness_note": runtime_readiness["plain_reason"],
+        "data_freshness_warning": data_freshness_warning,
         "plain_language_result": (
             f"主线正式账户当前权益 {mainline['current_equity']}，今日盈亏 {mainline['day_pnl']}；"
             f"实验账户当前权益 {experimental['current_equity']}，今日盈亏 {experimental['day_pnl']}。"
@@ -1896,6 +1905,31 @@ def build_accountized_summary(
         "live_execution": False,
         "paper_trading_approval": False,
     }
+
+
+def build_dashboard_data_freshness_warning(
+    *,
+    quote_source: str,
+    current_day_runtime_ready: bool,
+    current_day_scan_complete: bool,
+    daily_ready_symbols: Any,
+    current_5m_ready_symbols: Any,
+    runtime_readiness_note: str,
+) -> str:
+    fallback_or_no_fetch = any(
+        token in quote_source.lower()
+        for token in ("fallback", "no-fetch", "no_fetch", "no-refresh", "no_refresh")
+    )
+    if current_day_runtime_ready and current_day_scan_complete and not fallback_or_no_fetch:
+        return ""
+    return (
+        "看板数据未刷新 / fallback quotes / no-fetch："
+        f"quote_source={quote_source or 'unknown'}，"
+        f"current_day_runtime_ready={str(current_day_runtime_ready).lower()}，"
+        f"current_day_scan_complete={str(current_day_scan_complete).lower()}，"
+        f"第一批 50 只日线 {daily_ready_symbols}/50，当日 5m {current_5m_ready_symbols}/50。"
+        f"{runtime_readiness_note}"
+    )
 
 
 def source_config_output_path(config: M1229Config, filename: str) -> Path:
@@ -2919,6 +2953,7 @@ def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
 
 def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
+    summary = dashboard.get("summary", {})
     mainline = dashboard["mainline_account_view"]
     experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
@@ -2927,6 +2962,18 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     cards = "\n".join(
         f"<section class=\"metric\"><span>{html.escape(k)}</span><strong>{html.escape(str(v))}</strong></section>"
         for k, v in metrics.items()
+    )
+    data_freshness_warning = summary.get("data_freshness_warning") or build_dashboard_data_freshness_warning(
+        quote_source=str(summary.get("quote_source", "")),
+        current_day_runtime_ready=bool(summary.get("current_day_runtime_ready", False)),
+        current_day_scan_complete=bool(summary.get("current_day_scan_complete", False)),
+        daily_ready_symbols=summary.get("first50_daily_ready_symbols", "unknown"),
+        current_5m_ready_symbols=summary.get("first50_current_5m_ready_symbols", "unknown"),
+        runtime_readiness_note=str(summary.get("runtime_readiness_note", "")),
+    )
+    data_freshness_section = (
+        f"<section class=\"panel warning\"><h2>数据刷新告警</h2><div class=\"note\">{html.escape(str(data_freshness_warning))}</div></section>"
+        if data_freshness_warning else ""
     )
     mainline_rows = "\n".join(
         f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
@@ -2991,6 +3038,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     h1 {{ margin:0; font-size:24px; }} main {{ padding:18px 22px; display:grid; gap:18px; }}
     .grid {{ display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:10px; }}
     .metric,.panel {{ background:#fff; border:1px solid #d8dee9; border-radius:8px; }}
+    .warning {{ border-left:6px solid #b42318; background:#fff7f5; }}
     .metric {{ padding:12px; }} .metric span {{ display:block; color:#667085; font-size:12px; }} .metric strong {{ display:block; margin-top:8px; font-size:22px; }}
     h2 {{ margin:0; padding:14px 16px; font-size:18px; border-bottom:1px solid #d8dee9; }}
     .note {{ padding:12px 16px; color:#667085; line-height:1.6; }}
@@ -3015,6 +3063,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>当前电脑时间：{html.escape(update_status['wall_clock_beijing_time'])} ｜ 看板新鲜度：{html.escape(update_status['freshness_state'])} ｜ 看板延迟秒数：{html.escape(update_status['dashboard_age_seconds'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 守护器进程：{html.escape(update_status['supervisor_process_alive'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
   <main>
     <div class="grid">{cards}</div>
+    {data_freshness_section}
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
     <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
     <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>历史收益</th><th>胜率</th><th>最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>

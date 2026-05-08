@@ -1343,6 +1343,21 @@
   - 必须输出 `m12_34_observation_test_lane.json/csv/md`、`m12_35_timeframe_readonly_dashboard_data.json`、`m12_35_timeframe_views.json/md`、`m12_36_ftd001_monitor.json/md`、`m12_37_auto_runner_manifest.json`、`m12_38_codex_observer_latest.json`、`m12_38_codex_observer_inbox.jsonl`。
   - systemd/cron 只能作为示例配置或显式启用步骤，不得偷偷启动真实交易或长期后台下单路径。
   - 所有 artifact 必须继续保持 `paper_simulated_only=true`、`paper_trading_approval=false`、`broker_connection=false`、`real_orders=false`、`live_execution=false`，不得出现真实账户、真实订单、真实持仓或真实资金语义。
+- M13 Real Daily Strategy Testing 必须满足：
+  - 必须以 `config/examples/m13_strategy_runtime_registry.json` 作为策略测试 scope 的 source of truth。
+  - 每个纽约交易日必须输出 `m13_strategy_signal_ledger.jsonl`、`m13_account_operation_ledger.jsonl`、`m13_daily_strategy_scorecard.*` 与 `m13_goal_status.json`。
+  - `M10-PA-001/002/004/005/007/008/009/011/012/013/M12-FTD-001` 必须有独立账户或明确 blocker；`M10-PA-003/006/014/015/016` 必须作为 plugin/filter A/B 入账，不得伪装为独立开仓策略。
+  - 当天没有 ledger event 的策略不得算作已测试；看板不得把未接线策略展示成已测试。
+  - AI-Trader 只能作为外部候选研究源，不得 copy-trading、不得直接执行。
+- M14 Strategy Challenge And Internal Paper Gate 必须满足：
+  - M14 必须在 M13 之上输出 append-only `m14_challenge_day_ledger.jsonl`，同一 `strategy_id/runtime_id/trading_date` 不得覆盖历史行。
+  - 必须输出 `m14_strategy_decision_ledger.jsonl`，决策值只能是 `promote / modify / reject / continue_testing`。
+  - 默认挑战窗口固定为 `10` 个纽约交易日；未满窗口不得修改策略定义，除非至少 `3` 个 signal days 后触发 `-2R`、`>3%` 最大回撤、风险拦截占比过高或重复数据缺口。
+  - 亏损策略必须冻结 baseline 并创建新 variant 做 A/B，不得静默覆盖旧策略结果。
+  - `m14_paper_trial_gate.json` 中只有 `paper_trial_gate=approved_internal_sim_only` 才能进入内部模拟账户；这仍不代表 broker paper、真实账户、真实下单或 live approval。
+  - 内部模拟桥接必须按 `ExecutionRequest -> src.risk.evaluate_order_request -> src.execution.PaperBrokerAdapter` 顺序执行，并写入 `m14_internal_paper_execution_ledger.jsonl`。
+  - `fallback_quotes_only`、`--no-fetch`、`--no-refresh-quotes` 或 `current_day_runtime_ready=false` 必须阻止 gate 批准，并在 dashboard 明显提示“看板数据未刷新 / fallback quotes / no-fetch”。
+  - 所有 M14 artifact 必须继续保持 `paper_simulated_only=true`、`internal_simulated_account=true`、`broker_paper_connection=false`、`real_money_actions=false`、`live_execution=false`、`paper_trading_approval=false`。
 - M11.5 Paper Gate Recheck 必须满足：
   - 必须基于 M12 只读观察、scanner、visual review 和 definition fix 的实际 artifact 重新评估 gate。
   - 未完成真实只读观察窗口、未完成人工图形复核、未解决定义 blocker 或缺少人工业务审批时，paper trading approval 必须继续为 `false`。
