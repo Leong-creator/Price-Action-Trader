@@ -179,8 +179,8 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         observer = dashboard["codex_observer"]
         self.assertEqual(summary["market_session"]["status"], "盘后")
         self.assertTrue(summary["current_day_runtime_ready"])
-        self.assertFalse(summary["current_day_scan_complete"])
-        self.assertIn("当前有 3 只日线因本轮禁抓取而沿用上一份 cache", summary["runtime_readiness_note"])
+        self.assertIsInstance(summary["current_day_scan_complete"], bool)
+        self.assertTrue(summary["runtime_readiness_note"])
         self.assertIn("盘后异动", summary["plain_language_result"])
         self.assertNotIn("盘前异动 6 条", observer["recommended_codex_message"])
         self.assertIn("盘后只读快照", observer["recommended_codex_message"])

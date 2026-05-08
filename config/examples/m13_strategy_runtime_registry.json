@@ -1,0 +1,230 @@
+{
+  "schema_version": "m13.strategy-runtime-registry.v1",
+  "stage": "M13.real_daily_strategy_testing",
+  "description": "Source of truth for daily readonly strategy testing. A strategy is not tested unless it has a daily ledger state.",
+  "required_daily_states": [
+    "not_connected",
+    "detector_missing",
+    "missing_data",
+    "zero_signal",
+    "signal_generated",
+    "open",
+    "close",
+    "risk_blocked",
+    "plugin_ab_attached"
+  ],
+  "ai_trader_policy": {
+    "mode": "external_research_only",
+    "allowed": "authorized_public_or_user_approved_readonly_signals",
+    "forbidden": "copy_trading_or_direct_execution",
+    "shadow_test_days": 10
+  },
+  "strategies": [
+    {
+      "strategy_id": "M10-PA-001",
+      "display_name": "Trend pullback runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m12_12_core_scan",
+      "detector_status": "connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-001-1d", "timeframe": "1d", "lane": "mainline", "variant_id": "base"},
+        {"runtime_id": "M10-PA-001-5m", "timeframe": "5m", "lane": "mainline", "variant_id": "base"}
+      ],
+      "next_action": "Keep daily ledger running and score from immutable account operations."
+    },
+    {
+      "strategy_id": "M10-PA-002",
+      "display_name": "Breakout runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m12_12_core_scan",
+      "detector_status": "connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-002-1d", "timeframe": "1d", "lane": "mainline", "variant_id": "base"},
+        {"runtime_id": "M10-PA-002-5m", "timeframe": "5m", "lane": "mainline", "variant_id": "base"}
+      ],
+      "next_action": "Keep daily ledger running and score from immutable account operations."
+    },
+    {
+      "strategy_id": "M10-PA-004",
+      "display_name": "Broad channel boundary reversal long-only runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m12_29_pa004_formal_detector",
+      "detector_status": "connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-004-long-1d", "timeframe": "1d", "lane": "mainline", "variant_id": "long_only"}
+      ],
+      "next_action": "Require daily audit trail explaining open, close, zero_signal, or blocked."
+    },
+    {
+      "strategy_id": "M10-PA-005",
+      "display_name": "Range geometry experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m13_adapter_pending",
+      "detector_status": "not_connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-005-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"},
+        {"runtime_id": "M10-PA-005-5m", "timeframe": "5m", "lane": "experimental", "variant_id": "base"}
+      ],
+      "next_action": "Attach a minimum testable detector adapter or mark detector_missing with evidence."
+    },
+    {
+      "strategy_id": "M10-PA-007",
+      "display_name": "Second leg visual detector runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m12_23_visual_detector_retained_candidates",
+      "detector_status": "not_connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-007-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"}
+      ],
+      "next_action": "Connect retained detector output to formal daily signal rows."
+    },
+    {
+      "strategy_id": "M10-PA-008",
+      "display_name": "Visual strategy 008 experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m13_adapter_pending",
+      "detector_status": "not_connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-008-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"}
+      ],
+      "next_action": "Build or explicitly block the minimum detector adapter."
+    },
+    {
+      "strategy_id": "M10-PA-009",
+      "display_name": "Visual strategy 009 experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m13_adapter_pending",
+      "detector_status": "not_connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-009-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"}
+      ],
+      "next_action": "Build or explicitly block the minimum detector adapter."
+    },
+    {
+      "strategy_id": "M10-PA-011",
+      "display_name": "Session microstructure experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m13_adapter_pending",
+      "detector_status": "not_connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-011-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"},
+        {"runtime_id": "M10-PA-011-5m", "timeframe": "5m", "lane": "experimental", "variant_id": "base"}
+      ],
+      "next_action": "Separate session detector requirements from current core scanner and ledger blocker."
+    },
+    {
+      "strategy_id": "M10-PA-012",
+      "display_name": "Opening range breakout runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m12_12_core_scan",
+      "detector_status": "connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-012-5m", "timeframe": "5m", "lane": "mainline", "variant_id": "base"}
+      ],
+      "next_action": "Keep daily ledger running and score from immutable account operations."
+    },
+    {
+      "strategy_id": "M10-PA-013",
+      "display_name": "Visual strategy 013 experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m13_adapter_pending",
+      "detector_status": "not_connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-013-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "base"},
+        {"runtime_id": "M10-PA-013-5m", "timeframe": "5m", "lane": "experimental", "variant_id": "base"}
+      ],
+      "next_action": "Build or explicitly block the minimum detector adapter."
+    },
+    {
+      "strategy_id": "M12-FTD-001",
+      "display_name": "Formal daily trend runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m12_12_formal_daily_detector",
+      "detector_status": "connected",
+      "required_for_goal": true,
+      "runtime_accounts": [
+        {"runtime_id": "M12-FTD-001-baseline-1d", "timeframe": "1d", "lane": "mainline", "variant_id": "baseline"},
+        {"runtime_id": "M12-FTD-001-loss-streak-guard-1d", "timeframe": "1d", "lane": "mainline", "variant_id": "loss_streak_guard"}
+      ],
+      "next_action": "Run baseline and loss_streak_guard as a daily challenge pair."
+    },
+    {
+      "strategy_id": "M10-PA-003",
+      "display_name": "Filter and ranking module",
+      "module_role": "plugin_filter",
+      "detector_id": "m13_filter_ab",
+      "detector_status": "plugin_ab",
+      "required_for_goal": true,
+      "plugin_targets": ["M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001"],
+      "next_action": "Attach as A/B filter ledger, not as an independent account."
+    },
+    {
+      "strategy_id": "M10-PA-006",
+      "display_name": "BLSHS limit filter",
+      "module_role": "plugin_filter",
+      "detector_id": "m12_46_supporting_rule_ab",
+      "detector_status": "plugin_ab",
+      "required_for_goal": true,
+      "plugin_targets": ["M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001"],
+      "next_action": "Attach as A/B filter ledger, not as an independent account."
+    },
+    {
+      "strategy_id": "M10-PA-014",
+      "display_name": "Target module",
+      "module_role": "plugin_filter",
+      "detector_id": "m12_46_supporting_rule_ab",
+      "detector_status": "plugin_ab",
+      "required_for_goal": true,
+      "plugin_targets": ["M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001"],
+      "next_action": "Attach as A/B target module ledger."
+    },
+    {
+      "strategy_id": "M10-PA-015",
+      "display_name": "Stop and sizing module",
+      "module_role": "plugin_filter",
+      "detector_id": "m12_46_supporting_rule_ab",
+      "detector_status": "plugin_ab",
+      "required_for_goal": true,
+      "plugin_targets": ["M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001"],
+      "next_action": "Attach as A/B stop and sizing module ledger."
+    },
+    {
+      "strategy_id": "M10-PA-016",
+      "display_name": "Range add-on module",
+      "module_role": "plugin_filter",
+      "detector_id": "m12_46_supporting_rule_ab",
+      "detector_status": "plugin_ab",
+      "required_for_goal": true,
+      "plugin_targets": ["M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001"],
+      "next_action": "Attach as A/B add-on module ledger."
+    },
+    {
+      "strategy_id": "M10-PA-010",
+      "display_name": "Visual research-only module",
+      "module_role": "research_only",
+      "detector_id": "manual_visual_research",
+      "detector_status": "research_only",
+      "required_for_goal": false,
+      "next_action": "Keep as research-only until a minimum detector contract exists."
+    },
+    {
+      "strategy_id": "AI-TRADER-EXTERNAL",
+      "display_name": "AI-Trader external signal research",
+      "module_role": "external_research",
+      "detector_id": "authorized_ai_trader_readonly_feed",
+      "detector_status": "external_research",
+      "required_for_goal": false,
+      "next_action": "Only ingest authorized public/user-approved signals into shadow testing; never copy-trade or execute directly."
+    }
+  ]
+}

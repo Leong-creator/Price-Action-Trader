@@ -129,6 +129,44 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
         self.assertEqual(runtime["state"]["accounts"]["M12-FTD-001-baseline-1d"]["cash"], "15000.00")
         self.assertEqual(runtime["state"]["accounts"]["M12-FTD-001-loss-streak-guard-1d"]["cash"], "15000.00")
 
+    def test_today_signal_count_uses_trade_ledger_not_open_position_snapshot(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_46"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T14:00:00Z",
+                scan_date=date.fromisoformat("2026-04-29"),
+                trade_rows=[
+                    {
+                        "strategy_id": "M10-PA-001",
+                        "timeframe": "1d",
+                        "symbol": "SPY",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:00:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "101.00",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "100.50",
+                        "review_status": "ready",
+                        "risk_level": "medium",
+                        "source_refs": "src-a",
+                        "spec_ref": "spec-a",
+                    },
+                ],
+                pa004_formal_rows=[],
+                closure_rows=[],
+                current_day_runtime_ready=True,
+            )
+        rows = {row["runtime_id"]: row for row in runtime["account_rows"]}
+        account = rows["M10-PA-001-1d"]
+        self.assertEqual(account["today_signal_count"], "1")
+        self.assertEqual(account["today_opened_count"], "1")
+        self.assertEqual(account["today_closed_count"], "1")
+        self.assertEqual(account["open_position_count"], "0")
+
 
 if __name__ == "__main__":
     unittest.main()

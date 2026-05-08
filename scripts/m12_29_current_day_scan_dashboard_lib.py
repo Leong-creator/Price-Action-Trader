@@ -1005,7 +1005,11 @@ def mark_position_to_market(
     return trade
 
 
-def recalc_account_metrics(account: dict[str, Any], scan_date: date) -> None:
+def recalc_account_metrics(
+    account: dict[str, Any],
+    scan_date: date,
+    daily_ledger_rows: list[dict[str, Any]] | None = None,
+) -> None:
     open_positions = account["open_positions"]
     reserved = sum((money_to_decimal(position["reserved_notional"]) for position in open_positions), ZERO)
     unrealized = sum((money_to_decimal(position["current_pnl"]) for position in open_positions), ZERO)
@@ -1016,7 +1020,16 @@ def recalc_account_metrics(account: dict[str, Any], scan_date: date) -> None:
     drawdown = ((peak - equity) / peak * HUNDRED) if peak > ZERO else ZERO
     wins = [trade for trade in account["closed_trades"] if money_to_decimal(trade.get("realized_pnl", "0")) > ZERO]
     today_key = scan_date.isoformat()
-    today_opened = [position for position in open_positions if position.get("signal_date") == today_key]
+    if daily_ledger_rows is not None:
+        today_opened_count = sum(1 for row in daily_ledger_rows if row.get("event_type") == "open")
+        today_closed_count = sum(1 for row in daily_ledger_rows if row.get("event_type") == "close")
+    else:
+        today_opened_count = sum(1 for position in open_positions if position.get("signal_date") == today_key)
+        today_closed_count = sum(
+            1
+            for trade in account["closed_trades"]
+            if iso_to_ny_trading_date(trade.get("event_time", "")) == scan_date
+        )
     today_closed = [
         trade for trade in account["closed_trades"]
         if iso_to_ny_trading_date(trade.get("event_time", "")) == scan_date
@@ -1032,12 +1045,12 @@ def recalc_account_metrics(account: dict[str, Any], scan_date: date) -> None:
     account["losing_trade_count"] = len(account["closed_trades"]) - len(wins)
     account["win_rate_percent"] = pct(Decimal(len(wins)) / Decimal(len(account["closed_trades"])) * HUNDRED) if account["closed_trades"] else "0.00"
     account["cumulative_return_percent"] = pct((equity - DEFAULT_ACCOUNT_EQUITY) / DEFAULT_ACCOUNT_EQUITY * HUNDRED)
-    account["today_opened_count"] = len(today_opened)
-    account["today_closed_count"] = len(today_closed)
+    account["today_opened_count"] = today_opened_count
+    account["today_closed_count"] = today_closed_count
     account["today_realized_pnl"] = money(today_realized)
     account["today_unrealized_pnl"] = money(unrealized)
     account["today_total_pnl"] = money(today_realized + unrealized)
-    account["today_signal_count"] = len(today_opened)
+    account["today_signal_count"] = today_opened_count
 
 
 def advance_account_runtime(
@@ -1047,11 +1060,15 @@ def advance_account_runtime(
     trade_rows: list[dict[str, str]],
     pa004_formal_rows: list[dict[str, str]],
     closure_rows: list[dict[str, str]],
-    current_day_runtime_ready: bool,
+    current_day_runtime_ready: bool | None = None,
+    current_day_complete: bool | None = None,
 ) -> dict[str, Any]:
+    if current_day_runtime_ready is None:
+        current_day_runtime_ready = bool(current_day_complete)
     state = load_account_runtime_state(config)
     history_lookup = build_account_history_lookup(config, closure_rows)
     quote_lookup = build_quote_lookup(trade_rows, pa004_formal_rows)
+    existing_ledger_rows = read_jsonl(config.output_dir / "m12_46_account_trade_ledger.jsonl")
     new_ledger_rows: list[dict[str, Any]] = []
     account_rows: list[dict[str, Any]] = []
     mainline_accounts: list[dict[str, Any]] = []
@@ -1061,25 +1078,33 @@ def advance_account_runtime(
         state["accounts"][spec["account_id"]] = account
         rows = runtime_signal_rows(spec, trade_rows, pa004_formal_rows)
         max_holding = holding_days_limit(spec, history_lookup.get(spec["account_id"], {}))
+        account_new_ledger_rows: list[dict[str, Any]] = []
         remaining: list[dict[str, Any]] = []
         for position in account["open_positions"]:
             closed = mark_position_to_market(account, position, quote_lookup, spec, generated_at, scan_date, max_holding)
             if closed is None:
                 remaining.append(position)
             else:
-                new_ledger_rows.append(closed)
+                account_new_ledger_rows.append(closed)
         account["open_positions"] = remaining
         opened_rows, _ = open_new_positions(account, spec, rows, scan_date, generated_at)
-        new_ledger_rows.extend(opened_rows)
+        account_new_ledger_rows.extend(opened_rows)
         refreshed_positions: list[dict[str, Any]] = []
         for position in account["open_positions"]:
             closed = mark_position_to_market(account, position, quote_lookup, spec, generated_at, scan_date, max_holding)
             if closed is None:
                 refreshed_positions.append(position)
             else:
-                new_ledger_rows.append(closed)
+                account_new_ledger_rows.append(closed)
         account["open_positions"] = refreshed_positions
-        recalc_account_metrics(account, scan_date)
+        account_daily_ledger_rows = [
+            row
+            for row in existing_ledger_rows + account_new_ledger_rows
+            if row.get("runtime_id") == spec["account_id"]
+            and iso_to_ny_trading_date(str(row.get("event_time", ""))) == scan_date
+        ]
+        new_ledger_rows.extend(account_new_ledger_rows)
+        recalc_account_metrics(account, scan_date, account_daily_ledger_rows)
         account_view = build_account_view(account, history_lookup.get(spec["account_id"], {}))
         account_rows.append(account_view)
         if spec["lane"] == "mainline":
@@ -1903,6 +1928,18 @@ def append_rows_to_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped:
+                rows.append(json.loads(stripped))
+    return rows
 
 
 def parse_iso_date(value: str) -> date | None:
