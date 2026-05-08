@@ -1,8 +1,8 @@
 ```yaml
-task_id: M12.34-M12.39-intraday-observer-dashboard
+task_id: M12.46-M11.8-accountized-testing
 role: main-agent
-branch_or_worktree: feature/m12-34-39-intraday-observer-dashboard
-objective: 让观察策略进入每日测试，按周期重排看板，重点监控 FTD001，并提供自动运行器与 Codex 观察员摘要
+branch_or_worktree: codex/m12-46-accountized-testing
+objective: 把只读实时测试升级为 20,000 USD 独立模拟账户，按 1d/5m 分栏运行主线和实验策略，并修复纽约交易日累计口径
 status: success
 files_changed:
   - config/examples/m12_29_current_day_scan_dashboard.json
@@ -19,22 +19,23 @@ commands_run:
 tests_run:
   - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py -v
   - python -m unittest tests/unit/test_m12_37_intraday_auto_loop.py -v
-  - python -m unittest discover -s tests/unit -v
-  - python -m unittest discover -s tests/reliability -v
+  - python -m unittest tests/unit/test_m12_46_runtime_accounts.py -v
+  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py tests/unit/test_m12_37_intraday_auto_loop.py tests/unit/test_m12_46_runtime_accounts.py tests/unit/test_m12_17_daily_observation_continuity.py tests/unit/test_m12_25_daily_observation_continuity.py -v
+  - git diff --check
 verification_results:
-  - scan_date: 2026-04-30
-  - today_candidate_count: 61
-  - current_day_scan_complete: true
+  - scan_date: 2026-05-07
+  - today_candidate_count: 26
+  - current_day_scan_complete: false
 assumptions:
   - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单
 risks:
-  - 看板仍是只读行情和模拟盈亏，连续交易日样本仍只有 1/10
-  - systemd/cron 示例已提交，但本阶段没有偷偷启用系统级长期后台任务
+  - 实验账户仍需累计更多真实交易日，当前还不能直接当作稳定结论
+  - 自动运行需要显式启用 systemd/cron 或 Codex automation，当前 handoff 只记录实现状态
 qa_focus:
-  - 检查观察策略测试 lane、周期分组、FTD001 监控、Codex 观察员摘要和只读边界
+  - 检查纽约交易日累计、主线/实验账户隔离、FTD001 双版本并行和只读边界
 rollback_notes:
-  - 回滚本阶段提交即可撤回 M12.34-M12.39 产物
-next_recommended_action: 美股常规交易时段运行自动刷新，累计10个真实交易日的只读模拟看板记录，并在看板稳定后做模拟交易试运行准入复查
+  - 回滚本阶段提交即可撤回 M12.46 账户化实时测试产物
+next_recommended_action: 启用交易日会话自动运行，累计 10 个纽约真实交易日的主线/实验账户结果，再做 M11.8 模拟交易试运行复查
 needs_user_decision: false
 user_decision_needed: ''
 ```

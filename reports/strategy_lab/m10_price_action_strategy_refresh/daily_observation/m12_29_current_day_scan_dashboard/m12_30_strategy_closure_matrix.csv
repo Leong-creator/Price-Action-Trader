@@ -1,24 +1,24 @@
-daily_realtime_test,final_status,historical_average_holding_bars,historical_best_symbol,historical_best_timeframe,historical_final_equity,historical_initial_capital,historical_net_profit,historical_profit_factor,historical_worst_symbol,historical_worst_timeframe,linked_source_candidate,max_drawdown_percent,observation_queue,paper_trial_candidate_now,plain_reason,return_percent,strategy_id,strategy_title,supporting_or_research,trade_count,win_rate_percent
-true,进入每日实时只读测试,368.2969,TSLA,5m,1995723.86,1600000.00,395723.86,1.0580,NVDA,1h,M12-SRC-002,34.1783,false,false,核心顺势策略，历史资金测试完成，继续扫描 50 只。,24.7327,M10-PA-001,Trend Pullback Second-Entry Continuation,false,19312,35.84
-true,进入每日实时只读测试,83.2629,TSLA,15m,1652496.28,1600000.00,52496.28,1.0144,SPY,5m,M12-SRC-003,23.5592,false,false,突破后跟进策略，历史资金测试完成，也可作为 FTD 确认过滤器。,3.2810,M10-PA-002,Breakout Follow-Through Continuation,false,16303,34.92
-false,过滤器/排名因子,256.5006,NVDA,15m,1145568.65,1200000.00,-54431.35,0.9588,QQQ,5m,M12-SRC-004,16.0795,false,false,紧密通道更适合作为强趋势股票加分项，暂不作为独立买卖触发。,-4.5359,M10-PA-003,Tight Channel Trend Continuation,true,4890,33.91
-false,观察队列：只做多版,44.8673,MU,1d,4725989.23,4700000.00,25989.23,1.1594,SQQQ,1d,,2.0479,true,false,整体混合版本弱，但做多分支转正；只做多观察，做空版暂不进入主线。,0.5530,M10-PA-004,Broad Channel Boundary Reversal,false,574,40.24
-false,研究项：定义仍弱,,,,1489245.04,1600000.00,-110754.96,,,,,,false,false,交易区间失败突破复测仍弱，几何定义不能稳定改善，不拖主线。,-6.9222,M10-PA-005,Trading Range Failed Breakout Reversal,true,13111,33.33
-false,研究项,,,,,,,,,,,,false,false,BLSHS 限价框架不是独立触发。,,M10-PA-006,Trading Range BLSHS Limit-Order Framework,true,,
-false,观察队列,59.9109,DIA,1d,5032367.04,5000000.00,32367.04,1.0563,USO,1d,,3.8796,true,false,第二腿陷阱小范围测试为正，先观察但不进模拟买卖准入。,0.6473,M10-PA-007,Second-Leg Trap Reversal,false,2260,41.15
-false,观察队列,227.1160,TSLA,15m,1664057.47,1600000.00,64057.47,1.0532,NVDA,1d,M12-SRC-006,9.2807,true,false,主要趋势反转有历史资金测试，但图形语境强，先严格观察。,4.0036,M10-PA-008,Major Trend Reversal,false,4375,35.41
-false,观察队列,199.6932,SPY,15m,1616277.18,1600000.00,16277.18,1.0159,NVDA,5m,,9.1580,true,false,楔形反转历史测试略正，先严格观察。,1.0173,M10-PA-009,Wedge Reversal and Wedge Flag,false,4256,33.95
-false,研究项,,,,,,,,,,,,false,false,Final Flag/Climax/TBTL 过于复合，不作为单独触发。,,M10-PA-010,Final Flag or Climax TBTL Reversal,true,,
-false,暂不进入主线,66.2441,NVDA,5m,786985.82,800000.00,-13014.18,0.8270,TSLA,15m,,3.8072,false,false,开盘反转历史资金测试偏弱，保留复核。,-1.6268,M10-PA-011,Opening Reversal,false,295,28.81
-true,进入每日实时只读测试,488.3762,QQQ,5m,1015141.29,800000.00,215141.29,1.1674,NVDA,15m,,12.7415,false,false,开盘区间突破历史资金测试表现较好，继续 15m/5m。,26.8927,M10-PA-012,Opening Range Breakout,false,3662,38.15
-false,暂不进入主线,35.0377,NVDA,1d,1472972.46,1600000.00,-127027.54,0.8763,SPY,5m,,12.8117,false,false,支撑阻力失败测试历史资金测试偏弱，暂不加入实时主线。,-7.9392,M10-PA-013,Support and Resistance Failed Test,false,6239,32.55
-false,辅助规则,,,,,,,,,,,,false,false,Measured Move 只作为目标/止盈模块。,,M10-PA-014,Measured Move Target Engine,true,,
-false,辅助规则,,,,,,,,,,,,false,false,止损与仓位模块，不是入场触发。,,M10-PA-015,Protective Stops and Position Sizing,true,,
-false,研究项,,,,,,,,,,,,false,false,交易区间加仓研究不作为独立触发。,,M10-PA-016,Trading Range Scaling-In Research,true,,
-true,进入每日实时只读测试,4.77,,1d,710436.76,100000.00,610436.76,1.09,,1d,M12-SRC-001,48.38,false,false,早期强策略已改为 pullback_guard 版本，进入每日只读测试观察回撤。,610.44,M12-FTD-001,方方土日线趋势顺势信号K,false,22184,37.36
-true,已合并到 M12-FTD-001,,,,,,,,,,M12-FTD-001,,false,false,这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。,,M12-SRC-001,日线趋势顺势信号K增强版,false,,
-true,已合并到 M10-PA-001,,,,,,,,,,M10-PA-001,,false,false,这是已通过历史资金测试的核心顺势策略。,,M12-SRC-002,趋势回调二次入场,false,,
-true,已合并到 M10-PA-002,,,,,,,,,,M10-PA-002,,false,false,它本身是核心策略，也能帮助判断强K线后有没有真实延续。,,M12-SRC-003,突破后1-2根K线跟进,false,,
-false,已合并到 M10-PA-003,,,,,,,,,,M10-PA-003,,false,false,它更像帮我们从50只里挑更强的股票，不先单独统计盈利。,,M12-SRC-004,紧密通道/小回调顺势,true,,
-false,已合并到 M12-FTD-001-filter,,,,,,,,,,M12-FTD-001-filter,,false,false,它的作用是减少长回调里的差机会，不是独立策略。,,M12-SRC-005,长回调保护,true,,
-false,已合并到 M10-PA-008,,,,,,,,,,M10-PA-008,,true,false,反转机会更依赖图形语境，先观察典型机会，不和主线策略混测。,,M12-SRC-006,主要趋势反转观察,false,,
+daily_realtime_test,experimental_account,final_status,historical_average_holding_bars,historical_best_symbol,historical_best_timeframe,historical_final_equity,historical_initial_capital,historical_net_profit,historical_profit_factor,historical_worst_symbol,historical_worst_timeframe,linked_source_candidate,max_drawdown_percent,observation_queue,paper_trial_candidate_now,plain_reason,return_percent,strategy_id,strategy_title,supporting_or_research,trade_count,win_rate_percent
+true,false,主线正式账户,368.2969,TSLA,5m,1995723.86,1600000.00,395723.86,1.0580,NVDA,1h,M12-SRC-002,34.1783,false,false,核心顺势策略，进入 1d + 5m 正式模拟账户。,24.7327,M10-PA-001,Trend Pullback Second-Entry Continuation,false,19312,35.84
+true,false,主线正式账户,83.2629,TSLA,15m,1652496.28,1600000.00,52496.28,1.0144,SPY,5m,M12-SRC-003,23.5592,false,false,突破后跟进策略，进入 1d + 5m 正式模拟账户。,3.2810,M10-PA-002,Breakout Follow-Through Continuation,false,16303,34.92
+false,false,过滤器/排名因子,256.5006,NVDA,15m,1145568.65,1200000.00,-54431.35,0.9588,QQQ,5m,M12-SRC-004,16.0795,false,false,紧密通道更适合作为强趋势股票加分项，不独立造触发。,-4.5359,M10-PA-003,Tight Channel Trend Continuation,true,4890,33.91
+true,false,主线正式账户：只做多版,44.8673,MU,1d,4725989.23,4700000.00,25989.23,1.1594,SQQQ,1d,,2.0479,false,false,只做多版已升主线，独立 1d 账户测试；做空版继续冻结。,0.5530,M10-PA-004,Broad Channel Boundary Reversal,false,574,40.24
+false,true,实验账户测试,,,,1489245.04,1600000.00,-110754.96,,,,,,false,false,定义仍弱，但不能空挂；进入 1d + 5m 实验账户继续测。,-6.9222,M10-PA-005,Trading Range Failed Breakout Reversal,false,13111,33.33
+false,false,挂件 A/B,,,,,,,,,,,,false,false,BLSHS 限价框架只作为挂件，不独立开账户。,,M10-PA-006,Trading Range BLSHS Limit-Order Framework,true,,
+false,true,实验账户测试,59.9109,DIA,1d,5032367.04,5000000.00,32367.04,1.0563,USO,1d,,3.8796,false,false,第二腿陷阱反转进入 1d 实验账户，而不是只观察不入账。,0.6473,M10-PA-007,Second-Leg Trap Reversal,false,2260,41.15
+false,true,实验账户测试,227.1160,TSLA,15m,1664057.47,1600000.00,64057.47,1.0532,NVDA,1d,M12-SRC-006,9.2807,false,false,主要趋势反转进入 1d 实验账户，继续用账户结果决定升降级。,4.0036,M10-PA-008,Major Trend Reversal,false,4375,35.41
+false,true,实验账户测试,199.6932,SPY,15m,1616277.18,1600000.00,16277.18,1.0159,NVDA,5m,,9.1580,false,false,楔形反转进入 1d 实验账户。,1.0173,M10-PA-009,Wedge Reversal and Wedge Flag,false,4256,33.95
+false,false,研究项,,,,,,,,,,,,false,false,Final Flag/Climax/TBTL 过于复合，不作为单独触发。,,M10-PA-010,Final Flag or Climax TBTL Reversal,true,,
+false,true,实验账户测试,66.2441,NVDA,5m,786985.82,800000.00,-13014.18,0.8270,TSLA,15m,,3.8072,false,false,开盘反转不并入主线，但进入 1d + 5m 实验账户继续测。,-1.6268,M10-PA-011,Opening Reversal,false,295,28.81
+true,false,主线正式账户,488.3762,QQQ,5m,1015141.29,800000.00,215141.29,1.1674,NVDA,15m,,12.7415,false,false,开盘区间突破继续作为 5m 主线正式账户。,26.8927,M10-PA-012,Opening Range Breakout,false,3662,38.15
+false,true,实验账户测试,35.0377,NVDA,1d,1472972.46,1600000.00,-127027.54,0.8763,SPY,5m,,12.8117,false,false,支撑阻力失败测试进入 1d + 5m 实验账户继续测。,-7.9392,M10-PA-013,Support and Resistance Failed Test,false,6239,32.55
+false,false,挂件 A/B,,,,,,,,,,,,false,false,Measured Move 只作为目标/止盈模块。,,M10-PA-014,Measured Move Target Engine,true,,
+false,false,挂件 A/B,,,,,,,,,,,,false,false,止损与仓位模块，不是入场触发。,,M10-PA-015,Protective Stops and Position Sizing,true,,
+false,false,挂件 A/B,,,,,,,,,,,,false,false,交易区间加仓只作为挂件研究模块。,,M10-PA-016,Trading Range Scaling-In Research,true,,
+true,false,主线正式账户,4.77,,1d,710436.76,100000.00,610436.76,1.09,,1d,M12-SRC-001,48.38,false,false,早期强策略已改为 pullback_guard 版本，进入每日只读测试观察回撤。,610.44,M12-FTD-001,方方土日线趋势顺势信号K,false,22184,37.36
+true,false,已合并到 M12-FTD-001,,,,,,,,,,M12-FTD-001,,false,false,这是早期强策略的增强版，先放进每日观察，不直接批准模拟买卖。,,M12-SRC-001,日线趋势顺势信号K增强版,false,,
+true,false,已合并到 M10-PA-001,,,,,,,,,,M10-PA-001,,false,false,这是已通过历史资金测试的核心顺势策略。,,M12-SRC-002,趋势回调二次入场,false,,
+true,false,已合并到 M10-PA-002,,,,,,,,,,M10-PA-002,,false,false,它本身是核心策略，也能帮助判断强K线后有没有真实延续。,,M12-SRC-003,突破后1-2根K线跟进,false,,
+false,false,已合并到 M10-PA-003,,,,,,,,,,M10-PA-003,,false,false,它更像帮我们从50只里挑更强的股票，不先单独统计盈利。,,M12-SRC-004,紧密通道/小回调顺势,true,,
+false,false,已合并到 M12-FTD-001-filter,,,,,,,,,,M12-FTD-001-filter,,false,false,它的作用是减少长回调里的差机会，不是独立策略。,,M12-SRC-005,长回调保护,true,,
+false,true,已合并到 M10-PA-008,,,,,,,,,,M10-PA-008,,false,false,反转机会更依赖图形语境，先观察典型机会，不和主线策略混测。,,M12-SRC-006,主要趋势反转观察,false,,

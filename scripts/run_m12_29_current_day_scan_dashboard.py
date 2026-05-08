@@ -15,6 +15,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     load_config,
     run_m12_29_current_day_scan_dashboard,
+    validate_generated_at_for_artifacts,
 )
 
 
@@ -28,8 +29,19 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_generated_at(value: str | None) -> None:
+    if not value:
+        return
+    validate_generated_at_for_artifacts(value)
+
+
 def main() -> int:
     args = parse_args()
+    try:
+        validate_generated_at(args.generated_at)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     config = load_config(args.config)
     result = run_m12_29_current_day_scan_dashboard(
         config,
@@ -46,7 +58,10 @@ def main() -> int:
                 "scan_date": summary["scan_date"],
                 "today_candidate_count": summary["today_candidate_count"],
                 "visible_opportunity_count": summary["visible_opportunity_count"],
-                "total_simulated_pnl": summary["total_simulated_pnl"],
+                "mainline_today_pnl": summary.get("mainline_today_pnl", ""),
+                "experimental_today_pnl": summary.get("experimental_today_pnl", ""),
+                "premarket_mover_count": summary.get("premarket_mover_count", 0),
+                "postmarket_mover_count": summary.get("postmarket_mover_count", 0),
                 "current_day_scan_complete": summary["current_day_scan_complete"],
                 "output_dir": str(config.output_dir),
             },

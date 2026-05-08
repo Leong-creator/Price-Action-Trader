@@ -1,26 +1,28 @@
 {
   "codex_observer_enabled": true,
   "codex_observer_mode": "heartbeat_or_file_inbox",
-  "generated_at": "2026-04-30T16:00:59Z",
+  "generated_at": "2026-05-07T23:58:51Z",
   "latest_dashboard_html": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard.html",
   "latest_dashboard_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
   "latest_observer_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_38_codex_observer_latest.json",
   "live_execution": false,
   "loop_can_continue_now": true,
   "market_session": {
-    "beijing_time": "2026-05-01 00:00:59 CST",
-    "new_york_date": "2026-04-30",
-    "new_york_time": "2026-04-30 12:00:59 EDT",
-    "status": "美股常规交易时段"
+    "beijing_time": "2026-05-08 07:58:51 CST",
+    "new_york_date": "2026-05-07",
+    "new_york_time": "2026-05-07 19:58:51 EDT",
+    "status": "盘后"
   },
   "observer_inbox": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_38_codex_observer_inbox.jsonl",
   "observer_interval_minutes": 15,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "盘中观察：市场状态 美股常规交易时段，今日机会 80 条，今日模拟盈亏 16628.63，当前模拟权益 116628.63。FTD001 历史收益 610.44%，胜率 37.36%，最大回撤 48.38%。今天触发 4 条，股票：MSFT, NVDA, QCOM, XLE，当前模拟亏损 -315.74。重点风险：历史最大回撤高，盈利因子偏薄，今日暂时亏损。 当前提醒：重点：FTD001 触发风险观察：历史最大回撤高，盈利因子偏薄，今日暂时亏损；观察策略：观察策略今日已有触发：M10-PA-004",
+  "plain_language_result": "盘后只读快照：主线权益 154695.92，今日 -219.55；实验账户今日 0.00。另有 5 条非当前时段快照已隐藏，不作为当前 headline。 FTD001 原版今日 -250.59，连亏保护版今日 -152.99；重点看回撤、连亏和是否过度触发。 当前提醒：注意：主线账户今日暂时为负，先看是否集中在 M10-PA-012 或 FTD001。；数据：当前有 1 只日线因本轮禁抓取而沿用上一份 cache：LQD；这不影响当前只读账户刷新，但会让严格“50/50 当日全齐”口径显示未完成。；实验线：实验账户目前还没接入正式当日扫描输入，今天的 0 开仓不能解读成这些策略已经跑过实时测试。",
   "real_money_actions": false,
   "refresh_seconds": 60,
+  "regular_session_active_now": false,
   "schema_version": "m12.37.auto-runner-manifest.v1",
+  "session_monitoring_active_now": true,
   "stage": "M12.37.intraday_auto_loop",
   "trading_connection": false
 }

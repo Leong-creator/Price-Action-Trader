@@ -1,0 +1,37 @@
+{
+  "rows": [
+    {
+      "display_name": "BLSHS 限价过滤",
+      "mode": "base_trigger + M10-PA-006",
+      "plain_reason": "当前先把独立触发策略账户化；挂件规则保持 A/B 位，不伪造独立买卖触发。",
+      "status": "待接入 A/B",
+      "supporting_rule_id": "M10-PA-006",
+      "today_base_signal_accounts": "M12-FTD-001-baseline-1d, M12-FTD-001-loss-streak-guard-1d"
+    },
+    {
+      "display_name": "目标/止盈模块",
+      "mode": "base_trigger + M10-PA-014",
+      "plain_reason": "当前先把独立触发策略账户化；挂件规则保持 A/B 位，不伪造独立买卖触发。",
+      "status": "待接入 A/B",
+      "supporting_rule_id": "M10-PA-014",
+      "today_base_signal_accounts": "M12-FTD-001-baseline-1d, M12-FTD-001-loss-streak-guard-1d"
+    },
+    {
+      "display_name": "止损/仓位模块",
+      "mode": "base_trigger + M10-PA-015",
+      "plain_reason": "当前先把独立触发策略账户化；挂件规则保持 A/B 位，不伪造独立买卖触发。",
+      "status": "待接入 A/B",
+      "supporting_rule_id": "M10-PA-015",
+      "today_base_signal_accounts": "M12-FTD-001-baseline-1d, M12-FTD-001-loss-streak-guard-1d"
+    },
+    {
+      "display_name": "区间加仓研究模块",
+      "mode": "base_trigger + M10-PA-016",
+      "plain_reason": "当前先把独立触发策略账户化；挂件规则保持 A/B 位，不伪造独立买卖触发。",
+      "status": "待接入 A/B",
+      "supporting_rule_id": "M10-PA-016",
+      "today_base_signal_accounts": "M12-FTD-001-baseline-1d, M12-FTD-001-loss-streak-guard-1d"
+    }
+  ],
+  "schema_version": "m12.46.supporting-rule-ab.v1"
+}

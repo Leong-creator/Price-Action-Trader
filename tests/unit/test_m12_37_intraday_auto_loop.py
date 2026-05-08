@@ -8,12 +8,13 @@ from scripts.run_m12_37_intraday_auto_loop import (
     M1237AutoLoopConfig,
     load_auto_config,
     run_once,
+    session_refresh_policy,
+    validate_generated_at,
 )
 
 
 class M1237IntradayAutoLoopTest(unittest.TestCase):
     def make_config(self, output_dir: Path) -> M1237AutoLoopConfig:
-        source_config = replace(load_m12_29_config(), output_dir=output_dir)
         source_config_path = output_dir / "m12_29_config.json"
         source_config_path.write_text(
             """
@@ -62,7 +63,11 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertEqual(manifest["refresh_seconds"], 60)
             self.assertEqual(manifest["observer_interval_minutes"], 15)
             self.assertFalse(manifest["loop_can_continue_now"])
+            self.assertFalse(manifest["session_monitoring_active_now"])
+            self.assertFalse(manifest["regular_session_active_now"])
+            self.assertIn("主线权益", manifest["plain_language_result"])
             self.assertIn("FTD001", manifest["plain_language_result"])
+            self.assertIn("休市快照", manifest["plain_language_result"])
             self.assertFalse(manifest["trading_connection"])
             self.assertFalse(manifest["real_money_actions"])
             self.assertFalse(manifest["live_execution"])
@@ -81,8 +86,39 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
                 execute_fetch=False,
                 refresh_quotes=False,
             )
+            dashboard = outcome["result"]["dashboard"]
             self.assertEqual(outcome["manifest"]["market_session"]["status"], "美股常规交易时段")
             self.assertTrue(outcome["manifest"]["loop_can_continue_now"])
+            self.assertTrue(outcome["manifest"]["session_monitoring_active_now"])
+            self.assertTrue(outcome["manifest"]["regular_session_active_now"])
+            self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
+            self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
+
+    def test_session_refresh_policy_prefetches_preopen_and_fetches_only_on_5m_boundaries(self):
+        premarket = session_refresh_policy("2026-04-29T13:25:00Z", "盘前", no_fetch=False, no_refresh_quotes=False)
+        regular_boundary = session_refresh_policy("2026-04-29T14:00:00Z", "美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
+        regular_midbar = session_refresh_policy("2026-04-29T14:01:00Z", "美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
+        postmarket = session_refresh_policy("2026-04-29T20:30:00Z", "盘后", no_fetch=False, no_refresh_quotes=False)
+        closed = session_refresh_policy("2026-04-29T01:00:00Z", "休市", no_fetch=False, no_refresh_quotes=False)
+        self.assertTrue(premarket["execute_fetch"])
+        self.assertTrue(premarket["refresh_quotes"])
+        self.assertEqual(premarket["max_native_fetches"], 100)
+        self.assertTrue(premarket["continue_session"])
+        self.assertTrue(regular_boundary["execute_fetch"])
+        self.assertTrue(regular_boundary["refresh_quotes"])
+        self.assertEqual(regular_boundary["max_native_fetches"], 20)
+        self.assertTrue(regular_boundary["continue_session"])
+        self.assertFalse(regular_midbar["execute_fetch"])
+        self.assertTrue(regular_midbar["refresh_quotes"])
+        self.assertFalse(postmarket["execute_fetch"])
+        self.assertTrue(postmarket["refresh_quotes"])
+        self.assertTrue(postmarket["continue_session"])
+        self.assertEqual(regular_midbar["max_native_fetches"], 0)
+        self.assertFalse(closed["continue_session"])
+
+    def test_cli_generated_at_guard_rejects_future_timestamp(self):
+        with self.assertRaises(ValueError):
+            validate_generated_at("2999-01-01T00:00:00Z")
 
 
 if __name__ == "__main__":

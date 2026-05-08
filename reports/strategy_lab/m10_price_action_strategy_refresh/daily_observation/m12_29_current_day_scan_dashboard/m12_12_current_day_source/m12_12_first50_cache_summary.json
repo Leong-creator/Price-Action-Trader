@@ -1,7 +1,8 @@
 {
   "coverage_status_counts": {
-    "complete_for_target_window": 190,
+    "complete_for_target_window": 189,
     "complete_from_first_available_bar": 10,
+    "stale_cache": 1,
     "start_after_target_or_availability_gap": 50
   },
   "current_5m_ready_symbol_list": [
@@ -75,7 +76,6 @@
     "INTC",
     "IVV",
     "IWM",
-    "LQD",
     "META",
     "MSFT",
     "MU",
@@ -109,12 +109,12 @@
     "XLV",
     "XLY"
   ],
-  "daily_ready_symbols": 50,
+  "daily_ready_symbols": 49,
   "fake_data_created": false,
   "full_5m_target_ready_symbol_list": [],
   "full_5m_target_ready_symbols": 0,
   "full_intraday_target_note": "5m_full_target is the long historical intraday window; current_5m is enough for today's readonly bar-close dashboard but not enough for long historical intraday claims.",
-  "generated_at": "2026-04-30T16:00:59Z",
+  "generated_at": "2026-05-07T23:58:51Z",
   "local_data_git_policy": "local_data_not_tracked; checked-in reports record only path, checksum, coverage, and gaps",
   "schema_version": "m12.12.first50-cache-summary.v1",
   "stage": "M12.12.daily_observation_loop",

@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+import os
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -22,11 +23,19 @@ from scripts.m12_12_daily_observation_loop_lib import (  # noqa: E402
     load_config as load_m12_12_config,
     run_m12_12_daily_observation_loop,
 )
+from scripts.m12_20_visual_detector_implementation_lib import (  # noqa: E402
+    best_cache_file,
+    detect_broad_channel_boundary_reversal,
+    file_sha256,
+    load_config as load_m12_20_config,
+)
 from scripts.m12_28_trading_session_dashboard_lib import (  # noqa: E402
     build_pa004_long_rows,
     build_quotes,
     load_config as load_m12_28_config,
+    pa004_candidate_from_event,
 )
+from scripts.m12_liquid_universe_scanner_lib import load_bars  # noqa: E402
 
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
@@ -36,17 +45,59 @@ MONEY = Decimal("0.01")
 PERCENT = Decimal("0.01")
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
-DEFAULT_EQUITY = Decimal("100000")
-DEFAULT_RISK_BUDGET = Decimal("500")
-MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001")
-OBSERVATION_STRATEGIES = ("M10-PA-004-long", "M10-PA-007", "M10-PA-008", "M10-PA-009")
-TIMEFRAME_ORDER = ("1d", "1h", "15m", "5m")
+DEFAULT_ACCOUNT_EQUITY = Decimal("20000")
+DEFAULT_ACCOUNT_RISK_RATE = Decimal("0.005")
+DEFAULT_ACCOUNT_RISK_BUDGET = (DEFAULT_ACCOUNT_EQUITY * DEFAULT_ACCOUNT_RISK_RATE).quantize(MONEY)
+DEFAULT_EQUITY = DEFAULT_ACCOUNT_EQUITY
+DEFAULT_RISK_BUDGET = DEFAULT_ACCOUNT_RISK_BUDGET
+MAX_GENERATED_AT_FUTURE_SKEW_SECONDS = 90
+MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-004", "M10-PA-012", "M12-FTD-001")
+EXPERIMENTAL_STRATEGIES = ("M10-PA-005", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013")
+CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES)
+PRIMARY_TIMEFRAME_ORDER = ("1d", "5m")
+TIMEFRAME_ORDER = PRIMARY_TIMEFRAME_ORDER
 TIMEFRAME_LABELS = {
     "1d": "1d 日线测试",
-    "1h": "1h 小时线测试",
-    "15m": "15m 十五分钟测试",
     "5m": "5m 五分钟测试",
 }
+EXTENDED_SESSION_MOVE_THRESHOLD = Decimal("3")
+EXTENDED_SESSION_FOCUS_LABELS = {
+    "AMD": "AMD / AI 芯片",
+    "NVDA": "英伟达 / AI 芯片",
+    "QCOM": "高通 / 芯片",
+    "TSM": "台积电 / 晶圆代工",
+    "MU": "存储芯片",
+    "WDC": "存储芯片",
+    "SOXX": "半导体 ETF",
+    "SMH": "半导体 ETF",
+    "GOOG": "谷歌 / 财报观察",
+    "GOOGL": "谷歌 / 财报观察",
+}
+ACCOUNT_SPECS = (
+    {"account_id": "M10-PA-001-1d", "strategy_id": "M10-PA-001", "timeframe": "1d", "lane": "mainline", "display_name": "M10-PA-001 日线账户", "variant_id": "base"},
+    {"account_id": "M10-PA-001-5m", "strategy_id": "M10-PA-001", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-001 五分钟账户", "variant_id": "base"},
+    {"account_id": "M10-PA-002-1d", "strategy_id": "M10-PA-002", "timeframe": "1d", "lane": "mainline", "display_name": "M10-PA-002 日线账户", "variant_id": "base"},
+    {"account_id": "M10-PA-002-5m", "strategy_id": "M10-PA-002", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-002 五分钟账户", "variant_id": "base"},
+    {"account_id": "M10-PA-004-long-1d", "strategy_id": "M10-PA-004", "timeframe": "1d", "lane": "mainline", "display_name": "M10-PA-004 只做多日线账户", "variant_id": "long_only"},
+    {"account_id": "M10-PA-012-5m", "strategy_id": "M10-PA-012", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-012 五分钟账户", "variant_id": "base"},
+    {"account_id": "M12-FTD-001-baseline-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001 原版日线账户", "variant_id": "baseline"},
+    {"account_id": "M12-FTD-001-loss-streak-guard-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001 连亏保护日线账户", "variant_id": "loss_streak_guard"},
+    {"account_id": "M10-PA-005-1d", "strategy_id": "M10-PA-005", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-005 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-005-5m", "strategy_id": "M10-PA-005", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-005 五分钟实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-007-1d", "strategy_id": "M10-PA-007", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-007 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-008-1d", "strategy_id": "M10-PA-008", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-008 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-009-1d", "strategy_id": "M10-PA-009", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-009 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-011-1d", "strategy_id": "M10-PA-011", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-011 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-011-5m", "strategy_id": "M10-PA-011", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-011 五分钟实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-013-1d", "strategy_id": "M10-PA-013", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-013 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-013-5m", "strategy_id": "M10-PA-013", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-013 五分钟实验账户", "variant_id": "base"},
+)
+SUPPORTING_RULE_SPECS = (
+    {"supporting_rule_id": "M10-PA-006", "display_name": "BLSHS 限价过滤", "mode": "base_trigger + M10-PA-006"},
+    {"supporting_rule_id": "M10-PA-014", "display_name": "目标/止盈模块", "mode": "base_trigger + M10-PA-014"},
+    {"supporting_rule_id": "M10-PA-015", "display_name": "止损/仓位模块", "mode": "base_trigger + M10-PA-015"},
+    {"supporting_rule_id": "M10-PA-016", "display_name": "区间加仓研究模块", "mode": "base_trigger + M10-PA-016"},
+)
 FORBIDDEN_OUTPUT_TEXT = (
     "PA-SC-",
     "SF-",
@@ -161,6 +212,7 @@ def run_m12_29_current_day_scan_dashboard(
     config = config or load_config()
     validate_config(config)
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    validate_generated_at_for_artifacts(generated_at)
     config.output_dir.mkdir(parents=True, exist_ok=True)
     market = market_session_status(generated_at)
     scan_date = current_us_scan_date(generated_at)
@@ -184,21 +236,57 @@ def run_m12_29_current_day_scan_dashboard(
     first50 = load_json(source_dir / "m12_12_first50_universe.json")["symbols"]
     candidates = read_csv(source_dir / "m12_12_daily_candidates.csv")
     cache_summary = load_json(source_dir / "m12_12_first50_cache_summary.json")
+    fetch_results = load_json(source_dir / "m12_12_cache_fetch_results.json")
     quote_config = load_m12_28_config()
     quotes, quote_manifest = build_quotes(quote_config, first50, generated_at, enabled=refresh_quotes)
+    extended_session_monitor = build_extended_session_monitor(quotes, market["status"])
     trade_rows = build_trade_rows(candidates, quotes, scan_date)
-    pa004_rows = build_pa004_rows(quotes, generated_at)
+    pa004_formal_rows = build_pa004_formal_rows(first50, quotes, generated_at, scan_date)
+    pa004_reference_rows = build_pa004_reference_rows(quotes, generated_at)
     closure_rows = build_strategy_closure_rows(config)
     visual_rows = build_visual_definition_rows(closure_rows)
-    summary = build_summary(config, generated_at, market, scan_date, source_summary, cache_summary, quote_manifest, candidates, trade_rows, pa004_rows)
-    dashboard = build_dashboard_payload(config, generated_at, summary, trade_rows, pa004_rows, closure_rows, visual_rows)
-    run_status = build_run_status(config, summary, closure_rows)
-    gate = build_gate_recheck(config, summary, run_status, closure_rows)
+    runtime_readiness = build_runtime_readiness(config, cache_summary, fetch_results)
+    runtime = advance_account_runtime(
+        config,
+        generated_at,
+        scan_date,
+        trade_rows,
+        pa004_formal_rows,
+        closure_rows,
+        runtime_readiness["runtime_ready"],
+    )
+    summary = build_accountized_summary(
+        config,
+        generated_at,
+        market,
+        scan_date,
+        source_summary,
+        runtime_readiness,
+        quote_manifest,
+        extended_session_monitor,
+        trade_rows,
+        pa004_formal_rows,
+        pa004_reference_rows,
+        runtime,
+    )
+    dashboard = build_accountized_dashboard_payload(
+        config,
+        generated_at,
+        summary,
+        runtime,
+        extended_session_monitor,
+        closure_rows,
+        visual_rows,
+        pa004_reference_rows,
+    )
+    run_status = build_accountized_run_status(config, runtime)
+    gate = build_accountized_gate_recheck(config, summary, run_status)
 
     write_json(config.output_dir / "m12_29_current_day_scan_summary.json", summary)
+    write_json(config.output_dir / "m12_48_extended_session_monitor.json", extended_session_monitor)
     write_csv(config.output_dir / "m12_29_today_candidates.csv", candidates)
     write_jsonl(config.output_dir / "m12_29_today_candidates.jsonl", candidates)
-    write_csv(config.output_dir / "m12_29_trade_view.csv", trade_rows)
+    write_csv(config.output_dir / "m12_29_trade_view.csv", dashboard["trade_rows"])
     write_json(config.output_dir / "m12_30_strategy_closure_matrix.json", {"schema_version": "m12.30.strategy-closure.v1", "stage": "M12.30.strategy_closure", "rows": closure_rows})
     write_csv(config.output_dir / "m12_30_strategy_closure_matrix.csv", closure_rows)
     (config.output_dir / "m12_30_strategy_closure_report.md").write_text(build_strategy_closure_md(closure_rows), encoding="utf-8")
@@ -207,6 +295,8 @@ def run_m12_29_current_day_scan_dashboard(
     write_json(config.output_dir / "m12_32_minute_readonly_dashboard_data.json", dashboard)
     write_json(config.output_dir / "m12_35_timeframe_readonly_dashboard_data.json", dashboard)
     write_csv(config.output_dir / "m12_32_strategy_scorecard.csv", dashboard["strategy_scorecard_rows"])
+    write_csv(config.output_dir / "m12_46_account_scorecards.csv", dashboard["strategy_scorecard_rows"])
+    write_json(config.output_dir / "m12_46_account_input_audit.json", dashboard["account_input_audit"])
     (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(build_dashboard_html(config, dashboard), encoding="utf-8")
     write_json(config.output_dir / "m12_34_observation_test_lane.json", dashboard["observation_test_lane"])
     write_csv(config.output_dir / "m12_34_observation_strategy_rows.csv", dashboard["observation_test_lane"]["rows"])
@@ -215,12 +305,15 @@ def run_m12_29_current_day_scan_dashboard(
     (config.output_dir / "m12_35_timeframe_dashboard.md").write_text(build_timeframe_views_md(dashboard["timeframe_views"]), encoding="utf-8")
     write_json(config.output_dir / "m12_36_ftd001_monitor.json", dashboard["ftd001_monitor"])
     (config.output_dir / "m12_36_ftd001_monitor.md").write_text(build_ftd001_monitor_md(dashboard["ftd001_monitor"]), encoding="utf-8")
+    write_json(config.output_dir / "m12_46_supporting_rule_ab_results.json", dashboard["supporting_rule_ab_results"])
     write_json(config.output_dir / "m12_38_codex_observer_latest.json", dashboard["codex_observer"])
     append_jsonl(config.output_dir / "m12_38_codex_observer_inbox.jsonl", dashboard["codex_observer"])
     write_json(config.output_dir / "m12_33_observation_run_status.json", run_status)
     (config.output_dir / "m12_33_observation_run_status.md").write_text(build_run_status_md(run_status), encoding="utf-8")
     write_json(config.output_dir / "m11_6_paper_trial_gate_recheck.json", gate)
     (config.output_dir / "m11_6_paper_trial_gate_recheck.md").write_text(build_gate_md(gate), encoding="utf-8")
+    write_json(config.output_dir / "m11_8_paper_trial_gate_recheck.json", gate)
+    (config.output_dir / "m11_8_paper_trial_gate_recheck.md").write_text(build_gate_md(gate), encoding="utf-8")
     (config.output_dir / "m12_29_current_day_scan_report.md").write_text(build_report_md(summary), encoding="utf-8")
     (config.output_dir / "m12_29_handoff.md").write_text(build_handoff_md(config, summary), encoding="utf-8")
     assert_no_forbidden_output(config.output_dir)
@@ -231,7 +324,19 @@ def run_m12_29_current_day_scan_dashboard(
         "visual_definition_rows": visual_rows,
         "run_status": run_status,
         "gate_recheck": gate,
+        "runtime": runtime,
     }
+
+
+def validate_generated_at_for_artifacts(generated_at: str) -> None:
+    if os.environ.get("M12_ALLOW_FUTURE_GENERATED_AT") == "1":
+        return
+    generated = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    now = datetime.now(UTC)
+    if generated > now + timedelta(seconds=MAX_GENERATED_AT_FUTURE_SKEW_SECONDS):
+        raise ValueError(
+            f"generated_at_is_in_the_future: {generated_at}; refusing to write production dashboard artifacts"
+        )
 
 
 def current_us_scan_date(generated_at: str) -> date:
@@ -263,6 +368,16 @@ def market_session_status(generated_at: str) -> dict[str, str]:
         "new_york_time": ny_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "beijing_time": utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
     }
+
+
+def iso_to_ny_trading_date(value: str) -> date | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return parse_iso_date(value)
+    return dt.astimezone(ZoneInfo("America/New_York")).date()
 
 
 def build_trade_rows(candidates: list[dict[str, str]], quotes: dict[str, dict[str, str]], scan_date: date) -> list[dict[str, str]]:
@@ -308,16 +423,118 @@ def build_trade_rows(candidates: list[dict[str, str]], quotes: dict[str, dict[st
                 "simulated_context": row.get("simulated_context", ""),
                 "candidate_schema_version": row.get("schema_version", ""),
                 "source_refs": row.get("source_refs", ""),
+                "signal_source_type": "formal_scan",
             }
         )
     return rows
 
 
-def build_pa004_rows(quotes: dict[str, dict[str, str]], generated_at: str) -> list[dict[str, str]]:
-    pa004_rows = build_pa004_long_rows(load_m12_28_config(), quotes, generated_at)
-    for row in pa004_rows:
-        row["bucket"] = "PA004 做多观察"
-    return pa004_rows
+def next_us_trading_date(value: date) -> date:
+    candidate = value + timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def build_pa004_formal_rows(
+    first50: list[str],
+    quotes: dict[str, dict[str, str]],
+    generated_at: str,
+    scan_date: date,
+) -> list[dict[str, str]]:
+    detector_config = load_m12_20_config()
+    daily_start = parse_iso_date(str(detector_config.daily_start)) or date(2010, 6, 29)
+    rows: list[dict[str, str]] = []
+    for symbol in first50:
+        cache_path = best_cache_file(
+            detector_config.local_data_roots,
+            symbol,
+            "1d",
+            daily_start,
+            scan_date,
+        )
+        if cache_path is None or not cache_path.exists():
+            continue
+        bars = load_bars(cache_path)
+        if not bars:
+            continue
+        checksum = file_sha256(cache_path)
+        events = detect_broad_channel_boundary_reversal(
+            generated_at=generated_at,
+            symbol=symbol,
+            bars=bars,
+            data_path=cache_path,
+            source_checksum=checksum,
+        )
+        for event in events:
+            if not pa004_event_is_long(event):
+                continue
+            event_date = iso_to_ny_trading_date(event.get("bar_timestamp", ""))
+            if event_date is None:
+                continue
+            trade_date = next_us_trading_date(event_date)
+            if trade_date != scan_date:
+                continue
+            candidate = pa004_candidate_from_event(event)
+            if not candidate:
+                continue
+            quote = quotes.get(symbol, {})
+            latest = decimal_or_none(quote.get("latest_price")) or decimal_or_none(candidate.get("hypothetical_entry_price")) or ZERO
+            entry = decimal_or_none(candidate.get("hypothetical_entry_price")) or ZERO
+            stop = decimal_or_none(candidate.get("hypothetical_stop_price")) or ZERO
+            target = decimal_or_none(candidate.get("hypothetical_target_price")) or ZERO
+            qty = quantity_from_prices(entry, stop)
+            pnl = simulated_pnl("看涨", latest, entry, qty)
+            rows.append(
+                {
+                    "strategy_id": "M10-PA-004",
+                    "variant_id": "pa004_long_only_formal",
+                    "strategy_title": "宽通道边界反转（只做多正式版）",
+                    "symbol": symbol,
+                    "timeframe": "1d",
+                    "direction": "看涨",
+                    "signal_time": candidate["signal_time"],
+                    "signal_date": trade_date.isoformat(),
+                    "is_current_scan_date": str(trade_date.isoformat() == scan_date.isoformat()).lower(),
+                    "latest_price": money(latest),
+                    "latest_price_source": quote.get("quote_source", "candidate_reference_fallback"),
+                    "hypothetical_entry_price": candidate["hypothetical_entry_price"],
+                    "hypothetical_stop_price": candidate["hypothetical_stop_price"],
+                    "hypothetical_target_price": candidate["hypothetical_target_price"],
+                    "hypothetical_quantity": str(qty.quantize(Decimal("0.0001"))),
+                    "simulated_intraday_pnl": money(pnl),
+                    "simulated_intraday_return_percent": pct(pnl / DEFAULT_EQUITY * HUNDRED),
+                    "simulated_state": simulated_state("看涨", latest, stop, target),
+                    "bucket": "PA004 正式账户信号",
+                    "candidate_status": "formal_detector_entry",
+                    "queue_action": "open_runtime_account_if_scan_date_matches",
+                    "review_status": "PA004 只做多正式账户信号：前一交易日日线确认，当前交易日按账户口径入场。",
+                    "risk_level": "中",
+                    "notes": "该信号已从历史观察样例拆出，正式进入主线账户输入。",
+                    "data_path": project_path(cache_path),
+                    "data_lineage": event.get("source_lineage", ""),
+                    "data_checksum": checksum,
+                    "spec_ref": event.get("spec_ref", ""),
+                    "simulated_context": "broad_channel_boundary_reversal_long_only",
+                    "candidate_schema_version": event.get("schema_version", ""),
+                    "source_refs": ";".join(event.get("source_refs", [])),
+                    "signal_source_type": "formal_detector_entry",
+                }
+            )
+    rows.sort(key=lambda row: (row["signal_time"], row["symbol"]), reverse=True)
+    return rows
+
+
+def pa004_event_is_long(event: dict[str, Any]) -> bool:
+    return event.get("direction") in {"long", "看涨"}
+
+
+def build_pa004_reference_rows(quotes: dict[str, dict[str, str]], generated_at: str) -> list[dict[str, str]]:
+    rows = build_pa004_long_rows(load_m12_28_config(), quotes, generated_at)
+    for row in rows:
+        row["bucket"] = "PA004 历史参考样例"
+        row["signal_source_type"] = "reference_observation"
+    return rows
 
 
 def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
@@ -329,22 +546,22 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
     source_by_linked = {row["linked_runtime_id"]: row for row in source_plan["rows"]}
     rows: list[dict[str, str]] = []
     decisions = {
-        "M10-PA-001": ("进入每日实时只读测试", "核心顺势策略，历史资金测试完成，继续扫描 50 只。"),
-        "M10-PA-002": ("进入每日实时只读测试", "突破后跟进策略，历史资金测试完成，也可作为 FTD 确认过滤器。"),
-        "M10-PA-003": ("过滤器/排名因子", "紧密通道更适合作为强趋势股票加分项，暂不作为独立买卖触发。"),
-        "M10-PA-004": ("观察队列：只做多版", "整体混合版本弱，但做多分支转正；只做多观察，做空版暂不进入主线。"),
-        "M10-PA-005": ("研究项：定义仍弱", "交易区间失败突破复测仍弱，几何定义不能稳定改善，不拖主线。"),
-        "M10-PA-006": ("研究项", "BLSHS 限价框架不是独立触发。"),
-        "M10-PA-007": ("观察队列", "第二腿陷阱小范围测试为正，先观察但不进模拟买卖准入。"),
-        "M10-PA-008": ("观察队列", "主要趋势反转有历史资金测试，但图形语境强，先严格观察。"),
-        "M10-PA-009": ("观察队列", "楔形反转历史测试略正，先严格观察。"),
+        "M10-PA-001": ("主线正式账户", "核心顺势策略，进入 1d + 5m 正式模拟账户。"),
+        "M10-PA-002": ("主线正式账户", "突破后跟进策略，进入 1d + 5m 正式模拟账户。"),
+        "M10-PA-003": ("过滤器/排名因子", "紧密通道更适合作为强趋势股票加分项，不独立造触发。"),
+        "M10-PA-004": ("主线正式账户：只做多版", "只做多版已升主线，独立 1d 账户测试；做空版继续冻结。"),
+        "M10-PA-005": ("实验账户测试", "定义仍弱，但不能空挂；进入 1d + 5m 实验账户继续测。"),
+        "M10-PA-006": ("挂件 A/B", "BLSHS 限价框架只作为挂件，不独立开账户。"),
+        "M10-PA-007": ("实验账户测试", "第二腿陷阱反转进入 1d 实验账户，而不是只观察不入账。"),
+        "M10-PA-008": ("实验账户测试", "主要趋势反转进入 1d 实验账户，继续用账户结果决定升降级。"),
+        "M10-PA-009": ("实验账户测试", "楔形反转进入 1d 实验账户。"),
         "M10-PA-010": ("研究项", "Final Flag/Climax/TBTL 过于复合，不作为单独触发。"),
-        "M10-PA-011": ("暂不进入主线", "开盘反转历史资金测试偏弱，保留复核。"),
-        "M10-PA-012": ("进入每日实时只读测试", "开盘区间突破历史资金测试表现较好，继续 15m/5m。"),
-        "M10-PA-013": ("暂不进入主线", "支撑阻力失败测试历史资金测试偏弱，暂不加入实时主线。"),
-        "M10-PA-014": ("辅助规则", "Measured Move 只作为目标/止盈模块。"),
-        "M10-PA-015": ("辅助规则", "止损与仓位模块，不是入场触发。"),
-        "M10-PA-016": ("研究项", "交易区间加仓研究不作为独立触发。"),
+        "M10-PA-011": ("实验账户测试", "开盘反转不并入主线，但进入 1d + 5m 实验账户继续测。"),
+        "M10-PA-012": ("主线正式账户", "开盘区间突破继续作为 5m 主线正式账户。"),
+        "M10-PA-013": ("实验账户测试", "支撑阻力失败测试进入 1d + 5m 实验账户继续测。"),
+        "M10-PA-014": ("挂件 A/B", "Measured Move 只作为目标/止盈模块。"),
+        "M10-PA-015": ("挂件 A/B", "止损与仓位模块，不是入场触发。"),
+        "M10-PA-016": ("挂件 A/B", "交易区间加仓只作为挂件研究模块。"),
     }
     for strategy_id in [f"M10-PA-{idx:03d}" for idx in range(1, 17)]:
         metric = metrics.get(strategy_id, {})
@@ -355,9 +572,10 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
                 "strategy_id": strategy_id,
                 "strategy_title": metric.get("title", strategy_id),
                 "final_status": status,
-                "daily_realtime_test": str(status == "进入每日实时只读测试").lower(),
-                "observation_queue": str(status.startswith("观察队列")).lower(),
-                "supporting_or_research": str(status in {"辅助规则", "研究项", "研究项：定义仍弱", "过滤器/排名因子"}).lower(),
+                "daily_realtime_test": str(status.startswith("主线正式账户")).lower(),
+                "experimental_account": str(status == "实验账户测试").lower(),
+                "observation_queue": "false",
+                "supporting_or_research": str(status in {"过滤器/排名因子", "研究项", "挂件 A/B"}).lower(),
                 "return_percent": pilot.get("return_percent") or metric.get("return_percent", ""),
                 "win_rate_percent": pilot.get("win_rate_percent") or normalize_rate(pilot.get("win_rate", "")) or normalize_rate(metric.get("win_rate", "")),
                 "max_drawdown_percent": pilot.get("max_drawdown_percent") or metric.get("max_drawdown_percent", ""),
@@ -380,8 +598,9 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
         {
             "strategy_id": "M12-FTD-001",
             "strategy_title": "方方土日线趋势顺势信号K",
-            "final_status": "进入每日实时只读测试",
+            "final_status": "主线正式账户",
             "daily_realtime_test": "true",
+            "experimental_account": "false",
             "observation_queue": "false",
             "supporting_or_research": "false",
             "return_percent": best_ftd.get("return_percent", ""),
@@ -409,7 +628,8 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
                 "strategy_title": source["name"],
                 "final_status": "已合并到 " + source["linked_runtime_id"],
                 "daily_realtime_test": str(source["queue"] == "daily_readonly_test").lower(),
-                "observation_queue": str(source["queue"] == "strict_observation").lower(),
+                "experimental_account": str(source["queue"] == "strict_observation").lower(),
+                "observation_queue": "false",
                 "supporting_or_research": str(source["queue"] == "filter_or_ranking_factor").lower(),
                 "return_percent": "",
                 "win_rate_percent": "",
@@ -435,13 +655,13 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
 def build_visual_definition_rows(closure_rows: list[dict[str, str]]) -> list[dict[str, str]]:
     notes = {
         "M10-PA-003": ("紧密通道、小回调、顺势延续", "趋势强弱可近似；通道形态仍需代理字段", "过滤器/排名因子"),
-        "M10-PA-004": ("宽通道、边界触碰、边界后反转", "做空分支不稳定；只保留做多观察", "观察队列：只做多版"),
-        "M10-PA-007": ("第一腿、第二腿、陷阱点、反向确认", "复杂图形仍可能漏判，只做观察", "观察队列"),
-        "M10-PA-008": ("趋势破坏、二次测试、反转确认", "主要趋势反转仍强依赖上下文", "观察队列"),
-        "M10-PA-009": ("三推、楔形/楔形旗形、反转确认", "不强制完美收敛，误判需观察", "观察队列"),
+        "M10-PA-004": ("宽通道、边界触碰、边界后反转", "做空分支不稳定；当前只跑做多版", "主线正式账户：只做多版"),
+        "M10-PA-007": ("第一腿、第二腿、陷阱点、反向确认", "复杂图形仍可能漏判，只能先实验账户验证", "实验账户测试"),
+        "M10-PA-008": ("趋势破坏、二次测试、反转确认", "主要趋势反转仍强依赖上下文", "实验账户测试"),
+        "M10-PA-009": ("三推、楔形/楔形旗形、反转确认", "不强制完美收敛，误判需继续实验验证", "实验账户测试"),
         "M10-PA-010": ("最终旗形、高潮、TBTL 片段", "组合概念过多，机器触发不稳定", "研究项"),
-        "M10-PA-011": ("开盘反转、开盘失败突破", "历史结果偏弱，暂不主线", "暂不进入主线"),
-        "M10-PA-013": ("支撑阻力失败测试", "历史结果偏弱，暂不主线", "暂不进入主线"),
+        "M10-PA-011": ("开盘反转、开盘失败突破", "历史结果偏弱，但已进实验账户继续测", "实验账户测试"),
+        "M10-PA-013": ("支撑阻力失败测试", "历史结果偏弱，但已进实验账户继续测", "实验账户测试"),
     }
     by_id = {row["strategy_id"]: row for row in closure_rows}
     rows = []
@@ -459,6 +679,1242 @@ def build_visual_definition_rows(closure_rows: list[dict[str, str]]) -> list[dic
             }
         )
     return rows
+
+
+def build_account_history_lookup(config: M1229Config, closure_rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    closure_by_strategy = {row["strategy_id"]: row for row in closure_rows}
+    lookup: dict[str, dict[str, str]] = {}
+    ftd_variant_path = (
+        M10_DIR
+        / "news_earnings"
+        / "m12_42_ftd001_news_risk_ab"
+        / "m12_42_ftd001_news_risk_ab_metrics.csv"
+    )
+    ftd_variants: dict[str, dict[str, str]] = {}
+    if ftd_variant_path.exists():
+        with ftd_variant_path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("variant_id"):
+                    ftd_variants[row["variant_id"]] = row
+    for spec in ACCOUNT_SPECS:
+        history = dict(closure_by_strategy.get(spec["strategy_id"], {}))
+        if spec["strategy_id"] == "M12-FTD-001":
+            variant_history = ftd_variants.get(spec["variant_id"])
+            if variant_history:
+                history.update(
+                    {
+                        "return_percent": variant_history.get("return_percent", ""),
+                        "win_rate_percent": normalize_rate(variant_history.get("win_rate", "")),
+                        "max_drawdown_percent": variant_history.get("max_drawdown_percent", ""),
+                        "historical_initial_capital": variant_history.get("initial_capital", ""),
+                        "historical_final_equity": variant_history.get("final_equity", ""),
+                        "historical_net_profit": variant_history.get("net_profit", ""),
+                        "historical_profit_factor": variant_history.get("profit_factor", ""),
+                        "historical_average_holding_bars": variant_history.get("average_holding_bars", ""),
+                        "variant_label": variant_history.get("variant_title", spec["variant_id"]),
+                    }
+                )
+        lookup[spec["account_id"]] = history
+    return lookup
+
+
+def runtime_signal_rows(
+    spec: dict[str, str],
+    trade_rows: list[dict[str, str]],
+    pa004_formal_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    if spec["strategy_id"] == "M10-PA-004":
+        return [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]
+    return [
+        row for row in trade_rows
+        if row.get("strategy_id") == spec["strategy_id"]
+        and row.get("timeframe") == spec["timeframe"]
+    ]
+
+
+def build_runtime_readiness(
+    config: M1229Config,
+    cache_summary: dict[str, Any],
+    fetch_results: dict[str, Any],
+) -> dict[str, Any]:
+    daily_ready = int(cache_summary["daily_ready_symbols"])
+    current_5m_ready = int(cache_summary["current_5m_ready_symbols"])
+    strict_complete = daily_ready == config.first_batch_size and current_5m_ready == config.first_batch_size
+    deferred_daily_symbols = sorted(
+        {
+            str(item.get("symbol", ""))
+            for item in fetch_results.get("items", [])
+            if item.get("timeframe") == "1d"
+            and item.get("status") == "deferred"
+            and item.get("skipped_reason") == "fetch_disabled"
+        }
+    )
+    effective_daily_ready = min(config.first_batch_size, daily_ready + len(deferred_daily_symbols))
+    runtime_ready = current_5m_ready == config.first_batch_size and effective_daily_ready >= config.first_batch_size
+    if strict_complete:
+        plain_reason = "第一批 50 只股票当日数据已齐。"
+    elif runtime_ready:
+        symbol_text = "、".join(deferred_daily_symbols[:5]) or "少量日线"
+        plain_reason = (
+            f"当前有 {len(deferred_daily_symbols)} 只日线因本轮禁抓取而沿用上一份 cache：{symbol_text}；"
+            "这不影响当前只读账户刷新，但会让严格“50/50 当日全齐”口径显示未完成。"
+        )
+    else:
+        plain_reason = (
+            f"第一批 50 只股票仍有缺口：日线 {daily_ready}/{config.first_batch_size}，"
+            f"当日 5m {current_5m_ready}/{config.first_batch_size}。"
+        )
+    return {
+        "strict_complete": strict_complete,
+        "runtime_ready": runtime_ready,
+        "daily_ready_symbols": daily_ready,
+        "current_5m_ready_symbols": current_5m_ready,
+        "effective_daily_ready_symbols": effective_daily_ready,
+        "deferred_daily_symbols": deferred_daily_symbols,
+        "plain_reason": plain_reason,
+    }
+
+
+def bootstrap_account_state(spec: dict[str, str]) -> dict[str, Any]:
+    return {
+        "runtime_id": spec["account_id"],
+        "strategy_id": spec["strategy_id"],
+        "display_name": spec["display_name"],
+        "lane": spec["lane"],
+        "timeframe": spec["timeframe"],
+        "variant_id": spec["variant_id"],
+        "starting_capital": money(DEFAULT_ACCOUNT_EQUITY),
+        "cash": money(DEFAULT_ACCOUNT_EQUITY),
+        "equity": money(DEFAULT_ACCOUNT_EQUITY),
+        "peak_equity": money(DEFAULT_ACCOUNT_EQUITY),
+        "realized_pnl": money(ZERO),
+        "unrealized_pnl": money(ZERO),
+        "max_drawdown_percent": pct(ZERO),
+        "open_positions": [],
+        "closed_trades": [],
+        "processed_signal_ids": [],
+        "consecutive_losses": 0,
+        "pause_remaining_signals": 0,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def load_account_runtime_state(config: M1229Config) -> dict[str, Any]:
+    state_path = config.output_dir / "m12_46_account_runtime_state.json"
+    if not state_path.exists():
+        return {
+            "schema_version": "m12.46.account-runtime-state.v1",
+            "stage": "M12.46.accountized_realtime_testing",
+            "starting_capital": money(DEFAULT_ACCOUNT_EQUITY),
+            "risk_rate": str(DEFAULT_ACCOUNT_RISK_RATE),
+            "accounts": {},
+            "trading_day_registry": {},
+        }
+    state = load_json(state_path)
+    state.setdefault("accounts", {})
+    state.setdefault("trading_day_registry", {})
+    return state
+
+
+def account_signal_id(spec: dict[str, str], row: dict[str, str]) -> str:
+    base = row.get("variant_id") or spec["variant_id"]
+    return "|".join(
+        [
+            spec["account_id"],
+            row.get("symbol", ""),
+            row.get("timeframe", ""),
+            row.get("signal_time", ""),
+            base,
+        ]
+    )
+
+
+def build_quote_lookup(trade_rows: list[dict[str, str]], pa004_formal_rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    lookup: dict[str, dict[str, str]] = {}
+    for row in trade_rows + pa004_formal_rows:
+        symbol = row.get("symbol", "")
+        if not symbol:
+            continue
+        lookup[symbol] = {
+            "latest_price": row.get("latest_price", ""),
+            "latest_price_source": row.get("latest_price_source", ""),
+        }
+    return lookup
+
+
+def holding_days_limit(spec: dict[str, str], history: dict[str, str]) -> int:
+    if spec["timeframe"] == "5m":
+        return 1
+    avg = decimal_or_none(history.get("historical_average_holding_bars") or history.get("average_holding_bars"))
+    if avg is None:
+        return 5
+    return max(1, min(20, int(avg)))
+
+
+def open_new_positions(
+    account: dict[str, Any],
+    spec: dict[str, str],
+    rows: list[dict[str, str]],
+    scan_date: date,
+    generated_at: str,
+) -> tuple[list[dict[str, Any]], int]:
+    new_ledger: list[dict[str, Any]] = []
+    opened = 0
+    for row in rows:
+        if row.get("signal_date") != scan_date.isoformat():
+            continue
+        signal_id = account_signal_id(spec, row)
+        if signal_id in account["processed_signal_ids"]:
+            continue
+        if spec["variant_id"] == "loss_streak_guard" and account.get("pause_remaining_signals", 0) > 0:
+            account["pause_remaining_signals"] -= 1
+            account["processed_signal_ids"].append(signal_id)
+            continue
+        entry = money_to_decimal(row.get("hypothetical_entry_price", ""))
+        stop = money_to_decimal(row.get("hypothetical_stop_price", ""))
+        target = money_to_decimal(row.get("hypothetical_target_price", ""))
+        latest = money_to_decimal(row.get("latest_price", ""))
+        if entry <= ZERO or stop <= ZERO:
+            continue
+        risk_per_share = abs(entry - stop)
+        if risk_per_share <= ZERO:
+            continue
+        current_equity = money_to_decimal(account["equity"])
+        available_cash = money_to_decimal(account["cash"])
+        risk_budget = (current_equity * DEFAULT_ACCOUNT_RISK_RATE).quantize(MONEY)
+        max_risk_qty = risk_budget / risk_per_share
+        max_cash_qty = available_cash / entry if entry > ZERO else ZERO
+        qty = min(max_risk_qty, max_cash_qty).quantize(Decimal("0.0001"))
+        if qty <= ZERO:
+            continue
+        reserved_notional = (entry * qty).quantize(MONEY)
+        account["cash"] = money(available_cash - reserved_notional)
+        position = {
+            "position_id": signal_id,
+            "signal_id": signal_id,
+            "strategy_id": spec["strategy_id"],
+            "runtime_id": spec["account_id"],
+            "display_name": spec["display_name"],
+            "lane": spec["lane"],
+            "timeframe": spec["timeframe"],
+            "symbol": row.get("symbol", ""),
+            "direction": row.get("direction", ""),
+            "signal_time": row.get("signal_time", ""),
+            "signal_date": row.get("signal_date", scan_date.isoformat()),
+            "opened_at": generated_at,
+            "entry_price": money(entry),
+            "stop_price": money(stop),
+            "target_price": money(target),
+            "latest_price": money(latest or entry),
+            "quantity": str(qty),
+            "reserved_notional": money(reserved_notional),
+            "current_pnl": money(ZERO),
+            "current_state": "持仓中",
+            "review_status": row.get("review_status", ""),
+            "risk_level": row.get("risk_level", ""),
+            "source_refs": row.get("source_refs", ""),
+            "spec_ref": row.get("spec_ref", ""),
+        }
+        account["open_positions"].append(position)
+        account["processed_signal_ids"].append(signal_id)
+        opened += 1
+        new_ledger.append(
+            {
+                "event_type": "open",
+                "runtime_id": spec["account_id"],
+                "strategy_id": spec["strategy_id"],
+                "timeframe": spec["timeframe"],
+                "symbol": row.get("symbol", ""),
+                "signal_time": row.get("signal_time", ""),
+                "event_time": generated_at,
+                "direction": row.get("direction", ""),
+                "entry_price": money(entry),
+                "stop_price": money(stop),
+                "target_price": money(target),
+                "quantity": str(qty),
+                "reserved_notional": money(reserved_notional),
+            }
+        )
+    return new_ledger, opened
+
+
+def mark_position_to_market(
+    account: dict[str, Any],
+    position: dict[str, Any],
+    quote_lookup: dict[str, dict[str, str]],
+    spec: dict[str, str],
+    generated_at: str,
+    scan_date: date,
+    max_holding_days: int,
+) -> dict[str, Any] | None:
+    latest = money_to_decimal(quote_lookup.get(position["symbol"], {}).get("latest_price") or position.get("latest_price", ""))
+    if latest > ZERO:
+        position["latest_price"] = money(latest)
+    entry = money_to_decimal(position["entry_price"])
+    stop = money_to_decimal(position["stop_price"])
+    target = money_to_decimal(position["target_price"])
+    qty = decimal_or_none(position["quantity"]) or ZERO
+    direction = position.get("direction", "")
+    pnl = simulated_pnl(direction, latest, entry, qty)
+    position["current_pnl"] = money(pnl)
+    position["current_state"] = simulated_state(direction, latest, stop, target)
+    signal_date = parse_iso_date(position.get("signal_date", ""))
+    if spec["timeframe"] == "5m" and signal_date and scan_date > signal_date:
+        exit_reason = "次日超时退出"
+    elif signal_date and (scan_date - signal_date).days >= max_holding_days:
+        exit_reason = "持仓到期退出"
+    elif position["current_state"] == "触及止损参考":
+        exit_reason = "止损"
+    elif position["current_state"] == "触及目标参考":
+        exit_reason = "止盈"
+    else:
+        return None
+    reserved = money_to_decimal(position["reserved_notional"])
+    cash = money_to_decimal(account["cash"])
+    account["cash"] = money(cash + reserved + pnl)
+    trade = {
+        "event_type": "close",
+        "runtime_id": account["runtime_id"],
+        "strategy_id": account["strategy_id"],
+        "timeframe": account["timeframe"],
+        "symbol": position["symbol"],
+        "event_time": generated_at,
+        "direction": direction,
+        "entry_price": position["entry_price"],
+        "exit_price": money(latest),
+        "stop_price": position["stop_price"],
+        "target_price": position["target_price"],
+        "quantity": position["quantity"],
+        "signal_time": position["signal_time"],
+        "opened_at": position["opened_at"],
+        "exit_reason": exit_reason,
+        "realized_pnl": money(pnl),
+    }
+    account["closed_trades"].append(trade)
+    if pnl < ZERO:
+        account["consecutive_losses"] = int(account.get("consecutive_losses", 0)) + 1
+        if spec["variant_id"] == "loss_streak_guard" and account["consecutive_losses"] >= 3:
+            account["pause_remaining_signals"] = 1
+            account["consecutive_losses"] = 0
+    else:
+        account["consecutive_losses"] = 0
+    return trade
+
+
+def recalc_account_metrics(account: dict[str, Any], scan_date: date) -> None:
+    open_positions = account["open_positions"]
+    reserved = sum((money_to_decimal(position["reserved_notional"]) for position in open_positions), ZERO)
+    unrealized = sum((money_to_decimal(position["current_pnl"]) for position in open_positions), ZERO)
+    realized = sum((money_to_decimal(trade.get("realized_pnl", "0")) for trade in account["closed_trades"]), ZERO)
+    cash = money_to_decimal(account["cash"])
+    equity = cash + reserved + unrealized
+    peak = max(money_to_decimal(account["peak_equity"]), equity)
+    drawdown = ((peak - equity) / peak * HUNDRED) if peak > ZERO else ZERO
+    wins = [trade for trade in account["closed_trades"] if money_to_decimal(trade.get("realized_pnl", "0")) > ZERO]
+    today_key = scan_date.isoformat()
+    today_opened = [position for position in open_positions if position.get("signal_date") == today_key]
+    today_closed = [
+        trade for trade in account["closed_trades"]
+        if iso_to_ny_trading_date(trade.get("event_time", "")) == scan_date
+    ]
+    today_realized = sum((money_to_decimal(trade.get("realized_pnl", "0")) for trade in today_closed), ZERO)
+    account["realized_pnl"] = money(realized)
+    account["unrealized_pnl"] = money(unrealized)
+    account["equity"] = money(equity)
+    account["peak_equity"] = money(peak)
+    account["max_drawdown_percent"] = pct(drawdown)
+    account["closed_trade_count"] = len(account["closed_trades"])
+    account["winning_trade_count"] = len(wins)
+    account["losing_trade_count"] = len(account["closed_trades"]) - len(wins)
+    account["win_rate_percent"] = pct(Decimal(len(wins)) / Decimal(len(account["closed_trades"])) * HUNDRED) if account["closed_trades"] else "0.00"
+    account["cumulative_return_percent"] = pct((equity - DEFAULT_ACCOUNT_EQUITY) / DEFAULT_ACCOUNT_EQUITY * HUNDRED)
+    account["today_opened_count"] = len(today_opened)
+    account["today_closed_count"] = len(today_closed)
+    account["today_realized_pnl"] = money(today_realized)
+    account["today_unrealized_pnl"] = money(unrealized)
+    account["today_total_pnl"] = money(today_realized + unrealized)
+    account["today_signal_count"] = len(today_opened)
+
+
+def advance_account_runtime(
+    config: M1229Config,
+    generated_at: str,
+    scan_date: date,
+    trade_rows: list[dict[str, str]],
+    pa004_formal_rows: list[dict[str, str]],
+    closure_rows: list[dict[str, str]],
+    current_day_runtime_ready: bool,
+) -> dict[str, Any]:
+    state = load_account_runtime_state(config)
+    history_lookup = build_account_history_lookup(config, closure_rows)
+    quote_lookup = build_quote_lookup(trade_rows, pa004_formal_rows)
+    new_ledger_rows: list[dict[str, Any]] = []
+    account_rows: list[dict[str, Any]] = []
+    mainline_accounts: list[dict[str, Any]] = []
+    experimental_accounts: list[dict[str, Any]] = []
+    for spec in ACCOUNT_SPECS:
+        account = state["accounts"].get(spec["account_id"]) or bootstrap_account_state(spec)
+        state["accounts"][spec["account_id"]] = account
+        rows = runtime_signal_rows(spec, trade_rows, pa004_formal_rows)
+        max_holding = holding_days_limit(spec, history_lookup.get(spec["account_id"], {}))
+        remaining: list[dict[str, Any]] = []
+        for position in account["open_positions"]:
+            closed = mark_position_to_market(account, position, quote_lookup, spec, generated_at, scan_date, max_holding)
+            if closed is None:
+                remaining.append(position)
+            else:
+                new_ledger_rows.append(closed)
+        account["open_positions"] = remaining
+        opened_rows, _ = open_new_positions(account, spec, rows, scan_date, generated_at)
+        new_ledger_rows.extend(opened_rows)
+        refreshed_positions: list[dict[str, Any]] = []
+        for position in account["open_positions"]:
+            closed = mark_position_to_market(account, position, quote_lookup, spec, generated_at, scan_date, max_holding)
+            if closed is None:
+                refreshed_positions.append(position)
+            else:
+                new_ledger_rows.append(closed)
+        account["open_positions"] = refreshed_positions
+        recalc_account_metrics(account, scan_date)
+        account_view = build_account_view(account, history_lookup.get(spec["account_id"], {}))
+        account_rows.append(account_view)
+        if spec["lane"] == "mainline":
+            mainline_accounts.append(account_view)
+        else:
+            experimental_accounts.append(account_view)
+    account_input_audit_rows = build_account_input_audit_rows(scan_date, trade_rows, pa004_formal_rows)
+    registry = state["trading_day_registry"]
+    registry_key = scan_date.isoformat()
+    previous = registry.get(registry_key, {})
+    experimental_input_connected = any(
+        row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+        for row in account_input_audit_rows
+    )
+    counted_now = current_day_runtime_ready and bool(mainline_accounts)
+    registry[registry_key] = {
+        "counted": bool(previous.get("counted")) or counted_now,
+        "generated_at": generated_at,
+        "first_counted_at": previous.get("first_counted_at") or (generated_at if counted_now else ""),
+        "mainline_progressed": bool(previous.get("mainline_progressed")) or bool(mainline_accounts),
+        "experimental_progressed": bool(previous.get("experimental_progressed")) or experimental_input_connected,
+        "last_run_complete": counted_now,
+    }
+    write_json(config.output_dir / "m12_46_account_runtime_state.json", state)
+    if new_ledger_rows:
+        append_rows_to_jsonl(config.output_dir / "m12_46_account_trade_ledger.jsonl", new_ledger_rows)
+    return {
+        "state": state,
+        "account_rows": account_rows,
+        "mainline_accounts": mainline_accounts,
+        "experimental_accounts": experimental_accounts,
+        "supporting_rule_rows": build_supporting_rule_rows(mainline_accounts, experimental_accounts),
+        "signal_watchlist": trade_rows + pa004_formal_rows,
+        "account_input_audit_rows": account_input_audit_rows,
+        "new_trade_ledger_rows": new_ledger_rows,
+    }
+
+
+def build_supporting_rule_rows(mainline_accounts: list[dict[str, Any]], experimental_accounts: list[dict[str, Any]]) -> list[dict[str, str]]:
+    active_accounts = mainline_accounts + experimental_accounts
+    active_ids = [row["runtime_id"] for row in active_accounts if int(row["today_signal_count"]) > 0]
+    rows: list[dict[str, str]] = []
+    for spec in SUPPORTING_RULE_SPECS:
+        rows.append(
+            {
+                "supporting_rule_id": spec["supporting_rule_id"],
+                "display_name": spec["display_name"],
+                "mode": spec["mode"],
+                "today_base_signal_accounts": ", ".join(active_ids[:8]) or "暂无",
+                "status": "待接入 A/B",
+                "plain_reason": "当前先把独立触发策略账户化；挂件规则保持 A/B 位，不伪造独立买卖触发。",
+            }
+        )
+    return rows
+
+
+def build_account_input_audit_rows(
+    scan_date: date,
+    trade_rows: list[dict[str, str]],
+    pa004_formal_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for spec in ACCOUNT_SPECS:
+        scanner_connected = spec["strategy_id"] in CONNECTED_RUNTIME_STRATEGIES
+        if spec["strategy_id"] == "M10-PA-004":
+            source_rows = [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]
+            source_type = "formal_detector_entry"
+        else:
+            source_rows = [
+                row
+                for row in trade_rows
+                if row.get("strategy_id") == spec["strategy_id"] and row.get("timeframe") == spec["timeframe"]
+            ]
+            source_type = "formal_scan"
+        today_formal_count = sum(1 for row in source_rows if row.get("signal_date") == scan_date.isoformat())
+        if not scanner_connected:
+            input_status = "not_connected_to_current_scanner"
+            plain_language_result = "账户已建，但当前扫描器还没有给这条策略接正式信号流；今天的 0 开仓不能当成已完成实时测试。"
+        elif today_formal_count > 0:
+            input_status = "connected_with_signal_today"
+            plain_language_result = "今日有正式账户输入。"
+        else:
+            input_status = "connected_zero_signal_today"
+            plain_language_result = "当前账户已接入正式信号流；只是今天没有形成可入账信号。"
+        rows.append(
+            {
+                "runtime_id": spec["account_id"],
+                "strategy_id": spec["strategy_id"],
+                "lane": spec["lane"],
+                "timeframe": spec["timeframe"],
+                "input_source_type": source_type,
+                "formal_input_stream": str(scanner_connected).lower(),
+                "current_scanner_connected": str(scanner_connected).lower(),
+                "input_status": input_status,
+                "today_formal_signal_count": str(today_formal_count),
+                "source_row_count": str(len(source_rows)),
+                "watchlist_only": "false",
+                "plain_language_result": plain_language_result,
+            }
+        )
+    return rows
+
+
+def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict[str, str]:
+    open_positions = account["open_positions"]
+    symbols = sorted({position["symbol"] for position in open_positions + account["closed_trades"]})
+    return {
+        "runtime_id": account["runtime_id"],
+        "strategy_id": account["strategy_id"],
+        "display_name": account["display_name"],
+        "lane": account["lane"],
+        "timeframe": account["timeframe"],
+        "variant_id": account["variant_id"],
+        "starting_capital": account["starting_capital"],
+        "cash": account["cash"],
+        "equity": account["equity"],
+        "realized_pnl": account["realized_pnl"],
+        "unrealized_pnl": account["unrealized_pnl"],
+        "today_total_pnl": account["today_total_pnl"],
+        "today_realized_pnl": account["today_realized_pnl"],
+        "today_unrealized_pnl": account["today_unrealized_pnl"],
+        "today_opened_count": str(account["today_opened_count"]),
+        "today_closed_count": str(account["today_closed_count"]),
+        "today_signal_count": str(account["today_signal_count"]),
+        "open_position_count": str(len(open_positions)),
+        "closed_trade_count": str(account["closed_trade_count"]),
+        "winning_trade_count": str(account["winning_trade_count"]),
+        "losing_trade_count": str(account["losing_trade_count"]),
+        "win_rate_percent": account["win_rate_percent"],
+        "max_drawdown_percent": account["max_drawdown_percent"],
+        "cumulative_return_percent": account["cumulative_return_percent"],
+        "symbols": ", ".join(symbols[:10]),
+        "historical_return_percent": history.get("return_percent", ""),
+        "historical_win_rate_percent": history.get("win_rate_percent", ""),
+        "historical_max_drawdown_percent": history.get("max_drawdown_percent", ""),
+        "historical_profit_factor": history.get("historical_profit_factor", ""),
+        "historical_initial_capital": history.get("historical_initial_capital", history.get("initial_capital", "")),
+        "historical_final_equity": history.get("historical_final_equity", history.get("final_equity", "")),
+        "historical_net_profit": history.get("historical_net_profit", history.get("net_profit", "")),
+        "historical_average_holding_bars": history.get("historical_average_holding_bars", history.get("average_holding_bars", "")),
+        "variant_label": history.get("variant_label", ""),
+        "paper_trial_candidate_now": "false",
+    }
+
+
+def market_observer_prefix(status: str) -> str:
+    if status == "美股常规交易时段":
+        return "盘中只读模拟"
+    if status == "盘前":
+        return "盘前预热快照"
+    if status == "盘后":
+        return "盘后只读快照"
+    return "休市快照"
+
+
+def experimental_lane_plain_reason(audit_rows: list[dict[str, str]]) -> str:
+    experimental_rows = [row for row in audit_rows if row.get("lane") == "experimental"]
+    connected_rows = [row for row in experimental_rows if row.get("current_scanner_connected") == "true"]
+    if not experimental_rows:
+        return "当前没有实验账户。"
+    if connected_rows:
+        return "实验账户里已接入正式输入流的策略会正常入账；未接入的策略不会再被包装成‘已经在实时测试’。"
+    return "实验账户已建，但当前这批实验策略还没接上正式当日扫描输入；现在看到的 0 开仓只是账户空转，不是有效实时测试。"
+
+
+def build_account_overview(name: str, accounts: list[dict[str, str]]) -> dict[str, Any]:
+    starting = DEFAULT_ACCOUNT_EQUITY * Decimal(len(accounts))
+    current = sum((money_to_decimal(row["equity"]) for row in accounts), ZERO)
+    day_pnl = sum((money_to_decimal(row["today_total_pnl"]) for row in accounts), ZERO)
+    max_drawdown = max((decimal_or_none(row["max_drawdown_percent"]) or ZERO for row in accounts), default=ZERO)
+    closed_trades = sum((int(row["closed_trade_count"]) for row in accounts), 0)
+    wins = sum((int(row["winning_trade_count"]) for row in accounts), 0)
+    return {
+        "account_group_name": name,
+        "starting_capital": money(starting),
+        "current_equity": money(current),
+        "day_pnl": money(day_pnl),
+        "cumulative_return_percent": pct((current - starting) / starting * HUNDRED) if starting > ZERO else "0.00",
+        "win_rate_percent": pct(Decimal(wins) / Decimal(closed_trades) * HUNDRED) if closed_trades else "0.00",
+        "max_drawdown_percent": pct(max_drawdown),
+        "today_opened_count": str(sum(int(row["today_opened_count"]) for row in accounts)),
+        "today_closed_count": str(sum(int(row["today_closed_count"]) for row in accounts)),
+        "today_signal_count": str(sum(int(row["today_signal_count"]) for row in accounts)),
+        "strategy_account_count": str(len(accounts)),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_accountized_timeframe_views(account_rows: list[dict[str, str]]) -> dict[str, Any]:
+    views: dict[str, Any] = {}
+    for timeframe in PRIMARY_TIMEFRAME_ORDER:
+        rows = [row for row in account_rows if row["timeframe"] == timeframe]
+        mainline = [row for row in rows if row["lane"] == "mainline"]
+        experimental = [row for row in rows if row["lane"] == "experimental"]
+        pnl = sum((money_to_decimal(row["today_total_pnl"]) for row in rows), ZERO)
+        views[timeframe] = {
+            "timeframe": timeframe,
+            "display_name": TIMEFRAME_LABELS[timeframe],
+            "account_count": len(rows),
+            "mainline_account_count": len(mainline),
+            "experimental_account_count": len(experimental),
+            "today_total_pnl": money(pnl),
+            "win_rate_percent": pct(
+                Decimal(sum(int(row["winning_trade_count"]) for row in rows))
+                / Decimal(sum(int(row["closed_trade_count"]) for row in rows))
+                * HUNDRED
+            ) if sum(int(row["closed_trade_count"]) for row in rows) else "0.00",
+            "strategy_rows": rows,
+            "plain_language_note": timeframe_note(timeframe, []),
+        }
+    return {
+        "schema_version": "m12.46.timeframe-account-views.v1",
+        "stage": "M12.46.timeframe_account_views",
+        "timeframe_order": list(PRIMARY_TIMEFRAME_ORDER),
+        "views": views,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[str, Any]:
+    rows = [row for row in mainline_accounts if row["strategy_id"] == "M12-FTD-001"]
+    baseline = next((row for row in rows if row["variant_id"] == "baseline"), None)
+    guard = next((row for row in rows if row["variant_id"] == "loss_streak_guard"), None)
+    active = guard or baseline
+    risk_flags: list[str] = []
+    if active and decimal_or_none(active.get("historical_max_drawdown_percent", "")) and decimal_or_none(active["historical_max_drawdown_percent"]) >= Decimal("40"):
+        risk_flags.append("历史最大回撤高")
+    if active and decimal_or_none(active.get("historical_profit_factor", "")) and decimal_or_none(active["historical_profit_factor"]) <= Decimal("1.10"):
+        risk_flags.append("盈利因子偏薄")
+    if active and money_to_decimal(active.get("today_total_pnl", "0")) < ZERO:
+        risk_flags.append("今日暂时亏损")
+    if baseline and int(baseline["today_signal_count"]) > 10:
+        risk_flags.append("触发过密")
+    if not risk_flags:
+        risk_flags.append("继续观察")
+    return {
+        "schema_version": "m12.46.ftd-account-monitor.v1",
+        "stage": "M12.46.ftd_account_monitor",
+        "accounts": rows,
+        "current_plain_status": f"FTD001 对照：原版 {baseline['today_total_pnl'] if baseline else '暂无'} / 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}",
+        "risk_flags": risk_flags,
+        "plain_language_summary": (
+            f"FTD001 原版今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
+            f"连亏保护版今日 {guard['today_total_pnl'] if guard else '暂无'}；"
+            f"重点看回撤、连亏和是否过度触发。"
+        ),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_extended_session_monitor(quotes: dict[str, dict[str, str]], market_status: str) -> dict[str, Any]:
+    premarket_rows = build_extended_session_rows(quotes, "pre_market", "盘前")
+    postmarket_rows = build_extended_session_rows(quotes, "post_market", "盘后")
+    if market_status == "盘后":
+        active_rows = postmarket_rows
+        active_session = "盘后"
+        hidden_rows = premarket_rows
+    elif market_status == "盘前":
+        active_rows = premarket_rows
+        active_session = "盘前"
+        hidden_rows = postmarket_rows
+    elif market_status == "美股常规交易时段":
+        active_rows = premarket_rows
+        active_session = "盘前"
+        hidden_rows = postmarket_rows
+    else:
+        active_rows = []
+        active_session = "休市"
+        hidden_rows = premarket_rows + postmarket_rows
+    focus_hits = [
+        row for row in active_rows
+        if row["symbol"] in EXTENDED_SESSION_FOCUS_LABELS and row["threshold_hit"] == "true"
+    ]
+    summary_parts: list[str] = []
+    if active_rows:
+        summary_parts.append(f"{active_session}异动 {len(active_rows)} 条，最强 {extended_mover_label(active_rows[0])}")
+    if focus_hits:
+        summary_parts.append("重点关注股命中：" + "，".join(extended_mover_label(row) for row in focus_hits[:6]))
+    if hidden_rows:
+        summary_parts.append(f"另有 {len(hidden_rows)} 条非当前时段快照已隐藏，不作为当前 headline。")
+    if not summary_parts:
+        summary_parts.append("当前没有超过 3% 的盘前/盘后异动。")
+    return {
+        "schema_version": "m12.48.extended-session-monitor.v1",
+        "stage": "M12.48.extended_session_monitor",
+        "threshold_percent": pct(EXTENDED_SESSION_MOVE_THRESHOLD),
+        "market_status": market_status,
+        "active_session": active_session,
+        "active_rows": active_rows[:12],
+        "premarket_rows": premarket_rows[:12],
+        "postmarket_rows": postmarket_rows[:12],
+        "focus_hits": focus_hits[:12],
+        "premarket_count": len(premarket_rows),
+        "postmarket_count": len(postmarket_rows),
+        "active_count": len(active_rows),
+        "hidden_non_current_count": len(hidden_rows),
+        "focus_hit_count": len(focus_hits),
+        "plain_language_summary": "；".join(summary_parts),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_extended_session_rows(
+    quotes: dict[str, dict[str, str]],
+    prefix: str,
+    session_display: str,
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for symbol, quote in quotes.items():
+        extended_price = decimal_or_none(quote.get(f"{prefix}_last"))
+        reference_close = decimal_or_none(quote.get(f"{prefix}_reference_close"))
+        move_percent = decimal_or_none(quote.get(f"{prefix}_move_percent"))
+        if extended_price in (None, ZERO) or reference_close in (None, ZERO) or move_percent is None:
+            continue
+        move_amount = decimal_or_none(quote.get(f"{prefix}_move_amount")) or ZERO
+        rows.append(
+            {
+                "symbol": symbol,
+                "session": session_display,
+                "theme": EXTENDED_SESSION_FOCUS_LABELS.get(symbol, ""),
+                "quote_timestamp": quote.get(f"{prefix}_timestamp", ""),
+                "reference_close": money(reference_close),
+                "extended_price": money(extended_price),
+                "move_amount": money(move_amount),
+                "move_percent": pct(move_percent),
+                "move_direction": "上涨" if move_percent > ZERO else "下跌" if move_percent < ZERO else "持平",
+                "threshold_hit": "true" if abs(move_percent) >= EXTENDED_SESSION_MOVE_THRESHOLD else "false",
+                "quote_source": quote.get("quote_source", ""),
+                "quote_status": quote.get("quote_status", ""),
+            }
+        )
+    rows = [row for row in rows if row["threshold_hit"] == "true"]
+    rows.sort(key=lambda row: abs(money_to_decimal(row["move_percent"])), reverse=True)
+    return rows
+
+
+def extended_mover_label(row: dict[str, str]) -> str:
+    theme = f"（{row['theme']}）" if row.get("theme") else ""
+    return f"{row['symbol']}{theme} {row['move_percent']}%"
+
+
+def build_trade_ledger_rows(account_rows: list[dict[str, str]], state: dict[str, Any]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for account_row in account_rows:
+        account = state["accounts"][account_row["runtime_id"]]
+        for position in account["open_positions"]:
+            rows.append(
+                {
+                    "record_type": "open_position",
+                    "runtime_id": account_row["runtime_id"],
+                    "strategy_id": account_row["strategy_id"],
+                    "display_name": account_row["display_name"],
+                    "lane": account_row["lane"],
+                    "timeframe": account_row["timeframe"],
+                    "symbol": position["symbol"],
+                    "direction": direction_zh(position["direction"]),
+                    "opened_at": position["opened_at"],
+                    "signal_time": position["signal_time"],
+                    "entry_price": position["entry_price"],
+                    "stop_price": position["stop_price"],
+                    "target_price": position["target_price"],
+                    "latest_price": position["latest_price"],
+                    "quantity": position["quantity"],
+                    "pnl": position["current_pnl"],
+                    "state": position["current_state"],
+                }
+            )
+        for trade in account["closed_trades"][-10:]:
+            rows.append(
+                {
+                    "record_type": "closed_trade",
+                    "runtime_id": account_row["runtime_id"],
+                    "strategy_id": account_row["strategy_id"],
+                    "display_name": account_row["display_name"],
+                    "lane": account_row["lane"],
+                    "timeframe": account_row["timeframe"],
+                    "symbol": trade["symbol"],
+                    "direction": direction_zh(trade["direction"]),
+                    "opened_at": trade["opened_at"],
+                    "signal_time": trade["signal_time"],
+                    "entry_price": trade["entry_price"],
+                    "stop_price": trade["stop_price"],
+                    "target_price": trade["target_price"],
+                    "latest_price": trade["exit_price"],
+                    "quantity": trade["quantity"],
+                    "pnl": trade["realized_pnl"],
+                    "state": trade["exit_reason"],
+                }
+            )
+    rows.sort(key=lambda row: (row["signal_time"], row["record_type"], row["runtime_id"]), reverse=True)
+    return rows[:260]
+
+
+def build_accountized_summary(
+    config: M1229Config,
+    generated_at: str,
+    market: dict[str, str],
+    scan_date: date,
+    source_summary: dict[str, Any],
+    runtime_readiness: dict[str, Any],
+    quote_manifest: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
+    trade_rows: list[dict[str, str]],
+    pa004_formal_rows: list[dict[str, str]],
+    pa004_reference_rows: list[dict[str, str]],
+    runtime: dict[str, Any],
+) -> dict[str, Any]:
+    current_rows = [row for row in trade_rows if row["is_current_scan_date"] == "true"]
+    old_rows = [row for row in trade_rows if row["is_current_scan_date"] != "true"]
+    mainline = build_account_overview("主线正式账户", runtime["mainline_accounts"])
+    experimental = build_account_overview("实验账户", runtime["experimental_accounts"])
+    return {
+        "schema_version": "m12.46.accountized-summary.v1",
+        "stage": "M12.46.accountized_realtime_testing",
+        "generated_at": generated_at,
+        "market_session": market,
+        "scan_date": scan_date.isoformat(),
+        "source_m12_12_summary_ref": project_path(source_config_output_path(config, "m12_12_daily_observation_summary.json")),
+        "source_m12_12_candidate_count": len(trade_rows),
+        "quote_count": quote_manifest.get("quote_count", 0),
+        "quote_source": quote_manifest.get("quote_source", ""),
+        "today_candidate_count": len(current_rows),
+        "old_candidate_count": len(old_rows),
+        "visible_opportunity_count": len(trade_rows) + len(pa004_formal_rows),
+        "signal_watchlist_count": len(runtime["signal_watchlist"]),
+        "reference_watchlist_count": len(pa004_reference_rows),
+        "pa004_formal_signal_count": len(pa004_formal_rows),
+        "premarket_mover_count": extended_session_monitor["premarket_count"],
+        "postmarket_mover_count": extended_session_monitor["postmarket_count"],
+        "focus_mover_count": extended_session_monitor["focus_hit_count"],
+        "mainline_today_pnl": mainline["day_pnl"],
+        "experimental_today_pnl": experimental["day_pnl"],
+        "mainline_current_equity": mainline["current_equity"],
+        "experimental_current_equity": experimental["current_equity"],
+        "mainline_return_percent": mainline["cumulative_return_percent"],
+        "experimental_return_percent": experimental["cumulative_return_percent"],
+        "current_day_scan_complete": runtime_readiness["strict_complete"],
+        "current_day_runtime_ready": runtime_readiness["runtime_ready"],
+        "candidate_date_warning": "" if not old_rows else f"仍有 {len(old_rows)} 条旧日期候选留在观察信号里，不能当作今日新开仓。",
+        "first50_daily_ready_symbols": runtime_readiness["daily_ready_symbols"],
+        "first50_current_5m_ready_symbols": runtime_readiness["current_5m_ready_symbols"],
+        "runtime_readiness_note": runtime_readiness["plain_reason"],
+        "plain_language_result": (
+            f"主线正式账户当前权益 {mainline['current_equity']}，今日盈亏 {mainline['day_pnl']}；"
+            f"实验账户当前权益 {experimental['current_equity']}，今日盈亏 {experimental['day_pnl']}。"
+            f"PA004 正式信号 {len(pa004_formal_rows)} 条，历史参考样例 {len(pa004_reference_rows)} 条（不入账）。"
+            f"{runtime_readiness['plain_reason']} "
+            f"{extended_session_monitor['plain_language_summary']}"
+        ),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def source_config_output_path(config: M1229Config, filename: str) -> Path:
+    return config.output_dir / "m12_12_current_day_source" / filename
+
+
+def build_accountized_dashboard_payload(
+    config: M1229Config,
+    generated_at: str,
+    summary: dict[str, Any],
+    runtime: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
+    closure_rows: list[dict[str, str]],
+    visual_rows: list[dict[str, str]],
+    pa004_reference_rows: list[dict[str, str]],
+) -> dict[str, Any]:
+    mainline_overview = build_account_overview("主线正式账户", runtime["mainline_accounts"])
+    experimental_overview = build_account_overview("实验账户", runtime["experimental_accounts"])
+    timeframe_views = build_accountized_timeframe_views(runtime["account_rows"])
+    ftd001_monitor = build_ftd_account_monitor(runtime["mainline_accounts"])
+    codex_observer = build_accountized_codex_observer(
+        config,
+        summary,
+        runtime,
+        mainline_overview,
+        experimental_overview,
+        timeframe_views,
+        ftd001_monitor,
+        extended_session_monitor,
+    )
+    trade_ledger_rows = build_trade_ledger_rows(runtime["account_rows"], runtime["state"])
+    update_status = build_dashboard_update_status(config, summary, config.dashboard_refresh_seconds)
+    experimental_lane_note = experimental_lane_plain_reason(runtime["account_input_audit_rows"])
+    return {
+        "schema_version": "m12.46.accountized-readonly-dashboard.v1",
+        "stage": "M12.46.accountized_realtime_dashboard",
+        "generated_at": generated_at,
+        "title": "分钟级只读模拟账户看板",
+        "refresh_seconds": config.dashboard_refresh_seconds,
+        "update_status": update_status,
+        "top_metrics": {
+            "主线模拟权益": mainline_overview["current_equity"],
+            "主线今日盈亏": mainline_overview["day_pnl"],
+            "主线累计收益": mainline_overview["cumulative_return_percent"] + "%",
+            "主线胜率": mainline_overview["win_rate_percent"] + "%",
+            "主线最大回撤": mainline_overview["max_drawdown_percent"] + "%",
+            "今日新开仓": mainline_overview["today_opened_count"],
+            "今日已平仓": mainline_overview["today_closed_count"],
+            "FTD001 对照": ftd001_monitor["current_plain_status"],
+            "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
+            "北京时间更新": update_status["beijing_time"],
+            "运行状态": update_status["runtime_status"],
+        },
+        "dashboard_layout": {
+            "home": "主线正式账户总览",
+            "experimental": "实验账户总览",
+            "timeframe_views": "按 1d / 5m 分组测试",
+            "ftd001_focus": "FTD001 双版本对照",
+            "extended_session_monitor": "盘前 / 盘后异动",
+            "trade_ledger": "模拟交易明细",
+            "signal_watchlist": "信号观察清单",
+        },
+        "shared_account_view": mainline_overview,
+        "mainline_account_view": mainline_overview,
+        "experimental_account_view": experimental_overview,
+        "mainline_accounts": runtime["mainline_accounts"],
+        "experimental_accounts": runtime["experimental_accounts"],
+        "supporting_rule_ab_results": {
+            "schema_version": "m12.46.supporting-rule-ab.v1",
+            "rows": runtime["supporting_rule_rows"],
+        },
+        "account_input_audit": {
+            "schema_version": "m12.46.account-input-audit.v1",
+            "rows": runtime["account_input_audit_rows"],
+        },
+        "strategy_scorecard_rows": runtime["account_rows"],
+        "strategy_detail_views": build_account_detail_views(runtime["state"], runtime["account_rows"]),
+        "observation_test_lane": {
+            "schema_version": "m12.46.experimental-account-lane.v1",
+            "stage": "M12.46.experimental_account_lane",
+            "plain_language_result": experimental_lane_note,
+            "rows": runtime["experimental_accounts"],
+            "paper_simulated_only": True,
+            "trading_connection": False,
+            "real_money_actions": False,
+            "live_execution": False,
+            "paper_trading_approval": False,
+        },
+        "timeframe_views": timeframe_views,
+        "ftd001_monitor": ftd001_monitor,
+        "extended_session_monitor": extended_session_monitor,
+        "codex_observer": codex_observer,
+        "summary": summary,
+        "trade_rows": trade_ledger_rows,
+        "signal_watchlist": runtime["signal_watchlist"],
+        "reference_watchlist": pa004_reference_rows,
+        "strategy_status_rows": closure_rows,
+        "visual_definition_rows": visual_rows,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_account_detail_views(state: dict[str, Any], account_rows: list[dict[str, str]]) -> dict[str, Any]:
+    views: dict[str, Any] = {}
+    for row in account_rows:
+        account = state["accounts"][row["runtime_id"]]
+        views[row["runtime_id"]] = {
+            "summary": row,
+            "open_positions": account["open_positions"],
+            "closed_trades": account["closed_trades"][-20:],
+        }
+    return views
+
+
+def build_accountized_codex_observer(
+    config: M1229Config,
+    summary: dict[str, Any],
+    runtime: dict[str, Any],
+    mainline: dict[str, Any],
+    experimental: dict[str, Any],
+    timeframe_views: dict[str, Any],
+    ftd001_monitor: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
+) -> dict[str, Any]:
+    active_timeframes = [
+        timeframe_views["views"][timeframe]["display_name"]
+        for timeframe in timeframe_views["timeframe_order"]
+        if timeframe_views["views"][timeframe]["account_count"] > 0
+    ]
+    alerts: list[dict[str, str]] = []
+    if money_to_decimal(mainline["day_pnl"]) < ZERO:
+        alerts.append({"level": "注意", "message": "主线账户今日暂时为负，先看是否集中在 M10-PA-012 或 FTD001。"})
+    if summary["candidate_date_warning"]:
+        alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
+    if not summary["current_day_runtime_ready"]:
+        alerts.append({"level": "数据", "message": "第一批 50 只股票当前运行数据仍有真实缺口。"})
+    elif not summary["current_day_scan_complete"]:
+        alerts.append({"level": "数据", "message": summary["runtime_readiness_note"]})
+    experimental_connected = [
+        row for row in runtime["account_input_audit_rows"]
+        if row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+    ]
+    if not experimental_connected:
+        alerts.append({"level": "实验线", "message": "实验账户目前还没接入正式当日扫描输入，今天的 0 开仓不能解读成这些策略已经跑过实时测试。"})
+    if extended_session_monitor.get("active_session") == "盘前" and extended_session_monitor["premarket_count"] > 0:
+        alerts.append({"level": "盘前", "message": extended_session_monitor["plain_language_summary"]})
+    if extended_session_monitor.get("active_session") == "盘后" and extended_session_monitor["postmarket_count"] > 0:
+        alerts.append({"level": "盘后", "message": extended_session_monitor["plain_language_summary"]})
+    if not alerts:
+        alerts.append({"level": "正常", "message": "当前主线和实验账户都已刷新，没有明显数据阻塞。"})
+    prefix = market_observer_prefix(summary["market_session"]["status"])
+    return {
+        "schema_version": "m12.46.codex-observer.v1",
+        "stage": "M12.46.codex_observer",
+        "generated_at": summary["generated_at"],
+        "observer_mode": "codex_heartbeat_or_file_inbox",
+        "observer_interval_minutes": 15,
+        "dashboard_refresh_seconds": config.dashboard_refresh_seconds,
+        "market_session": summary["market_session"],
+        "plain_language_summary": (
+            f"主线模拟权益 {mainline['current_equity']}，主线今日盈亏 {mainline['day_pnl']}；"
+            f"实验账户权益 {experimental['current_equity']}，实验今日盈亏 {experimental['day_pnl']}。"
+            f"活跃周期：{', '.join(active_timeframes) or '暂无'}。"
+            f"{extended_session_monitor['plain_language_summary']} "
+            f"{ftd001_monitor['plain_language_summary']}"
+        ),
+        "active_timeframes": active_timeframes,
+        "alerts": alerts,
+        "recommended_codex_message": (
+            f"{prefix}：主线权益 {mainline['current_equity']}，今日 {mainline['day_pnl']}；"
+            f"实验账户今日 {experimental['day_pnl']}。"
+            f"{extended_session_monitor['plain_language_summary']} "
+            f"{ftd001_monitor['plain_language_summary']} 当前提醒："
+            + "；".join(f"{row['level']}：{row['message']}" for row in alerts)
+        ),
+        "latest_dashboard_json": project_path(config.output_dir / "m12_32_minute_readonly_dashboard_data.json"),
+        "latest_dashboard_html": project_path(config.output_dir / "m12_32_minute_readonly_dashboard.html"),
+        "observer_inbox": project_path(config.output_dir / "m12_38_codex_observer_inbox.jsonl"),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], refresh_seconds: int) -> dict[str, str]:
+    market = summary["market_session"]
+    status = market["status"]
+    now_dt = datetime.now(UTC).replace(microsecond=0)
+    generated_dt = datetime.fromisoformat(summary["generated_at"].replace("Z", "+00:00"))
+    dashboard_age = int((now_dt - generated_dt).total_seconds())
+    if dashboard_age < -90:
+        freshness_state = "future_timestamp_error"
+    elif dashboard_age <= refresh_seconds * 3:
+        freshness_state = "fresh"
+    else:
+        freshness_state = "stale"
+    if status == "美股常规交易时段":
+        runtime_status = f"交易时段自动运行中，每 {refresh_seconds} 秒刷新报价，5m 收盘更新信号。"
+    elif status == "盘前":
+        runtime_status = f"盘前异动监控中，每 {refresh_seconds} 秒刷新只读报价；正式信号仍等常规交易时段确认。"
+    elif status == "盘后":
+        runtime_status = f"盘后异动监控中，每 {refresh_seconds} 秒刷新只读报价；正式信号不在夜盘确认。"
+    else:
+        runtime_status = "非交易时段快照，当前不会生成新正式交易。"
+    supervisor_path = config.output_dir / "m12_47_session_supervisor_status.json"
+    session_liveness = "unknown"
+    supervisor_process_alive = "unknown"
+    last_heartbeat_at_utc = ""
+    last_heartbeat_beijing_time = ""
+    heartbeat_age_seconds = ""
+    stale_after_seconds = str(refresh_seconds * 3)
+    if supervisor_path.exists():
+        supervisor = load_json(supervisor_path)
+        last_heartbeat_at_utc = supervisor.get("supervisor_generated_at", "")
+        last_heartbeat_beijing_time = supervisor.get("beijing_time", "")
+        supervisor_alive = supervisor_pid_alive(supervisor)
+        supervisor_process_alive = str(supervisor_alive).lower()
+        child_running = bool(supervisor.get("child_running"))
+        supervisor_market_status = supervisor.get("market_status", "")
+        if last_heartbeat_at_utc:
+            try:
+                heartbeat_dt = datetime.fromisoformat(last_heartbeat_at_utc.replace("Z", "+00:00"))
+                heartbeat_age = int((now_dt - heartbeat_dt).total_seconds())
+                heartbeat_age_seconds = str(max(heartbeat_age, 0))
+                if not supervisor_alive:
+                    session_liveness = "stopped"
+                elif child_running and heartbeat_age <= refresh_seconds * 3:
+                    session_liveness = "alive"
+                elif child_running:
+                    session_liveness = "stale"
+                elif supervisor_market_status in {"等待开盘前预热", "等待下一交易日", "非交易日等待"}:
+                    session_liveness = "idle"
+                else:
+                    session_liveness = "stopped"
+            except ValueError:
+                session_liveness = "unknown"
+        elif child_running:
+            session_liveness = "alive"
+    return {
+        "generated_at_utc": summary["generated_at"],
+        "wall_clock_beijing_time": now_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "dashboard_age_seconds": str(dashboard_age),
+        "freshness_state": freshness_state,
+        "beijing_time": market["beijing_time"],
+        "new_york_time": market["new_york_time"],
+        "market_status": status,
+        "runtime_status": runtime_status,
+        "session_liveness": session_liveness,
+        "supervisor_process_alive": supervisor_process_alive,
+        "last_heartbeat_at_utc": last_heartbeat_at_utc,
+        "last_heartbeat_beijing_time": last_heartbeat_beijing_time,
+        "heartbeat_age_seconds": heartbeat_age_seconds,
+        "stale_after_seconds": stale_after_seconds,
+    }
+
+
+def supervisor_pid_alive(supervisor: dict[str, Any]) -> bool:
+    try:
+        pid = int(supervisor.get("supervisor_pid") or 0)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -> dict[str, Any]:
+    registry = runtime["state"]["trading_day_registry"]
+    observed_days = sum(1 for value in registry.values() if value.get("counted"))
+    experimental_connected = any(
+        row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+        for row in runtime["account_input_audit_rows"]
+    )
+    return {
+        "schema_version": "m12.46.trading-day-registry.v1",
+        "stage": "M12.46.trading_day_registry",
+        "observed_trading_days": observed_days,
+        "required_trading_days": config.min_observation_days_for_trial,
+        "ready_for_m11_8_review": observed_days >= config.min_observation_days_for_trial,
+        "daily_realtime_strategy_ids": runtime_strategy_ids_from_specs("mainline"),
+        "experimental_strategy_ids": runtime_strategy_ids_from_specs("experimental"),
+        "plain_language_result": (
+            "主线账户已按纽约交易日累计；当前已接线的实验账户也会同步累计。"
+            if observed_days >= config.min_observation_days_for_trial else
+            (
+                "主线账户已经开始按交易日累计，但还没满 10 个纽约真实交易日；"
+                "实验账户里尚未接线的策略不会被误算成已完成实时测试。"
+                if not experimental_connected else
+                "主线和已接线实验账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。"
+            )
+        ),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_accountized_gate_recheck(config: M1229Config, summary: dict[str, Any], run_status: dict[str, Any]) -> dict[str, Any]:
+    ready = run_status["ready_for_m11_8_review"] and summary["current_day_runtime_ready"]
+    blockers: list[str] = []
+    if not run_status["ready_for_m11_8_review"]:
+        blockers.append("连续纽约真实交易日不足 10 天")
+    if not summary["current_day_runtime_ready"]:
+        blockers.append("当前只读账户运行数据仍有真实缺口")
+    if not summary["current_day_scan_complete"]:
+        blockers.append("严格 50/50 当日全齐口径尚未满足，但这不等于当前账户运行中断")
+    return {
+        "schema_version": "m11.8.paper-trial-gate.v1",
+        "stage": "M11.8.paper_trial_gate_recheck",
+        "paper_trial_approval": ready,
+        "plain_language_result": (
+            "主线账户和实验账户都已累计足够交易日，可以进入模拟交易试运行复查。"
+            if ready else
+            "当前已经是账户化实时测试，但还没满 10 个纽约真实交易日，先继续累计。"
+        ),
+        "candidate_strategy_ids": runtime_strategy_ids_from_specs("mainline"),
+        "blocking_items": [] if ready else blockers,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": ready,
+    }
+
+
+def runtime_strategy_ids_from_specs(lane: str) -> list[str]:
+    seen: list[str] = []
+    for spec in ACCOUNT_SPECS:
+        if spec["lane"] != lane:
+            continue
+        if spec["strategy_id"] not in seen:
+            seen.append(spec["strategy_id"])
+    return seen
+
+
+def append_rows_to_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def parse_iso_date(value: str) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            return date.fromisoformat(value[:10])
+        except ValueError:
+            return None
 
 
 def build_summary(
@@ -1025,8 +2481,10 @@ def build_report_md(summary: dict[str, Any]) -> str:
         "# M12.29 当日扫描报告\n\n"
         "## 用人话结论\n\n"
         f"- 扫描交易日：`{summary['scan_date']}`；市场状态：{summary['market_session']['status']}。\n"
-        f"- 今日新机会 `{summary['today_candidate_count']}` 条，PA004 做多观察 `{summary['pa004_long_observation_count']}` 条。\n"
-        f"- 当前只读报价覆盖后的模拟盈亏：`{summary['total_simulated_pnl']}`，模拟收益率 `{summary['total_simulated_return_percent']}%`。\n"
+        f"- 主线正式账户今日盈亏：`{summary['mainline_today_pnl']}`，当前权益：`{summary['mainline_current_equity']}`。\n"
+        f"- 实验账户今日盈亏：`{summary['experimental_today_pnl']}`，当前权益：`{summary['experimental_current_equity']}`。\n"
+        f"- 今日新信号 `{summary['today_candidate_count']}` 条，信号观察清单总数 `{summary['signal_watchlist_count']}` 条。\n"
+        f"- 盘前异动 `{summary['premarket_mover_count']}` 条，盘后异动 `{summary['postmarket_mover_count']}` 条，重点关注股命中 `{summary['focus_mover_count']}` 条。\n"
         f"- 50 只股票日线可用 `{summary['first50_daily_ready_symbols']}` 只，当日 5m 可用 `{summary['first50_current_5m_ready_symbols']}` 只。{warning}\n"
         "- 这不是实盘，也不是自动买卖；只是只读行情和模拟盈亏。\n"
     )
@@ -1050,19 +2508,19 @@ def build_visual_definition_md(rows: list[dict[str, str]]) -> str:
 
 def build_observation_test_lane_md(lane: dict[str, Any]) -> str:
     lines = [
-        "# M12.34 观察策略每日测试",
+        "# M12.46 实验账户测试",
         "",
         "## 用人话结论",
         "",
         f"- {lane['plain_language_result']}",
-        "- 观察策略不是空挂状态；当天没有触发，也会记录为“没有符合条件的机会”。",
+        "- 实验策略也已经入账；当天没触发，会显示为零触发和零开仓，而不是空挂状态。",
         "",
-        "| 策略 | 今日机会 | 今日模拟盈亏 | 浮盈占比 | 说明 | 下一步 |",
-        "|---|---:|---:|---:|---|---|",
+        "| 账户 | 周期 | 今日开仓 | 今日平仓 | 今日盈亏 | 当前权益 | 历史收益 | 最大回撤 |",
+        "|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in lane["rows"]:
         lines.append(
-            f"| {row['strategy_id']} {row['strategy_title']} | {row['today_opportunity_count']} | {row['today_simulated_pnl']} | {row['positive_opportunity_percent']}% | {row['daily_result_plain']} | {row['upgrade_or_downgrade_hint']} |"
+            f"| {row['display_name']} | {row['timeframe']} | {row['today_opened_count']} | {row['today_closed_count']} | {row['today_total_pnl']} | {row['equity']} | {row['historical_return_percent']}% | {row['max_drawdown_percent']}% |"
         )
     return "\n".join(lines) + "\n"
 
@@ -1071,81 +2529,97 @@ def build_timeframe_views_md(timeframe_views: dict[str, Any]) -> str:
     lines = [
         "# M12.35 按周期分组看板",
         "",
-        "| 周期 | 今日机会 | 主线机会 | 观察机会 | 模拟盈亏 | 浮盈占比 | 命中策略 |",
+        "| 周期 | 账户数 | 主线账户 | 实验账户 | 今日盈亏 | 胜率 | 账户列表 |",
         "|---|---:|---:|---:|---:|---:|---|",
     ]
     for timeframe in timeframe_views["timeframe_order"]:
         view = timeframe_views["views"][timeframe]
         lines.append(
-            f"| {view['display_name']} | {view['opportunity_count']} | {view['mainline_opportunity_count']} | {view['observation_opportunity_count']} | {view['simulated_pnl']} | {view['positive_opportunity_percent']}% | {', '.join(view['active_strategy_ids']) or '暂无'} |"
+            f"| {view['display_name']} | {view['account_count']} | {view['mainline_account_count']} | {view['experimental_account_count']} | {view['today_total_pnl']} | {view['win_rate_percent']}% | {', '.join(row['runtime_id'] for row in view['strategy_rows']) or '暂无'} |"
         )
     return "\n".join(lines) + "\n"
 
 
 def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
+    baseline = next((row for row in monitor["accounts"] if row["variant_id"] == "baseline"), {})
+    guard = next((row for row in monitor["accounts"] if row["variant_id"] == "loss_streak_guard"), {})
     lines = [
-        "# M12.36 FTD001 重点监控",
+        "# M12.46 FTD001 双版本重点监控",
         "",
         "## 用人话结论",
         "",
         f"- {monitor['plain_language_summary']}",
         "",
-        "| 指标 | 数值 |",
-        "|---|---:|",
-        f"| 历史收益 | {monitor['historical_return_percent']}% |",
-        f"| 历史胜率 | {monitor['historical_win_rate_percent']}% |",
-        f"| 历史最大回撤 | {monitor['historical_max_drawdown_percent']}% |",
-        f"| 今日机会 | {monitor['today_opportunity_count']} |",
-        f"| 今日模拟盈亏 | {monitor['today_simulated_pnl']} |",
-        f"| 当前连续亏损参考 | {monitor['current_consecutive_loss_proxy']} |",
-        f"| 风险标记 | {'，'.join(monitor['risk_flags'])} |",
+        "| 版本 | 今日盈亏 | 当前权益 | 历史收益 | 胜率 | 最大回撤 |",
+        "|---|---:|---:|---:|---:|---:|",
+        f"| 原版 baseline | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('historical_return_percent', '')}% | {baseline.get('historical_win_rate_percent', '')}% | {baseline.get('historical_max_drawdown_percent', '')}% |",
+        f"| 连亏保护 loss_streak_guard | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('historical_return_percent', '')}% | {guard.get('historical_win_rate_percent', '')}% | {guard.get('historical_max_drawdown_percent', '')}% |",
+        "",
+        f"- 风险标记：{'，'.join(monitor['risk_flags'])}",
     ]
     return "\n".join(lines) + "\n"
 
 
 def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
-    shared = dashboard["shared_account_view"]
+    mainline = dashboard["mainline_account_view"]
+    experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
     ftd = dashboard["ftd001_monitor"]
+    update_status = dashboard["update_status"]
     cards = "\n".join(
         f"<section class=\"metric\"><span>{html.escape(k)}</span><strong>{html.escape(str(v))}</strong></section>"
         for k, v in metrics.items()
     )
-    account_rows = "\n".join(
+    mainline_rows = "\n".join(
         f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
         for label, value in [
-            ("初始模拟本金", shared["starting_capital"]),
-            ("当前模拟权益", shared["current_equity"]),
-            ("今日模拟盈亏", shared["day_simulated_pnl"]),
-            ("今日模拟收益率", shared["day_simulated_return_percent"] + "%"),
-            ("今日新机会", shared["today_candidate_count"]),
-            ("浮盈机会", shared["floating_profit_count"]),
-            ("浮亏机会", shared["floating_loss_count"]),
-            ("如果所有机会同时观察的理论风险预算", shared["theoretical_risk_budget_if_all_opportunities_active"]),
+            ("总起始本金", mainline["starting_capital"]),
+            ("当前主线权益", mainline["current_equity"]),
+            ("主线今日盈亏", mainline["day_pnl"]),
+            ("主线累计收益", mainline["cumulative_return_percent"] + "%"),
+            ("今日新开仓", mainline["today_opened_count"]),
+            ("今日已平仓", mainline["today_closed_count"]),
+            ("当前胜率", mainline["win_rate_percent"] + "%"),
+            ("当前最大回撤", mainline["max_drawdown_percent"] + "%"),
+        ]
+    )
+    experimental_rows = "\n".join(
+        f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
+        for label, value in [
+            ("总起始本金", experimental["starting_capital"]),
+            ("当前实验权益", experimental["current_equity"]),
+            ("实验今日盈亏", experimental["day_pnl"]),
+            ("实验累计收益", experimental["cumulative_return_percent"] + "%"),
+            ("今日新开仓", experimental["today_opened_count"]),
+            ("今日已平仓", experimental["today_closed_count"]),
+            ("当前胜率", experimental["win_rate_percent"] + "%"),
+            ("当前最大回撤", experimental["max_drawdown_percent"] + "%"),
         ]
     )
     strategy_scorecard_rows = "\n".join(strategy_scorecard_html(row) for row in dashboard["strategy_scorecard_rows"])
     pnl_bars = "\n".join(strategy_pnl_bar_html(row) for row in dashboard["strategy_scorecard_rows"])
     strategy_detail_rows = "\n".join(strategy_detail_summary_html(view["summary"]) for view in dashboard["strategy_detail_views"].values())
-    all_rows = dashboard["trade_rows"] + dashboard["pa004_long_rows"]
-    today_rows = "\n".join(trade_row_html(row) for row in all_rows[:220])
-    timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in TIMEFRAME_ORDER)
-    ftd_rows = "\n".join(
-        f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
-        for label, value in [
-            ("历史收益", ftd["historical_return_percent"] + "%"),
-            ("历史胜率", ftd["historical_win_rate_percent"] + "%"),
-            ("历史最大回撤", ftd["historical_max_drawdown_percent"] + "%"),
-            ("今日触发股票", ", ".join(ftd["today_symbols"]) or "暂无"),
-            ("今日模拟盈亏", ftd["today_simulated_pnl"]),
-            ("当前连续亏损参考", ftd["current_consecutive_loss_proxy"]),
-            ("风险标记", "，".join(ftd["risk_flags"])),
-        ]
-    )
+    today_rows = "\n".join(trade_row_html(row) for row in dashboard["trade_rows"][:220])
+    watch_rows = "\n".join(signal_watchlist_html(row) for row in dashboard["signal_watchlist"][:220])
+    reference_rows = "\n".join(signal_watchlist_html(row) for row in dashboard["reference_watchlist"][:80])
+    timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in PRIMARY_TIMEFRAME_ORDER)
+    ftd_rows = "".join(ftd_account_row_html(row) for row in ftd["accounts"])
+    extended_monitor = dashboard["extended_session_monitor"]
+    premarket_rows = "\n".join(extended_session_row_html(row) for row in extended_monitor["premarket_rows"])
+    postmarket_rows = "\n".join(extended_session_row_html(row) for row in extended_monitor["postmarket_rows"])
+    focus_rows = "\n".join(extended_session_row_html(row) for row in extended_monitor["focus_hits"])
     status_rows = "\n".join(
         f"<tr><td>{html.escape(row['strategy_id'])}</td><td>{html.escape(row['strategy_title'])}</td><td>{html.escape(row['final_status'])}</td><td>{html.escape(row['plain_reason'])}</td></tr>"
         for row in dashboard["strategy_status_rows"]
+    )
+    supporting_rows = "\n".join(
+        f"<tr><td>{html.escape(row['supporting_rule_id'])}</td><td>{html.escape(row['display_name'])}</td><td>{html.escape(row['mode'])}</td><td>{html.escape(row['status'])}</td><td>{html.escape(row['plain_reason'])}</td></tr>"
+        for row in dashboard["supporting_rule_ab_results"]["rows"]
+    )
+    audit_rows = "\n".join(
+        f"<tr><td>{html.escape(row['runtime_id'])}</td><td>{html.escape(row['input_source_type'])}</td><td>{html.escape(row['today_formal_signal_count'])}</td><td>{html.escape(row['source_row_count'])}</td><td>{html.escape(row['plain_language_result'])}</td></tr>"
+        for row in dashboard["account_input_audit"]["rows"]
     )
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -1153,7 +2627,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="{config.dashboard_refresh_seconds}">
-  <title>M12.35 分钟级只读模拟看板</title>
+  <title>M12.46 分钟级只读模拟账户看板</title>
   <style>
     body {{ margin:0; font-family:Arial,"Noto Sans SC",sans-serif; background:#f6f7f9; color:#1f2933; letter-spacing:0; }}
     header {{ padding:18px 22px; background:#fff; border-bottom:1px solid #d8dee9; display:flex; justify-content:space-between; gap:18px; }}
@@ -1181,15 +2655,20 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   </style>
 </head>
 <body>
-  <header><div><h1>分钟级只读模拟看板</h1><div>更新时间：{html.escape(dashboard['generated_at'])}</div></div><div>只读行情 + 模拟盈亏，不接真实账户，不做真实买卖</div></header>
+  <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>当前电脑时间：{html.escape(update_status['wall_clock_beijing_time'])} ｜ 看板新鲜度：{html.escape(update_status['freshness_state'])} ｜ 看板延迟秒数：{html.escape(update_status['dashboard_age_seconds'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 守护器进程：{html.escape(update_status['supervisor_process_alive'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
   <main>
     <div class="grid">{cards}</div>
-    <section class="panel"><h2>共享模拟账户</h2><div class="note">{html.escape(shared['plain_language_note'])}</div><div class="two-col"><div class="mini-card"><table><tbody>{account_rows}</tbody></table></div><div class="mini-card"><h2>各策略今日模拟盈亏</h2>{pnl_bars}</div></div></section>
-    <section class="panel"><h2>FTD001 重点观察</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="two-col"><div class="mini-card"><table><tbody>{ftd_rows}</tbody></table></div><div class="mini-card"><h2>当前判断</h2><div class="note">{html.escape(ftd['current_plain_status'])}</div></div></div></section>
-    <section class="panel"><h2>按周期分组测试</h2><div class="note">信号按各自 K 线收盘确认：日线收盘后更新，1h / 15m / 5m 只在对应周期收盘后更新。盘中每 60 秒只刷新当前价和模拟盈亏。</div><div class="timeframes">{timeframe_sections}</div></section>
-    <section class="panel"><h2>策略成绩单</h2><div class="note">这里按单策略独立展示，方便判断每条策略自己的历史表现和今日表现；首页共享账户则看所有策略合并后的总效果。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
-    <section class="panel"><h2>单策略下钻</h2><div class="note">这里把每条策略的今日机会、最好/最差股票、周期分布和历史参考指标放在一起；更细的每笔机会保存在 JSON 的 strategy_detail_views 里。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
-    <section class="panel"><h2>今日机会明细</h2><div class="note">报价每 {config.dashboard_refresh_seconds} 秒刷新；策略信号按对应 K 线收盘确认；表内“类别”会区分今日新扫描、旧观察和 PA004 做多观察。PA004 已统一放在总表和周期分组里，不再单独割裂展示。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
+    <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
+    <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
+    <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>历史收益</th><th>胜率</th><th>最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
+    <section class="panel"><h2>盘前 / 盘后异动</h2><div class="note">{html.escape(extended_monitor['plain_language_summary'])}</div><div class="two-col"><div class="mini-card"><h2>盘前超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{premarket_rows}</tbody></table></div></div><div class="mini-card"><h2>盘后超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{postmarket_rows}</tbody></table></div></div></div><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{focus_rows}</tbody></table></div></section>
+    <section class="panel"><h2>按 1d / 5m 分组测试</h2><div class="note">当前主计划只保留 1d 与 5m。信号按各自周期收盘确认，盘中每 60 秒只刷新报价和持仓盈亏。</div><div class="timeframes">{timeframe_sections}</div></section>
+    <section class="panel"><h2>账户成绩单</h2><div class="note">每条独立账户都看得到本金、权益、今日盈亏、胜率和最大回撤；主线和实验分层展示，但都真实入账。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
+    <section class="panel"><h2>账户下钻</h2><div class="note">这里看每个账户的当前状态、开平仓数量、可用现金和历史参考指标。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
+    <section class="panel"><h2>模拟交易明细</h2><div class="note">这里展示当前持仓和最近已平仓记录，按账户状态机推进，不再是旧的机会当前价覆盖。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
+    <section class="panel"><h2>正式信号清单</h2><div class="note">这里只展示真正会进入账户测试的正式信号，不再把历史观察样例混进主线收益和机会统计。</div><div class="wrap"><table><thead>{watchlist_head()}</thead><tbody>{watch_rows}</tbody></table></div></section>
+    <section class="panel"><h2>账户输入审计</h2><div class="note">这张表专门防止“名义上进测试、实际上还吃旧观察流”的老问题。所有进账户的策略都必须明确写清楚输入源。</div><div class="wrap"><table><thead><tr><th>账户</th><th>输入源</th><th>今日正式信号</th><th>可用正式行数</th><th>说明</th></tr></thead><tbody>{audit_rows}</tbody></table></div></section>
+    <section class="panel"><h2>历史参考样例（不入账）</h2><div class="note">这里只放回看和复盘用的旧样例，不参与今日主线收益，也不会触发新开仓。</div><div class="wrap"><table><thead>{watchlist_head()}</thead><tbody>{reference_rows}</tbody></table></div></section>
     <section class="panel"><h2>策略状态</h2><div class="wrap"><table><thead><tr><th>策略</th><th>名称</th><th>状态</th><th>说明</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
   </main>
 </body>
@@ -1198,105 +2677,148 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
 
 
 def table_head() -> str:
-    return "<tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>模拟盈亏</th><th>状态</th></tr>"
+    return "<tr><th>记录</th><th>账户</th><th>股票</th><th>周期</th><th>方向</th><th>开仓时间</th><th>入场</th><th>止损</th><th>目标</th><th>最新价/平仓价</th><th>盈亏</th><th>状态</th></tr>"
+
+
+def watchlist_head() -> str:
+    return "<tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>信号时间</th><th>说明</th></tr>"
 
 
 def strategy_scorecard_head() -> str:
-    return "<tr><th>策略</th><th>状态</th><th>今日机会</th><th>今日模拟盈亏</th><th>浮盈占比</th><th>历史收益</th><th>历史胜率</th><th>最大回撤</th><th>盈利因子</th><th>下一步</th></tr>"
+    return "<tr><th>账户</th><th>分层</th><th>周期</th><th>今日开仓</th><th>今日平仓</th><th>今日盈亏</th><th>当前权益</th><th>胜率</th><th>最大回撤</th><th>历史收益</th></tr>"
 
 
 def timeframe_view_html(view: dict[str, Any]) -> str:
     strategy_rows = "".join(
         "<tr>"
-        f"<td>{html.escape(row['strategy_id'])}</td>"
-        f"<td>{html.escape(row['status'])}</td>"
-        f"<td>{html.escape(row['opportunity_count'])}</td>"
-        f"<td>{html.escape(row['simulated_pnl'])}</td>"
-        f"<td>{html.escape(row['positive_opportunity_percent'])}%</td>"
+        f"<td>{html.escape(row['runtime_id'])}</td>"
+        f"<td>{html.escape('主线' if row['lane'] == 'mainline' else '实验')}</td>"
+        f"<td>{html.escape(row['today_total_pnl'])}</td>"
+        f"<td>{html.escape(row['equity'])}</td>"
+        f"<td>{html.escape(row['win_rate_percent'])}%</td>"
         "</tr>"
         for row in view["strategy_rows"]
     )
-    strategy_rows = strategy_rows or "<tr><td colspan=\"5\">暂无触发</td></tr>"
+    strategy_rows = strategy_rows or "<tr><td colspan=\"5\">暂无账户</td></tr>"
     return (
         "<section class=\"timeframe-card\">"
         f"<h3>{html.escape(view['display_name'])}</h3>"
         "<div class=\"stats\">"
-        f"<div><small>机会</small><strong>{html.escape(str(view['opportunity_count']))}</strong></div>"
-        f"<div><small>模拟盈亏</small><strong>{html.escape(view['simulated_pnl'])}</strong></div>"
-        f"<div><small>浮盈占比</small><strong>{html.escape(view['positive_opportunity_percent'])}%</strong></div>"
+        f"<div><small>账户数</small><strong>{html.escape(str(view['account_count']))}</strong></div>"
+        f"<div><small>今日盈亏</small><strong>{html.escape(view['today_total_pnl'])}</strong></div>"
+        f"<div><small>胜率</small><strong>{html.escape(view['win_rate_percent'])}%</strong></div>"
         "</div>"
         f"<div class=\"note\">{html.escape(view['plain_language_note'])}</div>"
-        "<table><thead><tr><th>策略</th><th>状态</th><th>机会</th><th>模拟盈亏</th><th>浮盈占比</th></tr></thead>"
+        "<table><thead><tr><th>账户</th><th>分层</th><th>今日盈亏</th><th>当前权益</th><th>胜率</th></tr></thead>"
         f"<tbody>{strategy_rows}</tbody></table>"
         "</section>"
     )
 
 
 def strategy_scorecard_html(row: dict[str, str]) -> str:
-    pnl = row["simulated_pnl_today"]
+    pnl = row["today_total_pnl"]
     cls = "good" if money_to_decimal(pnl) > ZERO else "bad" if money_to_decimal(pnl) < ZERO else ""
     return (
         "<tr>"
-        f"<td>{html.escape(row['strategy_id'])}<br><small>{html.escape(row['strategy_title'])}</small></td>"
-        f"<td>{html.escape(row['current_status'])}</td>"
-        f"<td>{html.escape(row['today_opportunity_count'])}</td>"
+        f"<td>{html.escape(row['runtime_id'])}<br><small>{html.escape(row['display_name'])}</small></td>"
+        f"<td>{html.escape('主线正式账户' if row['lane'] == 'mainline' else '实验账户')}</td>"
+        f"<td>{html.escape(row['timeframe'])}</td>"
+        f"<td>{html.escape(row['today_opened_count'])}</td>"
+        f"<td>{html.escape(row['today_closed_count'])}</td>"
         f"<td class=\"{cls}\">{html.escape(pnl)}</td>"
-        f"<td>{html.escape(row['floating_positive_percent'])}%</td>"
+        f"<td>{html.escape(row['equity'])}</td>"
+        f"<td>{html.escape(row['win_rate_percent'])}%</td>"
+        f"<td>{html.escape(row['max_drawdown_percent'])}%</td>"
         f"<td>{html.escape(row['historical_return_percent'])}%</td>"
-        f"<td>{html.escape(row['historical_win_rate_percent'])}%</td>"
-        f"<td>{html.escape(row['historical_max_drawdown_percent'])}%</td>"
-        f"<td>{html.escape(row['historical_profit_factor'])}</td>"
-        f"<td>{html.escape(row['plain_next_action'])}</td>"
         "</tr>"
     )
 
 
 def strategy_detail_head() -> str:
-    return "<tr><th>策略</th><th>今日机会</th><th>今日模拟盈亏</th><th>最好股票</th><th>最差股票</th><th>周期分布</th><th>历史净利润</th><th>历史最好/最差</th></tr>"
+    return "<tr><th>账户</th><th>当前权益</th><th>可用现金</th><th>当前持仓</th><th>累计已平仓</th><th>今日开仓/平仓</th><th>历史净利润</th><th>历史收益/回撤</th></tr>"
 
 
 def strategy_detail_summary_html(row: dict[str, Any]) -> str:
-    timeframe = "，".join(f"{key}:{value}" for key, value in row["timeframe_breakdown"].items()) or "暂无"
-    historical_edges = (
-        f"最好 {html.escape(row['historical_best_symbol'] or '暂无')} / {html.escape(row['historical_best_timeframe'] or '暂无')}"
-        f"<br>最差 {html.escape(row['historical_worst_symbol'] or '暂无')} / {html.escape(row['historical_worst_timeframe'] or '暂无')}"
-    )
     return (
         "<tr>"
-        f"<td>{html.escape(row['strategy_id'])}<br><small>{html.escape(row['strategy_title'])}</small></td>"
-        f"<td>{html.escape(row['today_opportunity_count'])}</td>"
-        f"<td>{html.escape(row['today_simulated_pnl'])}</td>"
-        f"<td>{html.escape(row['top_symbol_today'] or '暂无')}</td>"
-        f"<td>{html.escape(row['worst_symbol_today'] or '暂无')}</td>"
-        f"<td>{html.escape(timeframe)}</td>"
+        f"<td>{html.escape(row['runtime_id'])}<br><small>{html.escape(row['display_name'])}</small></td>"
+        f"<td>{html.escape(row['equity'])}</td>"
+        f"<td>{html.escape(row['cash'])}</td>"
+        f"<td>{html.escape(row['open_position_count'])}</td>"
+        f"<td>{html.escape(row['closed_trade_count'])}</td>"
+        f"<td>{html.escape(row['today_opened_count'])}/{html.escape(row['today_closed_count'])}</td>"
         f"<td>{html.escape(row['historical_net_profit'])}</td>"
-        f"<td>{historical_edges}</td>"
+        f"<td>{html.escape(row['historical_return_percent'])}% / {html.escape(row['historical_max_drawdown_percent'])}%</td>"
         "</tr>"
     )
 
 
 def strategy_pnl_bar_html(row: dict[str, str]) -> str:
-    pnl = money_to_decimal(row["simulated_pnl_today"])
+    pnl = money_to_decimal(row["today_total_pnl"])
     width = min(100, max(4, int(abs(pnl) / Decimal("250")))) if pnl != ZERO else 4
     cls = "bar-good" if pnl > ZERO else "bar-bad" if pnl < ZERO else ""
     return (
         "<div class=\"bar-row\">"
-        f"<div>{html.escape(row['strategy_id'])}</div>"
+        f"<div>{html.escape(row['runtime_id'])}</div>"
         f"<div class=\"bar-track\"><div class=\"bar-fill {cls}\" style=\"width:{width}%\"></div></div>"
-        f"<div>{html.escape(row['simulated_pnl_today'])}</div>"
+        f"<div>{html.escape(row['today_total_pnl'])}</div>"
         "</div>"
     )
 
 
 def trade_row_html(row: dict[str, str]) -> str:
-    pnl = row["simulated_intraday_pnl"]
+    pnl = row["pnl"]
     cls = "good" if pnl != "暂无" and money_to_decimal(pnl) > ZERO else "bad" if pnl != "暂无" and money_to_decimal(pnl) < ZERO else ""
+    return (
+        "<tr>"
+        f"<td>{html.escape(row.get('record_type', ''))}</td><td>{html.escape(row['runtime_id'])}<br><small>{html.escape(row['display_name'])}</small></td>"
+        f"<td>{html.escape(row['symbol'])}</td><td>{html.escape(row['timeframe'])}</td><td>{html.escape(row.get('direction', ''))}</td>"
+        f"<td>{html.escape(row['opened_at'])}</td><td>{html.escape(row['entry_price'])}</td><td>{html.escape(row['stop_price'])}</td><td>{html.escape(row['target_price'])}</td>"
+        f"<td>{html.escape(row['latest_price'])}</td><td class=\"{cls}\">{html.escape(pnl)}</td><td>{html.escape(row['state'])}</td></tr>"
+    )
+
+
+def signal_watchlist_html(row: dict[str, str]) -> str:
     return (
         "<tr>"
         f"<td>{html.escape(row.get('bucket', ''))}</td><td>{html.escape(row['strategy_id'])}<br><small>{html.escape(row['strategy_title'])}</small></td>"
         f"<td>{html.escape(row['symbol'])}</td><td>{html.escape(row['timeframe'])}</td><td>{html.escape(row.get('direction', ''))}</td>"
         f"<td>{html.escape(row['latest_price'])}</td><td>{html.escape(row['hypothetical_entry_price'])}</td><td>{html.escape(row['hypothetical_stop_price'])}</td><td>{html.escape(row['hypothetical_target_price'])}</td>"
-        f"<td class=\"{cls}\">{html.escape(pnl)}</td><td>{html.escape(row['simulated_state'])}</td></tr>"
+        f"<td>{html.escape(row.get('signal_time', ''))}</td><td>{html.escape(row.get('review_status', ''))}</td></tr>"
+    )
+
+
+def extended_session_head() -> str:
+    return "<tr><th>时段</th><th>股票</th><th>主题</th><th>现价</th><th>参考收盘</th><th>涨跌额</th><th>涨跌幅</th><th>时间</th></tr>"
+
+
+def extended_session_row_html(row: dict[str, str]) -> str:
+    cls = "good" if money_to_decimal(row["move_percent"]) > ZERO else "bad" if money_to_decimal(row["move_percent"]) < ZERO else ""
+    return (
+        "<tr>"
+        f"<td>{html.escape(row['session'])}</td>"
+        f"<td>{html.escape(row['symbol'])}</td>"
+        f"<td>{html.escape(row.get('theme', '') or '普通监控')}</td>"
+        f"<td>{html.escape(row['extended_price'])}</td>"
+        f"<td>{html.escape(row['reference_close'])}</td>"
+        f"<td class=\"{cls}\">{html.escape(row['move_amount'])}</td>"
+        f"<td class=\"{cls}\">{html.escape(row['move_percent'])}%</td>"
+        f"<td>{html.escape(row['quote_timestamp'])}</td>"
+        "</tr>"
+    )
+
+
+def ftd_account_row_html(row: dict[str, str]) -> str:
+    label = "原版 baseline" if row["variant_id"] == "baseline" else "连亏保护 loss_streak_guard"
+    return (
+        "<tr>"
+        f"<td>{html.escape(label)}</td>"
+        f"<td>{html.escape(row['today_total_pnl'])}</td>"
+        f"<td>{html.escape(row['equity'])}</td>"
+        f"<td>{html.escape(row['historical_return_percent'])}%</td>"
+        f"<td>{html.escape(row['historical_win_rate_percent'])}%</td>"
+        f"<td>{html.escape(row['historical_max_drawdown_percent'])}%</td>"
+        "</tr>"
     )
 
 
@@ -1309,7 +2831,7 @@ def build_run_status_md(status: dict[str, Any]) -> str:
 
 
 def build_gate_md(gate: dict[str, Any]) -> str:
-    lines = ["# M11.6 模拟交易试运行准入复查", "", f"- 结论：{gate['plain_language_result']}", f"- 是否批准：`{str(gate['paper_trial_approval']).lower()}`", ""]
+    lines = ["# M11.8 模拟交易试运行准入复查", "", f"- 结论：{gate['plain_language_result']}", f"- 是否批准：`{str(gate['paper_trial_approval']).lower()}`", ""]
     if gate["blocking_items"]:
         lines.append("## 还差什么")
         for item in gate["blocking_items"]:
@@ -1320,10 +2842,10 @@ def build_gate_md(gate: dict[str, Any]) -> str:
 def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
     return (
         "```yaml\n"
-        "task_id: M12.34-M12.39-intraday-observer-dashboard\n"
+        "task_id: M12.46-M11.8-accountized-testing\n"
         "role: main-agent\n"
-        "branch_or_worktree: feature/m12-34-39-intraday-observer-dashboard\n"
-        "objective: 让观察策略进入每日测试，按周期重排看板，重点监控 FTD001，并提供自动运行器与 Codex 观察员摘要\n"
+        "branch_or_worktree: codex/m12-46-accountized-testing\n"
+        "objective: 把只读实时测试升级为 20,000 USD 独立模拟账户，按 1d/5m 分栏运行主线和实验策略，并修复纽约交易日累计口径\n"
         "status: success\n"
         "files_changed:\n"
         "  - config/examples/m12_29_current_day_scan_dashboard.json\n"
@@ -1340,8 +2862,9 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "tests_run:\n"
         "  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py -v\n"
         "  - python -m unittest tests/unit/test_m12_37_intraday_auto_loop.py -v\n"
-        "  - python -m unittest discover -s tests/unit -v\n"
-        "  - python -m unittest discover -s tests/reliability -v\n"
+        "  - python -m unittest tests/unit/test_m12_46_runtime_accounts.py -v\n"
+        "  - python -m unittest tests/unit/test_m12_29_current_day_scan_dashboard.py tests/unit/test_m12_37_intraday_auto_loop.py tests/unit/test_m12_46_runtime_accounts.py tests/unit/test_m12_17_daily_observation_continuity.py tests/unit/test_m12_25_daily_observation_continuity.py -v\n"
+        "  - git diff --check\n"
         "verification_results:\n"
         f"  - scan_date: {summary['scan_date']}\n"
         f"  - today_candidate_count: {summary['today_candidate_count']}\n"
@@ -1349,13 +2872,13 @@ def build_handoff_md(config: M1229Config, summary: dict[str, Any]) -> str:
         "assumptions:\n"
         "  - 当前仍是只读行情和模拟盈亏，不接真实账户，不下真实订单\n"
         "risks:\n"
-        "  - 看板仍是只读行情和模拟盈亏，连续交易日样本仍只有 1/10\n"
-        "  - systemd/cron 示例已提交，但本阶段没有偷偷启用系统级长期后台任务\n"
+        "  - 实验账户仍需累计更多真实交易日，当前还不能直接当作稳定结论\n"
+        "  - 自动运行需要显式启用 systemd/cron 或 Codex automation，当前 handoff 只记录实现状态\n"
         "qa_focus:\n"
-        "  - 检查观察策略测试 lane、周期分组、FTD001 监控、Codex 观察员摘要和只读边界\n"
+        "  - 检查纽约交易日累计、主线/实验账户隔离、FTD001 双版本并行和只读边界\n"
         "rollback_notes:\n"
-        "  - 回滚本阶段提交即可撤回 M12.34-M12.39 产物\n"
-        "next_recommended_action: 美股常规交易时段运行自动刷新，累计10个真实交易日的只读模拟看板记录，并在看板稳定后做模拟交易试运行准入复查\n"
+        "  - 回滚本阶段提交即可撤回 M12.46 账户化实时测试产物\n"
+        "next_recommended_action: 启用交易日会话自动运行，累计 10 个纽约真实交易日的主线/实验账户结果，再做 M11.8 模拟交易试运行复查\n"
         "needs_user_decision: false\n"
         "user_decision_needed: ''\n"
         "```\n"

@@ -20,6 +20,7 @@ LONGRIDGE_AUTH_HINT = (
     "Run `longbridge auth login`, finish the browser authorization for the simulated account, "
     "and confirm quote permission is enabled in OpenAPI."
 )
+LONGBRIDGE_HISTORY_TIMEOUT_SECONDS = 6
 SUPPORTED_LONGBRIDGE_INTERVALS = frozenset({"1m", "5m", "15m", "30m", "1h", "1d", "1w", "1mo", "1y"})
 INTRADAY_INTERVALS = frozenset({"1m", "5m", "15m", "30m", "1h"})
 _INTERVAL_TO_PERIOD = {
@@ -210,12 +211,20 @@ def _run_longbridge_command(
 ) -> Any:
     last_detail = ""
     for attempt in range(3):
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=LONGBRIDGE_HISTORY_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            last_detail = f"timeout after {LONGBRIDGE_HISTORY_TIMEOUT_SECONDS}s"
+            if attempt < 2:
+                time_module.sleep(float(attempt + 1))
+                continue
+            break
         output = (completed.stderr or completed.stdout or "").strip()
         if completed.returncode == 0:
             stdout = completed.stdout.strip()
