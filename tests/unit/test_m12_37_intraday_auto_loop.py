@@ -1,16 +1,32 @@
 import tempfile
 import unittest
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.m12_29_current_day_scan_dashboard_lib import load_config as load_m12_29_config
 from scripts.run_m12_37_intraday_auto_loop import (
     M1237AutoLoopConfig,
     load_auto_config,
     run_once,
+    run_post_run_strategy_ledgers,
     session_refresh_policy,
+    should_run_m14_finalization,
     validate_generated_at,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class FakeM13Config:
+    output_dir: Path
+    m12_29_output_dir: Path
+
+
+@dataclass(frozen=True, slots=True)
+class FakeM14Config:
+    output_dir: Path
+    m13_output_dir: Path
+    m12_29_output_dir: Path
 
 
 class M1237IntradayAutoLoopTest(unittest.TestCase):
@@ -45,7 +61,11 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             encoding="utf-8",
         )
         config = load_auto_config()
-        return replace(config, source_m12_29_config_path=source_config_path)
+        return replace(
+            config,
+            source_m12_29_config_path=source_config_path,
+            post_run_strategy_ledgers_enabled=False,
+        )
 
     def test_once_writes_runner_manifest_and_observer_files(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -115,6 +135,100 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
         self.assertTrue(postmarket["continue_session"])
         self.assertEqual(regular_midbar["max_native_fetches"], 0)
         self.assertFalse(closed["continue_session"])
+
+    def test_m14_finalization_policy_waits_for_postmarket_by_default(self):
+        degraded = {"current_day_runtime_ready": False}
+        ready = {"current_day_runtime_ready": True}
+        self.assertEqual(
+            should_run_m14_finalization("postmarket_only", market_status="美股常规交易时段", m12_summary=ready),
+            (False, "not_postmarket"),
+        )
+        self.assertEqual(
+            should_run_m14_finalization("postmarket_only", market_status="盘后", m12_summary=degraded),
+            (True, ""),
+        )
+        self.assertEqual(
+            should_run_m14_finalization("postmarket_or_runtime_ready", market_status="美股常规交易时段", m12_summary=ready),
+            (True, ""),
+        )
+
+    def test_post_run_strategy_ledgers_runs_m13_and_postmarket_m14(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(
+                self.make_config(output_dir),
+                post_run_strategy_ledgers_enabled=True,
+                post_run_m14_finalize_policy="postmarket_only",
+                post_run_m13_config_path=Path(tmp) / "m13_config.json",
+                post_run_m14_config_path=Path(tmp) / "m14_config.json",
+            )
+            fake_m13 = FakeM13Config(output_dir=Path(tmp) / "m13", m12_29_output_dir=Path("old_m12"))
+            fake_m14 = FakeM14Config(
+                output_dir=Path(tmp) / "m14",
+                m13_output_dir=Path("old_m13"),
+                m12_29_output_dir=Path("old_m12"),
+            )
+
+            with (
+                patch("scripts.run_m12_37_intraday_auto_loop.load_m13_config", return_value=fake_m13),
+                patch("scripts.run_m12_37_intraday_auto_loop.load_m14_config", return_value=fake_m14),
+                patch("scripts.run_m12_37_intraday_auto_loop.run_m13_daily_strategy_test_runner") as run_m13,
+                patch("scripts.run_m12_37_intraday_auto_loop.run_m14_strategy_challenge_gate") as run_m14,
+            ):
+                run_m13.return_value = {"goal_status": {"goal_complete": True}}
+                run_m14.return_value = {"goal_status": {"goal_complete": False}}
+                payload = run_post_run_strategy_ledgers(
+                    config,
+                    generated_at="2026-04-29T20:30:00Z",
+                    trading_date="2026-04-29",
+                    market_status="盘后",
+                    m12_29_output_dir=output_dir,
+                    m12_summary={"current_day_runtime_ready": False},
+                )
+
+            self.assertTrue(payload["m13_ran"])
+            self.assertTrue(payload["m14_ran"])
+            self.assertTrue(payload["m13_goal_complete"])
+            self.assertFalse(payload["m14_goal_complete"])
+            m13_config = run_m13.call_args.args[0]
+            m14_config = run_m14.call_args.args[0]
+            self.assertEqual(m13_config.m12_29_output_dir, output_dir)
+            self.assertEqual(m14_config.m13_output_dir, fake_m13.output_dir)
+            self.assertEqual(m14_config.m12_29_output_dir, output_dir)
+
+    def test_post_run_strategy_ledgers_records_m13_failure_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(
+                self.make_config(output_dir),
+                post_run_strategy_ledgers_enabled=True,
+                post_run_m14_finalize_policy="postmarket_only",
+            )
+            fake_m13 = FakeM13Config(output_dir=Path(tmp) / "m13", m12_29_output_dir=Path("old_m12"))
+
+            with (
+                patch("scripts.run_m12_37_intraday_auto_loop.load_m13_config", return_value=fake_m13),
+                patch(
+                    "scripts.run_m12_37_intraday_auto_loop.run_m13_daily_strategy_test_runner",
+                    side_effect=RuntimeError("ledger unavailable"),
+                ),
+            ):
+                payload = run_post_run_strategy_ledgers(
+                    config,
+                    generated_at="2026-04-29T20:30:00Z",
+                    trading_date="2026-04-29",
+                    market_status="盘后",
+                    m12_29_output_dir=output_dir,
+                    m12_summary={"current_day_runtime_ready": False},
+                )
+
+            self.assertFalse(payload["m13_ran"])
+            self.assertFalse(payload["m14_ran"])
+            self.assertEqual(payload["m13_error_type"], "RuntimeError")
+            self.assertEqual(payload["m13_error"], "ledger unavailable")
+            self.assertEqual(payload["m14_skip_reason"], "m13_post_run_failed")
 
     def test_cli_generated_at_guard_rejects_future_timestamp(self):
         with self.assertRaises(ValueError):

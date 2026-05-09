@@ -1339,6 +1339,7 @@
   - 看板必须提供 `timeframe_views`，并按 `1d / 1h / 15m / 5m` 分组展示机会数、模拟盈亏、胜率/浮盈占比、回撤参考、命中策略和交易明细。
   - `M12-FTD-001` 必须有独立重点监控卡，展示历史收益、历史胜率、历史最大回撤、今日触发股票、今日模拟盈亏、连续亏损参考和风险标记。
   - 自动运行器必须支持单次刷新与美股常规交易时段 60 秒循环刷新；信号更新必须遵守对应 K 线收盘确认语义，不能用未收盘波动生成正式信号。
+  - M12.37 自动运行器可通过 `post_run_strategy_ledgers` 在刷新后触发 M13/M14，但 M14 默认只能在盘后固化 challenge/gate，不得把盘中快照当作完整 challenge day。
   - Codex 观察员必须输出中文人话摘要，至少包括当前模拟权益、今日模拟盈亏、今日机会、活跃周期、FTD001 风险、数据缺失或时间戳异常提醒。
   - 必须输出 `m12_34_observation_test_lane.json/csv/md`、`m12_35_timeframe_readonly_dashboard_data.json`、`m12_35_timeframe_views.json/md`、`m12_36_ftd001_monitor.json/md`、`m12_37_auto_runner_manifest.json`、`m12_38_codex_observer_latest.json`、`m12_38_codex_observer_inbox.jsonl`。
   - systemd/cron 只能作为示例配置或显式启用步骤，不得偷偷启动真实交易或长期后台下单路径。

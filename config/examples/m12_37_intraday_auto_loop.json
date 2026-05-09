@@ -17,6 +17,12 @@
     "mode": "heartbeat_or_file_inbox",
     "inbox_file": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_38_codex_observer_inbox.jsonl"
   },
+  "post_run_strategy_ledgers": {
+    "enabled": true,
+    "m13_config_path": "config/examples/m13_daily_strategy_test_runner.json",
+    "m14_config_path": "config/examples/m14_strategy_challenge_gate.json",
+    "m14_finalize_policy": "postmarket_only"
+  },
   "boundary": {
     "paper_simulated_only": true,
     "trading_connection": false,
