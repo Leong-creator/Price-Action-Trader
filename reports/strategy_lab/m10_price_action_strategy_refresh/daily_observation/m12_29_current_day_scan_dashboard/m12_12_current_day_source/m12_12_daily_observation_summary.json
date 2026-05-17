@@ -1,8 +1,8 @@
 {
-  "candidate_count": 26,
+  "candidate_count": 145,
   "deferred": [],
   "deferred_count": 0,
-  "generated_at": "2026-05-08T16:52:49Z",
+  "generated_at": "2026-05-15T23:58:45Z",
   "observation_event_count": 550,
   "schema_version": "m12.12.daily-observation-summary.v1",
   "stage": "M12.12.daily_observation_loop",

@@ -1,11 +1,11 @@
 {
   "approved_internal_sim_strategy_ids": [],
   "continue_without_stopping": true,
-  "data_quality_state": "degraded_no_fetch_or_fallback_quotes",
-  "generated_at": "2026-05-08T17:10:00Z",
+  "data_quality_state": "fully_ready",
+  "generated_at": "2026-05-15T23:58:45Z",
   "goal_complete": false,
   "goal_name": "Build a reliable strategy challenge and internal paper-trading gate",
   "next_action": "Continue the 10 NY trading-day challenge; do not modify baseline strategies unless a circuit breaker triggers.",
   "schema_version": "m14.goal-status.v1",
-  "trading_date": "2026-05-08"
+  "trading_date": "2026-05-15"
 }
