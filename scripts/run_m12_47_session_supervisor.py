@@ -511,21 +511,27 @@ def print_status(config: SupervisorConfig) -> int:
     stored = read_json_if_exists(status_path(config))
     stored_pid = int(stored.get("supervisor_pid") or read_existing_pid(config) or 0) if stored else (read_existing_pid(config) or 0)
     supervisor_alive = process_alive(stored_pid)
-    if stored and supervisor_alive:
-        payload = dict(stored)
-        payload["supervisor_process_alive"] = True
-    else:
-        payload = build_status_payload(
-            config,
-            phase=build_window_state(config),
-            supervisor_pid=stored_pid,
-            supervisor_process_alive=False,
-            child_pid=None,
-            child_running=False,
-            child_started_at="",
-            child_last_exit_code=None,
-            restart_count=int(stored.get("restart_count", 0)) if stored else 0,
-        )
+    child_pid = int(stored.get("child_pid") or 0) if stored else 0
+    child_running = bool(stored.get("child_running")) and process_alive(child_pid)
+    raw_exit_code = stored.get("child_last_exit_code") if stored else None
+    try:
+        child_last_exit_code = None if raw_exit_code in (None, "") else int(raw_exit_code)
+    except (TypeError, ValueError):
+        child_last_exit_code = None
+    payload = build_status_payload(
+        config,
+        phase=build_window_state(config),
+        supervisor_pid=stored_pid,
+        supervisor_process_alive=supervisor_alive,
+        child_pid=child_pid if child_running else None,
+        child_running=child_running,
+        child_started_at=stored.get("child_started_at", "") if stored else "",
+        child_last_exit_code=child_last_exit_code,
+        restart_count=int(stored.get("restart_count", 0)) if stored else 0,
+        failure_state=stored.get("failure_state", "") if stored else "",
+        failure_reason=stored.get("failure_reason", "") if stored else "",
+    )
+    write_status(config, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

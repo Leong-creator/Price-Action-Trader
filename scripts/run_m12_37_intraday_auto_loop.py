@@ -36,7 +36,7 @@ from scripts.m14_strategy_challenge_gate_lib import (  # noqa: E402
 
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_37_intraday_auto_loop.json"
 PREOPEN_NATIVE_FETCH_BUDGET = 100
-REGULAR_NATIVE_FETCH_BUDGET = 20
+REGULAR_NATIVE_FETCH_BUDGET = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +117,7 @@ def run_once(
     execute_fetch: bool = True,
     max_native_fetches: int | None = None,
     refresh_quotes: bool = True,
+    force_refresh_current_intraday: bool = False,
 ) -> dict[str, Any]:
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     m12_29_config = load_m12_29_config(config.source_m12_29_config_path)
@@ -126,6 +127,7 @@ def run_once(
         execute_fetch=execute_fetch,
         max_native_fetches=max_native_fetches,
         refresh_quotes=refresh_quotes,
+        force_refresh_current_intraday=force_refresh_current_intraday,
     )
     market = market_session_status(generated_at)
     post_run_strategy_ledgers = run_post_run_strategy_ledgers(
@@ -294,15 +296,31 @@ def should_run_m14_finalization(
     raise ValueError("Unsupported M14 finalize policy")
 
 
-def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: bool, no_refresh_quotes: bool) -> dict[str, Any]:
+def intraday_refresh_bucket(generated_at: str) -> str:
+    ny_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
+    bucket_minute = ny_dt.minute - (ny_dt.minute % 5)
+    return ny_dt.replace(minute=bucket_minute, second=0, microsecond=0).isoformat()
+
+
+def session_refresh_policy(
+    generated_at: str,
+    market_status: str,
+    *,
+    no_fetch: bool,
+    no_refresh_quotes: bool,
+    last_intraday_refresh_bucket: str | None = None,
+) -> dict[str, Any]:
     ny_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
     preopen_window = market_status == "盘前" and wall_time(9, 25) <= ny_dt.time() < wall_time(9, 30)
-    kline_refresh_due = market_status == "美股常规交易时段" and ny_dt.minute % 5 == 0
+    current_intraday_bucket = intraday_refresh_bucket(generated_at) if market_status == "美股常规交易时段" else ""
+    kline_refresh_due = market_status == "美股常规交易时段" and current_intraday_bucket != last_intraday_refresh_bucket
     if market_status == "美股常规交易时段":
         return {
             "execute_fetch": (not no_fetch) and kline_refresh_due,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": REGULAR_NATIVE_FETCH_BUDGET if (not no_fetch) and kline_refresh_due else 0,
+            "force_refresh_current_intraday": (not no_fetch) and kline_refresh_due,
+            "intraday_refresh_bucket": current_intraday_bucket,
             "continue_session": True,
             "entered_regular_session": True,
         }
@@ -311,6 +329,8 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
             "execute_fetch": not no_fetch,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": PREOPEN_NATIVE_FETCH_BUDGET if not no_fetch else 0,
+            "force_refresh_current_intraday": False,
+            "intraday_refresh_bucket": "",
             "continue_session": True,
             "entered_regular_session": False,
         }
@@ -319,6 +339,8 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
             "execute_fetch": False,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": 0,
+            "force_refresh_current_intraday": False,
+            "intraday_refresh_bucket": "",
             "continue_session": True,
             "entered_regular_session": False,
         }
@@ -327,6 +349,8 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
             "execute_fetch": False,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": 0,
+            "force_refresh_current_intraday": False,
+            "intraday_refresh_bucket": "",
             "continue_session": True,
             "entered_regular_session": True,
         }
@@ -334,6 +358,8 @@ def session_refresh_policy(generated_at: str, market_status: str, *, no_fetch: b
         "execute_fetch": False,
         "refresh_quotes": False,
         "max_native_fetches": 0,
+        "force_refresh_current_intraday": False,
+        "intraday_refresh_bucket": "",
         "continue_session": False,
         "entered_regular_session": False,
     }
@@ -371,6 +397,7 @@ def main() -> int:
     session_enabled = args.session and not args.once
     iteration = 0
     entered_regular_session = False
+    last_intraday_refresh_bucket: str | None = None
     while True:
         generated_at = args.generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         market = market_session_status(generated_at)
@@ -380,20 +407,24 @@ def main() -> int:
                 market["status"],
                 no_fetch=args.no_fetch,
                 no_refresh_quotes=args.no_refresh_quotes,
+                last_intraday_refresh_bucket=last_intraday_refresh_bucket,
             )
             execute_fetch = policy["execute_fetch"]
             refresh_quotes = policy["refresh_quotes"]
             max_native_fetches = policy["max_native_fetches"]
+            force_refresh_current_intraday = policy["force_refresh_current_intraday"]
         else:
             execute_fetch = not args.no_fetch
             refresh_quotes = not args.no_refresh_quotes
             max_native_fetches = args.max_native_fetches
+            force_refresh_current_intraday = False
         outcome = run_once(
             config,
             generated_at=generated_at,
             execute_fetch=execute_fetch,
             max_native_fetches=max_native_fetches,
             refresh_quotes=refresh_quotes,
+            force_refresh_current_intraday=force_refresh_current_intraday,
         )
         manifest = outcome["manifest"]
         print(json.dumps({
@@ -410,6 +441,8 @@ def main() -> int:
             "summary": manifest["plain_language_result"],
         }, ensure_ascii=False, indent=2, sort_keys=True))
         iteration += 1
+        if session_enabled and policy["execute_fetch"] and policy["intraday_refresh_bucket"]:
+            last_intraday_refresh_bucket = policy["intraday_refresh_bucket"]
         if not loop_enabled and not session_enabled:
             break
         if args.max_iterations and iteration >= args.max_iterations:

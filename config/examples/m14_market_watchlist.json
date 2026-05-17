@@ -1,0 +1,38 @@
+{
+  "schema_version": "m14.market-watchlist.v1",
+  "stage": "M14.1.market_watchlist_terminal",
+  "description": "Default broker-terminal watchlists for the M14.1 readonly dashboard. Watchlist membership is observation context only and never authorizes trading.",
+  "groups": [
+    {
+      "group_id": "core_etf",
+      "display_name": "核心指数/ETF",
+      "symbols": ["SPY", "QQQ", "DIA", "IWM", "SMH", "SOXX", "XLK"]
+    },
+    {
+      "group_id": "magnificent_seven",
+      "display_name": "美股七姐妹",
+      "symbols": ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA"]
+    },
+    {
+      "group_id": "ai_chips",
+      "display_name": "AI/芯片",
+      "symbols": ["NVDA", "AMD", "AVGO", "TSM", "ASML", "ARM", "SMCI", "QCOM", "INTC", "MRVL"]
+    },
+    {
+      "group_id": "memory_flash",
+      "display_name": "存储/闪存热点",
+      "symbols": ["MU", "SNDK", "WDC", "STX"]
+    }
+  ],
+  "news_review_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_41_close_earnings_news_review",
+  "m13_goal_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m13_real_daily_strategy_testing/m13_goal_status.json",
+  "m14_summary_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_challenge_summary.json",
+  "m14_paper_trial_gate_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+  "watchlist_drives_trading_signal": false,
+  "news_drives_trading_signal": false,
+  "paper_simulated_only": true,
+  "trading_connection": false,
+  "real_money_actions": false,
+  "live_execution": false,
+  "paper_trading_approval": false
+}

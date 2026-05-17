@@ -111,6 +111,8 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 for row in result["signal_ledger_rows"]
             }
             self.assertEqual(states[("M10-PA-004", "M10-PA-004-long-1d")], "zero_signal")
+            self.assertEqual(states[("M10-PA-004-MBF", "M10-PA-004-MBF-1d")], "zero_signal")
+            self.assertEqual(states[("M10-PA-004-MBF-QC", "M10-PA-004-MBF-QC-1d")], "zero_signal")
             self.assertEqual(states[("M10-PA-005", "M10-PA-005-1d")], "zero_signal")
             self.assertEqual(states[("M12-FTD-001", "M12-FTD-001-baseline-1d")], "signal_generated")
 

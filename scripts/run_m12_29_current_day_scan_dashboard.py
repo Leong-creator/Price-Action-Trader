@@ -26,6 +26,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-fetch", action="store_true", help="Do not call readonly Longbridge kline fetch; use existing cache only.")
     parser.add_argument("--max-native-fetches", type=int, default=None, help="Limit readonly native fetch calls.")
     parser.add_argument("--no-refresh-quotes", action="store_true", help="Do not call readonly Longbridge quote; use fallback quote data.")
+    parser.add_argument(
+        "--force-refresh-current-intraday",
+        action="store_true",
+        help="Refresh current-session 5m readonly kline cache even if a same-date cache already exists.",
+    )
     return parser.parse_args()
 
 
@@ -49,6 +54,7 @@ def main() -> int:
         execute_fetch=not args.no_fetch,
         max_native_fetches=args.max_native_fetches,
         refresh_quotes=not args.no_refresh_quotes,
+        force_refresh_current_intraday=args.force_refresh_current_intraday,
     )
     summary = result["summary"]
     print(

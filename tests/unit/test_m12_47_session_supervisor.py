@@ -2,14 +2,18 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.run_m12_47_session_supervisor import (
     build_failure_payload,
     build_status_payload,
     build_window_state,
     load_config,
+    print_status,
     should_trip_failure_breaker,
+    status_path,
 )
 
 
@@ -93,6 +97,33 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         )
         self.assertIn("连续 3 次", payload["failure_reason"])
         self.assertFalse(payload["live_execution"])
+
+    def test_print_status_persists_dead_supervisor_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            status_path(config).write_text(
+                json.dumps(
+                    {
+                        "supervisor_pid": 999999,
+                        "supervisor_process_alive": True,
+                        "child_pid": 999998,
+                        "child_running": True,
+                        "child_started_at": "2026-05-05T13:25:00Z",
+                        "child_last_exit_code": "",
+                        "restart_count": 0,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            with patch("sys.stdout", new=StringIO()):
+                print_status(config)
+            payload = json.loads(status_path(config).read_text(encoding="utf-8"))
+        self.assertFalse(payload["supervisor_process_alive"])
+        self.assertFalse(payload["child_running"])
+        self.assertIn("自动调度器没有运行", payload["plain_language_result"])
 
 
 if __name__ == "__main__":

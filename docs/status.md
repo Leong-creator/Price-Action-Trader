@@ -9,7 +9,7 @@
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：M14 稳定策略测试、自动调参决策与内部模拟准入
-- 当前子阶段：已从 M13 前置基线创建 `codex/m14-strategy-challenge-paper-gate`。M14 当前已新增 append-only challenge ledger、strategy decision ledger、internal paper trial gate、M14 dashboard 和内部模拟桥接；M12.37 已接入 `post_run_strategy_ledgers`，自动刷新后运行 M13，并默认只在盘后运行 M14 固化 challenge/gate；`2026-05-08` 样本已写入 `23` 条 challenge rows 和 `18` 条 decision rows，但因 M12 看板为 `fallback_quotes_only / current_day_runtime_ready=false / 第一批 50 只 0/50`，当前所有策略均未获准进入内部模拟成交。
+- 当前子阶段：已从 M13 前置基线创建 `codex/m14-strategy-challenge-paper-gate`。M14 当前已新增 append-only challenge ledger、strategy decision ledger、internal paper trial gate、M14 dashboard 和内部模拟桥接；M12.37 已接入 `post_run_strategy_ledgers`，自动刷新后运行 M13，并默认只在盘后运行 M14 固化 challenge/gate。`M10-PA-004` baseline 继续保持宽通道低位反转只做多口径；`M10-PA-004-MBF` 原始强势突破跟进实验账户继续独立跑满 10 个交易日；新增 `M10-PA-004-MBF-QC` 质量确认改进变体并行 A/B 测试，不覆盖 baseline 或原 MBF 结果。M14.1 当前新增券商式 `broker_terminal_view`、默认自选股/热点股配置和新闻/催化面板；自选股与新闻只用于观察、解释、优先级和复盘，不触发交易，也不能绕过 M14 `approved_internal_sim_only` gate。M14.1 同步修复账户 runtime 的共性平仓问题：fallback/cached/no-refresh quote 不再允许触发任何策略平仓，止损/止盈成交价统一按 stop/target 结算；已生成 `m12_46_account_trade_ledger_repair_audit.json` 记录旧账本修复。
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
@@ -496,7 +496,7 @@
 - M12.49 当前已把看板头部补成“北京时间最后更新 + 当前电脑时间 + 看板新鲜度 + 看板延迟秒数 + 自动会话 + 守护器进程 + 心跳延迟”；当前真实自检显示 `fresh / alive`，守护器 PID 与 M12.37 子会话 PID 均存活。
 - M12.49 当前已给 M12.47 加入连续失败熔断：M12.37 子会话连续 `3` 次非零退出后停止无限重启，并输出 `m12_47_session_failure_dossier.json`；避免坏进程反复刷半成品看板。
 - M12.49 当前已修复 PA004 正式账户方向字段兼容问题：PA004 检测器输出为中文 `看涨 / 看跌`，正式账户入口现在同时接受 `long / 看涨`，避免未来 PA004 做多信号被误过滤；2026-05-06 当天 PA004 做多仍为 `0` 条，原因是当天命中的 PA004 事件为做空方向，而 PA004 做空版仍冻结。
-- M12.49 当前已提高 M12.37 只读 K 线补数预算：盘前预热最多补 `100` 个 native fetch，盘中 5 分钟边界最多补 `20` 个 native fetch，避免 50 只股票长期只补到少数标的；报价刷新仍保持每 `60` 秒。
+- M12.49/M14.1 当前已修复看板数据刷新误报与补数节奏：M12.37 常规盘中 K 线补数预算从 `20` 提高到 `100`，并改为按 5 分钟 bucket 触发一次，而不是要求进程刚好命中 `minute % 5 == 0`；`5m_current` 可在 bucket 刷新时强制重拉，即使同日缓存已存在也会更新当日 5m bars。M12.29 freshness 阈值改为至少 `600` 秒，避免 first50 全量补数期间被误报 stale。真实刷新样本 `2026-05-14T15:27:25Z` 已恢复 `first50_daily_ready_symbols=50`、`first50_current_5m_ready_symbols=50`、`current_day_runtime_ready=true`、`data_freshness_warning=''`。
 - M12.49 当前已修复三类看板口径失真：`codex observer / auto runner manifest` 现在会按 `盘前 / 盘中 / 盘后 / 休市` 输出对应文案，不再把盘后快照说成“盘中只读模拟”；盘前/盘后异动 headline 只展示当前时段数据，非当前时段快照会显式隐藏；`m12_29_current_day_scan_summary.json` 新增 `current_day_runtime_ready` 与 `runtime_readiness_note`，把“严格 50/50 全齐”和“当前可运行”区分开来。
 - M12.49 当前已修复实验账户误报推进：`m12_46_account_input_audit.json` 新增 `current_scanner_connected / input_status`，未接入正式当日扫描输入的实验策略不再被写成 `formal_input_stream=true`；看板“实验账户”说明和 `m12_33_observation_run_status.json` 也同步改成真实口径，避免再把“0 开仓空转账户”误报成已完成实时测试。
 - M13 当前已完成 Step 0 工作区整理：在 `codex/m12-49-dashboard-runtime-hardening` 提交并推送 `d6c730f m12.49: archive latest runtime artifacts`，纳入 58 个运行产物文件和 `2026-05-01` 至 `2026-05-07` 的盘后新闻复盘证据。
@@ -505,7 +505,7 @@
 - M13 当前已修复 M12.46 scorecard 语义：`today_signal_count / today_opened_count / today_closed_count` 改为从当日交易账本统计，避免“今日开仓后又平仓”的账户被当前持仓快照误报为 0 信号。
 - M13 首次 runner 样本使用 `2026-05-07` 纽约交易日，输出 `24` 条策略/账户信号账本事件、`44` 条账户操作账本事件、`12` 次 open、`12` 次 close；该样本保留为接线前对照，当时 `M10-PA-005/007/008/009/011/013` 仍为 `not_connected` blocker。
 - M13 当前已接入实验策略最小 adapter：`M10-PA-005` 复用失败突破 range adapter，`M10-PA-007` 复用 M12.23 第二腿检测器，`M10-PA-008/009/013` 复用 M10.11 Wave B proxy detector，`M10-PA-011` 只保留 `5m` 开盘反转账户，不再用日线伪装开盘策略测试。
-- M13 最新 runner 样本使用 `2026-05-08` 纽约交易日，输出 `23` 条策略/账户信号账本事件、`25` 条账户操作账本事件、`3` 次 open、`3` 次 close；所有 required 策略都有账本状态且 `blocked_strategy_ids=[]`，`m13_goal_status.json` 中 `goal_complete=true`、`continue_without_stopping=false`。该结果只表示真实每日测试闭环已跑通，不代表 paper/live 批准。
+- M13 最新 runner 样本使用 `2026-05-13` 纽约交易日，输出 `24` 条策略/账户信号账本事件、`47` 条账户操作账本事件、`19` 次 open、`11` 次 close；所有 required 策略都有账本状态且 `blocked_strategy_ids=[]`。该结果只表示真实每日测试闭环已跑通，不代表 paper/live 批准。
 - M13 当前已明确 AI-Trader 边界：表现优秀的 AI-Trader agent/signal 只能作为公开或用户授权的外部候选信号源进入只读影子测试，不得 copy-trading、不得直接执行、不得把外部信号包装成自有策略。
 - M14 当前已新增 `config/examples/m14_strategy_challenge_gate.json`、`scripts/run_m14_strategy_challenge_gate.py` 与 `scripts/m14_strategy_challenge_gate_lib.py`，把 M13 当日账本滚入 append-only `m14_challenge_day_ledger.jsonl`，再输出 `m14_strategy_decision_ledger.jsonl`、`m14_paper_trial_gate.json`、`m14_strategy_challenge_summary.json`、`m14_goal_status.json` 与 `m14_strategy_challenge_dashboard.html`。
 - M14 当前已把策略决策固定为 `promote / modify / reject / continue_testing`；默认不满 `10` 个纽约交易日不得调策略定义，只有至少 `3` 个 signal days 后触发 `-2R`、`>3%` 最大回撤、风险拦截占比过高或重复数据缺口时才提前冻结/改版。
@@ -513,11 +513,16 @@
 - M12.29/M12.46 看板 HTML 当前已新增“数据刷新告警”，当 `fallback_quotes_only`、`--no-fetch`、`--no-refresh-quotes` 或 `current_day_runtime_ready=false` 时，会在页面顶部明确显示“看板数据未刷新 / fallback quotes / no-fetch”，避免把降级快照误判为完整策略测试。
 - M14 当前已新增单测与集成测试，覆盖 append-only challenge、fallback/no-fetch 不批准、亏损 baseline 创建新 variant、风险检查先于模拟成交、M13 daily ledger 滚入 M14 summary 与 dashboard 聚合一致。
 - M12.37 自动运行器当前已接入 M13/M14 后置链路：`--session` 或 `--once` 每次刷新后运行 M13 更新当日最新账本，M14 默认 `postmarket_only` 只在盘后固化 challenge/gate；所有输出仍保持只读模拟边界。
+- M14.1 当前已修复账户 runtime 的统一平仓语义：所有策略只有 `longbridge_quote_readonly` fresh quote 才能触发平仓，fallback/cached/no-refresh quote 只允许标记 `行情过期，暂停平仓`；止损/止盈成交按 stop/target 结算，不再使用穿透 stop/target 的最新价扩大亏损或盈利。旧账本已生成 `m12_46_account_trade_ledger_repair_audit.json`，其中 `2026-05-12T04:10:35Z` 的 `6` 条 fallback close 已作废，`58` 条旧版 stop/target close 已按 stop/target 纠偏；`M10-PA-004-MBF-1d` 当前恢复为 `3` 个 open position、`0` 笔 closed trade、总盈亏 `0.00`。
+- M14.1 当前已修复账户 runtime 的全量持仓估值缺口：既有持仓不再只依赖“当天新信号行”拿报价，而是同时消费第一批 `50` 只 readonly quote pool；因此没有新信号的旧持仓也会参与 fresh quote 估值、止损/止盈检查。`2026-05-12` 盘后重算后，M12 open position 状态全部为 `观察中`，不再有错误的 `行情过期，暂停平仓`；M13 当日账本更新为 `8` 次 open、`7` 次 close。M14 保持原始 challenge append-only 不覆盖，新增 `m14_challenge_day_correction_ledger.jsonl` 记录 `9` 条 5/12 修正行，并让 M14 聚合、decision 与 gate 使用修正后的有效 challenge rows；`strategy_decision_ledger` 的去重键也已纳入 PnL / R / drawdown / open-close counts，保证后续指标修正会追加新 decision 行而不是静默复用旧行。
+- M14.1 当前已按用户口径新增 `M10-PA-004-MBF-QC-1d` 并行改进账户：QC 版本要求更强日线涨幅、更强收盘位置、过滤过宽风险，并使用更近的 `1.5R` 目标；M14 circuit-breaker 对原 `M10-PA-004-MBF` 记录 `modify_candidate=true` 和 `next_variant_id=M10-PA-004-MBF-QC`，但不冻结原 MBF，原策略继续跑满 10 个交易日后再最终判断。
+- M14.1 当前已修复 M14 challenge 计数口径：`fallback/no-fetch/current_day_runtime_ready=false` 的降级日继续保留在 append-only ledger 做审计，但不再计入有效 `10` 个交易日 challenge，也不再永久污染后续 paper trial gate。`2026-05-08` 当前被保留为 audit-only degraded day；有效 fully-ready challenge 为 `2026-05-11` 至 `2026-05-15` 共 `5/10` 天，下一有效交易日从 `2026-05-18` 继续累计。M14 summary/dashboard 现在显式输出 `challenge_progress_label=5/10`、`effective_challenge_trading_days=5`，避免把审计账本里的降级日误读成已完成挑战。
+- M12.47 当前已修复 `--status` 状态回写：手动或自动执行 status 时会把真实 `supervisor_process_alive / child_running / market_status` 写回 `m12_47_session_supervisor_status.json`，避免周末继续显示上一次交易日的 alive 状态。当前北京时间 `2026-05-17 13:46:47` 状态为 `非交易日等待`，下次自动启动窗口为 `2026-05-18 21:25:00 CST`。
 
 ## 当前阻塞
 
 - 远端推送大文件阻塞已处理：M10.6 原始大 JSONL 已用 gzip archive manifest 保留可追溯，原始文件不再进入可推送历史；后续推送 `main` 不应再被该文件阻塞。
-- 当前 M14 已把“是否真的测试过”升级为 challenge/gate 口径；主要 blocker 是 `10` 个纽约真实交易日 challenge 尚未累计完成，且最近样本的 M12 看板仍是 fallback/no-fetch 降级数据。任何单日 open/close、zero_signal 或 M13 goal complete 都不能直接解释成可投入使用或可盈利。
+- 当前 M14 已把“是否真的测试过”升级为 challenge/gate 口径；主要 blocker 是有效 `10` 个纽约真实交易日 challenge 尚未累计完成。当前有效 fully-ready challenge 是 `5/10` 天，`2026-05-08` 降级样本只保留审计、不计入有效挑战。任何单日 open/close、zero_signal 或 M13 goal complete 都不能直接解释成可投入使用或可盈利。最近有效样本已恢复 `fully_ready`，但仍需要继续保持 fresh quote / full quote pool 估值。
 - M12.49 运行层 blocker 和 PA004 方向兼容 bug 已修复；M12.47 守护器可自动拉起 M12.37，盘前/盘中/盘后刷新看板；M12.37 已自动接入 M13 runner，M14 只在盘后固化 challenge/gate。
 - M11.7 模拟交易试运行仍有业务准入阻塞：还没有连续 `10` 个交易日的每日看板记录，且用户尚未批准进入模拟交易试运行。
 - 新闻/财报当前仍是 sidecar 第一版：Google 案例已覆盖，但生产级新闻/财报历史事件集尚未建立，不能把当前 `2` 条事件样本解释成完整新闻感知回测。

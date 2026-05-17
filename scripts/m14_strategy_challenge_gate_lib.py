@@ -26,6 +26,7 @@ from src.strategy.contracts import Signal
 
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m14_strategy_challenge_gate.json"
 CHALLENGE_LEDGER = "m14_challenge_day_ledger.jsonl"
+CHALLENGE_CORRECTION_LEDGER = "m14_challenge_day_correction_ledger.jsonl"
 DECISION_LEDGER = "m14_strategy_decision_ledger.jsonl"
 PAPER_GATE = "m14_paper_trial_gate.json"
 EXECUTION_LEDGER = "m14_internal_paper_execution_ledger.jsonl"
@@ -35,6 +36,10 @@ GOAL_STATUS_JSON = "m14_goal_status.json"
 GOAL_PROMPT_MD = "m14_goal_prompt.md"
 BLOCKER_STATES = {"not_connected", "detector_missing", "missing_data"}
 DECISIONS = {"promote", "modify", "reject", "continue_testing"}
+CHALLENGE_KEY_FIELDS = ("strategy_id", "runtime_id", "trading_date")
+PARALLEL_MODIFY_VARIANTS = {
+    "M10-PA-004-MBF": "M10-PA-004-MBF-QC",
+}
 ZERO = Decimal("0")
 ONE_HUNDRED = Decimal("100")
 
@@ -210,9 +215,18 @@ def run_m14_strategy_challenge_gate(
     appended_challenge_rows = append_unique_jsonl(
         challenge_path,
         new_challenge_rows,
-        key_fields=("strategy_id", "runtime_id", "trading_date"),
+        key_fields=CHALLENGE_KEY_FIELDS,
     )
-    challenge_rows = read_jsonl(challenge_path)
+    raw_challenge_rows = read_jsonl(challenge_path)
+    correction_path = config.output_dir / CHALLENGE_CORRECTION_LEDGER
+    appended_correction_rows = append_challenge_corrections(
+        correction_path,
+        new_challenge_rows,
+        raw_challenge_rows,
+        generated_at=generated_at,
+        key_fields=CHALLENGE_KEY_FIELDS,
+    )
+    challenge_rows = effective_challenge_rows(raw_challenge_rows, read_jsonl(correction_path), key_fields=CHALLENGE_KEY_FIELDS)
     strategy_aggregates = build_strategy_aggregates(config, challenge_rows)
     decision_rows = build_strategy_decision_rows(
         config=config,
@@ -224,7 +238,7 @@ def run_m14_strategy_challenge_gate(
     appended_decision_rows = append_unique_jsonl(
         decision_path,
         decision_rows,
-        key_fields=("strategy_id", "trading_date", "decision", "decision_reason"),
+        key_fields=("strategy_id", "trading_date", "decision", "decision_reason", "realized_pnl", "net_pnl_r", "max_drawdown_percent", "open_count", "close_count"),
     )
     latest_decisions = {row["strategy_id"]: row for row in decision_rows}
     paper_gate = build_paper_trial_gate(config, generated_at, latest_decisions, strategy_aggregates)
@@ -253,6 +267,7 @@ def run_m14_strategy_challenge_gate(
         data_quality=data_quality,
         challenge_rows=challenge_rows,
         appended_challenge_rows=appended_challenge_rows,
+        appended_correction_rows=appended_correction_rows,
         appended_decision_rows=appended_decision_rows,
         appended_execution_rows=appended_execution_rows,
         strategy_aggregates=strategy_aggregates,
@@ -270,8 +285,10 @@ def run_m14_strategy_challenge_gate(
         "summary": summary,
         "goal_status": goal_status,
         "challenge_rows": challenge_rows,
+        "raw_challenge_rows": raw_challenge_rows,
         "new_challenge_rows": new_challenge_rows,
         "appended_challenge_rows": appended_challenge_rows,
+        "appended_correction_rows": appended_correction_rows,
         "decision_rows": decision_rows,
         "appended_decision_rows": appended_decision_rows,
         "paper_gate": paper_gate,
@@ -365,8 +382,27 @@ def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, 
         by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in rows:
             by_date[str(row.get("trading_date", ""))].append(row)
+        valid_dates = sorted(
+            day
+            for day, day_rows in by_date.items()
+            if day and all(row.get("data_quality_state") == "fully_ready" for row in day_rows)
+        )
+        valid_date_set = set(valid_dates)
+        valid_rows = [row for row in rows if str(row.get("trading_date", "")) in valid_date_set]
         signal_days = sum(1 for day_rows in by_date.values() if sum(int_or_zero(row.get("signal_count")) for row in day_rows) > 0)
+        valid_signal_days = sum(
+            1
+            for day, day_rows in by_date.items()
+            if day in valid_date_set and sum(int_or_zero(row.get("signal_count")) for row in day_rows) > 0
+        )
         zero_signal_days = sum(
+            1
+            for day, day_rows in by_date.items()
+            if day in valid_date_set
+            and sum(int_or_zero(row.get("signal_count")) for row in day_rows) == 0
+            and any(row.get("test_state") == "zero_signal" for row in day_rows)
+        )
+        observed_zero_signal_days = sum(
             1
             for day_rows in by_date.values()
             if sum(int_or_zero(row.get("signal_count")) for row in day_rows) == 0
@@ -375,10 +411,10 @@ def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, 
         data_mismatch_days = sum(
             1 for day_rows in by_date.values() if any(row.get("data_quality_state") != "fully_ready" for row in day_rows)
         )
-        realized_pnl = sum((decimal_or_zero(row.get("realized_pnl")) for row in rows), ZERO)
-        total_signals = sum(int_or_zero(row.get("signal_count")) for row in rows)
-        risk_blocks = sum(int_or_zero(row.get("risk_blocked_count")) for row in rows)
-        max_drawdown = max((decimal_or_zero(row.get("max_drawdown_percent")) for row in rows), default=ZERO)
+        realized_pnl = sum((decimal_or_zero(row.get("realized_pnl")) for row in valid_rows), ZERO)
+        total_signals = sum(int_or_zero(row.get("signal_count")) for row in valid_rows)
+        risk_blocks = sum(int_or_zero(row.get("risk_blocked_count")) for row in valid_rows)
+        max_drawdown = max((decimal_or_zero(row.get("max_drawdown_percent")) for row in valid_rows), default=ZERO)
         latest = sorted(rows, key=lambda row: (str(row.get("trading_date", "")), str(row.get("generated_at", ""))))[-1]
         aggregates[strategy_id] = {
             "strategy_id": strategy_id,
@@ -387,16 +423,21 @@ def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, 
             "required_for_goal": bool(latest.get("required_for_goal", False)),
             "runtime_ids": sorted({str(row.get("runtime_id", "")) for row in rows if row.get("runtime_id")}),
             "variant_ids": sorted({str(row.get("variant_id", "")) for row in rows if row.get("variant_id")}),
-            "completed_trading_days": len(dates),
+            "observed_trading_days": len(dates),
+            "completed_trading_days": len(valid_dates),
             "required_trading_days": config.challenge_trading_days,
-            "progress_label": f"{min(len(dates), config.challenge_trading_days)}/{config.challenge_trading_days}",
+            "progress_label": f"{min(len(valid_dates), config.challenge_trading_days)}/{config.challenge_trading_days}",
             "first_trading_date": dates[0] if dates else "",
             "latest_trading_date": dates[-1] if dates else "",
-            "signal_days": signal_days,
+            "first_valid_trading_date": valid_dates[0] if valid_dates else "",
+            "latest_valid_trading_date": valid_dates[-1] if valid_dates else "",
+            "signal_days": valid_signal_days,
+            "observed_signal_days": signal_days,
             "zero_signal_days": zero_signal_days,
+            "observed_zero_signal_days": observed_zero_signal_days,
             "total_signal_count": total_signals,
-            "open_count": sum(int_or_zero(row.get("open_count")) for row in rows),
-            "close_count": sum(int_or_zero(row.get("close_count")) for row in rows),
+            "open_count": sum(int_or_zero(row.get("open_count")) for row in valid_rows),
+            "close_count": sum(int_or_zero(row.get("close_count")) for row in valid_rows),
             "risk_blocked_count": risk_blocks,
             "risk_block_ratio": fmt_decimal(safe_div(Decimal(risk_blocks), Decimal(max(total_signals, 1)))),
             "realized_pnl": money(realized_pnl),
@@ -438,9 +479,12 @@ def build_strategy_decision_rows(
                 "frozen": frozen,
                 "modify_candidate": modify_candidate,
                 "next_variant_id": variant,
+                "observed_trading_days": aggregate.get("observed_trading_days", aggregate["completed_trading_days"]),
                 "completed_trading_days": aggregate["completed_trading_days"],
                 "required_trading_days": config.challenge_trading_days,
+                "observed_signal_days": aggregate.get("observed_signal_days", aggregate["signal_days"]),
                 "signal_days": aggregate["signal_days"],
+                "observed_zero_signal_days": aggregate.get("observed_zero_signal_days", aggregate["zero_signal_days"]),
                 "zero_signal_days": aggregate["zero_signal_days"],
                 "total_signal_count": aggregate["total_signal_count"],
                 "open_count": aggregate["open_count"],
@@ -487,11 +531,18 @@ def decide_strategy(
 
     if signal_days >= config.circuit_breaker.min_signal_days:
         variant = f"{aggregate['strategy_id']}-m14-modify-{trading_date.strftime('%Y%m%d')}"
+        parallel_variant = PARALLEL_MODIFY_VARIANTS.get(str(aggregate["strategy_id"]))
         if net_pnl_r < config.circuit_breaker.net_pnl_r_threshold:
+            if parallel_variant:
+                return ("continue_testing", "parallel_modify_variant_started_continue_original_to_10d", True, False, True, parallel_variant)
             return ("modify", "net_pnl_below_minus_2r", True, True, True, variant)
         if max_drawdown > config.circuit_breaker.max_drawdown_percent_threshold:
+            if parallel_variant:
+                return ("continue_testing", "parallel_modify_variant_started_continue_original_to_10d", True, False, True, parallel_variant)
             return ("modify", "max_drawdown_above_3_percent", True, True, True, variant)
         if risk_block_ratio > config.circuit_breaker.risk_block_ratio_threshold:
+            if parallel_variant:
+                return ("continue_testing", "parallel_modify_variant_started_continue_original_to_10d", True, False, True, parallel_variant)
             return ("modify", "risk_blocks_dominate_signals", True, True, True, variant)
 
     if completed_days >= config.challenge_trading_days:
@@ -526,9 +577,15 @@ def build_paper_trial_gate(
         elif decision["decision"] == "reject":
             gate_status = "not_approved_rejected"
             reason = "Strategy is rejected for the current challenge window."
-        elif int(decision["data_mismatch_days"]) > 0:
+        elif decision["modify_candidate"]:
+            gate_status = "not_approved_parallel_modify_testing"
+            reason = "Circuit breaker noted; original continues to 10 trading days while the parallel modify variant is tested."
+        elif int(decision["data_mismatch_days"]) > 0 and int(decision["completed_trading_days"]) == 0:
             gate_status = "not_approved_data_quality"
-            reason = "Challenge includes no-fetch/fallback or incomplete current-day data."
+            reason = "No fully-ready challenge day is available yet; fallback/no-fetch days are audit-only."
+        elif int(decision["data_mismatch_days"]) > 0:
+            gate_status = "not_approved_challenge_incomplete"
+            reason = "Only fully-ready trading days count toward the 10-day challenge; degraded days are kept as audit-only."
         else:
             gate_status = "not_approved_challenge_incomplete"
             reason = "Strategy has not completed the required 10 NY trading-day challenge."
@@ -706,6 +763,7 @@ def build_summary(
     data_quality: dict[str, str],
     challenge_rows: list[dict[str, Any]],
     appended_challenge_rows: list[dict[str, Any]],
+    appended_correction_rows: list[dict[str, Any]],
     appended_decision_rows: list[dict[str, Any]],
     appended_execution_rows: list[dict[str, Any]],
     strategy_aggregates: dict[str, dict[str, Any]],
@@ -728,6 +786,11 @@ def build_summary(
         if strategy_aggregates[strategy_id]["required_for_goal"]
     ]
     approved = paper_gate["approved_internal_sim_strategy_ids"]
+    completed_day_counts = [int(row["completed_trading_days"]) for row in strategy_aggregates.values()]
+    required_completed_day_counts = [int(row["completed_trading_days"]) for row in required]
+    effective_completed_days = max(completed_day_counts, default=0)
+    required_min_effective_completed_days = min(required_completed_day_counts, default=0)
+    challenge_progress_label = f"{min(effective_completed_days, config.challenge_trading_days)}/{config.challenge_trading_days}"
     return {
         "schema_version": "m14.strategy-challenge-summary.v1",
         "stage": config.stage,
@@ -736,6 +799,7 @@ def build_summary(
         "m13_summary_ref": project_path(config.m13_output_dir / "m13_daily_strategy_test_summary.json"),
         "m12_dashboard_ref": project_path(config.m12_29_output_dir / "m12_32_minute_readonly_dashboard_data.json"),
         "challenge_ledger_ref": project_path(config.output_dir / CHALLENGE_LEDGER),
+        "challenge_correction_ledger_ref": project_path(config.output_dir / CHALLENGE_CORRECTION_LEDGER),
         "strategy_decision_ledger_ref": project_path(config.output_dir / DECISION_LEDGER),
         "paper_trial_gate_ref": project_path(config.output_dir / PAPER_GATE),
         "internal_paper_execution_ledger_ref": project_path(config.output_dir / EXECUTION_LEDGER),
@@ -748,10 +812,15 @@ def build_summary(
         "first50_daily_ready_symbols": m12_summary.get("first50_daily_ready_symbols", ""),
         "first50_current_5m_ready_symbols": m12_summary.get("first50_current_5m_ready_symbols", ""),
         "challenge_trading_days": config.challenge_trading_days,
+        "required_challenge_trading_days": config.challenge_trading_days,
+        "effective_challenge_trading_days": effective_completed_days,
+        "required_min_effective_challenge_trading_days": required_min_effective_completed_days,
+        "challenge_progress_label": challenge_progress_label,
         "strategy_count": len(strategy_aggregates),
         "required_strategy_count": len(required),
         "challenge_day_ledger_row_count": len(challenge_rows),
         "appended_challenge_day_row_count": len(appended_challenge_rows),
+        "appended_challenge_correction_row_count": len(appended_correction_rows),
         "appended_decision_row_count": len(appended_decision_rows),
         "appended_internal_paper_execution_row_count": len(appended_execution_rows),
         "strategies_completed_or_circuit_decided": sorted(completed_or_decided),
@@ -766,7 +835,8 @@ def build_summary(
         "live_execution": False,
         "paper_trading_approval": False,
         "plain_language_result": (
-            f"M14 has {len(challenge_rows)} append-only challenge rows. "
+            f"M14 effective challenge progress is {challenge_progress_label}. "
+            f"It has {len(challenge_rows)} append-only challenge rows including audit-only degraded days. "
             f"{len(approved)} strategies are approved for internal simulated trading only. "
             f"Data quality: {data_quality['warning'] or data_quality['state']}."
         ),
@@ -848,7 +918,7 @@ def build_dashboard_html(
     {warning_section}
     <div class="metrics">
       <section class="metric"><span>策略数</span><strong>{html.escape(str(summary['strategy_count']))}</strong></section>
-      <section class="metric"><span>挑战账本行</span><strong>{html.escape(str(summary['challenge_day_ledger_row_count']))}</strong></section>
+      <section class="metric"><span>有效挑战进度</span><strong>{html.escape(str(summary['challenge_progress_label']))}</strong></section>
       <section class="metric"><span>内部模拟准入</span><strong>{html.escape(str(summary['paper_trial_gate_approved_count']))}</strong></section>
       <section class="metric"><span>数据状态</span><strong>{html.escape(str(summary['data_quality_state']))}</strong></section>
     </div>
@@ -975,6 +1045,83 @@ def append_unique_jsonl(path: Path, rows: list[dict[str, Any]], *, key_fields: t
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
     return append_rows
+
+
+def append_challenge_corrections(
+    path: Path,
+    new_rows: list[dict[str, Any]],
+    raw_rows: list[dict[str, Any]],
+    *,
+    generated_at: str,
+    key_fields: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    base_keys = {row_key(row, key_fields) for row in raw_rows}
+    current_by_key = {row_key(row, key_fields): row for row in effective_challenge_rows(raw_rows, read_jsonl(path), key_fields=key_fields)}
+    append_rows: list[dict[str, Any]] = []
+    seen_new_keys: set[tuple[str, ...]] = set()
+    for row in new_rows:
+        key = row_key(row, key_fields)
+        if key not in base_keys or key in seen_new_keys:
+            continue
+        seen_new_keys.add(key)
+        current = current_by_key.get(key)
+        if current is not None and challenge_row_fingerprint(current) == challenge_row_fingerprint(row):
+            continue
+        correction = dict(row)
+        correction.update(
+            {
+                "correction_schema_version": "m14.challenge-day-correction.v1",
+                "correction_generated_at": generated_at,
+                "correction_reason": "source_daily_ledger_changed_for_existing_challenge_key",
+            }
+        )
+        append_rows.append(correction)
+    if append_rows:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            for row in append_rows:
+                handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    elif not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    return append_rows
+
+
+def effective_challenge_rows(
+    raw_rows: list[dict[str, Any]],
+    correction_rows: list[dict[str, Any]],
+    *,
+    key_fields: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    effective = [dict(row) for row in raw_rows]
+    index_by_key = {row_key(row, key_fields): index for index, row in enumerate(effective)}
+    for correction in correction_rows:
+        key = row_key(correction, key_fields)
+        corrected = {
+            item_key: item_value
+            for item_key, item_value in correction.items()
+            if not item_key.startswith("correction_")
+        }
+        if key in index_by_key:
+            effective[index_by_key[key]] = corrected
+        else:
+            index_by_key[key] = len(effective)
+            effective.append(corrected)
+    return effective
+
+
+def row_key(row: dict[str, Any], key_fields: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(str(row.get(field, "")) for field in key_fields)
+
+
+def challenge_row_fingerprint(row: dict[str, Any]) -> str:
+    ignored = {"generated_at", "run_id"}
+    payload = {
+        key: value
+        for key, value in row.items()
+        if key not in ignored and not key.startswith("correction_")
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def filter_rows_for_trading_date(rows: list[dict[str, Any]], trading_date: date) -> list[dict[str, Any]]:

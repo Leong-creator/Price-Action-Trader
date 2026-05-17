@@ -84,6 +84,35 @@
       "next_action": "Run the M12.23 tightened detector through daily experimental account ledger."
     },
     {
+      "strategy_id": "M10-PA-004-MBF",
+      "display_name": "PA004 momentum breakout follow-through experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m14_pa004_momentum_breakout_followthrough_adapter",
+      "detector_status": "connected",
+      "required_for_goal": false,
+      "runtime_accounts": [
+        {"runtime_id": "M10-PA-004-MBF-1d", "timeframe": "1d", "lane": "experimental", "variant_id": "momentum_breakout_followthrough"}
+      ],
+      "next_action": "Run as a separate A/B variant for strong gap/breakout follow-through; do not overwrite PA004 long-only broad-channel baseline."
+    },
+    {
+      "strategy_id": "M10-PA-004-MBF-QC",
+      "display_name": "PA004 momentum breakout quality-confirmed experimental runtime",
+      "module_role": "independent_runtime",
+      "detector_id": "m14_pa004_momentum_breakout_quality_confirmed_adapter",
+      "detector_status": "connected",
+      "required_for_goal": false,
+      "runtime_accounts": [
+        {
+          "runtime_id": "M10-PA-004-MBF-QC-1d",
+          "timeframe": "1d",
+          "lane": "experimental",
+          "variant_id": "momentum_breakout_quality_confirmed"
+        }
+      ],
+      "next_action": "Run as the first parallel modify variant for PA004-MBF after early losses; keep the original PA004-MBF account running to the 10-day challenge before final judgement."
+    },
+    {
       "strategy_id": "M10-PA-008",
       "display_name": "Visual strategy 008 experimental runtime",
       "module_role": "independent_runtime",

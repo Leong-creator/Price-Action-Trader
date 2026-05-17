@@ -225,6 +225,7 @@ def run_m12_12_daily_observation_loop(
     generated_at: str | None = None,
     execute_fetch: bool = True,
     max_native_fetches: int | None = None,
+    force_refresh_current_intraday: bool = False,
 ) -> dict[str, Any]:
     config = config or load_config()
     validate_config(config)
@@ -238,6 +239,7 @@ def run_m12_12_daily_observation_loop(
         generated_at=generated_at,
         execute_fetch=execute_fetch,
         max_native_fetches=max_native_fetches,
+        force_refresh_current_intraday=force_refresh_current_intraday,
     )
     cache_inventory, cache_summary = build_cache_inventory(config, symbols, generated_at, fetch_results)
     specs = load_specs()
@@ -348,6 +350,7 @@ def run_fetch_plan(
     generated_at: str,
     execute_fetch: bool,
     max_native_fetches: int | None,
+    force_refresh_current_intraday: bool = False,
 ) -> list[dict[str, Any]]:
     budget = config.fetch_policy.max_native_fetches if max_native_fetches is None else max_native_fetches
     fetch_enabled = execute_fetch and config.fetch_policy.allow_readonly_fetch
@@ -356,7 +359,12 @@ def run_fetch_plan(
     executed = 0
     for target in targets:
         existing = best_cache_file(config.local_data_roots, target.symbol, target.timeframe, target.target_start, target.target_end)
-        if existing and is_target_ready(existing, target.target_start, target.target_end):
+        force_current_intraday = (
+            force_refresh_current_intraday
+            and target.timeframe == "5m"
+            and target.fetch_mode == "current_regular_session_5m"
+        )
+        if existing and is_target_ready(existing, target.target_start, target.target_end) and not force_current_intraday:
             results.append(fetch_result(target, "already_ready", existing, generated_at, skipped_reason="cache_already_covers_target"))
             continue
         if not fetch_enabled:

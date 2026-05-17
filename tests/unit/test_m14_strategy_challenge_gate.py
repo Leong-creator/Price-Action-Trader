@@ -202,6 +202,50 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "not_approved_data_quality")
             self.assertIn("fallback quotes / no-fetch", second["summary"]["data_freshness_warning"])
 
+    def test_degraded_days_are_audit_only_and_do_not_poison_valid_challenge_progress(self):
+        temp, config, m13_dir, m12_dir, output_dir = self.build_dirs()
+        with temp:
+            degraded = self.base_challenge_row("2026-05-07")
+            degraded["data_quality_state"] = "degraded_no_fetch_or_fallback_quotes"
+            degraded["data_freshness_warning"] = "fallback quotes / no-fetch"
+            self.write_jsonl(output_dir / "m14_challenge_day_ledger.jsonl", [degraded])
+            self.write_fixture(m13_dir=m13_dir, m12_dir=m12_dir, trading_date="2026-05-08", data_ready=True)
+            result = run_m14_strategy_challenge_gate(config, generated_at="2026-05-08T17:00:00Z", trading_date="2026-05-08")
+            aggregate = result["strategy_aggregates"]["M10-PA-001"]
+            gate = {row["strategy_id"]: row for row in result["paper_gate"]["rows"]}
+            self.assertEqual(aggregate["observed_trading_days"], 2)
+            self.assertEqual(aggregate["completed_trading_days"], 1)
+            self.assertEqual(aggregate["data_mismatch_days"], 1)
+            self.assertEqual(result["summary"]["effective_challenge_trading_days"], 1)
+            self.assertEqual(result["summary"]["challenge_progress_label"], "1/10")
+            self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "not_approved_challenge_incomplete")
+            self.assertIn("fully-ready", gate["M10-PA-001"]["gate_reason"])
+
+    def test_challenge_corrections_are_appended_without_mutating_base_ledger(self):
+        temp, config, m13_dir, m12_dir, output_dir = self.build_dirs()
+        with temp:
+            self.write_fixture(m13_dir=m13_dir, m12_dir=m12_dir, data_ready=True)
+            first = run_m14_strategy_challenge_gate(config, generated_at="2026-05-08T17:00:00Z", trading_date="2026-05-08")
+            self.write_fixture(
+                m13_dir=m13_dir,
+                m12_dir=m12_dir,
+                data_ready=True,
+                account_event_type="close",
+                realized_pnl="-100.00",
+            )
+            second = run_m14_strategy_challenge_gate(config, generated_at="2026-05-08T18:00:00Z", trading_date="2026-05-08")
+            base_rows = read_jsonl(output_dir / "m14_challenge_day_ledger.jsonl")
+            correction_rows = read_jsonl(output_dir / "m14_challenge_day_correction_ledger.jsonl")
+            self.assertEqual(len(base_rows), 2)
+            self.assertEqual(second["summary"]["appended_challenge_day_row_count"], 0)
+            self.assertEqual(second["summary"]["appended_challenge_correction_row_count"], 1)
+            self.assertEqual(len(correction_rows), 1)
+            self.assertEqual(correction_rows[0]["runtime_id"], "M10-PA-001-1d")
+            self.assertEqual(correction_rows[0]["realized_pnl"], "-100.00")
+            aggregate = second["strategy_aggregates"]["M10-PA-001"]
+            self.assertEqual(aggregate["net_pnl_r"], "-1")
+            self.assertEqual(first["summary"]["appended_challenge_day_row_count"], 2)
+
     def test_losing_baseline_creates_modify_variant_without_mutating_history(self):
         temp, config, _, _, _ = self.build_dirs()
         with temp:
@@ -222,6 +266,43 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.assertTrue(decision["circuit_breaker_triggered"])
             self.assertTrue(decision["frozen"])
             self.assertEqual(decision["next_variant_id"], "M10-PA-001-m14-modify-20260508")
+
+    def test_pa004_mbf_starts_parallel_variant_but_original_keeps_testing(self):
+        temp, config, _, _, _ = self.build_dirs()
+        with temp:
+            aggregates = {
+                "M10-PA-004-MBF": {
+                    "strategy_id": "M10-PA-004-MBF",
+                    "display_name": "PA004 momentum breakout follow-through experimental runtime",
+                    "module_role": "independent_runtime",
+                    "required_for_goal": False,
+                    "completed_trading_days": 3,
+                    "signal_days": 3,
+                    "zero_signal_days": 0,
+                    "total_signal_count": 5,
+                    "open_count": 5,
+                    "close_count": 3,
+                    "realized_pnl": "-300.00",
+                    "net_pnl_r": "-3",
+                    "max_drawdown_percent": "2.01",
+                    "risk_blocked_count": 0,
+                    "risk_block_ratio": "0",
+                    "data_mismatch_days": 0,
+                }
+            }
+            decisions = build_strategy_decision_rows(
+                config=config,
+                generated_at="2026-05-13T20:00:00Z",
+                trading_date=date.fromisoformat("2026-05-13"),
+                aggregates=aggregates,
+            )
+            decision = decisions[0]
+            self.assertEqual(decision["decision"], "continue_testing")
+            self.assertEqual(decision["decision_reason"], "parallel_modify_variant_started_continue_original_to_10d")
+            self.assertTrue(decision["circuit_breaker_triggered"])
+            self.assertFalse(decision["frozen"])
+            self.assertTrue(decision["modify_candidate"])
+            self.assertEqual(decision["next_variant_id"], "M10-PA-004-MBF-QC")
 
     def test_promoted_strategy_uses_risk_before_internal_simulated_fill(self):
         temp, config, m13_dir, m12_dir, output_dir = self.build_dirs()

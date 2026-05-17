@@ -5,6 +5,7 @@ import csv
 import html
 import json
 import os
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -47,6 +48,7 @@ from src.data import OhlcvRow  # noqa: E402
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_29_current_day_scan_dashboard.json"
+MARKET_WATCHLIST_CONFIG_PATH = ROOT / "config" / "examples" / "m14_market_watchlist.json"
 OUTPUT_DIR = M10_DIR / "daily_observation" / "m12_29_current_day_scan_dashboard"
 MONEY = Decimal("0.01")
 PERCENT = Decimal("0.01")
@@ -59,7 +61,18 @@ DEFAULT_EQUITY = DEFAULT_ACCOUNT_EQUITY
 DEFAULT_RISK_BUDGET = DEFAULT_ACCOUNT_RISK_BUDGET
 MAX_GENERATED_AT_FUTURE_SKEW_SECONDS = 90
 MAINLINE_STRATEGIES = ("M10-PA-001", "M10-PA-002", "M10-PA-004", "M10-PA-012", "M12-FTD-001")
-EXPERIMENTAL_STRATEGIES = ("M10-PA-005", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013")
+PA004_MOMENTUM_VARIANT_ID = "M10-PA-004-MBF"
+PA004_MOMENTUM_QUALITY_VARIANT_ID = "M10-PA-004-MBF-QC"
+EXPERIMENTAL_STRATEGIES = (
+    "M10-PA-005",
+    "M10-PA-007",
+    PA004_MOMENTUM_VARIANT_ID,
+    PA004_MOMENTUM_QUALITY_VARIANT_ID,
+    "M10-PA-008",
+    "M10-PA-009",
+    "M10-PA-011",
+    "M10-PA-013",
+)
 EXPERIMENTAL_ADAPTER_STRATEGIES = frozenset(EXPERIMENTAL_STRATEGIES)
 CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES) | EXPERIMENTAL_ADAPTER_STRATEGIES
 WAVE_B_ADAPTER_STRATEGIES = frozenset({"M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013"})
@@ -70,6 +83,17 @@ TIMEFRAME_LABELS = {
     "5m": "5m 五分钟测试",
 }
 EXTENDED_SESSION_MOVE_THRESHOLD = Decimal("3")
+RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES = frozenset({"longbridge_quote_readonly"})
+DEFAULT_MARKET_WATCHLIST_GROUPS = (
+    {"group_id": "core_etf", "display_name": "核心指数/ETF", "symbols": ("SPY", "QQQ", "DIA", "IWM", "SMH", "SOXX", "XLK")},
+    {"group_id": "magnificent_seven", "display_name": "美股七姐妹", "symbols": ("AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA")},
+    {"group_id": "ai_chips", "display_name": "AI/芯片", "symbols": ("NVDA", "AMD", "AVGO", "TSM", "ASML", "ARM", "SMCI", "QCOM", "INTC", "MRVL")},
+    {"group_id": "memory_flash", "display_name": "存储/闪存热点", "symbols": ("MU", "SNDK", "WDC", "STX")},
+)
+WATCHLIST_ALIASES = {
+    "GOOGL": ("GOOGL", "GOOG"),
+    "GOOG": ("GOOG", "GOOGL"),
+}
 EXTENDED_SESSION_FOCUS_LABELS = {
     "AMD": "AMD / AI 芯片",
     "NVDA": "英伟达 / AI 芯片",
@@ -94,6 +118,8 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-005-1d", "strategy_id": "M10-PA-005", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-005 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-005-5m", "strategy_id": "M10-PA-005", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-005 五分钟实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-007-1d", "strategy_id": "M10-PA-007", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-007 日线实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-004-MBF-1d", "strategy_id": PA004_MOMENTUM_VARIANT_ID, "timeframe": "1d", "lane": "experimental", "display_name": "PA004 强势突破跟进实验账户", "variant_id": "momentum_breakout_followthrough"},
+    {"account_id": "M10-PA-004-MBF-QC-1d", "strategy_id": PA004_MOMENTUM_QUALITY_VARIANT_ID, "timeframe": "1d", "lane": "experimental", "display_name": "PA004 强势突破质量确认实验账户", "variant_id": "momentum_breakout_quality_confirmed"},
     {"account_id": "M10-PA-008-1d", "strategy_id": "M10-PA-008", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-008 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-009-1d", "strategy_id": "M10-PA-009", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-009 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-011-5m", "strategy_id": "M10-PA-011", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-011 五分钟实验账户", "variant_id": "base"},
@@ -216,6 +242,7 @@ def run_m12_29_current_day_scan_dashboard(
     execute_fetch: bool = True,
     max_native_fetches: int | None = None,
     refresh_quotes: bool = True,
+    force_refresh_current_intraday: bool = False,
 ) -> dict[str, Any]:
     config = config or load_config()
     validate_config(config)
@@ -239,6 +266,7 @@ def run_m12_29_current_day_scan_dashboard(
         generated_at=generated_at,
         execute_fetch=execute_fetch,
         max_native_fetches=max_native_fetches,
+        force_refresh_current_intraday=force_refresh_current_intraday,
     )
 
     first50 = load_json(source_dir / "m12_12_first50_universe.json")["symbols"]
@@ -264,6 +292,7 @@ def run_m12_29_current_day_scan_dashboard(
         pa004_formal_rows,
         closure_rows,
         runtime_readiness["runtime_ready"],
+        quotes=quotes,
     )
     summary = build_accountized_summary(
         config,
@@ -598,6 +627,10 @@ def experimental_rows_for_spec(
         return pa005_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id == "M10-PA-007":
         return pa007_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, generated_at, scan_date)
+    if strategy_id == PA004_MOMENTUM_VARIANT_ID:
+        return pa004_momentum_breakout_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
+    if strategy_id == PA004_MOMENTUM_QUALITY_VARIANT_ID:
+        return pa004_momentum_breakout_quality_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id in WAVE_B_ADAPTER_STRATEGIES:
         return wave_b_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     return []
@@ -744,6 +777,164 @@ def wave_b_adapter_rows(
     return rows
 
 
+def pa004_momentum_breakout_rows(
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    scan_date: date,
+) -> list[dict[str, str]]:
+    signal = pa004_momentum_breakout_signal(symbol=symbol, bars=bars, scan_date=scan_date)
+    if signal is None:
+        return []
+    entry = signal["entry"]
+    stop = signal["stop"]
+    target = signal["target"]
+    latest = quote_latest_or_entry(quotes, symbol, entry)
+    return [
+        experimental_adapter_trade_row(
+            strategy_id=spec["strategy_id"],
+            strategy_title="PA004 强势突破跟进（实验账户）",
+            symbol=symbol,
+            timeframe=spec["timeframe"],
+            direction="看涨",
+            signal_time=str(signal["signal_time"]),
+            signal_date=scan_date,
+            entry=entry,
+            stop=stop,
+            target=target,
+            latest=latest,
+            latest_price_source=quotes.get(symbol, {}).get("quote_source", "candidate_reference_fallback"),
+            cache_path=cache_path,
+            checksum=checksum,
+            spec_ref="reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_27_pa004_retest_live_snapshot/m12_27_pa004_retest_live_snapshot_summary.json#pa004_momentum_breakout_followthrough",
+            source_refs="reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-004.json;reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_27_pa004_retest_live_snapshot/m12_27_pa004_retest_live_snapshot_summary.json",
+            context="m14_pa004_momentum_breakout_followthrough_adapter",
+            review_status="PA004-MBF 是独立实验变体：只处理强势突破/跳空后跟进，不改变 PA004 宽通道低位反转 baseline。",
+            risk_level="中高",
+            variant_id="momentum_breakout_followthrough",
+        )
+    ]
+
+
+def pa004_momentum_breakout_signal(symbol: str, bars: list[Any], scan_date: date) -> dict[str, Decimal | str] | None:
+    return pa004_momentum_breakout_signal_with_thresholds(
+        symbol=symbol,
+        bars=bars,
+        scan_date=scan_date,
+        min_close_to_close_percent=Decimal("3.00"),
+        min_gap_percent=Decimal("2.50"),
+        min_gap_close_to_close_percent=Decimal("1.50"),
+        min_close_position=Decimal("0.25"),
+        max_risk_percent=None,
+        target_r=Decimal("2"),
+    )
+
+
+def pa004_momentum_breakout_quality_rows(
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    scan_date: date,
+) -> list[dict[str, str]]:
+    signal = pa004_momentum_breakout_quality_signal(symbol=symbol, bars=bars, scan_date=scan_date)
+    if signal is None:
+        return []
+    entry = signal["entry"]
+    stop = signal["stop"]
+    target = signal["target"]
+    latest = quote_latest_or_entry(quotes, symbol, entry)
+    return [
+        experimental_adapter_trade_row(
+            strategy_id=spec["strategy_id"],
+            strategy_title="PA004 强势突破质量确认（实验账户）",
+            symbol=symbol,
+            timeframe=spec["timeframe"],
+            direction="看涨",
+            signal_time=str(signal["signal_time"]),
+            signal_date=scan_date,
+            entry=entry,
+            stop=stop,
+            target=target,
+            latest=latest,
+            latest_price_source=quotes.get(symbol, {}).get("quote_source", "candidate_reference_fallback"),
+            cache_path=cache_path,
+            checksum=checksum,
+            spec_ref="reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_27_pa004_retest_live_snapshot/m12_27_pa004_retest_live_snapshot_summary.json#pa004_momentum_breakout_quality_confirmed",
+            source_refs="reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-004.json;reports/strategy_lab/m10_price_action_strategy_refresh/visual_detectors/m12_27_pa004_retest_live_snapshot/m12_27_pa004_retest_live_snapshot_summary.json",
+            context="m14_pa004_momentum_breakout_quality_confirmed_adapter",
+            review_status="PA004-MBF-QC 是 MBF 的并行改进变体：要求更强收盘位置、更强涨幅且过滤过宽风险；原 MBF 继续独立跑满 10 个交易日。",
+            risk_level="中",
+            variant_id="momentum_breakout_quality_confirmed",
+        )
+    ]
+
+
+def pa004_momentum_breakout_quality_signal(symbol: str, bars: list[Any], scan_date: date) -> dict[str, Decimal | str] | None:
+    return pa004_momentum_breakout_signal_with_thresholds(
+        symbol=symbol,
+        bars=bars,
+        scan_date=scan_date,
+        min_close_to_close_percent=Decimal("4.00"),
+        min_gap_percent=Decimal("3.00"),
+        min_gap_close_to_close_percent=Decimal("2.50"),
+        min_close_position=Decimal("0.60"),
+        max_risk_percent=Decimal("5.50"),
+        target_r=Decimal("1.50"),
+    )
+
+
+def pa004_momentum_breakout_signal_with_thresholds(
+    *,
+    symbol: str,
+    bars: list[Any],
+    scan_date: date,
+    min_close_to_close_percent: Decimal,
+    min_gap_percent: Decimal,
+    min_gap_close_to_close_percent: Decimal,
+    min_close_position: Decimal,
+    max_risk_percent: Decimal | None,
+    target_r: Decimal,
+) -> dict[str, Decimal | str] | None:
+    if symbol in {"SQQQ", "TQQQ"} or len(bars) < 2:
+        return None
+    latest = bars[-1]
+    previous = bars[-2]
+    latest_date = iso_to_ny_trading_date(str(latest.timestamp))
+    if latest_date != scan_date:
+        return None
+    previous_close = Decimal(str(previous.close))
+    open_price = Decimal(str(latest.open))
+    high = Decimal(str(latest.high))
+    low = Decimal(str(latest.low))
+    close = Decimal(str(latest.close))
+    if previous_close <= ZERO or high <= ZERO or low <= ZERO or close <= ZERO or high <= low:
+        return None
+    close_to_close_percent = (close - previous_close) / previous_close * HUNDRED
+    gap_percent = (open_price - previous_close) / previous_close * HUNDRED
+    close_position = (close - low) / (high - low)
+    strong_followthrough = close_to_close_percent >= min_close_to_close_percent
+    strong_gap_hold = gap_percent >= min_gap_percent and close_to_close_percent >= min_gap_close_to_close_percent
+    if not (strong_followthrough or strong_gap_hold):
+        return None
+    if close_position < min_close_position:
+        return None
+    entry = close
+    risk = max(entry - low, entry * Decimal("0.025"))
+    if risk <= ZERO:
+        return None
+    if max_risk_percent is not None and (risk / entry) * HUNDRED > max_risk_percent:
+        return None
+    stop = entry - risk
+    target = entry + risk * target_r
+    return {"signal_time": str(latest.timestamp), "entry": entry, "stop": stop, "target": target}
+
+
 def bars_to_ohlcv_rows(bars: list[Any]) -> list[OhlcvRow]:
     rows: list[OhlcvRow] = []
     for bar in bars:
@@ -799,13 +990,14 @@ def experimental_adapter_trade_row(
     context: str,
     review_status: str,
     risk_level: str,
+    variant_id: str = "m13_experimental_adapter",
 ) -> dict[str, str]:
     direction_label = direction if direction in {"看涨", "看跌"} else direction_zh(direction)
     qty = quantity_from_prices(entry, stop)
     pnl = simulated_pnl(direction_label, latest, entry, qty)
     return {
         "strategy_id": strategy_id,
-        "variant_id": "m13_experimental_adapter",
+        "variant_id": variant_id,
         "strategy_title": strategy_title,
         "symbol": symbol,
         "timeframe": timeframe,
@@ -1147,8 +1339,19 @@ def account_signal_id(spec: dict[str, str], row: dict[str, str]) -> str:
     )
 
 
-def build_quote_lookup(trade_rows: list[dict[str, str]], pa004_formal_rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+def build_quote_lookup(
+    trade_rows: list[dict[str, str]],
+    pa004_formal_rows: list[dict[str, str]],
+    quotes: dict[str, dict[str, str]] | None = None,
+) -> dict[str, dict[str, str]]:
     lookup: dict[str, dict[str, str]] = {}
+    for symbol, quote in (quotes or {}).items():
+        if not symbol:
+            continue
+        lookup[symbol] = {
+            "latest_price": quote.get("latest_price", ""),
+            "latest_price_source": quote.get("quote_source", ""),
+        }
     for row in trade_rows + pa004_formal_rows:
         symbol = row.get("symbol", "")
         if not symbol:
@@ -1158,6 +1361,10 @@ def build_quote_lookup(trade_rows: list[dict[str, str]], pa004_formal_rows: list
             "latest_price_source": row.get("latest_price_source", ""),
         }
     return lookup
+
+
+def quote_source_allows_runtime_close(source: str) -> bool:
+    return source in RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES
 
 
 def holding_days_limit(spec: dict[str, str], history: dict[str, str]) -> int:
@@ -1224,6 +1431,7 @@ def open_new_positions(
             "stop_price": money(stop),
             "target_price": money(target),
             "latest_price": money(latest or entry),
+            "latest_price_source": row.get("latest_price_source", ""),
             "quantity": str(qty),
             "reserved_notional": money(reserved_notional),
             "current_pnl": money(ZERO),
@@ -1265,28 +1473,44 @@ def mark_position_to_market(
     scan_date: date,
     max_holding_days: int,
 ) -> dict[str, Any] | None:
-    latest = money_to_decimal(quote_lookup.get(position["symbol"], {}).get("latest_price") or position.get("latest_price", ""))
-    if latest > ZERO:
+    quote = quote_lookup.get(position["symbol"], {})
+    quote_source = quote.get("latest_price_source", "")
+    close_allowed = quote_source_allows_runtime_close(quote_source)
+    latest = money_to_decimal(quote.get("latest_price") or position.get("latest_price", ""))
+    if latest > ZERO and close_allowed:
         position["latest_price"] = money(latest)
+        position["latest_price_source"] = quote_source
     entry = money_to_decimal(position["entry_price"])
     stop = money_to_decimal(position["stop_price"])
     target = money_to_decimal(position["target_price"])
     qty = decimal_or_none(position["quantity"]) or ZERO
     direction = position.get("direction", "")
+    if not close_allowed:
+        stale_latest = money_to_decimal(position.get("latest_price", ""))
+        stale_pnl = simulated_pnl(direction, stale_latest, entry, qty)
+        position["current_pnl"] = money(stale_pnl)
+        position["current_state"] = "行情过期，暂停平仓"
+        position["mark_to_market_blocker"] = "stale_quote_blocked_mark_to_market"
+        position["blocked_quote_source"] = quote_source or position.get("latest_price_source", "")
+        return None
     pnl = simulated_pnl(direction, latest, entry, qty)
     position["current_pnl"] = money(pnl)
     position["current_state"] = simulated_state(direction, latest, stop, target)
     signal_date = parse_iso_date(position.get("signal_date", ""))
+    exit_price = latest
     if spec["timeframe"] == "5m" and signal_date and scan_date > signal_date:
         exit_reason = "次日超时退出"
     elif signal_date and (scan_date - signal_date).days >= max_holding_days:
         exit_reason = "持仓到期退出"
     elif position["current_state"] == "触及止损参考":
         exit_reason = "止损"
+        exit_price = stop
     elif position["current_state"] == "触及目标参考":
         exit_reason = "止盈"
+        exit_price = target
     else:
         return None
+    pnl = simulated_pnl(direction, exit_price, entry, qty)
     reserved = money_to_decimal(position["reserved_notional"])
     cash = money_to_decimal(account["cash"])
     account["cash"] = money(cash + reserved + pnl)
@@ -1299,7 +1523,8 @@ def mark_position_to_market(
         "event_time": generated_at,
         "direction": direction,
         "entry_price": position["entry_price"],
-        "exit_price": money(latest),
+        "exit_price": money(exit_price),
+        "exit_price_source": quote_source,
         "stop_price": position["stop_price"],
         "target_price": position["target_price"],
         "quantity": position["quantity"],
@@ -1376,12 +1601,13 @@ def advance_account_runtime(
     closure_rows: list[dict[str, str]],
     current_day_runtime_ready: bool | None = None,
     current_day_complete: bool | None = None,
+    quotes: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     if current_day_runtime_ready is None:
         current_day_runtime_ready = bool(current_day_complete)
     state = load_account_runtime_state(config)
     history_lookup = build_account_history_lookup(config, closure_rows)
-    quote_lookup = build_quote_lookup(trade_rows, pa004_formal_rows)
+    quote_lookup = build_quote_lookup(trade_rows, pa004_formal_rows, quotes)
     existing_ledger_rows = read_jsonl(config.output_dir / "m12_46_account_trade_ledger.jsonl")
     new_ledger_rows: list[dict[str, Any]] = []
     account_rows: list[dict[str, Any]] = []
@@ -1936,6 +2162,464 @@ def source_config_output_path(config: M1229Config, filename: str) -> Path:
     return config.output_dir / "m12_12_current_day_source" / filename
 
 
+def load_market_watchlist_config(path: str | Path = MARKET_WATCHLIST_CONFIG_PATH) -> dict[str, Any]:
+    config_path = resolve_repo_path(path)
+    if not config_path.exists():
+        return {
+            "schema_version": "m14.market-watchlist.v1",
+            "stage": "M14.1.market_watchlist_terminal",
+            "groups": [
+                {"group_id": group["group_id"], "display_name": group["display_name"], "symbols": list(group["symbols"])}
+                for group in DEFAULT_MARKET_WATCHLIST_GROUPS
+            ],
+            "news_review_dir": project_path(M10_DIR / "daily_observation" / "m12_41_close_earnings_news_review"),
+        }
+    payload = load_json(config_path)
+    payload.setdefault(
+        "groups",
+        [
+            {"group_id": group["group_id"], "display_name": group["display_name"], "symbols": list(group["symbols"])}
+            for group in DEFAULT_MARKET_WATCHLIST_GROUPS
+        ],
+    )
+    return payload
+
+
+def build_broker_terminal_view(
+    config: M1229Config,
+    generated_at: str,
+    summary: dict[str, Any],
+    runtime: dict[str, Any],
+    extended_session_monitor: dict[str, Any],
+    trade_ledger_rows: list[dict[str, str]],
+    update_status: dict[str, str],
+) -> dict[str, Any]:
+    watchlist_config = load_market_watchlist_config()
+    m14_context = load_m14_terminal_context(config)
+    news_panel = build_news_catalyst_panel(watchlist_config, runtime, trade_ledger_rows)
+    watchlists = build_terminal_watchlists(
+        watchlist_config,
+        runtime,
+        trade_ledger_rows,
+        extended_session_monitor,
+        news_panel["symbol_news_counts"],
+    )
+    account_rows = build_terminal_account_rows(runtime, m14_context)
+    pa004_rows = [
+        row for row in account_rows
+        if row["runtime_id"] in {"M10-PA-004-long-1d", "M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"}
+    ]
+    data_freshness_warning = summary.get("data_freshness_warning", "")
+    fully_ready = not data_freshness_warning and bool(summary.get("current_day_runtime_ready")) and bool(summary.get("current_day_scan_complete"))
+    return {
+        "schema_version": "m14.1.broker-terminal-view.v1",
+        "stage": "M14.1.broker_terminal_dashboard",
+        "generated_at": generated_at,
+        "title": "券商式策略交易终端",
+        "top_status": {
+            "market_status": update_status["market_status"],
+            "beijing_time": update_status["beijing_time"],
+            "new_york_time": update_status["new_york_time"],
+            "runtime_status": update_status["runtime_status"],
+            "session_liveness": update_status["session_liveness"],
+            "freshness_state": update_status["freshness_state"],
+            "m13_goal_status": m14_context["m13_goal_status"],
+            "m14_goal_status": m14_context["m14_goal_status"],
+            "paper_trial_gate_approved_count": m14_context["paper_trial_gate_approved_count"],
+            "fully_ready_for_trading_display": str(fully_ready).lower(),
+            "data_freshness_warning": data_freshness_warning,
+        },
+        "strategy_accounts": account_rows,
+        "open_positions": [row for row in trade_ledger_rows if row.get("record_type") == "open_position"],
+        "recent_orders_or_fills": trade_ledger_rows[:80],
+        "signal_panel": runtime["signal_watchlist"][:120],
+        "pa004_comparison": {
+            "plain_language_result": "PA004 baseline 保持宽通道低位反转只做多；PA004-MBF 原始强势突破变体继续跑满 10 天；PA004-MBF-QC 是更严格的质量确认并行改进变体，三者独立入账。",
+            "rows": pa004_rows,
+        },
+        "watchlists": watchlists,
+        "news_panel": news_panel,
+        "audit_drawer": {
+            "m13_goal_ref": project_path(m14_context["m13_goal_path"]),
+            "m14_summary_ref": project_path(m14_context["m14_summary_path"]),
+            "m14_paper_trial_gate_ref": project_path(m14_context["m14_gate_path"]),
+            "account_input_audit_ref": project_path(config.output_dir / "m12_46_account_input_audit.json"),
+            "legacy_dashboard_ref": project_path(config.output_dir / "m12_32_minute_readonly_dashboard_data.json"),
+        },
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_terminal_account_rows(runtime: dict[str, Any], m14_context: dict[str, Any]) -> list[dict[str, str]]:
+    audit_by_runtime = {row["runtime_id"]: row for row in runtime["account_input_audit_rows"]}
+    rows: list[dict[str, str]] = []
+    for row in runtime["account_rows"]:
+        total_pnl = money(money_to_decimal(row["equity"]) - money_to_decimal(row["starting_capital"]))
+        audit = audit_by_runtime.get(row["runtime_id"], {})
+        gate = m14_context["paper_gate_by_strategy"].get(row["strategy_id"], {})
+        decision = m14_context["decision_by_strategy"].get(row["strategy_id"], {})
+        rows.append(
+            {
+                "runtime_id": row["runtime_id"],
+                "display_name": row["display_name"],
+                "strategy_id": row["strategy_id"],
+                "lane": row["lane"],
+                "timeframe": row["timeframe"],
+                "variant_id": row.get("variant_id", ""),
+                "status": terminal_account_status(row, audit),
+                "today_total_pnl": row["today_total_pnl"],
+                "today_realized_pnl": row["today_realized_pnl"],
+                "today_unrealized_pnl": row["today_unrealized_pnl"],
+                "total_pnl": total_pnl,
+                "equity": row["equity"],
+                "cash": row["cash"],
+                "open_position_count": row["open_position_count"],
+                "today_signal_count": row["today_signal_count"],
+                "today_opened_count": row["today_opened_count"],
+                "today_closed_count": row["today_closed_count"],
+                "win_rate_percent": row["win_rate_percent"],
+                "max_drawdown_percent": row["max_drawdown_percent"],
+                "m14_decision": str(decision.get("decision", "not_available")),
+                "m14_decision_reason": str(decision.get("decision_reason", "")),
+                "paper_trial_gate": str(gate.get("paper_trial_gate", "not_approved_or_pending")),
+                "gate_reason": str(gate.get("gate_reason", "")),
+                "input_status": str(audit.get("input_status", "")),
+                "symbols": row.get("symbols", ""),
+            }
+        )
+    rows.sort(key=lambda item: (0 if item["lane"] == "mainline" else 1, item["runtime_id"]))
+    return rows
+
+
+def terminal_account_status(row: dict[str, str], audit: dict[str, str]) -> str:
+    if audit.get("input_status", "").startswith("missing") or audit.get("current_scanner_connected") == "false":
+        return "数据阻塞"
+    if row.get("open_position_count") not in {"", "0"}:
+        return "持仓中"
+    if row.get("today_opened_count") not in {"", "0"}:
+        return "今日已开仓"
+    if row.get("today_signal_count") not in {"", "0"}:
+        return "今日有信号"
+    return "今日无信号"
+
+
+def load_m14_terminal_context(config: M1229Config) -> dict[str, Any]:
+    daily_dir = config.output_dir.parent
+    m13_goal_path = daily_dir / "m13_real_daily_strategy_testing" / "m13_goal_status.json"
+    m14_dir = daily_dir / "m14_strategy_challenge"
+    m14_summary_path = m14_dir / "m14_strategy_challenge_summary.json"
+    m14_gate_path = m14_dir / "m14_paper_trial_gate.json"
+    m14_decision_path = m14_dir / "m14_strategy_decision_ledger.jsonl"
+    m13_goal_status = "not_available"
+    if m13_goal_path.exists():
+        m13_goal = load_json(m13_goal_path)
+        m13_goal_status = "complete" if m13_goal.get("goal_complete") else "in_progress"
+    m14_goal_status = "not_available"
+    paper_trial_gate_approved_count = "0"
+    if m14_summary_path.exists():
+        m14_summary = load_json(m14_summary_path)
+        m14_goal_status = str(m14_summary.get("plain_language_result", "available"))
+        paper_trial_gate_approved_count = str(m14_summary.get("paper_trial_gate_approved_count", "0"))
+    gate_by_strategy: dict[str, dict[str, Any]] = {}
+    if m14_gate_path.exists():
+        gate = load_json(m14_gate_path)
+        gate_by_strategy = {row["strategy_id"]: row for row in gate.get("rows", []) if row.get("strategy_id")}
+    latest_decisions: dict[str, dict[str, Any]] = {}
+    for row in read_jsonl(m14_decision_path):
+        strategy_id = row.get("strategy_id")
+        if strategy_id:
+            latest_decisions[strategy_id] = row
+    return {
+        "m13_goal_path": m13_goal_path,
+        "m14_summary_path": m14_summary_path,
+        "m14_gate_path": m14_gate_path,
+        "m13_goal_status": m13_goal_status,
+        "m14_goal_status": m14_goal_status,
+        "paper_trial_gate_approved_count": paper_trial_gate_approved_count,
+        "paper_gate_by_strategy": gate_by_strategy,
+        "decision_by_strategy": latest_decisions,
+    }
+
+
+def build_terminal_watchlists(
+    watchlist_config: dict[str, Any],
+    runtime: dict[str, Any],
+    trade_ledger_rows: list[dict[str, str]],
+    extended_session_monitor: dict[str, Any],
+    symbol_news_counts: dict[str, int],
+) -> dict[str, Any]:
+    quote_index = build_terminal_symbol_index(runtime["signal_watchlist"], trade_ledger_rows, extended_session_monitor)
+    activity_symbols = sorted(
+        {
+            row.get("symbol", "")
+            for row in runtime["signal_watchlist"] + trade_ledger_rows
+            if row.get("symbol")
+        }
+    )
+    configured_groups = [
+        {
+            "group_id": str(group.get("group_id", "")),
+            "display_name": str(group.get("display_name", group.get("group_id", ""))),
+            "symbols": [str(symbol) for symbol in group.get("symbols", [])],
+        }
+        for group in watchlist_config.get("groups", [])
+    ]
+    groups: list[dict[str, Any]] = []
+    for group in configured_groups:
+        groups.append(
+            {
+                "group_id": group["group_id"],
+                "display_name": group["display_name"],
+                "rows": [
+                    build_terminal_watchlist_row(symbol, group["group_id"], quote_index, symbol_news_counts)
+                    for symbol in group["symbols"]
+                ],
+            }
+        )
+    groups.append(
+        {
+            "group_id": "strategy_active",
+            "display_name": "策略活跃标的",
+            "rows": [
+                build_terminal_watchlist_row(symbol, "strategy_active", quote_index, symbol_news_counts)
+                for symbol in activity_symbols[:30]
+            ],
+            "generated_from": "当日信号、持仓和账户账本自动聚合",
+        }
+    )
+    configured_symbols = sorted({symbol for group in configured_groups for symbol in group["symbols"]})
+    return {
+        "schema_version": "m14.1.market-watchlists.v1",
+        "configured_symbol_count": len(configured_symbols),
+        "configured_symbols": configured_symbols,
+        "groups": groups,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def build_terminal_symbol_index(
+    signal_rows: list[dict[str, str]],
+    trade_rows: list[dict[str, str]],
+    extended_session_monitor: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    index: dict[str, dict[str, Any]] = {}
+    for row in signal_rows:
+        symbol = row.get("symbol", "")
+        if not symbol:
+            continue
+        entry = index.setdefault(symbol, terminal_symbol_seed(symbol))
+        entry["strategy_signal_count"] += 1
+        if row.get("strategy_id"):
+            entry["strategy_ids"].add(row["strategy_id"])
+        if row.get("latest_price") not in ("", "暂无", None):
+            entry["latest_price"] = row["latest_price"]
+            entry["latest_price_source"] = row.get("latest_price_source", "signal_watchlist")
+            entry["refresh_state"] = "signal_quote_available"
+    for row in trade_rows:
+        symbol = row.get("symbol", "")
+        if not symbol:
+            continue
+        entry = index.setdefault(symbol, terminal_symbol_seed(symbol))
+        entry["holding_count"] += 1 if row.get("record_type") == "open_position" else 0
+        entry["account_pnl"] += money_to_decimal(row.get("pnl", ""))
+        if row.get("strategy_id"):
+            entry["strategy_ids"].add(row["strategy_id"])
+        if row.get("latest_price") not in ("", "暂无", None):
+            entry["latest_price"] = row["latest_price"]
+            entry["latest_price_source"] = "account_runtime"
+            entry["refresh_state"] = "runtime_quote_available"
+    for row in extended_session_monitor.get("premarket_rows", []) + extended_session_monitor.get("postmarket_rows", []):
+        symbol = row.get("symbol", "")
+        if not symbol:
+            continue
+        entry = index.setdefault(symbol, terminal_symbol_seed(symbol))
+        if row.get("session") == "盘前":
+            entry["premarket_change_percent"] = row.get("move_percent", "")
+        if row.get("session") == "盘后":
+            entry["postmarket_change_percent"] = row.get("move_percent", "")
+        if entry["latest_price"] == "暂无" and row.get("extended_price"):
+            entry["latest_price"] = row["extended_price"]
+            entry["latest_price_source"] = row.get("quote_source", "extended_session")
+            entry["refresh_state"] = "extended_session_quote_available"
+    return index
+
+
+def terminal_symbol_seed(symbol: str) -> dict[str, Any]:
+    return {
+        "symbol": symbol,
+        "latest_price": "暂无",
+        "latest_price_source": "no_verified_quote",
+        "regular_change_percent": "暂无",
+        "premarket_change_percent": "暂无",
+        "postmarket_change_percent": "暂无",
+        "strategy_signal_count": 0,
+        "holding_count": 0,
+        "account_pnl": ZERO,
+        "strategy_ids": set(),
+        "refresh_state": "missing_verified_quote",
+    }
+
+
+def build_terminal_watchlist_row(
+    symbol: str,
+    group_id: str,
+    quote_index: dict[str, dict[str, Any]],
+    symbol_news_counts: dict[str, int],
+) -> dict[str, str]:
+    data_symbol = next((alias for alias in WATCHLIST_ALIASES.get(symbol, (symbol,)) if alias in quote_index), symbol)
+    entry = quote_index.get(data_symbol, terminal_symbol_seed(symbol))
+    news_count = symbol_news_counts.get(symbol, 0) + (symbol_news_counts.get(data_symbol, 0) if data_symbol != symbol else 0)
+    return {
+        "symbol": symbol,
+        "data_symbol": data_symbol if data_symbol != symbol else "",
+        "group_id": group_id,
+        "latest_price": str(entry["latest_price"]),
+        "regular_change_percent": str(entry["regular_change_percent"]),
+        "premarket_change_percent": str(entry["premarket_change_percent"]),
+        "postmarket_change_percent": str(entry["postmarket_change_percent"]),
+        "latest_price_source": str(entry["latest_price_source"]),
+        "has_strategy_signal": str(entry["strategy_signal_count"] > 0).lower(),
+        "strategy_signal_count": str(entry["strategy_signal_count"]),
+        "strategy_ids": ", ".join(sorted(entry["strategy_ids"])),
+        "has_position": str(entry["holding_count"] > 0).lower(),
+        "holding_count": str(entry["holding_count"]),
+        "today_pnl": money(entry["account_pnl"]),
+        "total_pnl": money(entry["account_pnl"]),
+        "news_count": str(news_count),
+        "refresh_state": str(entry["refresh_state"]),
+    }
+
+
+def build_news_catalyst_panel(
+    watchlist_config: dict[str, Any],
+    runtime: dict[str, Any],
+    trade_ledger_rows: list[dict[str, str]],
+) -> dict[str, Any]:
+    configured_symbols = {
+        str(symbol)
+        for group in watchlist_config.get("groups", [])
+        for symbol in group.get("symbols", [])
+    }
+    active_symbols = {
+        row.get("symbol", "")
+        for row in runtime["signal_watchlist"] + trade_ledger_rows
+        if row.get("symbol")
+    }
+    news_review_dir = resolve_repo_path(
+        watchlist_config.get(
+            "news_review_dir",
+            M10_DIR / "daily_observation" / "m12_41_close_earnings_news_review",
+        )
+    )
+    rows = parse_news_review_rows(news_review_dir, configured_symbols, active_symbols)
+    symbol_counts: Counter[str] = Counter()
+    for row in rows:
+        for symbol in row["symbols"]:
+            symbol_counts[symbol] += 1
+    categories = ("全市场", "自选股", "策略相关", "财报/盘前盘后异动")
+    return {
+        "schema_version": "m14.1.news-catalyst-panel.v1",
+        "stage": "M14.1.news_catalyst_panel",
+        "plain_language_result": "无已验证新闻" if not rows else f"已从本地只读新闻/复盘产物提取 {len(rows)} 条新闻与催化提示。",
+        "categories": {
+            category: [row for row in rows if row["category"] == category][:20]
+            for category in categories
+        },
+        "rows": rows[:80],
+        "symbol_news_counts": dict(symbol_counts),
+        "source_dir": project_path(news_review_dir),
+        "news_drives_trading_signal": False,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def parse_news_review_rows(news_review_dir: Path, configured_symbols: set[str], active_symbols: set[str]) -> list[dict[str, Any]]:
+    if not news_review_dir.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for path in sorted(news_review_dir.glob("*_us_close_after_hours_review.md"), reverse=True)[:5]:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        trading_date = path.name[:10]
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("- "):
+                continue
+            symbols = extract_symbols_from_news_line(stripped)
+            if not symbols:
+                continue
+            category = news_category(stripped, symbols, configured_symbols, active_symbols)
+            rows.append(
+                {
+                    "headline": stripped[2:220],
+                    "symbols": symbols,
+                    "symbol": ", ".join(symbols[:6]),
+                    "source": "local_after_hours_review",
+                    "published_at": trading_date,
+                    "event_type": news_event_type(stripped),
+                    "severity": news_severity(stripped),
+                    "strategy_relevance": "strategy_related" if set(symbols) & active_symbols else "watchlist_or_market_context",
+                    "category": category,
+                    "source_path": project_path(path),
+                    "news_drives_trading_signal": False,
+                }
+            )
+    return rows
+
+
+def extract_symbols_from_news_line(line: str) -> list[str]:
+    raw = re.findall(r"`([A-Z][A-Z0-9.]{0,5})`", line)
+    raw += re.findall(r"\b([A-Z]{2,5})\b", line)
+    blocked = {"CST", "ETF", "SEC", "CEO", "AI", "PA", "USD"}
+    symbols: list[str] = []
+    for item in raw:
+        symbol = item.replace(".", "-")
+        if symbol in blocked or symbol in symbols:
+            continue
+        symbols.append(symbol)
+    return symbols[:12]
+
+
+def news_category(line: str, symbols: list[str], configured_symbols: set[str], active_symbols: set[str]) -> str:
+    symbol_set = set(symbols)
+    if symbol_set & active_symbols:
+        return "策略相关"
+    if any(token in line for token in ("盘前", "盘后", "财报", "After-hours", "after-hours")):
+        return "财报/盘前盘后异动"
+    if symbol_set & configured_symbols:
+        return "自选股"
+    return "全市场"
+
+
+def news_event_type(line: str) -> str:
+    if "财报" in line or "earnings" in line.lower():
+        return "earnings"
+    if "盘前" in line or "盘后" in line or "after-hours" in line.lower():
+        return "extended_session_mover"
+    if "风险" in line or "异常" in line:
+        return "risk_note"
+    return "news_review"
+
+
+def news_severity(line: str) -> str:
+    if any(token in line for token in ("异常", "大幅", "风险", "极端", "跌幅")):
+        return "high"
+    if any(token in line for token in ("财报", "盘前", "盘后", "异动")):
+        return "medium"
+    return "info"
+
+
 def build_accountized_dashboard_payload(
     config: M1229Config,
     generated_at: str,
@@ -1962,6 +2646,15 @@ def build_accountized_dashboard_payload(
     )
     trade_ledger_rows = build_trade_ledger_rows(runtime["account_rows"], runtime["state"])
     update_status = build_dashboard_update_status(config, summary, config.dashboard_refresh_seconds)
+    broker_terminal_view = build_broker_terminal_view(
+        config,
+        generated_at,
+        summary,
+        runtime,
+        extended_session_monitor,
+        trade_ledger_rows,
+        update_status,
+    )
     experimental_lane_note = experimental_lane_plain_reason(runtime["account_input_audit_rows"])
     return {
         "schema_version": "m12.46.accountized-readonly-dashboard.v1",
@@ -1984,14 +2677,16 @@ def build_accountized_dashboard_payload(
             "运行状态": update_status["runtime_status"],
         },
         "dashboard_layout": {
-            "home": "主线正式账户总览",
+            "home": "券商式交易终端",
             "experimental": "实验账户总览",
             "timeframe_views": "按 1d / 5m 分组测试",
             "ftd001_focus": "FTD001 双版本对照",
             "extended_session_monitor": "盘前 / 盘后异动",
             "trade_ledger": "模拟交易明细",
             "signal_watchlist": "信号观察清单",
+            "audit_reports": "审计与历史报告",
         },
+        "broker_terminal_view": broker_terminal_view,
         "shared_account_view": mainline_overview,
         "mainline_account_view": mainline_overview,
         "experimental_account_view": experimental_overview,
@@ -2126,9 +2821,10 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
     now_dt = datetime.now(UTC).replace(microsecond=0)
     generated_dt = datetime.fromisoformat(summary["generated_at"].replace("Z", "+00:00"))
     dashboard_age = int((now_dt - generated_dt).total_seconds())
+    stale_after = max(refresh_seconds * 3, 600)
     if dashboard_age < -90:
         freshness_state = "future_timestamp_error"
-    elif dashboard_age <= refresh_seconds * 3:
+    elif dashboard_age <= stale_after:
         freshness_state = "fresh"
     else:
         freshness_state = "stale"
@@ -2146,7 +2842,7 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
     last_heartbeat_at_utc = ""
     last_heartbeat_beijing_time = ""
     heartbeat_age_seconds = ""
-    stale_after_seconds = str(refresh_seconds * 3)
+    stale_after_seconds = str(stale_after)
     if supervisor_path.exists():
         supervisor = load_json(supervisor_path)
         last_heartbeat_at_utc = supervisor.get("supervisor_generated_at", "")
@@ -2162,7 +2858,7 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
                 heartbeat_age_seconds = str(max(heartbeat_age, 0))
                 if not supervisor_alive:
                     session_liveness = "stopped"
-                elif child_running and heartbeat_age <= refresh_seconds * 3:
+                elif child_running and heartbeat_age <= stale_after:
                     session_liveness = "alive"
                 elif child_running:
                     session_liveness = "stale"
@@ -2954,6 +3650,7 @@ def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
 def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
     summary = dashboard.get("summary", {})
+    terminal = dashboard.get("broker_terminal_view", {})
     mainline = dashboard["mainline_account_view"]
     experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
@@ -3007,6 +3704,12 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     today_rows = "\n".join(trade_row_html(row) for row in dashboard["trade_rows"][:220])
     watch_rows = "\n".join(signal_watchlist_html(row) for row in dashboard["signal_watchlist"][:220])
     reference_rows = "\n".join(signal_watchlist_html(row) for row in dashboard["reference_watchlist"][:80])
+    terminal_account_rows = "\n".join(terminal_account_row_html(row) for row in terminal.get("strategy_accounts", []))
+    terminal_position_rows = "\n".join(trade_row_html(row) for row in terminal.get("open_positions", [])[:80]) or "<tr><td colspan=\"12\">暂无持仓</td></tr>"
+    terminal_signal_rows = "\n".join(signal_watchlist_html(row) for row in terminal.get("signal_panel", [])[:40]) or "<tr><td colspan=\"11\">暂无正式信号</td></tr>"
+    terminal_watchlist_sections = "\n".join(watchlist_group_html(group) for group in terminal.get("watchlists", {}).get("groups", []))
+    terminal_news_sections = news_panel_html(terminal.get("news_panel", {}))
+    pa004_terminal_rows = "\n".join(terminal_account_row_html(row) for row in terminal.get("pa004_comparison", {}).get("rows", [])) or "<tr><td colspan=\"17\">暂无 PA004 对照行</td></tr>"
     timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in PRIMARY_TIMEFRAME_ORDER)
     ftd_rows = "".join(ftd_account_row_html(row) for row in ftd["accounts"])
     extended_monitor = dashboard["extended_session_monitor"]
@@ -3033,9 +3736,9 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
   <meta http-equiv="refresh" content="{config.dashboard_refresh_seconds}">
   <title>M12.46 分钟级只读模拟账户看板</title>
   <style>
-    body {{ margin:0; font-family:Arial,"Noto Sans SC",sans-serif; background:#f6f7f9; color:#1f2933; letter-spacing:0; }}
-    header {{ padding:18px 22px; background:#fff; border-bottom:1px solid #d8dee9; display:flex; justify-content:space-between; gap:18px; }}
-    h1 {{ margin:0; font-size:24px; }} main {{ padding:18px 22px; display:grid; gap:18px; }}
+    body {{ margin:0; font-family:Arial,"Noto Sans SC",sans-serif; background:#f4f6f8; color:#1f2933; letter-spacing:0; }}
+    header {{ padding:14px 18px; background:#101828; color:#f9fafb; border-bottom:1px solid #263142; display:flex; justify-content:space-between; gap:18px; }}
+    h1 {{ margin:0; font-size:22px; }} main {{ padding:14px 18px; display:grid; gap:14px; }}
     .grid {{ display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:10px; }}
     .metric,.panel {{ background:#fff; border:1px solid #d8dee9; border-radius:8px; }}
     .warning {{ border-left:6px solid #b42318; background:#fff7f5; }}
@@ -3047,6 +3750,17 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     table {{ width:100%; border-collapse:collapse; font-size:13px; }} th,td {{ padding:9px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }}
     th {{ background:#eef2f7; }} .wrap {{ max-height:520px; overflow:auto; }}
     .good {{ color:#18794e; font-weight:700; }} .bad {{ color:#b42318; font-weight:700; }}
+    .terminal {{ display:grid; grid-template-columns:minmax(320px,0.95fr) minmax(430px,1.35fr) minmax(360px,1fr); gap:12px; align-items:start; }}
+    .terminal-band {{ display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:8px; }}
+    .terminal-band div {{ background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:10px; min-height:54px; }}
+    .terminal-band small {{ display:block; color:#9ca3af; margin-bottom:5px; }}
+    .terminal-panel {{ background:#fff; border:1px solid #cfd6e3; border-radius:8px; overflow:hidden; }}
+    .terminal-panel h2 {{ font-size:15px; padding:10px 12px; background:#f8fafc; }}
+    .terminal-table th,.terminal-table td {{ padding:7px 8px; font-size:12px; }}
+    .watch-grid {{ display:grid; gap:10px; padding:10px; }}
+    .watch-group {{ border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff; }}
+    .watch-group h3 {{ margin:0; padding:9px 10px; background:#f8fafc; font-size:14px; border-bottom:1px solid #e5e7eb; }}
+    .pill {{ display:inline-block; padding:2px 7px; border:1px solid #d0d5dd; border-radius:999px; font-size:12px; color:#475467; background:#fff; }}
     .timeframes {{ display:grid; grid-template-columns:repeat(2,minmax(260px,1fr)); gap:14px; padding:14px 16px; }}
     .timeframe-card {{ border:1px solid #d8dee9; border-radius:8px; background:#fff; overflow:hidden; }}
     .timeframe-card h3 {{ margin:0; padding:12px 14px; background:#f2f4f7; font-size:16px; }}
@@ -3056,14 +3770,29 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     .bar-track {{ height:12px; background:#eef2f7; border-radius:999px; overflow:hidden; }}
     .bar-fill {{ height:12px; min-width:2px; }}
     .bar-good {{ background:#2f9e6b; }} .bar-bad {{ background:#d92d20; }}
+    @media (max-width:1180px) {{ .terminal {{ grid-template-columns:1fr; }} .terminal-band {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
     @media (max-width:980px) {{ .grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} header,.two-col,.timeframes {{ display:block; }} }}
   </style>
 </head>
 <body>
-  <header><div><h1>分钟级只读模拟账户看板</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>当前电脑时间：{html.escape(update_status['wall_clock_beijing_time'])} ｜ 看板新鲜度：{html.escape(update_status['freshness_state'])} ｜ 看板延迟秒数：{html.escape(update_status['dashboard_age_seconds'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 守护器进程：{html.escape(update_status['supervisor_process_alive'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 模拟账户，不接真实账户，不做真实买卖</div></header>
+  <header><div><h1>券商式策略交易终端</h1><div>北京时间最后更新：{html.escape(update_status['beijing_time'])}</div><div>当前电脑时间：{html.escape(update_status['wall_clock_beijing_time'])} ｜ 看板新鲜度：{html.escape(update_status['freshness_state'])} ｜ 看板延迟秒数：{html.escape(update_status['dashboard_age_seconds'])}</div><div>纽约时间：{html.escape(update_status['new_york_time'])} ｜ 市场状态：{html.escape(update_status['market_status'])}</div><div>运行状态：{html.escape(update_status['runtime_status'])}</div><div>自动会话：{html.escape(update_status['session_liveness'])} ｜ 守护器进程：{html.escape(update_status['supervisor_process_alive'])} ｜ 上次心跳（北京时间）：{html.escape(update_status['last_heartbeat_beijing_time'] or '暂无')} ｜ 心跳延迟秒数：{html.escape(update_status['heartbeat_age_seconds'] or '暂无')}</div></div><div>只读行情 + 内部模拟 + ledger 审计<br>不接真实账户，不做真实买卖</div></header>
   <main>
+    <section class="terminal-band">
+      <div><small>市场状态</small>{html.escape(terminal.get('top_status', {}).get('market_status', update_status['market_status']))}</div>
+      <div><small>M13 Goal</small>{html.escape(terminal.get('top_status', {}).get('m13_goal_status', 'not_available'))}</div>
+      <div><small>M14 Gate</small>approved {html.escape(terminal.get('top_status', {}).get('paper_trial_gate_approved_count', '0'))}</div>
+      <div><small>数据状态</small>{html.escape(terminal.get('top_status', {}).get('freshness_state', update_status['freshness_state']))}</div>
+      <div><small>自动会话</small>{html.escape(terminal.get('top_status', {}).get('session_liveness', update_status['session_liveness']))}</div>
+      <div><small>可交易展示</small>{html.escape(terminal.get('top_status', {}).get('fully_ready_for_trading_display', 'false'))}</div>
+    </section>
     <div class="grid">{cards}</div>
     {data_freshness_section}
+    <section class="terminal">
+      <div class="terminal-panel"><h2>策略账户</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{terminal_account_rows}</tbody></table></div></div>
+      <div class="terminal-panel"><h2>持仓 / 信号 / PA004 对照</h2><div class="note">{html.escape(terminal.get('pa004_comparison', {}).get('plain_language_result', ''))}</div><div class="wrap"><table class="terminal-table"><thead>{table_head()}</thead><tbody>{terminal_position_rows}</tbody></table></div><h2>今日正式信号</h2><div class="wrap"><table class="terminal-table"><thead>{watchlist_head()}</thead><tbody>{terminal_signal_rows}</tbody></table></div><h2>PA004 baseline / MBF / QC 对照</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{pa004_terminal_rows}</tbody></table></div></div>
+      <div class="terminal-panel"><h2>自选股与新闻</h2><div class="watch-grid">{terminal_watchlist_sections}</div>{terminal_news_sections}</div>
+    </section>
+    <section class="panel"><h2>审计与历史报告</h2><div class="note">以下保留原账户成绩单、模拟交易明细、正式信号清单、账户输入审计和历史参考样例，用于回看与验证。首屏交易终端不改变任何策略、风控或执行结果。</div></section>
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
     <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
     <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>历史收益</th><th>胜率</th><th>最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
@@ -3084,6 +3813,110 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
 
 def table_head() -> str:
     return "<tr><th>记录</th><th>账户</th><th>股票</th><th>周期</th><th>方向</th><th>开仓时间</th><th>入场</th><th>止损</th><th>目标</th><th>最新价/平仓价</th><th>盈亏</th><th>状态</th></tr>"
+
+
+def terminal_account_head() -> str:
+    return "<tr><th>账户</th><th>状态</th><th>今日盈亏</th><th>总盈亏</th><th>权益</th><th>持仓</th><th>信号</th><th>开/平</th><th>M14 决策</th><th>准入</th></tr>"
+
+
+def terminal_account_row_html(row: dict[str, str]) -> str:
+    today_cls = pnl_css_class(row.get("today_total_pnl", "0"))
+    total_cls = pnl_css_class(row.get("total_pnl", "0"))
+    lane = "主线" if row.get("lane") == "mainline" else "实验"
+    variant = f" / {row.get('variant_id', '')}" if row.get("variant_id") else ""
+    return (
+        "<tr>"
+        f"<td>{html.escape(row['runtime_id'])}<br><small>{html.escape(lane)} {html.escape(row.get('timeframe', ''))}{html.escape(variant)}</small></td>"
+        f"<td><span class=\"pill\">{html.escape(row.get('status', ''))}</span><br><small>{html.escape(row.get('input_status', ''))}</small></td>"
+        f"<td class=\"{today_cls}\">{html.escape(row.get('today_total_pnl', '0.00'))}</td>"
+        f"<td class=\"{total_cls}\">{html.escape(row.get('total_pnl', '0.00'))}</td>"
+        f"<td>{html.escape(row.get('equity', ''))}</td>"
+        f"<td>{html.escape(row.get('open_position_count', '0'))}</td>"
+        f"<td>{html.escape(row.get('today_signal_count', '0'))}</td>"
+        f"<td>{html.escape(row.get('today_opened_count', '0'))}/{html.escape(row.get('today_closed_count', '0'))}</td>"
+        f"<td>{html.escape(row.get('m14_decision', ''))}<br><small>{html.escape(row.get('m14_decision_reason', ''))}</small></td>"
+        f"<td>{html.escape(row.get('paper_trial_gate', ''))}<br><small>{html.escape(row.get('gate_reason', ''))}</small></td>"
+        "</tr>"
+    )
+
+
+def watchlist_group_html(group: dict[str, Any]) -> str:
+    rows = "\n".join(market_watchlist_row_html(row) for row in group.get("rows", []))
+    if not rows:
+        rows = "<tr><td colspan=\"10\">暂无自选标的</td></tr>"
+    note = f"<div class=\"note\">{html.escape(str(group.get('generated_from', '')))}</div>" if group.get("generated_from") else ""
+    return (
+        "<section class=\"watch-group\">"
+        f"<h3>{html.escape(group.get('display_name', ''))}</h3>"
+        f"{note}"
+        "<div class=\"wrap\"><table class=\"terminal-table\"><thead>"
+        "<tr><th>股票</th><th>价格</th><th>涨跌</th><th>盘前</th><th>盘后</th><th>信号</th><th>持仓</th><th>今日PnL</th><th>新闻</th><th>刷新</th></tr>"
+        f"</thead><tbody>{rows}</tbody></table></div>"
+        "</section>"
+    )
+
+
+def market_watchlist_row_html(row: dict[str, str]) -> str:
+    pnl_cls = pnl_css_class(row.get("today_pnl", "0"))
+    symbol = row["symbol"]
+    data_symbol = f"<br><small>data:{html.escape(row['data_symbol'])}</small>" if row.get("data_symbol") else ""
+    return (
+        "<tr>"
+        f"<td>{html.escape(symbol)}{data_symbol}</td>"
+        f"<td>{html.escape(row.get('latest_price', '暂无'))}<br><small>{html.escape(row.get('latest_price_source', ''))}</small></td>"
+        f"<td>{html.escape(row.get('regular_change_percent', '暂无'))}</td>"
+        f"<td>{html.escape(percent_cell(row.get('premarket_change_percent', '暂无')))}</td>"
+        f"<td>{html.escape(percent_cell(row.get('postmarket_change_percent', '暂无')))}</td>"
+        f"<td>{html.escape(row.get('strategy_signal_count', '0'))}<br><small>{html.escape(row.get('strategy_ids', ''))}</small></td>"
+        f"<td>{html.escape(row.get('holding_count', '0'))}</td>"
+        f"<td class=\"{pnl_cls}\">{html.escape(row.get('today_pnl', '0.00'))}</td>"
+        f"<td>{html.escape(row.get('news_count', '0'))}</td>"
+        f"<td>{html.escape(row.get('refresh_state', ''))}</td>"
+        "</tr>"
+    )
+
+
+def news_panel_html(panel: dict[str, Any]) -> str:
+    if not panel or not panel.get("rows"):
+        return "<section class=\"watch-group\"><h3>新闻与催化</h3><div class=\"note\">无已验证新闻</div></section>"
+    sections: list[str] = []
+    for category in ("策略相关", "自选股", "财报/盘前盘后异动", "全市场"):
+        rows = panel.get("categories", {}).get(category, [])
+        body = "\n".join(news_row_html(row) for row in rows[:8])
+        if not body:
+            body = "<tr><td colspan=\"6\">暂无</td></tr>"
+        sections.append(
+            "<section class=\"watch-group\">"
+            f"<h3>{html.escape(category)}</h3>"
+            "<div class=\"wrap\"><table class=\"terminal-table\"><thead>"
+            "<tr><th>时间</th><th>股票</th><th>事件</th><th>级别</th><th>标题</th><th>来源</th></tr>"
+            f"</thead><tbody>{body}</tbody></table></div></section>"
+        )
+    return "".join(sections)
+
+
+def news_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('published_at', '')))}</td>"
+        f"<td>{html.escape(str(row.get('symbol', '')))}</td>"
+        f"<td>{html.escape(str(row.get('event_type', '')))}</td>"
+        f"<td>{html.escape(str(row.get('severity', '')))}</td>"
+        f"<td>{html.escape(str(row.get('headline', '')))}</td>"
+        f"<td>{html.escape(str(row.get('source_path', '')))}</td>"
+        "</tr>"
+    )
+
+
+def pnl_css_class(value: str) -> str:
+    pnl = money_to_decimal(value)
+    return "good" if pnl > ZERO else "bad" if pnl < ZERO else ""
+
+
+def percent_cell(value: str) -> str:
+    if value in {"", "暂无", None}:  # type: ignore[comparison-overlap]
+        return "暂无"
+    return f"{value}%"
 
 
 def watchlist_head() -> str:

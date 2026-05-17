@@ -56,6 +56,22 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
         self.assertFalse(row["required_for_goal"])
         self.assertIn("copy_trading_or_direct_execution", registry["ai_trader_policy"]["forbidden"])
 
+    def test_pa004_momentum_variant_is_separate_optional_runtime(self):
+        config = load_config()
+        registry = load_registry(config.registry_path)
+        rows = {item["strategy_id"]: item for item in registry["strategies"]}
+        original = rows["M10-PA-004-MBF"]
+        self.assertEqual(original["module_role"], "independent_runtime")
+        self.assertFalse(original["required_for_goal"])
+        self.assertEqual(original["runtime_accounts"][0]["runtime_id"], "M10-PA-004-MBF-1d")
+        self.assertIn("do not overwrite PA004", original["next_action"])
+
+        quality = rows["M10-PA-004-MBF-QC"]
+        self.assertEqual(quality["module_role"], "independent_runtime")
+        self.assertFalse(quality["required_for_goal"])
+        self.assertEqual(quality["runtime_accounts"][0]["runtime_id"], "M10-PA-004-MBF-QC-1d")
+        self.assertIn("keep the original PA004-MBF account running", quality["next_action"])
+
 
 if __name__ == "__main__":
     unittest.main()

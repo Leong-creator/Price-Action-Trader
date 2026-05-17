@@ -7,6 +7,7 @@ from unittest.mock import patch
 from scripts.m12_29_current_day_scan_dashboard_lib import load_config as load_m12_29_config
 from scripts.run_m12_37_intraday_auto_loop import (
     M1237AutoLoopConfig,
+    intraday_refresh_bucket,
     load_auto_config,
     run_once,
     run_post_run_strategy_ledgers,
@@ -114,10 +115,23 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
             self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
 
-    def test_session_refresh_policy_prefetches_preopen_and_fetches_only_on_5m_boundaries(self):
+    def test_session_refresh_policy_prefetches_preopen_and_fetches_once_per_5m_bucket(self):
         premarket = session_refresh_policy("2026-04-29T13:25:00Z", "盘前", no_fetch=False, no_refresh_quotes=False)
         regular_boundary = session_refresh_policy("2026-04-29T14:00:00Z", "美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
-        regular_midbar = session_refresh_policy("2026-04-29T14:01:00Z", "美股常规交易时段", no_fetch=False, no_refresh_quotes=False)
+        same_bucket = session_refresh_policy(
+            "2026-04-29T14:01:00Z",
+            "美股常规交易时段",
+            no_fetch=False,
+            no_refresh_quotes=False,
+            last_intraday_refresh_bucket=regular_boundary["intraday_refresh_bucket"],
+        )
+        next_bucket = session_refresh_policy(
+            "2026-04-29T14:06:00Z",
+            "美股常规交易时段",
+            no_fetch=False,
+            no_refresh_quotes=False,
+            last_intraday_refresh_bucket=regular_boundary["intraday_refresh_bucket"],
+        )
         postmarket = session_refresh_policy("2026-04-29T20:30:00Z", "盘后", no_fetch=False, no_refresh_quotes=False)
         closed = session_refresh_policy("2026-04-29T01:00:00Z", "休市", no_fetch=False, no_refresh_quotes=False)
         self.assertTrue(premarket["execute_fetch"])
@@ -126,14 +140,18 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
         self.assertTrue(premarket["continue_session"])
         self.assertTrue(regular_boundary["execute_fetch"])
         self.assertTrue(regular_boundary["refresh_quotes"])
-        self.assertEqual(regular_boundary["max_native_fetches"], 20)
+        self.assertEqual(regular_boundary["max_native_fetches"], 100)
+        self.assertTrue(regular_boundary["force_refresh_current_intraday"])
+        self.assertEqual(regular_boundary["intraday_refresh_bucket"], intraday_refresh_bucket("2026-04-29T14:00:00Z"))
         self.assertTrue(regular_boundary["continue_session"])
-        self.assertFalse(regular_midbar["execute_fetch"])
-        self.assertTrue(regular_midbar["refresh_quotes"])
+        self.assertFalse(same_bucket["execute_fetch"])
+        self.assertTrue(same_bucket["refresh_quotes"])
+        self.assertEqual(same_bucket["max_native_fetches"], 0)
+        self.assertTrue(next_bucket["execute_fetch"])
+        self.assertEqual(next_bucket["max_native_fetches"], 100)
         self.assertFalse(postmarket["execute_fetch"])
         self.assertTrue(postmarket["refresh_quotes"])
         self.assertTrue(postmarket["continue_session"])
-        self.assertEqual(regular_midbar["max_native_fetches"], 0)
         self.assertFalse(closed["continue_session"])
 
     def test_m14_finalization_policy_waits_for_postmarket_by_default(self):

@@ -2,22 +2,28 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.m12_29_current_day_scan_dashboard_lib import (
     ACCOUNT_SPECS,
     DEFAULT_ACCOUNT_EQUITY,
+    PA004_MOMENTUM_QUALITY_VARIANT_ID,
+    PA004_MOMENTUM_VARIANT_ID,
     advance_account_runtime,
     bootstrap_account_state,
-    build_dashboard_data_freshness_warning,
-    build_extended_session_monitor,
-    build_accountized_run_status,
-    current_us_scan_date,
-    load_config,
+        build_dashboard_data_freshness_warning,
+        build_dashboard_update_status,
+        build_extended_session_monitor,
+        build_accountized_run_status,
+        current_us_scan_date,
+        load_config,
     pa004_event_is_long,
+    pa004_momentum_breakout_quality_signal,
+    pa004_momentum_breakout_signal,
     run_m12_29_current_day_scan_dashboard,
 )
 from scripts.run_m12_29_current_day_scan_dashboard import validate_generated_at
@@ -76,6 +82,23 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             "",
         )
 
+    def test_dashboard_freshness_allows_full_first50_refresh_runtime(self):
+        generated_at = (datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=500)).isoformat().replace("+00:00", "Z")
+        status = build_dashboard_update_status(
+            load_config(),
+            {
+                "generated_at": generated_at,
+                "market_session": {
+                    "status": "美股常规交易时段",
+                    "beijing_time": "2026-05-14 23:16:59 CST",
+                    "new_york_time": "2026-05-14 11:16:59 EDT",
+                },
+            },
+            60,
+        )
+        self.assertEqual(status["freshness_state"], "fresh")
+        self.assertEqual(status["stale_after_seconds"], "600")
+
     def test_strategy_closure_reflects_mainline_experimental_and_supporting_lanes(self):
         _, result, _ = self.run_stage()
         rows = {row["strategy_id"]: row for row in result["strategy_closure_rows"] if not row["strategy_id"].startswith("M12-SRC-")}
@@ -91,7 +114,14 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         dashboard = json.loads((output_dir / "m12_32_minute_readonly_dashboard_data.json").read_text(encoding="utf-8"))
         html = (output_dir / "m12_32_minute_readonly_dashboard.html").read_text(encoding="utf-8")
         self.assertEqual(dashboard["schema_version"], "m12.46.accountized-readonly-dashboard.v1")
+        self.assertIn("broker_terminal_view", dashboard)
         self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
+        self.assertIn("券商式策略交易终端", html)
+        self.assertIn("自选股与新闻", html)
+        self.assertIn("美股七姐妹", html)
+        self.assertIn("存储/闪存热点", html)
+        self.assertIn("PA004 baseline / MBF / QC 对照", html)
+        self.assertIn("审计与历史报告", html)
         self.assertIn("主线正式账户", html)
         self.assertIn("实验账户", html)
         self.assertIn("FTD001 双版本对照", html)
@@ -106,15 +136,51 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         mainline = dashboard["mainline_account_view"]
         experimental = dashboard["experimental_account_view"]
         self.assertEqual(mainline["strategy_account_count"], "8")
-        self.assertEqual(experimental["strategy_account_count"], "8")
+        self.assertEqual(experimental["strategy_account_count"], "10")
         self.assertEqual(mainline["starting_capital"], "160000.00")
-        self.assertEqual(experimental["starting_capital"], "160000.00")
+        self.assertEqual(experimental["starting_capital"], "200000.00")
         first_account = dashboard["mainline_accounts"][0]
         self.assertEqual(first_account["starting_capital"], "20000.00")
         self.assertEqual(Decimal(first_account["starting_capital"]), DEFAULT_ACCOUNT_EQUITY)
         self.assertIn("CST", dashboard["update_status"]["beijing_time"])
         self.assertIn("session_liveness", dashboard["update_status"])
         self.assertIn("freshness_state", dashboard["update_status"])
+
+    def test_broker_terminal_view_has_accounts_watchlists_news_and_pa004_split(self):
+        _, result, _ = self.run_stage()
+        terminal = result["dashboard"]["broker_terminal_view"]
+        self.assertEqual(terminal["schema_version"], "m14.1.broker-terminal-view.v1")
+        self.assertEqual(terminal["top_status"]["fully_ready_for_trading_display"], "false")
+        self.assertEqual(len(terminal["strategy_accounts"]), len(ACCOUNT_SPECS))
+        for row in terminal["strategy_accounts"]:
+            for key in (
+                "today_total_pnl",
+                "today_realized_pnl",
+                "today_unrealized_pnl",
+                "total_pnl",
+                "equity",
+                "open_position_count",
+                "today_signal_count",
+                "today_opened_count",
+                "today_closed_count",
+                "m14_decision",
+                "paper_trial_gate",
+            ):
+                self.assertIn(key, row)
+        group_by_id = {group["group_id"]: group for group in terminal["watchlists"]["groups"]}
+        self.assertEqual(
+            [row["symbol"] for row in group_by_id["magnificent_seven"]["rows"]],
+            ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA"],
+        )
+        self.assertIn("MU", [row["symbol"] for row in group_by_id["memory_flash"]["rows"]])
+        self.assertIn("SNDK", [row["symbol"] for row in group_by_id["memory_flash"]["rows"]])
+        self.assertIn("QCOM", [row["symbol"] for row in group_by_id["ai_chips"]["rows"]])
+        self.assertTrue(group_by_id["strategy_active"]["rows"])
+        self.assertEqual(group_by_id["strategy_active"]["generated_from"], "当日信号、持仓和账户账本自动聚合")
+        pa004_ids = {row["runtime_id"] for row in terminal["pa004_comparison"]["rows"]}
+        self.assertEqual(pa004_ids, {"M10-PA-004-long-1d", "M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"})
+        self.assertFalse(terminal["news_panel"]["news_drives_trading_signal"])
+        self.assertIn("audit_drawer", terminal)
 
     def test_mainline_and_experimental_accounts_are_separated(self):
         _, result, _ = self.run_stage()
@@ -124,6 +190,8 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("M10-PA-004", mainline_ids)
         self.assertIn("M10-PA-005", experimental_ids)
         self.assertIn("M10-PA-007", experimental_ids)
+        self.assertIn(PA004_MOMENTUM_VARIANT_ID, experimental_ids)
+        self.assertIn(PA004_MOMENTUM_QUALITY_VARIANT_ID, experimental_ids)
         self.assertIn("M10-PA-013", experimental_ids)
         self.assertNotIn("M10-PA-005", mainline_ids)
         self.assertNotIn("M10-PA-004", experimental_ids)
@@ -133,7 +201,16 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         )
         self.assertEqual(
             result["run_status"]["experimental_strategy_ids"],
-            ["M10-PA-005", "M10-PA-007", "M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013"],
+            [
+                "M10-PA-005",
+                "M10-PA-007",
+                PA004_MOMENTUM_VARIANT_ID,
+                PA004_MOMENTUM_QUALITY_VARIANT_ID,
+                "M10-PA-008",
+                "M10-PA-009",
+                "M10-PA-011",
+                "M10-PA-013",
+            ],
         )
         self.assertEqual(
             result["gate_recheck"]["candidate_strategy_ids"],
@@ -182,6 +259,53 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertTrue(pa004_event_is_long({"direction": "看涨"}))
         self.assertFalse(pa004_event_is_long({"direction": "short"}))
         self.assertFalse(pa004_event_is_long({"direction": "看跌"}))
+
+    def test_pa004_momentum_breakout_variant_is_separate_from_baseline(self):
+        bars = [
+            SimpleNamespace(
+                timestamp="2026-05-08T16:00:00-04:00",
+                open=Decimal("100"),
+                high=Decimal("101"),
+                low=Decimal("99"),
+                close=Decimal("100"),
+            ),
+            SimpleNamespace(
+                timestamp="2026-05-11T16:00:00-04:00",
+                open=Decimal("104"),
+                high=Decimal("110"),
+                low=Decimal("103"),
+                close=Decimal("108"),
+            ),
+        ]
+        signal = pa004_momentum_breakout_signal("QCOM", bars, date.fromisoformat("2026-05-11"))
+        self.assertIsNotNone(signal)
+        self.assertEqual(signal["entry"], Decimal("108"))
+        self.assertLess(signal["stop"], signal["entry"])
+        self.assertGreater(signal["target"], signal["entry"])
+        quality_signal = pa004_momentum_breakout_quality_signal("QCOM", bars, date.fromisoformat("2026-05-11"))
+        self.assertIsNotNone(quality_signal)
+        self.assertEqual(quality_signal["entry"], Decimal("108"))
+        self.assertLess(quality_signal["target"], signal["target"])
+        self.assertIsNone(pa004_momentum_breakout_signal("TQQQ", bars, date.fromisoformat("2026-05-11")))
+
+        lower_quality_bars = [
+            SimpleNamespace(
+                timestamp="2026-05-08T16:00:00-04:00",
+                open=Decimal("100"),
+                high=Decimal("101"),
+                low=Decimal("99"),
+                close=Decimal("100"),
+            ),
+            SimpleNamespace(
+                timestamp="2026-05-11T16:00:00-04:00",
+                open=Decimal("104"),
+                high=Decimal("112"),
+                low=Decimal("103"),
+                close=Decimal("106"),
+            ),
+        ]
+        self.assertIsNotNone(pa004_momentum_breakout_signal("QCOM", lower_quality_bars, date.fromisoformat("2026-05-11")))
+        self.assertIsNone(pa004_momentum_breakout_quality_signal("QCOM", lower_quality_bars, date.fromisoformat("2026-05-11")))
 
     def test_all_runtime_accounts_are_marked_as_formal_input_streams(self):
         _, result, _ = self.run_stage()
@@ -270,6 +394,153 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                     "stop_price": "97.00",
                     "target_price": "108.00",
                     "latest_price": "95.00",
+                    "latest_price_source": "longbridge_quote_readonly",
+                    "quantity": "10.0000",
+                    "reserved_notional": "1000.00",
+                    "current_pnl": "0.00",
+                    "current_state": "持仓中",
+                    "review_status": "test",
+                    "risk_level": "medium",
+                    "source_refs": "manual",
+                    "spec_ref": "manual",
+                }
+            ]
+            state = {
+                "schema_version": "m12.46.account-runtime-state.v1",
+                "stage": "M12.46.accountized_realtime_testing",
+                "starting_capital": "20000.00",
+                "risk_rate": "0.005",
+                "accounts": {spec["account_id"]: account},
+                "trading_day_registry": {},
+            }
+            (output_dir / "m12_46_account_runtime_state.json").write_text(
+                json.dumps(state, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T01:05:00Z",
+                scan_date=date.fromisoformat("2026-04-28"),
+                trade_rows=[
+                    {
+                        "symbol": "SPY",
+                        "latest_price": "95.00",
+                        "latest_price_source": "longbridge_quote_readonly",
+                    }
+                ],
+                pa004_formal_rows=[],
+                closure_rows=[],
+                current_day_runtime_ready=False,
+            )
+        row = next(item for item in runtime["account_rows"] if item["runtime_id"] == spec["account_id"])
+        close_row = next(item for item in runtime["new_trade_ledger_rows"] if item["event_type"] == "close")
+        self.assertEqual(row["today_closed_count"], "1")
+        self.assertEqual(row["today_realized_pnl"], "-30.00")
+        self.assertEqual(row["today_total_pnl"], "-30.00")
+        self.assertEqual(close_row["exit_price"], "97.00")
+        self.assertEqual(close_row["exit_price_source"], "longbridge_quote_readonly")
+
+    def test_fallback_quotes_do_not_close_positions_or_expand_stop_loss(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_29"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            spec = next(item for item in ACCOUNT_SPECS if item["account_id"] == "M10-PA-001-1d")
+            account = bootstrap_account_state(spec)
+            account["cash"] = "19000.00"
+            account["open_positions"] = [
+                {
+                    "position_id": "fallback-close-block-test",
+                    "signal_id": "fallback-close-block-test",
+                    "strategy_id": spec["strategy_id"],
+                    "runtime_id": spec["account_id"],
+                    "display_name": spec["display_name"],
+                    "lane": spec["lane"],
+                    "timeframe": spec["timeframe"],
+                    "symbol": "SPY",
+                    "direction": "long",
+                    "signal_time": "2026-04-28T19:30:00Z",
+                    "signal_date": "2026-04-28",
+                    "opened_at": "2026-04-28T19:35:00Z",
+                    "entry_price": "100.00",
+                    "stop_price": "97.00",
+                    "target_price": "108.00",
+                    "latest_price": "100.00",
+                    "latest_price_source": "longbridge_quote_readonly",
+                    "quantity": "10.0000",
+                    "reserved_notional": "1000.00",
+                    "current_pnl": "0.00",
+                    "current_state": "持仓中",
+                    "review_status": "test",
+                    "risk_level": "medium",
+                    "source_refs": "manual",
+                    "spec_ref": "manual",
+                }
+            ]
+            state = {
+                "schema_version": "m12.46.account-runtime-state.v1",
+                "stage": "M12.46.accountized_realtime_testing",
+                "starting_capital": "20000.00",
+                "risk_rate": "0.005",
+                "accounts": {spec["account_id"]: account},
+                "trading_day_registry": {},
+            }
+            (output_dir / "m12_46_account_runtime_state.json").write_text(
+                json.dumps(state, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T01:05:00Z",
+                scan_date=date.fromisoformat("2026-04-28"),
+                trade_rows=[
+                    {
+                        "symbol": "SPY",
+                        "latest_price": "80.00",
+                        "latest_price_source": "m12_12_cached_reference_fallback",
+                    }
+                ],
+                pa004_formal_rows=[],
+                closure_rows=[],
+                current_day_runtime_ready=False,
+            )
+            state = json.loads((output_dir / "m12_46_account_runtime_state.json").read_text(encoding="utf-8"))
+        row = next(item for item in runtime["account_rows"] if item["runtime_id"] == spec["account_id"])
+        position = state["accounts"][spec["account_id"]]["open_positions"][0]
+        self.assertEqual(row["today_closed_count"], "0")
+        self.assertEqual(row["closed_trade_count"], "0")
+        self.assertEqual(row["today_total_pnl"], "0.00")
+        self.assertEqual(position["current_state"], "行情过期，暂停平仓")
+        self.assertEqual(position["mark_to_market_blocker"], "stale_quote_blocked_mark_to_market")
+        self.assertEqual(position["blocked_quote_source"], "m12_12_cached_reference_fallback")
+
+    def test_full_quote_pool_marks_existing_positions_even_without_new_signal_row(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_29"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            spec = next(item for item in ACCOUNT_SPECS if item["account_id"] == "M10-PA-001-1d")
+            account = bootstrap_account_state(spec)
+            account["cash"] = "19000.00"
+            account["open_positions"] = [
+                {
+                    "position_id": "quote-pool-close-test",
+                    "signal_id": "quote-pool-close-test",
+                    "strategy_id": spec["strategy_id"],
+                    "runtime_id": spec["account_id"],
+                    "display_name": spec["display_name"],
+                    "lane": spec["lane"],
+                    "timeframe": spec["timeframe"],
+                    "symbol": "SPY",
+                    "direction": "long",
+                    "signal_time": "2026-04-28T19:30:00Z",
+                    "signal_date": "2026-04-28",
+                    "opened_at": "2026-04-28T19:35:00Z",
+                    "entry_price": "100.00",
+                    "stop_price": "97.00",
+                    "target_price": "108.00",
+                    "latest_price": "100.00",
+                    "latest_price_source": "longbridge_quote_readonly",
                     "quantity": "10.0000",
                     "reserved_notional": "1000.00",
                     "current_pnl": "0.00",
@@ -299,12 +570,20 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 trade_rows=[],
                 pa004_formal_rows=[],
                 closure_rows=[],
-                current_day_runtime_ready=False,
+                current_day_runtime_ready=True,
+                quotes={
+                    "SPY": {
+                        "latest_price": "95.00",
+                        "quote_source": "longbridge_quote_readonly",
+                    }
+                },
             )
         row = next(item for item in runtime["account_rows"] if item["runtime_id"] == spec["account_id"])
+        close_row = next(item for item in runtime["new_trade_ledger_rows"] if item["event_type"] == "close")
         self.assertEqual(row["today_closed_count"], "1")
-        self.assertEqual(row["today_realized_pnl"], "-50.00")
-        self.assertEqual(row["today_total_pnl"], "-50.00")
+        self.assertEqual(row["today_realized_pnl"], "-30.00")
+        self.assertEqual(close_row["exit_price"], "97.00")
+        self.assertEqual(close_row["exit_price_source"], "longbridge_quote_readonly")
 
     def test_extended_session_monitor_detects_premarket_and_postmarket_focus_movers(self):
         quotes = {
