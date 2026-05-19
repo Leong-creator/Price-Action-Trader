@@ -520,6 +520,7 @@
 - M12.47 当前已修复 `--status` 状态回写：手动或自动执行 status 时会把真实 `supervisor_process_alive / child_running / market_status` 写回 `m12_47_session_supervisor_status.json`，避免周末继续显示上一次交易日的 alive 状态。当前北京时间 `2026-05-17 13:46:47` 状态为 `非交易日等待`，下次自动启动窗口为 `2026-05-18 21:25:00 CST`。
 - M12.47 最新自检时间为北京时间 `2026-05-19 13:42:00`：守护器 PID `2418` 存活，当前纽约时间 `2026-05-19 01:42:00 EDT`，市场状态为 `等待开盘前预热`，盘中子会话未运行属正常等待状态；最近看板为 `2026-05-18T23:58:09Z`，下次自动启动窗口为 `2026-05-19 21:25:00 CST`。
 - M14.2 预备方向：可以提前做“模拟账户/券商接入 readiness scaffold”，但只能在单独高风险分支中实现 `broker_paper_ready / live_dry_run_ready` 的接口、配置、审批 gate、凭证隔离、dry-run contract、审计日志和 kill switch；不得接真实账户、不得提交真实订单、不得引入默认 live 开关。实盘交易必须在 M14 10 日 challenge、内部模拟准入、paper dry-run、人工审批和凭证隔离全部通过后再单独批准。
+- M14.2 当前已从 M14 分支切出 `codex/m14-2-broker-readiness-scaffold` 做工程准备：新增 `BrokerReadinessConfig`、`BrokerOrderPreview`、`BrokerReadinessPlan` 与 `build_broker_readiness_plan`，只把已通过风控和 `approved_internal_sim_only` gate 的 `ExecutionRequest` 转成 dry-run 订单预演；默认 `broker_connection_enabled=false`、`real_order_enabled=false`、`live_execution_enabled=false`、`paper_trading_approval=false`。
 
 ## 当前阻塞
 
@@ -540,6 +541,7 @@
 - 同步连续运行 M12.37/M12.39/M13/M14 每日只读循环，累计 `10` 个真实交易日看板和账本记录，并把每日候选、模拟结果、数据缺口、FTD001 风险、Codex 摘要、M13 goal status 与 M14 paper gate 写入同一套 artifact；若 M12 数据仍是 fallback/no-fetch，当天只能记为数据质量 blocker，不能算作完整可批准表现。当前已完成 `6/10`，若 2026-05-19 至 2026-05-22 都 fully-ready，预计本周五盘后达到 `10/10`。
 - 每日 challenge 结束后按收益、回撤、胜率、期望、交易频率、滑点敏感性输出 `promote / modify / reject / continue_testing`；只有 gate 为 `approved_internal_sim_only` 才能进入内部模拟账户，且在用户另行批准前仍不得进入 broker paper、真实账户、真实下单或 live。
 - 新增下一步：设计 M14.2 / M15 `broker readiness scaffold`，先做模拟账户与未来券商接入的工程准备，包括 `BrokerExecutionRequest`、`BrokerExecutionPlan`、`credential_policy`、`approval_token`、`paper_dry_run_only`、`live_disabled_by_default`、只读账户探针接口、订单预演日志、熔断/kill switch、回放校验和审计报表；默认不开真实连接，所有真实 broker/paper broker/live 调用都必须等待用户单独审批。
+- M14.2 验收下一步：在不引入真实 broker SDK / HTTP / WebSocket 的前提下，把 dry-run preview 与 M14 gate artifact 连接成只读审计报告；之后才讨论 broker paper 凭证注入和人工审批流程。
 - 单次刷新可用 `python scripts/run_m12_37_intraday_auto_loop.py --once --no-fetch`；整段交易日自动会话可用 `python scripts/run_m12_37_intraday_auto_loop.py --session`；两者都仍是只读模拟，不接账户、不下单。
 - `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版现已进入正式主线账户，历史样例只留作参考不入账，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
 - 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。

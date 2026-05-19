@@ -89,6 +89,7 @@
 - Git 远端推送阻塞已处理：原始 M10.6 大 JSONL 通过 gzip archive manifest 保留可追溯，未把超过 GitHub 单文件限制的原始 blob 推送到远端；`main` 已可推送。
 - 下一阶段主线是继续用 `scripts/run_m12_37_intraday_auto_loop.py --session` 在美股开盘相关时段自动预热并持续刷新看板和 Codex 摘要；该入口已自动运行 M13 并在盘后运行 M14 固化每日 ledger/challenge/gate。M13 最新样本 `2026-05-18` 已显示所有 required 策略/模块都有有效账本状态且无 `not_connected` blocker；M14.1 已修复 fallback close、stop/target 成交价、以及“旧持仓不在当天信号行就不更新报价”的全量持仓估值缺口。当前 M14 gate 仍未批准任何策略进入内部模拟成交，有效 fully-ready challenge 为 `6/10` 天，M14 summary/dashboard 已明确展示 `challenge_progress_label=6/10`，下一步必须继续累计到 `10/10`，并继续同时记录 `PA004 baseline / PA004-MBF / PA004-MBF-QC` 三条独立账户。`M10-PA-002/007/012/013/M12-FTD-001` 当前已进入 `modify_candidate`，但 baseline 不静默覆盖，后续只能通过新变体 A/B 验证。
 - M14.2 / M15 预备方向：可以提前做模拟账户与未来券商接入的 readiness scaffold，但默认必须是 `paper_dry_run_only`、`live_disabled_by_default`、`broker_connection=false`、`real_orders=false`。允许准备接口、审批 gate、凭证隔离、订单预演日志、kill switch、回放一致性测试和人工审批清单；不允许接真实账户、不允许真实下单、不允许把 broker paper 或 live 开关默认打开。
+- M14.2 当前已切出 `codex/m14-2-broker-readiness-scaffold`，目标是在不联网、不接账户、不下单的前提下，先完成 `BrokerReadinessConfig / BrokerOrderPreview / BrokerReadinessPlan`、dry-run plan builder、示例配置和测试；后续只允许接 M14 gate artifact 生成审计报告，不允许直接进入 broker paper/live。
 
 ## 2. 执行总原则
 

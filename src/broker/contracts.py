@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Literal
 
 from src.execution.contracts import ExecutionRequest
 from src.risk.contracts import RiskDecision
 
 AssessmentMode = Literal["assessment_only"]
+BrokerReadinessStatus = Literal["blocked", "dry_run_ready"]
+BrokerReadinessMode = Literal["paper_dry_run_only"]
 ReadinessStatus = Literal["not_started", "needs_review", "ready_for_manual_approval"]
 
 
@@ -67,3 +70,47 @@ class BrokerAssessmentEnvelope:
     request: ExecutionRequest
     risk_decision: RiskDecision
     draft: FormalBrokerAdapterDraft = field(default_factory=FormalBrokerAdapterDraft)
+
+
+@dataclass(frozen=True, slots=True)
+class BrokerReadinessConfig:
+    mode: BrokerReadinessMode = "paper_dry_run_only"
+    broker_connection_enabled: bool = False
+    real_order_enabled: bool = False
+    live_execution_enabled: bool = False
+    paper_trading_approval: bool = False
+    requires_approved_internal_sim_gate: bool = True
+    kill_switch_enabled: bool = True
+    credential_policy: BrokerCredentialPolicy = field(default_factory=BrokerCredentialPolicy)
+
+
+@dataclass(frozen=True, slots=True)
+class BrokerOrderPreview:
+    preview_id: str
+    signal_id: str
+    strategy_id: str
+    symbol: str
+    market: str
+    timeframe: str
+    side: str
+    order_type: str
+    quantity: Decimal
+    limit_price: Decimal
+    stop_price: Decimal
+    target_price: Decimal
+    dry_run_only: bool = True
+    broker_connection: bool = False
+    real_order: bool = False
+    live_execution: bool = False
+    approval_required: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class BrokerReadinessPlan:
+    status: BrokerReadinessStatus
+    reason_codes: tuple[str, ...]
+    request: ExecutionRequest
+    risk_decision: RiskDecision
+    order_preview: BrokerOrderPreview | None
+    audit_messages: tuple[str, ...]
+    config: BrokerReadinessConfig = field(default_factory=BrokerReadinessConfig)
