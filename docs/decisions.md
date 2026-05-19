@@ -195,3 +195,10 @@
 - 结论：每个 `visual_pack_ready` 只表示 3 正例、1 反例、1 边界例的 evidence image logical path 与 checksum 完整；该状态不代表策略有效、盈利、可自动执行或可进入实盘。
 - 结论：Brooks v2 图片资产继续 local-only；tracked artifact 只保存 source ref、logical path、checksum、decision points、disqualifiers 与 OHLCV approximation risk。
 - 结论：M10.2 不启动回测，不生成正式 backtest spec，不输出 `retain/promote`。`m10_3_backtest_spec_handoff.md` 只允许为 Wave A 的 `M10-PA-001/002/005/012` 留出 spec freeze 承接。
+
+## D-0037 M14.2 / M15 Broker Readiness Scaffold 边界
+
+- 日期：2026-05-19
+- 结论：允许提前设计并实现模拟账户与未来券商接入的 readiness scaffold，用于在策略通过 M14 gate 后减少工程等待时间；但默认必须保持 `paper_dry_run_only`、`live_disabled_by_default`、`broker_connection=false`、`real_orders=false`、`paper_trading_approval=false`。
+- 结论：允许交付接口、配置、审批 gate、凭证隔离策略、dry-run contract、订单预演日志、回放一致性测试、kill switch、人工审批清单和审计报表；不得接真实账户、不得引入真实 broker SDK 默认依赖、不得提交真实订单、不得把 broker paper 或 live 开关默认打开。
+- 结论：真实 broker paper / live 只能在 M14 10 个 fully-ready 交易日挑战完成、策略获得 `approved_internal_sim_only` 或更高人工审批、凭证隔离通过、paper dry-run 通过、用户单独批准后进入新的高风险分支实施。

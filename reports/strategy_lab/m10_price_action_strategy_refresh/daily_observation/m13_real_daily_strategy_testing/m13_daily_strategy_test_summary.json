@@ -1,15 +1,15 @@
 {
-  "account_ledger_event_count": 127,
+  "account_ledger_event_count": 193,
   "ai_trader_copy_trading": false,
   "all_required_have_ledger_state": true,
   "blocked_strategy_ids": [],
-  "close_count": 61,
-  "generated_at": "2026-05-15T23:58:45Z",
+  "close_count": 91,
+  "generated_at": "2026-05-18T23:58:09Z",
   "live_execution": false,
   "m12_29_output_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard",
   "min_challenge_trading_days": 10,
   "missing_ledger_strategy_ids": [],
-  "open_count": 53,
+  "open_count": 90,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "plain_language_result": "M13 wrote daily ledger states for 25 strategy/account rows. 0 required strategies or modules are still blocked before a reliable 10-day challenge.",
@@ -22,5 +22,5 @@
   "stage": "M13.real_daily_strategy_testing",
   "strategy_count": 20,
   "trading_connection": false,
-  "trading_date": "2026-05-15"
+  "trading_date": "2026-05-18"
 }
