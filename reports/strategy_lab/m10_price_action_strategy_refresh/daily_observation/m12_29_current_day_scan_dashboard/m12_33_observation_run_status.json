@@ -17,7 +17,7 @@
     "M10-PA-013"
   ],
   "live_execution": false,
-  "observed_trading_days": 11,
+  "observed_trading_days": 14,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "plain_language_result": "主线账户已按纽约交易日累计；当前已接线的实验账户也会同步累计。",

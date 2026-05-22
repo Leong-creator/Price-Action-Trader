@@ -4,10 +4,10 @@
     "daily_ready_symbols": 50,
     "first_batch_symbols": 50
   },
-  "generated_at": "2026-05-18T23:58:09Z",
+  "generated_at": "2026-05-21T23:58:16Z",
   "items": [
     {
-      "candidate_count_today": "28",
+      "candidate_count_today": "15",
       "paper_gate_evidence_now": "false",
       "plain_reason": "50只日线可测；日内用当前5m观察",
       "status": "已进入每日测试",
@@ -15,7 +15,7 @@
       "title": "趋势回调二次入场"
     },
     {
-      "candidate_count_today": "6",
+      "candidate_count_today": "7",
       "paper_gate_evidence_now": "false",
       "plain_reason": "50只日线可测；日内用当前5m观察",
       "status": "已进入每日测试",
@@ -135,7 +135,7 @@
       "title": "交易区间加仓研究"
     },
     {
-      "candidate_count_today": "1",
+      "candidate_count_today": "9",
       "paper_gate_evidence_now": "false",
       "plain_reason": "从方方土来源重新正式化，不再叫 placeholder；本轮已重测。",
       "status": "只保留为对照或选股因子",
