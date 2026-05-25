@@ -1,0 +1,23 @@
+{
+  "schema_version": "m14.rescue-ab-evidence-tracker.config.v1",
+  "stage": "M14.rescue_ab_evidence_tracker",
+  "min_ab_trading_days": 10,
+  "inputs": {
+    "m14_rescue_runtime_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_runtime_coverage.json",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m13_daily_strategy_scorecard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m13_real_daily_strategy_testing/m13_daily_strategy_scorecard.json",
+    "m13_strategy_signal_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m13_real_daily_strategy_testing/m13_strategy_signal_ledger.jsonl",
+    "m13_account_operation_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m13_real_daily_strategy_testing/m13_account_operation_ledger.jsonl"
+  },
+  "outputs": {
+    "tracker_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_ab_evidence_tracker.json",
+    "tracker_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_ab_evidence_tracker.md"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}
