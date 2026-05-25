@@ -124,7 +124,19 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 "zero_signal",
             )
             self.assertEqual(
+                states[("M10-PA-009-m14-modify-20260522", "M10-PA-009-m14-modify-20260522-1d")],
+                "zero_signal",
+            )
+            self.assertEqual(
                 states[("M10-PA-012-m14-modify-20260522", "M10-PA-012-m14-modify-20260522-5m")],
+                "zero_signal",
+            )
+            self.assertEqual(
+                states[("M10-PA-013-m14-modify-20260522", "M10-PA-013-m14-modify-20260522-1d")],
+                "zero_signal",
+            )
+            self.assertEqual(
+                states[("M10-PA-013-m14-modify-20260522", "M10-PA-013-m14-modify-20260522-5m")],
                 "zero_signal",
             )
             self.assertEqual(states[("M10-PA-011-ORB-R1", "M10-PA-011-ORB-R1-5m")], "not_connected")
@@ -190,6 +202,16 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(pa007_rescue["test_states"], "zero_signal")
             self.assertEqual(pa007_rescue["challenge_status"], "ready_for_10_day_challenge")
             self.assertEqual(pa007_rescue["goal_blocked"], "false")
+            pa009_rescue = by_id["M10-PA-009-m14-modify-20260522"]
+            self.assertEqual(pa009_rescue["required_for_goal"], "false")
+            self.assertEqual(pa009_rescue["test_states"], "zero_signal")
+            self.assertEqual(pa009_rescue["challenge_status"], "ready_for_10_day_challenge")
+            self.assertEqual(pa009_rescue["goal_blocked"], "false")
+            pa013_rescue = by_id["M10-PA-013-m14-modify-20260522"]
+            self.assertEqual(pa013_rescue["required_for_goal"], "false")
+            self.assertEqual(pa013_rescue["test_states"], "zero_signal")
+            self.assertEqual(pa013_rescue["challenge_status"], "ready_for_10_day_challenge")
+            self.assertEqual(pa013_rescue["goal_blocked"], "false")
             blocked_rescue = by_id["M10-PA-011-ORB-R1"]
             self.assertEqual(blocked_rescue["test_states"], "not_connected")
             self.assertEqual(blocked_rescue["challenge_status"], "blocked_before_challenge")
