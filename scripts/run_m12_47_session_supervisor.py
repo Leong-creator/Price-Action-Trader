@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     build_dashboard_html,
+    load_m14_terminal_context,
     load_config as load_m12_29_dashboard_config,
     load_json,
     write_json,
@@ -357,7 +358,11 @@ def dashboard_runtime_status_from_supervisor(payload: dict[str, Any]) -> str:
     return f"{market_status or '未知市场状态'}；当前面板保留上一有效审计快照。"
 
 
-def apply_dashboard_status_overlay(dashboard: dict[str, Any], payload: dict[str, Any]) -> bool:
+def apply_dashboard_status_overlay(
+    dashboard: dict[str, Any],
+    payload: dict[str, Any],
+    m14_context: dict[str, Any] | None = None,
+) -> bool:
     if not dashboard:
         return False
     market_status = str(payload.get("market_status", ""))
@@ -429,6 +434,8 @@ def apply_dashboard_status_overlay(dashboard: dict[str, Any], payload: dict[str,
             "data_freshness_warning": summary.get("data_freshness_warning", ""),
         }
     )
+    if m14_context:
+        apply_dashboard_m14_overlay(terminal, m14_context)
     terminal["status_overlay"] = {
         "schema_version": "m12.47.dashboard-status-overlay.v1",
         "source": "m12_47_session_supervisor",
@@ -442,16 +449,46 @@ def apply_dashboard_status_overlay(dashboard: dict[str, Any], payload: dict[str,
     return True
 
 
+def apply_dashboard_m14_overlay(terminal: dict[str, Any], m14_context: dict[str, Any]) -> None:
+    top_status = terminal.setdefault("top_status", {})
+    top_status.update(
+        {
+            "m13_goal_status": str(m14_context.get("m13_goal_status", top_status.get("m13_goal_status", "not_available"))),
+            "m14_goal_status": str(m14_context.get("m14_goal_status", top_status.get("m14_goal_status", "not_available"))),
+            "paper_trial_gate_approved_count": str(
+                m14_context.get("paper_trial_gate_approved_count", top_status.get("paper_trial_gate_approved_count", "0"))
+            ),
+        }
+    )
+    paper_gate_by_strategy = m14_context.get("paper_gate_by_strategy") or {}
+    decision_by_strategy = m14_context.get("decision_by_strategy") or {}
+    for row in terminal.get("strategy_accounts", []):
+        if not isinstance(row, dict):
+            continue
+        strategy_id = str(row.get("strategy_id", ""))
+        if not strategy_id:
+            continue
+        gate = paper_gate_by_strategy.get(strategy_id, {})
+        decision = decision_by_strategy.get(strategy_id, {})
+        if decision:
+            row["m14_decision"] = str(decision.get("decision", row.get("m14_decision", "not_available")))
+            row["m14_decision_reason"] = str(decision.get("decision_reason", row.get("m14_decision_reason", "")))
+        if gate:
+            row["paper_trial_gate"] = str(gate.get("paper_trial_gate", row.get("paper_trial_gate", "not_approved_or_pending")))
+            row["gate_reason"] = str(gate.get("gate_reason", row.get("gate_reason", "")))
+
+
 def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, Any]) -> bool:
     dashboard_path = dashboard_json_path(config)
     if not dashboard_path.exists():
         return False
     dashboard = load_json(dashboard_path)
-    if not apply_dashboard_status_overlay(dashboard, payload):
+    dashboard_config = replace(load_m12_29_dashboard_config(), output_dir=config.output_dir)
+    m14_context = load_m14_terminal_context(dashboard_config)
+    if not apply_dashboard_status_overlay(dashboard, payload, m14_context=m14_context):
         return False
     write_json(dashboard_path, dashboard)
     try:
-        dashboard_config = replace(load_m12_29_dashboard_config(), output_dir=config.output_dir)
         (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(
             build_dashboard_html(dashboard_config, dashboard),
             encoding="utf-8",

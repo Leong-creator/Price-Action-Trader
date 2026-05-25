@@ -124,6 +124,75 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["fully_ready_for_trading_display"], "true")
         self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
 
+    def test_dashboard_status_overlay_refreshes_m14_gate_context(self):
+        dashboard = {
+            "generated_at": "2026-05-26T14:09:30Z",
+            "summary": {
+                "generated_at": "2026-05-26T14:09:30Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {"market_status": "美股常规交易时段", "freshness_state": "fresh"},
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {
+                "top_status": {
+                    "m14_goal_status": "old",
+                    "paper_trial_gate_approved_count": "0",
+                    "fully_ready_for_trading_display": "true",
+                },
+                "strategy_accounts": [
+                    {
+                        "strategy_id": "M10-PA-004",
+                        "m14_decision": "continue_testing",
+                        "paper_trial_gate": "not_approved_pending",
+                    },
+                    {
+                        "strategy_id": "M10-PA-012",
+                        "m14_decision": "continue_testing",
+                        "paper_trial_gate": "not_approved_pending",
+                    },
+                ],
+            },
+        }
+        changed = apply_dashboard_status_overlay(
+            dashboard,
+            {
+                "supervisor_generated_at": "2026-05-26T14:09:30Z",
+                "market_status": "美股常规交易时段",
+                "session_should_run": True,
+                "child_running": True,
+                "supervisor_process_alive": True,
+                "new_york_time": "2026-05-26 10:09:30 EDT",
+                "beijing_time": "2026-05-26 22:09:30 CST",
+            },
+            m14_context={
+                "m13_goal_status": "complete",
+                "m14_goal_status": "M14 effective challenge progress is 10/10. 3 strategies are approved.",
+                "paper_trial_gate_approved_count": "3",
+                "paper_gate_by_strategy": {
+                    "M10-PA-004": {
+                        "paper_trial_gate": "approved_internal_sim_only",
+                        "gate_reason": "ten_day_positive_expectancy_internal_sim_candidate",
+                    }
+                },
+                "decision_by_strategy": {
+                    "M10-PA-004": {
+                        "decision": "promote",
+                        "decision_reason": "ten_day_positive_expectancy_internal_sim_candidate",
+                    }
+                },
+            },
+        )
+        self.assertTrue(changed)
+        terminal = dashboard["broker_terminal_view"]
+        self.assertEqual(terminal["top_status"]["paper_trial_gate_approved_count"], "3")
+        self.assertIn("10/10", terminal["top_status"]["m14_goal_status"])
+        self.assertEqual(terminal["strategy_accounts"][0]["m14_decision"], "promote")
+        self.assertEqual(terminal["strategy_accounts"][0]["paper_trial_gate"], "approved_internal_sim_only")
+        self.assertEqual(terminal["strategy_accounts"][1]["m14_decision"], "continue_testing")
+
     def test_status_payload_reads_latest_dashboard_timestamp(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "m12_47"

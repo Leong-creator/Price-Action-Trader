@@ -298,6 +298,98 @@ def run_m14_strategy_challenge_gate(
     }
 
 
+def run_m14_strategy_challenge_recompute(
+    config: M14Config | None = None,
+    *,
+    generated_at: str | None = None,
+    trading_date: str | date | None = None,
+) -> dict[str, Any]:
+    config = config or load_config()
+    generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    raw_challenge_rows = read_jsonl(config.output_dir / CHALLENGE_LEDGER)
+    correction_rows = read_jsonl(config.output_dir / CHALLENGE_CORRECTION_LEDGER)
+    challenge_rows = effective_challenge_rows(raw_challenge_rows, correction_rows, key_fields=CHALLENGE_KEY_FIELDS)
+    if not challenge_rows:
+        raise ValueError("No M14 challenge history found for recompute")
+    if trading_date is None:
+        resolved_trading_date = date.fromisoformat(max(str(row.get("trading_date", "")) for row in challenge_rows if row.get("trading_date")))
+    else:
+        resolved_trading_date = date.fromisoformat(trading_date) if isinstance(trading_date, str) else trading_date
+
+    strategy_aggregates = build_strategy_aggregates(config, challenge_rows)
+    decision_rows = build_strategy_decision_rows(
+        config=config,
+        generated_at=generated_at,
+        trading_date=resolved_trading_date,
+        aggregates=strategy_aggregates,
+    )
+    decision_path = config.output_dir / DECISION_LEDGER
+    appended_decision_rows = append_unique_jsonl(
+        decision_path,
+        decision_rows,
+        key_fields=("strategy_id", "trading_date", "decision", "decision_reason", "realized_pnl", "net_pnl_r", "max_drawdown_percent", "open_count", "close_count"),
+    )
+    latest_decisions = {row["strategy_id"]: row for row in decision_rows}
+    paper_gate = build_paper_trial_gate(config, generated_at, latest_decisions, strategy_aggregates)
+    write_json(config.output_dir / PAPER_GATE, paper_gate)
+    m12_trade_rows = filter_rows_for_trading_date(
+        read_jsonl(config.m12_29_output_dir / "m12_46_account_trade_ledger.jsonl"),
+        resolved_trading_date,
+    )
+    run_id = f"{config.run_id}:recompute:{resolved_trading_date.isoformat()}:{generated_at}"
+    execution_rows = run_internal_paper_bridge(
+        config=config,
+        run_id=run_id,
+        generated_at=generated_at,
+        trading_date=resolved_trading_date,
+        paper_gate=paper_gate,
+        m12_trade_rows=m12_trade_rows,
+    )
+    appended_execution_rows = append_unique_jsonl(
+        config.output_dir / EXECUTION_LEDGER,
+        execution_rows,
+        key_fields=("execution_event_id",),
+    )
+    m13_summary = read_json(config.m13_output_dir / "m13_daily_strategy_test_summary.json")
+    m12_summary = load_m12_summary(config.m12_29_output_dir)
+    summary = build_summary(
+        config=config,
+        generated_at=generated_at,
+        trading_date=resolved_trading_date,
+        m13_summary=m13_summary,
+        m12_summary=m12_summary,
+        data_quality={"state": "history_recompute_from_existing_challenge", "warning": ""},
+        challenge_rows=challenge_rows,
+        appended_challenge_rows=[],
+        appended_correction_rows=[],
+        appended_decision_rows=appended_decision_rows,
+        appended_execution_rows=appended_execution_rows,
+        strategy_aggregates=strategy_aggregates,
+        decisions=latest_decisions,
+        paper_gate=paper_gate,
+    )
+    summary["recompute_only"] = True
+    summary["recompute_reason"] = "existing_challenge_history_gate_recalculation"
+    goal_status = build_goal_status(summary)
+    dashboard_html = build_dashboard_html(summary, strategy_aggregates, latest_decisions, paper_gate)
+    write_json(config.output_dir / SUMMARY_JSON, summary)
+    write_json(config.output_dir / GOAL_STATUS_JSON, goal_status)
+    (config.output_dir / DASHBOARD_HTML).write_text(dashboard_html, encoding="utf-8")
+    (config.output_dir / GOAL_PROMPT_MD).write_text(build_goal_prompt_md(), encoding="utf-8")
+    return {
+        "summary": summary,
+        "goal_status": goal_status,
+        "challenge_rows": challenge_rows,
+        "raw_challenge_rows": raw_challenge_rows,
+        "decision_rows": decision_rows,
+        "appended_decision_rows": appended_decision_rows,
+        "paper_gate": paper_gate,
+        "execution_rows": execution_rows,
+        "appended_execution_rows": appended_execution_rows,
+        "strategy_aggregates": strategy_aggregates,
+    }
+
+
 def build_challenge_day_rows(
     *,
     config: M14Config,
@@ -408,8 +500,13 @@ def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, 
             if sum(int_or_zero(row.get("signal_count")) for row in day_rows) == 0
             and any(row.get("test_state") == "zero_signal" for row in day_rows)
         )
-        data_mismatch_days = sum(
+        observed_data_mismatch_days = sum(
             1 for day_rows in by_date.values() if any(row.get("data_quality_state") != "fully_ready" for row in day_rows)
+        )
+        data_mismatch_days = sum(
+            1
+            for day, day_rows in by_date.items()
+            if day in valid_date_set and any(row.get("data_quality_state") != "fully_ready" for row in day_rows)
         )
         realized_pnl = sum((decimal_or_zero(row.get("realized_pnl")) for row in valid_rows), ZERO)
         total_signals = sum(int_or_zero(row.get("signal_count")) for row in valid_rows)
@@ -444,6 +541,7 @@ def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, 
             "net_pnl_r": fmt_decimal(safe_div(realized_pnl, config.internal_paper.max_risk_per_order)),
             "max_drawdown_percent": fmt_decimal(max_drawdown),
             "data_mismatch_days": data_mismatch_days,
+            "observed_data_mismatch_days": observed_data_mismatch_days,
             "blocker_reasons": sorted({str(row.get("blocker_reason", "")) for row in rows if row.get("blocker_reason")}),
             "data_freshness_warnings": sorted({str(row.get("data_freshness_warning", "")) for row in rows if row.get("data_freshness_warning")}),
         }
@@ -495,6 +593,7 @@ def build_strategy_decision_rows(
                 "risk_blocked_count": aggregate["risk_blocked_count"],
                 "risk_block_ratio": aggregate["risk_block_ratio"],
                 "data_mismatch_days": aggregate["data_mismatch_days"],
+                "observed_data_mismatch_days": aggregate.get("observed_data_mismatch_days", aggregate["data_mismatch_days"]),
                 "paper_simulated_only": True,
                 "internal_simulated_account": True,
                 "broker_paper_connection": False,
@@ -568,6 +667,9 @@ def build_paper_trial_gate(
     for strategy_id in sorted(aggregates):
         aggregate = aggregates[strategy_id]
         decision = decisions[strategy_id]
+        completed_days = int(decision["completed_trading_days"])
+        data_mismatch_days = int(decision["data_mismatch_days"])
+        observed_data_mismatch_days = int(decision.get("observed_data_mismatch_days", data_mismatch_days))
         if decision["decision"] == "promote" and int(decision["completed_trading_days"]) >= config.challenge_trading_days and int(decision["data_mismatch_days"]) == 0:
             gate_status = "approved_internal_sim_only"
             reason = "10 trading-day challenge passed; internal simulator only."
@@ -580,10 +682,10 @@ def build_paper_trial_gate(
         elif decision["modify_candidate"]:
             gate_status = "not_approved_parallel_modify_testing"
             reason = "Circuit breaker noted; original continues to 10 trading days while the parallel modify variant is tested."
-        elif int(decision["data_mismatch_days"]) > 0 and int(decision["completed_trading_days"]) == 0:
+        elif (data_mismatch_days > 0 or observed_data_mismatch_days > 0) and completed_days == 0:
             gate_status = "not_approved_data_quality"
             reason = "No fully-ready challenge day is available yet; fallback/no-fetch days are audit-only."
-        elif int(decision["data_mismatch_days"]) > 0:
+        elif data_mismatch_days > 0 or (observed_data_mismatch_days > 0 and completed_days < config.challenge_trading_days):
             gate_status = "not_approved_challenge_incomplete"
             reason = "Only fully-ready trading days count toward the 10-day challenge; degraded days are kept as audit-only."
         else:
@@ -856,7 +958,12 @@ def build_goal_status(summary: dict[str, Any]) -> dict[str, Any]:
         "goal_complete": complete,
         "continue_without_stopping": not complete,
         "data_quality_state": summary["data_quality_state"],
+        "challenge_progress_label": summary["challenge_progress_label"],
+        "effective_challenge_trading_days": summary["effective_challenge_trading_days"],
+        "required_challenge_trading_days": summary["required_challenge_trading_days"],
         "approved_internal_sim_strategy_ids": summary["approved_internal_sim_strategy_ids"],
+        "paper_trial_gate_approved_count": summary["paper_trial_gate_approved_count"],
+        "plain_language_result": summary["plain_language_result"],
         "next_action": (
             "Continue the 10 NY trading-day challenge; do not modify baseline strategies unless a circuit breaker triggers."
             if not complete

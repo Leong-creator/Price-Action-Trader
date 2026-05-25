@@ -20,6 +20,7 @@
 ## 当前工具修复
 
 - 已修复 M12.37/M12.47 面板假日误判：`M12.29` 和 `M12.37` 现在共用配置化美股休市日历，`2026-05-25` Memorial Day 不再显示为常规交易时段，也不会在休市日误跑 M13 ledger；M12.47 `--status` 会把现有静态看板 overlay 成“非交易日等待 / audit-only 快照”。
+- 已修复 M14 gate 与券商式主面板同步滞后：M12.47 `--status` 现在会刷新主面板里的 M14 进度、内部模拟准入数量和每条策略账户的 gate/decision；M14 `goal_status` 也直接写入 `challenge_progress_label`、`paper_trial_gate_approved_count` 和 approved ids，避免心跳汇报继续读到旧的 `approved 0`。
 
 ## 已完成
 
