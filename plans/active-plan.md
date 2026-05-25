@@ -96,6 +96,7 @@
 - M14 rescue 当前已新增 `scripts/run_m14_strategy_rescue_plan.py`：`M10-PA-004 / M10-PA-005 / M10-PA-008` 继续内部模拟；`M10-PA-001/002/004-MBF/004-MBF-QC/007/009/012/013/M12-FTD-001` 进入新变体 A/B 救援；`M10-PA-011` 先重建 detector 再决定是否最终放弃；plugin/filter/research 策略继续做 A/B 或影子覆盖，不伪装成独立交易账户。AI-Trader 和 TradingAgents 只作为公开项目架构与影子信号研究参考。
 - M14 rescue 首批变体已进入 M13 registry：所有已登记 rescue runtime 先以 `not_connected` 状态进入每日 ledger，目标是让未盈利策略从“计划中要救”变成“每天有账本状态”。当前 `M10-PA-001-m14-modify-20260522`、`M10-PA-002-m14-modify-20260522`、`M10-PA-004-MBF-QC-m14-modify-20260522`、`M10-PA-007-m14-modify-20260522`、`M10-PA-009-m14-modify-20260522`、`M10-PA-012-m14-modify-20260522`、`M10-PA-013-m14-modify-20260522`、`M12-FTD-001-m14-modify-20260522`、`M10-PA-011-ORB-R1` 已接入 M12 accountized `rescue` lane；其中 PA004-MBF-QC rescue 使用更严格的风险压缩 adapter，ORB-R1 使用 5m 失败开盘区间突破后回测确认 adapter，其余复用父策略扫描器并增加看涨、低风险、至少 `1.2R` 的质量过滤；下一步继续用 10 日 A/B 数据判断 `promote / modify / reject`，不得把已接线等同于已通过。
 - M14 rescue runtime 覆盖审计已落地：`scripts/run_m14_rescue_runtime_coverage.py` 当前证明 M13 registry 中 `9/9` 条 rescue 策略、`10` 个 M12 account specs 输入流均已接线，M14 rescue plan 中 `10/10` 个 rescue/rebuild 动作已有 runtime 覆盖；该审计只证明输入覆盖，不代表策略通过或准入，所有 rescue runtime 仍必须继续累计 10 个交易日 A/B ledger 后再判断 `promote / modify / reject`。
+- M14 goal readiness 总览已落地：`scripts/run_m14_goal_readiness_report.py` 当前把 M14 challenge、internal sim gate、rescue coverage 与 M14.2 broker dry-run 汇总成单一验收视图；结论是 10 日 challenge 已够，`M10-PA-004 / M10-PA-005 / M10-PA-008` 可继续内部模拟账户测试，弱策略救援变体已准备进入 10 日 A/B 取证，目标仍未完成，因为 rescue 变体尚未形成新 10 日证据且 broker/live 继续禁用。
 
 ## 2. 执行总原则
 

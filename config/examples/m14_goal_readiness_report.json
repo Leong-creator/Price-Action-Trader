@@ -1,0 +1,24 @@
+{
+  "schema_version": "m14.goal-readiness-report.config.v1",
+  "stage": "M14.goal_readiness_report",
+  "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+  "inputs": {
+    "m14_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_challenge_summary.json",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
+    "m14_rescue_runtime_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_runtime_coverage.json",
+    "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json"
+  },
+  "outputs": {
+    "readiness_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_goal_readiness_report.json",
+    "readiness_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_goal_readiness_report.md"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "internal_simulated_account": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}
