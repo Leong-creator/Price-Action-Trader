@@ -49,6 +49,7 @@ class SupervisorConfig:
     regular_session_start_time: str
     regular_session_end_time: str
     postclose_grace_minutes: int
+    market_holidays: frozenset[date]
     boundary: BoundaryConfig
 
 
@@ -72,6 +73,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SupervisorConfig:
         regular_session_start_time=payload["regular_session_start_time"],
         regular_session_end_time=payload["regular_session_end_time"],
         postclose_grace_minutes=int(payload["postclose_grace_minutes"]),
+        market_holidays=parse_market_holidays(payload.get("market_holidays", [])),
         boundary=BoundaryConfig(
             paper_simulated_only=bool(boundary["paper_simulated_only"]),
             trading_connection=bool(boundary["trading_connection"]),
@@ -82,6 +84,18 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SupervisorConfig:
     )
     validate_config(config)
     return config
+
+
+def parse_market_holidays(values: list[str]) -> frozenset[date]:
+    holidays: set[date] = set()
+    for raw_value in values:
+        if not isinstance(raw_value, str):
+            raise ValueError("market_holidays must contain ISO date strings")
+        try:
+            holidays.add(date.fromisoformat(raw_value))
+        except ValueError as exc:
+            raise ValueError(f"invalid market holiday date: {raw_value}") from exc
+    return frozenset(holidays)
 
 
 def validate_config(config: SupervisorConfig) -> None:
@@ -115,16 +129,20 @@ def current_times(config: SupervisorConfig, generated_at: str | None = None) -> 
     return utc_dt, market_dt
 
 
-def next_business_day(value: date) -> date:
+def is_trading_day(config: SupervisorConfig, value: date) -> bool:
+    return value.weekday() < 5 and value not in config.market_holidays
+
+
+def next_trading_day(config: SupervisorConfig, value: date) -> date:
     candidate = value + timedelta(days=1)
-    while candidate.weekday() >= 5:
+    while not is_trading_day(config, candidate):
         candidate += timedelta(days=1)
     return candidate
 
 
-def previous_business_day(value: date) -> date:
+def previous_trading_day(config: SupervisorConfig, value: date) -> date:
     candidate = value - timedelta(days=1)
-    while candidate.weekday() >= 5:
+    while not is_trading_day(config, candidate):
         candidate -= timedelta(days=1)
     return candidate
 
@@ -134,9 +152,9 @@ def build_window_state(config: SupervisorConfig, generated_at: str | None = None
     preopen_start = parse_clock(config.preopen_start_time)
     regular_open = parse_clock(config.regular_session_start_time)
     regular_close = parse_clock(config.regular_session_end_time)
-    if market_dt.weekday() >= 5:
+    if not is_trading_day(config, market_dt.date()):
         phase = "非交易日等待"
-        next_session_date = next_business_day(market_dt.date())
+        next_session_date = next_trading_day(config, market_dt.date())
     elif market_dt.time() < preopen_start:
         phase = "等待开盘前预热"
         next_session_date = market_dt.date()
@@ -148,15 +166,16 @@ def build_window_state(config: SupervisorConfig, generated_at: str | None = None
         next_session_date = market_dt.date()
     elif market_dt.time() <= (datetime.combine(market_dt.date(), regular_close) + timedelta(minutes=config.postclose_grace_minutes)).time():
         phase = "收盘后收尾窗口"
-        next_session_date = next_business_day(market_dt.date())
+        next_session_date = next_trading_day(config, market_dt.date())
     else:
         phase = "等待下一交易日"
-        next_session_date = next_business_day(market_dt.date())
+        next_session_date = next_trading_day(config, market_dt.date())
     next_session_market_dt = datetime.combine(next_session_date, preopen_start, tzinfo=ZoneInfo(config.market_timezone))
     return {
         "generated_at": utc_dt.replace(tzinfo=UTC).isoformat().replace("+00:00", "Z"),
         "market_status": phase,
         "market_date": market_dt.date().isoformat(),
+        "market_holiday": str(market_dt.date() in config.market_holidays).lower(),
         "new_york_time": market_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "beijing_time": utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "session_should_run": str(phase in {"开盘前预热窗口", "美股常规交易时段", "收盘后收尾窗口"}).lower(),

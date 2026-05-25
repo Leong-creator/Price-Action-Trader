@@ -30,6 +30,22 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(after["market_status"], "收盘后收尾窗口")
         self.assertEqual(after["session_should_run"], "true")
 
+    def test_window_state_skips_configured_market_holiday(self):
+        config = load_config()
+        phase = build_window_state(config, "2026-05-25T13:26:00Z")
+        self.assertEqual(phase["market_status"], "非交易日等待")
+        self.assertEqual(phase["market_holiday"], "true")
+        self.assertEqual(phase["session_should_run"], "false")
+        self.assertEqual(phase["next_session_start_new_york"], "2026-05-26 09:25:00 EDT")
+        self.assertEqual(phase["next_session_start_beijing"], "2026-05-26 21:25:00 CST")
+
+    def test_window_state_after_friday_skips_monday_holiday(self):
+        config = load_config()
+        phase = build_window_state(config, "2026-05-23T00:01:00Z")
+        self.assertEqual(phase["market_status"], "等待下一交易日")
+        self.assertEqual(phase["session_should_run"], "false")
+        self.assertEqual(phase["next_session_start_new_york"], "2026-05-26 09:25:00 EDT")
+
     def test_status_payload_reads_latest_dashboard_timestamp(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "m12_47"
