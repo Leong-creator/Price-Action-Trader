@@ -21,6 +21,10 @@
     "credential_isolation_review_passed",
     "kill_switch_enabled"
   ],
+  "inputs": {
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m14_internal_paper_execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_internal_paper_execution_ledger.jsonl"
+  },
   "outputs": {
     "dry_run_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json",
     "audit_log": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_audit.jsonl"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import tempfile
 import unittest
 from dataclasses import replace
 from datetime import datetime
@@ -18,6 +19,8 @@ from src.broker import (
 from src.risk.contracts import RiskDecision, RiskEvent, SessionRiskState
 from src.strategy.contracts import Signal
 from src.execution.contracts import ExecutionRequest
+from scripts.m14_2_broker_readiness_scaffold_lib import load_config as load_m142_config
+from scripts.m14_2_broker_readiness_scaffold_lib import run_broker_readiness_scaffold
 
 
 class M142BrokerReadinessScaffoldTest(unittest.TestCase):
@@ -124,6 +127,93 @@ class M142BrokerReadinessScaffoldTest(unittest.TestCase):
         self.assertEqual(payload["credential_policy"]["required_fields"], [])
         self.assertFalse(payload["credential_policy"]["allows_default_values"])
 
+    def test_runner_builds_dry_run_artifacts_from_internal_paper_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paper_gate = root / "m14_paper_trial_gate.json"
+            internal_ledger = root / "m14_internal_paper_execution_ledger.jsonl"
+            plan_path = root / "broker_readiness_plan.json"
+            audit_path = root / "broker_readiness_audit.jsonl"
+            config_path = root / "m14_2_config.json"
+            paper_gate.write_text(
+                json.dumps({"approved_internal_sim_strategy_ids": ["M10-PA-004"]}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            rows = [
+                self._internal_paper_row(
+                    strategy_id="M10-PA-004",
+                    signal_id="sig-approved-allow",
+                    risk_outcome="allow",
+                    reason_codes="risk_allow",
+                ),
+                self._internal_paper_row(
+                    strategy_id="M10-PA-001",
+                    signal_id="sig-not-approved",
+                    risk_outcome="allow",
+                    reason_codes="risk_allow",
+                ),
+                self._internal_paper_row(
+                    strategy_id="M10-PA-004",
+                    signal_id="sig-approved-blocked",
+                    risk_outcome="block",
+                    reason_codes="max_total_exposure_exceeded",
+                ),
+            ]
+            internal_ledger.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "stage": "M14.2.broker_readiness_scaffold",
+                        "mode": "paper_dry_run_only",
+                        "broker_connection_enabled": False,
+                        "real_order_enabled": False,
+                        "live_execution_enabled": False,
+                        "paper_trading_approval": False,
+                        "requires_approved_internal_sim_gate": True,
+                        "kill_switch_enabled": True,
+                        "credential_policy": {
+                            "required_fields": [],
+                            "allows_default_values": False,
+                            "requires_manual_secret_injection": True,
+                        },
+                        "inputs": {
+                            "m14_paper_trial_gate": str(paper_gate),
+                            "m14_internal_paper_execution_ledger": str(internal_ledger),
+                        },
+                        "outputs": {
+                            "dry_run_plan": str(plan_path),
+                            "audit_log": str(audit_path),
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_broker_readiness_scaffold(
+                load_m142_config(config_path),
+                generated_at="2026-05-26T12:00:00Z",
+            )
+
+            self.assertEqual(result["source_risk_check_count"], 3)
+            self.assertEqual(result["dry_run_ready_count"], 1)
+            self.assertEqual(result["blocked_count"], 2)
+            by_signal = {row["signal_id"]: row for row in result["rows"]}
+            self.assertEqual(by_signal["sig-approved-allow"]["readiness_status"], "dry_run_ready")
+            self.assertEqual(by_signal["sig-approved-allow"]["order_type"], "limit_entry_with_attached_stop_target")
+            self.assertEqual(by_signal["sig-not-approved"]["readiness_status"], "blocked")
+            self.assertIn("strategy_not_approved_internal_sim", by_signal["sig-not-approved"]["reason_codes"])
+            self.assertEqual(by_signal["sig-approved-blocked"]["readiness_status"], "blocked")
+            self.assertIn("risk_decision_not_allow", by_signal["sig-approved-blocked"]["reason_codes"])
+            self.assertTrue(plan_path.exists())
+            self.assertTrue(audit_path.exists())
+            persisted = json.loads(plan_path.read_text(encoding="utf-8"))
+            self.assertFalse(persisted["broker_connection_enabled"])
+            self.assertFalse(persisted["real_order_enabled"])
+            self.assertFalse(persisted["live_execution_enabled"])
+            self.assertFalse(persisted["paper_trading_approval"])
+            self.assertEqual(len(audit_path.read_text(encoding="utf-8").splitlines()), 3)
+
     def _request(self) -> ExecutionRequest:
         return ExecutionRequest(
             signal=Signal(
@@ -170,6 +260,44 @@ class M142BrokerReadinessScaffoldTest(unittest.TestCase):
             events=(RiskEvent(code="risk_allow", severity="info", message="fixture allow"),),
             resulting_state=SessionRiskState(session_key="2026-05-18"),
         )
+
+    def _internal_paper_row(
+        self,
+        *,
+        strategy_id: str,
+        signal_id: str,
+        risk_outcome: str,
+        reason_codes: str,
+    ) -> dict:
+        return {
+            "schema_version": "m14.internal-paper-execution-ledger.v1",
+            "stage": "M14.strategy_challenge_paper_gate",
+            "execution_event_id": f"exec-{signal_id}",
+            "run_id": "fixture-run",
+            "generated_at": "2026-05-26T11:00:00Z",
+            "trading_date": "2026-05-26",
+            "strategy_id": strategy_id,
+            "runtime_id": f"{strategy_id}-1d",
+            "signal_id": signal_id,
+            "symbol": "SAMPLE",
+            "timeframe": "1d",
+            "direction": "long",
+            "action": "risk_check",
+            "status": "filled" if risk_outcome == "allow" else "blocked",
+            "risk_outcome": risk_outcome,
+            "reason_codes": reason_codes,
+            "quantity": "1",
+            "entry_price": "100",
+            "stop_price": "98",
+            "target_price": "104",
+            "simulated": True,
+            "internal_simulated_account": True,
+            "broker_paper_connection": False,
+            "trading_connection": False,
+            "real_money_actions": False,
+            "live_execution": False,
+            "paper_trading_approval": False,
+        }
 
 
 if __name__ == "__main__":

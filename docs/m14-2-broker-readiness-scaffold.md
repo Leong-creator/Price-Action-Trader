@@ -25,6 +25,19 @@
 5. `BrokerOrderPreview` 不是订单，不含 `submit/connect/login` 行为。
 6. 真实 broker paper 或 live 必须另开高风险分支、补凭证隔离、人工审批和回退方案。
 
+当前新增生成入口：
+
+```bash
+python scripts/run_m14_2_broker_readiness_scaffold.py --config config/examples/m14_2_broker_readiness_scaffold.json
+```
+
+该入口只读取 `m14_paper_trial_gate.json` 与 `m14_internal_paper_execution_ledger.jsonl`，把内部模拟的 `risk_check` 事件转成 dry-run readiness rows，并输出：
+
+- `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json`
+- `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_audit.jsonl`
+
+当前真实样本显示：`8` 条内部模拟风控检查中，`1` 条为 `dry_run_ready`，`7` 条仍被风控阻断；这说明后续优化应先处理策略信号质量、敞口与仓位适配，而不是放宽风控或跳过风控。
+
 ## Block Conditions
 
 以下任一条件触发时必须阻断：
