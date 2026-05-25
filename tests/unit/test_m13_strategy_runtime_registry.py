@@ -97,6 +97,7 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
         connected_rescue_ids = {
             "M10-PA-001-m14-modify-20260522",
             "M10-PA-002-m14-modify-20260522",
+            "M10-PA-007-m14-modify-20260522",
             "M10-PA-012-m14-modify-20260522",
         }
         for rescue_id, parent_id in rescue_parent_ids.items():

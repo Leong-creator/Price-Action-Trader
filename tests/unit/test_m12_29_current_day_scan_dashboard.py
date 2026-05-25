@@ -282,6 +282,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("M10-PA-013", experimental_ids)
         self.assertIn("M10-PA-001-m14-modify-20260522", rescue_ids)
         self.assertIn("M10-PA-002-m14-modify-20260522", rescue_ids)
+        self.assertIn("M10-PA-007-m14-modify-20260522", rescue_ids)
         self.assertIn("M10-PA-012-m14-modify-20260522", rescue_ids)
         self.assertNotIn("M10-PA-005", mainline_ids)
         self.assertNotIn("M10-PA-004", experimental_ids)
@@ -307,6 +308,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             [
                 "M10-PA-001-m14-modify-20260522",
                 "M10-PA-002-m14-modify-20260522",
+                "M10-PA-007-m14-modify-20260522",
                 "M10-PA-012-m14-modify-20260522",
             ],
         )
@@ -422,6 +424,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             {
                 "M10-PA-001-m14-modify-20260522-1d",
                 "M10-PA-002-m14-modify-20260522-1d",
+                "M10-PA-007-m14-modify-20260522-1d",
                 "M10-PA-012-m14-modify-20260522-5m",
             },
         )
