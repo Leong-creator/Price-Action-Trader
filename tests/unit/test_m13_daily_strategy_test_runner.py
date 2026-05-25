@@ -120,6 +120,10 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 "zero_signal",
             )
             self.assertEqual(
+                states[("M10-PA-004-MBF-QC-m14-modify-20260522", "M10-PA-004-MBF-QC-m14-modify-20260522-1d")],
+                "zero_signal",
+            )
+            self.assertEqual(
                 states[("M10-PA-007-m14-modify-20260522", "M10-PA-007-m14-modify-20260522-1d")],
                 "zero_signal",
             )
@@ -221,6 +225,11 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(ftd_rescue["test_states"], "zero_signal")
             self.assertEqual(ftd_rescue["challenge_status"], "ready_for_10_day_challenge")
             self.assertEqual(ftd_rescue["goal_blocked"], "false")
+            pa004_qc_rescue = by_id["M10-PA-004-MBF-QC-m14-modify-20260522"]
+            self.assertEqual(pa004_qc_rescue["required_for_goal"], "false")
+            self.assertEqual(pa004_qc_rescue["test_states"], "zero_signal")
+            self.assertEqual(pa004_qc_rescue["challenge_status"], "ready_for_10_day_challenge")
+            self.assertEqual(pa004_qc_rescue["goal_blocked"], "false")
             blocked_rescue = by_id["M10-PA-011-ORB-R1"]
             self.assertEqual(blocked_rescue["test_states"], "not_connected")
             self.assertEqual(blocked_rescue["challenge_status"], "blocked_before_challenge")

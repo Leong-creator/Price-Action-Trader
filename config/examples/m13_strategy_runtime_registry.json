@@ -218,15 +218,15 @@
       "strategy_id": "M10-PA-004-MBF-QC-m14-modify-20260522",
       "display_name": "M14 rescue variant for PA004-MBF-QC",
       "module_role": "independent_runtime",
-      "detector_id": "m14_rescue_variant_pending_adapter",
-      "detector_status": "not_connected",
+      "detector_id": "m14_rescue_pa004_mbf_qc_risk_compression_adapter",
+      "detector_status": "connected",
       "required_for_goal": false,
       "parent_strategy_id": "M10-PA-004-MBF-QC",
       "rescue_source_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
       "runtime_accounts": [
         {"runtime_id": "M10-PA-004-MBF-QC-m14-modify-20260522-1d", "timeframe": "1d", "lane": "rescue", "variant_id": "m14_modify_20260522"}
       ],
-      "next_action": "M14 rescue variant is ledger-visible but not yet connected to M12 accountized inputs; build a stricter quality-confirmation adapter before judging performance. Do not overwrite PA004 baseline, PA004-MBF, or PA004-MBF-QC."
+      "next_action": "M14 rescue variant is connected to the M12 accountized PA004-MBF-QC risk-compression adapter; run it as a stricter A/B rescue account for 10 trading days. Do not overwrite PA004 baseline, PA004-MBF, or PA004-MBF-QC."
     },
     {
       "strategy_id": "M10-PA-007-m14-modify-20260522",

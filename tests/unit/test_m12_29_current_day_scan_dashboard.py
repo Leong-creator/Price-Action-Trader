@@ -11,6 +11,8 @@ from unittest.mock import patch
 from scripts.m12_29_current_day_scan_dashboard_lib import (
     ACCOUNT_SPECS,
     DEFAULT_ACCOUNT_EQUITY,
+    PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID,
+    PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID,
     PA004_MOMENTUM_QUALITY_VARIANT_ID,
     PA004_MOMENTUM_VARIANT_ID,
     advance_account_runtime,
@@ -25,6 +27,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     pa004_event_is_long,
     pa004_momentum_breakout_quality_signal,
     pa004_momentum_breakout_signal,
+    rescue_signal_filter,
     run_m12_29_current_day_scan_dashboard,
 )
 from scripts.run_m12_29_current_day_scan_dashboard import validate_generated_at
@@ -413,6 +416,21 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIsNotNone(pa004_momentum_breakout_signal("QCOM", lower_quality_bars, date.fromisoformat("2026-05-11")))
         self.assertIsNone(pa004_momentum_breakout_quality_signal("QCOM", lower_quality_bars, date.fromisoformat("2026-05-11")))
 
+    def test_pa004_qc_rescue_adapter_is_stricter_than_parent_qc(self):
+        spec = {"strategy_id": PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID, "timeframe": "1d"}
+        base_row = {
+            "symbol": "QCOM",
+            "direction": "看涨",
+            "hypothetical_entry_price": "100.00",
+            "hypothetical_target_price": "106.00",
+            "signal_date": "2026-05-11",
+            "latest_price_source": "longbridge_quote_readonly",
+        }
+        self.assertTrue(rescue_signal_filter(spec, base_row | {"hypothetical_stop_price": "96.00"}))
+        self.assertFalse(rescue_signal_filter(spec, base_row | {"hypothetical_stop_price": "95.00"}))
+        self.assertFalse(rescue_signal_filter(spec, base_row | {"hypothetical_target_price": "105.00", "hypothetical_stop_price": "96.00"}))
+        self.assertFalse(rescue_signal_filter(spec, base_row | {"symbol": "TQQQ", "hypothetical_stop_price": "96.00"}))
+
     def test_all_runtime_accounts_are_marked_as_formal_input_streams(self):
         _, result, _ = self.run_stage()
         rows = result["dashboard"]["account_input_audit"]["rows"]
@@ -430,6 +448,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             {
                 "M10-PA-001-m14-modify-20260522-1d",
                 "M10-PA-002-m14-modify-20260522-1d",
+                "M10-PA-004-MBF-QC-m14-modify-20260522-1d",
                 "M10-PA-007-m14-modify-20260522-1d",
                 "M10-PA-009-m14-modify-20260522-1d",
                 "M10-PA-012-m14-modify-20260522-5m",
@@ -440,7 +459,18 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         )
         self.assertTrue(all(row["formal_input_stream"] == "true" for row in rescue_rows))
         self.assertTrue(all(row["current_scanner_connected"] == "true" for row in rescue_rows))
-        self.assertTrue(all(row["input_source_type"] == "m14_rescue_parent_quality_filter_adapter" for row in rescue_rows))
+        rescue_source_by_runtime = {row["runtime_id"]: row["input_source_type"] for row in rescue_rows}
+        self.assertEqual(
+            rescue_source_by_runtime["M10-PA-004-MBF-QC-m14-modify-20260522-1d"],
+            PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID,
+        )
+        self.assertTrue(
+            all(
+                row["input_source_type"] == "m14_rescue_parent_quality_filter_adapter"
+                for row in rescue_rows
+                if row["runtime_id"] != "M10-PA-004-MBF-QC-m14-modify-20260522-1d"
+            )
+        )
         self.assertTrue(
             all(row["input_status"] in {"connected_with_signal_today", "connected_zero_signal_today"} for row in experimental_rows)
         )
