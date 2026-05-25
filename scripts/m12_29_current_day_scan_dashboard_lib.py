@@ -67,6 +67,8 @@ PA004_MOMENTUM_VARIANT_ID = "M10-PA-004-MBF"
 PA004_MOMENTUM_QUALITY_VARIANT_ID = "M10-PA-004-MBF-QC"
 PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID = "M10-PA-004-MBF-QC-m14-modify-20260522"
 PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID = "m14_rescue_pa004_mbf_qc_risk_compression_adapter"
+PA011_ORB_REBUILD_VARIANT_ID = "M10-PA-011-ORB-R1"
+PA011_ORB_REBUILD_ADAPTER_ID = "m14_rescue_pa011_failed_orb_retest_adapter"
 EXPERIMENTAL_STRATEGIES = (
     "M10-PA-005",
     "M10-PA-007",
@@ -87,6 +89,7 @@ RESCUE_PARENT_STRATEGIES = {
     "M10-PA-012-m14-modify-20260522": "M10-PA-012",
     "M10-PA-013-m14-modify-20260522": "M10-PA-013",
     "M12-FTD-001-m14-modify-20260522": "M12-FTD-001",
+    PA011_ORB_REBUILD_VARIANT_ID: "M10-PA-011",
 }
 RESCUE_CONNECTED_STRATEGIES = frozenset(RESCUE_PARENT_STRATEGIES)
 CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES) | EXPERIMENTAL_ADAPTER_STRATEGIES | RESCUE_CONNECTED_STRATEGIES
@@ -149,6 +152,7 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-013-m14-modify-20260522-1d", "strategy_id": "M10-PA-013-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-013 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-013-m14-modify-20260522-5m", "strategy_id": "M10-PA-013-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-013 救援五分钟账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M12-FTD-001-m14-modify-20260522-1d", "strategy_id": "M12-FTD-001-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M12-FTD-001 救援日线账户", "variant_id": "m14_modify_20260522"},
+    {"account_id": "M10-PA-011-ORB-R1-5m", "strategy_id": PA011_ORB_REBUILD_VARIANT_ID, "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-011 ORB-R1 五分钟救援账户", "variant_id": "orb_rebuild_r1"},
 )
 SUPPORTING_RULE_SPECS = (
     {"supporting_rule_id": "M10-PA-006", "display_name": "BLSHS 限价过滤", "mode": "base_trigger + M10-PA-006"},
@@ -619,7 +623,9 @@ def build_experimental_adapter_rows(
     daily_start = parse_iso_date(str(detector_config.daily_start)) or date(2010, 6, 29)
     rows: list[dict[str, str]] = []
     for spec in ACCOUNT_SPECS:
-        if spec["lane"] != "experimental" or not scanner_connected_for_spec(spec):
+        if spec["lane"] == "rescue" and spec["strategy_id"] != PA011_ORB_REBUILD_VARIANT_ID:
+            continue
+        if spec["lane"] not in {"experimental", "rescue"} or not scanner_connected_for_spec(spec):
             continue
         timeframe = spec["timeframe"]
         start_date = daily_start if timeframe == "1d" else scan_date
@@ -665,6 +671,8 @@ def runtime_source_strategy_id(spec: dict[str, str]) -> str:
 def rescue_input_source_type_for_spec(spec: dict[str, str]) -> str:
     if spec["strategy_id"] == PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID:
         return PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID
+    if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
+        return PA011_ORB_REBUILD_ADAPTER_ID
     return "m14_rescue_parent_quality_filter_adapter"
 
 
@@ -749,6 +757,8 @@ def experimental_rows_for_spec(
         return pa004_momentum_breakout_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id == PA004_MOMENTUM_QUALITY_VARIANT_ID:
         return pa004_momentum_breakout_quality_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
+    if strategy_id == PA011_ORB_REBUILD_VARIANT_ID:
+        return pa011_orb_rebuild_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id in WAVE_B_ADAPTER_STRATEGIES:
         return wave_b_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     return []
@@ -893,6 +903,122 @@ def wave_b_adapter_rows(
             )
         )
     return rows
+
+
+def pa011_orb_rebuild_rows(
+    spec: dict[str, str],
+    symbol: str,
+    bars: list[Any],
+    cache_path: Path,
+    checksum: str,
+    quotes: dict[str, dict[str, str]],
+    scan_date: date,
+) -> list[dict[str, str]]:
+    signal = pa011_orb_rebuild_signal(symbol=symbol, bars=bars, scan_date=scan_date)
+    if signal is None:
+        return []
+    entry = signal["entry"]
+    stop = signal["stop"]
+    target = signal["target"]
+    latest = quote_latest_or_entry(quotes, symbol, entry)
+    row = experimental_adapter_trade_row(
+        strategy_id=spec["strategy_id"],
+        strategy_title="M10-PA-011 ORB-R1 失败开盘突破反转（救援账户）",
+        symbol=symbol,
+        timeframe=spec["timeframe"],
+        direction=str(signal["direction"]),
+        signal_time=str(signal["signal_time"]),
+        signal_date=scan_date,
+        entry=entry,
+        stop=stop,
+        target=target,
+        latest=latest,
+        latest_price_source=quotes.get(symbol, {}).get("quote_source", "candidate_reference_fallback"),
+        cache_path=cache_path,
+        checksum=checksum,
+        spec_ref="reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json#M10-PA-011",
+        source_refs="reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-011.json;reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
+        context=PA011_ORB_REBUILD_ADAPTER_ID,
+        review_status=(
+            "ORB-R1 重建版只在 5m 开盘 30 分钟区间后工作：要求先假突破开盘区间、"
+            "随后回到区间中轴另一侧确认，单次风险不超过 2.5%，目标固定 1.5R；"
+            "M10-PA-011 baseline 保持独立不覆盖。"
+        ),
+        risk_level="中",
+        variant_id="orb_rebuild_r1",
+    )
+    row["bucket"] = "M14 救援变体输入"
+    row["candidate_status"] = "m14_rescue_adapter_entry"
+    row["data_lineage"] = PA011_ORB_REBUILD_ADAPTER_ID
+    row["signal_source_type"] = PA011_ORB_REBUILD_ADAPTER_ID
+    return [row]
+
+
+def pa011_orb_rebuild_signal(symbol: str, bars: list[Any], scan_date: date) -> dict[str, Decimal | str] | None:
+    if symbol in {"SQQQ", "TQQQ"}:
+        return None
+    session = [
+        bar
+        for bar in bars
+        if iso_to_ny_trading_date(str(getattr(bar, "timestamp", ""))) == scan_date
+    ]
+    session.sort(key=lambda bar: str(getattr(bar, "timestamp", "")))
+    opening_bars_required = 6
+    if len(session) <= opening_bars_required + 1:
+        return None
+    opening = session[:opening_bars_required]
+    opening_high = max(Decimal(str(bar.high)) for bar in opening)
+    opening_low = min(Decimal(str(bar.low)) for bar in opening)
+    opening_ref = Decimal(str(opening[-1].close))
+    opening_height = opening_high - opening_low
+    if opening_ref <= ZERO or opening_height <= ZERO:
+        return None
+    opening_height_percent = opening_height / opening_ref * HUNDRED
+    if opening_height_percent < Decimal("0.10") or opening_height_percent > Decimal("3.00"):
+        return None
+    opening_mid = (opening_high + opening_low) / Decimal("2")
+    search_window = session[opening_bars_required : min(len(session) - 1, opening_bars_required + 12)]
+    for index, probe in enumerate(search_window, start=opening_bars_required):
+        confirm = session[index + 1]
+        probe_open = Decimal(str(probe.open))
+        probe_high = Decimal(str(probe.high))
+        probe_low = Decimal(str(probe.low))
+        probe_close = Decimal(str(probe.close))
+        confirm_open = Decimal(str(confirm.open))
+        confirm_close = Decimal(str(confirm.close))
+        if (
+            probe_high > opening_high
+            and probe_close < opening_high
+            and probe_close < probe_open
+            and confirm_close < opening_mid
+            and confirm_close < confirm_open
+        ):
+            entry = confirm_close
+            stop = max(probe_high, opening_high + opening_height * Decimal("0.10"))
+            return pa011_orb_rebuild_signal_payload("short", confirm, entry, stop)
+        if (
+            probe_low < opening_low
+            and probe_close > opening_low
+            and probe_close > probe_open
+            and confirm_close > opening_mid
+            and confirm_close > confirm_open
+        ):
+            entry = confirm_close
+            stop = min(probe_low, opening_low - opening_height * Decimal("0.10"))
+            return pa011_orb_rebuild_signal_payload("long", confirm, entry, stop)
+    return None
+
+
+def pa011_orb_rebuild_signal_payload(direction: str, bar: Any, entry: Decimal, stop: Decimal) -> dict[str, Decimal | str] | None:
+    risk = entry - stop if direction == "long" else stop - entry
+    if entry <= ZERO or stop <= ZERO or risk <= ZERO:
+        return None
+    if risk / entry * HUNDRED > Decimal("2.50"):
+        return None
+    target = entry + risk * Decimal("1.50") if direction == "long" else entry - risk * Decimal("1.50")
+    if target <= ZERO:
+        return None
+    return {"direction": direction, "signal_time": str(bar.timestamp), "entry": entry, "stop": stop, "target": target}
 
 
 def pa004_momentum_breakout_rows(
@@ -1347,6 +1473,12 @@ def runtime_signal_rows(
     trade_rows: list[dict[str, str]],
     pa004_formal_rows: list[dict[str, str]],
 ) -> list[dict[str, str]]:
+    if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
+        return [
+            row for row in trade_rows
+            if row.get("strategy_id") == spec["strategy_id"]
+            and row.get("timeframe") == spec["timeframe"]
+        ]
     source_strategy_id = runtime_source_strategy_id(spec)
     if source_strategy_id == "M10-PA-004":
         return filter_rescue_signal_rows(spec, [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]])
@@ -1839,7 +1971,14 @@ def build_account_input_audit_rows(
     for spec in ACCOUNT_SPECS:
         scanner_connected = scanner_connected_for_spec(spec)
         source_strategy_id = runtime_source_strategy_id(spec)
-        if source_strategy_id == "M10-PA-004":
+        if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
+            source_rows = [
+                row
+                for row in trade_rows
+                if row.get("strategy_id") == spec["strategy_id"] and row.get("timeframe") == spec["timeframe"]
+            ]
+            source_type = source_rows[0].get("signal_source_type", input_source_type_for_spec(spec)) if source_rows else input_source_type_for_spec(spec)
+        elif source_strategy_id == "M10-PA-004":
             source_rows = filter_rescue_signal_rows(
                 spec,
                 [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]],

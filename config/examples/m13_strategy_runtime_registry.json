@@ -303,15 +303,15 @@
       "strategy_id": "M10-PA-011-ORB-R1",
       "display_name": "M14 detector rebuild variant for M10-PA-011",
       "module_role": "independent_runtime",
-      "detector_id": "m14_pa011_orb_rebuild_pending_adapter",
-      "detector_status": "not_connected",
+      "detector_id": "m14_rescue_pa011_failed_orb_retest_adapter",
+      "detector_status": "connected",
       "required_for_goal": false,
       "parent_strategy_id": "M10-PA-011",
       "rescue_source_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
       "runtime_accounts": [
         {"runtime_id": "M10-PA-011-ORB-R1-5m", "timeframe": "5m", "lane": "rescue", "variant_id": "orb_rebuild_r1"}
       ],
-      "next_action": "M14 detector rebuild variant is ledger-visible but not yet connected to M12 accountized inputs; rebuild the opening-reversal detector before any reject/final-drop decision. Do not overwrite the M10-PA-011 baseline."
+      "next_action": "M14 detector rebuild variant is connected to the M12 accountized failed-ORB retest adapter; run it as a 5m A/B rescue account for 10 trading days before any reject/final-drop decision. Do not overwrite the M10-PA-011 baseline."
     },
     {
       "strategy_id": "M10-PA-003",

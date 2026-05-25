@@ -147,7 +147,7 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 states[("M12-FTD-001-m14-modify-20260522", "M12-FTD-001-m14-modify-20260522-1d")],
                 "zero_signal",
             )
-            self.assertEqual(states[("M10-PA-011-ORB-R1", "M10-PA-011-ORB-R1-5m")], "not_connected")
+            self.assertEqual(states[("M10-PA-011-ORB-R1", "M10-PA-011-ORB-R1-5m")], "zero_signal")
 
     def test_connected_required_scope_is_ready_for_reliable_testing_goal(self):
         temp, config = self.build_fixture()
@@ -230,9 +230,11 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(pa004_qc_rescue["test_states"], "zero_signal")
             self.assertEqual(pa004_qc_rescue["challenge_status"], "ready_for_10_day_challenge")
             self.assertEqual(pa004_qc_rescue["goal_blocked"], "false")
-            blocked_rescue = by_id["M10-PA-011-ORB-R1"]
-            self.assertEqual(blocked_rescue["test_states"], "not_connected")
-            self.assertEqual(blocked_rescue["challenge_status"], "blocked_before_challenge")
+            orb_rescue = by_id["M10-PA-011-ORB-R1"]
+            self.assertEqual(orb_rescue["required_for_goal"], "false")
+            self.assertEqual(orb_rescue["test_states"], "zero_signal")
+            self.assertEqual(orb_rescue["challenge_status"], "ready_for_10_day_challenge")
+            self.assertEqual(orb_rescue["goal_blocked"], "false")
             self.assertTrue(result["summary"]["ready_for_complete_reliable_testing"])
             self.assertEqual(result["summary"]["blocked_strategy_ids"], [])
 
