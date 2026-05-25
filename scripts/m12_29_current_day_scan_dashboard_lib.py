@@ -3687,18 +3687,25 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
         f"<section class=\"metric\"><span>{html.escape(k)}</span><strong>{html.escape(str(v))}</strong></section>"
         for k, v in metrics.items()
     )
-    data_freshness_warning = summary.get("data_freshness_warning") or build_dashboard_data_freshness_warning(
-        quote_source=str(summary.get("quote_source", "")),
-        current_day_runtime_ready=bool(summary.get("current_day_runtime_ready", False)),
-        current_day_scan_complete=bool(summary.get("current_day_scan_complete", False)),
-        daily_ready_symbols=summary.get("first50_daily_ready_symbols", "unknown"),
-        current_5m_ready_symbols=summary.get("first50_current_5m_ready_symbols", "unknown"),
-        runtime_readiness_note=str(summary.get("runtime_readiness_note", "")),
-    )
-    data_freshness_section = (
-        f"<section class=\"panel warning\"><h2>数据刷新告警</h2><div class=\"note\">{html.escape(str(data_freshness_warning))}</div></section>"
-        if data_freshness_warning else ""
-    )
+    audit_only_note = str(summary.get("audit_only_snapshot_note", "")) if summary.get("audit_only_snapshot") else ""
+    if audit_only_note:
+        data_freshness_warning = ""
+        data_freshness_section = (
+            f"<section class=\"panel audit-only\"><h2>非交易日审计快照</h2><div class=\"note\">{html.escape(audit_only_note)}</div></section>"
+        )
+    else:
+        data_freshness_warning = summary.get("data_freshness_warning") or build_dashboard_data_freshness_warning(
+            quote_source=str(summary.get("quote_source", "")),
+            current_day_runtime_ready=bool(summary.get("current_day_runtime_ready", False)),
+            current_day_scan_complete=bool(summary.get("current_day_scan_complete", False)),
+            daily_ready_symbols=summary.get("first50_daily_ready_symbols", "unknown"),
+            current_5m_ready_symbols=summary.get("first50_current_5m_ready_symbols", "unknown"),
+            runtime_readiness_note=str(summary.get("runtime_readiness_note", "")),
+        )
+        data_freshness_section = (
+            f"<section class=\"panel warning\"><h2>数据刷新告警</h2><div class=\"note\">{html.escape(str(data_freshness_warning))}</div></section>"
+            if data_freshness_warning else ""
+        )
     mainline_rows = "\n".join(
         f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
         for label, value in [
@@ -3769,6 +3776,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     .grid {{ display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:10px; }}
     .metric,.panel {{ background:#fff; border:1px solid #d8dee9; border-radius:8px; }}
     .warning {{ border-left:6px solid #b42318; background:#fff7f5; }}
+    .audit-only {{ border-left:6px solid #175cd3; background:#f5f8ff; }}
     .metric {{ padding:12px; }} .metric span {{ display:block; color:#667085; font-size:12px; }} .metric strong {{ display:block; margin-top:8px; font-size:22px; }}
     h2 {{ margin:0; padding:14px 16px; font-size:18px; border-bottom:1px solid #d8dee9; }}
     .note {{ padding:12px 16px; color:#667085; line-height:1.6; }}
@@ -3870,14 +3878,14 @@ def terminal_account_row_html(row: dict[str, str]) -> str:
 def watchlist_group_html(group: dict[str, Any]) -> str:
     rows = "\n".join(market_watchlist_row_html(row) for row in group.get("rows", []))
     if not rows:
-        rows = "<tr><td colspan=\"10\">暂无自选标的</td></tr>"
+        rows = "<tr><td colspan=\"11\">暂无自选标的</td></tr>"
     note = f"<div class=\"note\">{html.escape(str(group.get('generated_from', '')))}</div>" if group.get("generated_from") else ""
     return (
         "<section class=\"watch-group\">"
         f"<h3>{html.escape(group.get('display_name', ''))}</h3>"
         f"{note}"
         "<div class=\"wrap\"><table class=\"terminal-table\"><thead>"
-        "<tr><th>股票</th><th>价格</th><th>涨跌</th><th>盘前</th><th>盘后</th><th>信号</th><th>持仓</th><th>今日PnL</th><th>新闻</th><th>刷新</th></tr>"
+        "<tr><th>股票</th><th>价格</th><th>涨跌</th><th>盘前</th><th>盘后</th><th>信号</th><th>持仓</th><th>今日PnL</th><th>总PnL</th><th>新闻</th><th>刷新</th></tr>"
         f"</thead><tbody>{rows}</tbody></table></div>"
         "</section>"
     )
@@ -3885,6 +3893,7 @@ def watchlist_group_html(group: dict[str, Any]) -> str:
 
 def market_watchlist_row_html(row: dict[str, str]) -> str:
     pnl_cls = pnl_css_class(row.get("today_pnl", "0"))
+    total_pnl_cls = pnl_css_class(row.get("total_pnl", "0"))
     symbol = row["symbol"]
     data_symbol = f"<br><small>data:{html.escape(row['data_symbol'])}</small>" if row.get("data_symbol") else ""
     return (
@@ -3897,6 +3906,7 @@ def market_watchlist_row_html(row: dict[str, str]) -> str:
         f"<td>{html.escape(row.get('strategy_signal_count', '0'))}<br><small>{html.escape(row.get('strategy_ids', ''))}</small></td>"
         f"<td>{html.escape(row.get('holding_count', '0'))}</td>"
         f"<td class=\"{pnl_cls}\">{html.escape(row.get('today_pnl', '0.00'))}</td>"
+        f"<td class=\"{total_pnl_cls}\">{html.escape(row.get('total_pnl', '0.00'))}</td>"
         f"<td>{html.escape(row.get('news_count', '0'))}</td>"
         f"<td>{html.escape(row.get('refresh_state', ''))}</td>"
         "</tr>"

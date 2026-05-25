@@ -416,10 +416,18 @@ def apply_dashboard_status_overlay(
             "当前面板是上一有效审计快照，不代表新的交易日测试。"
         )
         existing_warning = str(summary.get("data_freshness_warning", ""))
-        if overlay_warning not in existing_warning:
-            summary["data_freshness_warning"] = f"{existing_warning} {overlay_warning}".strip()
+        if existing_warning and not summary.get("data_freshness_warning_before_audit_overlay"):
+            summary["data_freshness_warning_before_audit_overlay"] = existing_warning
+        summary["audit_only_snapshot"] = True
+        summary["audit_only_snapshot_note"] = overlay_warning
+        summary["data_freshness_warning"] = ""
+    else:
+        summary["audit_only_snapshot"] = False
+        summary["audit_only_snapshot_note"] = ""
     top_metrics = dashboard.setdefault("top_metrics", {})
     top_metrics["运行状态"] = runtime_status
+    top_metrics["守护器状态时间"] = str(payload.get("beijing_time", ""))
+    top_metrics["数据快照状态"] = "非交易日审计快照" if audit_only else "交易窗口刷新中"
     terminal = dashboard.setdefault("broker_terminal_view", {})
     top_status = terminal.setdefault("top_status", {})
     top_status.update(
@@ -432,6 +440,7 @@ def apply_dashboard_status_overlay(
             "freshness_state": update_status.get("freshness_state", ""),
             "fully_ready_for_trading_display": "false" if audit_only else top_status.get("fully_ready_for_trading_display", "false"),
             "data_freshness_warning": summary.get("data_freshness_warning", ""),
+            "audit_only_snapshot_note": summary.get("audit_only_snapshot_note", ""),
         }
     )
     if m14_context:

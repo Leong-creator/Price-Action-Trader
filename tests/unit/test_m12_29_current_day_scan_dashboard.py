@@ -127,6 +127,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("自选股与新闻", html)
         self.assertIn("美股七姐妹", html)
         self.assertIn("存储/闪存热点", html)
+        self.assertIn("总PnL", html)
         self.assertIn("PA004 baseline / MBF / QC 对照", html)
         self.assertIn("审计与历史报告", html)
         self.assertIn("主线正式账户", html)
@@ -200,6 +201,72 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         html = (output_dir / "m12_32_minute_readonly_dashboard.html").read_text(encoding="utf-8")
         self.assertNotIn("> %<", html)
         self.assertNotIn("% / %", html)
+
+    def test_audit_only_snapshot_uses_notice_not_data_refresh_failure_panel(self):
+        from scripts.m12_29_current_day_scan_dashboard_lib import build_dashboard_html
+
+        empty_overview = {
+            "starting_capital": "0.00",
+            "current_equity": "0.00",
+            "day_pnl": "0.00",
+            "cumulative_return_percent": "0.00",
+            "today_opened_count": "0",
+            "today_closed_count": "0",
+            "win_rate_percent": "0.00",
+            "max_drawdown_percent": "0.00",
+        }
+        empty_timeframe = {
+            "display_name": "fixture",
+            "account_count": "0",
+            "today_total_pnl": "0.00",
+            "win_rate_percent": "0.00",
+            "plain_language_note": "fixture",
+            "strategy_rows": [],
+        }
+        dashboard = {
+            "top_metrics": {},
+            "summary": {
+                "audit_only_snapshot": True,
+                "audit_only_snapshot_note": "市场状态由 M12.47 守护器覆盖为 非交易日等待；当前面板是上一有效审计快照，不代表新的交易日测试。",
+                "data_freshness_warning": "",
+            },
+            "mainline_account_view": empty_overview,
+            "experimental_account_view": empty_overview,
+            "timeframe_views": {"views": {"1d": empty_timeframe, "5m": empty_timeframe}},
+            "ftd001_monitor": {"plain_language_summary": "fixture", "accounts": [], "current_plain_status": "fixture", "risk_flags": []},
+            "update_status": {
+                "beijing_time": "2026-05-26 02:55:04 CST",
+                "wall_clock_beijing_time": "2026-05-26 02:55:04 CST",
+                "freshness_state": "supervisor_idle",
+                "dashboard_age_seconds": "0",
+                "new_york_time": "2026-05-25 14:55:04 EDT",
+                "market_status": "非交易日等待",
+                "runtime_status": "非交易日等待",
+                "session_liveness": "idle",
+                "supervisor_process_alive": "true",
+                "last_heartbeat_beijing_time": "2026-05-26 02:55:04 CST",
+                "heartbeat_age_seconds": "0",
+            },
+            "strategy_scorecard_rows": [],
+            "strategy_detail_views": {},
+            "trade_rows": [],
+            "signal_watchlist": [],
+            "reference_watchlist": [],
+            "broker_terminal_view": {"top_status": {}, "strategy_accounts": [], "pa004_comparison": {"rows": []}, "watchlists": {"groups": []}, "news_panel": {}},
+            "extended_session_monitor": {
+                "plain_language_summary": "fixture",
+                "threshold_percent": "2.00",
+                "premarket_rows": [],
+                "postmarket_rows": [],
+                "focus_hits": [],
+            },
+            "strategy_status_rows": [],
+            "supporting_rule_ab_results": {"rows": []},
+            "account_input_audit": {"rows": []},
+        }
+        html = build_dashboard_html(load_config(), dashboard)
+        self.assertIn("非交易日审计快照", html)
+        self.assertNotIn("<h2>数据刷新告警</h2>", html)
 
     def test_mainline_and_experimental_accounts_are_separated(self):
         _, result, _ = self.run_stage()

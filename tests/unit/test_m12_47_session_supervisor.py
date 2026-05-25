@@ -91,7 +91,11 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(dashboard["summary"]["market_session"]["status"], "非交易日等待")
         self.assertFalse(dashboard["summary"]["current_day_runtime_ready"])
         self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["fully_ready_for_trading_display"], "false")
-        self.assertIn("上一有效审计快照", dashboard["summary"]["data_freshness_warning"])
+        self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
+        self.assertTrue(dashboard["summary"]["audit_only_snapshot"])
+        self.assertIn("上一有效审计快照", dashboard["summary"]["audit_only_snapshot_note"])
+        self.assertEqual(dashboard["top_metrics"]["数据快照状态"], "非交易日审计快照")
+        self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["audit_only_snapshot_note"], dashboard["summary"]["audit_only_snapshot_note"])
 
     def test_dashboard_status_overlay_preserves_ready_flag_during_regular_session(self):
         dashboard = {
@@ -123,6 +127,8 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertTrue(dashboard["summary"]["current_day_runtime_ready"])
         self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["fully_ready_for_trading_display"], "true")
         self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
+        self.assertFalse(dashboard["summary"]["audit_only_snapshot"])
+        self.assertEqual(dashboard["top_metrics"]["数据快照状态"], "交易窗口刷新中")
 
     def test_dashboard_status_overlay_refreshes_m14_gate_context(self):
         dashboard = {
