@@ -273,12 +273,16 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         dashboard = result["dashboard"]
         mainline_ids = {row["strategy_id"] for row in dashboard["mainline_accounts"]}
         experimental_ids = {row["strategy_id"] for row in dashboard["experimental_accounts"]}
+        rescue_ids = {row["strategy_id"] for row in dashboard["rescue_accounts"]}
         self.assertIn("M10-PA-004", mainline_ids)
         self.assertIn("M10-PA-005", experimental_ids)
         self.assertIn("M10-PA-007", experimental_ids)
         self.assertIn(PA004_MOMENTUM_VARIANT_ID, experimental_ids)
         self.assertIn(PA004_MOMENTUM_QUALITY_VARIANT_ID, experimental_ids)
         self.assertIn("M10-PA-013", experimental_ids)
+        self.assertIn("M10-PA-001-m14-modify-20260522", rescue_ids)
+        self.assertIn("M10-PA-002-m14-modify-20260522", rescue_ids)
+        self.assertIn("M10-PA-012-m14-modify-20260522", rescue_ids)
         self.assertNotIn("M10-PA-005", mainline_ids)
         self.assertNotIn("M10-PA-004", experimental_ids)
         self.assertEqual(
@@ -296,6 +300,14 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "M10-PA-009",
                 "M10-PA-011",
                 "M10-PA-013",
+            ],
+        )
+        self.assertEqual(
+            result["run_status"]["rescue_strategy_ids"],
+            [
+                "M10-PA-001-m14-modify-20260522",
+                "M10-PA-002-m14-modify-20260522",
+                "M10-PA-012-m14-modify-20260522",
             ],
         )
         self.assertEqual(
@@ -400,12 +412,27 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertTrue(all(row["watchlist_only"] == "false" for row in rows))
         mainline_rows = [row for row in rows if row["lane"] == "mainline"]
         experimental_rows = [row for row in rows if row["lane"] == "experimental"]
+        rescue_rows = [row for row in rows if row["lane"] == "rescue"]
         self.assertTrue(all(row["formal_input_stream"] == "true" for row in mainline_rows))
         self.assertTrue(all(row["current_scanner_connected"] == "true" for row in mainline_rows))
         self.assertTrue(all(row["formal_input_stream"] == "true" for row in experimental_rows))
         self.assertTrue(all(row["current_scanner_connected"] == "true" for row in experimental_rows))
+        self.assertEqual(
+            {row["runtime_id"] for row in rescue_rows},
+            {
+                "M10-PA-001-m14-modify-20260522-1d",
+                "M10-PA-002-m14-modify-20260522-1d",
+                "M10-PA-012-m14-modify-20260522-5m",
+            },
+        )
+        self.assertTrue(all(row["formal_input_stream"] == "true" for row in rescue_rows))
+        self.assertTrue(all(row["current_scanner_connected"] == "true" for row in rescue_rows))
+        self.assertTrue(all(row["input_source_type"] == "m14_rescue_parent_quality_filter_adapter" for row in rescue_rows))
         self.assertTrue(
             all(row["input_status"] in {"connected_with_signal_today", "connected_zero_signal_today"} for row in experimental_rows)
+        )
+        self.assertTrue(
+            all(row["input_status"] in {"connected_with_signal_today", "connected_zero_signal_today"} for row in rescue_rows)
         )
 
     def test_postmarket_runtime_uses_postmarket_wording_and_runtime_ready_note(self):

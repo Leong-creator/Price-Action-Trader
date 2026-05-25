@@ -94,15 +94,23 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
         }
         self.assertIn("M10-PA-001-1d", runtime_ids)
         self.assertIn("M10-PA-012-5m", runtime_ids)
+        connected_rescue_ids = {
+            "M10-PA-001-m14-modify-20260522",
+            "M10-PA-002-m14-modify-20260522",
+            "M10-PA-012-m14-modify-20260522",
+        }
         for rescue_id, parent_id in rescue_parent_ids.items():
             with self.subTest(rescue_id=rescue_id):
                 row = rows[rescue_id]
                 self.assertEqual(row["module_role"], "independent_runtime")
                 self.assertEqual(row["parent_strategy_id"], parent_id)
-                self.assertEqual(row["detector_status"], "not_connected")
+                self.assertEqual(row["detector_status"], "connected" if rescue_id in connected_rescue_ids else "not_connected")
                 self.assertFalse(row["required_for_goal"])
                 self.assertEqual(row["runtime_accounts"][0]["lane"], "rescue")
-                self.assertIn("not yet connected", row["next_action"])
+                if rescue_id in connected_rescue_ids:
+                    self.assertIn("connected to the M12 accountized", row["next_action"])
+                else:
+                    self.assertIn("not yet connected", row["next_action"])
                 self.assertIn("Do not overwrite", row["next_action"])
 
 

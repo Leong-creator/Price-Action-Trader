@@ -76,7 +76,13 @@ EXPERIMENTAL_STRATEGIES = (
     "M10-PA-013",
 )
 EXPERIMENTAL_ADAPTER_STRATEGIES = frozenset(EXPERIMENTAL_STRATEGIES)
-CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES) | EXPERIMENTAL_ADAPTER_STRATEGIES
+RESCUE_PARENT_STRATEGIES = {
+    "M10-PA-001-m14-modify-20260522": "M10-PA-001",
+    "M10-PA-002-m14-modify-20260522": "M10-PA-002",
+    "M10-PA-012-m14-modify-20260522": "M10-PA-012",
+}
+RESCUE_CONNECTED_STRATEGIES = frozenset(RESCUE_PARENT_STRATEGIES)
+CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES) | EXPERIMENTAL_ADAPTER_STRATEGIES | RESCUE_CONNECTED_STRATEGIES
 WAVE_B_ADAPTER_STRATEGIES = frozenset({"M10-PA-008", "M10-PA-009", "M10-PA-011", "M10-PA-013"})
 PRIMARY_TIMEFRAME_ORDER = ("1d", "5m")
 TIMEFRAME_ORDER = PRIMARY_TIMEFRAME_ORDER
@@ -127,6 +133,9 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-011-5m", "strategy_id": "M10-PA-011", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-011 五分钟实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-013-1d", "strategy_id": "M10-PA-013", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-013 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-013-5m", "strategy_id": "M10-PA-013", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-013 五分钟实验账户", "variant_id": "base"},
+    {"account_id": "M10-PA-001-m14-modify-20260522-1d", "strategy_id": "M10-PA-001-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-001 救援日线账户", "variant_id": "m14_modify_20260522"},
+    {"account_id": "M10-PA-002-m14-modify-20260522-1d", "strategy_id": "M10-PA-002-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-002 救援日线账户", "variant_id": "m14_modify_20260522"},
+    {"account_id": "M10-PA-012-m14-modify-20260522-5m", "strategy_id": "M10-PA-012-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-012 救援五分钟账户", "variant_id": "m14_modify_20260522"},
 )
 SUPPORTING_RULE_SPECS = (
     {"supporting_rule_id": "M10-PA-006", "display_name": "BLSHS 限价过滤", "mode": "base_trigger + M10-PA-006"},
@@ -631,7 +640,60 @@ def scanner_connected_for_spec(spec: dict[str, str]) -> bool:
         return True
     if strategy_id == "M10-PA-011":
         return spec["timeframe"] in {"5m", "15m"}
+    if strategy_id in RESCUE_CONNECTED_STRATEGIES:
+        return True
     return strategy_id in EXPERIMENTAL_ADAPTER_STRATEGIES
+
+
+def runtime_source_strategy_id(spec: dict[str, str]) -> str:
+    return RESCUE_PARENT_STRATEGIES.get(spec["strategy_id"], spec["strategy_id"])
+
+
+def rescue_signal_filter(spec: dict[str, str], row: dict[str, str]) -> bool:
+    if spec["strategy_id"] not in RESCUE_CONNECTED_STRATEGIES:
+        return True
+    if row.get("symbol") in {"TQQQ", "SQQQ"}:
+        return False
+    if row.get("direction") != "看涨":
+        return False
+    entry = decimal_or_none(row.get("hypothetical_entry_price", ""))
+    stop = decimal_or_none(row.get("hypothetical_stop_price", ""))
+    target = decimal_or_none(row.get("hypothetical_target_price", ""))
+    if entry is None or stop is None or target is None or entry <= ZERO or stop <= ZERO or target <= ZERO:
+        return False
+    risk = abs(entry - stop)
+    reward = abs(target - entry)
+    if risk <= ZERO or reward <= ZERO or reward < risk * Decimal("1.20"):
+        return False
+    max_risk_percent = Decimal("6.00") if spec["timeframe"] == "1d" else Decimal("2.50")
+    if risk / entry * HUNDRED > max_risk_percent:
+        return False
+    if row.get("signal_date") and row.get("latest_price_source") not in RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES:
+        return False
+    return True
+
+
+def filter_rescue_signal_rows(spec: dict[str, str], rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    if spec["strategy_id"] not in RESCUE_CONNECTED_STRATEGIES:
+        return rows
+    filtered: list[dict[str, str]] = []
+    for row in rows:
+        if not rescue_signal_filter(spec, row):
+            continue
+        clone = dict(row)
+        clone["strategy_id"] = spec["strategy_id"]
+        clone["variant_id"] = spec["variant_id"]
+        clone["strategy_title"] = spec["display_name"]
+        clone["signal_source_type"] = "m14_rescue_parent_quality_filter_adapter"
+        clone["candidate_status"] = "m14_rescue_adapter_entry"
+        clone["bucket"] = "M14 救援变体输入"
+        clone["review_status"] = (
+            f"{spec['display_name']} 复用父策略 {runtime_source_strategy_id(spec)} 的扫描结果，"
+            "但只保留看涨、低风险、至少 1.2R 目标空间的信号；baseline 保持独立不覆盖。"
+        )
+        clone["notes"] = "M14 rescue A/B adapter entry; simulated-only and not approved for live execution."
+        filtered.append(clone)
+    return filtered
 
 
 def experimental_rows_for_spec(
@@ -1252,13 +1314,15 @@ def runtime_signal_rows(
     trade_rows: list[dict[str, str]],
     pa004_formal_rows: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    if spec["strategy_id"] == "M10-PA-004":
-        return [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]
-    return [
+    source_strategy_id = runtime_source_strategy_id(spec)
+    if source_strategy_id == "M10-PA-004":
+        return filter_rescue_signal_rows(spec, [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]])
+    rows = [
         row for row in trade_rows
-        if row.get("strategy_id") == spec["strategy_id"]
+        if row.get("strategy_id") == source_strategy_id
         and row.get("timeframe") == spec["timeframe"]
     ]
+    return filter_rescue_signal_rows(spec, rows)
 
 
 def build_runtime_readiness(
@@ -1636,6 +1700,7 @@ def advance_account_runtime(
     account_rows: list[dict[str, Any]] = []
     mainline_accounts: list[dict[str, Any]] = []
     experimental_accounts: list[dict[str, Any]] = []
+    rescue_accounts: list[dict[str, Any]] = []
     for spec in ACCOUNT_SPECS:
         account = state["accounts"].get(spec["account_id"]) or bootstrap_account_state(spec)
         state["accounts"][spec["account_id"]] = account
@@ -1672,14 +1737,20 @@ def advance_account_runtime(
         account_rows.append(account_view)
         if spec["lane"] == "mainline":
             mainline_accounts.append(account_view)
-        else:
+        elif spec["lane"] == "experimental":
             experimental_accounts.append(account_view)
+        elif spec["lane"] == "rescue":
+            rescue_accounts.append(account_view)
     account_input_audit_rows = build_account_input_audit_rows(scan_date, trade_rows, pa004_formal_rows)
     registry = state["trading_day_registry"]
     registry_key = scan_date.isoformat()
     previous = registry.get(registry_key, {})
     experimental_input_connected = any(
         row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
+        for row in account_input_audit_rows
+    )
+    rescue_input_connected = any(
+        row.get("lane") == "rescue" and row.get("current_scanner_connected") == "true"
         for row in account_input_audit_rows
     )
     counted_now = current_day_runtime_ready and bool(mainline_accounts)
@@ -1689,6 +1760,7 @@ def advance_account_runtime(
         "first_counted_at": previous.get("first_counted_at") or (generated_at if counted_now else ""),
         "mainline_progressed": bool(previous.get("mainline_progressed")) or bool(mainline_accounts),
         "experimental_progressed": bool(previous.get("experimental_progressed")) or experimental_input_connected,
+        "rescue_progressed": bool(previous.get("rescue_progressed")) or rescue_input_connected,
         "last_run_complete": counted_now,
     }
     write_json(config.output_dir / "m12_46_account_runtime_state.json", state)
@@ -1699,6 +1771,7 @@ def advance_account_runtime(
         "account_rows": account_rows,
         "mainline_accounts": mainline_accounts,
         "experimental_accounts": experimental_accounts,
+        "rescue_accounts": rescue_accounts,
         "supporting_rule_rows": build_supporting_rule_rows(mainline_accounts, experimental_accounts),
         "signal_watchlist": trade_rows + pa004_formal_rows,
         "account_input_audit_rows": account_input_audit_rows,
@@ -1732,15 +1805,22 @@ def build_account_input_audit_rows(
     rows: list[dict[str, str]] = []
     for spec in ACCOUNT_SPECS:
         scanner_connected = scanner_connected_for_spec(spec)
-        if spec["strategy_id"] == "M10-PA-004":
-            source_rows = [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]
+        source_strategy_id = runtime_source_strategy_id(spec)
+        if source_strategy_id == "M10-PA-004":
+            source_rows = filter_rescue_signal_rows(
+                spec,
+                [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]],
+            )
             source_type = "formal_detector_entry"
         else:
-            source_rows = [
-                row
-                for row in trade_rows
-                if row.get("strategy_id") == spec["strategy_id"] and row.get("timeframe") == spec["timeframe"]
-            ]
+            source_rows = filter_rescue_signal_rows(
+                spec,
+                [
+                    row
+                    for row in trade_rows
+                    if row.get("strategy_id") == source_strategy_id and row.get("timeframe") == spec["timeframe"]
+                ],
+            )
             source_type = source_rows[0].get("signal_source_type", input_source_type_for_spec(spec)) if source_rows else input_source_type_for_spec(spec)
         today_formal_count = sum(1 for row in source_rows if row.get("signal_date") == scan_date.isoformat())
         if not scanner_connected:
@@ -1772,6 +1852,8 @@ def build_account_input_audit_rows(
 
 
 def input_source_type_for_spec(spec: dict[str, str]) -> str:
+    if spec["strategy_id"] in RESCUE_CONNECTED_STRATEGIES:
+        return "m14_rescue_parent_quality_filter_adapter"
     if spec["strategy_id"] in EXPERIMENTAL_ADAPTER_STRATEGIES:
         return "experimental_detector_entry"
     return "formal_scan"
@@ -1872,6 +1954,7 @@ def build_accountized_timeframe_views(account_rows: list[dict[str, str]]) -> dic
         rows = [row for row in account_rows if row["timeframe"] == timeframe]
         mainline = [row for row in rows if row["lane"] == "mainline"]
         experimental = [row for row in rows if row["lane"] == "experimental"]
+        rescue = [row for row in rows if row["lane"] == "rescue"]
         pnl = sum((money_to_decimal(row["today_total_pnl"]) for row in rows), ZERO)
         views[timeframe] = {
             "timeframe": timeframe,
@@ -1879,6 +1962,7 @@ def build_accountized_timeframe_views(account_rows: list[dict[str, str]]) -> dic
             "account_count": len(rows),
             "mainline_account_count": len(mainline),
             "experimental_account_count": len(experimental),
+            "rescue_account_count": len(rescue),
             "today_total_pnl": money(pnl),
             "win_rate_percent": pct(
                 Decimal(sum(int(row["winning_trade_count"]) for row in rows))
@@ -2314,8 +2398,16 @@ def build_terminal_account_rows(runtime: dict[str, Any], m14_context: dict[str, 
                 "symbols": row.get("symbols", ""),
             }
         )
-    rows.sort(key=lambda item: (0 if item["lane"] == "mainline" else 1, item["runtime_id"]))
+    rows.sort(key=lambda item: (lane_sort_order(item["lane"]), item["runtime_id"]))
     return rows
+
+
+def lane_sort_order(lane: str) -> int:
+    return {"mainline": 0, "experimental": 1, "rescue": 2}.get(lane, 9)
+
+
+def lane_label(lane: str) -> str:
+    return {"mainline": "主线", "experimental": "实验", "rescue": "救援"}.get(lane, lane or "未知")
 
 
 def terminal_account_status(row: dict[str, str], audit: dict[str, str]) -> str:
@@ -2659,6 +2751,7 @@ def build_accountized_dashboard_payload(
 ) -> dict[str, Any]:
     mainline_overview = build_account_overview("主线正式账户", runtime["mainline_accounts"])
     experimental_overview = build_account_overview("实验账户", runtime["experimental_accounts"])
+    rescue_overview = build_account_overview("救援账户", runtime.get("rescue_accounts", []))
     timeframe_views = build_accountized_timeframe_views(runtime["account_rows"])
     ftd001_monitor = build_ftd_account_monitor(runtime["mainline_accounts"])
     codex_observer = build_accountized_codex_observer(
@@ -2717,8 +2810,10 @@ def build_accountized_dashboard_payload(
         "shared_account_view": mainline_overview,
         "mainline_account_view": mainline_overview,
         "experimental_account_view": experimental_overview,
+        "rescue_account_view": rescue_overview,
         "mainline_accounts": runtime["mainline_accounts"],
         "experimental_accounts": runtime["experimental_accounts"],
+        "rescue_accounts": runtime.get("rescue_accounts", []),
         "supporting_rule_ab_results": {
             "schema_version": "m12.46.supporting-rule-ab.v1",
             "rows": runtime["supporting_rule_rows"],
@@ -2936,6 +3031,10 @@ def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -
         row.get("lane") == "experimental" and row.get("current_scanner_connected") == "true"
         for row in runtime["account_input_audit_rows"]
     )
+    rescue_connected = any(
+        row.get("lane") == "rescue" and row.get("current_scanner_connected") == "true"
+        for row in runtime["account_input_audit_rows"]
+    )
     return {
         "schema_version": "m12.46.trading-day-registry.v1",
         "stage": "M12.46.trading_day_registry",
@@ -2944,14 +3043,15 @@ def build_accountized_run_status(config: M1229Config, runtime: dict[str, Any]) -
         "ready_for_m11_8_review": observed_days >= config.min_observation_days_for_trial,
         "daily_realtime_strategy_ids": runtime_strategy_ids_from_specs("mainline"),
         "experimental_strategy_ids": runtime_strategy_ids_from_specs("experimental"),
+        "rescue_strategy_ids": runtime_strategy_ids_from_specs("rescue"),
         "plain_language_result": (
-            "主线账户已按纽约交易日累计；当前已接线的实验账户也会同步累计。"
+            "主线账户已按纽约交易日累计；当前已接线的实验/救援账户也会同步累计。"
             if observed_days >= config.min_observation_days_for_trial else
             (
                 "主线账户已经开始按交易日累计，但还没满 10 个纽约真实交易日；"
-                "实验账户里尚未接线的策略不会被误算成已完成实时测试。"
-                if not experimental_connected else
-                "主线和已接线实验账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。"
+                "实验/救援账户里尚未接线的策略不会被误算成已完成实时测试。"
+                if not (experimental_connected or rescue_connected) else
+                "主线和已接线实验/救援账户已经开始按交易日累计，但还没满 10 个纽约真实交易日。"
             )
         ),
         "paper_simulated_only": True,
@@ -3857,7 +3957,7 @@ def terminal_account_head() -> str:
 def terminal_account_row_html(row: dict[str, str]) -> str:
     today_cls = pnl_css_class(row.get("today_total_pnl", "0"))
     total_cls = pnl_css_class(row.get("total_pnl", "0"))
-    lane = "主线" if row.get("lane") == "mainline" else "实验"
+    lane = lane_label(row.get("lane", ""))
     variant = f" / {row.get('variant_id', '')}" if row.get("variant_id") else ""
     return (
         "<tr>"
@@ -3980,7 +4080,7 @@ def timeframe_view_html(view: dict[str, Any]) -> str:
     strategy_rows = "".join(
         "<tr>"
         f"<td>{html.escape(row['runtime_id'])}</td>"
-        f"<td>{html.escape('主线' if row['lane'] == 'mainline' else '实验')}</td>"
+        f"<td>{html.escape(lane_label(row['lane']))}</td>"
         f"<td>{html.escape(row['today_total_pnl'])}</td>"
         f"<td>{html.escape(row['equity'])}</td>"
         f"<td>{html.escape(row['win_rate_percent'])}%</td>"
@@ -4009,7 +4109,7 @@ def strategy_scorecard_html(row: dict[str, str]) -> str:
     return (
         "<tr>"
         f"<td>{html.escape(row['runtime_id'])}<br><small>{html.escape(row['display_name'])}</small></td>"
-        f"<td>{html.escape('主线正式账户' if row['lane'] == 'mainline' else '实验账户')}</td>"
+        f"<td>{html.escape(lane_label(row['lane']) + '账户')}</td>"
         f"<td>{html.escape(row['timeframe'])}</td>"
         f"<td>{html.escape(row['today_opened_count'])}</td>"
         f"<td>{html.escape(row['today_closed_count'])}</td>"

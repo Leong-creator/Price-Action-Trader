@@ -190,29 +190,29 @@
       "strategy_id": "M10-PA-001-m14-modify-20260522",
       "display_name": "M14 rescue variant for M10-PA-001",
       "module_role": "independent_runtime",
-      "detector_id": "m14_rescue_variant_pending_adapter",
-      "detector_status": "not_connected",
+      "detector_id": "m14_rescue_parent_quality_filter_adapter",
+      "detector_status": "connected",
       "required_for_goal": false,
       "parent_strategy_id": "M10-PA-001",
       "rescue_source_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
       "runtime_accounts": [
         {"runtime_id": "M10-PA-001-m14-modify-20260522-1d", "timeframe": "1d", "lane": "rescue", "variant_id": "m14_modify_20260522"}
       ],
-      "next_action": "M14 rescue variant is ledger-visible but not yet connected to M12 accountized inputs; build the smallest detector/adapter before judging performance. Do not overwrite the M10-PA-001 baseline."
+      "next_action": "M14 rescue variant is connected to the M12 accountized parent-scan quality filter; run it as an A/B rescue account for 10 trading days. Do not overwrite the M10-PA-001 baseline."
     },
     {
       "strategy_id": "M10-PA-002-m14-modify-20260522",
       "display_name": "M14 rescue variant for M10-PA-002",
       "module_role": "independent_runtime",
-      "detector_id": "m14_rescue_variant_pending_adapter",
-      "detector_status": "not_connected",
+      "detector_id": "m14_rescue_parent_quality_filter_adapter",
+      "detector_status": "connected",
       "required_for_goal": false,
       "parent_strategy_id": "M10-PA-002",
       "rescue_source_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
       "runtime_accounts": [
         {"runtime_id": "M10-PA-002-m14-modify-20260522-1d", "timeframe": "1d", "lane": "rescue", "variant_id": "m14_modify_20260522"}
       ],
-      "next_action": "M14 rescue variant is ledger-visible but not yet connected to M12 accountized inputs; build the smallest detector/adapter before judging performance. Do not overwrite the M10-PA-002 baseline."
+      "next_action": "M14 rescue variant is connected to the M12 accountized parent-scan quality filter; run it as an A/B rescue account for 10 trading days. Do not overwrite the M10-PA-002 baseline."
     },
     {
       "strategy_id": "M10-PA-004-MBF-QC-m14-modify-20260522",
@@ -260,15 +260,15 @@
       "strategy_id": "M10-PA-012-m14-modify-20260522",
       "display_name": "M14 rescue variant for M10-PA-012",
       "module_role": "independent_runtime",
-      "detector_id": "m14_rescue_variant_pending_adapter",
-      "detector_status": "not_connected",
+      "detector_id": "m14_rescue_orb_quality_filter_adapter",
+      "detector_status": "connected",
       "required_for_goal": false,
       "parent_strategy_id": "M10-PA-012",
       "rescue_source_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
       "runtime_accounts": [
         {"runtime_id": "M10-PA-012-m14-modify-20260522-5m", "timeframe": "5m", "lane": "rescue", "variant_id": "m14_modify_20260522"}
       ],
-      "next_action": "M14 rescue variant is ledger-visible but not yet connected to M12 accountized inputs; build the smallest ORB filter before judging performance. Do not overwrite the M10-PA-012 baseline."
+      "next_action": "M14 rescue variant is connected to the M12 accountized parent-scan ORB quality filter; run it as an A/B rescue account for 10 trading days. Do not overwrite the M10-PA-012 baseline."
     },
     {
       "strategy_id": "M10-PA-013-m14-modify-20260522",

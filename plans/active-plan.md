@@ -93,7 +93,7 @@
 - M14.2 / M15 预备方向：可以提前做模拟账户与未来券商接入的 readiness scaffold，但默认必须是 `paper_dry_run_only`、`live_disabled_by_default`、`broker_connection=false`、`real_orders=false`。允许准备接口、审批 gate、凭证隔离、订单预演日志、kill switch、回放一致性测试和人工审批清单；不允许接真实账户、不允许真实下单、不允许把 broker paper 或 live 开关默认打开。
 - M14.2 当前已切出 `codex/m14-2-broker-readiness-scaffold`，目标是在不联网、不接账户、不下单的前提下，先完成 `BrokerReadinessConfig / BrokerOrderPreview / BrokerReadinessPlan`、dry-run plan builder、示例配置和测试；后续只允许接 M14 gate artifact 生成审计报告，不允许直接进入 broker paper/live。
 - M14 rescue 当前已新增 `scripts/run_m14_strategy_rescue_plan.py`：`M10-PA-004 / M10-PA-005 / M10-PA-008` 继续内部模拟；`M10-PA-001/002/004-MBF/004-MBF-QC/007/009/012/013/M12-FTD-001` 进入新变体 A/B 救援；`M10-PA-011` 先重建 detector 再决定是否最终放弃；plugin/filter/research 策略继续做 A/B 或影子覆盖，不伪装成独立交易账户。AI-Trader 和 TradingAgents 只作为公开项目架构与影子信号研究参考。
-- M14 rescue 首批变体已进入 M13 registry：所有已登记 rescue runtime 先以 `not_connected` 状态进入每日 ledger，目标是让未盈利策略从“计划中要救”变成“每天有账本状态”；下一步必须逐个补最小 M12 detector/account adapter，连接后再用 10 日 A/B 数据判断 `promote / modify / reject`。
+- M14 rescue 首批变体已进入 M13 registry：所有已登记 rescue runtime 先以 `not_connected` 状态进入每日 ledger，目标是让未盈利策略从“计划中要救”变成“每天有账本状态”。当前 `M10-PA-001-m14-modify-20260522`、`M10-PA-002-m14-modify-20260522`、`M10-PA-012-m14-modify-20260522` 已接入 M12 accountized `rescue` lane，复用父策略扫描器并增加看涨、低风险、至少 `1.2R` 的质量过滤；其余 rescue 仍保持未接线，下一步继续逐个补最小 detector/account adapter，连接后再用 10 日 A/B 数据判断 `promote / modify / reject`。
 
 ## 2. 执行总原则
 

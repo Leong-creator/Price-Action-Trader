@@ -25,6 +25,7 @@
 - 已修复券商式主面板非交易日误报：M12.47 audit-only overlay 不再把休市/等待窗口渲染成“数据刷新告警”，改为“非交易日审计快照”；顶部指标补充守护器状态时间和数据快照状态，自选股表格补回“总PnL”列。
 - 已新增 M14 策略救援计划入口：`scripts/run_m14_strategy_rescue_plan.py` 会从 M14 summary/gate/decision ledger 生成 `m14_strategy_rescue_plan.json/md`，把获批策略、亏损待救策略、零信号 detector 重建、plugin/research 策略分 lane 管理；AI-Trader 与 TradingAgents 只作为影子信号/多角色诊断参考，不允许 copy-trading 或绕过本地 M13/M14 gate。
 - 已把首批 M14 救援变体登记进 M13 runtime registry：`M10-PA-001/002/007/009/012/013`、`M12-FTD-001`、`PA004-MBF-QC` 和 `M10-PA-011-ORB-R1` 现在会进入每日 ledger；这些变体当前诚实标记为 `not_connected`、`lane=rescue`、`required_for_goal=false`，不会覆盖 baseline，也不会把未接线变体伪装成已测试通过。
+- 已接上首批 M14 rescue 最小输入流：`M10-PA-001-m14-modify-20260522`、`M10-PA-002-m14-modify-20260522`、`M10-PA-012-m14-modify-20260522` 现在进入 M12 accountized runtime 的 `rescue` lane，复用父策略扫描器但增加看涨、低风险、至少 `1.2R` 质量过滤；其余 rescue 仍保持 `not_connected`，不得伪装成已测试。
 
 ## 已完成
 

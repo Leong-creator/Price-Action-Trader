@@ -117,7 +117,11 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(states[("M12-FTD-001", "M12-FTD-001-baseline-1d")], "signal_generated")
             self.assertEqual(
                 states[("M10-PA-001-m14-modify-20260522", "M10-PA-001-m14-modify-20260522-1d")],
-                "not_connected",
+                "zero_signal",
+            )
+            self.assertEqual(
+                states[("M10-PA-012-m14-modify-20260522", "M10-PA-012-m14-modify-20260522-5m")],
+                "zero_signal",
             )
             self.assertEqual(states[("M10-PA-011-ORB-R1", "M10-PA-011-ORB-R1-5m")], "not_connected")
 
@@ -174,9 +178,12 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             by_id = {row["strategy_id"]: row for row in result["scorecard_rows"]}
             rescue = by_id["M10-PA-012-m14-modify-20260522"]
             self.assertEqual(rescue["required_for_goal"], "false")
-            self.assertEqual(rescue["test_states"], "not_connected")
-            self.assertEqual(rescue["challenge_status"], "blocked_before_challenge")
+            self.assertEqual(rescue["test_states"], "zero_signal")
+            self.assertEqual(rescue["challenge_status"], "ready_for_10_day_challenge")
             self.assertEqual(rescue["goal_blocked"], "false")
+            blocked_rescue = by_id["M10-PA-011-ORB-R1"]
+            self.assertEqual(blocked_rescue["test_states"], "not_connected")
+            self.assertEqual(blocked_rescue["challenge_status"], "blocked_before_challenge")
             self.assertTrue(result["summary"]["ready_for_complete_reliable_testing"])
             self.assertEqual(result["summary"]["blocked_strategy_ids"], [])
 
