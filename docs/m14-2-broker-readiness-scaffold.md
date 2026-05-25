@@ -36,7 +36,7 @@ python scripts/run_m14_2_broker_readiness_scaffold.py --config config/examples/m
 - `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json`
 - `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_audit.jsonl`
 
-当前真实样本显示：`8` 条内部模拟风控检查中，`1` 条为 `dry_run_ready`，`7` 条仍被风控阻断；这说明后续优化应先处理策略信号质量、敞口与仓位适配，而不是放宽风控或跳过风控。
+当前真实样本显示：去重后 `8` 条内部模拟风控检查中，`5` 条为 `dry_run_ready`，`3` 条仍被风控阻断；这说明后续优化应先处理策略信号质量、敞口与仓位适配，而不是跳过风控。
 
 ## Block Conditions
 

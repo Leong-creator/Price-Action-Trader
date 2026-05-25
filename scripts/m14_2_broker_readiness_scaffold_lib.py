@@ -116,11 +116,12 @@ def run_broker_readiness_scaffold(
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     paper_gate = read_json(config.paper_gate_path)
     approved_ids = tuple(str(item) for item in paper_gate.get("approved_internal_sim_strategy_ids", []))
-    source_rows = [
+    raw_risk_check_rows = [
         row
         for row in read_jsonl(config.internal_paper_execution_ledger_path)
         if row.get("action") == "risk_check"
     ]
+    source_rows = latest_risk_check_rows(raw_risk_check_rows)
     broker_config = BrokerReadinessConfig(
         mode="paper_dry_run_only",
         broker_connection_enabled=config.broker_connection_enabled,
@@ -170,6 +171,7 @@ def run_broker_readiness_scaffold(
         "internal_paper_execution_ledger_ref": project_path(config.internal_paper_execution_ledger_path),
         "audit_log_ref": project_path(config.audit_log_path),
         "approved_internal_sim_strategy_ids": list(approved_ids),
+        "raw_risk_check_count": len(raw_risk_check_rows),
         "source_risk_check_count": len(source_rows),
         "dry_run_ready_count": sum(1 for row in plan_rows if row["readiness_status"] == "dry_run_ready"),
         "blocked_count": sum(1 for row in plan_rows if row["readiness_status"] == "blocked"),
@@ -259,6 +261,31 @@ def broker_envelope_from_internal_paper_row(row: dict[str, Any], source_path: Pa
         resulting_state=SessionRiskState(session_key=trading_date),
     )
     return BrokerAssessmentEnvelope(request=request, risk_decision=risk_decision)
+
+
+def latest_risk_check_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    latest_by_key: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        key = (
+            str(row.get("strategy_id", "")),
+            str(row.get("runtime_id", "")),
+            str(row.get("signal_id", "")),
+            str(row.get("trading_date", "")),
+        )
+        current = latest_by_key.get(key)
+        current_order = (str(current.get("generated_at", "")), str(current.get("execution_event_id", ""))) if current else ("", "")
+        next_order = (str(row.get("generated_at", "")), str(row.get("execution_event_id", "")))
+        if current is None or next_order >= current_order:
+            latest_by_key[key] = row
+    return sorted(
+        latest_by_key.values(),
+        key=lambda row: (
+            str(row.get("trading_date", "")),
+            str(row.get("generated_at", "")),
+            str(row.get("runtime_id", "")),
+            str(row.get("signal_id", "")),
+        ),
+    )
 
 
 def broker_plan_row(generated_at: str, source_row: dict[str, Any], plan: Any) -> dict[str, Any]:

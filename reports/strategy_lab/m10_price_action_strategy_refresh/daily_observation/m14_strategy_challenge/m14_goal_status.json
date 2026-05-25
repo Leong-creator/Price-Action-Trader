@@ -8,7 +8,7 @@
   "continue_without_stopping": false,
   "data_quality_state": "history_recompute_from_existing_challenge",
   "effective_challenge_trading_days": 10,
-  "generated_at": "2026-05-25T17:55:00Z",
+  "generated_at": "2026-05-26T12:30:00Z",
   "goal_complete": true,
   "goal_name": "Build a reliable strategy challenge and internal paper-trading gate",
   "next_action": "Review completed/circuit decisions, keep broker paper and real-money execution disabled.",

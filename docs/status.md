@@ -27,7 +27,8 @@
 - 已新增 M14 策略救援计划入口：`scripts/run_m14_strategy_rescue_plan.py` 会从 M14 summary/gate/decision ledger 生成 `m14_strategy_rescue_plan.json/md`，把获批策略、亏损待救策略、零信号 detector 重建、plugin/research 策略分 lane 管理；AI-Trader 与 TradingAgents 只作为影子信号/多角色诊断参考，不允许 copy-trading 或绕过本地 M13/M14 gate。
 - 已把首批 M14 救援变体登记进 M13 runtime registry：`M10-PA-001/002/007/009/012/013`、`M12-FTD-001`、`PA004-MBF-QC` 和 `M10-PA-011-ORB-R1` 现在会进入每日 ledger；这些变体当前诚实标记为 `not_connected`、`lane=rescue`、`required_for_goal=false`，不会覆盖 baseline，也不会把未接线变体伪装成已测试通过。
 - 已接上首批 M14 rescue 最小输入流：`M10-PA-001-m14-modify-20260522`、`M10-PA-002-m14-modify-20260522`、`M10-PA-012-m14-modify-20260522` 现在进入 M12 accountized runtime 的 `rescue` lane，复用父策略扫描器但增加看涨、低风险、至少 `1.2R` 质量过滤；其余 rescue 仍保持 `not_connected`，不得伪装成已测试。
-- 已补齐 M14.2 broker readiness dry-run artifact 生成器：`scripts/run_m14_2_broker_readiness_scaffold.py` 现在只读 `m14_paper_trial_gate.json` 与 `m14_internal_paper_execution_ledger.jsonl`，把内部模拟 `risk_check` 事件转成 `broker_readiness_plan.json` 与 `broker_readiness_audit.jsonl`；当前真实样本为 `8` 条内部模拟风控检查、`1` 条 dry-run ready、`7` 条被风控阻断，仍未连接 broker、未读取凭证、未生成真实订单。
+- 已补齐 M14.2 broker readiness dry-run artifact 生成器：`scripts/run_m14_2_broker_readiness_scaffold.py` 现在只读 `m14_paper_trial_gate.json` 与 `m14_internal_paper_execution_ledger.jsonl`，把内部模拟 `risk_check` 事件转成 `broker_readiness_plan.json` 与 `broker_readiness_audit.jsonl`；当前真实样本去重后为 `8` 条内部模拟风控检查、`5` 条 dry-run ready、`3` 条被风控阻断，仍未连接 broker、未读取凭证、未生成真实订单。
+- 已修复 M14 内部模拟桥接的平仓同步缺口：`run_internal_paper_bridge` 现在按时间处理 `open/close`，同一交易日平仓会释放内部模拟敞口；同时把 M14 内部模拟总敞口从孤立的 `1000` 对齐到本项目账户化 runtime 的 `25000` 量级，保留单笔风险 `100` 不变。修复后 M14.2 dry-run ready 从旧口径 `1/8` 提升为 `5/8`，剩余阻断来自真实 `max_risk_per_order / max_total_exposure / consecutive_losses_limit`。
 
 ## 已完成
 
@@ -534,7 +535,7 @@
 - Codex App 自动化已在 `2026-05-21` 调整：`m14` 从每小时 cron 改为每个美股交易日前北京时间 `21:10` 只做一次守护器检查，避免反复新建“策略测试闭环守护”会话；盘中真实刷新继续由 M12.47 supervisor 和 M12.37 child session 承担。
 - M14.2 预备方向：可以提前做“模拟账户/券商接入 readiness scaffold”，但只能在单独高风险分支中实现 `broker_paper_ready / live_dry_run_ready` 的接口、配置、审批 gate、凭证隔离、dry-run contract、审计日志和 kill switch；不得接真实账户、不得提交真实订单、不得引入默认 live 开关。实盘交易必须在 M14 10 日 challenge、内部模拟准入、paper dry-run、人工审批和凭证隔离全部通过后再单独批准。
 - M14.2 当前已从 M14 分支切出 `codex/m14-2-broker-readiness-scaffold` 做工程准备：新增 `BrokerReadinessConfig`、`BrokerOrderPreview`、`BrokerReadinessPlan` 与 `build_broker_readiness_plan`，只把已通过风控和 `approved_internal_sim_only` gate 的 `ExecutionRequest` 转成 dry-run 订单预演；默认 `broker_connection_enabled=false`、`real_order_enabled=false`、`live_execution_enabled=false`、`paper_trading_approval=false`。
-- M14.2 已新增 `scripts/run_m14_2_broker_readiness_scaffold.py` 与 `scripts/m14_2_broker_readiness_scaffold_lib.py`，把真实内部模拟执行账本里的 `risk_check` 事件批量生成 dry-run readiness plan/audit。当前 artifact 位于 `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/`，结果显示 8 条内部模拟风控检查中只有 1 条可形成 dry-run preview，7 条被现有风控阻断；下一步应优先降低弱信号/超敞口触发，而不是放宽风控。
+- M14.2 已新增 `scripts/run_m14_2_broker_readiness_scaffold.py` 与 `scripts/m14_2_broker_readiness_scaffold_lib.py`，把真实内部模拟执行账本里的 `risk_check` 事件批量生成 dry-run readiness plan/audit。当前 artifact 位于 `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/`，结果显示去重后 8 条内部模拟风控检查中 5 条可形成 dry-run preview，3 条被现有风控阻断；下一步应优先降低弱信号/超敞口触发，而不是放宽风控。
 
 ## 当前阻塞
 

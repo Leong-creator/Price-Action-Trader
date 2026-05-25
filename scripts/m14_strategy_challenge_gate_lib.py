@@ -752,8 +752,113 @@ def run_internal_paper_bridge(
     seen_by_runtime: dict[str, frozenset[str]] = defaultdict(frozenset)
     state_by_runtime: dict[str, SessionRiskState] = defaultdict(lambda: SessionRiskState(session_key=trading_date.isoformat()))
     events: list[dict[str, Any]] = []
-    open_rows = [row for row in m12_trade_rows if row.get("event_type") == "open" and row.get("strategy_id") in approved]
-    for row in sorted(open_rows, key=lambda item: (str(item.get("event_time", "")), str(item.get("runtime_id", "")), str(item.get("symbol", "")))):
+    bridge_rows = [
+        row
+        for row in m12_trade_rows
+        if row.get("event_type") in {"open", "close"} and row.get("strategy_id") in approved
+    ]
+    indexed_rows = list(enumerate(bridge_rows))
+    for source_index, row in sorted(
+        indexed_rows,
+        key=lambda item: (
+            str(item[1].get("event_time", "")),
+            str(item[1].get("runtime_id", "")),
+            0 if item[1].get("event_type") == "open" else 1,
+            item[0],
+        ),
+    ):
+        if row.get("event_type") == "close":
+            runtime_id = str(row.get("runtime_id", ""))
+            positions = positions_by_runtime[runtime_id]
+            session_state = state_by_runtime[runtime_id]
+            matched_position = match_close_position(row, positions)
+            if matched_position is None:
+                events.append(
+                    {
+                        "schema_version": "m14.internal-paper-execution-ledger.v1",
+                        "stage": config.stage,
+                        "execution_event_id": f"{run_id}:{runtime_id}:{row.get('symbol', '')}:{source_index}:position_close_unmatched",
+                        "run_id": run_id,
+                        "generated_at": generated_at,
+                        "trading_date": trading_date.isoformat(),
+                        "strategy_id": row.get("strategy_id", ""),
+                        "runtime_id": runtime_id,
+                        "signal_id": "",
+                        "symbol": row.get("symbol", ""),
+                        "timeframe": row.get("timeframe", ""),
+                        "direction": normalize_direction(str(row.get("direction", ""))),
+                        "action": "position_close_unmatched",
+                        "status": "error",
+                        "risk_outcome": "",
+                        "reason_codes": "missing_open_position_in_internal_bridge",
+                        "quantity": fmt_decimal(decimal_or_zero(row.get("quantity"))),
+                        "entry_price": fmt_decimal(decimal_or_zero(row.get("entry_price"))),
+                        "exit_price": fmt_decimal(decimal_or_zero(row.get("exit_price"))),
+                        "stop_price": fmt_decimal(decimal_or_zero(row.get("stop_price"))),
+                        "target_price": fmt_decimal(decimal_or_zero(row.get("target_price"))),
+                        "related_position_id": "",
+                        "related_fill_id": "",
+                        "fill_simulated": False,
+                        "simulated": True,
+                        "internal_simulated_account": True,
+                        "broker_paper_connection": False,
+                        "trading_connection": False,
+                        "real_money_actions": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    }
+                )
+                continue
+            close_result = adapter.close_position(
+                position_id=matched_position.position_id,
+                exit_price=decimal(row.get("exit_price")),
+                closed_at=parse_datetime(str(row.get("event_time", trading_date.isoformat()))),
+                positions=positions,
+                session_state=session_state,
+                config=risk_config,
+                session_key=trading_date.isoformat(),
+                exit_reason=str(row.get("exit_reason", "ledger_close")),
+            )
+            positions_by_runtime[runtime_id] = close_result.resulting_positions
+            state_by_runtime[runtime_id] = close_result.session_state
+            for log_index, log in enumerate(close_result.logs):
+                events.append(
+                    {
+                        "schema_version": "m14.internal-paper-execution-ledger.v1",
+                        "stage": config.stage,
+                        "execution_event_id": f"{run_id}:{runtime_id}:{matched_position.position_id}:{source_index}:{log_index}:{log.action}",
+                        "run_id": run_id,
+                        "generated_at": generated_at,
+                        "trading_date": trading_date.isoformat(),
+                        "strategy_id": row.get("strategy_id", ""),
+                        "runtime_id": runtime_id,
+                        "signal_id": log.signal_id or "",
+                        "symbol": log.symbol or row.get("symbol", ""),
+                        "timeframe": row.get("timeframe", ""),
+                        "direction": normalize_direction(str(row.get("direction", ""))),
+                        "action": log.action,
+                        "status": log.status,
+                        "risk_outcome": "",
+                        "reason_codes": ",".join(log.reason_codes),
+                        "quantity": fmt_decimal(log.quantity) if log.quantity is not None else "",
+                        "entry_price": fmt_decimal(log.entry_price) if log.entry_price is not None else "",
+                        "exit_price": fmt_decimal(log.exit_price) if log.exit_price is not None else "",
+                        "realized_pnl": fmt_decimal(log.realized_pnl) if log.realized_pnl is not None else "",
+                        "stop_price": fmt_decimal(decimal_or_zero(row.get("stop_price"))),
+                        "target_price": fmt_decimal(decimal_or_zero(row.get("target_price"))),
+                        "related_position_id": log.related_position_id or "",
+                        "related_fill_id": log.related_fill_id or "",
+                        "fill_simulated": False,
+                        "simulated": True,
+                        "internal_simulated_account": True,
+                        "broker_paper_connection": False,
+                        "trading_connection": False,
+                        "real_money_actions": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    }
+                )
+            continue
         request = execution_request_from_trade_row(row, trading_date)
         runtime_id = str(row.get("runtime_id", ""))
         positions = positions_by_runtime[runtime_id]
@@ -818,6 +923,24 @@ def run_internal_paper_bridge(
                 }
             )
     return events
+
+
+def match_close_position(row: dict[str, Any], positions: tuple[PaperPosition, ...]) -> PaperPosition | None:
+    symbol = str(row.get("symbol", ""))
+    direction = normalize_direction(str(row.get("direction", "")))
+    quantity = decimal_or_zero(row.get("quantity"))
+    entry = decimal_or_zero(row.get("entry_price"))
+    for position in positions:
+        if position.symbol != symbol:
+            continue
+        if position.direction != direction:
+            continue
+        if position.quantity != quantity:
+            continue
+        if position.entry_price != entry:
+            continue
+        return position
+    return None
 
 
 def execution_request_from_trade_row(row: dict[str, Any], trading_date: date) -> ExecutionRequest:

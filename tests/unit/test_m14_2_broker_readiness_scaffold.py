@@ -143,8 +143,16 @@ class M142BrokerReadinessScaffoldTest(unittest.TestCase):
                 self._internal_paper_row(
                     strategy_id="M10-PA-004",
                     signal_id="sig-approved-allow",
+                    risk_outcome="block",
+                    reason_codes="max_total_exposure_exceeded",
+                    generated_at="2026-05-26T10:00:00Z",
+                ),
+                self._internal_paper_row(
+                    strategy_id="M10-PA-004",
+                    signal_id="sig-approved-allow",
                     risk_outcome="allow",
                     reason_codes="risk_allow",
+                    generated_at="2026-05-26T11:00:00Z",
                 ),
                 self._internal_paper_row(
                     strategy_id="M10-PA-001",
@@ -195,6 +203,7 @@ class M142BrokerReadinessScaffoldTest(unittest.TestCase):
                 generated_at="2026-05-26T12:00:00Z",
             )
 
+            self.assertEqual(result["raw_risk_check_count"], 4)
             self.assertEqual(result["source_risk_check_count"], 3)
             self.assertEqual(result["dry_run_ready_count"], 1)
             self.assertEqual(result["blocked_count"], 2)
@@ -268,13 +277,14 @@ class M142BrokerReadinessScaffoldTest(unittest.TestCase):
         signal_id: str,
         risk_outcome: str,
         reason_codes: str,
+        generated_at: str = "2026-05-26T11:00:00Z",
     ) -> dict:
         return {
             "schema_version": "m14.internal-paper-execution-ledger.v1",
             "stage": "M14.strategy_challenge_paper_gate",
             "execution_event_id": f"exec-{signal_id}",
             "run_id": "fixture-run",
-            "generated_at": "2026-05-26T11:00:00Z",
+            "generated_at": generated_at,
             "trading_date": "2026-05-26",
             "strategy_id": strategy_id,
             "runtime_id": f"{strategy_id}-1d",

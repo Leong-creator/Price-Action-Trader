@@ -17,7 +17,7 @@
   "internal_paper": {
     "enabled": true,
     "max_risk_per_order": "100",
-    "max_total_exposure": "1000",
+    "max_total_exposure": "25000",
     "max_symbol_exposure_ratio": "1",
     "max_daily_loss": "200",
     "max_consecutive_losses": 2
