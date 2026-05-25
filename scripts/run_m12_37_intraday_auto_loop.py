@@ -130,16 +130,25 @@ def run_once(
         force_refresh_current_intraday=force_refresh_current_intraday,
     )
     market = market_session_status(generated_at)
-    post_run_strategy_ledgers = run_post_run_strategy_ledgers(
-        config,
-        generated_at=generated_at,
-        trading_date=str(result["summary"].get("scan_date", "")),
-        market_status=market["status"],
-        m12_29_output_dir=m12_29_config.output_dir,
-        m12_summary=result["summary"],
-    )
-    observer = result["dashboard"]["codex_observer"]
     monitoring_active = market["status"] in {"盘前", "美股常规交易时段", "盘后"}
+    if monitoring_active:
+        post_run_strategy_ledgers = run_post_run_strategy_ledgers(
+            config,
+            generated_at=generated_at,
+            trading_date=str(result["summary"].get("scan_date", "")),
+            market_status=market["status"],
+            m12_29_output_dir=m12_29_config.output_dir,
+            m12_summary=result["summary"],
+        )
+    else:
+        post_run_strategy_ledgers = build_skipped_post_run_strategy_ledgers(
+            config,
+            generated_at=generated_at,
+            trading_date=str(result["summary"].get("scan_date", "")),
+            market_status=market["status"],
+            reason="market_not_in_monitoring_window",
+        )
+    observer = result["dashboard"]["codex_observer"]
     manifest = {
         "schema_version": "m12.37.auto-runner-manifest.v1",
         "stage": config.stage,
@@ -169,6 +178,79 @@ def run_once(
         "result": result,
         "manifest": manifest,
     }
+
+
+def build_skipped_post_run_strategy_ledgers(
+    config: M1237AutoLoopConfig,
+    *,
+    generated_at: str,
+    trading_date: str,
+    market_status: str,
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "m12.37.post-run-strategy-ledgers.v1",
+        "enabled": config.post_run_strategy_ledgers_enabled,
+        "generated_at": generated_at,
+        "trading_date": trading_date,
+        "market_status": market_status,
+        "m13_ran": False,
+        "m14_ran": False,
+        "m14_skip_reason": reason,
+        "m13_error_type": "",
+        "m13_error": "",
+        "m14_error_type": "",
+        "m14_error": "",
+        "m13_goal_complete": False,
+        "m14_goal_complete": False,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def write_idle_manifest(
+    config: M1237AutoLoopConfig,
+    *,
+    generated_at: str,
+    market: dict[str, str],
+    reason: str,
+) -> dict[str, Any]:
+    m12_29_config = load_m12_29_config(config.source_m12_29_config_path)
+    manifest = {
+        "schema_version": "m12.37.auto-runner-manifest.v1",
+        "stage": config.stage,
+        "generated_at": generated_at,
+        "market_session": market,
+        "refresh_seconds": config.refresh_seconds,
+        "observer_interval_minutes": config.observer_interval_minutes,
+        "codex_observer_enabled": config.codex_observer_enabled,
+        "codex_observer_mode": config.codex_observer_mode,
+        "loop_can_continue_now": False,
+        "session_monitoring_active_now": False,
+        "regular_session_active_now": False,
+        "latest_dashboard_json": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard_data.json"),
+        "latest_dashboard_html": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard.html"),
+        "latest_observer_json": project_path(m12_29_config.output_dir / "m12_38_codex_observer_latest.json"),
+        "observer_inbox": project_path(m12_29_config.output_dir / "m12_38_codex_observer_inbox.jsonl"),
+        "plain_language_result": f"非交易窗口：M12.37 session 未刷新看板，原因 {reason}，等待下一交易窗口。",
+        "post_run_strategy_ledgers": build_skipped_post_run_strategy_ledgers(
+            config,
+            generated_at=generated_at,
+            trading_date=market.get("new_york_date", ""),
+            market_status=market["status"],
+            reason=reason,
+        ),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+    write_json(m12_29_config.output_dir / "m12_37_auto_runner_manifest.json", manifest)
+    return manifest
 
 
 def run_post_run_strategy_ledgers(
@@ -409,6 +491,27 @@ def main() -> int:
                 no_refresh_quotes=args.no_refresh_quotes,
                 last_intraday_refresh_bucket=last_intraday_refresh_bucket,
             )
+            if not policy["continue_session"]:
+                manifest = write_idle_manifest(
+                    config,
+                    generated_at=generated_at,
+                    market=market,
+                    reason="market_not_in_monitoring_window",
+                )
+                print(json.dumps({
+                    "stage": manifest["stage"],
+                    "market_status": manifest["market_session"]["status"],
+                    "loop_can_continue_now": manifest["loop_can_continue_now"],
+                    "post_run_strategy_ledgers": {
+                        "m13_ran": manifest["post_run_strategy_ledgers"]["m13_ran"],
+                        "m14_ran": manifest["post_run_strategy_ledgers"]["m14_ran"],
+                        "m14_skip_reason": manifest["post_run_strategy_ledgers"]["m14_skip_reason"],
+                        "m13_error_type": manifest["post_run_strategy_ledgers"]["m13_error_type"],
+                        "m14_error_type": manifest["post_run_strategy_ledgers"]["m14_error_type"],
+                    },
+                    "summary": manifest["plain_language_result"],
+                }, ensure_ascii=False, indent=2, sort_keys=True))
+                break
             execute_fetch = policy["execute_fetch"]
             refresh_quotes = policy["refresh_quotes"]
             max_native_fetches = policy["max_native_fetches"]

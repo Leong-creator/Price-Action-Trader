@@ -11,6 +11,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -48,6 +49,7 @@ from src.data import OhlcvRow  # noqa: E402
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_29_current_day_scan_dashboard.json"
+MARKET_CALENDAR_CONFIG_PATH = ROOT / "config" / "examples" / "m12_47_session_supervisor.json"
 MARKET_WATCHLIST_CONFIG_PATH = ROOT / "config" / "examples" / "m14_market_watchlist.json"
 OUTPUT_DIR = M10_DIR / "daily_observation" / "m12_29_current_day_scan_dashboard"
 MONEY = Decimal("0.01")
@@ -381,17 +383,38 @@ def validate_generated_at_for_artifacts(generated_at: str) -> None:
 def current_us_scan_date(generated_at: str) -> date:
     ny_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
     candidate = ny_dt.date()
-    if ny_dt.weekday() < 5 and ny_dt.time() < time(9, 30):
+    if is_us_market_trading_day(candidate) and ny_dt.time() < time(9, 30):
         candidate -= timedelta(days=1)
-    while candidate.weekday() >= 5:
+    while not is_us_market_trading_day(candidate):
         candidate -= timedelta(days=1)
     return candidate
+
+
+@lru_cache(maxsize=8)
+def load_us_market_holidays(path: str = str(MARKET_CALENDAR_CONFIG_PATH)) -> frozenset[date]:
+    config_path = resolve_repo_path(path)
+    if not config_path.exists():
+        return frozenset()
+    payload = load_json(config_path)
+    holidays: set[date] = set()
+    for raw_value in payload.get("market_holidays", []):
+        if not isinstance(raw_value, str):
+            raise ValueError("market_holidays must contain ISO date strings")
+        try:
+            holidays.add(date.fromisoformat(raw_value))
+        except ValueError as exc:
+            raise ValueError(f"invalid market holiday date: {raw_value}") from exc
+    return frozenset(holidays)
+
+
+def is_us_market_trading_day(value: date) -> bool:
+    return value.weekday() < 5 and value not in load_us_market_holidays()
 
 
 def market_session_status(generated_at: str) -> dict[str, str]:
     utc_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
     ny_dt = utc_dt.astimezone(ZoneInfo("America/New_York"))
-    if ny_dt.weekday() >= 5:
+    if not is_us_market_trading_day(ny_dt.date()):
         status = "非交易日"
     elif time(9, 30) <= ny_dt.time() <= time(16, 0):
         status = "美股常规交易时段"

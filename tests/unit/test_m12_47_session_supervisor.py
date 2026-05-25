@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.run_m12_47_session_supervisor import (
+    apply_dashboard_status_overlay,
     build_failure_payload,
     build_status_payload,
     build_window_state,
@@ -45,6 +46,83 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(phase["market_status"], "等待下一交易日")
         self.assertEqual(phase["session_should_run"], "false")
         self.assertEqual(phase["next_session_start_new_york"], "2026-05-26 09:25:00 EDT")
+
+    def test_dashboard_status_overlay_marks_holiday_snapshot_audit_only(self):
+        dashboard = {
+            "generated_at": "2026-05-25T14:09:30Z",
+            "summary": {
+                "generated_at": "2026-05-25T14:09:30Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {
+                    "status": "美股常规交易时段",
+                    "new_york_time": "2026-05-25 10:09:30 EDT",
+                    "beijing_time": "2026-05-25 22:09:30 CST",
+                },
+            },
+            "update_status": {
+                "market_status": "美股常规交易时段",
+                "runtime_status": "交易时段自动运行中",
+                "freshness_state": "fresh",
+            },
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {
+                "top_status": {
+                    "market_status": "美股常规交易时段",
+                    "fully_ready_for_trading_display": "true",
+                }
+            },
+        }
+        changed = apply_dashboard_status_overlay(
+            dashboard,
+            {
+                "supervisor_generated_at": "2026-05-25T16:02:29Z",
+                "market_status": "非交易日等待",
+                "session_should_run": False,
+                "child_running": False,
+                "supervisor_process_alive": True,
+                "new_york_time": "2026-05-25 12:02:29 EDT",
+                "beijing_time": "2026-05-26 00:02:29 CST",
+            },
+        )
+        self.assertTrue(changed)
+        self.assertEqual(dashboard["update_status"]["market_status"], "非交易日等待")
+        self.assertEqual(dashboard["summary"]["market_session"]["status"], "非交易日等待")
+        self.assertFalse(dashboard["summary"]["current_day_runtime_ready"])
+        self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["fully_ready_for_trading_display"], "false")
+        self.assertIn("上一有效审计快照", dashboard["summary"]["data_freshness_warning"])
+
+    def test_dashboard_status_overlay_preserves_ready_flag_during_regular_session(self):
+        dashboard = {
+            "generated_at": "2026-05-26T14:09:30Z",
+            "summary": {
+                "generated_at": "2026-05-26T14:09:30Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {"market_status": "美股常规交易时段", "freshness_state": "fresh"},
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {"top_status": {"fully_ready_for_trading_display": "true"}},
+        }
+        changed = apply_dashboard_status_overlay(
+            dashboard,
+            {
+                "supervisor_generated_at": "2026-05-26T14:09:30Z",
+                "market_status": "美股常规交易时段",
+                "session_should_run": True,
+                "child_running": True,
+                "supervisor_process_alive": True,
+                "new_york_time": "2026-05-26 10:09:30 EDT",
+                "beijing_time": "2026-05-26 22:09:30 CST",
+            },
+        )
+        self.assertTrue(changed)
+        self.assertTrue(dashboard["summary"]["current_day_runtime_ready"])
+        self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["fully_ready_for_trading_display"], "true")
+        self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
 
     def test_status_payload_reads_latest_dashboard_timestamp(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -17,6 +17,10 @@
 
 - `codex/m14-2-broker-readiness-scaffold`
 
+## 当前工具修复
+
+- 已修复 M12.37/M12.47 面板假日误判：`M12.29` 和 `M12.37` 现在共用配置化美股休市日历，`2026-05-25` Memorial Day 不再显示为常规交易时段，也不会在休市日误跑 M13 ledger；M12.47 `--status` 会把现有静态看板 overlay 成“非交易日等待 / audit-only 快照”。
+
 ## 已完成
 
 - Git 仓库初始化

@@ -8,7 +8,7 @@ import signal
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time as wall_time, timedelta
 from pathlib import Path
 from typing import Any
@@ -19,7 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.m12_29_current_day_scan_dashboard_lib import load_json, write_json  # noqa: E402
+from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
+    build_dashboard_html,
+    load_config as load_m12_29_dashboard_config,
+    load_json,
+    write_json,
+)
 
 
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_47_session_supervisor.json"
@@ -335,6 +340,171 @@ def write_status(config: SupervisorConfig, payload: dict[str, Any]) -> None:
     write_json(status_path(config), payload)
 
 
+def dashboard_runtime_status_from_supervisor(payload: dict[str, Any]) -> str:
+    market_status = str(payload.get("market_status", ""))
+    if market_status == "非交易日等待":
+        return "非交易日等待，M12.37 不会启动；当前面板保留上一有效审计快照。"
+    if market_status == "等待下一交易日":
+        return "等待下一交易日，M12.37 暂停刷新；当前面板保留上一有效审计快照。"
+    if market_status == "等待开盘前预热":
+        return "等待开盘前预热，M12.37 尚未进入预热窗口。"
+    if market_status == "开盘前预热窗口":
+        return "开盘前预热窗口，M12.37 可由守护器启动，只读预热不生成实盘订单。"
+    if market_status == "收盘后收尾窗口":
+        return "收盘后收尾窗口，M12.37 可进行只读收尾与盘后固化。"
+    if market_status == "美股常规交易时段":
+        return "美股常规交易时段，M12.37 应由守护器保持只读刷新。"
+    return f"{market_status or '未知市场状态'}；当前面板保留上一有效审计快照。"
+
+
+def apply_dashboard_status_overlay(dashboard: dict[str, Any], payload: dict[str, Any]) -> bool:
+    if not dashboard:
+        return False
+    market_status = str(payload.get("market_status", ""))
+    if not market_status:
+        return False
+    audit_only = market_status in {"非交易日等待", "等待下一交易日", "等待开盘前预热"}
+    runtime_status = dashboard_runtime_status_from_supervisor(payload)
+    supervisor_generated_at = str(payload.get("supervisor_generated_at", ""))
+    now_dt = datetime.now(UTC).replace(microsecond=0)
+    dashboard_generated_at = str(dashboard.get("generated_at") or dashboard.get("summary", {}).get("generated_at") or "")
+    dashboard_age_seconds = ""
+    if dashboard_generated_at:
+        try:
+            generated_dt = datetime.fromisoformat(dashboard_generated_at.replace("Z", "+00:00"))
+            dashboard_age_seconds = str(max(int((now_dt - generated_dt).total_seconds()), 0))
+        except ValueError:
+            dashboard_age_seconds = ""
+    session_liveness = "alive" if payload.get("child_running") else ("idle" if not payload.get("session_should_run") else "stopped")
+    update_status = dashboard.setdefault("update_status", {})
+    update_status.update(
+        {
+            "market_status": market_status,
+            "new_york_time": str(payload.get("new_york_time", update_status.get("new_york_time", ""))),
+            "beijing_time": str(payload.get("beijing_time", update_status.get("beijing_time", ""))),
+            "runtime_status": runtime_status,
+            "session_liveness": session_liveness,
+            "supervisor_process_alive": str(bool(payload.get("supervisor_process_alive"))).lower(),
+            "last_heartbeat_at_utc": supervisor_generated_at,
+            "last_heartbeat_beijing_time": str(payload.get("beijing_time", "")),
+            "wall_clock_beijing_time": now_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
+            "dashboard_age_seconds": dashboard_age_seconds or str(update_status.get("dashboard_age_seconds", "")),
+            "heartbeat_age_seconds": "0",
+        }
+    )
+    if audit_only:
+        update_status["freshness_state"] = "supervisor_idle"
+    summary = dashboard.setdefault("summary", {})
+    market_session = summary.setdefault("market_session", {})
+    market_session.update(
+        {
+            "status": market_status,
+            "new_york_time": str(payload.get("new_york_time", market_session.get("new_york_time", ""))),
+            "beijing_time": str(payload.get("beijing_time", market_session.get("beijing_time", ""))),
+        }
+    )
+    if audit_only:
+        summary["current_day_runtime_ready"] = False
+        summary["current_day_scan_complete"] = False
+        overlay_warning = (
+            f"市场状态由 M12.47 守护器覆盖为 {market_status}；"
+            "当前面板是上一有效审计快照，不代表新的交易日测试。"
+        )
+        existing_warning = str(summary.get("data_freshness_warning", ""))
+        if overlay_warning not in existing_warning:
+            summary["data_freshness_warning"] = f"{existing_warning} {overlay_warning}".strip()
+    top_metrics = dashboard.setdefault("top_metrics", {})
+    top_metrics["运行状态"] = runtime_status
+    terminal = dashboard.setdefault("broker_terminal_view", {})
+    top_status = terminal.setdefault("top_status", {})
+    top_status.update(
+        {
+            "market_status": market_status,
+            "new_york_time": update_status["new_york_time"],
+            "beijing_time": update_status["beijing_time"],
+            "runtime_status": runtime_status,
+            "session_liveness": session_liveness,
+            "freshness_state": update_status.get("freshness_state", ""),
+            "fully_ready_for_trading_display": "false" if audit_only else top_status.get("fully_ready_for_trading_display", "false"),
+            "data_freshness_warning": summary.get("data_freshness_warning", ""),
+        }
+    )
+    terminal["status_overlay"] = {
+        "schema_version": "m12.47.dashboard-status-overlay.v1",
+        "source": "m12_47_session_supervisor",
+        "applied_at": now_dt.isoformat().replace("+00:00", "Z"),
+        "supervisor_generated_at": supervisor_generated_at,
+        "market_status": market_status,
+        "session_should_run": bool(payload.get("session_should_run")),
+        "child_running": bool(payload.get("child_running")),
+        "audit_only": audit_only,
+    }
+    return True
+
+
+def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, Any]) -> bool:
+    dashboard_path = dashboard_json_path(config)
+    if not dashboard_path.exists():
+        return False
+    dashboard = load_json(dashboard_path)
+    if not apply_dashboard_status_overlay(dashboard, payload):
+        return False
+    write_json(dashboard_path, dashboard)
+    try:
+        dashboard_config = replace(load_m12_29_dashboard_config(), output_dir=config.output_dir)
+        (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(
+            build_dashboard_html(dashboard_config, dashboard),
+            encoding="utf-8",
+        )
+    except Exception as exc:  # pragma: no cover - defensive artifact repair path
+        write_json(
+            config.output_dir / "m12_47_dashboard_status_overlay_error.json",
+            {
+                "schema_version": "m12.47.dashboard-status-overlay-error.v1",
+                "generated_at": now_utc_iso(),
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+            },
+        )
+    return True
+
+
+def sync_manifest_status_overlay(config: SupervisorConfig, payload: dict[str, Any]) -> bool:
+    manifest_path = config.output_dir / "m12_37_auto_runner_manifest.json"
+    if not manifest_path.exists():
+        return False
+    manifest = load_json(manifest_path)
+    market_status = str(payload.get("market_status", ""))
+    if not market_status:
+        return False
+    prior_market_status = manifest.get("market_session", {}).get("status", "")
+    manifest.setdefault("market_session", {})
+    manifest["market_session"].update(
+        {
+            "status": market_status,
+            "new_york_time": str(payload.get("new_york_time", "")),
+            "beijing_time": str(payload.get("beijing_time", "")),
+        }
+    )
+    if market_status in {"非交易日等待", "等待下一交易日", "等待开盘前预热"}:
+        manifest["loop_can_continue_now"] = False
+        manifest["session_monitoring_active_now"] = False
+        manifest["regular_session_active_now"] = False
+        manifest["plain_language_result"] = dashboard_runtime_status_from_supervisor(payload)
+    manifest["status_overlay"] = {
+        "schema_version": "m12.47.manifest-status-overlay.v1",
+        "source": "m12_47_session_supervisor",
+        "applied_at": now_utc_iso(),
+        "prior_market_status": prior_market_status,
+        "market_status": market_status,
+        "session_should_run": bool(payload.get("session_should_run")),
+        "child_running": bool(payload.get("child_running")),
+        "audit_only": market_status in {"非交易日等待", "等待下一交易日", "等待开盘前预热"},
+    }
+    write_json(manifest_path, manifest)
+    return True
+
+
 def write_failure_dossier(config: SupervisorConfig, payload: dict[str, Any]) -> None:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(failure_dossier_path(config), payload)
@@ -551,6 +721,8 @@ def print_status(config: SupervisorConfig) -> int:
         failure_reason=stored.get("failure_reason", "") if stored else "",
     )
     write_status(config, payload)
+    sync_dashboard_status_overlay(config, payload)
+    sync_manifest_status_overlay(config, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

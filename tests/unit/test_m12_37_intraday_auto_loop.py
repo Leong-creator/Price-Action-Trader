@@ -14,6 +14,7 @@ from scripts.run_m12_37_intraday_auto_loop import (
     session_refresh_policy,
     should_run_m14_finalization,
     validate_generated_at,
+    write_idle_manifest,
 )
 
 
@@ -114,6 +115,47 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertTrue(outcome["manifest"]["regular_session_active_now"])
             self.assertEqual(dashboard["timeframe_views"]["timeframe_order"], ["1d", "5m"])
             self.assertEqual([row["variant_id"] for row in dashboard["ftd001_monitor"]["accounts"]], ["baseline", "loss_streak_guard"])
+
+    def test_market_holiday_manifest_does_not_run_strategy_ledgers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(self.make_config(output_dir), post_run_strategy_ledgers_enabled=True)
+            with patch("scripts.run_m12_37_intraday_auto_loop.run_m13_daily_strategy_test_runner") as m13_runner:
+                outcome = run_once(
+                    config,
+                    generated_at="2026-05-25T14:00:00Z",
+                    execute_fetch=False,
+                    refresh_quotes=False,
+                )
+            manifest = outcome["manifest"]
+            self.assertEqual(manifest["market_session"]["status"], "非交易日")
+            self.assertFalse(manifest["loop_can_continue_now"])
+            self.assertFalse(manifest["post_run_strategy_ledgers"]["m13_ran"])
+            self.assertEqual(manifest["post_run_strategy_ledgers"]["m14_skip_reason"], "market_not_in_monitoring_window")
+            m13_runner.assert_not_called()
+
+    def test_idle_manifest_does_not_rebuild_dashboard_on_holiday_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            manifest = write_idle_manifest(
+                config,
+                generated_at="2026-05-25T14:00:00Z",
+                market={
+                    "status": "非交易日",
+                    "new_york_date": "2026-05-25",
+                    "new_york_time": "2026-05-25 10:00:00 EDT",
+                    "beijing_time": "2026-05-25 22:00:00 CST",
+                },
+                reason="market_not_in_monitoring_window",
+            )
+            self.assertFalse(manifest["loop_can_continue_now"])
+            self.assertFalse(manifest["regular_session_active_now"])
+            self.assertFalse(manifest["post_run_strategy_ledgers"]["m13_ran"])
+            self.assertFalse((output_dir / "m12_32_minute_readonly_dashboard_data.json").exists())
+            self.assertTrue((output_dir / "m12_37_auto_runner_manifest.json").exists())
 
     def test_session_refresh_policy_prefetches_preopen_and_fetches_once_per_5m_bucket(self):
         premarket = session_refresh_policy("2026-04-29T13:25:00Z", "盘前", no_fetch=False, no_refresh_quotes=False)

@@ -15,12 +15,13 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     PA004_MOMENTUM_VARIANT_ID,
     advance_account_runtime,
     bootstrap_account_state,
-        build_dashboard_data_freshness_warning,
-        build_dashboard_update_status,
-        build_extended_session_monitor,
-        build_accountized_run_status,
-        current_us_scan_date,
-        load_config,
+    build_accountized_run_status,
+    build_dashboard_data_freshness_warning,
+    build_dashboard_update_status,
+    build_extended_session_monitor,
+    current_us_scan_date,
+    load_config,
+    market_session_status,
     pa004_event_is_long,
     pa004_momentum_breakout_quality_signal,
     pa004_momentum_breakout_signal,
@@ -54,6 +55,12 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
     def test_scan_date_uses_prior_session_before_regular_open(self):
         self.assertEqual(current_us_scan_date("2026-04-29T12:00:00Z").isoformat(), "2026-04-28")
         self.assertEqual(current_us_scan_date("2026-04-29T14:00:00Z").isoformat(), "2026-04-29")
+
+    def test_market_calendar_skips_configured_holiday(self):
+        self.assertEqual(market_session_status("2026-05-25T14:00:00Z")["status"], "非交易日")
+        self.assertEqual(current_us_scan_date("2026-05-25T14:00:00Z").isoformat(), "2026-05-22")
+        self.assertEqual(current_us_scan_date("2026-05-26T13:26:00Z").isoformat(), "2026-05-22")
+        self.assertEqual(current_us_scan_date("2026-05-26T14:00:00Z").isoformat(), "2026-05-26")
 
     def test_cli_generated_at_guard_rejects_future_timestamp(self):
         with self.assertRaises(ValueError):
