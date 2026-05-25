@@ -1,0 +1,34 @@
+{
+  "schema_version": "m14.strategy-rescue-plan.config.v1",
+  "stage": "M14.strategy_rescue_plan",
+  "input_paths": {
+    "m14_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_challenge_summary.json",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m14_strategy_decision_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_decision_ledger.jsonl"
+  },
+  "output_paths": {
+    "rescue_plan_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
+    "rescue_plan_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.md"
+  },
+  "external_references": [
+    {
+      "project": "HKUDS/AI-Trader",
+      "url": "https://github.com/HKUDS/AI-Trader",
+      "usable_pattern": "paper trading, signal feed, leaderboard-style comparison, and agent signal sync can inspire shadow-signal evaluation only",
+      "boundary": "Do not copy-trade external agents; only ingest authorized public/user-approved signals into local shadow tests."
+    },
+    {
+      "project": "TauricResearch/TradingAgents",
+      "url": "https://github.com/TauricResearch/TradingAgents",
+      "usable_pattern": "separate analyst, researcher, trader, risk, and portfolio-manager roles can inspire local review gates and rescue diagnostics",
+      "boundary": "Use as architecture inspiration only; no external LLM decision can bypass local ledger, risk, or paper gate."
+    }
+  ],
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}
