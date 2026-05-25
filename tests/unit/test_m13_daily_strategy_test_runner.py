@@ -115,6 +115,11 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(states[("M10-PA-004-MBF-QC", "M10-PA-004-MBF-QC-1d")], "zero_signal")
             self.assertEqual(states[("M10-PA-005", "M10-PA-005-1d")], "zero_signal")
             self.assertEqual(states[("M12-FTD-001", "M12-FTD-001-baseline-1d")], "signal_generated")
+            self.assertEqual(
+                states[("M10-PA-001-m14-modify-20260522", "M10-PA-001-m14-modify-20260522-1d")],
+                "not_connected",
+            )
+            self.assertEqual(states[("M10-PA-011-ORB-R1", "M10-PA-011-ORB-R1-5m")], "not_connected")
 
     def test_connected_required_scope_is_ready_for_reliable_testing_goal(self):
         temp, config = self.build_fixture()
@@ -157,6 +162,23 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(by_id["M10-PA-006"]["runtime_account_count"], "0")
             self.assertEqual(by_id["AI-TRADER-EXTERNAL"]["challenge_status"], "external_shadow_research_only")
             self.assertEqual(by_id["AI-TRADER-EXTERNAL"]["goal_blocked"], "false")
+
+    def test_rescue_variants_are_visible_but_do_not_block_required_goal(self):
+        temp, config = self.build_fixture()
+        with temp:
+            result = run_m13_daily_strategy_test_runner(
+                config,
+                generated_at="2026-05-07T20:30:00Z",
+                trading_date="2026-05-07",
+            )
+            by_id = {row["strategy_id"]: row for row in result["scorecard_rows"]}
+            rescue = by_id["M10-PA-012-m14-modify-20260522"]
+            self.assertEqual(rescue["required_for_goal"], "false")
+            self.assertEqual(rescue["test_states"], "not_connected")
+            self.assertEqual(rescue["challenge_status"], "blocked_before_challenge")
+            self.assertEqual(rescue["goal_blocked"], "false")
+            self.assertTrue(result["summary"]["ready_for_complete_reliable_testing"])
+            self.assertEqual(result["summary"]["blocked_strategy_ids"], [])
 
 
 if __name__ == "__main__":
