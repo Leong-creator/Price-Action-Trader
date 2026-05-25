@@ -21,6 +21,7 @@
 
 - 已修复 M12.37/M12.47 面板假日误判：`M12.29` 和 `M12.37` 现在共用配置化美股休市日历，`2026-05-25` Memorial Day 不再显示为常规交易时段，也不会在休市日误跑 M13 ledger；M12.47 `--status` 会把现有静态看板 overlay 成“非交易日等待 / audit-only 快照”。
 - 已修复 M14 gate 与券商式主面板同步滞后：M12.47 `--status` 现在会刷新主面板里的 M14 进度、内部模拟准入数量和每条策略账户的 gate/decision；M14 `goal_status` 也直接写入 `challenge_progress_label`、`paper_trial_gate_approved_count` 和 approved ids，避免心跳汇报继续读到旧的 `approved 0`。
+- 已修复券商式主面板 PA004 对照区同步漏网：M12.47 overlay 现在同时刷新 `strategy_accounts` 与 `pa004_comparison.rows`，避免 PA004 在账户列表显示 `approved_internal_sim_only`、但对照表仍显示旧 `not_approved_challenge_incomplete`。同时修正自选股信号数/策略列表错位，以及空历史收益字段显示成裸 `%` 的表格问题。
 - 已新增 M14 策略救援计划入口：`scripts/run_m14_strategy_rescue_plan.py` 会从 M14 summary/gate/decision ledger 生成 `m14_strategy_rescue_plan.json/md`，把获批策略、亏损待救策略、零信号 detector 重建、plugin/research 策略分 lane 管理；AI-Trader 与 TradingAgents 只作为影子信号/多角色诊断参考，不允许 copy-trading 或绕过本地 M13/M14 gate。
 
 ## 已完成

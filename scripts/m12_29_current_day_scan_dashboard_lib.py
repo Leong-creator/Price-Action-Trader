@@ -2441,7 +2441,8 @@ def build_terminal_symbol_index(
         entry = index.setdefault(symbol, terminal_symbol_seed(symbol))
         entry["strategy_signal_count"] += 1
         if row.get("strategy_id"):
-            entry["strategy_ids"].add(row["strategy_id"])
+            entry["signal_strategy_ids"].add(row["strategy_id"])
+            entry["related_strategy_ids"].add(row["strategy_id"])
         if row.get("latest_price") not in ("", "暂无", None):
             entry["latest_price"] = row["latest_price"]
             entry["latest_price_source"] = row.get("latest_price_source", "signal_watchlist")
@@ -2454,7 +2455,7 @@ def build_terminal_symbol_index(
         entry["holding_count"] += 1 if row.get("record_type") == "open_position" else 0
         entry["account_pnl"] += money_to_decimal(row.get("pnl", ""))
         if row.get("strategy_id"):
-            entry["strategy_ids"].add(row["strategy_id"])
+            entry["related_strategy_ids"].add(row["strategy_id"])
         if row.get("latest_price") not in ("", "暂无", None):
             entry["latest_price"] = row["latest_price"]
             entry["latest_price_source"] = "account_runtime"
@@ -2486,7 +2487,8 @@ def terminal_symbol_seed(symbol: str) -> dict[str, Any]:
         "strategy_signal_count": 0,
         "holding_count": 0,
         "account_pnl": ZERO,
-        "strategy_ids": set(),
+        "signal_strategy_ids": set(),
+        "related_strategy_ids": set(),
         "refresh_state": "missing_verified_quote",
     }
 
@@ -2500,6 +2502,7 @@ def build_terminal_watchlist_row(
     data_symbol = next((alias for alias in WATCHLIST_ALIASES.get(symbol, (symbol,)) if alias in quote_index), symbol)
     entry = quote_index.get(data_symbol, terminal_symbol_seed(symbol))
     news_count = symbol_news_counts.get(symbol, 0) + (symbol_news_counts.get(data_symbol, 0) if data_symbol != symbol else 0)
+    signal_strategy_ids = sorted(entry["signal_strategy_ids"])
     return {
         "symbol": symbol,
         "data_symbol": data_symbol if data_symbol != symbol else "",
@@ -2511,7 +2514,8 @@ def build_terminal_watchlist_row(
         "latest_price_source": str(entry["latest_price_source"]),
         "has_strategy_signal": str(entry["strategy_signal_count"] > 0).lower(),
         "strategy_signal_count": str(entry["strategy_signal_count"]),
-        "strategy_ids": ", ".join(sorted(entry["strategy_ids"])),
+        "strategy_ids": ", ".join(signal_strategy_ids),
+        "related_strategy_ids": ", ".join(sorted(entry["related_strategy_ids"])),
         "has_position": str(entry["holding_count"] > 0).lower(),
         "holding_count": str(entry["holding_count"]),
         "today_pnl": money(entry["account_pnl"]),
@@ -3942,6 +3946,18 @@ def percent_cell(value: str) -> str:
     return f"{value}%"
 
 
+def percent_or_na(value: Any) -> str:
+    if value in {"", "暂无", None}:  # type: ignore[comparison-overlap]
+        return "暂无"
+    return f"{value}%"
+
+
+def percent_pair_or_na(left: Any, right: Any) -> str:
+    if left in {"", "暂无", None} and right in {"", "暂无", None}:  # type: ignore[comparison-overlap]
+        return "暂无"
+    return f"{percent_or_na(left)} / {percent_or_na(right)}"
+
+
 def watchlist_head() -> str:
     return "<tr><th>类别</th><th>策略</th><th>股票</th><th>周期</th><th>方向</th><th>当前价</th><th>入场</th><th>止损</th><th>目标</th><th>信号时间</th><th>说明</th></tr>"
 
@@ -3989,9 +4005,9 @@ def strategy_scorecard_html(row: dict[str, str]) -> str:
         f"<td>{html.escape(row['today_closed_count'])}</td>"
         f"<td class=\"{cls}\">{html.escape(pnl)}</td>"
         f"<td>{html.escape(row['equity'])}</td>"
-        f"<td>{html.escape(row['win_rate_percent'])}%</td>"
-        f"<td>{html.escape(row['max_drawdown_percent'])}%</td>"
-        f"<td>{html.escape(row['historical_return_percent'])}%</td>"
+        f"<td>{html.escape(percent_or_na(row.get('win_rate_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('max_drawdown_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('historical_return_percent', '')))}</td>"
         "</tr>"
     )
 
@@ -4010,7 +4026,7 @@ def strategy_detail_summary_html(row: dict[str, Any]) -> str:
         f"<td>{html.escape(row['closed_trade_count'])}</td>"
         f"<td>{html.escape(row['today_opened_count'])}/{html.escape(row['today_closed_count'])}</td>"
         f"<td>{html.escape(row['historical_net_profit'])}</td>"
-        f"<td>{html.escape(row['historical_return_percent'])}% / {html.escape(row['historical_max_drawdown_percent'])}%</td>"
+        f"<td>{html.escape(percent_pair_or_na(row.get('historical_return_percent', ''), row.get('historical_max_drawdown_percent', '')))}</td>"
         "</tr>"
     )
 
@@ -4077,9 +4093,9 @@ def ftd_account_row_html(row: dict[str, str]) -> str:
         f"<td>{html.escape(label)}</td>"
         f"<td>{html.escape(row['today_total_pnl'])}</td>"
         f"<td>{html.escape(row['equity'])}</td>"
-        f"<td>{html.escape(row['historical_return_percent'])}%</td>"
-        f"<td>{html.escape(row['historical_win_rate_percent'])}%</td>"
-        f"<td>{html.escape(row['historical_max_drawdown_percent'])}%</td>"
+        f"<td>{html.escape(percent_or_na(row.get('historical_return_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('historical_win_rate_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('historical_max_drawdown_percent', '')))}</td>"
         "</tr>"
     )
 

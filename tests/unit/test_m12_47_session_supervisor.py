@@ -154,6 +154,15 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                         "paper_trial_gate": "not_approved_pending",
                     },
                 ],
+                "pa004_comparison": {
+                    "rows": [
+                        {
+                            "strategy_id": "M10-PA-004",
+                            "m14_decision": "continue_testing",
+                            "paper_trial_gate": "not_approved_pending",
+                        }
+                    ]
+                },
             },
         }
         changed = apply_dashboard_status_overlay(
@@ -192,6 +201,8 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(terminal["strategy_accounts"][0]["m14_decision"], "promote")
         self.assertEqual(terminal["strategy_accounts"][0]["paper_trial_gate"], "approved_internal_sim_only")
         self.assertEqual(terminal["strategy_accounts"][1]["m14_decision"], "continue_testing")
+        self.assertEqual(terminal["pa004_comparison"]["rows"][0]["m14_decision"], "promote")
+        self.assertEqual(terminal["pa004_comparison"]["rows"][0]["paper_trial_gate"], "approved_internal_sim_only")
 
     def test_status_payload_reads_latest_dashboard_timestamp(self):
         with tempfile.TemporaryDirectory() as temp_dir:

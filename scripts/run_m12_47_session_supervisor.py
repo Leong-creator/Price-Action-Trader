@@ -462,7 +462,22 @@ def apply_dashboard_m14_overlay(terminal: dict[str, Any], m14_context: dict[str,
     )
     paper_gate_by_strategy = m14_context.get("paper_gate_by_strategy") or {}
     decision_by_strategy = m14_context.get("decision_by_strategy") or {}
-    for row in terminal.get("strategy_accounts", []):
+    apply_m14_rows_overlay(terminal.get("strategy_accounts", []), paper_gate_by_strategy, decision_by_strategy)
+    apply_m14_rows_overlay(
+        terminal.get("pa004_comparison", {}).get("rows", []),
+        paper_gate_by_strategy,
+        decision_by_strategy,
+    )
+
+
+def apply_m14_rows_overlay(
+    rows: Any,
+    paper_gate_by_strategy: dict[str, Any],
+    decision_by_strategy: dict[str, Any],
+) -> None:
+    if not isinstance(rows, list):
+        return
+    for row in rows:
         if not isinstance(row, dict):
             continue
         strategy_id = str(row.get("strategy_id", ""))

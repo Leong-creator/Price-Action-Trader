@@ -154,7 +154,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("freshness_state", dashboard["update_status"])
 
     def test_broker_terminal_view_has_accounts_watchlists_news_and_pa004_split(self):
-        _, result, _ = self.run_stage()
+        _, result, output_dir = self.run_stage()
         terminal = result["dashboard"]["broker_terminal_view"]
         self.assertEqual(terminal["schema_version"], "m14.1.broker-terminal-view.v1")
         self.assertEqual(terminal["top_status"]["fully_ready_for_trading_display"], "false")
@@ -184,10 +184,22 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("QCOM", [row["symbol"] for row in group_by_id["ai_chips"]["rows"]])
         self.assertTrue(group_by_id["strategy_active"]["rows"])
         self.assertEqual(group_by_id["strategy_active"]["generated_from"], "当日信号、持仓和账户账本自动聚合")
+        for group in terminal["watchlists"]["groups"]:
+            for row in group["rows"]:
+                if row["strategy_signal_count"] == "0":
+                    self.assertEqual(row["strategy_ids"], "")
+                if row["strategy_ids"]:
+                    self.assertGreater(int(row["strategy_signal_count"]), 0)
+                    signal_ids = {item.strip() for item in row["strategy_ids"].split(",") if item.strip()}
+                    related_ids = {item.strip() for item in row["related_strategy_ids"].split(",") if item.strip()}
+                    self.assertTrue(signal_ids.issubset(related_ids))
         pa004_ids = {row["runtime_id"] for row in terminal["pa004_comparison"]["rows"]}
         self.assertEqual(pa004_ids, {"M10-PA-004-long-1d", "M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"})
         self.assertFalse(terminal["news_panel"]["news_drives_trading_signal"])
         self.assertIn("audit_drawer", terminal)
+        html = (output_dir / "m12_32_minute_readonly_dashboard.html").read_text(encoding="utf-8")
+        self.assertNotIn("> %<", html)
+        self.assertNotIn("% / %", html)
 
     def test_mainline_and_experimental_accounts_are_separated(self):
         _, result, _ = self.run_stage()
