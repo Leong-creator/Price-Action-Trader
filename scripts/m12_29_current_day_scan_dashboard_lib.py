@@ -83,6 +83,7 @@ RESCUE_PARENT_STRATEGIES = {
     "M10-PA-009-m14-modify-20260522": "M10-PA-009",
     "M10-PA-012-m14-modify-20260522": "M10-PA-012",
     "M10-PA-013-m14-modify-20260522": "M10-PA-013",
+    "M12-FTD-001-m14-modify-20260522": "M12-FTD-001",
 }
 RESCUE_CONNECTED_STRATEGIES = frozenset(RESCUE_PARENT_STRATEGIES)
 CONNECTED_RUNTIME_STRATEGIES = frozenset(MAINLINE_STRATEGIES) | EXPERIMENTAL_ADAPTER_STRATEGIES | RESCUE_CONNECTED_STRATEGIES
@@ -143,6 +144,7 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-012-m14-modify-20260522-5m", "strategy_id": "M10-PA-012-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-012 救援五分钟账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-013-m14-modify-20260522-1d", "strategy_id": "M10-PA-013-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-013 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-013-m14-modify-20260522-5m", "strategy_id": "M10-PA-013-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-013 救援五分钟账户", "variant_id": "m14_modify_20260522"},
+    {"account_id": "M12-FTD-001-m14-modify-20260522-1d", "strategy_id": "M12-FTD-001-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M12-FTD-001 救援日线账户", "variant_id": "m14_modify_20260522"},
 )
 SUPPORTING_RULE_SPECS = (
     {"supporting_rule_id": "M10-PA-006", "display_name": "BLSHS 限价过滤", "mode": "base_trigger + M10-PA-006"},

@@ -101,6 +101,7 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
             "M10-PA-009-m14-modify-20260522",
             "M10-PA-012-m14-modify-20260522",
             "M10-PA-013-m14-modify-20260522",
+            "M12-FTD-001-m14-modify-20260522",
         }
         for rescue_id, parent_id in rescue_parent_ids.items():
             with self.subTest(rescue_id=rescue_id):
