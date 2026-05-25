@@ -418,9 +418,16 @@ def apply_dashboard_status_overlay(
         existing_warning = str(summary.get("data_freshness_warning", ""))
         if existing_warning and not summary.get("data_freshness_warning_before_audit_overlay"):
             summary["data_freshness_warning_before_audit_overlay"] = existing_warning
+        existing_plain_language = str(summary.get("plain_language_result", ""))
+        if existing_plain_language and not summary.get("plain_language_result_before_audit_overlay"):
+            summary["plain_language_result_before_audit_overlay"] = existing_plain_language
         summary["audit_only_snapshot"] = True
         summary["audit_only_snapshot_note"] = overlay_warning
         summary["data_freshness_warning"] = ""
+        summary["plain_language_result"] = (
+            f"{runtime_status} 守护器状态时间 {payload.get('beijing_time', '')}；"
+            "当前不是新的交易日测试，不把当日行情缺口、零信号或旧账本状态当成刷新失败。"
+        )
     else:
         summary["audit_only_snapshot"] = False
         summary["audit_only_snapshot_note"] = ""
@@ -445,6 +452,14 @@ def apply_dashboard_status_overlay(
     )
     if m14_context:
         apply_dashboard_m14_overlay(terminal, m14_context)
+    if audit_only:
+        prior_m13_status = str(top_status.get("m13_goal_status", ""))
+        if prior_m13_status and not top_status.get("m13_goal_status_before_audit_overlay"):
+            top_status["m13_goal_status_before_audit_overlay"] = prior_m13_status
+        top_status["m13_goal_status"] = (
+            f"audit_only_snapshot; last_m13_status={prior_m13_status or 'not_available'}; "
+            "not_counted_as_new_trading_day"
+        )
     terminal["status_overlay"] = {
         "schema_version": "m12.47.dashboard-status-overlay.v1",
         "source": "m12_47_session_supervisor",
@@ -768,9 +783,10 @@ def print_status(config: SupervisorConfig) -> int:
         child_last_exit_code = None if raw_exit_code in (None, "") else int(raw_exit_code)
     except (TypeError, ValueError):
         child_last_exit_code = None
+    phase = build_window_state(config)
     payload = build_status_payload(
         config,
-        phase=build_window_state(config),
+        phase=phase,
         supervisor_pid=stored_pid,
         supervisor_process_alive=supervisor_alive,
         child_pid=child_pid if child_running else None,
@@ -782,8 +798,23 @@ def print_status(config: SupervisorConfig) -> int:
         failure_reason=stored.get("failure_reason", "") if stored else "",
     )
     write_status(config, payload)
-    sync_dashboard_status_overlay(config, payload)
+    dashboard_synced = sync_dashboard_status_overlay(config, payload)
     sync_manifest_status_overlay(config, payload)
+    if dashboard_synced:
+        payload = build_status_payload(
+            config,
+            phase=phase,
+            supervisor_pid=stored_pid,
+            supervisor_process_alive=supervisor_alive,
+            child_pid=child_pid if child_running else None,
+            child_running=child_running,
+            child_started_at=stored.get("child_started_at", "") if stored else "",
+            child_last_exit_code=child_last_exit_code,
+            restart_count=int(stored.get("restart_count", 0)) if stored else 0,
+            failure_state=stored.get("failure_state", "") if stored else "",
+            failure_reason=stored.get("failure_reason", "") if stored else "",
+        )
+        write_status(config, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
