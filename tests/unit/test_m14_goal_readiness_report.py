@@ -41,6 +41,13 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                 result["rescue_target_stop_diagnostics"]["dominant_target_stop_issue_counts"],
                 {"target_reward_below_1r_after_quality_gates": 1},
             )
+            self.assertEqual(result["rescue_target_stop_shadow_normalization"]["diagnosed_runtime_count"], 1)
+            self.assertEqual(result["rescue_target_stop_shadow_normalization"]["runtime_with_shadow_candidate_count"], 1)
+            self.assertEqual(result["rescue_target_stop_shadow_normalization"]["best_variant_candidate_row_count"], 2)
+            self.assertEqual(
+                result["rescue_target_stop_shadow_normalization"]["best_variant_id_counts"],
+                {"risk_normalized_1_0r": 1},
+            )
             self.assertEqual(result["broker_readiness"]["mode"], "paper_dry_run_only")
             self.assertEqual(result["broker_readiness"]["dry_run_ready_count"], 1)
             self.assertEqual(result["broker_readiness"]["blocked_count"], 1)
@@ -67,6 +74,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertIn("Rescue Optimization Backlog", md)
             self.assertIn("Rescue Zero-Signal Diagnostics", md)
             self.assertIn("Rescue Target/Stop Diagnostics", md)
+            self.assertIn("Rescue Target/Stop Shadow Normalization", md)
             self.assertIn("Completion Assessment", md)
 
     def test_unsafe_config_is_rejected(self) -> None:
@@ -89,6 +97,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         rescue_backlog_path = root / "rescue_backlog.json"
         zero_signal_path = root / "zero_signal.json"
         target_stop_path = root / "target_stop.json"
+        shadow_normalization_path = root / "shadow_normalization.json"
         broker_path = root / "broker.json"
         config_path = root / "config.json"
         summary_path.write_text(
@@ -323,6 +332,37 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        shadow_normalization_path.write_text(
+            json.dumps(
+                {
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "diagnosed_runtime_count": 1,
+                        "runtime_with_shadow_candidate_count": 1,
+                        "runtime_without_shadow_candidate_count": 0,
+                        "source_candidate_row_count": 2,
+                        "best_variant_candidate_row_count": 2,
+                        "best_variant_id_counts": {"risk_normalized_1_0r": 1},
+                        "runtime_ids": ["M10-PA-012-m14-modify-20260522-5m"],
+                        "strategy_ids": ["M10-PA-012-m14-modify-20260522"],
+                        "parent_strategy_ids": ["M10-PA-012"],
+                        "opening_range_minutes": 30,
+                    },
+                    "plain_language_result": "fixture target/stop shadow normalization",
+                }
+            ),
+            encoding="utf-8",
+        )
         broker_path.write_text(
             json.dumps(
                 {
@@ -353,6 +393,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_rescue_optimization_backlog": str(rescue_backlog_path),
                         "m14_rescue_zero_signal_diagnostics": str(zero_signal_path),
                         "m14_rescue_target_stop_diagnostics": str(target_stop_path),
+                        "m14_rescue_target_stop_shadow_normalization": str(shadow_normalization_path),
                         "m14_2_broker_readiness_plan": str(broker_path),
                     },
                     "outputs": {

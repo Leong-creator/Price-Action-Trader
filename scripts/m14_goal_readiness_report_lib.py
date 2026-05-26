@@ -25,6 +25,7 @@ class GoalReadinessConfig:
     rescue_optimization_backlog_path: Path
     rescue_zero_signal_diagnostics_path: Path
     rescue_target_stop_diagnostics_path: Path
+    rescue_target_stop_shadow_normalization_path: Path
     broker_readiness_path: Path
     readiness_json_path: Path
     readiness_md_path: Path
@@ -58,6 +59,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
         rescue_zero_signal_diagnostics_path=resolve_repo_path(inputs["m14_rescue_zero_signal_diagnostics"]),
         rescue_target_stop_diagnostics_path=resolve_repo_path(inputs["m14_rescue_target_stop_diagnostics"]),
+        rescue_target_stop_shadow_normalization_path=resolve_repo_path(
+            inputs["m14_rescue_target_stop_shadow_normalization"]
+        ),
         broker_readiness_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         readiness_json_path=resolve_repo_path(outputs["readiness_json"]),
         readiness_md_path=resolve_repo_path(outputs["readiness_md"]),
@@ -94,6 +98,7 @@ def run_m14_goal_readiness_report(
     rescue_optimization_backlog = read_json(config.rescue_optimization_backlog_path)
     rescue_zero_signal_diagnostics = read_json(config.rescue_zero_signal_diagnostics_path)
     rescue_target_stop_diagnostics = read_json(config.rescue_target_stop_diagnostics_path)
+    rescue_target_stop_shadow_normalization = read_json(config.rescue_target_stop_shadow_normalization_path)
     broker_readiness = read_json(config.broker_readiness_path)
 
     gate_rows = list(paper_gate.get("rows", []))
@@ -111,6 +116,7 @@ def run_m14_goal_readiness_report(
         rescue_optimization_backlog,
         rescue_zero_signal_diagnostics,
         rescue_target_stop_diagnostics,
+        rescue_target_stop_shadow_normalization,
         broker_readiness,
     )
     boundaries_ok = all(boundaries.values())
@@ -136,6 +142,9 @@ def run_m14_goal_readiness_report(
             "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
             "m14_rescue_zero_signal_diagnostics": project_path(config.rescue_zero_signal_diagnostics_path),
             "m14_rescue_target_stop_diagnostics": project_path(config.rescue_target_stop_diagnostics_path),
+            "m14_rescue_target_stop_shadow_normalization": project_path(
+                config.rescue_target_stop_shadow_normalization_path
+            ),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_path),
         },
         "challenge": {
@@ -171,6 +180,9 @@ def run_m14_goal_readiness_report(
         "rescue_optimization_backlog": build_rescue_optimization_backlog_summary(rescue_optimization_backlog),
         "rescue_zero_signal_diagnostics": build_rescue_zero_signal_diagnostics_summary(rescue_zero_signal_diagnostics),
         "rescue_target_stop_diagnostics": build_rescue_target_stop_diagnostics_summary(rescue_target_stop_diagnostics),
+        "rescue_target_stop_shadow_normalization": build_rescue_target_stop_shadow_normalization_summary(
+            rescue_target_stop_shadow_normalization
+        ),
         "broker_readiness": {
             "mode": str(broker_readiness.get("mode", "")),
             "dry_run_ready_count": int_or_zero(broker_readiness.get("dry_run_ready_count")),
@@ -213,6 +225,7 @@ def build_boundaries(
     rescue_optimization_backlog: dict[str, Any],
     rescue_zero_signal_diagnostics: dict[str, Any],
     rescue_target_stop_diagnostics: dict[str, Any],
+    rescue_target_stop_shadow_normalization: dict[str, Any],
     broker_readiness: dict[str, Any],
 ) -> dict[str, bool]:
     return {
@@ -226,6 +239,7 @@ def build_boundaries(
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
+                rescue_target_stop_shadow_normalization,
             )
         ),
         "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
@@ -239,6 +253,7 @@ def build_boundaries(
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
+                rescue_target_stop_shadow_normalization,
                 broker_readiness,
             )
         ),
@@ -249,6 +264,7 @@ def build_boundaries(
             and not bool(rescue_optimization_backlog.get("real_order", False))
             and not bool(rescue_zero_signal_diagnostics.get("real_order", False))
             and not bool(rescue_target_stop_diagnostics.get("real_order", False))
+            and not bool(rescue_target_stop_shadow_normalization.get("real_order", False))
         ),
         "live_execution_disabled": not any(
             bool(item.get("live_execution", item.get("live_execution_enabled", False)))
@@ -260,6 +276,7 @@ def build_boundaries(
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
+                rescue_target_stop_shadow_normalization,
                 broker_readiness,
             )
         ),
@@ -273,6 +290,7 @@ def build_boundaries(
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
+                rescue_target_stop_shadow_normalization,
                 broker_readiness,
             )
         ),
@@ -346,6 +364,23 @@ def build_rescue_target_stop_diagnostics_summary(diagnostics: dict[str, Any]) ->
         "parent_strategy_ids": list(summary.get("parent_strategy_ids", [])),
         "dominant_target_stop_issue_counts": dict(summary.get("dominant_target_stop_issue_counts", {})),
         "plain_language_result": str(diagnostics.get("plain_language_result", "")),
+    }
+
+
+def build_rescue_target_stop_shadow_normalization_summary(normalization: dict[str, Any]) -> dict[str, Any]:
+    summary = normalization.get("summary", {})
+    return {
+        "diagnosed_runtime_count": int_or_zero(summary.get("diagnosed_runtime_count")),
+        "runtime_with_shadow_candidate_count": int_or_zero(summary.get("runtime_with_shadow_candidate_count")),
+        "runtime_without_shadow_candidate_count": int_or_zero(summary.get("runtime_without_shadow_candidate_count")),
+        "source_candidate_row_count": int_or_zero(summary.get("source_candidate_row_count")),
+        "best_variant_candidate_row_count": int_or_zero(summary.get("best_variant_candidate_row_count")),
+        "best_variant_id_counts": dict(summary.get("best_variant_id_counts", {})),
+        "runtime_ids": list(summary.get("runtime_ids", [])),
+        "strategy_ids": list(summary.get("strategy_ids", [])),
+        "parent_strategy_ids": list(summary.get("parent_strategy_ids", [])),
+        "opening_range_minutes": int_or_zero(summary.get("opening_range_minutes")),
+        "plain_language_result": str(normalization.get("plain_language_result", "")),
     }
 
 
@@ -474,6 +509,21 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "boundary": "Target/stop fixes stay shadow-only until 10 trading-day A/B evidence exists.",
             },
         )
+    shadow_normalization = payload.get("rescue_target_stop_shadow_normalization", {})
+    if int_or_zero(shadow_normalization.get("runtime_with_shadow_candidate_count")):
+        actions.insert(
+            5,
+            {
+                "priority": "P0",
+                "action": "Prepare the PA012 target/stop shadow normalization candidate for fresh-data A/B evidence",
+                "evidence": (
+                    f"{shadow_normalization['best_variant_candidate_row_count']}/"
+                    f"{shadow_normalization['source_candidate_row_count']} eligible rows pass the best shadow variant; "
+                    f"best variants {shadow_normalization['best_variant_id_counts']}"
+                ),
+                "boundary": "Shadow candidate is not a runtime change, promotion, or broker approval.",
+            },
+        )
     if not payload["challenge"]["m12_current_day_runtime_ready"]:
         actions.append(
             {
@@ -493,6 +543,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
     backlog = payload["rescue_optimization_backlog"]
     diagnostics = payload["rescue_zero_signal_diagnostics"]
     target_stop = payload["rescue_target_stop_diagnostics"]
+    shadow_normalization = payload["rescue_target_stop_shadow_normalization"]
     broker = payload["broker_readiness"]
     return (
         f"Project is at {payload['project_stage_label']}. "
@@ -512,6 +563,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{diagnostics['parent_detector_zero_signal_runtime_count']} should keep same-timeframe mapping and wait for parent detector evidence. "
         f"Target/stop diagnosis reviewed {target_stop['diagnosed_runtime_count']} reward/R runtimes, "
         f"with {target_stop['target_stop_issue_runtime_count']} still needing target/stop geometry work before threshold changes. "
+        f"Target/stop shadow normalization has {shadow_normalization['runtime_with_shadow_candidate_count']} candidate runtimes "
+        f"and {shadow_normalization['best_variant_candidate_row_count']}/{shadow_normalization['source_candidate_row_count']} eligible rows passing the best shadow variant. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -586,6 +639,19 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Shadow-candidate runtimes: `{target_stop['shadow_candidate_runtime_count']}`",
             f"- Reward >= 1.0R runtime count: `{target_stop['reward_ge_1_0_runtime_count']}`",
             f"- Dominant target/stop issues: `{target_stop['dominant_target_stop_issue_counts']}`",
+        ]
+    )
+    shadow_normalization = payload["rescue_target_stop_shadow_normalization"]
+    lines.extend(
+        [
+            "",
+            "## Rescue Target/Stop Shadow Normalization",
+            "",
+            f"- Diagnosed runtimes: `{shadow_normalization['diagnosed_runtime_count']}`",
+            f"- Runtime with shadow candidate: `{shadow_normalization['runtime_with_shadow_candidate_count']}`",
+            f"- Best candidate rows: `{shadow_normalization['best_variant_candidate_row_count']}/{shadow_normalization['source_candidate_row_count']}`",
+            f"- Best variant counts: `{shadow_normalization['best_variant_id_counts']}`",
+            f"- Runtime ids: `{', '.join(shadow_normalization['runtime_ids']) or 'none'}`",
         ]
     )
     lines.extend(["", "## Next Actions", ""])
