@@ -41,6 +41,12 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_decision_rescue_continue_count"], 3)
             self.assertEqual(result["summary"]["strategy_decision_final_discard_allowed_count"], 0)
             self.assertEqual(result["summary"]["strategy_decision_promotion_candidate_count"], 0)
+            self.assertEqual(result["summary"]["strategy_evidence_gap_row_count"], 6)
+            self.assertEqual(result["summary"]["strategy_evidence_open_gap_row_count"], 6)
+            self.assertEqual(result["summary"]["strategy_evidence_requires_fresh_refresh_count"], 4)
+            self.assertEqual(result["summary"]["strategy_evidence_wait_first_ledger_gap_count"], 1)
+            self.assertEqual(result["summary"]["strategy_evidence_rescue_10_day_ab_gap_count"], 3)
+            self.assertEqual(result["summary"]["strategy_evidence_shadow_review_gap_count"], 2)
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
@@ -58,15 +64,25 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(rows["ten_day_challenge_complete"]["state"], "proven")
             self.assertEqual(rows["weak_strategies_rescue_not_discarded"]["state"], "in_progress")
             self.assertIn("decision ladder keeps 3", rows["weak_strategies_rescue_not_discarded"]["evidence"])
+            self.assertIn("evidence gap matrix has 6 open rows", rows["weak_strategies_rescue_not_discarded"]["evidence"])
             self.assertIn(
                 "m14_strategy_decision_ladder",
+                rows["weak_strategies_rescue_not_discarded"]["source_refs"],
+            )
+            self.assertIn(
+                "m14_strategy_evidence_gap_matrix",
                 rows["weak_strategies_rescue_not_discarded"]["source_refs"],
             )
             self.assertEqual(rows["rescue_evidence_sufficient_for_promotion"]["state"], "blocked")
             self.assertEqual(rows["parameter_optimization_path_ready"]["state"], "in_progress")
             self.assertIn("shadow specs cover 4", rows["parameter_optimization_path_ready"]["evidence"])
+            self.assertIn("evidence gap matrix shows 2 shadow-review gaps", rows["parameter_optimization_path_ready"]["evidence"])
             self.assertIn(
                 "m14_rescue_parameter_shadow_spec",
+                rows["parameter_optimization_path_ready"]["source_refs"],
+            )
+            self.assertIn(
+                "m14_strategy_evidence_gap_matrix",
                 rows["parameter_optimization_path_ready"]["source_refs"],
             )
             self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
@@ -85,6 +101,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("M14 Objective Completion Audit", md)
             self.assertIn("Objective complete: `False`", md)
             self.assertIn("Parameter shadow specs/variants: `4/4`", md)
+            self.assertIn("Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `6/4/1/3/2`", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
     def test_rejects_mutation_boundary(self) -> None:
@@ -108,6 +125,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
         activation_gate_path = root / "activation_gate.json"
         parameter_shadow_spec_path = root / "parameter_shadow_spec.json"
         decision_ladder_path = root / "decision_ladder.json"
+        evidence_gap_matrix_path = root / "evidence_gap_matrix.json"
         external_map_path = root / "external_map.json"
         broker_plan_path = root / "broker_plan.json"
         config_path = root / "config.json"
@@ -286,6 +304,24 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        evidence_gap_matrix_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "strategy_gap_row_count": 6,
+                        "open_evidence_gap_row_count": 6,
+                        "requires_m12_47_fresh_refresh_count": 4,
+                        "wait_first_ledger_gap_count": 1,
+                        "rescue_10_day_ab_gap_count": 3,
+                        "shadow_review_gap_count": 2,
+                        "final_discard_allowed_count": 0,
+                        "promotion_candidate_count": 0,
+                        "parameter_mutation_allowed_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         external_map_path.write_text(
             json.dumps(
                 {
@@ -328,6 +364,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "m14_rescue_parameter_activation_gate": str(activation_gate_path),
                         "m14_rescue_parameter_shadow_spec": str(parameter_shadow_spec_path),
                         "m14_strategy_decision_ladder": str(decision_ladder_path),
+                        "m14_strategy_evidence_gap_matrix": str(evidence_gap_matrix_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_2_broker_readiness_plan": str(broker_plan_path),
                     },

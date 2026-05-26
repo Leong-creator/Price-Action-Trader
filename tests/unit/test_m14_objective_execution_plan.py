@@ -33,6 +33,11 @@ class M14ObjectiveExecutionPlanTest(unittest.TestCase):
             self.assertEqual(result["summary"]["parameter_gate_row_count"], 3)
             self.assertEqual(result["summary"]["parameter_digest_waiting_count"], 2)
             self.assertEqual(result["summary"]["parameter_continue_ab_collection_count"], 1)
+            self.assertEqual(result["summary"]["strategy_evidence_open_gap_row_count"], 6)
+            self.assertEqual(result["summary"]["strategy_evidence_requires_fresh_refresh_count"], 4)
+            self.assertEqual(result["summary"]["strategy_evidence_wait_first_ledger_gap_count"], 1)
+            self.assertEqual(result["summary"]["strategy_evidence_rescue_10_day_ab_gap_count"], 3)
+            self.assertEqual(result["summary"]["strategy_evidence_shadow_review_gap_count"], 2)
             self.assertFalse(result["summary"]["broker_or_live_enabled"])
             self.assertFalse(result["summary"]["manual_m12_37_once_allowed"])
 
@@ -50,6 +55,7 @@ class M14ObjectiveExecutionPlanTest(unittest.TestCase):
                 "waiting_for_m12_47_fresh_refresh_no_candidates",
             )
             self.assertEqual(actions["broker_dry_run_watch_only"]["action_state"], "guardrail_watch_only")
+            self.assertIn("open evidence gaps=6", actions["objective_completion_recheck"]["evidence"])
             for action in result["execution_actions"]:
                 self.assertFalse(action["manual_execution_allowed"])
                 self.assertFalse(action["broker_connection"])
@@ -76,6 +82,7 @@ class M14ObjectiveExecutionPlanTest(unittest.TestCase):
             md = (root / "execution_plan.md").read_text(encoding="utf-8")
             self.assertIn("M14 Objective Execution Plan", md)
             self.assertIn("approved_internal_sim_next_refresh", md)
+            self.assertIn("Strategy evidence open/fresh/first-ledger/10-day/shadow gaps: `6/4/1/3/2`", md)
             self.assertIn("Manual M12.37 once-mode", result["plain_language_result"])
 
     def test_rejects_manual_once_boundary(self) -> None:
@@ -116,6 +123,11 @@ class M14ObjectiveExecutionPlanTest(unittest.TestCase):
                         "m14_trading_date": "2026-05-22",
                         "approved_internal_sim_strategy_count": 2,
                         "approved_internal_sim_strategy_ids": ["M10-PA-004", "M10-PA-005"],
+                        "strategy_evidence_open_gap_row_count": 6,
+                        "strategy_evidence_requires_fresh_refresh_count": 4,
+                        "strategy_evidence_wait_first_ledger_gap_count": 1,
+                        "strategy_evidence_rescue_10_day_ab_gap_count": 3,
+                        "strategy_evidence_shadow_review_gap_count": 2,
                     },
                     "objective_completion_assessment": {"completion_state": "not_complete"},
                 }

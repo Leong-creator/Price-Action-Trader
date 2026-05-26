@@ -1,6 +1,6 @@
 # M14 Objective Execution Plan
 
-- Generated at: `2026-05-26T23:55:00Z`
+- Generated at: `2026-05-26T23:59:00Z`
 - Objective complete: `False`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Execution actions: `7`
@@ -9,12 +9,13 @@
 - Rescue evidence observed: `9/11`
 - Rescue no-ledger waits: `2`
 - Parameter shadow-review candidates: `0`
+- Strategy evidence open/fresh/first-ledger/10-day/shadow gaps: `20/12/2/10/11`
 - Manual execution allowed count: `0`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
 
 ## Plain Result
 
-Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still require an M12.47-owned fresh refresh. Approved internal sim is ready for 3 strategies; rescue evidence remains 9/11 observed with 2 first-ledger waits. Parameter activation has 0 shadow-review candidates and 13 rows waiting for fresh evidence. Manual M12.37 once-mode, broker/live, real orders, paper approval, registry/account-spec mutation, broker readiness mutation, and parameter mutation remain disabled.
+Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still require an M12.47-owned fresh refresh. Approved internal sim is ready for 3 strategies; rescue evidence remains 9/11 observed with 2 first-ledger waits. Parameter activation has 0 shadow-review candidates and 13 rows waiting for fresh evidence. Strategy evidence gaps remain open in 20 rows, with 12 waiting for fresh refresh. Manual M12.37 once-mode, broker/live, real orders, paper approval, registry/account-spec mutation, broker readiness mutation, and parameter mutation remain disabled.
 
 ## Execution Actions
 
@@ -90,7 +91,7 @@ Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still 
 - State: `blocked_or_in_progress`
 - Gate: `audit_recheck_after_evidence_updates`
 - Requires M12.47 fresh refresh: `True`
-- Evidence: Objective complete=False; blockers=['weak_strategies_rescue_not_discarded', 'rescue_evidence_sufficient_for_promotion', 'parameter_optimization_path_ready', 'fresh_refresh_required_before_parameter_activation', 'objective_complete'].
+- Evidence: Objective complete=False; blockers=['weak_strategies_rescue_not_discarded', 'rescue_evidence_sufficient_for_promotion', 'parameter_optimization_path_ready', 'fresh_refresh_required_before_parameter_activation', 'objective_complete']; open evidence gaps=20.
 - Blocked by: `weak_strategies_rescue_not_discarded, rescue_evidence_sufficient_for_promotion, parameter_optimization_path_ready, fresh_refresh_required_before_parameter_activation, objective_complete`
 - Next action: Regenerate objective audit after fresh-refresh, rescue evidence, and parameter activation artifacts update.
 - Success condition: Objective audit has no blocked or in-progress requirements and all guardrails remain intact.

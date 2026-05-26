@@ -274,6 +274,21 @@ def build_summary(
         "parameter_digest_waiting_count": sum(
             1 for row in parameter_rows if row["execution_state"] == "wait_fresh_refresh"
         ),
+        "strategy_evidence_open_gap_row_count": int_or_zero(
+            objective_summary.get("strategy_evidence_open_gap_row_count")
+        ),
+        "strategy_evidence_requires_fresh_refresh_count": int_or_zero(
+            objective_summary.get("strategy_evidence_requires_fresh_refresh_count")
+        ),
+        "strategy_evidence_wait_first_ledger_gap_count": int_or_zero(
+            objective_summary.get("strategy_evidence_wait_first_ledger_gap_count")
+        ),
+        "strategy_evidence_rescue_10_day_ab_gap_count": int_or_zero(
+            objective_summary.get("strategy_evidence_rescue_10_day_ab_gap_count")
+        ),
+        "strategy_evidence_shadow_review_gap_count": int_or_zero(
+            objective_summary.get("strategy_evidence_shadow_review_gap_count")
+        ),
         "external_reference_project_count": int_or_zero(
             external_summary.get("external_reference_project_count")
         ),
@@ -535,7 +550,8 @@ def build_execution_actions(
             execution_gate="audit_recheck_after_evidence_updates",
             requirement_ids=["objective_complete"],
             evidence=(
-                f"Objective complete={summary['objective_complete']}; blockers={summary['objective_blockers']}."
+                f"Objective complete={summary['objective_complete']}; blockers={summary['objective_blockers']}; "
+                f"open evidence gaps={summary['strategy_evidence_open_gap_row_count']}."
             ),
             next_action="Regenerate objective audit after fresh-refresh, rescue evidence, and parameter activation artifacts update.",
             strategy_ids=[],
@@ -607,6 +623,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['rescue_no_m13_ledger_evidence_count']} first-ledger waits. "
         f"Parameter activation has {summary['parameter_shadow_review_candidate_count']} shadow-review candidates "
         f"and {summary['parameter_waiting_for_fresh_refresh_count']} rows waiting for fresh evidence. "
+        f"Strategy evidence gaps remain open in {summary['strategy_evidence_open_gap_row_count']} rows, "
+        f"with {summary['strategy_evidence_requires_fresh_refresh_count']} waiting for fresh refresh. "
         "Manual M12.37 once-mode, broker/live, real orders, paper approval, registry/account-spec mutation, "
         "broker readiness mutation, and parameter mutation remain disabled."
     )
@@ -626,6 +644,7 @@ def build_execution_plan_md(payload: dict[str, Any]) -> str:
         f"- Rescue evidence observed: `{summary['rescue_m13_ledger_observed_strategy_count']}/{summary['rescue_runtime_strategy_count']}`",
         f"- Rescue no-ledger waits: `{summary['rescue_no_m13_ledger_evidence_count']}`",
         f"- Parameter shadow-review candidates: `{summary['parameter_shadow_review_candidate_count']}`",
+        f"- Strategy evidence open/fresh/first-ledger/10-day/shadow gaps: `{summary['strategy_evidence_open_gap_row_count']}/{summary['strategy_evidence_requires_fresh_refresh_count']}/{summary['strategy_evidence_wait_first_ledger_gap_count']}/{summary['strategy_evidence_rescue_10_day_ab_gap_count']}/{summary['strategy_evidence_shadow_review_gap_count']}`",
         f"- Manual execution allowed count: `{summary['manual_execution_allowed_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
         "",

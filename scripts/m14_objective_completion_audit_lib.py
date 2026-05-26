@@ -26,6 +26,7 @@ class ObjectiveCompletionAuditConfig:
     rescue_parameter_activation_gate_path: Path
     rescue_parameter_shadow_spec_path: Path
     strategy_decision_ladder_path: Path
+    strategy_evidence_gap_matrix_path: Path
     rescue_external_reference_map_path: Path
     broker_readiness_plan_path: Path
     audit_json_path: Path
@@ -65,6 +66,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveCompletionAu
         ),
         rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
         strategy_decision_ladder_path=resolve_repo_path(inputs["m14_strategy_decision_ladder"]),
+        strategy_evidence_gap_matrix_path=resolve_repo_path(inputs["m14_strategy_evidence_gap_matrix"]),
         rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         broker_readiness_plan_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         audit_json_path=resolve_repo_path(outputs["audit_json"]),
@@ -114,6 +116,7 @@ def run_m14_objective_completion_audit(
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
     parameter_shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
     decision_ladder = read_json(config.strategy_decision_ladder_path)
+    evidence_gap_matrix = read_json(config.strategy_evidence_gap_matrix_path)
     external_map = read_json(config.rescue_external_reference_map_path)
     broker_plan = read_json(config.broker_readiness_plan_path)
 
@@ -127,6 +130,7 @@ def run_m14_objective_completion_audit(
         activation_gate=activation_gate,
         parameter_shadow_spec=parameter_shadow_spec,
         decision_ladder=decision_ladder,
+        evidence_gap_matrix=evidence_gap_matrix,
         external_map=external_map,
         broker_plan=broker_plan,
     )
@@ -169,6 +173,7 @@ def run_m14_objective_completion_audit(
             ),
             "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
             "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
+            "m14_strategy_evidence_gap_matrix": project_path(config.strategy_evidence_gap_matrix_path),
             "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_plan_path),
         },
@@ -179,8 +184,9 @@ def run_m14_objective_completion_audit(
             "completion_state": "not_complete",
             "reason": (
                 "Project stage, 10-day challenge, approved internal simulation, external-reference mapping, "
-                "parameter shadow specs, strategy decision ladder, and guardrails are visible, but rescue "
-                "promotion, fresh-refresh review, and parameter activation are still blocked or in progress."
+                "parameter shadow specs, strategy decision ladder, strategy evidence gap matrix, and guardrails "
+                "are visible, but rescue promotion, fresh-refresh review, and parameter activation are still "
+                "blocked or in progress."
             ),
             "blocked_or_in_progress_requirement_ids": summary["objective_blockers"],
         },
@@ -227,6 +233,7 @@ def build_summary(
     activation_gate: dict[str, Any],
     parameter_shadow_spec: dict[str, Any],
     decision_ladder: dict[str, Any],
+    evidence_gap_matrix: dict[str, Any],
     external_map: dict[str, Any],
     broker_plan: dict[str, Any],
 ) -> dict[str, Any]:
@@ -240,6 +247,7 @@ def build_summary(
     activation_summary = activation_gate.get("summary", {})
     parameter_shadow_summary = parameter_shadow_spec.get("summary", {})
     decision_summary = decision_ladder.get("summary", {})
+    evidence_gap_summary = evidence_gap_matrix.get("summary", {})
     external_summary = external_map.get("summary", {})
     parameter_shadow_mutation_allowed_count = int_or_zero(
         stage_summary.get(
@@ -414,6 +422,57 @@ def build_summary(
             )
         ),
         "strategy_decision_parameter_mutation_allowed_count": decision_parameter_mutation_allowed_count,
+        "strategy_evidence_gap_row_count": int_or_zero(
+            stage_summary.get("strategy_evidence_gap_row_count", evidence_gap_summary.get("strategy_gap_row_count"))
+        ),
+        "strategy_evidence_open_gap_row_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_open_gap_row_count",
+                evidence_gap_summary.get("open_evidence_gap_row_count"),
+            )
+        ),
+        "strategy_evidence_requires_fresh_refresh_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_requires_fresh_refresh_count",
+                evidence_gap_summary.get("requires_m12_47_fresh_refresh_count"),
+            )
+        ),
+        "strategy_evidence_wait_first_ledger_gap_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_wait_first_ledger_gap_count",
+                evidence_gap_summary.get("wait_first_ledger_gap_count"),
+            )
+        ),
+        "strategy_evidence_rescue_10_day_ab_gap_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_rescue_10_day_ab_gap_count",
+                evidence_gap_summary.get("rescue_10_day_ab_gap_count"),
+            )
+        ),
+        "strategy_evidence_shadow_review_gap_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_shadow_review_gap_count",
+                evidence_gap_summary.get("shadow_review_gap_count"),
+            )
+        ),
+        "strategy_evidence_final_discard_allowed_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_final_discard_allowed_count",
+                evidence_gap_summary.get("final_discard_allowed_count"),
+            )
+        ),
+        "strategy_evidence_promotion_candidate_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_promotion_candidate_count",
+                evidence_gap_summary.get("promotion_candidate_count"),
+            )
+        ),
+        "strategy_evidence_parameter_mutation_allowed_count": int_or_zero(
+            stage_summary.get(
+                "strategy_evidence_parameter_mutation_allowed_count",
+                evidence_gap_summary.get("parameter_mutation_allowed_count"),
+            )
+        ),
         "fresh_refresh_observed": bool(
             activation_summary.get(
                 "fresh_refresh_observed",
@@ -563,11 +622,19 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['rescue_m13_ledger_observed_strategy_count']} have M13 ledger evidence; "
                 f"decision ladder keeps {summary['strategy_decision_rescue_continue_count']} strategies "
                 f"in rescue/continuation and final-discard allowed remains "
-                f"{summary['strategy_decision_final_discard_allowed_count']}."
+                f"{summary['strategy_decision_final_discard_allowed_count']}; "
+                f"evidence gap matrix has {summary['strategy_evidence_open_gap_row_count']} open rows, "
+                f"{summary['strategy_evidence_rescue_10_day_ab_gap_count']} rescue 10-day A/B gaps, and "
+                f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps."
             ),
             "" if summary["rescue_runtime_strategy_count"] > 0 else "No rescue runtime coverage is visible.",
             "Continue rescue A/B collection, zero-signal diagnostics, and detector rebuild work before discarding.",
-            ["m14_rescue_ab_evidence_tracker", "m14_strategy_decision_ladder", "m14_project_stage_assessment"],
+            [
+                "m14_rescue_ab_evidence_tracker",
+                "m14_strategy_decision_ladder",
+                "m14_strategy_evidence_gap_matrix",
+                "m14_project_stage_assessment",
+            ],
         ),
         requirement_row(
             "rescue_evidence_sufficient_for_promotion",
@@ -592,6 +659,7 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['parameter_shadow_spec_candidate_variant_count']} candidate variants; "
                 f"allowed-now changes {summary['parameter_experiment_allowed_now_count']}; "
                 f"activation shadow-review candidates {summary['parameter_activation_shadow_review_candidate_count']}; "
+                f"evidence gap matrix shows {summary['strategy_evidence_shadow_review_gap_count']} shadow-review gaps; "
                 f"parameter mutations allowed {summary['parameter_mutation_allowed_count']}."
             ),
             "" if summary["parameter_experiment_row_count"] > 0 else "No parameter queue is visible.",
@@ -600,6 +668,7 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "m14_rescue_parameter_experiment_queue",
                 "m14_rescue_parameter_activation_gate",
                 "m14_rescue_parameter_shadow_spec",
+                "m14_strategy_evidence_gap_matrix",
             ],
         ),
         requirement_row(
@@ -661,11 +730,12 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, "
                 "and parameter activation are not complete; strategy ladder still allows "
                 f"{summary['strategy_decision_final_discard_allowed_count']} final discards and "
-                f"{summary['strategy_decision_promotion_candidate_count']} promotion candidates."
+                f"{summary['strategy_decision_promotion_candidate_count']} promotion candidates; "
+                f"evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows."
             ),
-            "Objective is not complete while rescue promotion is 0, fresh refresh is absent, and parameter activation candidates are 0.",
+            "Objective is not complete while rescue promotion is 0, fresh refresh is absent, parameter activation candidates are 0, and evidence gaps remain open.",
             "Continue internal simulation and rescue evidence collection under read-only/simulated guardrails.",
-            ["m14_objective_completion_audit"],
+            ["m14_objective_completion_audit", "m14_strategy_evidence_gap_matrix"],
         ),
     ]
 
@@ -710,7 +780,11 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"strategies can continue: {approved}. In progress: {summary['rescue_runtime_strategy_count']} rescue "
         f"runtimes, {summary['parameter_experiment_row_count']} parameter experiment rows, "
         f"{summary['parameter_shadow_spec_candidate_variant_count']} parameter shadow variants, and "
-        f"{summary['strategy_decision_rescue_continue_count']} rescue-continuation ladder rows. Blocked: rescue "
+        f"{summary['strategy_decision_rescue_continue_count']} rescue-continuation ladder rows. "
+        f"Evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows, "
+        f"including {summary['strategy_evidence_requires_fresh_refresh_count']} fresh-refresh waits, "
+        f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
+        f"{summary['strategy_evidence_rescue_10_day_ab_gap_count']} rescue 10-day A/B gaps. Blocked: rescue "
         f"promotion remains {summary['rescue_promotion_allowed_count']}, fresh refresh observed is "
         f"{summary['fresh_refresh_observed']} with {summary['post_refresh_waiting_count']} waiting rows, and "
         f"parameter activation has {summary['parameter_activation_shadow_review_candidate_count']} shadow-review "
@@ -734,6 +808,7 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Rescue promotions allowed: `{summary['rescue_promotion_allowed_count']}`",
         f"- Parameter shadow specs/variants: `{summary['parameter_shadow_spec_row_count']}/{summary['parameter_shadow_spec_candidate_variant_count']}`",
         f"- Strategy ladder rescue/final discard: `{summary['strategy_decision_rescue_continue_count']}/{summary['strategy_decision_final_discard_allowed_count']}`",
+        f"- Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `{summary['strategy_evidence_open_gap_row_count']}/{summary['strategy_evidence_requires_fresh_refresh_count']}/{summary['strategy_evidence_wait_first_ledger_gap_count']}/{summary['strategy_evidence_rescue_10_day_ab_gap_count']}/{summary['strategy_evidence_shadow_review_gap_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",
         f"- Parameter activation candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",
