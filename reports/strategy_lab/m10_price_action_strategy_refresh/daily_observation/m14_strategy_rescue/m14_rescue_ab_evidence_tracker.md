@@ -1,6 +1,6 @@
 # M14 Rescue A/B Evidence Tracker
 
-- Generated at: `2026-05-26T00:06:37Z`
+- Generated at: `2026-05-26T15:30:00Z`
 - Rescue strategies with M13 ledger evidence: `9/9`
 - Ready for manual review after min days: `0`
 - No M13 rescue ledger evidence yet: `0`
@@ -61,7 +61,7 @@
 - Runtime ids: `M10-PA-011-ORB-R1-5m`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `18 / 0 / 0 / 0`
+- Signal / open / close / risk-blocked: `18 / 2 / 0 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-012-m14-modify-20260522

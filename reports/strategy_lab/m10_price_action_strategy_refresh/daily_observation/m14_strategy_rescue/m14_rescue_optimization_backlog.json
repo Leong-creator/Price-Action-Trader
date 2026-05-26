@@ -45,7 +45,7 @@
       ]
     }
   ],
-  "generated_at": "2026-05-26T15:00:00Z",
+  "generated_at": "2026-05-26T15:30:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "live_execution": false,
@@ -62,7 +62,7 @@
   "min_ab_trading_days": 10,
   "paper_or_live_approval": false,
   "paper_trading_approval": false,
-  "plain_language_result": "Rescue optimization backlog has 9 rescue rows; 9 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 1. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+  "plain_language_result": "Rescue optimization backlog has 9 rescue rows; 8 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
   "real_order": false,
   "rescue_rows": [
     {
@@ -236,40 +236,6 @@
       "work_state": "actionable_before_10d"
     },
     {
-      "backlog_id": "m14-rescue-opt-m10-pa-011-orb-r1",
-      "broker_connection": false,
-      "close_count": 0,
-      "evidence_status": "collecting_ab_evidence",
-      "issue_type": "signal_generated_no_account_operation",
-      "live_execution": false,
-      "m13_account_ledger_row_count": 1,
-      "observed_trading_days_count": 1,
-      "open_count": 0,
-      "optimization_family": "ledger_bridge_trading_date_noop_reason",
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_decision": "reject",
-      "parent_decision_reason": "ten_days_no_viable_signal",
-      "parent_optimization_hypothesis": "The problem is likely no actionable detector coverage, not proven negative expectancy.",
-      "parent_rescue_mode": "rebuild_detector_before_abandon",
-      "parent_strategy_id": "M10-PA-011",
-      "pre_10_day_actionable": true,
-      "priority": "P0",
-      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
-      "real_order": false,
-      "recommended_action": "Audit signal-to-account bridge, trading-date normalization, and no-op reason attribution; do not treat signals as execution evidence until account operations are explicit.",
-      "remaining_ab_trading_days": 9,
-      "required_ab_trading_days": 10,
-      "risk_blocked_count": 0,
-      "runtime_ids": [
-        "M10-PA-011-ORB-R1-5m"
-      ],
-      "signal_count": 18,
-      "source_row_count": 18,
-      "strategy_id": "M10-PA-011-ORB-R1",
-      "work_state": "actionable_before_10d"
-    },
-    {
       "backlog_id": "m14-rescue-opt-m10-pa-012-m14-modify-20260522",
       "broker_connection": false,
       "close_count": 0,
@@ -371,12 +337,46 @@
       "source_row_count": 0,
       "strategy_id": "M12-FTD-001-m14-modify-20260522",
       "work_state": "actionable_before_10d"
+    },
+    {
+      "backlog_id": "m14-rescue-opt-m10-pa-011-orb-r1",
+      "broker_connection": false,
+      "close_count": 0,
+      "evidence_status": "collecting_ab_evidence",
+      "issue_type": "collect_more_ab_evidence",
+      "live_execution": false,
+      "m13_account_ledger_row_count": 2,
+      "observed_trading_days_count": 1,
+      "open_count": 2,
+      "optimization_family": "detector_contract_rebuild",
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parent_decision": "reject",
+      "parent_decision_reason": "ten_days_no_viable_signal",
+      "parent_optimization_hypothesis": "The problem is likely no actionable detector coverage, not proven negative expectancy.",
+      "parent_rescue_mode": "rebuild_detector_before_abandon",
+      "parent_strategy_id": "M10-PA-011",
+      "pre_10_day_actionable": false,
+      "priority": "P2",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "real_order": false,
+      "recommended_action": "Continue collecting rescue A/B ledger days without changing the frozen variant.",
+      "remaining_ab_trading_days": 9,
+      "required_ab_trading_days": 10,
+      "risk_blocked_count": 0,
+      "runtime_ids": [
+        "M10-PA-011-ORB-R1-5m"
+      ],
+      "signal_count": 18,
+      "source_row_count": 18,
+      "strategy_id": "M10-PA-011-ORB-R1",
+      "work_state": "wait_for_more_ab_evidence"
     }
   ],
   "schema_version": "m14.rescue-optimization-backlog.v1",
   "stage": "M14.rescue_optimization_backlog",
   "summary": {
-    "actionable_before_10d_count": 9,
+    "actionable_before_10d_count": 8,
     "broker_blocker_reason_counts": {
       "consecutive_losses_limit": 1,
       "max_risk_per_order_exceeded": 1,
@@ -390,20 +390,19 @@
       "M10-PA-004-MBF-QC-m14-modify-20260522",
       "M10-PA-007-m14-modify-20260522",
       "M10-PA-009-m14-modify-20260522",
-      "M10-PA-011-ORB-R1",
       "M10-PA-012-m14-modify-20260522",
       "M10-PA-013-m14-modify-20260522",
       "M12-FTD-001-m14-modify-20260522"
     ],
     "issue_counts": {
-      "signal_generated_no_account_operation": 1,
+      "collect_more_ab_evidence": 1,
       "zero_signal_after_connection": 8
     },
     "missing_rescue_ledger_count": 0,
     "ready_for_manual_review_count": 0,
     "rescue_strategy_count": 9,
-    "signal_generated_no_account_operation_count": 1,
-    "wait_for_more_ab_evidence_count": 0,
+    "signal_generated_no_account_operation_count": 0,
+    "wait_for_more_ab_evidence_count": 1,
     "zero_signal_after_connection_count": 8
   }
 }

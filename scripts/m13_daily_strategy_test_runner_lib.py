@@ -572,7 +572,27 @@ def load_m12_account_input_audit(m12_output_dir: Path) -> list[dict[str, str]]:
 
 
 def filter_rows_for_trading_date(rows: list[dict[str, Any]], trading_date: date) -> list[dict[str, Any]]:
-    return [row for row in rows if iso_to_ny_trading_date(str(row.get("event_time", ""))) == trading_date]
+    return [row for row in rows if m12_operation_trading_date(row) == trading_date]
+
+
+def m12_operation_trading_date(row: dict[str, Any]) -> date | None:
+    explicit = iso_prefix_date(str(row.get("trading_date", "")))
+    if explicit is not None:
+        return explicit
+    if str(row.get("event_type", "")) == "open":
+        signal_date = iso_prefix_date(str(row.get("signal_time", "")))
+        if signal_date is not None:
+            return signal_date
+    return iso_to_ny_trading_date(str(row.get("event_time", "")))
+
+
+def iso_prefix_date(value: str) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
 
 
 def iso_to_ny_trading_date(value: str) -> date | None:

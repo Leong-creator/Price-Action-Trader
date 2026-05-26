@@ -1,6 +1,6 @@
 {
   "broker_connection": false,
-  "generated_at": "2026-05-26T00:06:37Z",
+  "generated_at": "2026-05-26T15:30:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "live_execution": false,
@@ -304,16 +304,18 @@
       "has_blocking_ledger_state": false,
       "latest_trading_date": "2026-05-22",
       "live_execution": false,
-      "m13_account_ledger_row_count": 1,
+      "m13_account_ledger_row_count": 2,
       "m13_signal_ledger_row_count": 1,
       "meets_min_ab_trading_days": false,
-      "no_account_operation_count": 1,
+      "no_account_operation_count": 0,
       "observed_trading_days": [
         "2026-05-22"
       ],
       "observed_trading_days_count": 1,
-      "open_count": 0,
-      "operation_trading_days": [],
+      "open_count": 2,
+      "operation_trading_days": [
+        "2026-05-22"
+      ],
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parent_gate_decision": "reject",
@@ -339,6 +341,7 @@
       "source_row_count": 18,
       "strategy_id": "M10-PA-011-ORB-R1",
       "test_states": [
+        "open",
         "signal_generated"
       ],
       "timeframes": [

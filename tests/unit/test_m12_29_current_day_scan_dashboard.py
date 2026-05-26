@@ -17,6 +17,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID,
     PA004_MOMENTUM_QUALITY_VARIANT_ID,
     PA004_MOMENTUM_VARIANT_ID,
+    account_ledger_trading_date,
     advance_account_runtime,
     bootstrap_account_state,
     build_accountized_run_status,
@@ -67,6 +68,29 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(current_us_scan_date("2026-05-25T14:00:00Z").isoformat(), "2026-05-22")
         self.assertEqual(current_us_scan_date("2026-05-26T13:26:00Z").isoformat(), "2026-05-22")
         self.assertEqual(current_us_scan_date("2026-05-26T14:00:00Z").isoformat(), "2026-05-26")
+
+    def test_account_ledger_trading_date_prefers_explicit_or_open_signal_date(self):
+        self.assertEqual(
+            account_ledger_trading_date(
+                {
+                    "event_type": "open",
+                    "trading_date": "2026-05-22",
+                    "signal_time": "2026-05-21T13:30:00",
+                    "event_time": "2026-05-26T00:06:37Z",
+                }
+            ),
+            date(2026, 5, 22),
+        )
+        self.assertEqual(
+            account_ledger_trading_date(
+                {
+                    "event_type": "open",
+                    "signal_time": "2026-05-22T13:30:00",
+                    "event_time": "2026-05-26T00:06:37Z",
+                }
+            ),
+            date(2026, 5, 22),
+        )
 
     def test_cli_generated_at_guard_rejects_future_timestamp(self):
         with self.assertRaises(ValueError):

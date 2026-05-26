@@ -1,6 +1,6 @@
 # M14 Goal Readiness Report
 
-- Generated at: `2026-05-26T15:00:00Z`
+- Generated at: `2026-05-26T15:30:00Z`
 - Project stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge progress: `10/10`
 - Internal simulated-account ready strategies: `M10-PA-004, M10-PA-005, M10-PA-008`
@@ -8,7 +8,7 @@
 
 ## Plain Result
 
-Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 9 actionable items: 8 zero-signal and 1 signal-to-account no-op. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.
+Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 8 actionable items: 8 zero-signal and 0 signal-to-account no-op. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.
 
 ## Gate Counts
 
@@ -27,16 +27,16 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 
 ## Rescue Optimization Backlog
 
-- Actionable before 10-day A/B completion: `9`
+- Actionable before 10-day A/B completion: `8`
 - Zero-signal connected variants: `8`
-- Signal-to-account no-op variants: `1`
+- Signal-to-account no-op variants: `0`
 - Broker dry-run blockers: `3`
 
 ## Next Actions
 
 - `P0` Run approved strategies in internal simulated-account testing only Evidence: M10-PA-004, M10-PA-005, M10-PA-008 Boundary: No broker connection, no real order, no live execution.
 - `P0` Collect 10 trading-day A/B evidence for connected rescue runtimes Evidence: 9/9 rescue strategies have M13 ledger evidence; 0 ready for manual review Boundary: Connected rescue runtime is not a promotion or approval.
-- `P0` Work the rescue optimization backlog before the 10-day A/B window completes Evidence: 9 actionable; 8 zero-signal connected variants; 1 signal-to-account no-op variants Boundary: Optimization backlog cannot change broker/live approval or count as promotion evidence.
+- `P0` Work the rescue optimization backlog before the 10-day A/B window completes Evidence: 8 actionable; 8 zero-signal connected variants; 0 signal-to-account no-op variants Boundary: Optimization backlog cannot change broker/live approval or count as promotion evidence.
 - `P1` Keep M14.2 broker readiness in dry-run preview mode Evidence: 5 dry-run ready, 3 blocked Boundary: Manual user approval is still required before any broker paper/live path.
 - `P1` Treat the current artifact set as a recompute/audit snapshot until the next trading session refresh Evidence: history_recompute_from_existing_challenge Boundary: Do not manually run M12.37 once-mode; M12.47 owns session launch.
 

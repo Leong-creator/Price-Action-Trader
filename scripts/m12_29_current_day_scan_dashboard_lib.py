@@ -468,6 +468,17 @@ def iso_to_ny_trading_date(value: str) -> date | None:
     return dt.astimezone(ZoneInfo("America/New_York")).date()
 
 
+def account_ledger_trading_date(row: dict[str, Any]) -> date | None:
+    explicit = parse_iso_date(str(row.get("trading_date", "")))
+    if explicit is not None:
+        return explicit
+    if str(row.get("event_type", "")) == "open":
+        signal_date = parse_iso_date(str(row.get("signal_time", "")))
+        if signal_date is not None:
+            return signal_date
+    return iso_to_ny_trading_date(str(row.get("event_time", "")))
+
+
 def build_trade_rows(candidates: list[dict[str, str]], quotes: dict[str, dict[str, str]], scan_date: date) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for row in candidates:
@@ -1703,6 +1714,7 @@ def open_new_positions(
                 "strategy_id": spec["strategy_id"],
                 "timeframe": spec["timeframe"],
                 "symbol": row.get("symbol", ""),
+                "trading_date": scan_date.isoformat(),
                 "signal_time": row.get("signal_time", ""),
                 "event_time": generated_at,
                 "direction": row.get("direction", ""),
@@ -1772,6 +1784,7 @@ def mark_position_to_market(
         "strategy_id": account["strategy_id"],
         "timeframe": account["timeframe"],
         "symbol": position["symbol"],
+        "trading_date": scan_date.isoformat(),
         "event_time": generated_at,
         "direction": direction,
         "entry_price": position["entry_price"],
@@ -1894,7 +1907,7 @@ def advance_account_runtime(
             row
             for row in existing_ledger_rows + account_new_ledger_rows
             if row.get("runtime_id") == spec["account_id"]
-            and iso_to_ny_trading_date(str(row.get("event_time", ""))) == scan_date
+            and account_ledger_trading_date(row) == scan_date
         ]
         new_ledger_rows.extend(account_new_ledger_rows)
         recalc_account_metrics(account, scan_date, account_daily_ledger_rows)

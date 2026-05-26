@@ -45,7 +45,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T15:00:00Z",
+  "generated_at": "2026-05-26T15:30:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own 10 trading-day A/B evidence before final promote/modify/reject."
@@ -94,7 +94,7 @@
     {
       "action": "Work the rescue optimization backlog before the 10-day A/B window completes",
       "boundary": "Optimization backlog cannot change broker/live approval or count as promotion evidence.",
-      "evidence": "9 actionable; 8 zero-signal connected variants; 1 signal-to-account no-op variants",
+      "evidence": "8 actionable; 8 zero-signal connected variants; 0 signal-to-account no-op variants",
       "priority": "P0"
     },
     {
@@ -110,7 +110,7 @@
       "priority": "P1"
     }
   ],
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 9 actionable items: 8 zero-signal and 1 signal-to-account no-op. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 8 actionable items: 8 zero-signal and 0 signal-to-account no-op. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
   "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "rescue_ab_evidence": {
     "collecting_evidence_count": 9,
@@ -136,7 +136,7 @@
     "rescue_runtime_strategy_count": 9
   },
   "rescue_optimization_backlog": {
-    "actionable_before_10d_count": 9,
+    "actionable_before_10d_count": 8,
     "broker_blocker_reason_counts": {
       "consecutive_losses_limit": 1,
       "max_risk_per_order_exceeded": 1,
@@ -150,15 +150,14 @@
       "M10-PA-004-MBF-QC-m14-modify-20260522",
       "M10-PA-007-m14-modify-20260522",
       "M10-PA-009-m14-modify-20260522",
-      "M10-PA-011-ORB-R1",
       "M10-PA-012-m14-modify-20260522",
       "M10-PA-013-m14-modify-20260522",
       "M12-FTD-001-m14-modify-20260522"
     ],
-    "plain_language_result": "Rescue optimization backlog has 9 rescue rows; 9 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 1. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+    "plain_language_result": "Rescue optimization backlog has 9 rescue rows; 8 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
     "rescue_strategy_count": 9,
-    "signal_generated_no_account_operation_count": 1,
-    "wait_for_more_ab_evidence_count": 0,
+    "signal_generated_no_account_operation_count": 0,
+    "wait_for_more_ab_evidence_count": 1,
     "zero_signal_after_connection_count": 8
   },
   "rescue_status": {

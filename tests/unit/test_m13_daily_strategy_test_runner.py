@@ -177,6 +177,54 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(ftd["open_count"], "1")
             self.assertEqual(ftd["close_count"], "1")
 
+    def test_open_operation_uses_signal_date_when_event_time_is_later(self):
+        temp, config = self.build_fixture()
+        with temp:
+            audit_path = config.m12_29_output_dir / "m12_46_account_input_audit.json"
+            audit_payload = json.loads(audit_path.read_text(encoding="utf-8"))
+            for row in audit_payload["rows"]:
+                if row["runtime_id"] == "M10-PA-011-ORB-R1-5m":
+                    row["input_status"] = "connected_with_signal_today"
+                    row["today_formal_signal_count"] = "1"
+                    row["source_row_count"] = "1"
+                    row["plain_language_result"] = "connected_with_signal_today"
+                    break
+            audit_path.write_text(json.dumps(audit_payload, ensure_ascii=False), encoding="utf-8")
+            ledger_path = config.m12_29_output_dir / "m12_46_account_trade_ledger.jsonl"
+            legacy_open = {
+                "event_type": "open",
+                "runtime_id": "M10-PA-011-ORB-R1-5m",
+                "strategy_id": "M10-PA-011-ORB-R1",
+                "timeframe": "5m",
+                "symbol": "XLY",
+                "direction": "看涨",
+                "quantity": "1",
+                "entry_price": "100.00",
+                "signal_time": "2026-05-07T13:30:00",
+                "event_time": "2026-05-26T00:06:37Z",
+            }
+            with ledger_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(legacy_open, sort_keys=True) + "\n")
+
+            result = run_m13_daily_strategy_test_runner(
+                config,
+                generated_at="2026-05-07T20:30:00Z",
+                trading_date="2026-05-07",
+            )
+
+            by_id = {row["strategy_id"]: row for row in result["scorecard_rows"]}
+            orb = by_id["M10-PA-011-ORB-R1"]
+            self.assertEqual(orb["test_states"], "signal_generated")
+            self.assertEqual(orb["signal_count"], "1")
+            self.assertEqual(orb["open_count"], "1")
+            operations = [
+                row for row in result["account_ledger_rows"]
+                if row["runtime_id"] == "M10-PA-011-ORB-R1-5m"
+            ]
+            self.assertEqual(len(operations), 1)
+            self.assertEqual(operations[0]["event_type"], "open")
+            self.assertEqual(operations[0]["source_event_time"], "2026-05-26T00:06:37Z")
+
     def test_plugins_and_ai_trader_do_not_create_independent_accounts(self):
         temp, config = self.build_fixture()
         with temp:
