@@ -1,6 +1,6 @@
 # M14 Objective Completion Audit
 
-- Generated at: `2026-05-27T00:45:00Z`
+- Generated at: `2026-05-26T13:25:00Z`
 - Objective complete: `False`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
@@ -11,6 +11,7 @@
 - Strategy ladder rescue/final discard: `10/0`
 - Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `20/12/2/10/11`
 - Source recheck rows/future-reextract: `7/2`
+- Source reextract plan rows/future/tasks/questions: `7/2/16/16`
 - Fresh refresh observed: `False`
 - Post-refresh waiting rows: `13`
 - Parameter activation candidates: `0`
@@ -19,7 +20,7 @@
 
 ## Plain Result
 
-Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.
+Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates; the source reextract plan now carries 7 rows, 2 future candidates, and 16 source-review tasks. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.
 
 ## Requirements
 
@@ -75,7 +76,7 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 ### source_reextract_path_ready
 
 - State: `in_progress`
-- Evidence: Source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 future source-reextract candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds; create/close/promote/discard/mutation allowed now is 0/0/0/0/0.
+- Evidence: Source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 future source-reextract candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds; source reextract plan has 7 rows, 2 future candidates, 16 review tasks, and 16 review questions; create/close/promote/discard/mutation allowed now is 0/0/0/0/0.
 - Blocker: None
 - Next action: Use this queue to review original source refs and visual packs; do not create, promote, discard, or mutate a strategy from source review alone.
 

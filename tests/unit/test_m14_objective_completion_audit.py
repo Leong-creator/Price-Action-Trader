@@ -55,6 +55,12 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_recheck_external_hold_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_recheck_can_create_strategy_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_recheck_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_plan_row_count"], 3)
+            self.assertEqual(result["summary"]["strategy_source_reextract_future_candidate_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_task_count"], 7)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_question_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_reextract_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
@@ -96,8 +102,14 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(rows["source_reextract_path_ready"]["state"], "in_progress")
             self.assertIn("3 artifact-only rows", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("1 future source-reextract candidates", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("source reextract plan has 3 rows", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("7 review tasks", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn(
                 "m14_strategy_source_recheck_triage",
+                rows["source_reextract_path_ready"]["source_refs"],
+            )
+            self.assertIn(
+                "m14_strategy_source_reextract_plan",
                 rows["source_reextract_path_ready"]["source_refs"],
             )
             self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
@@ -118,6 +130,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("Parameter shadow specs/variants: `4/4`", md)
             self.assertIn("Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `6/4/1/3/2`", md)
             self.assertIn("Source recheck rows/future-reextract: `3/1`", md)
+            self.assertIn("Source reextract plan rows/future/tasks/questions: `3/1/7/6`", md)
             self.assertIn("source_reextract_path_ready", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
@@ -144,6 +157,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
         decision_ladder_path = root / "decision_ladder.json"
         evidence_gap_matrix_path = root / "evidence_gap_matrix.json"
         source_recheck_path = root / "source_recheck.json"
+        source_reextract_plan_path = root / "source_reextract_plan.json"
         external_map_path = root / "external_map.json"
         broker_plan_path = root / "broker_plan.json"
         config_path = root / "config.json"
@@ -360,6 +374,29 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        source_reextract_plan_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_reextract_plan_row_count": 3,
+                        "future_source_reextract_candidate_count": 1,
+                        "research_only_hold_no_reextract_count": 1,
+                        "supporting_rule_no_standalone_reextract_count": 1,
+                        "external_reference_hold_count": 0,
+                        "source_ref_review_task_count": 7,
+                        "source_review_question_count": 6,
+                        "can_draft_future_source_reextract_spec_count": 1,
+                        "can_create_strategy_now_count": 0,
+                        "can_close_gap_now_count": 0,
+                        "can_promote_now_count": 0,
+                        "can_discard_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source reextract plan fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         external_map_path.write_text(
             json.dumps(
                 {
@@ -404,6 +441,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "m14_strategy_decision_ladder": str(decision_ladder_path),
                         "m14_strategy_evidence_gap_matrix": str(evidence_gap_matrix_path),
                         "m14_strategy_source_recheck_triage": str(source_recheck_path),
+                        "m14_strategy_source_reextract_plan": str(source_reextract_plan_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_2_broker_readiness_plan": str(broker_plan_path),
                     },

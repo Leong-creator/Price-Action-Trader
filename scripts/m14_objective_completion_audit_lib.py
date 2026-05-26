@@ -28,6 +28,7 @@ class ObjectiveCompletionAuditConfig:
     strategy_decision_ladder_path: Path
     strategy_evidence_gap_matrix_path: Path
     strategy_source_recheck_triage_path: Path
+    strategy_source_reextract_plan_path: Path
     rescue_external_reference_map_path: Path
     broker_readiness_plan_path: Path
     audit_json_path: Path
@@ -70,6 +71,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveCompletionAu
         strategy_evidence_gap_matrix_path=resolve_repo_path(inputs["m14_strategy_evidence_gap_matrix"]),
         strategy_source_recheck_triage_path=resolve_repo_path(
             inputs["m14_strategy_source_recheck_triage"]
+        ),
+        strategy_source_reextract_plan_path=resolve_repo_path(
+            inputs["m14_strategy_source_reextract_plan"]
         ),
         rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         broker_readiness_plan_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
@@ -122,6 +126,7 @@ def run_m14_objective_completion_audit(
     decision_ladder = read_json(config.strategy_decision_ladder_path)
     evidence_gap_matrix = read_json(config.strategy_evidence_gap_matrix_path)
     source_recheck = read_json(config.strategy_source_recheck_triage_path)
+    source_reextract_plan = read_json(config.strategy_source_reextract_plan_path)
     external_map = read_json(config.rescue_external_reference_map_path)
     broker_plan = read_json(config.broker_readiness_plan_path)
 
@@ -137,6 +142,7 @@ def run_m14_objective_completion_audit(
         decision_ladder=decision_ladder,
         evidence_gap_matrix=evidence_gap_matrix,
         source_recheck=source_recheck,
+        source_reextract_plan=source_reextract_plan,
         external_map=external_map,
         broker_plan=broker_plan,
     )
@@ -182,6 +188,9 @@ def run_m14_objective_completion_audit(
             "m14_strategy_evidence_gap_matrix": project_path(config.strategy_evidence_gap_matrix_path),
             "m14_strategy_source_recheck_triage": project_path(
                 config.strategy_source_recheck_triage_path
+            ),
+            "m14_strategy_source_reextract_plan": project_path(
+                config.strategy_source_reextract_plan_path
             ),
             "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_plan_path),
@@ -244,6 +253,7 @@ def build_summary(
     decision_ladder: dict[str, Any],
     evidence_gap_matrix: dict[str, Any],
     source_recheck: dict[str, Any],
+    source_reextract_plan: dict[str, Any],
     external_map: dict[str, Any],
     broker_plan: dict[str, Any],
 ) -> dict[str, Any]:
@@ -259,6 +269,7 @@ def build_summary(
     decision_summary = decision_ladder.get("summary", {})
     evidence_gap_summary = evidence_gap_matrix.get("summary", {})
     source_recheck_summary = source_recheck.get("summary", {})
+    source_reextract_summary = source_reextract_plan.get("summary", {})
     external_summary = external_map.get("summary", {})
     parameter_shadow_mutation_allowed_count = int_or_zero(
         stage_summary.get(
@@ -550,6 +561,84 @@ def build_summary(
                 source_recheck_summary.get("parameter_mutation_allowed_now_count"),
             )
         ),
+        "strategy_source_reextract_plan_row_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_plan_row_count",
+                source_reextract_summary.get("source_reextract_plan_row_count"),
+            )
+        ),
+        "strategy_source_reextract_future_candidate_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_future_candidate_count",
+                source_reextract_summary.get("future_source_reextract_candidate_count"),
+            )
+        ),
+        "strategy_source_reextract_research_hold_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_research_hold_count",
+                source_reextract_summary.get("research_only_hold_no_reextract_count"),
+            )
+        ),
+        "strategy_source_reextract_supporting_only_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_supporting_only_count",
+                source_reextract_summary.get("supporting_rule_no_standalone_reextract_count"),
+            )
+        ),
+        "strategy_source_reextract_external_hold_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_external_hold_count",
+                source_reextract_summary.get("external_reference_hold_count"),
+            )
+        ),
+        "strategy_source_reextract_review_task_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_review_task_count",
+                source_reextract_summary.get("source_ref_review_task_count"),
+            )
+        ),
+        "strategy_source_reextract_review_question_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_review_question_count",
+                source_reextract_summary.get("source_review_question_count"),
+            )
+        ),
+        "strategy_source_reextract_can_draft_future_spec_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_can_draft_future_spec_count",
+                source_reextract_summary.get("can_draft_future_source_reextract_spec_count"),
+            )
+        ),
+        "strategy_source_reextract_can_create_strategy_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_can_create_strategy_now_count",
+                source_reextract_summary.get("can_create_strategy_now_count"),
+            )
+        ),
+        "strategy_source_reextract_can_close_gap_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_can_close_gap_now_count",
+                source_reextract_summary.get("can_close_gap_now_count"),
+            )
+        ),
+        "strategy_source_reextract_can_promote_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_can_promote_now_count",
+                source_reextract_summary.get("can_promote_now_count"),
+            )
+        ),
+        "strategy_source_reextract_can_discard_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_can_discard_now_count",
+                source_reextract_summary.get("can_discard_now_count"),
+            )
+        ),
+        "strategy_source_reextract_parameter_mutation_allowed_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_reextract_parameter_mutation_allowed_count",
+                source_reextract_summary.get("parameter_mutation_allowed_now_count"),
+            )
+        ),
         "fresh_refresh_observed": bool(
             activation_summary.get(
                 "fresh_refresh_observed",
@@ -751,7 +840,10 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
         requirement_row(
             "source_reextract_path_ready",
             "Original-source recheck and future source-reextract candidates are tracked before creating new strategies.",
-            "in_progress" if summary["strategy_source_recheck_row_count"] > 0 else "blocked",
+            "in_progress"
+            if summary["strategy_source_recheck_row_count"] > 0
+            and summary["strategy_source_reextract_plan_row_count"] > 0
+            else "blocked",
             (
                 f"Source recheck triage has {summary['strategy_source_recheck_row_count']} artifact-only rows, "
                 f"{summary['strategy_source_recheck_visual_candidate_count']} source/visual candidates, "
@@ -759,16 +851,23 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['strategy_source_recheck_research_hold_count']} research-only holds, "
                 f"{summary['strategy_source_recheck_supporting_rule_count']} supporting-only rows, and "
                 f"{summary['strategy_source_recheck_external_hold_count']} external-reference holds; "
+                f"source reextract plan has {summary['strategy_source_reextract_plan_row_count']} rows, "
+                f"{summary['strategy_source_reextract_future_candidate_count']} future candidates, "
+                f"{summary['strategy_source_reextract_review_task_count']} review tasks, and "
+                f"{summary['strategy_source_reextract_review_question_count']} review questions; "
                 f"create/close/promote/discard/mutation allowed now is "
-                f"{summary['strategy_source_recheck_can_create_strategy_now_count']}/"
-                f"{summary['strategy_source_recheck_can_close_gap_now_count']}/"
-                f"{summary['strategy_source_recheck_can_promote_now_count']}/"
-                f"{summary['strategy_source_recheck_can_discard_now_count']}/"
-                f"{summary['strategy_source_recheck_parameter_mutation_allowed_count']}."
+                f"{summary['strategy_source_reextract_can_create_strategy_now_count']}/"
+                f"{summary['strategy_source_reextract_can_close_gap_now_count']}/"
+                f"{summary['strategy_source_reextract_can_promote_now_count']}/"
+                f"{summary['strategy_source_reextract_can_discard_now_count']}/"
+                f"{summary['strategy_source_reextract_parameter_mutation_allowed_count']}."
             ),
-            "" if summary["strategy_source_recheck_row_count"] > 0 else "No source recheck triage artifact is visible.",
+            ""
+            if summary["strategy_source_recheck_row_count"] > 0
+            and summary["strategy_source_reextract_plan_row_count"] > 0
+            else "Source recheck triage or source reextract plan artifact is missing.",
             "Use this queue to review original source refs and visual packs; do not create, promote, discard, or mutate a strategy from source review alone.",
-            ["m14_strategy_source_recheck_triage"],
+            ["m14_strategy_source_recheck_triage", "m14_strategy_source_reextract_plan"],
         ),
         requirement_row(
             "fresh_refresh_required_before_parameter_activation",
@@ -881,7 +980,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['parameter_shadow_spec_candidate_variant_count']} parameter shadow variants, and "
         f"{summary['strategy_decision_rescue_continue_count']} rescue-continuation ladder rows. "
         f"Source recheck triage tracks {summary['strategy_source_recheck_row_count']} artifact-only rows, "
-        f"including {summary['strategy_source_recheck_future_reextract_candidate_count']} future source-reextract candidates. "
+        f"including {summary['strategy_source_recheck_future_reextract_candidate_count']} future source-reextract candidates; "
+        f"the source reextract plan now carries {summary['strategy_source_reextract_plan_row_count']} rows, "
+        f"{summary['strategy_source_reextract_future_candidate_count']} future candidates, and "
+        f"{summary['strategy_source_reextract_review_task_count']} source-review tasks. "
         f"Evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows, "
         f"including {summary['strategy_evidence_requires_fresh_refresh_count']} fresh-refresh waits, "
         f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
@@ -911,6 +1013,7 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Strategy ladder rescue/final discard: `{summary['strategy_decision_rescue_continue_count']}/{summary['strategy_decision_final_discard_allowed_count']}`",
         f"- Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `{summary['strategy_evidence_open_gap_row_count']}/{summary['strategy_evidence_requires_fresh_refresh_count']}/{summary['strategy_evidence_wait_first_ledger_gap_count']}/{summary['strategy_evidence_rescue_10_day_ab_gap_count']}/{summary['strategy_evidence_shadow_review_gap_count']}`",
         f"- Source recheck rows/future-reextract: `{summary['strategy_source_recheck_row_count']}/{summary['strategy_source_recheck_future_reextract_candidate_count']}`",
+        f"- Source reextract plan rows/future/tasks/questions: `{summary['strategy_source_reextract_plan_row_count']}/{summary['strategy_source_reextract_future_candidate_count']}/{summary['strategy_source_reextract_review_task_count']}/{summary['strategy_source_reextract_review_question_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",
         f"- Parameter activation candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",

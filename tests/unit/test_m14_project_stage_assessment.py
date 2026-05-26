@@ -118,6 +118,19 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_recheck_can_promote_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_recheck_can_discard_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_recheck_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_plan_row_count"], 3)
+            self.assertEqual(result["summary"]["strategy_source_reextract_future_candidate_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_reextract_research_hold_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_reextract_supporting_only_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_reextract_external_hold_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_task_count"], 7)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_question_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_reextract_can_draft_future_spec_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_reextract_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_can_close_gap_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_can_promote_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_can_discard_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -207,6 +220,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 "source_recheck_triage_ready_no_gap_closure_or_mutation",
             )
             self.assertEqual(
+                result["stage_assessment"]["strategy_source_reextract_plan_status"],
+                "source_reextract_plan_ready_no_strategy_creation_or_mutation",
+            )
+            self.assertEqual(
                 result["stage_assessment"]["objective_completion_status"],
                 "blocked_or_in_progress",
             )
@@ -267,6 +284,18 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 0,
             )
             self.assertFalse(result["strategy_source_recheck_triage"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["strategy_source_reextract_plan"]["source_reextract_plan_row_count"], 3)
+            self.assertEqual(
+                result["strategy_source_reextract_plan"]["future_source_reextract_candidate_count"],
+                1,
+            )
+            self.assertEqual(result["strategy_source_reextract_plan"]["source_ref_review_task_count"], 7)
+            self.assertEqual(result["strategy_source_reextract_plan"]["can_create_strategy_now_count"], 0)
+            self.assertEqual(
+                result["strategy_source_reextract_plan"]["parameter_mutation_allowed_now_count"],
+                0,
+            )
+            self.assertFalse(result["strategy_source_reextract_plan"]["manual_m12_37_once_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -306,6 +335,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy pre-refresh review close/promote/discard/mutation allowed: `0/0/0/0`", md)
             self.assertIn("Strategy pre-refresh review audit rows/ready/waiting/backfill: `4/1/2/1`", md)
             self.assertIn("Strategy pre-refresh review audit close/promote/discard/mutation allowed: `0/0/0/0`", md)
+            self.assertIn("Strategy source reextract plan rows/future/tasks/questions: `3/1/7/6`", md)
+            self.assertIn("Strategy source reextract plan create/close/promote/discard/mutation allowed: `0/0/0/0/0`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
             self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `24/23/7`", md)
@@ -338,6 +369,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_pre_refresh_review_packet_path = root / "strategy_pre_refresh_review_packet.json"
         strategy_pre_refresh_review_audit_path = root / "strategy_pre_refresh_review_audit.json"
         strategy_source_recheck_triage_path = root / "strategy_source_recheck_triage.json"
+        strategy_source_reextract_plan_path = root / "strategy_source_reextract_plan.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -724,6 +756,29 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_source_reextract_plan_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_reextract_plan_row_count": 3,
+                        "future_source_reextract_candidate_count": 1,
+                        "research_only_hold_no_reextract_count": 1,
+                        "supporting_rule_no_standalone_reextract_count": 1,
+                        "external_reference_hold_count": 0,
+                        "source_ref_review_task_count": 7,
+                        "source_review_question_count": 6,
+                        "can_draft_future_source_reextract_spec_count": 1,
+                        "can_create_strategy_now_count": 0,
+                        "can_close_gap_now_count": 0,
+                        "can_promote_now_count": 0,
+                        "can_discard_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source reextract plan fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -818,6 +873,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_pre_refresh_review_packet": str(strategy_pre_refresh_review_packet_path),
                         "m14_strategy_pre_refresh_review_audit": str(strategy_pre_refresh_review_audit_path),
                         "m14_strategy_source_recheck_triage": str(strategy_source_recheck_triage_path),
+                        "m14_strategy_source_reextract_plan": str(strategy_source_reextract_plan_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                         "m14_post_fresh_refresh_recompute_checklist": str(post_fresh_checklist_path),

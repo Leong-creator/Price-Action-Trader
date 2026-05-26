@@ -32,6 +32,7 @@ class ProjectStageAssessmentConfig:
     strategy_pre_refresh_review_packet_path: Path
     strategy_pre_refresh_review_audit_path: Path
     strategy_source_recheck_triage_path: Path
+    strategy_source_reextract_plan_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     post_fresh_refresh_recompute_checklist_path: Path
@@ -88,6 +89,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         strategy_source_recheck_triage_path=resolve_repo_path(
             inputs["m14_strategy_source_recheck_triage"]
         ),
+        strategy_source_reextract_plan_path=resolve_repo_path(
+            inputs["m14_strategy_source_reextract_plan"]
+        ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         post_fresh_refresh_recompute_checklist_path=resolve_repo_path(
@@ -135,6 +139,7 @@ def run_m14_project_stage_assessment(
     pre_refresh_review = read_json(config.strategy_pre_refresh_review_packet_path)
     pre_refresh_audit = read_json(config.strategy_pre_refresh_review_audit_path)
     source_recheck = read_json(config.strategy_source_recheck_triage_path)
+    source_reextract_plan = read_json(config.strategy_source_reextract_plan_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
     post_fresh_checklist = read_json(config.post_fresh_refresh_recompute_checklist_path)
@@ -159,6 +164,7 @@ def run_m14_project_stage_assessment(
         pre_refresh_review,
         pre_refresh_audit,
         source_recheck,
+        source_reextract_plan,
         objective_audit,
         objective_execution,
         post_fresh_checklist,
@@ -201,6 +207,9 @@ def run_m14_project_stage_assessment(
             "m14_strategy_source_recheck_triage": project_path(
                 config.strategy_source_recheck_triage_path
             ),
+            "m14_strategy_source_reextract_plan": project_path(
+                config.strategy_source_reextract_plan_path
+            ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
             "m14_post_fresh_refresh_recompute_checklist": project_path(
@@ -223,6 +232,7 @@ def run_m14_project_stage_assessment(
             pre_refresh_review,
             pre_refresh_audit,
             source_recheck,
+            source_reextract_plan,
             objective_audit,
             objective_execution,
             post_fresh_checklist,
@@ -248,6 +258,7 @@ def run_m14_project_stage_assessment(
             pre_refresh_audit
         ),
         "strategy_source_recheck_triage": build_strategy_source_recheck_triage(source_recheck),
+        "strategy_source_reextract_plan": build_strategy_source_reextract_plan(source_reextract_plan),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
         "post_fresh_refresh_recompute_checklist": build_post_fresh_refresh_recompute_checklist(
@@ -301,6 +312,7 @@ def build_summary(
     pre_refresh_review: dict[str, Any],
     pre_refresh_audit: dict[str, Any],
     source_recheck: dict[str, Any],
+    source_reextract_plan: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -325,6 +337,7 @@ def build_summary(
     pre_refresh_summary = pre_refresh_review.get("summary", {})
     pre_refresh_audit_summary = pre_refresh_audit.get("summary", {})
     source_recheck_summary = source_recheck.get("summary", {})
+    source_reextract_summary = source_reextract_plan.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     post_fresh_summary = post_fresh_checklist.get("summary", {})
@@ -634,6 +647,45 @@ def build_summary(
         "strategy_source_recheck_parameter_mutation_allowed_count": int_or_zero(
             source_recheck_summary.get("parameter_mutation_allowed_now_count")
         ),
+        "strategy_source_reextract_plan_row_count": int_or_zero(
+            source_reextract_summary.get("source_reextract_plan_row_count")
+        ),
+        "strategy_source_reextract_future_candidate_count": int_or_zero(
+            source_reextract_summary.get("future_source_reextract_candidate_count")
+        ),
+        "strategy_source_reextract_research_hold_count": int_or_zero(
+            source_reextract_summary.get("research_only_hold_no_reextract_count")
+        ),
+        "strategy_source_reextract_supporting_only_count": int_or_zero(
+            source_reextract_summary.get("supporting_rule_no_standalone_reextract_count")
+        ),
+        "strategy_source_reextract_external_hold_count": int_or_zero(
+            source_reextract_summary.get("external_reference_hold_count")
+        ),
+        "strategy_source_reextract_review_task_count": int_or_zero(
+            source_reextract_summary.get("source_ref_review_task_count")
+        ),
+        "strategy_source_reextract_review_question_count": int_or_zero(
+            source_reextract_summary.get("source_review_question_count")
+        ),
+        "strategy_source_reextract_can_draft_future_spec_count": int_or_zero(
+            source_reextract_summary.get("can_draft_future_source_reextract_spec_count")
+        ),
+        "strategy_source_reextract_can_create_strategy_now_count": int_or_zero(
+            source_reextract_summary.get("can_create_strategy_now_count")
+        ),
+        "strategy_source_reextract_can_close_gap_now_count": int_or_zero(
+            source_reextract_summary.get("can_close_gap_now_count")
+        ),
+        "strategy_source_reextract_can_promote_now_count": int_or_zero(
+            source_reextract_summary.get("can_promote_now_count")
+        ),
+        "strategy_source_reextract_can_discard_now_count": int_or_zero(
+            source_reextract_summary.get("can_discard_now_count")
+        ),
+        "strategy_source_reextract_parameter_mutation_allowed_count": int_or_zero(
+            source_reextract_summary.get("parameter_mutation_allowed_now_count")
+        ),
         "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
         "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
         "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -698,6 +750,7 @@ def build_stage_assessment(
     pre_refresh_review: dict[str, Any],
     pre_refresh_audit: dict[str, Any],
     source_recheck: dict[str, Any],
+    source_reextract_plan: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -735,6 +788,7 @@ def build_stage_assessment(
             else "supporting_artifact_backfill_needed_no_gap_closure_or_mutation"
         ),
         "strategy_source_recheck_status": "source_recheck_triage_ready_no_gap_closure_or_mutation",
+        "strategy_source_reextract_plan_status": "source_reextract_plan_ready_no_strategy_creation_or_mutation",
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
         ),
@@ -815,6 +869,12 @@ def build_stage_assessment(
                 f"{summary['strategy_source_recheck_external_hold_count']} external-reference holds."
             ),
             (
+                f"Strategy source reextract plan has {summary['strategy_source_reextract_plan_row_count']} rows, "
+                f"{summary['strategy_source_reextract_future_candidate_count']} future candidates, "
+                f"{summary['strategy_source_reextract_review_task_count']} source-review tasks, and "
+                f"{summary['strategy_source_reextract_can_create_strategy_now_count']} strategy creations allowed now."
+            ),
+            (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
                 f"{summary['objective_audit_blocked_count']} blocked and "
                 f"{summary['objective_audit_in_progress_count']} in progress."
@@ -850,6 +910,7 @@ def build_stage_assessment(
         "strategy_pre_refresh_review_plain_result": str(pre_refresh_review.get("plain_language_result", "")),
         "strategy_pre_refresh_review_audit_plain_result": str(pre_refresh_audit.get("plain_language_result", "")),
         "strategy_source_recheck_plain_result": str(source_recheck.get("plain_language_result", "")),
+        "strategy_source_reextract_plain_result": str(source_reextract_plan.get("plain_language_result", "")),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
         "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
         "post_fresh_recompute_plain_result": str(post_fresh_checklist.get("plain_language_result", "")),
@@ -1150,6 +1211,41 @@ def build_strategy_source_recheck_triage(source_recheck: dict[str, Any]) -> dict
     }
 
 
+def build_strategy_source_reextract_plan(source_reextract_plan: dict[str, Any]) -> dict[str, Any]:
+    summary = source_reextract_plan.get("summary", {})
+    return {
+        "source_reextract_plan_row_count": int_or_zero(
+            summary.get("source_reextract_plan_row_count")
+        ),
+        "future_source_reextract_candidate_count": int_or_zero(
+            summary.get("future_source_reextract_candidate_count")
+        ),
+        "research_only_hold_no_reextract_count": int_or_zero(
+            summary.get("research_only_hold_no_reextract_count")
+        ),
+        "supporting_rule_no_standalone_reextract_count": int_or_zero(
+            summary.get("supporting_rule_no_standalone_reextract_count")
+        ),
+        "external_reference_hold_count": int_or_zero(summary.get("external_reference_hold_count")),
+        "source_ref_review_task_count": int_or_zero(summary.get("source_ref_review_task_count")),
+        "source_review_question_count": int_or_zero(summary.get("source_review_question_count")),
+        "can_draft_future_source_reextract_spec_count": int_or_zero(
+            summary.get("can_draft_future_source_reextract_spec_count")
+        ),
+        "can_create_strategy_now_count": int_or_zero(summary.get("can_create_strategy_now_count")),
+        "can_close_gap_now_count": int_or_zero(summary.get("can_close_gap_now_count")),
+        "can_promote_now_count": int_or_zero(summary.get("can_promote_now_count")),
+        "can_discard_now_count": int_or_zero(summary.get("can_discard_now_count")),
+        "parameter_mutation_allowed_now_count": int_or_zero(
+            summary.get("parameter_mutation_allowed_now_count")
+        ),
+        "plan_state_counts": dict(summary.get("plan_state_counts", {})),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(source_reextract_plan.get("plain_language_result", "")),
+    }
+
+
 def build_objective_completion_audit(objective_audit: dict[str, Any]) -> dict[str, Any]:
     summary = objective_audit.get("summary", {})
     assessment = objective_audit.get("objective_completion_assessment", {})
@@ -1387,6 +1483,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_source_recheck_research_hold_count']} research-only holds, "
         f"{summary['strategy_source_recheck_supporting_rule_count']} supporting-only rows, and "
         f"{summary['strategy_source_recheck_external_hold_count']} external-reference holds. "
+        f"Strategy source reextract plan has {summary['strategy_source_reextract_plan_row_count']} rows, "
+        f"{summary['strategy_source_reextract_future_candidate_count']} future candidates, "
+        f"{summary['strategy_source_reextract_review_task_count']} source-review tasks, and "
+        f"{summary['strategy_source_reextract_can_create_strategy_now_count']} strategy creations allowed now. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -1442,6 +1542,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy pre-refresh review audit close/promote/discard/mutation allowed: `{summary['strategy_pre_refresh_review_audit_can_close_gap_now_count']}/{summary['strategy_pre_refresh_review_audit_can_promote_now_count']}/{summary['strategy_pre_refresh_review_audit_can_discard_now_count']}/{summary['strategy_pre_refresh_review_audit_parameter_mutation_allowed_count']}`",
         f"- Strategy source recheck rows/visual/research/support/external: `{summary['strategy_source_recheck_row_count']}/{summary['strategy_source_recheck_visual_candidate_count']}/{summary['strategy_source_recheck_research_hold_count']}/{summary['strategy_source_recheck_supporting_rule_count']}/{summary['strategy_source_recheck_external_hold_count']}`",
         f"- Strategy source recheck future-reextract/create/close/promote/discard/mutation allowed: `{summary['strategy_source_recheck_future_reextract_candidate_count']}/{summary['strategy_source_recheck_can_create_strategy_now_count']}/{summary['strategy_source_recheck_can_close_gap_now_count']}/{summary['strategy_source_recheck_can_promote_now_count']}/{summary['strategy_source_recheck_can_discard_now_count']}/{summary['strategy_source_recheck_parameter_mutation_allowed_count']}`",
+        f"- Strategy source reextract plan rows/future/tasks/questions: `{summary['strategy_source_reextract_plan_row_count']}/{summary['strategy_source_reextract_future_candidate_count']}/{summary['strategy_source_reextract_review_task_count']}/{summary['strategy_source_reextract_review_question_count']}`",
+        f"- Strategy source reextract plan create/close/promote/discard/mutation allowed: `{summary['strategy_source_reextract_can_create_strategy_now_count']}/{summary['strategy_source_reextract_can_close_gap_now_count']}/{summary['strategy_source_reextract_can_promote_now_count']}/{summary['strategy_source_reextract_can_discard_now_count']}/{summary['strategy_source_reextract_parameter_mutation_allowed_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -1471,6 +1573,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy pre-refresh review status: `{payload['stage_assessment']['strategy_pre_refresh_review_status']}`",
         f"- Strategy pre-refresh review audit status: `{payload['stage_assessment']['strategy_pre_refresh_review_audit_status']}`",
         f"- Strategy source recheck status: `{payload['stage_assessment']['strategy_source_recheck_status']}`",
+        f"- Strategy source reextract plan status: `{payload['stage_assessment']['strategy_source_reextract_plan_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Post-fresh recompute status: `{payload['stage_assessment']['post_fresh_recompute_status']}`",
