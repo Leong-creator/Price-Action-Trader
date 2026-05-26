@@ -107,6 +107,17 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_shadow_ready_count"], 1)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_can_close_gap_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_recheck_row_count"], 3)
+            self.assertEqual(result["summary"]["strategy_source_recheck_visual_candidate_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_recheck_research_hold_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_recheck_supporting_rule_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_recheck_external_hold_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_recheck_future_reextract_candidate_count"], 1)
+            self.assertEqual(result["summary"]["strategy_source_recheck_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_recheck_can_close_gap_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_recheck_can_promote_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_recheck_can_discard_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_recheck_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -192,6 +203,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 "supporting_artifact_backfill_needed_no_gap_closure_or_mutation",
             )
             self.assertEqual(
+                result["stage_assessment"]["strategy_source_recheck_status"],
+                "source_recheck_triage_ready_no_gap_closure_or_mutation",
+            )
+            self.assertEqual(
                 result["stage_assessment"]["objective_completion_status"],
                 "blocked_or_in_progress",
             )
@@ -241,6 +256,17 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["strategy_pre_refresh_review_audit"]["needs_supporting_artifact_backfill_count"], 1)
             self.assertEqual(result["strategy_pre_refresh_review_audit"]["review_can_close_gap_now_count"], 0)
             self.assertFalse(result["strategy_pre_refresh_review_audit"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["strategy_source_recheck_triage"]["source_recheck_row_count"], 3)
+            self.assertEqual(
+                result["strategy_source_recheck_triage"]["source_visual_recheck_candidate_count"],
+                1,
+            )
+            self.assertEqual(result["strategy_source_recheck_triage"]["recheck_can_close_gap_now_count"], 0)
+            self.assertEqual(
+                result["strategy_source_recheck_triage"]["parameter_mutation_allowed_now_count"],
+                0,
+            )
+            self.assertFalse(result["strategy_source_recheck_triage"]["manual_m12_37_once_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -311,6 +337,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_evidence_gap_burndown_path = root / "strategy_evidence_gap_burndown.json"
         strategy_pre_refresh_review_packet_path = root / "strategy_pre_refresh_review_packet.json"
         strategy_pre_refresh_review_audit_path = root / "strategy_pre_refresh_review_audit.json"
+        strategy_source_recheck_triage_path = root / "strategy_source_recheck_triage.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -673,6 +700,30 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_source_recheck_triage_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_recheck_row_count": 3,
+                        "source_visual_recheck_candidate_count": 1,
+                        "research_only_risk_definition_hold_count": 1,
+                        "supporting_rule_attach_to_parent_count": 1,
+                        "external_reference_hold_count": 0,
+                        "source_recheck_hold_count": 0,
+                        "local_m10_row_count": 3,
+                        "eligible_for_future_source_reextract_count": 1,
+                        "standalone_strategy_creation_allowed_count": 0,
+                        "recheck_can_close_gap_now_count": 0,
+                        "recheck_can_promote_now_count": 0,
+                        "recheck_can_discard_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                        "manual_m12_37_once_allowed": False,
+                    },
+                    "plain_language_result": "Source recheck fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -766,6 +817,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_evidence_gap_burndown": str(strategy_evidence_gap_burndown_path),
                         "m14_strategy_pre_refresh_review_packet": str(strategy_pre_refresh_review_packet_path),
                         "m14_strategy_pre_refresh_review_audit": str(strategy_pre_refresh_review_audit_path),
+                        "m14_strategy_source_recheck_triage": str(strategy_source_recheck_triage_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                         "m14_post_fresh_refresh_recompute_checklist": str(post_fresh_checklist_path),

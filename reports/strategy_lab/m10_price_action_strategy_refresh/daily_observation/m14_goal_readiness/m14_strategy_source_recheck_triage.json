@@ -1,0 +1,960 @@
+{
+  "broker_connection": false,
+  "broker_readiness_status_mutation": false,
+  "generated_at": "2026-05-27T00:30:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "broker_readiness_status_mutation": false,
+    "internal_simulated_account": true,
+    "live_execution": false,
+    "m12_account_specs_mutation": false,
+    "m13_registry_mutation": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "parameter_mutation": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "m10_backtest_eligibility_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/backtest_eligibility_matrix.json",
+    "m10_source_support_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/source_support_matrix_m10.json",
+    "m10_strategy_catalog": "reports/strategy_lab/m10_price_action_strategy_refresh/strategy_catalog_m10.json",
+    "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json",
+    "m14_strategy_pre_refresh_review_audit": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_pre_refresh_review_audit.json"
+  },
+  "internal_simulated_account": true,
+  "live_execution": false,
+  "m12_account_specs_mutation": false,
+  "m13_registry_mutation": false,
+  "manual_m12_37_once": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "parameter_mutation": false,
+  "plain_language_result": "Source recheck triage reviewed 7 artifact-only rows. 2 rows can be prioritized for source/visual recheck, 2 rows should attach to parent setups only, 2 rows remain research-only until risk/cost rules are frozen, and 1 rows are external-reference only. No row can create a new strategy, close gaps, promote, discard, mutate parameters, run M12.37 manually, or enable broker/live.",
+  "real_order": false,
+  "schema_version": "m14.strategy-source-recheck-triage.v1",
+  "stage": "M14.strategy_source_recheck_triage",
+  "summary": {
+    "artifact_only_review_row_count": 7,
+    "broker_or_live_enabled": false,
+    "challenge_progress_label": "10/10",
+    "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+    "eligible_for_future_source_reextract_count": 2,
+    "external_reference_hold_count": 1,
+    "local_m10_row_count": 6,
+    "m14_trading_date": "2026-05-22",
+    "manual_m12_37_once_allowed": false,
+    "parameter_mutation_allowed_now_count": 0,
+    "recheck_can_close_gap_now_count": 0,
+    "recheck_can_discard_now_count": 0,
+    "recheck_can_promote_now_count": 0,
+    "research_only_risk_definition_hold_count": 2,
+    "source_recheck_hold_count": 0,
+    "source_recheck_row_count": 7,
+    "source_visual_recheck_candidate_count": 2,
+    "standalone_strategy_creation_allowed_count": 0,
+    "supporting_rule_attach_to_parent_count": 2,
+    "triage_state_counts": {
+      "external_reference_hold_no_local_strategy": 1,
+      "research_only_risk_definition_hold": 2,
+      "source_visual_recheck_candidate": 2,
+      "supporting_rule_attach_to_parent": 2
+    }
+  },
+  "triage_policy": {
+    "allowed_now": "Review M10 source ledgers, strategy catalog status, visual-review prerequisites, and support/eligibility matrices.",
+    "completion_rule": "This triage can prioritize source rechecks, but cannot upgrade strategy status or discard a strategy without later evidence.",
+    "not_allowed_now": "No evidence-changing refresh, promotion, final discard, parameter mutation, registry/account-spec mutation, broker readiness mutation, broker/live path, paper approval, or manual M12.37 once-mode.",
+    "purpose": "Convert artifact-only pre-refresh review rows into source recheck and research triage tasks."
+  },
+  "triage_rows": [
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "backtest_candidate",
+      "catalog_title": "Tight Channel Trend Continuation",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "Filter and ranking module",
+      "eligible_for_historical_backtest": true,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Recheck original source refs and visual packs; if independent setup evidence is stronger, draft a future source-reextract spec without promoting now.",
+      "ohlcv_approximable": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::M10-PA-003",
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_ref_count": 7,
+      "source_refs": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014E_trends_tight_channel_small_pullback.md"
+          },
+          "matched_keywords": [
+            "tight channel",
+            "small pullback",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "title": "Video 14E: Trends - Tight Channel and Small Pullback Trend"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_017A_tight_channels_micro_channels_definitions.md"
+          },
+          "matched_keywords": [
+            "tight channel",
+            "micro channel",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+          "title": "Video 17A: Tight Channels and Micro Channels - Definitions, Measurements, and Trading Direction"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014C_trends_types_spike_channel_traps.md"
+          },
+          "matched_keywords": [
+            "tight channel",
+            "small pullback",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+          "title": "Video 14C: Trends - Types, Spike and Channel, Traps and Breakouts"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "channel"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p2"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "matched_keywords": [
+            "channel"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p11"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "matched_keywords": [
+            "tight channel",
+            "channel"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p1"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "channel"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p2"
+        }
+      ],
+      "strategy_id": "M10-PA-003",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_notes": 2,
+        "fangfangtu_youtube_transcript": 2
+      },
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "triage_id": "source_recheck::M10-PA-003",
+      "triage_rank": 10,
+      "triage_state": "source_visual_recheck_candidate",
+      "visual_dependency": "high"
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "visual_review_then_backtest",
+      "catalog_title": "Final Flag or Climax TBTL Reversal",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "Visual research-only module",
+      "eligible_for_historical_backtest": true,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Recheck original source refs and visual packs; if independent setup evidence is stronger, draft a future source-reextract spec without promoting now.",
+      "ohlcv_approximable": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion"
+      ],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::M10-PA-010",
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_ref_count": 6,
+      "source_refs": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md"
+          },
+          "matched_keywords": [
+            "final flag",
+            "climax",
+            "exhaustion",
+            "高潮"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+          "title": "Video 29A: Climaxes - Breakouts, Exhaustion, Vacuums, and Support/Resistance"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md"
+          },
+          "matched_keywords": [
+            "climax",
+            "tbtl",
+            "exhaustion",
+            "高潮"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md",
+          "title": "Video 29C: Climaxes - Climactic Reversals, Exhaustion Gaps, and Measuring Gaps"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md"
+          },
+          "matched_keywords": [
+            "climax",
+            "tbtl",
+            "exhaustion",
+            "高潮"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+          "title": "Video 29E: Climaxes - Options Firms and Failed Consecutive Climaxes"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 7
+          },
+          "matched_keywords": [
+            "exhaustion"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p7"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 5
+          },
+          "matched_keywords": [
+            "climax"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "title": "方方土视频笔记 - 楔形 p5"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "tbtl"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+          "title": "方方土视频笔记 - 新手篇 p2"
+        }
+      ],
+      "strategy_id": "M10-PA-010",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_notes": 2,
+        "fangfangtu_youtube_transcript": 1
+      },
+      "test_route": "visual_golden_case_then_historical_backtest",
+      "triage_id": "source_recheck::M10-PA-010",
+      "triage_rank": 10,
+      "triage_state": "source_visual_recheck_candidate",
+      "visual_dependency": "high"
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "research_only",
+      "catalog_title": "Trading Range BLSHS Limit-Order Framework",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "BLSHS limit filter",
+      "eligible_for_historical_backtest": false,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Keep as research-only until range maturity, cost, and bounded-risk rules are frozen; do not convert to a daily trigger now.",
+      "ohlcv_approximable": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion",
+        "risk_definition_freeze_before_simulation"
+      ],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::M10-PA-006",
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_ref_count": 7,
+      "source_refs": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048G_trading_the_middle_look_for_change.md"
+          },
+          "matched_keywords": [
+            "blshs",
+            "limit order",
+            "trading range",
+            "限价单",
+            "低买高卖",
+            "交易区间"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+          "title": "Video 48G: Trading the Middle of the Day"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md"
+          },
+          "matched_keywords": [
+            "blshs",
+            "trading range",
+            "限价单",
+            "低买高卖",
+            "交易区间"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_018F_trading_ranges_dont_bet_breakout_early_tr_day.md",
+          "title": "Video 18F: Trading Ranges - Do Not Bet on Breakouts and Early Signs of a TR Day"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+          },
+          "matched_keywords": [
+            "trading range",
+            "交易区间"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+          "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "matched_keywords": [
+            "限价单"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p11"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 6
+          },
+          "matched_keywords": [
+            "限价单"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p6"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "blshs",
+            "buy low sell high scalp",
+            "trading range"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p2"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "limit order",
+            "限价单"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "title": "方方土视频笔记 - 楔形 p2"
+        }
+      ],
+      "strategy_id": "M10-PA-006",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_notes": 2,
+        "fangfangtu_youtube_transcript": 2
+      },
+      "test_route": "research_or_visual_review_queue",
+      "triage_id": "source_recheck::M10-PA-006",
+      "triage_rank": 20,
+      "triage_state": "research_only_risk_definition_hold",
+      "visual_dependency": "high"
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "research_only",
+      "catalog_title": "Trading Range Scaling-In Research",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "Range add-on module",
+      "eligible_for_historical_backtest": false,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Keep as research-only until range maturity, cost, and bounded-risk rules are frozen; do not convert to a daily trigger now.",
+      "ohlcv_approximable": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "golden_visual_case_before_promotion",
+        "risk_definition_freeze_before_simulation"
+      ],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::M10-PA-016",
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_ref_count": 7,
+      "source_refs": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_048G_trading_the_middle_look_for_change.md"
+          },
+          "matched_keywords": [
+            "scaling in",
+            "scale in",
+            "trading range",
+            "加仓",
+            "交易区间"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_048G_trading_the_middle_look_for_change.md",
+          "title": "Video 48G: Trading the Middle of the Day"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_035A_scaling_in_who_scales_winning_positions.md"
+          },
+          "matched_keywords": [
+            "scaling in",
+            "scale in",
+            "加仓",
+            "交易区间"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_035A_scaling_in_who_scales_winning_positions.md",
+          "title": "Video 35A: Scaling In - Who Scales In and Adding to Winning Positions"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_012B_market_cycle_trend_tr_inertia_definitions.md"
+          },
+          "matched_keywords": [
+            "trading range",
+            "交易区间"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_012B_market_cycle_trend_tr_inertia_definitions.md",
+          "title": "Video 12B: Market Cycle - Trend or Trading Range, Inertia, and Definitions"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 9
+          },
+          "matched_keywords": [
+            "加仓"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p9"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 12
+          },
+          "matched_keywords": [
+            "加仓"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p12"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "matched_keywords": [
+            "trading range"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 信号K线 & 入场.pdf",
+          "title": "方方土视频笔记 - 信号K线 & 入场 p1"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "trading range"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p2"
+        }
+      ],
+      "strategy_id": "M10-PA-016",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_notes": 2,
+        "fangfangtu_youtube_transcript": 2
+      },
+      "test_route": "research_or_visual_review_queue",
+      "triage_id": "source_recheck::M10-PA-016",
+      "triage_rank": 20,
+      "triage_state": "research_only_risk_definition_hold",
+      "visual_dependency": "high"
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "supporting_rule",
+      "catalog_title": "Measured Move Target Engine",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "Target module",
+      "eligible_for_historical_backtest": false,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Attach as target, stop, or sizing support to parent setups; do not treat it as a standalone strategy.",
+      "ohlcv_approximable": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "attach_to_parent_strategy_not_standalone"
+      ],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::M10-PA-014",
+      "source_families": [
+        "brooks_v2_manual_transcript"
+      ],
+      "source_ref_count": 3,
+      "source_refs": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_034B_small_actual_risk_profit_targets_sampling_error.md"
+          },
+          "matched_keywords": [
+            "measured move",
+            "target",
+            "profit target",
+            "测量移动",
+            "目标"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034B_small_actual_risk_profit_targets_sampling_error.md",
+          "title": "Video 34B: Actual Risk - Small Actual Risk, Profit Targets, and Sampling Error"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_020A_measured_moves_leg1_equals_leg2_prior_leg.md"
+          },
+          "matched_keywords": [
+            "measured move",
+            "leg 1 equals leg 2",
+            "测量移动",
+            "目标"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_020A_measured_moves_leg1_equals_leg2_prior_leg.md",
+          "title": "Video 20A: Measured Moves - Leg 1 Equals Leg 2 and Prior-Leg Projections"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_036B_profit_taking_defaults_big_profit_targets.md"
+          },
+          "matched_keywords": [
+            "measured move",
+            "target",
+            "测量移动",
+            "目标"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_036B_profit_taking_defaults_big_profit_targets.md",
+          "title": "Video 36B: Trade Management and Taking Profits - Profit Taking Defaults and Big Targets"
+        }
+      ],
+      "strategy_id": "M10-PA-014",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_notes": 0,
+        "fangfangtu_youtube_transcript": 0
+      },
+      "test_route": "supporting_rule_attached_to_parent_setups",
+      "triage_id": "source_recheck::M10-PA-014",
+      "triage_rank": 30,
+      "triage_state": "supporting_rule_attach_to_parent",
+      "visual_dependency": "medium"
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "supporting_rule",
+      "catalog_title": "Protective Stops and Position Sizing",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "Stop and sizing module",
+      "eligible_for_historical_backtest": false,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Attach as target, stop, or sizing support to parent setups; do not treat it as a standalone strategy.",
+      "ohlcv_approximable": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [
+        "source_refs_exist",
+        "paper_simulated_only",
+        "no_broker_or_live_order_path",
+        "attach_to_parent_strategy_not_standalone"
+      ],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::M10-PA-015",
+      "source_families": [
+        "brooks_v2_manual_transcript",
+        "fangfangtu_youtube_transcript",
+        "fangfangtu_notes"
+      ],
+      "source_ref_count": 7,
+      "source_refs": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_034A_actual_risk_traders_equation_profit_targets.md"
+          },
+          "matched_keywords": [
+            "actual risk",
+            "risk",
+            "止损",
+            "风险"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034A_actual_risk_traders_equation_profit_targets.md",
+          "title": "Video 34A: Actual Risk - Trader's Equation, Perfect Stop, and Profit Targets"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_034B_small_actual_risk_profit_targets_sampling_error.md"
+          },
+          "matched_keywords": [
+            "actual risk",
+            "risk",
+            "止损",
+            "仓位",
+            "风险"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_034B_small_actual_risk_profit_targets_sampling_error.md",
+          "title": "Video 34B: Actual Risk - Small Actual Risk, Profit Targets, and Sampling Error"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_033F_measured_moves_support_resistance_small_signal_bar_big_stop.md"
+          },
+          "matched_keywords": [
+            "protective stop",
+            "wide stop",
+            "止损",
+            "仓位",
+            "风险"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_033F_measured_moves_support_resistance_small_signal_bar_big_stop.md",
+          "title": "Video 33F: Measured Moves, Support/Resistance, Small Signal Bars, and Big Stops"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 9
+          },
+          "matched_keywords": [
+            "risk",
+            "仓位"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p9"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 8
+          },
+          "matched_keywords": [
+            "risk",
+            "仓位"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p8"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "matched_keywords": [
+            "仓位"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+          "title": "方方土视频笔记 - 新手篇 p3"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 3
+          },
+          "matched_keywords": [
+            "仓位"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p3"
+        }
+      ],
+      "strategy_id": "M10-PA-015",
+      "support_counts": {
+        "brooks_v2_manual_transcript": 3,
+        "fangfangtu_notes": 2,
+        "fangfangtu_youtube_transcript": 2
+      },
+      "test_route": "supporting_rule_attached_to_parent_setups",
+      "triage_id": "source_recheck::M10-PA-015",
+      "triage_rank": 30,
+      "triage_state": "supporting_rule_attach_to_parent",
+      "visual_dependency": "medium"
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "burn_down_lane": "shadow_plugin_research",
+      "catalog_status": "external_or_missing_catalog",
+      "catalog_title": "",
+      "decision_ladder_next_decision": "keep_shadow_research_coverage",
+      "decision_ladder_state": "shadow_or_plugin_hold",
+      "display_name": "AI-Trader external signal research",
+      "eligible_for_historical_backtest": false,
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "next_source_recheck_action": "Keep external project ideas as architecture/reference checklists only; require local source refs before any local strategy account.",
+      "ohlcv_approximable": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "prerequisites": [],
+      "priority": "P2",
+      "real_order": false,
+      "recheck_can_close_gap_now": false,
+      "recheck_can_create_new_strategy_now": false,
+      "recheck_can_discard_now": false,
+      "recheck_can_promote_now": false,
+      "review_id": "pre_refresh::AI-TRADER-EXTERNAL",
+      "source_families": [],
+      "source_ref_count": 0,
+      "source_refs": [],
+      "strategy_id": "AI-TRADER-EXTERNAL",
+      "support_counts": {},
+      "test_route": "",
+      "triage_id": "source_recheck::AI-TRADER-EXTERNAL",
+      "triage_rank": 40,
+      "triage_state": "external_reference_hold_no_local_strategy",
+      "visual_dependency": ""
+    }
+  ]
+}

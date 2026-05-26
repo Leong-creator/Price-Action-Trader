@@ -18,7 +18,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-27T00:20:20Z",
+  "generated_at": "2026-05-27T00:30:20Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but the objective audit remains not complete because rescue promotion, fresh-refresh review, and parameter activation are still blocked or in progress."
@@ -49,7 +49,8 @@
     "m14_strategy_evidence_gap_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_evidence_gap_matrix.json",
     "m14_strategy_pre_refresh_review_audit": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_pre_refresh_review_audit.json",
     "m14_strategy_pre_refresh_review_packet": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_pre_refresh_review_packet.json",
-    "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json"
+    "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
+    "m14_strategy_source_recheck_triage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_recheck_triage.json"
   },
   "internal_simulated_account": true,
   "live_execution": false,
@@ -246,7 +247,7 @@
   },
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Parameter shadow specs now cover 14 rows and 14 candidate variants, with 0 parameter mutations allowed. Strategy decision ladder has 3 approved next-step rows, 10 rescue-continuation rows, and 0 final discards allowed. Strategy evidence gap matrix has 20 open rows, 12 waiting for M12.47 fresh refresh, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Strategy evidence burndown orders the open rows as P0/P1/P2=12/1/7, with 19 pre-refresh review rows available. Strategy pre-refresh review packet has 19 review rows, 12 still fresh-dependent, 7 artifact-only, and 0 allowed to close gaps now. Strategy pre-refresh review audit has 19 rows, 7 ready now, 12 waiting for fresh evidence, and 0 needing supporting artifact backfill. Objective audit is complete=False with 3 blocked and 2 in-progress requirements. Objective execution plan has 7 actions, 5 P0, and 5 waiting for fresh refresh. Post-fresh-refresh recompute checklist has 24 steps, 23 read-only M14 script steps, 7 acceptance gates, and two-pass stabilization required=True. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Parameter shadow specs now cover 14 rows and 14 candidate variants, with 0 parameter mutations allowed. Strategy decision ladder has 3 approved next-step rows, 10 rescue-continuation rows, and 0 final discards allowed. Strategy evidence gap matrix has 20 open rows, 12 waiting for M12.47 fresh refresh, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Strategy evidence burndown orders the open rows as P0/P1/P2=12/1/7, with 19 pre-refresh review rows available. Strategy pre-refresh review packet has 19 review rows, 12 still fresh-dependent, 7 artifact-only, and 0 allowed to close gaps now. Strategy pre-refresh review audit has 19 rows, 7 ready now, 12 waiting for fresh evidence, and 0 needing supporting artifact backfill. Strategy source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds. Objective audit is complete=False with 3 blocked and 2 in-progress requirements. Objective execution plan has 7 actions, 5 P0, and 5 waiting for fresh refresh. Post-fresh-refresh recompute checklist has 24 steps, 23 read-only M14 script steps, 7 acceptance gates, and two-pass stabilization required=True. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
   "post_fresh_refresh_recompute_checklist": {
     "acceptance_gate_count": 7,
     "broker_or_live_enabled": false,
@@ -387,6 +388,7 @@
       "Strategy evidence gap burndown has P0/P1/P2=12/1/7, 3 approved refresh rows, 2 first-ledger watches, and 10 rescue A/B rows.",
       "Strategy pre-refresh review packet has 19 review rows, 12 fresh-dependent rows, 7 artifact-only rows, and 0 rows allowed to close gaps now.",
       "Strategy pre-refresh review audit has 19 rows, 7 ready now, 12 waiting for fresh evidence, and 0 needing supporting artifact backfill.",
+      "Strategy source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds.",
       "Objective completion audit has 12 requirements, 3 blocked and 2 in progress.",
       "Objective execution plan has 7 actions, 5 P0, and 5 waiting for a fresh refresh.",
       "Post-fresh-refresh recompute checklist has 24 steps, 23 read-only M14 script steps, 7 acceptance gates, and two-pass stabilization required=True.",
@@ -419,6 +421,8 @@
     "strategy_pre_refresh_review_audit_status": "supporting_artifacts_ready_no_gap_closure_or_mutation",
     "strategy_pre_refresh_review_plain_result": "Pre-refresh review packet has 19 review rows (12 P0, 0 P1, 7 P2) and 1 held row. 12 review rows still depend on M12.47 fresh evidence, while 7 can only receive artifact/source review before refresh. External-reference checklists apply to 11 rows. No review row can close gaps, promote, discard, mutate parameters, run M12.37 manually, or enable broker/live.",
     "strategy_pre_refresh_review_status": "review_packet_ready_no_gap_closure_or_mutation",
+    "strategy_source_recheck_plain_result": "Source recheck triage reviewed 7 artifact-only rows. 2 rows can be prioritized for source/visual recheck, 2 rows should attach to parent setups only, 2 rows remain research-only until risk/cost rules are frozen, and 1 rows are external-reference only. No row can create a new strategy, close gaps, promote, discard, mutate parameters, run M12.37 manually, or enable broker/live.",
+    "strategy_source_recheck_status": "source_recheck_triage_ready_no_gap_closure_or_mutation",
     "ten_day_status": "complete"
   },
   "strategy_decision_ladder": {
@@ -1079,6 +1083,30 @@
       "strategy_id": "M12-FTD-001"
     }
   ],
+  "strategy_source_recheck_triage": {
+    "broker_or_live_enabled": false,
+    "eligible_for_future_source_reextract_count": 2,
+    "external_reference_hold_count": 1,
+    "local_m10_row_count": 6,
+    "manual_m12_37_once_allowed": false,
+    "parameter_mutation_allowed_now_count": 0,
+    "plain_language_result": "Source recheck triage reviewed 7 artifact-only rows. 2 rows can be prioritized for source/visual recheck, 2 rows should attach to parent setups only, 2 rows remain research-only until risk/cost rules are frozen, and 1 rows are external-reference only. No row can create a new strategy, close gaps, promote, discard, mutate parameters, run M12.37 manually, or enable broker/live.",
+    "recheck_can_close_gap_now_count": 0,
+    "recheck_can_discard_now_count": 0,
+    "recheck_can_promote_now_count": 0,
+    "research_only_risk_definition_hold_count": 2,
+    "source_recheck_hold_count": 0,
+    "source_recheck_row_count": 7,
+    "source_visual_recheck_candidate_count": 2,
+    "standalone_strategy_creation_allowed_count": 0,
+    "supporting_rule_attach_to_parent_count": 2,
+    "triage_state_counts": {
+      "external_reference_hold_no_local_strategy": 1,
+      "research_only_risk_definition_hold": 2,
+      "source_visual_recheck_candidate": 2,
+      "supporting_rule_attach_to_parent": 2
+    }
+  },
   "summary": {
     "approved_internal_sim_strategy_count": 3,
     "approved_internal_sim_strategy_ids": [
@@ -1247,6 +1275,18 @@
     "strategy_pre_refresh_review_parameter_mutation_allowed_count": 0,
     "strategy_pre_refresh_review_row_count": 19,
     "strategy_route_count": 20,
+    "strategy_source_recheck_can_close_gap_now_count": 0,
+    "strategy_source_recheck_can_create_strategy_now_count": 0,
+    "strategy_source_recheck_can_discard_now_count": 0,
+    "strategy_source_recheck_can_promote_now_count": 0,
+    "strategy_source_recheck_external_hold_count": 1,
+    "strategy_source_recheck_future_reextract_candidate_count": 2,
+    "strategy_source_recheck_local_m10_row_count": 6,
+    "strategy_source_recheck_parameter_mutation_allowed_count": 0,
+    "strategy_source_recheck_research_hold_count": 2,
+    "strategy_source_recheck_row_count": 7,
+    "strategy_source_recheck_supporting_rule_count": 2,
+    "strategy_source_recheck_visual_candidate_count": 2,
     "ten_day_challenge_complete": true
   }
 }
