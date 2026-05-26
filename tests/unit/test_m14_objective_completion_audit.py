@@ -133,6 +133,19 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                 0,
             )
             self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_invalid_count"], 0)
+            self.assertTrue(result["summary"]["strategy_source_visual_confirmation_response_review_pack_ready"])
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_review_pack_question_count"],
+                6,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_review_pack_asset_count"],
+                10,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_review_pack_asset_exists_count"],
+                10,
+            )
             self.assertEqual(
                 result["summary"]["strategy_source_visual_confirmation_response_can_create_strategy_now_count"],
                 0,
@@ -197,6 +210,8 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("6 pending question responses", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("10 pending case responses", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("0 complete confirmations", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("manual review pack ready=True", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("10/10 local case assets present", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn(
                 "m14_strategy_source_recheck_triage",
                 rows["source_reextract_path_ready"]["source_refs"],
@@ -244,6 +259,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("Source visual alignment gate rows/cases/checksum/ready/manual-required: `2/10/10/2/2`", md)
             self.assertIn("Source visual confirmation packet rows/questions/cases/ready/recorded/unblocked: `2/6/10/2/0/0`", md)
             self.assertIn("Source visual confirmation response gate rows/questions pending/cases pending/complete/unblocked: `2/6/10/0/0`", md)
+            self.assertIn("Source visual confirmation response review pack ready/questions/assets existing/assets total: `True/6/10/10`", md)
             self.assertIn("source_reextract_path_ready", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
@@ -595,6 +611,10 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "future_spec_unblocked_count": 0,
                         "ready_for_future_source_reextract_spec_draft_count": 0,
                         "invalid_response_count": 0,
+                        "manual_visual_confirmation_review_pack_ready": True,
+                        "review_pack_question_count": 6,
+                        "review_pack_case_asset_count": 10,
+                        "review_pack_case_asset_exists_count": 10,
                         "can_create_strategy_now_count": 0,
                         "parameter_mutation_allowed_now_count": 0,
                     },

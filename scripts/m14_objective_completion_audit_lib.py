@@ -965,6 +965,33 @@ def build_summary(
                 source_visual_confirmation_response_summary.get("invalid_response_count"),
             )
         ),
+        "strategy_source_visual_confirmation_response_review_pack_ready": bool(
+            stage_summary.get(
+                "strategy_source_visual_confirmation_response_review_pack_ready",
+                source_visual_confirmation_response_summary.get(
+                    "manual_visual_confirmation_review_pack_ready",
+                    False,
+                ),
+            )
+        ),
+        "strategy_source_visual_confirmation_response_review_pack_question_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_confirmation_response_review_pack_question_count",
+                source_visual_confirmation_response_summary.get("review_pack_question_count"),
+            )
+        ),
+        "strategy_source_visual_confirmation_response_review_pack_asset_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_confirmation_response_review_pack_asset_count",
+                source_visual_confirmation_response_summary.get("review_pack_case_asset_count"),
+            )
+        ),
+        "strategy_source_visual_confirmation_response_review_pack_asset_exists_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_confirmation_response_review_pack_asset_exists_count",
+                source_visual_confirmation_response_summary.get("review_pack_case_asset_exists_count"),
+            )
+        ),
         "strategy_source_visual_confirmation_response_can_create_strategy_now_count": int_or_zero(
             stage_summary.get(
                 "strategy_source_visual_confirmation_response_can_create_strategy_now_count",
@@ -1220,6 +1247,10 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['strategy_source_visual_confirmation_response_complete_count']} complete confirmations, "
                 f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked, and "
                 f"{summary['strategy_source_visual_confirmation_response_invalid_count']} invalid responses; "
+                f"manual review pack ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} "
+                f"with {summary['strategy_source_visual_confirmation_response_review_pack_question_count']} questions and "
+                f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
+                f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present; "
                 f"create/close/promote/discard/mutation allowed now is "
                 f"{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/"
                 f"{summary['strategy_source_reextract_review_can_close_gap_now_count']}/"
@@ -1374,7 +1405,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"the response gate has {summary['strategy_source_visual_confirmation_response_gate_row_count']} rows, "
         f"{summary['strategy_source_visual_confirmation_response_question_pending_count']} pending question responses, "
         f"{summary['strategy_source_visual_confirmation_response_case_pending_count']} pending case responses, and "
-        f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked. "
+        f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked; "
+        f"its manual review pack is ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} "
+        f"with {summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
+        f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present. "
         f"Evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows, "
         f"including {summary['strategy_evidence_requires_fresh_refresh_count']} fresh-refresh waits, "
         f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
@@ -1411,6 +1445,7 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Source visual confirmation packet rows/questions/cases/ready/recorded/unblocked: `{summary['strategy_source_visual_confirmation_packet_row_count']}/{summary['strategy_source_visual_confirmation_item_count']}/{summary['strategy_source_visual_confirmation_case_count']}/{summary['strategy_source_visual_confirmation_packet_ready_count']}/{summary['strategy_source_visual_confirmation_recorded_count']}/{summary['strategy_source_visual_confirmation_future_spec_unblocked_count']}`",
         f"- Source visual confirmation draft/create/mutation allowed: `{summary['strategy_source_visual_confirmation_can_draft_now_count']}/{summary['strategy_source_visual_confirmation_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_parameter_mutation_allowed_count']}`",
         f"- Source visual confirmation response gate rows/questions pending/cases pending/complete/unblocked: `{summary['strategy_source_visual_confirmation_response_gate_row_count']}/{summary['strategy_source_visual_confirmation_response_question_pending_count']}/{summary['strategy_source_visual_confirmation_response_case_pending_count']}/{summary['strategy_source_visual_confirmation_response_complete_count']}/{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']}`",
+        f"- Source visual confirmation response review pack ready/questions/assets existing/assets total: `{summary['strategy_source_visual_confirmation_response_review_pack_ready']}/{summary['strategy_source_visual_confirmation_response_review_pack_question_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']}`",
         f"- Source visual confirmation response create/mutation/invalid allowed: `{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_response_parameter_mutation_allowed_count']}/{summary['strategy_source_visual_confirmation_response_invalid_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",

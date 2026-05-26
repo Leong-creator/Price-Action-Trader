@@ -179,6 +179,19 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 0,
             )
             self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_invalid_count"], 0)
+            self.assertTrue(result["summary"]["strategy_source_visual_confirmation_response_review_pack_ready"])
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_review_pack_question_count"],
+                6,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_review_pack_asset_count"],
+                10,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_review_pack_asset_exists_count"],
+                10,
+            )
             self.assertEqual(
                 result["summary"]["strategy_source_visual_confirmation_response_can_create_strategy_now_count"],
                 0,
@@ -316,6 +329,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertTrue(
                 any(
                     "Strategy source visual confirmation response gate has 2 rows" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    "10/10 local case assets present" in item
                     for item in result["stage_assessment"]["next_required_evidence"]
                 )
             )
@@ -459,6 +478,15 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["strategy_source_visual_confirmation_response_gate"]["future_spec_unblocked_count"],
                 0,
             )
+            self.assertTrue(
+                result["strategy_source_visual_confirmation_response_gate"][
+                    "manual_visual_confirmation_review_pack_ready"
+                ]
+            )
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_response_gate"]["review_pack_case_asset_exists_count"],
+                10,
+            )
             self.assertFalse(
                 result["strategy_source_visual_confirmation_response_gate"]["manual_m12_37_once_allowed"]
             )
@@ -511,6 +539,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy source visual alignment rows/cases/checksum/ready/manual-required: `2/10/10/2/2`", md)
             self.assertIn("Strategy source visual alignment status: `source_visual_alignment_ready_for_manual_review_no_strategy_creation_or_mutation`", md)
             self.assertIn("Strategy source visual confirmation response rows/questions pending/cases pending/complete/unblocked: `2/6/10/0/0`", md)
+            self.assertIn("Strategy source visual confirmation response review pack ready/questions/assets existing/assets total: `True/6/10/10`", md)
             self.assertIn("Strategy source visual confirmation response status: `manual_response_gate_pending_no_future_spec_unblocked`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
@@ -1051,6 +1080,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "future_spec_unblocked_count": 0,
                         "ready_for_future_source_reextract_spec_draft_count": 0,
                         "invalid_response_count": 0,
+                        "manual_visual_confirmation_review_pack_ready": True,
+                        "review_pack_question_count": 6,
+                        "review_pack_case_asset_count": 10,
+                        "review_pack_case_asset_exists_count": 10,
                         "can_create_strategy_now_count": 0,
                         "parameter_mutation_allowed_now_count": 0,
                     },

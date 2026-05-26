@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,8 @@ class StrategySourceVisualConfirmationResponseGateConfig:
     manual_visual_confirmation_response_path: Path
     source_visual_confirmation_response_gate_json_path: Path
     source_visual_confirmation_response_gate_md_path: Path
+    source_visual_confirmation_response_review_md_path: Path
+    source_visual_confirmation_response_review_html_path: Path
     hard_boundaries: dict[str, bool]
 
 
@@ -66,6 +69,12 @@ def load_config(
         ),
         source_visual_confirmation_response_gate_md_path=resolve_repo_path(
             outputs["source_visual_confirmation_response_gate_md"]
+        ),
+        source_visual_confirmation_response_review_md_path=resolve_repo_path(
+            outputs["source_visual_confirmation_response_review_md"]
+        ),
+        source_visual_confirmation_response_review_html_path=resolve_repo_path(
+            outputs["source_visual_confirmation_response_review_html"]
         ),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
@@ -138,6 +147,16 @@ def run_m14_strategy_source_visual_confirmation_response_gate(
     write_json(config.source_visual_confirmation_response_gate_json_path, payload)
     config.source_visual_confirmation_response_gate_md_path.parent.mkdir(parents=True, exist_ok=True)
     config.source_visual_confirmation_response_gate_md_path.write_text(build_gate_md(payload), encoding="utf-8")
+    config.source_visual_confirmation_response_review_md_path.parent.mkdir(parents=True, exist_ok=True)
+    config.source_visual_confirmation_response_review_md_path.write_text(
+        build_review_md(payload),
+        encoding="utf-8",
+    )
+    config.source_visual_confirmation_response_review_html_path.parent.mkdir(parents=True, exist_ok=True)
+    config.source_visual_confirmation_response_review_html_path.write_text(
+        build_review_html(payload),
+        encoding="utf-8",
+    )
     return payload
 
 
@@ -310,11 +329,14 @@ def build_case_gate_row(packet_case: dict[str, Any], response_item: dict[str, An
     manual_response = str(response_item.get("manual_response", "pending"))
     validate_manual_response(manual_response)
     evidence_checked = bool(response_item.get("evidence_checked", False))
+    evidence_path = str(packet_case.get("resolved_evidence_path", ""))
     return {
         "case_id": str(packet_case.get("case_id", "")),
         "case_type": str(packet_case.get("case_type", "")),
         "expected_visual_role": str(packet_case.get("expected_visual_role", "")),
-        "resolved_evidence_path": str(packet_case.get("resolved_evidence_path", "")),
+        "resolved_evidence_path": evidence_path,
+        "evidence_asset_exists": path_exists(evidence_path),
+        "evidence_asset_file_uri": file_uri(evidence_path),
         "manual_response": manual_response,
         "evidence_checked": evidence_checked,
         "review_note": str(response_item.get("review_note", "")),
@@ -380,6 +402,7 @@ def build_summary(
     config: StrategySourceVisualConfirmationResponseGateConfig,
 ) -> dict[str, Any]:
     packet_summary = packet.get("summary", {})
+    case_rows = [case for row in gate_rows for case in row["case_gate_rows"]]
     return {
         "current_project_stage": str(packet_summary.get("current_project_stage", "")),
         "m14_trading_date": str(packet_summary.get("m14_trading_date", "")),
@@ -387,8 +410,19 @@ def build_summary(
         "manual_visual_confirmation_response_path": project_path(
             config.manual_visual_confirmation_response_path
         ),
+        "source_visual_confirmation_response_review_md_path": project_path(
+            config.source_visual_confirmation_response_review_md_path
+        ),
+        "source_visual_confirmation_response_review_html_path": project_path(
+            config.source_visual_confirmation_response_review_html_path
+        ),
         "manual_visual_confirmation_response_created": response_created,
         "response_scaffold_created": response_created,
+        "manual_visual_confirmation_review_pack_ready": True,
+        "review_pack_question_count": sum(row["required_question_response_count"] for row in gate_rows),
+        "review_pack_case_asset_count": len(case_rows),
+        "review_pack_case_asset_exists_count": sum(case["evidence_asset_exists"] for case in case_rows),
+        "review_pack_case_asset_missing_count": sum(not case["evidence_asset_exists"] for case in case_rows),
         "source_visual_confirmation_response_gate_row_count": len(gate_rows),
         "candidate_strategy_count": len({row["strategy_id"] for row in gate_rows}),
         "required_question_response_count": sum(row["required_question_response_count"] for row in gate_rows),
@@ -487,6 +521,148 @@ def build_gate_md(payload: dict[str, Any]) -> str:
             ]
         )
     return "\n".join(lines)
+
+
+def build_review_md(payload: dict[str, Any]) -> str:
+    summary = payload["summary"]
+    lines = [
+        "# M14 Strategy Source Visual Confirmation Review Pack",
+        "",
+        f"- Generated at: `{payload['generated_at']}`",
+        f"- Response file: `{summary['manual_visual_confirmation_response_path']}`",
+        f"- Gate rows / strategies: `{summary['source_visual_confirmation_response_gate_row_count']}/{summary['candidate_strategy_count']}`",
+        f"- Review questions / case assets: `{summary['review_pack_question_count']}/{summary['review_pack_case_asset_count']}`",
+        f"- Case assets existing / missing: `{summary['review_pack_case_asset_exists_count']}/{summary['review_pack_case_asset_missing_count']}`",
+        "- Boundary: this review pack is for manual visual review only. It does not record confirmation, draft specs, create strategies, mutate parameters, run M12.37 manually, or enable broker/live.",
+        "",
+    ]
+    for row in payload["response_gate_rows"]:
+        lines.extend(
+            [
+                f"## {row['strategy_id']} {row['catalog_title']}",
+                "",
+                f"- Gate state: `{row['response_gate_state']}`",
+                f"- Future spec gate: `{row['future_spec_gate_state']}`",
+                "",
+                "### Questions",
+                "",
+            ]
+        )
+        for question in row["question_gate_rows"]:
+            lines.extend(
+                [
+                    f"- `{question['question_id']}`: {question['question']}",
+                    f"  - Acceptance signal: {question['acceptance_signal']}",
+                    f"  - Response / evidence checked: `{question['manual_response']}` / `{question['evidence_checked']}`",
+                ]
+            )
+        lines.extend(["", "### Case Assets", ""])
+        for case in row["case_gate_rows"]:
+            lines.extend(
+                [
+                    f"- `{case['case_id']}` `{case['case_type']}`",
+                    f"  - Role: `{case['expected_visual_role']}`",
+                    f"  - Asset exists: `{case['evidence_asset_exists']}`",
+                    f"  - Evidence path: `{case['resolved_evidence_path']}`",
+                    f"  - Response / evidence checked: `{case['manual_response']}` / `{case['evidence_checked']}`",
+                ]
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def build_review_html(payload: dict[str, Any]) -> str:
+    summary = payload["summary"]
+    parts = [
+        "<!doctype html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="utf-8">',
+        "<title>M14 Strategy Source Visual Confirmation Review Pack</title>",
+        "<style>",
+        "body{font-family:Arial,sans-serif;margin:24px;color:#1f2933;background:#f7f8fa}",
+        "h1,h2,h3{color:#0f172a}",
+        ".summary,.strategy,.case,.question{background:#fff;border:1px solid #d9dee7;border-radius:6px;padding:16px;margin:14px 0}",
+        ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}",
+        ".case img{display:block;max-width:100%;height:auto;border:1px solid #ccd3df;border-radius:4px;background:#f1f5f9}",
+        ".meta{font-size:13px;color:#4b5563;word-break:break-word}",
+        ".pending{color:#92400e;font-weight:700}",
+        ".blocked{color:#991b1b;font-weight:700}",
+        "code{background:#eef2f7;padding:1px 4px;border-radius:4px}",
+        "</style>",
+        "</head>",
+        "<body>",
+        "<h1>M14 Strategy Source Visual Confirmation Review Pack</h1>",
+        '<div class="summary">',
+        f"<p><strong>Generated at:</strong> <code>{escape(str(payload['generated_at']))}</code></p>",
+        f"<p><strong>Response file:</strong> <code>{escape(summary['manual_visual_confirmation_response_path'])}</code></p>",
+        f"<p><strong>Gate rows / strategies:</strong> <code>{summary['source_visual_confirmation_response_gate_row_count']}/{summary['candidate_strategy_count']}</code></p>",
+        f"<p><strong>Review questions / case assets:</strong> <code>{summary['review_pack_question_count']}/{summary['review_pack_case_asset_count']}</code></p>",
+        f"<p><strong>Case assets existing / missing:</strong> <code>{summary['review_pack_case_asset_exists_count']}/{summary['review_pack_case_asset_missing_count']}</code></p>",
+        '<p class="blocked">Manual visual review pack only: no confirmation is recorded here, no strategy/spec state changes are made, and broker/live remains disabled.</p>',
+        "</div>",
+    ]
+    for row in payload["response_gate_rows"]:
+        parts.extend(
+            [
+                '<section class="strategy">',
+                f"<h2>{escape(row['strategy_id'])} {escape(row['catalog_title'])}</h2>",
+                f"<p><strong>Gate state:</strong> <code>{escape(row['response_gate_state'])}</code></p>",
+                f"<p><strong>Future spec gate:</strong> <code>{escape(row['future_spec_gate_state'])}</code></p>",
+                "<h3>Questions</h3>",
+            ]
+        )
+        for question in row["question_gate_rows"]:
+            parts.extend(
+                [
+                    '<div class="question">',
+                    f"<p><strong>{escape(question['question_id'])}</strong>: {escape(question['question'])}</p>",
+                    f"<p class=\"meta\">Acceptance signal: {escape(question['acceptance_signal'])}</p>",
+                    f"<p class=\"pending\">Response / evidence checked: {escape(question['manual_response'])} / {question['evidence_checked']}</p>",
+                    "</div>",
+                ]
+            )
+        parts.extend(["<h3>Case Assets</h3>", '<div class="grid">'])
+        for case in row["case_gate_rows"]:
+            parts.extend(
+                [
+                    '<div class="case">',
+                    f"<h4>{escape(case['case_id'])} <code>{escape(case['case_type'])}</code></h4>",
+                    f"<p class=\"meta\">Role: {escape(case['expected_visual_role'])}</p>",
+                    build_case_image_html(case),
+                    f"<p class=\"meta\">Path: <code>{escape(case['resolved_evidence_path'])}</code></p>",
+                    f"<p class=\"pending\">Response / evidence checked: {escape(case['manual_response'])} / {case['evidence_checked']}</p>",
+                    "</div>",
+                ]
+            )
+        parts.extend(["</div>", "</section>"])
+    parts.extend(["</body>", "</html>", ""])
+    return "\n".join(parts)
+
+
+def build_case_image_html(case: dict[str, Any]) -> str:
+    if not case["evidence_asset_exists"] or not case["evidence_asset_file_uri"]:
+        return '<p class="blocked">Evidence asset missing or not readable from this path.</p>'
+    return (
+        f"<img src=\"{escape(case['evidence_asset_file_uri'])}\" "
+        f"alt=\"{escape(case['case_id'])} evidence asset\">"
+    )
+
+
+def path_exists(value: str) -> bool:
+    return bool(value) and Path(value).exists()
+
+
+def file_uri(value: str) -> str:
+    if not value:
+        return ""
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    try:
+        return path.resolve().as_uri()
+    except ValueError:
+        return ""
 
 
 def hard_boundaries() -> dict[str, bool]:

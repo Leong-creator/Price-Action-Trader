@@ -899,6 +899,21 @@ def build_summary(
         "strategy_source_visual_confirmation_response_invalid_count": int_or_zero(
             source_visual_confirmation_response_summary.get("invalid_response_count")
         ),
+        "strategy_source_visual_confirmation_response_review_pack_ready": bool(
+            source_visual_confirmation_response_summary.get(
+                "manual_visual_confirmation_review_pack_ready",
+                False,
+            )
+        ),
+        "strategy_source_visual_confirmation_response_review_pack_question_count": int_or_zero(
+            source_visual_confirmation_response_summary.get("review_pack_question_count")
+        ),
+        "strategy_source_visual_confirmation_response_review_pack_asset_count": int_or_zero(
+            source_visual_confirmation_response_summary.get("review_pack_case_asset_count")
+        ),
+        "strategy_source_visual_confirmation_response_review_pack_asset_exists_count": int_or_zero(
+            source_visual_confirmation_response_summary.get("review_pack_case_asset_exists_count")
+        ),
         "strategy_source_visual_confirmation_response_can_create_strategy_now_count": int_or_zero(
             source_visual_confirmation_response_summary.get("can_create_strategy_now_count")
         ),
@@ -1135,7 +1150,10 @@ def build_stage_assessment(
                 f"{summary['strategy_source_visual_confirmation_response_question_pending_count']} pending question responses, "
                 f"{summary['strategy_source_visual_confirmation_response_case_pending_count']} pending case responses, "
                 f"{summary['strategy_source_visual_confirmation_response_complete_count']} complete confirmations, and "
-                f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked."
+                f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked; "
+                f"review pack ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} with "
+                f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
+                f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present."
             ),
             (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
@@ -1648,6 +1666,14 @@ def build_strategy_source_visual_confirmation_response_gate(
             summary.get("ready_for_future_source_reextract_spec_draft_count")
         ),
         "invalid_response_count": int_or_zero(summary.get("invalid_response_count")),
+        "manual_visual_confirmation_review_pack_ready": bool(
+            summary.get("manual_visual_confirmation_review_pack_ready", False)
+        ),
+        "review_pack_question_count": int_or_zero(summary.get("review_pack_question_count")),
+        "review_pack_case_asset_count": int_or_zero(summary.get("review_pack_case_asset_count")),
+        "review_pack_case_asset_exists_count": int_or_zero(
+            summary.get("review_pack_case_asset_exists_count")
+        ),
         "can_create_strategy_now_count": int_or_zero(summary.get("can_create_strategy_now_count")),
         "parameter_mutation_allowed_now_count": int_or_zero(
             summary.get("parameter_mutation_allowed_now_count")
@@ -1916,7 +1942,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_source_visual_confirmation_response_gate_row_count']} rows, "
         f"{summary['strategy_source_visual_confirmation_response_question_pending_count']} pending question responses, "
         f"{summary['strategy_source_visual_confirmation_response_case_pending_count']} pending case responses, and "
-        f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked. "
+        f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked; "
+        f"review pack ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} with "
+        f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
+        f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -1981,6 +2010,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy source visual confirmation rows/questions/cases/ready/recorded/unblocked: `{summary['strategy_source_visual_confirmation_packet_row_count']}/{summary['strategy_source_visual_confirmation_item_count']}/{summary['strategy_source_visual_confirmation_case_count']}/{summary['strategy_source_visual_confirmation_packet_ready_count']}/{summary['strategy_source_visual_confirmation_recorded_count']}/{summary['strategy_source_visual_confirmation_future_spec_unblocked_count']}`",
         f"- Strategy source visual confirmation draft/create/mutation allowed: `{summary['strategy_source_visual_confirmation_can_draft_now_count']}/{summary['strategy_source_visual_confirmation_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_parameter_mutation_allowed_count']}`",
         f"- Strategy source visual confirmation response rows/questions pending/cases pending/complete/unblocked: `{summary['strategy_source_visual_confirmation_response_gate_row_count']}/{summary['strategy_source_visual_confirmation_response_question_pending_count']}/{summary['strategy_source_visual_confirmation_response_case_pending_count']}/{summary['strategy_source_visual_confirmation_response_complete_count']}/{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']}`",
+        f"- Strategy source visual confirmation response review pack ready/questions/assets existing/assets total: `{summary['strategy_source_visual_confirmation_response_review_pack_ready']}/{summary['strategy_source_visual_confirmation_response_review_pack_question_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']}`",
         f"- Strategy source visual confirmation response create/mutation/invalid allowed: `{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_response_parameter_mutation_allowed_count']}/{summary['strategy_source_visual_confirmation_response_invalid_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",

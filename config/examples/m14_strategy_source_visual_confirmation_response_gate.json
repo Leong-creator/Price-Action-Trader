@@ -7,7 +7,9 @@
   },
   "outputs": {
     "source_visual_confirmation_response_gate_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_response_gate.json",
-    "source_visual_confirmation_response_gate_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_response_gate.md"
+    "source_visual_confirmation_response_gate_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_response_gate.md",
+    "source_visual_confirmation_response_review_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_review_pack.md",
+    "source_visual_confirmation_response_review_html": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_review_pack.html"
   },
   "hard_boundaries": {
     "paper_simulated_only": true,

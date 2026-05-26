@@ -28,6 +28,11 @@ class M14StrategySourceVisualConfirmationResponseGateTest(unittest.TestCase):
             )
             self.assertEqual(result["summary"]["source_visual_confirmation_response_gate_row_count"], 2)
             self.assertTrue(result["summary"]["manual_visual_confirmation_response_created"])
+            self.assertTrue(result["summary"]["manual_visual_confirmation_review_pack_ready"])
+            self.assertEqual(result["summary"]["review_pack_question_count"], 6)
+            self.assertEqual(result["summary"]["review_pack_case_asset_count"], 10)
+            self.assertEqual(result["summary"]["review_pack_case_asset_exists_count"], 0)
+            self.assertEqual(result["summary"]["review_pack_case_asset_missing_count"], 10)
             self.assertEqual(result["summary"]["required_question_response_count"], 6)
             self.assertEqual(result["summary"]["question_response_required_count"], 6)
             self.assertEqual(result["summary"]["confirmed_question_response_count"], 0)
@@ -67,6 +72,12 @@ class M14StrategySourceVisualConfirmationResponseGateTest(unittest.TestCase):
             md = (root / "gate.md").read_text(encoding="utf-8")
             self.assertIn("M14 Strategy Source Visual Confirmation Response Gate", md)
             self.assertIn("Future specs unblocked / ready-for-draft: `0/0`", md)
+            review_md = (root / "review.md").read_text(encoding="utf-8")
+            self.assertIn("M14 Strategy Source Visual Confirmation Review Pack", review_md)
+            self.assertIn("Case assets existing / missing: `0/10`", review_md)
+            review_html = (root / "review.html").read_text(encoding="utf-8")
+            self.assertIn("M14 Strategy Source Visual Confirmation Review Pack", review_html)
+            self.assertIn("Evidence asset missing", review_html)
 
     def test_confirmed_response_unblocks_future_spec_review_without_state_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -157,6 +168,8 @@ class M14StrategySourceVisualConfirmationResponseGateTest(unittest.TestCase):
                     "outputs": {
                         "source_visual_confirmation_response_gate_json": str(root / "gate.json"),
                         "source_visual_confirmation_response_gate_md": str(root / "gate.md"),
+                        "source_visual_confirmation_response_review_md": str(root / "review.md"),
+                        "source_visual_confirmation_response_review_html": str(root / "review.html"),
                     },
                     "hard_boundaries": {
                         "paper_simulated_only": True,
