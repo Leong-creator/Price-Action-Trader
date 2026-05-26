@@ -1,0 +1,213 @@
+{
+  "broker_connection": false,
+  "generated_at": "2026-05-26T20:05:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "live_execution": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json",
+    "m14_internal_paper_execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_internal_paper_execution_ledger.jsonl",
+    "m14_strategy_challenge_config": "config/examples/m14_strategy_challenge_gate.json"
+  },
+  "internal_paper_limits": {
+    "max_consecutive_losses": 2,
+    "max_risk_per_order": "100",
+    "max_total_exposure": "25000"
+  },
+  "live_execution": false,
+  "paper_or_live_approval": false,
+  "paper_trading_approval": false,
+  "plain_language_result": "M14.2 broker blocker diagnostics found 3 blocked dry-run rows across 2 strategies. Sizing candidates: 1; exposure ranking candidates: 1; cooldown candidates: 1. Rows stay blocked; no broker connection, real order, live execution, or paper-trading approval is enabled.",
+  "real_order": false,
+  "rows": [
+    {
+      "broker_connection": false,
+      "diagnostic_family": "loss_streak_cooldown_quality_veto",
+      "direction": "long",
+      "entry_price": "149.9",
+      "exposure_headroom_ratio_after_this_signal_only": "0.175346136",
+      "live_execution": false,
+      "max_risk_per_order": "100",
+      "max_total_exposure": "25000",
+      "next_action": "Keep the loss-streak halt active and test a same-session cooldown or quality veto before allowing more simulated entries.",
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "preview_blocked": true,
+      "quantity_cap_for_risk_limit": "250",
+      "quantity_delta_to_risk_cap": "0",
+      "real_order": false,
+      "reason_codes": [
+        "consecutive_losses_limit"
+      ],
+      "recommended_shadow_fix": "post_loss_cooldown_and_quality_veto_shadow",
+      "reward_per_share": "0.78",
+      "reward_r": "1.95",
+      "risk_excess_amount": "0",
+      "risk_excess_ratio": "0",
+      "risk_outcome": "halted",
+      "risk_per_share": "0.4",
+      "row_id": "m14-2-broker-blocker-m14-m10-pa-005-5m-xlv-2026-05-22t173617z-149-90-137-5340",
+      "runtime_id": "M10-PA-005-5m",
+      "signal_id": "m14-M10-PA-005-5m-XLV-2026-05-22T173617Z-149.90-137.5340",
+      "source_execution_event_id": "m14_strategy_challenge_gate:recompute:2026-05-22:2026-05-26T12:30:00Z:M10-PA-005-5m:m14-M10-PA-005-5m-XLV-2026-05-22T173617Z-149.90-137.5340:0:risk_check",
+      "source_notional_exposure": "20616.35",
+      "source_quantity": "137.534",
+      "source_risk_amount": "55.01",
+      "stop_price": "149.5",
+      "strategy_id": "M10-PA-005",
+      "symbol": "XLV",
+      "target_price": "150.68",
+      "timeframe": "5m",
+      "trading_date": "2026-05-22"
+    },
+    {
+      "broker_connection": false,
+      "diagnostic_family": "portfolio_exposure_ranking",
+      "direction": "short",
+      "entry_price": "119.45",
+      "exposure_headroom_ratio_after_this_signal_only": "0.1703375684",
+      "live_execution": false,
+      "max_risk_per_order": "100",
+      "max_total_exposure": "25000",
+      "next_action": "Shadow-test exposure allocation and signal ranking so lower-priority entries defer instead of increasing total exposure.",
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "preview_blocked": true,
+      "quantity_cap_for_risk_limit": "476.1904",
+      "quantity_delta_to_risk_cap": "0",
+      "real_order": false,
+      "reason_codes": [
+        "max_total_exposure_exceeded"
+      ],
+      "recommended_shadow_fix": "portfolio_exposure_ranker_shadow",
+      "reward_per_share": "0.42",
+      "reward_r": "2",
+      "risk_excess_amount": "0",
+      "risk_excess_ratio": "0",
+      "risk_outcome": "block",
+      "risk_per_share": "0.21",
+      "row_id": "m14-2-broker-blocker-m14-m10-pa-005-5m-xly-2026-05-22t161612z-119-45-173-6422",
+      "runtime_id": "M10-PA-005-5m",
+      "signal_id": "m14-M10-PA-005-5m-XLY-2026-05-22T161612Z-119.45-173.6422",
+      "source_execution_event_id": "m14_strategy_challenge_gate:recompute:2026-05-22:2026-05-26T12:30:00Z:M10-PA-005-5m:m14-M10-PA-005-5m-XLY-2026-05-22T161612Z-119.45-173.6422:0:risk_check",
+      "source_notional_exposure": "20741.56",
+      "source_quantity": "173.6422",
+      "source_risk_amount": "36.46",
+      "stop_price": "119.66",
+      "strategy_id": "M10-PA-005",
+      "symbol": "XLY",
+      "target_price": "119.03",
+      "timeframe": "5m",
+      "trading_date": "2026-05-22"
+    },
+    {
+      "broker_connection": false,
+      "diagnostic_family": "quantity_cap_stop_geometry",
+      "direction": "short",
+      "entry_price": "245.89",
+      "exposure_headroom_ratio_after_this_signal_only": "0.94839359036",
+      "live_execution": false,
+      "max_risk_per_order": "100",
+      "max_total_exposure": "25000",
+      "next_action": "Shadow-test a quantity cap to the existing max risk per order; do not raise the risk limit or change broker readiness status.",
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "preview_blocked": true,
+      "quantity_cap_for_risk_limit": "5.2083",
+      "quantity_delta_to_risk_cap": "0.0386",
+      "real_order": false,
+      "reason_codes": [
+        "max_risk_per_order_exceeded"
+      ],
+      "recommended_shadow_fix": "risk_budget_quantity_cap_without_setup_change",
+      "reward_per_share": "38.4",
+      "reward_r": "2",
+      "risk_excess_amount": "0.74",
+      "risk_excess_ratio": "0.0074048",
+      "risk_outcome": "block",
+      "risk_per_share": "19.2",
+      "row_id": "m14-2-broker-blocker-m14-m10-pa-008-1d-adbe-2026-05-22t133216z-245-89-5-2469",
+      "runtime_id": "M10-PA-008-1d",
+      "signal_id": "m14-M10-PA-008-1d-ADBE-2026-05-22T133216Z-245.89-5.2469",
+      "source_execution_event_id": "m14_strategy_challenge_gate:recompute:2026-05-22:2026-05-26T12:30:00Z:M10-PA-008-1d:m14-M10-PA-008-1d-ADBE-2026-05-22T133216Z-245.89-5.2469:0:risk_check",
+      "source_notional_exposure": "1290.16",
+      "source_quantity": "5.2469",
+      "source_risk_amount": "100.74",
+      "stop_price": "265.09",
+      "strategy_id": "M10-PA-008",
+      "symbol": "ADBE",
+      "target_price": "207.49",
+      "timeframe": "1d",
+      "trading_date": "2026-05-22"
+    }
+  ],
+  "schema_version": "m14.2.broker-blocker-diagnostics.v1",
+  "stage": "M14.2.broker_blocker_diagnostics",
+  "strategy_summaries": [
+    {
+      "blocked_count": 2,
+      "broker_connection": false,
+      "diagnostic_family_counts": {
+        "loss_streak_cooldown_quality_veto": 1,
+        "portfolio_exposure_ranking": 1
+      },
+      "live_execution": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "priority": "P0",
+      "real_order": false,
+      "reason_counts": {
+        "consecutive_losses_limit": 1,
+        "max_total_exposure_exceeded": 1
+      },
+      "recommended_next_action": "M10-PA-005: keep the loss-streak guard and shadow-test cooldown/quality veto before more simulated entries.",
+      "strategy_id": "M10-PA-005",
+      "symbols": [
+        "XLV",
+        "XLY"
+      ]
+    },
+    {
+      "blocked_count": 1,
+      "broker_connection": false,
+      "diagnostic_family_counts": {
+        "quantity_cap_stop_geometry": 1
+      },
+      "live_execution": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "priority": "P0",
+      "real_order": false,
+      "reason_counts": {
+        "max_risk_per_order_exceeded": 1
+      },
+      "recommended_next_action": "M10-PA-008: shadow-test quantity capping to max_risk_per_order before any broker-paper review.",
+      "strategy_id": "M10-PA-008",
+      "symbols": [
+        "ADBE"
+      ]
+    }
+  ],
+  "summary": {
+    "blocked_count": 3,
+    "blocked_strategy_count": 2,
+    "cooldown_candidate_count": 1,
+    "diagnostic_family_counts": {
+      "loss_streak_cooldown_quality_veto": 1,
+      "portfolio_exposure_ranking": 1,
+      "quantity_cap_stop_geometry": 1
+    },
+    "exposure_ranking_candidate_count": 1,
+    "reason_counts": {
+      "consecutive_losses_limit": 1,
+      "max_risk_per_order_exceeded": 1,
+      "max_total_exposure_exceeded": 1
+    },
+    "sizing_repair_candidate_count": 1,
+    "source_readiness_rows": 8
+  }
+}
