@@ -85,6 +85,18 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_evidence_burndown_shadow_review_wait_count"], 2)
             self.assertEqual(result["summary"]["strategy_evidence_burndown_pre_refresh_review_available_count"], 4)
             self.assertEqual(result["summary"]["strategy_evidence_burndown_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_row_count"], 4)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_p0_count"], 3)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_p1_count"], 0)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_p2_count"], 1)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_fresh_dependent_count"], 3)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_artifact_only_count"], 1)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_external_reference_count"], 2)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_held_count"], 1)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_can_close_gap_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_can_promote_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_can_discard_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -95,8 +107,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["objective_execution_p0_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_waiting_for_fresh_refresh_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_manual_execution_allowed_count"], 0)
-            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 22)
-            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 21)
+            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 23)
+            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 22)
             self.assertEqual(result["summary"]["post_fresh_recompute_acceptance_gate_count"], 7)
             self.assertTrue(result["summary"]["post_fresh_recompute_two_pass_required"])
             self.assertEqual(result["summary"]["post_fresh_recompute_parameter_mutation_allowed_count"], 0)
@@ -162,6 +174,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 "no_final_discard_until_rescue_exhausted",
             )
             self.assertEqual(
+                result["stage_assessment"]["strategy_pre_refresh_review_status"],
+                "review_packet_ready_no_gap_closure_or_mutation",
+            )
+            self.assertEqual(
                 result["stage_assessment"]["objective_completion_status"],
                 "blocked_or_in_progress",
             )
@@ -195,14 +211,24 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["strategy_evidence_gap_burndown"]["first_ledger_watch_row_count"], 1)
             self.assertEqual(result["strategy_evidence_gap_burndown"]["rescue_ab_collection_row_count"], 2)
             self.assertFalse(result["strategy_evidence_gap_burndown"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["strategy_pre_refresh_review_packet"]["review_row_count"], 4)
+            self.assertEqual(result["strategy_pre_refresh_review_packet"]["p0_review_count"], 3)
+            self.assertEqual(
+                result["strategy_pre_refresh_review_packet"]["m12_47_fresh_refresh_dependent_review_count"],
+                3,
+            )
+            self.assertEqual(result["strategy_pre_refresh_review_packet"]["artifact_only_review_count"], 1)
+            self.assertEqual(result["strategy_pre_refresh_review_packet"]["external_reference_review_row_count"], 2)
+            self.assertEqual(result["strategy_pre_refresh_review_packet"]["review_can_close_gap_now_count"], 0)
+            self.assertFalse(result["strategy_pre_refresh_review_packet"]["manual_m12_37_once_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
             self.assertEqual(result["objective_execution_plan"]["execution_action_count"], 7)
             self.assertEqual(result["objective_execution_plan"]["p0_action_count"], 5)
             self.assertEqual(result["objective_execution_plan"]["manual_execution_allowed_count"], 0)
-            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 22)
-            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 21)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 23)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 22)
             self.assertFalse(
                 result["post_fresh_refresh_recompute_checklist"]["manual_m12_37_once_allowed"]
             )
@@ -230,9 +256,11 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy evidence first-ledger/10-day/shadow gaps: `1/2/2`", md)
             self.assertIn("Strategy evidence burndown rows/P0/P1/P2: `5/3/1/1`", md)
             self.assertIn("Strategy evidence burndown approved-refresh/first-ledger/rescue-A-B/shadow-review: `2/1/2/2`", md)
+            self.assertIn("Strategy pre-refresh review rows/P0/P1/P2: `4/3/0/1`", md)
+            self.assertIn("Strategy pre-refresh review close/promote/discard/mutation allowed: `0/0/0/0`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
-            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `22/21/7`", md)
+            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `23/22/7`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -259,6 +287,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_decision_ladder_path = root / "strategy_decision_ladder.json"
         strategy_evidence_gap_matrix_path = root / "strategy_evidence_gap_matrix.json"
         strategy_evidence_gap_burndown_path = root / "strategy_evidence_gap_burndown.json"
+        strategy_pre_refresh_review_packet_path = root / "strategy_pre_refresh_review_packet.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -574,6 +603,29 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_pre_refresh_review_packet_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "review_row_count": 4,
+                        "held_no_pre_refresh_action_count": 1,
+                        "p0_review_count": 3,
+                        "p1_review_count": 0,
+                        "p2_review_count": 1,
+                        "m12_47_fresh_refresh_dependent_review_count": 3,
+                        "artifact_only_review_count": 1,
+                        "external_reference_review_row_count": 2,
+                        "review_can_close_gap_now_count": 0,
+                        "review_can_promote_now_count": 0,
+                        "review_can_discard_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                        "manual_m12_37_once_allowed": False,
+                    },
+                    "plain_language_result": "Pre-refresh review fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -632,10 +684,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             json.dumps(
                 {
                     "summary": {
-                        "recompute_step_count": 22,
-                        "m14_script_step_count": 21,
+                        "recompute_step_count": 23,
+                        "m14_script_step_count": 22,
                         "acceptance_gate_count": 7,
-                        "requires_m12_47_fresh_refresh_step_count": 22,
+                        "requires_m12_47_fresh_refresh_step_count": 23,
                         "two_pass_stabilization_required": True,
                         "fresh_refresh_observed": False,
                         "source_quote": "fallback_quotes_only",
@@ -665,6 +717,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_decision_ladder": str(strategy_decision_ladder_path),
                         "m14_strategy_evidence_gap_matrix": str(strategy_evidence_gap_matrix_path),
                         "m14_strategy_evidence_gap_burndown": str(strategy_evidence_gap_burndown_path),
+                        "m14_strategy_pre_refresh_review_packet": str(strategy_pre_refresh_review_packet_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                         "m14_post_fresh_refresh_recompute_checklist": str(post_fresh_checklist_path),

@@ -478,6 +478,13 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Refresh the ordered strategy evidence gap burn-down queue before final assessment.",
         ),
         (
+            "strategy_pre_refresh_review_packet_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_pre_refresh_review_packet.py",
+            "Refresh the pre-refresh artifact review packet before final assessment.",
+        ),
+        (
             "project_stage_assessment_refresh",
             "final_assessment",
             "read_only_script",
@@ -532,6 +539,9 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
         ),
         "strategy_evidence_gap_matrix_refresh": "open-gap rows should explain exactly which evidence remains missing per strategy.",
         "strategy_evidence_gap_burndown_refresh": "P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.",
+        "strategy_pre_refresh_review_packet_refresh": (
+            "review rows should stay review-only, with zero close/promote/discard/mutation allowed."
+        ),
         "project_stage_assessment_refresh": "goal_complete must remain false unless objective audit proves every requirement.",
     }
     return hints.get(step_id, "Regenerate the artifact and inspect summary plus hard-boundary flags.")

@@ -27,18 +27,21 @@
 - Strategy evidence burndown rows/P0/P1/P2: `20/12/1/7`
 - Strategy evidence burndown approved-refresh/first-ledger/rescue-A-B/shadow-review: `3/2/10/11`
 - Strategy evidence burndown final-discard/promotion/mutation allowed: `0/0/0`
+- Strategy pre-refresh review rows/P0/P1/P2: `19/12/0/7`
+- Strategy pre-refresh review fresh-dependent/artifact-only/external-reference: `12/7/11`
+- Strategy pre-refresh review close/promote/discard/mutation allowed: `0/0/0/0`
 - Objective audit complete: `False`
 - Objective audit requirements/proven/blocked/in-progress/guardrail: `12/4/3/2/3`
 - Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`
 - Objective execution manual actions allowed: `0`
-- Post-fresh recompute steps/M14 scripts/gates: `22/21/7`
+- Post-fresh recompute steps/M14 scripts/gates: `23/22/7`
 - Post-fresh two-pass stabilization required: `True`
 - Broker dry-run ready/blocked: `5/3`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
 
 ## Plain Result
 
-Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Parameter shadow specs now cover 14 rows and 14 candidate variants, with 0 parameter mutations allowed. Strategy decision ladder has 3 approved next-step rows, 10 rescue-continuation rows, and 0 final discards allowed. Strategy evidence gap matrix has 20 open rows, 12 waiting for M12.47 fresh refresh, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Strategy evidence burndown orders the open rows as P0/P1/P2=12/1/7, with 19 pre-refresh review rows available. Objective audit is complete=False with 3 blocked and 2 in-progress requirements. Objective execution plan has 7 actions, 5 P0, and 5 waiting for fresh refresh. Post-fresh-refresh recompute checklist has 22 steps, 21 read-only M14 script steps, 7 acceptance gates, and two-pass stabilization required=True. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.
+Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Parameter shadow specs now cover 14 rows and 14 candidate variants, with 0 parameter mutations allowed. Strategy decision ladder has 3 approved next-step rows, 10 rescue-continuation rows, and 0 final discards allowed. Strategy evidence gap matrix has 20 open rows, 12 waiting for M12.47 fresh refresh, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Strategy evidence burndown orders the open rows as P0/P1/P2=12/1/7, with 19 pre-refresh review rows available. Strategy pre-refresh review packet has 19 review rows, 12 still fresh-dependent, 7 artifact-only, and 0 allowed to close gaps now. Objective audit is complete=False with 3 blocked and 2 in-progress requirements. Objective execution plan has 7 actions, 5 P0, and 5 waiting for fresh refresh. Post-fresh-refresh recompute checklist has 23 steps, 22 read-only M14 script steps, 7 acceptance gates, and two-pass stabilization required=True. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.
 
 ## Stage Assessment
 
@@ -53,6 +56,7 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 - Strategy decision ladder status: `no_final_discard_until_rescue_exhausted`
 - Strategy evidence gap status: `open_gaps_waiting_for_refresh_and_rescue_evidence`
 - Strategy evidence gap burndown status: `ordered_queue_ready_waiting_for_refresh_and_rescue_review`
+- Strategy pre-refresh review status: `review_packet_ready_no_gap_closure_or_mutation`
 - Objective completion status: `blocked_or_in_progress`
 - Objective execution status: `ready_queue_waiting_for_fresh_refresh`
 - Post-fresh recompute status: `checklist_ready_waiting_for_m12_47_fresh_refresh`

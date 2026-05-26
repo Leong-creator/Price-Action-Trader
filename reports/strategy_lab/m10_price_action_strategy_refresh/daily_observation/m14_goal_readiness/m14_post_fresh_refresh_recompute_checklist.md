@@ -3,8 +3,8 @@
 - Generated at: `2026-05-26T23:59:50Z`
 - Fresh refresh observed: `False`
 - Quote source: `fallback_quotes_only`
-- Recompute steps: `22`
-- M14 read-only script steps: `21`
+- Recompute steps: `23`
+- M14 read-only script steps: `22`
 - Acceptance gates: `7`
 - Two-pass stabilization required: `True`
 - Rescue no-ledger count: `2`
@@ -14,7 +14,7 @@
 
 ## Plain Result
 
-Post-fresh-refresh recompute checklist has 22 steps, including 21 read-only M14 script steps and 7 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.
+Post-fresh-refresh recompute checklist has 23 steps, including 22 read-only M14 script steps and 7 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.
 
 ## Preconditions
 
@@ -108,7 +108,11 @@ Post-fresh-refresh recompute checklist has 22 steps, including 21 read-only M14 
    - Command: `python scripts/run_m14_strategy_evidence_gap_burndown.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.
-22. `project_stage_assessment_refresh` (final_assessment)
+22. `strategy_pre_refresh_review_packet_refresh` (decision_stabilization)
+   - Command: `python scripts/run_m14_strategy_pre_refresh_review_packet.py`
+   - Current state: `waiting_for_m12_47_fresh_refresh`
+   - Acceptance hint: review rows should stay review-only, with zero close/promote/discard/mutation allowed.
+23. `project_stage_assessment_refresh` (final_assessment)
    - Command: `python scripts/run_m14_project_stage_assessment.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: goal_complete must remain false unless objective audit proves every requirement.
