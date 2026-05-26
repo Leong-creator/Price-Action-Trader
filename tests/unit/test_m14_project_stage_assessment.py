@@ -60,6 +60,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["parameter_shadow_spec_broker_quantity_variant_count"], 1)
             self.assertEqual(result["summary"]["parameter_shadow_spec_broker_rule_variant_count"], 1)
             self.assertEqual(result["summary"]["parameter_shadow_spec_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_decision_ladder_row_count"], 5)
+            self.assertEqual(result["summary"]["strategy_decision_approved_next_step_count"], 2)
+            self.assertEqual(result["summary"]["strategy_decision_rescue_continue_count"], 2)
+            self.assertEqual(result["summary"]["strategy_decision_final_discard_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_decision_candidate_variant_count"], 4)
+            self.assertEqual(result["summary"]["strategy_decision_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -128,6 +134,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 "shadow_specs_prepared_no_mutation",
             )
             self.assertEqual(
+                result["stage_assessment"]["strategy_decision_ladder_status"],
+                "no_final_discard_until_rescue_exhausted",
+            )
+            self.assertEqual(
                 result["stage_assessment"]["objective_completion_status"],
                 "blocked_or_in_progress",
             )
@@ -146,6 +156,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["rescue_parameter_shadow_spec"]["candidate_variant_count"], 4)
             self.assertEqual(result["rescue_parameter_shadow_spec"]["parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["rescue_parameter_shadow_spec"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["strategy_decision_ladder"]["strategy_ladder_row_count"], 5)
+            self.assertEqual(result["strategy_decision_ladder"]["approved_next_step_count"], 2)
+            self.assertEqual(result["strategy_decision_ladder"]["final_discard_allowed_count"], 0)
+            self.assertFalse(result["strategy_decision_ladder"]["manual_m12_37_once_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -171,6 +185,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Parameter experiments allowed now: `0`", md)
             self.assertIn("Parameter activation shadow-review candidates: `0`", md)
             self.assertIn("Parameter shadow spec rows/variants/waiting-fresh-refresh: `4/4/3`", md)
+            self.assertIn("Strategy decision rows/approved-next/rescue/final-discard: `5/2/2/0`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
             self.assertIn("approved_internal_sim_continue", md)
@@ -196,6 +211,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         parameter_queue_path = root / "parameter_queue.json"
         activation_gate_path = root / "activation_gate.json"
         parameter_shadow_spec_path = root / "parameter_shadow_spec.json"
+        strategy_decision_ladder_path = root / "strategy_decision_ladder.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         config_path = root / "config.json"
@@ -436,6 +452,28 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_decision_ladder_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "strategy_ladder_row_count": 5,
+                        "approved_next_step_count": 2,
+                        "rescue_continue_count": 2,
+                        "manual_review_ready_count": 0,
+                        "promotion_candidate_count": 0,
+                        "final_discard_allowed_count": 0,
+                        "shadow_spec_strategy_count": 2,
+                        "candidate_variant_count": 4,
+                        "parameter_mutation_allowed_count": 0,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    },
+                    "plain_language_result": "Decision ladder fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -506,6 +544,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
                         "m14_rescue_parameter_activation_gate": str(activation_gate_path),
                         "m14_rescue_parameter_shadow_spec": str(parameter_shadow_spec_path),
+                        "m14_strategy_decision_ladder": str(strategy_decision_ladder_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                     },
