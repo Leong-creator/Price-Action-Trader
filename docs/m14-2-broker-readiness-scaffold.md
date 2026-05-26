@@ -51,6 +51,19 @@ python scripts/run_m14_2_broker_blocker_diagnostics.py --config config/examples/
 
 当前诊断显示 `3` 条 blocked rows 分布在 `M10-PA-005 / M10-PA-008`：`M10-PA-008` 是单笔风险略超 `100` 风控上限，优先影子测试 quantity cap；`M10-PA-005` 同时触发总敞口与连续亏损暂停，优先影子测试组合曝险排序、同日 cooldown 和质量 veto。诊断不改变 readiness status，不把 blocked row 升级为 ready。
 
+当前新增 shadow repair plan 入口：
+
+```bash
+python scripts/run_m14_2_broker_blocker_shadow_repair.py --config config/examples/m14_2_broker_blocker_shadow_repair.json
+```
+
+该入口只读取 blocker diagnostics，输出不改原 dry-run rows 的影子修复计划：
+
+- `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_repair.json`
+- `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_repair.md`
+
+当前 shadow plan 结论：`M10-PA-008 / ADBE` 可以影子测试 quantity cap，把数量从 `5.2469` 降到 `5.2083`，风险从 `100.74` 压回 `100`；`M10-PA-005 / XLY` 应等待敞口释放或由排序器延后，`M10-PA-005 / XLV` 应保留连续亏损暂停并只测试 cooldown / quality veto。原 readiness rows 仍保持 blocked。
+
 ## Block Conditions
 
 以下任一条件触发时必须阻断：
