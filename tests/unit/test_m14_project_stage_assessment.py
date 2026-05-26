@@ -59,6 +59,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["objective_audit_blocked_count"], 3)
             self.assertEqual(result["summary"]["objective_audit_in_progress_count"], 2)
             self.assertEqual(result["summary"]["objective_audit_guardrail_count"], 3)
+            self.assertEqual(result["summary"]["objective_execution_action_count"], 7)
+            self.assertEqual(result["summary"]["objective_execution_p0_action_count"], 5)
+            self.assertEqual(result["summary"]["objective_execution_waiting_for_fresh_refresh_action_count"], 5)
+            self.assertEqual(result["summary"]["objective_execution_manual_execution_allowed_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
             self.assertEqual(result["summary"]["broker_dry_run_blocked_count"], 1)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
@@ -116,6 +120,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["objective_completion_status"],
                 "blocked_or_in_progress",
             )
+            self.assertEqual(
+                result["stage_assessment"]["objective_execution_status"],
+                "ready_queue_waiting_for_fresh_refresh",
+            )
             self.assertEqual(result["rescue_parameter_experiment_queue"]["experiment_row_count"], 4)
             self.assertEqual(result["rescue_parameter_experiment_queue"]["allowed_now_count"], 0)
             self.assertFalse(result["rescue_parameter_experiment_queue"]["manual_m12_37_once_allowed"])
@@ -126,6 +134,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
+            self.assertEqual(result["objective_execution_plan"]["execution_action_count"], 7)
+            self.assertEqual(result["objective_execution_plan"]["p0_action_count"], 5)
+            self.assertEqual(result["objective_execution_plan"]["manual_execution_allowed_count"], 0)
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertEqual(
                 result["rescue_policy"]["policy"],
@@ -145,6 +156,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Parameter experiments allowed now: `0`", md)
             self.assertIn("Parameter activation shadow-review candidates: `0`", md)
             self.assertIn("Objective audit complete: `False`", md)
+            self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -168,6 +180,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         parameter_queue_path = root / "parameter_queue.json"
         activation_gate_path = root / "activation_gate.json"
         objective_audit_path = root / "objective_audit.json"
+        objective_execution_path = root / "objective_execution.json"
         config_path = root / "config.json"
 
         goal_path.write_text(
@@ -414,6 +427,30 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        objective_execution_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "execution_action_count": 7,
+                        "p0_action_count": 5,
+                        "waiting_for_fresh_refresh_action_count": 5,
+                        "manual_execution_allowed_count": 0,
+                        "execution_action_state_counts": {
+                            "blocked_or_in_progress": 1,
+                            "collecting_rescue_ab_evidence": 1,
+                            "guardrail_watch_only": 1,
+                            "ready_for_m12_47_supervisor_window": 1,
+                            "review_only_available_now": 1,
+                            "waiting_for_m12_47_fresh_refresh": 1,
+                            "waiting_for_m12_47_fresh_refresh_no_candidates": 1,
+                        },
+                        "execution_priority_counts": {"P0": 5, "P1": 2},
+                    },
+                    "plain_language_result": "Objective execution fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -430,6 +467,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
                         "m14_rescue_parameter_activation_gate": str(activation_gate_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
+                        "m14_objective_execution_plan": str(objective_execution_path),
                     },
                     "outputs": {
                         "assessment_json": str(root / "assessment.json"),

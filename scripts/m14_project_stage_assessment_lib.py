@@ -26,6 +26,7 @@ class ProjectStageAssessmentConfig:
     rescue_parameter_experiment_queue_path: Path
     rescue_parameter_activation_gate_path: Path
     objective_completion_audit_path: Path
+    objective_execution_plan_path: Path
     assessment_json_path: Path
     assessment_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -65,6 +66,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
             inputs["m14_rescue_parameter_activation_gate"]
         ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
+        objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         assessment_json_path=resolve_repo_path(outputs["assessment_json"]),
         assessment_md_path=resolve_repo_path(outputs["assessment_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -101,6 +103,7 @@ def run_m14_project_stage_assessment(
     parameter_queue = read_json(config.rescue_parameter_experiment_queue_path)
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
     objective_audit = read_json(config.objective_completion_audit_path)
+    objective_execution = read_json(config.objective_execution_plan_path)
 
     strategy_routes = build_strategy_routes(
         action_matrix=list(goal.get("strategy_action_matrix", [])),
@@ -116,6 +119,7 @@ def run_m14_project_stage_assessment(
         parameter_queue,
         activation_gate,
         objective_audit,
+        objective_execution,
         strategy_routes,
     )
     payload: dict[str, Any] = {
@@ -141,6 +145,7 @@ def run_m14_project_stage_assessment(
                 config.rescue_parameter_activation_gate_path
             ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
+            "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
         },
         "summary": summary,
         "stage_assessment": build_stage_assessment(
@@ -152,6 +157,7 @@ def run_m14_project_stage_assessment(
             parameter_queue,
             activation_gate,
             objective_audit,
+            objective_execution,
             summary,
         ),
         "strategy_routes": strategy_routes,
@@ -162,6 +168,7 @@ def run_m14_project_stage_assessment(
         "rescue_parameter_experiment_queue": build_parameter_experiment_queue(parameter_queue),
         "rescue_parameter_activation_gate": build_parameter_activation_gate(activation_gate),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
+        "objective_execution_plan": build_objective_execution_plan(objective_execution),
         "external_reference_policy": dict(goal.get("external_reference_policy", {})),
         "goal_completion_assessment": {
             "goal_complete": False,
@@ -204,6 +211,7 @@ def build_summary(
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
     objective_audit: dict[str, Any],
+    objective_execution: dict[str, Any],
     strategy_routes: list[dict[str, Any]],
 ) -> dict[str, Any]:
     challenge = goal.get("challenge", {})
@@ -219,6 +227,7 @@ def build_summary(
     parameter_summary = parameter_queue.get("summary", {})
     activation_summary = activation_gate.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
+    execution_summary = objective_execution.get("summary", {})
     route_counts = dict(sorted(Counter(str(row.get("route_category", "")) for row in strategy_routes).items()))
     return {
         "current_project_stage": str(goal.get("project_stage_label", "")),
@@ -321,6 +330,14 @@ def build_summary(
         "objective_audit_guardrail_count": int_or_zero(objective_summary.get("guardrail_count")),
         "objective_audit_complete": bool(objective_summary.get("objective_complete", False)),
         "objective_audit_blockers": list(objective_summary.get("objective_blockers", [])),
+        "objective_execution_action_count": int_or_zero(execution_summary.get("execution_action_count")),
+        "objective_execution_p0_action_count": int_or_zero(execution_summary.get("p0_action_count")),
+        "objective_execution_waiting_for_fresh_refresh_action_count": int_or_zero(
+            execution_summary.get("waiting_for_fresh_refresh_action_count")
+        ),
+        "objective_execution_manual_execution_allowed_count": int_or_zero(
+            execution_summary.get("manual_execution_allowed_count")
+        ),
         "rescue_actionable_before_10d_count": int_or_zero(
             backlog_summary.get("actionable_before_10d_count")
         ),
@@ -347,6 +364,7 @@ def build_stage_assessment(
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
     objective_audit: dict[str, Any],
+    objective_execution: dict[str, Any],
     summary: dict[str, Any],
 ) -> dict[str, Any]:
     post_refresh_status = (
@@ -372,6 +390,11 @@ def build_stage_assessment(
         "parameter_activation_status": "waiting_for_fresh_refresh_no_activation",
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
+        ),
+        "objective_execution_status": (
+            "ready_queue_waiting_for_fresh_refresh"
+            if summary["objective_execution_waiting_for_fresh_refresh_action_count"]
+            else "ready_queue_no_fresh_refresh_blocker"
         ),
         "broker_status": "dry_run_preview_only_not_broker_paper",
         "next_required_evidence": [
@@ -406,6 +429,11 @@ def build_stage_assessment(
                 f"{summary['objective_audit_in_progress_count']} in progress."
             ),
             (
+                f"Objective execution plan has {summary['objective_execution_action_count']} actions, "
+                f"{summary['objective_execution_p0_action_count']} P0, and "
+                f"{summary['objective_execution_waiting_for_fresh_refresh_action_count']} waiting for a fresh refresh."
+            ),
+            (
                 f"{summary['broker_dry_run_blocked_count']} broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
             ),
         ],
@@ -417,6 +445,7 @@ def build_stage_assessment(
         "parameter_experiment_plain_result": str(parameter_queue.get("plain_language_result", "")),
         "parameter_activation_plain_result": str(activation_gate.get("plain_language_result", "")),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
+        "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
     }
 
 
@@ -530,6 +559,23 @@ def build_objective_completion_audit(objective_audit: dict[str, Any]) -> dict[st
             summary.get("parameter_mutation_allowed_count")
         ),
         "plain_language_result": str(objective_audit.get("plain_language_result", "")),
+    }
+
+
+def build_objective_execution_plan(objective_execution: dict[str, Any]) -> dict[str, Any]:
+    summary = objective_execution.get("summary", {})
+    return {
+        "execution_action_count": int_or_zero(summary.get("execution_action_count")),
+        "p0_action_count": int_or_zero(summary.get("p0_action_count")),
+        "waiting_for_fresh_refresh_action_count": int_or_zero(
+            summary.get("waiting_for_fresh_refresh_action_count")
+        ),
+        "manual_execution_allowed_count": int_or_zero(summary.get("manual_execution_allowed_count")),
+        "execution_action_state_counts": dict(summary.get("execution_action_state_counts", {})),
+        "execution_priority_counts": dict(summary.get("execution_priority_counts", {})),
+        "broker_or_live_enabled": False,
+        "manual_m12_37_once_allowed": False,
+        "plain_language_result": str(objective_execution.get("plain_language_result", "")),
     }
 
 
@@ -687,6 +733,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
+        f"Objective execution plan has {summary['objective_execution_action_count']} actions, "
+        f"{summary['objective_execution_p0_action_count']} P0, and "
+        f"{summary['objective_execution_waiting_for_fresh_refresh_action_count']} waiting for fresh refresh. "
         f"Broker readiness stays dry-run preview only: {summary['broker_dry_run_ready_count']} ready and {summary['broker_dry_run_blocked_count']} blocked; "
         "manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled."
     )
@@ -716,6 +765,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Parameter activation implementation mutations allowed: `{summary['parameter_activation_implementation_mutation_allowed_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
+        f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
+        f"- Objective execution manual actions allowed: `{summary['objective_execution_manual_execution_allowed_count']}`",
         f"- Broker dry-run ready/blocked: `{summary['broker_dry_run_ready_count']}/{summary['broker_dry_run_blocked_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
         "",
@@ -733,6 +784,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Parameter experiment status: `{payload['stage_assessment']['parameter_experiment_status']}`",
         f"- Parameter activation status: `{payload['stage_assessment']['parameter_activation_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
+        f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Broker status: `{payload['stage_assessment']['broker_status']}`",
         "",
         "## Route Counts",
