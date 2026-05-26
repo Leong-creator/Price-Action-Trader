@@ -28,6 +28,7 @@ class GoalReadinessConfig:
     rescue_target_stop_shadow_normalization_path: Path
     broker_readiness_path: Path
     broker_blocker_shadow_repair_path: Path
+    broker_blocker_shadow_ab_prep_path: Path
     readiness_json_path: Path
     readiness_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -65,6 +66,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         ),
         broker_readiness_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         broker_blocker_shadow_repair_path=resolve_repo_path(inputs["m14_2_broker_blocker_shadow_repair"]),
+        broker_blocker_shadow_ab_prep_path=resolve_repo_path(inputs["m14_2_broker_blocker_shadow_ab_prep"]),
         readiness_json_path=resolve_repo_path(outputs["readiness_json"]),
         readiness_md_path=resolve_repo_path(outputs["readiness_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -103,6 +105,7 @@ def run_m14_goal_readiness_report(
     rescue_target_stop_shadow_normalization = read_json(config.rescue_target_stop_shadow_normalization_path)
     broker_readiness = read_json(config.broker_readiness_path)
     broker_blocker_shadow_repair = read_json(config.broker_blocker_shadow_repair_path)
+    broker_blocker_shadow_ab_prep = read_json(config.broker_blocker_shadow_ab_prep_path)
 
     gate_rows = list(paper_gate.get("rows", []))
     approved_ids = tuple(str(item) for item in paper_gate.get("approved_internal_sim_strategy_ids", []))
@@ -122,6 +125,7 @@ def run_m14_goal_readiness_report(
         rescue_target_stop_shadow_normalization,
         broker_readiness,
         broker_blocker_shadow_repair,
+        broker_blocker_shadow_ab_prep,
     )
     boundaries_ok = all(boundaries.values())
     internal_sim_ready = bool(ten_day_complete and approved_ids and boundaries_ok)
@@ -151,6 +155,7 @@ def run_m14_goal_readiness_report(
             ),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_path),
             "m14_2_broker_blocker_shadow_repair": project_path(config.broker_blocker_shadow_repair_path),
+            "m14_2_broker_blocker_shadow_ab_prep": project_path(config.broker_blocker_shadow_ab_prep_path),
         },
         "challenge": {
             "challenge_progress_label": str(summary.get("challenge_progress_label", "")),
@@ -200,6 +205,7 @@ def run_m14_goal_readiness_report(
             "dry_run_only_not_broker_paper": True,
         },
         "broker_blocker_shadow_repair": build_broker_blocker_shadow_repair_summary(broker_blocker_shadow_repair),
+        "broker_blocker_shadow_ab_prep": build_broker_blocker_shadow_ab_prep_summary(broker_blocker_shadow_ab_prep),
         "execution_boundaries": boundaries,
         "strategy_action_matrix": build_strategy_action_matrix(gate_rows, rescue_coverage),
         "external_reference_policy": {
@@ -234,6 +240,7 @@ def build_boundaries(
     rescue_target_stop_shadow_normalization: dict[str, Any],
     broker_readiness: dict[str, Any],
     broker_blocker_shadow_repair: dict[str, Any],
+    broker_blocker_shadow_ab_prep: dict[str, Any],
 ) -> dict[str, bool]:
     return {
         "paper_simulated_only": all(
@@ -248,6 +255,7 @@ def build_boundaries(
                 rescue_target_stop_diagnostics,
                 rescue_target_stop_shadow_normalization,
                 broker_blocker_shadow_repair,
+                broker_blocker_shadow_ab_prep,
             )
         ),
         "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
@@ -264,6 +272,7 @@ def build_boundaries(
                 rescue_target_stop_shadow_normalization,
                 broker_readiness,
                 broker_blocker_shadow_repair,
+                broker_blocker_shadow_ab_prep,
             )
         ),
         "real_order_disabled": (
@@ -275,6 +284,7 @@ def build_boundaries(
             and not bool(rescue_target_stop_diagnostics.get("real_order", False))
             and not bool(rescue_target_stop_shadow_normalization.get("real_order", False))
             and not bool(broker_blocker_shadow_repair.get("real_order", False))
+            and not bool(broker_blocker_shadow_ab_prep.get("real_order", False))
         ),
         "live_execution_disabled": not any(
             bool(item.get("live_execution", item.get("live_execution_enabled", False)))
@@ -289,6 +299,7 @@ def build_boundaries(
                 rescue_target_stop_shadow_normalization,
                 broker_readiness,
                 broker_blocker_shadow_repair,
+                broker_blocker_shadow_ab_prep,
             )
         ),
         "paper_trading_approval_disabled": not any(
@@ -304,6 +315,7 @@ def build_boundaries(
                 rescue_target_stop_shadow_normalization,
                 broker_readiness,
                 broker_blocker_shadow_repair,
+                broker_blocker_shadow_ab_prep,
             )
         ),
     }
@@ -411,6 +423,32 @@ def build_broker_blocker_shadow_repair_summary(shadow_repair: dict[str, Any]) ->
         "shadow_status_counts": dict(summary.get("shadow_status_counts", {})),
         "readiness_status_mutation": bool(shadow_repair.get("readiness_status_mutation", False)),
         "plain_language_result": str(shadow_repair.get("plain_language_result", "")),
+    }
+
+
+def build_broker_blocker_shadow_ab_prep_summary(shadow_ab_prep: dict[str, Any]) -> dict[str, Any]:
+    summary = shadow_ab_prep.get("summary", {})
+    return {
+        "source_shadow_repair_rows": int_or_zero(summary.get("source_shadow_repair_rows")),
+        "ab_prep_rows": int_or_zero(summary.get("ab_prep_rows")),
+        "strategy_count": int_or_zero(summary.get("strategy_count")),
+        "risk_cap_runtime_candidate_count": int_or_zero(summary.get("risk_cap_runtime_candidate_count")),
+        "exposure_ranker_rule_candidate_count": int_or_zero(summary.get("exposure_ranker_rule_candidate_count")),
+        "cooldown_quality_rule_candidate_count": int_or_zero(summary.get("cooldown_quality_rule_candidate_count")),
+        "runtime_registration_candidate_count": int_or_zero(summary.get("runtime_registration_candidate_count")),
+        "rule_only_candidate_count": int_or_zero(summary.get("rule_only_candidate_count")),
+        "original_blocked_rows_preserved_count": int_or_zero(summary.get("original_blocked_rows_preserved_count")),
+        "m13_registry_mutation_count": int_or_zero(summary.get("m13_registry_mutation_count")),
+        "m12_account_specs_mutation_count": int_or_zero(summary.get("m12_account_specs_mutation_count")),
+        "broker_readiness_status_mutation_count": int_or_zero(summary.get("broker_readiness_status_mutation_count")),
+        "broker_or_live_enabled": bool(summary.get("broker_or_live_enabled", False)),
+        "prep_action_counts": dict(summary.get("prep_action_counts", {})),
+        "prep_status_counts": dict(summary.get("prep_status_counts", {})),
+        "readiness_status_mutation": bool(shadow_ab_prep.get("readiness_status_mutation", False)),
+        "m13_registry_mutation": bool(shadow_ab_prep.get("m13_registry_mutation", False)),
+        "m12_account_specs_mutation": bool(shadow_ab_prep.get("m12_account_specs_mutation", False)),
+        "broker_readiness_status_mutation": bool(shadow_ab_prep.get("broker_readiness_status_mutation", False)),
+        "plain_language_result": str(shadow_ab_prep.get("plain_language_result", "")),
     }
 
 
@@ -569,6 +607,21 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "boundary": "Original broker readiness rows remain blocked; no broker/live approval or readiness mutation.",
             },
         )
+    shadow_ab_prep = payload.get("broker_blocker_shadow_ab_prep", {})
+    if int_or_zero(shadow_ab_prep.get("ab_prep_rows")):
+        actions.insert(
+            7,
+            {
+                "priority": "P0",
+                "action": "Use broker-blocker shadow A/B prep before registering any blocker repair runtime",
+                "evidence": (
+                    f"{shadow_ab_prep['runtime_registration_candidate_count']} runtime-registration candidate; "
+                    f"{shadow_ab_prep['rule_only_candidate_count']} rule-only shadow candidates; "
+                    f"{shadow_ab_prep['original_blocked_rows_preserved_count']} original blocked rows preserved"
+                ),
+                "boundary": "Prep does not mutate M13 registry, M12 account specs, broker readiness, or broker/live approval.",
+            },
+        )
     if not payload["challenge"]["m12_current_day_runtime_ready"]:
         actions.append(
             {
@@ -591,6 +644,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
     shadow_normalization = payload["rescue_target_stop_shadow_normalization"]
     broker = payload["broker_readiness"]
     shadow_repair = payload["broker_blocker_shadow_repair"]
+    shadow_ab_prep = payload["broker_blocker_shadow_ab_prep"]
     return (
         f"Project is at {payload['project_stage_label']}. "
         f"10-day challenge complete: {payload['challenge']['challenge_progress_label']}. "
@@ -613,6 +667,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"and {shadow_normalization['best_variant_candidate_row_count']}/{shadow_normalization['source_candidate_row_count']} eligible rows passing the best shadow variant. "
         f"Broker blocker shadow repair has {shadow_repair['risk_cap_candidate_count']} quantity-cap candidate, "
         f"{shadow_repair['defer_for_exposure_count']} exposure deferrals, and {shadow_repair['cooldown_defer_count']} cooldown halts. "
+        f"Broker blocker shadow A/B prep has {shadow_ab_prep['runtime_registration_candidate_count']} runtime-registration candidate "
+        f"and {shadow_ab_prep['rule_only_candidate_count']} rule-only shadow candidates, with "
+        f"{shadow_ab_prep['original_blocked_rows_preserved_count']} original blocked rows preserved. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -714,6 +771,22 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Cooldown halts: `{shadow_repair['cooldown_defer_count']}`",
             f"- Original readiness mutation: `{shadow_repair['readiness_status_mutation']}`",
             f"- Shadow action counts: `{shadow_repair['shadow_action_counts']}`",
+        ]
+    )
+    shadow_ab_prep = payload["broker_blocker_shadow_ab_prep"]
+    lines.extend(
+        [
+            "",
+            "## Broker Blocker Shadow A/B Prep",
+            "",
+            f"- A/B prep rows: `{shadow_ab_prep['ab_prep_rows']}`",
+            f"- Runtime-registration candidates: `{shadow_ab_prep['runtime_registration_candidate_count']}`",
+            f"- Rule-only shadow candidates: `{shadow_ab_prep['rule_only_candidate_count']}`",
+            f"- Original blocked rows preserved: `{shadow_ab_prep['original_blocked_rows_preserved_count']}`",
+            f"- M13 registry mutations: `{shadow_ab_prep['m13_registry_mutation_count']}`",
+            f"- M12 account spec mutations: `{shadow_ab_prep['m12_account_specs_mutation_count']}`",
+            f"- Broker readiness mutations: `{shadow_ab_prep['broker_readiness_status_mutation_count']}`",
+            f"- Prep action counts: `{shadow_ab_prep['prep_action_counts']}`",
         ]
     )
     lines.extend(["", "## Next Actions", ""])
