@@ -1,0 +1,168 @@
+{
+  "broker_connection": false,
+  "broker_readiness_status_mutation": false,
+  "generated_at": "2026-05-26T22:05:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "live_execution": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "broker_blocker_shadow_ab_prep": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_ab_prep.json",
+    "source_broker_blocker_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_diagnostics.json",
+    "source_broker_blocker_shadow_repair": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_repair.json",
+    "source_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json"
+  },
+  "live_execution": false,
+  "m12_account_specs_mutation": false,
+  "m13_registry_mutation": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "Broker-blocker rule-only shadow evidence opened 2 rows from 3 A/B prep rows: 1 exposure-ranker rule and 1 cooldown/quality rule. Runtime registrations: 0; original blocked rows preserved: 2. No M13 registry, M12 account specs, broker readiness, broker connection, real order, live execution, or paper approval is changed.",
+  "readiness_status_mutation": false,
+  "real_order": false,
+  "rows": [
+    {
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "comparison_contract": "Preserve the loss-streak halt and compare later same-session entries against cooldown/quality-veto checks; the blocked source row remains blocked.",
+      "direction": "long",
+      "expected_blocker_reduction": [
+        "consecutive_losses_limit"
+      ],
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "next_action": "Keep the halt active and collect later same-session veto evidence after fresh ledger rows exist.",
+      "original_readiness_status_remains_blocked": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "proposed_notional_exposure": "0",
+      "proposed_quantity": "0",
+      "proposed_risk_amount": "0",
+      "proposed_shadow_strategy_id": "M10-PA-005-broker-cooldown-quality-shadow",
+      "proposed_variant_id": "broker_cooldown_quality_shadow",
+      "readiness_status_mutation": false,
+      "ready_for_shadow_runtime_registration": false,
+      "real_order": false,
+      "row_id": "m14-2-broker-blocker-m14-m10-pa-005-5m-xlv-2026-05-22t173617z-149-90-137-5340",
+      "rule_family": "cooldown_quality_veto",
+      "runtime_id": "M10-PA-005-5m",
+      "runtime_registration_mutation": false,
+      "shadow_evidence_status": "ready_for_next_internal_sim_refresh",
+      "shadow_rule_decision": "preserve_loss_streak_halt_and_veto_lower_quality_later_entries",
+      "signal_id": "m14-M10-PA-005-5m-XLV-2026-05-22T173617Z-149.90-137.5340",
+      "source_notional_exposure": "20616.35",
+      "source_prep_action": "prepare_cooldown_quality_veto_shadow_rule",
+      "source_prep_status": "rule_only_prep_not_runtime",
+      "source_quantity": "137.534",
+      "source_reason_codes": [
+        "consecutive_losses_limit"
+      ],
+      "source_risk_amount": "55.01",
+      "source_shadow_action": "keep_loss_streak_halt",
+      "source_shadow_repair_status": "defer_not_repair",
+      "strategy_id": "M10-PA-005",
+      "symbol": "XLV",
+      "timeframe": "5m",
+      "trading_date": "2026-05-22",
+      "would_create_runtime": false
+    },
+    {
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "comparison_contract": "Compare future same-strategy internal-sim signals by total exposure headroom and rank; lower-ranked entries remain deferred until headroom exists.",
+      "direction": "short",
+      "expected_blocker_reduction": [
+        "max_total_exposure_exceeded"
+      ],
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "next_action": "Observe the next fresh internal-sim refresh and compare ranking/defer decisions without creating a runtime.",
+      "original_readiness_status_remains_blocked": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "proposed_notional_exposure": "0",
+      "proposed_quantity": "0",
+      "proposed_risk_amount": "0",
+      "proposed_shadow_strategy_id": "M10-PA-005-broker-exposure-ranker-shadow",
+      "proposed_variant_id": "broker_exposure_ranker_shadow",
+      "readiness_status_mutation": false,
+      "ready_for_shadow_runtime_registration": false,
+      "real_order": false,
+      "row_id": "m14-2-broker-blocker-m14-m10-pa-005-5m-xly-2026-05-22t161612z-119-45-173-6422",
+      "rule_family": "portfolio_exposure_ranker",
+      "runtime_id": "M10-PA-005-5m",
+      "runtime_registration_mutation": false,
+      "shadow_evidence_status": "ready_for_next_internal_sim_refresh",
+      "shadow_rule_decision": "defer_until_exposure_headroom_returns",
+      "signal_id": "m14-M10-PA-005-5m-XLY-2026-05-22T161612Z-119.45-173.6422",
+      "source_notional_exposure": "20741.56",
+      "source_prep_action": "prepare_exposure_ranker_shadow_rule",
+      "source_prep_status": "rule_only_prep_not_runtime",
+      "source_quantity": "173.6422",
+      "source_reason_codes": [
+        "max_total_exposure_exceeded"
+      ],
+      "source_risk_amount": "36.46",
+      "source_shadow_action": "defer_until_exposure_frees",
+      "source_shadow_repair_status": "defer_not_repair",
+      "strategy_id": "M10-PA-005",
+      "symbol": "XLY",
+      "timeframe": "5m",
+      "trading_date": "2026-05-22",
+      "would_create_runtime": false
+    }
+  ],
+  "runtime_registration_mutation": false,
+  "schema_version": "m14.2.broker-blocker-rule-shadow-evidence.v1",
+  "stage": "M14.2.broker_blocker_rule_shadow_evidence",
+  "strategy_summaries": [
+    {
+      "broker_connection": false,
+      "live_execution": false,
+      "original_blocked_rows_preserved_count": 2,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "real_order": false,
+      "recommended_next_action": "M10-PA-005: observe exposure ranking and cooldown/quality veto evidence together; do not create a runtime or unblock broker readiness.",
+      "rule_family_counts": {
+        "cooldown_quality_veto": 1,
+        "portfolio_exposure_ranker": 1
+      },
+      "rule_shadow_rows": 2,
+      "runtime_registration_count": 0,
+      "strategy_id": "M10-PA-005",
+      "symbols": [
+        "XLV",
+        "XLY"
+      ]
+    }
+  ],
+  "summary": {
+    "broker_or_live_enabled": false,
+    "broker_readiness_status_mutation_count": 0,
+    "cooldown_quality_rule_count": 1,
+    "exposure_ranker_rule_count": 1,
+    "m12_account_specs_mutation_count": 0,
+    "m13_registry_mutation_count": 0,
+    "original_blocked_rows_preserved_count": 2,
+    "ready_for_next_internal_sim_refresh_count": 2,
+    "rule_family_counts": {
+      "cooldown_quality_veto": 1,
+      "portfolio_exposure_ranker": 1
+    },
+    "rule_only_candidate_count": 2,
+    "rule_shadow_evidence_rows": 2,
+    "runtime_registration_count": 0,
+    "shadow_evidence_status_counts": {
+      "ready_for_next_internal_sim_refresh": 2
+    },
+    "source_ab_prep_rows": 3,
+    "source_runtime_candidate_rows": 1,
+    "strategy_count": 1
+  }
+}

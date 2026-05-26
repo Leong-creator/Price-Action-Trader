@@ -1,4 +1,33 @@
 {
+  "broker_blocker_rule_shadow_evidence": {
+    "broker_or_live_enabled": false,
+    "broker_readiness_status_mutation": false,
+    "broker_readiness_status_mutation_count": 0,
+    "cooldown_quality_rule_count": 1,
+    "exposure_ranker_rule_count": 1,
+    "m12_account_specs_mutation": false,
+    "m12_account_specs_mutation_count": 0,
+    "m13_registry_mutation": false,
+    "m13_registry_mutation_count": 0,
+    "original_blocked_rows_preserved_count": 2,
+    "plain_language_result": "Broker-blocker rule-only shadow evidence opened 2 rows from 3 A/B prep rows: 1 exposure-ranker rule and 1 cooldown/quality rule. Runtime registrations: 0; original blocked rows preserved: 2. No M13 registry, M12 account specs, broker readiness, broker connection, real order, live execution, or paper approval is changed.",
+    "readiness_status_mutation": false,
+    "ready_for_next_internal_sim_refresh_count": 2,
+    "rule_family_counts": {
+      "cooldown_quality_veto": 1,
+      "portfolio_exposure_ranker": 1
+    },
+    "rule_only_candidate_count": 2,
+    "rule_shadow_evidence_rows": 2,
+    "runtime_registration_count": 0,
+    "runtime_registration_mutation": false,
+    "shadow_evidence_status_counts": {
+      "ready_for_next_internal_sim_refresh": 2
+    },
+    "source_ab_prep_rows": 3,
+    "source_runtime_candidate_rows": 1,
+    "strategy_count": 1
+  },
   "broker_blocker_shadow_ab_prep": {
     "ab_prep_rows": 3,
     "broker_or_live_enabled": false,
@@ -101,6 +130,7 @@
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own 10 trading-day A/B evidence before final promote/modify/reject."
   },
   "input_refs": {
+    "m14_2_broker_blocker_rule_shadow_evidence": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_rule_shadow_evidence.json",
     "m14_2_broker_blocker_shadow_ab_prep": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_ab_prep.json",
     "m14_2_broker_blocker_shadow_repair": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_repair.json",
     "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json",
@@ -183,6 +213,12 @@
       "priority": "P0"
     },
     {
+      "action": "Collect PA005 broker-blocker rule-only shadow evidence without registering a runtime",
+      "boundary": "Rule-only evidence cannot create a runtime, mutate readiness, or approve broker/live paths.",
+      "evidence": "2 rule-only rows; 1 exposure-ranker rule; 1 cooldown/quality rule; 2 original blocked rows preserved",
+      "priority": "P0"
+    },
+    {
       "action": "Keep M14.2 broker readiness in dry-run preview mode",
       "boundary": "Manual user approval is still required before any broker paper/live path.",
       "evidence": "5 dry-run ready, 3 blocked",
@@ -195,7 +231,7 @@
       "priority": "P1"
     }
   ],
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker blocker rule shadow evidence has 2 PA005 rule-only rows (1 exposure ranker, 1 cooldown/quality) and 0 runtime registrations. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
   "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "rescue_ab_evidence": {
     "collecting_evidence_count": 9,

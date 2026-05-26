@@ -60,11 +60,19 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(result["broker_blocker_shadow_ab_prep"]["original_blocked_rows_preserved_count"], 3)
             self.assertEqual(result["broker_blocker_shadow_ab_prep"]["m13_registry_mutation_count"], 0)
             self.assertFalse(result["broker_blocker_shadow_ab_prep"]["broker_readiness_status_mutation"])
+            self.assertEqual(result["broker_blocker_rule_shadow_evidence"]["rule_shadow_evidence_rows"], 2)
+            self.assertEqual(result["broker_blocker_rule_shadow_evidence"]["exposure_ranker_rule_count"], 1)
+            self.assertEqual(result["broker_blocker_rule_shadow_evidence"]["cooldown_quality_rule_count"], 1)
+            self.assertEqual(result["broker_blocker_rule_shadow_evidence"]["runtime_registration_count"], 0)
+            self.assertEqual(result["broker_blocker_rule_shadow_evidence"]["original_blocked_rows_preserved_count"], 2)
+            self.assertFalse(result["broker_blocker_rule_shadow_evidence"]["runtime_registration_mutation"])
+            self.assertFalse(result["broker_blocker_rule_shadow_evidence"]["broker_readiness_status_mutation"])
             self.assertTrue(all(result["execution_boundaries"].values()))
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertIn("no broker/live/real order approval", result["plain_language_result"])
             self.assertIn("Broker blocker shadow repair has 1 quantity-cap candidate", result["plain_language_result"])
             self.assertIn("Broker blocker shadow A/B prep has 1 runtime-registration candidate", result["plain_language_result"])
+            self.assertIn("Broker blocker rule shadow evidence has 2 PA005 rule-only rows", result["plain_language_result"])
 
             matrix = {row["strategy_id"]: row for row in result["strategy_action_matrix"]}
             self.assertEqual(matrix["M10-PA-004"]["next_action_category"], "continue_internal_simulation")
@@ -88,6 +96,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertIn("Rescue Target/Stop Shadow Normalization", md)
             self.assertIn("Broker Blocker Shadow Repair", md)
             self.assertIn("Broker Blocker Shadow A/B Prep", md)
+            self.assertIn("Broker Blocker Rule Shadow Evidence", md)
             self.assertIn("Completion Assessment", md)
 
     def test_unsafe_config_is_rejected(self) -> None:
@@ -114,6 +123,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         broker_path = root / "broker.json"
         broker_shadow_repair_path = root / "broker_shadow_repair.json"
         broker_shadow_ab_prep_path = root / "broker_shadow_ab_prep.json"
+        broker_rule_shadow_evidence_path = root / "broker_rule_shadow_evidence.json"
         config_path = root / "config.json"
         summary_path.write_text(
             json.dumps(
@@ -479,6 +489,53 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        broker_rule_shadow_evidence_path.write_text(
+            json.dumps(
+                {
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "readiness_status_mutation": False,
+                    "runtime_registration_mutation": False,
+                    "m13_registry_mutation": False,
+                    "m12_account_specs_mutation": False,
+                    "broker_readiness_status_mutation": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "source_ab_prep_rows": 3,
+                        "source_runtime_candidate_rows": 1,
+                        "rule_shadow_evidence_rows": 2,
+                        "strategy_count": 1,
+                        "rule_only_candidate_count": 2,
+                        "exposure_ranker_rule_count": 1,
+                        "cooldown_quality_rule_count": 1,
+                        "ready_for_next_internal_sim_refresh_count": 2,
+                        "runtime_registration_count": 0,
+                        "original_blocked_rows_preserved_count": 2,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                        "broker_or_live_enabled": False,
+                        "rule_family_counts": {
+                            "cooldown_quality_veto": 1,
+                            "portfolio_exposure_ranker": 1,
+                        },
+                        "shadow_evidence_status_counts": {
+                            "ready_for_next_internal_sim_refresh": 2,
+                        },
+                    },
+                    "plain_language_result": "fixture broker blocker rule shadow evidence",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -498,6 +555,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_2_broker_readiness_plan": str(broker_path),
                         "m14_2_broker_blocker_shadow_repair": str(broker_shadow_repair_path),
                         "m14_2_broker_blocker_shadow_ab_prep": str(broker_shadow_ab_prep_path),
+                        "m14_2_broker_blocker_rule_shadow_evidence": str(broker_rule_shadow_evidence_path),
                     },
                     "outputs": {
                         "readiness_json": str(root / "readiness.json"),
