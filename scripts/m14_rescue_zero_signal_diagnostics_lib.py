@@ -16,6 +16,7 @@ ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 FRESH_QUOTE_SOURCE = "longbridge_quote_readonly"
 LEVERAGED_ETFS = frozenset({"TQQQ", "SQQQ"})
+SHADOW_REWARD_MIN_R_VALUES = (Decimal("1.00"), Decimal("1.10"), Decimal("1.20"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +88,7 @@ def run_m14_rescue_zero_signal_diagnostics(
     diagnostic_rows = [
         build_diagnostic_row(
             audit_row=row,
+            audit_rows=audit_rows,
             coverage_row=coverage_by_runtime.get(str(row.get("runtime_id", "")), {}),
             signal_watchlist=signal_watchlist,
         )
@@ -98,14 +100,17 @@ def run_m14_rescue_zero_signal_diagnostics(
 
     dominant_issue_counts = Counter(row["dominant_issue"] for row in diagnostic_rows)
     rejection_counts = Counter()
+    shadow_reward_counts = Counter()
     for row in diagnostic_rows:
         rejection_counts.update(row["rejection_reason_counts"])
+        shadow_reward_counts.update(row["shadow_reward_min_r_pass_counts"])
 
     summary = {
         "zero_signal_runtime_count": len(diagnostic_rows),
         "zero_signal_strategy_count": len({row["strategy_id"] for row in diagnostic_rows}),
         "parent_source_available_runtime_count": sum(1 for row in diagnostic_rows if row["parent_source_row_count"] > 0),
         "parent_source_absent_runtime_count": dominant_issue_counts.get("parent_source_absent_for_timeframe", 0),
+        "parent_detector_zero_signal_runtime_count": dominant_issue_counts.get("parent_detector_zero_signal_for_timeframe", 0),
         "quote_refresh_candidate_runtime_count": dominant_issue_counts.get("stale_quote_source_blocks_candidate", 0),
         "quality_filter_blocked_runtime_count": sum(
             count
@@ -114,6 +119,7 @@ def run_m14_rescue_zero_signal_diagnostics(
         ),
         "potential_signal_if_fresh_quote_count": sum(row["eligible_if_fresh_quote_count"] for row in diagnostic_rows),
         "filter_pass_count": sum(row["filter_pass_count"] for row in diagnostic_rows),
+        "shadow_reward_min_r_pass_counts": dict(sorted(shadow_reward_counts.items())),
         "dominant_issue_counts": dict(sorted(dominant_issue_counts.items())),
         "rejection_reason_counts": dict(sorted(rejection_counts.items())),
     }
@@ -150,6 +156,7 @@ def run_m14_rescue_zero_signal_diagnostics(
 def build_diagnostic_row(
     *,
     audit_row: dict[str, Any],
+    audit_rows: list[dict[str, Any]],
     coverage_row: dict[str, Any],
     signal_watchlist: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -180,8 +187,16 @@ def build_diagnostic_row(
         if not [reason for reason in reasons if reason != "stale_quote_source"]:
             eligible_if_fresh_quote_count += 1
 
+    parent_audit = find_parent_audit_row(
+        audit_rows=audit_rows,
+        parent_strategy_id=parent_strategy_id,
+        timeframe=timeframe,
+    )
+    shadow_counts = shadow_reward_min_r_pass_counts(source_rows, strategy_id, timeframe)
     dominant_issue = classify_dominant_issue(
         source_row_count=len(source_rows),
+        parent_audit_source_row_count=int_or_zero(parent_audit.get("source_row_count")),
+        parent_audit_input_status=str(parent_audit.get("input_status", "")),
         filter_pass_count=filter_pass_count,
         eligible_if_fresh_quote_count=eligible_if_fresh_quote_count,
         rejection_counts=rejection_counts,
@@ -193,10 +208,13 @@ def build_diagnostic_row(
         "timeframe": timeframe,
         "input_source_type": str(audit_row.get("input_source_type", "")),
         "dominant_issue": dominant_issue,
-        "recommended_action": recommended_action(dominant_issue),
+        "recommended_action": recommended_action(dominant_issue, shadow_counts),
         "parent_source_row_count": len(source_rows),
+        "parent_audit_input_status": str(parent_audit.get("input_status", "")),
+        "parent_audit_source_row_count": int_or_zero(parent_audit.get("source_row_count")),
         "filter_pass_count": filter_pass_count,
         "eligible_if_fresh_quote_count": eligible_if_fresh_quote_count,
+        "shadow_reward_min_r_pass_counts": shadow_counts,
         "rejection_reason_counts": dict(sorted(rejection_counts.items())),
         "source_quote_source_counts": dict(sorted(quote_source_counts.items())),
         "source_direction_counts": dict(sorted(direction_counts.items())),
@@ -209,7 +227,48 @@ def build_diagnostic_row(
     }
 
 
-def rescue_filter_rejection_reasons(row: dict[str, Any], strategy_id: str, timeframe: str) -> list[str]:
+def find_parent_audit_row(
+    *,
+    audit_rows: list[dict[str, Any]],
+    parent_strategy_id: str,
+    timeframe: str,
+) -> dict[str, Any]:
+    for row in audit_rows:
+        if (
+            str(row.get("strategy_id", "")) == parent_strategy_id
+            and str(row.get("timeframe", "")) == timeframe
+            and str(row.get("lane", "")) != "rescue"
+        ):
+            return row
+    return {}
+
+
+def shadow_reward_min_r_pass_counts(source_rows: list[dict[str, Any]], strategy_id: str, timeframe: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for min_reward_r in SHADOW_REWARD_MIN_R_VALUES:
+        label = f"{min_reward_r:.1f}R"
+        counts[label] = sum(
+            1
+            for row in source_rows
+            if not rescue_filter_rejection_reasons(
+                row,
+                strategy_id,
+                timeframe,
+                min_reward_r=min_reward_r,
+                check_quote_source=False,
+            )
+        )
+    return counts
+
+
+def rescue_filter_rejection_reasons(
+    row: dict[str, Any],
+    strategy_id: str,
+    timeframe: str,
+    *,
+    min_reward_r: Decimal | None = None,
+    check_quote_source: bool = True,
+) -> list[str]:
     reasons: list[str] = []
     if str(row.get("symbol", "")) in LEVERAGED_ETFS:
         reasons.append("leveraged_etf_excluded")
@@ -223,7 +282,7 @@ def rescue_filter_rejection_reasons(row: dict[str, Any], strategy_id: str, timef
     else:
         risk = abs(entry - stop)
         reward = abs(target - entry)
-        min_reward_r = Decimal("1.50") if strategy_id == "M10-PA-004-MBF-QC-m14-modify-20260522" else Decimal("1.20")
+        min_reward_r = min_reward_r or default_min_reward_r(strategy_id)
         if risk <= ZERO or reward <= ZERO:
             reasons.append("invalid_risk_reward")
         elif reward < risk * min_reward_r:
@@ -231,19 +290,27 @@ def rescue_filter_rejection_reasons(row: dict[str, Any], strategy_id: str, timef
         max_risk_percent = Decimal("4.00") if strategy_id == "M10-PA-004-MBF-QC-m14-modify-20260522" else Decimal("6.00") if timeframe == "1d" else Decimal("2.50")
         if risk > ZERO and entry > ZERO and risk / entry * HUNDRED > max_risk_percent:
             reasons.append("risk_percent_above_limit")
-    if row.get("signal_date") and str(row.get("latest_price_source", "")) != FRESH_QUOTE_SOURCE:
+    if check_quote_source and row.get("signal_date") and str(row.get("latest_price_source", "")) != FRESH_QUOTE_SOURCE:
         reasons.append("stale_quote_source")
     return reasons
+
+
+def default_min_reward_r(strategy_id: str) -> Decimal:
+    return Decimal("1.50") if strategy_id == "M10-PA-004-MBF-QC-m14-modify-20260522" else Decimal("1.20")
 
 
 def classify_dominant_issue(
     *,
     source_row_count: int,
+    parent_audit_source_row_count: int,
+    parent_audit_input_status: str,
     filter_pass_count: int,
     eligible_if_fresh_quote_count: int,
     rejection_counts: Counter[str],
 ) -> str:
     if source_row_count == 0:
+        if parent_audit_input_status == "connected_zero_signal_today" and parent_audit_source_row_count == 0:
+            return "parent_detector_zero_signal_for_timeframe"
         return "parent_source_absent_for_timeframe"
     if filter_pass_count > 0:
         return "account_audit_mismatch"
@@ -254,12 +321,16 @@ def classify_dominant_issue(
     return "strict_quality_filter_blocks_all"
 
 
-def recommended_action(dominant_issue: str) -> str:
+def recommended_action(dominant_issue: str, shadow_reward_counts: dict[str, int] | None = None) -> str:
+    if dominant_issue == "parent_detector_zero_signal_for_timeframe":
+        return "Keep same-timeframe mapping and wait for the parent detector to produce a valid same-timeframe signal; do not remap across timeframes."
     if dominant_issue == "parent_source_absent_for_timeframe":
         return "Fix parent detector/timeframe source mapping before waiting for more A/B days."
     if dominant_issue == "stale_quote_source_blocks_candidate":
         return "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters."
     if dominant_issue == "reward_filter_blocks_all":
+        if shadow_reward_counts and int_or_zero(shadow_reward_counts.get("1.0R")) <= 0:
+            return "Reward failure remains even at shadow-only 1.0R after other quality gates; inspect target/stop generation before lowering the frozen rescue threshold."
         return "Test a shadow-only reward/R normalization family, such as 1.0R or 1.1R minimum, before changing the frozen rescue runtime."
     if dominant_issue == "account_audit_mismatch":
         return "Audit account_input_audit generation because filtered rows appear to pass but the runtime stayed zero-signal."
@@ -272,7 +343,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Zero-signal rescue diagnostics reviewed {summary['zero_signal_runtime_count']} rescue runtimes. "
         f"{summary['quote_refresh_candidate_runtime_count']} are blocked mainly by stale/non-fresh quote source and should be rechecked on the next M12.47 fresh refresh; "
         f"{summary['quality_filter_blocked_runtime_count']} need parameter/filter work; "
-        f"{summary['parent_source_absent_runtime_count']} have no parent source rows for the configured timeframe. "
+        f"{summary['parent_source_absent_runtime_count']} have no parent source rows for the configured timeframe; "
+        f"{summary['parent_detector_zero_signal_runtime_count']} have parent detectors that were also zero-signal on the same timeframe. "
         f"Potential entries if fresh quote gate clears: {summary['potential_signal_if_fresh_quote_count']}. "
         "No broker connection, real order, live execution, or paper-trading approval is enabled."
     )
@@ -289,6 +361,7 @@ def build_diagnostics_md(payload: dict[str, Any]) -> str:
         f"- Quote-refresh candidates: `{summary['quote_refresh_candidate_runtime_count']}`",
         f"- Quality/filter blocked: `{summary['quality_filter_blocked_runtime_count']}`",
         f"- Parent source absent: `{summary['parent_source_absent_runtime_count']}`",
+        f"- Parent detector same-timeframe zero-signal: `{summary['parent_detector_zero_signal_runtime_count']}`",
         f"- Potential entries if fresh quote gate clears: `{summary['potential_signal_if_fresh_quote_count']}`",
         "- Boundary: internal simulated only; no broker connection, no real orders, no live execution.",
         "",
@@ -307,7 +380,9 @@ def build_diagnostics_md(payload: dict[str, Any]) -> str:
                 f"- Parent/timeframe: `{row['parent_strategy_id']} / {row['timeframe']}`",
                 f"- Dominant issue: `{row['dominant_issue']}`",
                 f"- Parent source rows: `{row['parent_source_row_count']}`",
+                f"- Parent audit: `{row['parent_audit_input_status']}` / `{row['parent_audit_source_row_count']}` rows",
                 f"- Eligible if fresh quote: `{row['eligible_if_fresh_quote_count']}`",
+                f"- Shadow reward min-R pass counts: `{row['shadow_reward_min_r_pass_counts']}`",
                 f"- Rejection reasons: `{row['rejection_reason_counts']}`",
                 f"- Quote sources: `{row['source_quote_source_counts']}`",
                 f"- Sample symbols: `{', '.join(row['sample_symbols']) or 'none'}`",
@@ -315,7 +390,16 @@ def build_diagnostics_md(payload: dict[str, Any]) -> str:
                 "",
             ]
         )
-    lines.extend(["## Summary", "", f"- Dominant issues: `{summary['dominant_issue_counts']}`", f"- Rejection reasons: `{summary['rejection_reason_counts']}`", ""])
+    lines.extend(
+        [
+            "## Summary",
+            "",
+            f"- Dominant issues: `{summary['dominant_issue_counts']}`",
+            f"- Rejection reasons: `{summary['rejection_reason_counts']}`",
+            f"- Shadow reward min-R pass counts: `{summary['shadow_reward_min_r_pass_counts']}`",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -324,6 +408,13 @@ def decimal_or_none(value: Any) -> Decimal | None:
         return Decimal(str(value).replace(",", ""))
     except (InvalidOperation, ValueError):
         return None
+
+
+def int_or_zero(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def read_json(path: Path) -> dict[str, Any]:

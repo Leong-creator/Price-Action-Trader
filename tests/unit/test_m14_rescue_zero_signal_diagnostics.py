@@ -20,15 +20,19 @@ class M14RescueZeroSignalDiagnosticsTest(unittest.TestCase):
             )
 
             self.assertEqual(result["schema_version"], "m14.rescue-zero-signal-diagnostics.v1")
-            self.assertEqual(result["summary"]["zero_signal_runtime_count"], 3)
+            self.assertEqual(result["summary"]["zero_signal_runtime_count"], 4)
             self.assertEqual(result["summary"]["quote_refresh_candidate_runtime_count"], 1)
             self.assertEqual(result["summary"]["quality_filter_blocked_runtime_count"], 1)
             self.assertEqual(result["summary"]["parent_source_absent_runtime_count"], 1)
+            self.assertEqual(result["summary"]["parent_detector_zero_signal_runtime_count"], 1)
             self.assertEqual(result["summary"]["potential_signal_if_fresh_quote_count"], 1)
             by_runtime = {row["runtime_id"]: row for row in result["rows"]}
             self.assertEqual(by_runtime["rescue-a-1d"]["dominant_issue"], "stale_quote_source_blocks_candidate")
             self.assertEqual(by_runtime["rescue-b-1d"]["dominant_issue"], "parent_source_absent_for_timeframe")
             self.assertEqual(by_runtime["rescue-c-5m"]["dominant_issue"], "reward_filter_blocks_all")
+            self.assertEqual(by_runtime["rescue-c-5m"]["shadow_reward_min_r_pass_counts"]["1.0R"], 1)
+            self.assertEqual(by_runtime["rescue-d-1d"]["dominant_issue"], "parent_detector_zero_signal_for_timeframe")
+            self.assertEqual(by_runtime["rescue-d-1d"]["parent_audit_input_status"], "connected_zero_signal_today")
             self.assertFalse(result["broker_connection"])
             self.assertFalse(result["real_order"])
             self.assertFalse(result["live_execution"])
@@ -59,12 +63,15 @@ class M14RescueZeroSignalDiagnosticsTest(unittest.TestCase):
                             self._audit_row("rescue-a-1d", "rescue-a", "1d"),
                             self._audit_row("rescue-b-1d", "rescue-b", "1d"),
                             self._audit_row("rescue-c-5m", "rescue-c", "5m"),
+                            self._audit_row("parent-d-1d", "parent-d", "1d", lane="experimental"),
+                            self._audit_row("rescue-d-1d", "rescue-d", "1d"),
                             self._audit_row("rescue-live-5m", "rescue-live", "5m", input_status="connected_with_signal_today"),
                         ]
                     },
                     "signal_watchlist": [
                         self._source_row("parent-a", "1d", "AAPL", "看涨", "100", "98", "104", "cached_quote"),
                         self._source_row("parent-c", "5m", "MSFT", "看涨", "100", "99", "100.50", "cached_quote"),
+                        self._source_row("parent-c", "5m", "NVDA", "看涨", "100", "99", "101.05", "cached_quote"),
                     ],
                 }
             ),
@@ -77,6 +84,7 @@ class M14RescueZeroSignalDiagnosticsTest(unittest.TestCase):
                         self._coverage_row("rescue-a-1d", "rescue-a", "parent-a"),
                         self._coverage_row("rescue-b-1d", "rescue-b", "parent-b"),
                         self._coverage_row("rescue-c-5m", "rescue-c", "parent-c"),
+                        self._coverage_row("rescue-d-1d", "rescue-d", "parent-d"),
                         self._coverage_row("rescue-live-5m", "rescue-live", "parent-live"),
                     ]
                 }
@@ -109,14 +117,23 @@ class M14RescueZeroSignalDiagnosticsTest(unittest.TestCase):
         )
         return config_path
 
-    def _audit_row(self, runtime_id: str, strategy_id: str, timeframe: str, *, input_status: str = "connected_zero_signal_today") -> dict[str, str]:
+    def _audit_row(
+        self,
+        runtime_id: str,
+        strategy_id: str,
+        timeframe: str,
+        *,
+        input_status: str = "connected_zero_signal_today",
+        lane: str = "rescue",
+    ) -> dict[str, str]:
         return {
             "runtime_id": runtime_id,
             "strategy_id": strategy_id,
-            "lane": "rescue",
+            "lane": lane,
             "timeframe": timeframe,
             "input_status": input_status,
             "input_source_type": "fixture",
+            "source_row_count": "0",
         }
 
     def _coverage_row(self, runtime_id: str, strategy_id: str, parent_strategy_id: str) -> dict[str, object]:

@@ -309,9 +309,11 @@ def build_rescue_zero_signal_diagnostics_summary(diagnostics: dict[str, Any]) ->
         "zero_signal_strategy_count": int_or_zero(summary.get("zero_signal_strategy_count")),
         "parent_source_available_runtime_count": int_or_zero(summary.get("parent_source_available_runtime_count")),
         "parent_source_absent_runtime_count": int_or_zero(summary.get("parent_source_absent_runtime_count")),
+        "parent_detector_zero_signal_runtime_count": int_or_zero(summary.get("parent_detector_zero_signal_runtime_count")),
         "quote_refresh_candidate_runtime_count": int_or_zero(summary.get("quote_refresh_candidate_runtime_count")),
         "quality_filter_blocked_runtime_count": int_or_zero(summary.get("quality_filter_blocked_runtime_count")),
         "potential_signal_if_fresh_quote_count": int_or_zero(summary.get("potential_signal_if_fresh_quote_count")),
+        "shadow_reward_min_r_pass_counts": dict(summary.get("shadow_reward_min_r_pass_counts", {})),
         "dominant_issue_counts": dict(summary.get("dominant_issue_counts", {})),
         "rejection_reason_counts": dict(summary.get("rejection_reason_counts", {})),
         "plain_language_result": str(diagnostics.get("plain_language_result", "")),
@@ -423,7 +425,8 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "evidence": (
                     f"{diagnostics['quote_refresh_candidate_runtime_count']} quote-refresh candidates; "
                     f"{diagnostics['quality_filter_blocked_runtime_count']} quality/filter candidates; "
-                    f"{diagnostics['parent_source_absent_runtime_count']} source-mapping candidates"
+                    f"{diagnostics['parent_source_absent_runtime_count']} source-mapping candidates; "
+                    f"{diagnostics['parent_detector_zero_signal_runtime_count']} parent-detector zero-signal candidates"
                 ),
                 "boundary": "Fresh-data rerun and shadow parameter tests only; no broker/live approval.",
             },
@@ -461,7 +464,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{backlog['signal_generated_no_account_operation_count']} signal-to-account no-op. "
         f"Zero-signal diagnosis: {diagnostics['quote_refresh_candidate_runtime_count']} should be rechecked after fresh quote refresh, "
         f"{diagnostics['quality_filter_blocked_runtime_count']} need filter/parameter work, "
-        f"{diagnostics['parent_source_absent_runtime_count']} need source mapping. "
+        f"{diagnostics['parent_source_absent_runtime_count']} need source mapping, "
+        f"{diagnostics['parent_detector_zero_signal_runtime_count']} should keep same-timeframe mapping and wait for parent detector evidence. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -520,7 +524,9 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Quote-refresh candidates: `{diagnostics['quote_refresh_candidate_runtime_count']}`",
             f"- Quality/filter candidates: `{diagnostics['quality_filter_blocked_runtime_count']}`",
             f"- Source-mapping candidates: `{diagnostics['parent_source_absent_runtime_count']}`",
+            f"- Parent-detector same-timeframe zero-signal: `{diagnostics['parent_detector_zero_signal_runtime_count']}`",
             f"- Potential entries if fresh quote gate clears: `{diagnostics['potential_signal_if_fresh_quote_count']}`",
+            f"- Shadow reward min-R pass counts: `{diagnostics['shadow_reward_min_r_pass_counts']}`",
         ]
     )
     lines.extend(["", "## Next Actions", ""])
