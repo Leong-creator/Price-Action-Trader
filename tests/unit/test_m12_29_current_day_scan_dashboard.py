@@ -11,6 +11,9 @@ from unittest.mock import patch
 from scripts.m12_29_current_day_scan_dashboard_lib import (
     ACCOUNT_SPECS,
     DEFAULT_ACCOUNT_EQUITY,
+    PA008_BROKER_RISK_CAP_SHADOW_ADAPTER_ID,
+    PA008_BROKER_RISK_CAP_SHADOW_RUNTIME_VARIANT_ID,
+    PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID,
     PA011_ORB_REBUILD_ADAPTER_ID,
     PA011_ORB_REBUILD_VARIANT_ID,
     PA012_ORB_QUALITY_RESCUE_ADAPTER_ID,
@@ -32,6 +35,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     filter_rescue_signal_rows,
     load_config,
     market_session_status,
+    open_new_positions,
     pa011_orb_rebuild_signal,
     pa004_event_is_long,
     pa004_momentum_breakout_quality_signal,
@@ -319,6 +323,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("M10-PA-002-m14-modify-20260522", rescue_ids)
         self.assertIn(PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID, rescue_ids)
         self.assertIn("M10-PA-007-m14-modify-20260522", rescue_ids)
+        self.assertIn(PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID, rescue_ids)
         self.assertIn("M10-PA-009-m14-modify-20260522", rescue_ids)
         self.assertIn("M10-PA-012-m14-modify-20260522", rescue_ids)
         self.assertIn(PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID, rescue_ids)
@@ -351,6 +356,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "M10-PA-002-m14-modify-20260522",
                 PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID,
                 "M10-PA-007-m14-modify-20260522",
+                PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID,
                 "M10-PA-009-m14-modify-20260522",
                 "M10-PA-012-m14-modify-20260522",
                 PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID,
@@ -505,6 +511,55 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("1.0R", filtered[0]["review_status"])
         self.assertIn("frozen rescue runtime", filtered[0]["review_status"])
 
+    def test_pa008_broker_risk_cap_shadow_accepts_short_and_caps_simulated_risk(self):
+        base_row = {
+            "symbol": "ADBE",
+            "direction": "看跌",
+            "hypothetical_entry_price": "245.89",
+            "hypothetical_stop_price": "265.09",
+            "hypothetical_target_price": "207.49",
+            "hypothetical_quantity": "5.2469",
+            "signal_date": "2026-05-22",
+            "signal_time": "2026-05-22T09:32:16-04:00",
+            "latest_price": "245.89",
+            "latest_price_source": "longbridge_quote_readonly",
+            "timeframe": "1d",
+        }
+        shadow_spec = {
+            "account_id": f"{PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID}-1d",
+            "strategy_id": PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID,
+            "timeframe": "1d",
+            "lane": "rescue",
+            "variant_id": PA008_BROKER_RISK_CAP_SHADOW_RUNTIME_VARIANT_ID,
+            "display_name": "M10-PA-008 风险上限影子账户",
+        }
+
+        filtered = filter_rescue_signal_rows(shadow_spec, [base_row])
+
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["direction"], "看跌")
+        self.assertEqual(filtered[0]["signal_source_type"], PA008_BROKER_RISK_CAP_SHADOW_ADAPTER_ID)
+        self.assertEqual(filtered[0]["hypothetical_quantity"], "5.2083")
+        self.assertEqual(filtered[0]["broker_risk_cap_quantity_cap"], "5.2083")
+        self.assertIn("100.00", filtered[0]["review_status"])
+        account = bootstrap_account_state(shadow_spec)
+        account["cash"] = "20200.00"
+        account["equity"] = "20200.00"
+        ledger_rows, opened = open_new_positions(
+            account,
+            shadow_spec,
+            filtered,
+            date.fromisoformat("2026-05-22"),
+            "2026-05-22T20:30:00Z",
+        )
+
+        self.assertEqual(opened, 1)
+        self.assertEqual(account["open_positions"][0]["quantity"], "5.2083")
+        self.assertEqual(account["open_positions"][0]["broker_risk_cap_amount"], "100.00")
+        self.assertEqual(account["open_positions"][0]["broker_risk_cap_applied"], "true")
+        self.assertEqual(ledger_rows[0]["broker_risk_cap_uncapped_risk_budget"], "101.00")
+        self.assertEqual(ledger_rows[0]["broker_risk_cap_uncapped_quantity"], "5.2604")
+
     def test_pa011_orb_rebuild_requires_failed_opening_range_retest(self):
         bars = [
             SimpleNamespace(timestamp="2026-05-11T09:30:00-04:00", open=Decimal("100.00"), high=Decimal("100.60"), low=Decimal("99.50"), close=Decimal("100.10")),
@@ -543,6 +598,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "M10-PA-002-m14-modify-20260522-1d",
                 "M10-PA-004-MBF-QC-m14-modify-20260522-1d",
                 "M10-PA-007-m14-modify-20260522-1d",
+                f"{PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID}-1d",
                 "M10-PA-009-m14-modify-20260522-1d",
                 "M10-PA-012-m14-modify-20260522-5m",
                 f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m",
@@ -558,6 +614,10 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(
             rescue_source_by_runtime["M10-PA-004-MBF-QC-m14-modify-20260522-1d"],
             PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID,
+        )
+        self.assertEqual(
+            rescue_source_by_runtime[f"{PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID}-1d"],
+            PA008_BROKER_RISK_CAP_SHADOW_ADAPTER_ID,
         )
         self.assertEqual(
             rescue_source_by_runtime["M10-PA-011-ORB-R1-5m"],
@@ -577,6 +637,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 for row in rescue_rows
                 if row["runtime_id"] not in {
                     "M10-PA-004-MBF-QC-m14-modify-20260522-1d",
+                    f"{PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID}-1d",
                     "M10-PA-011-ORB-R1-5m",
                     "M10-PA-012-m14-modify-20260522-5m",
                     f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m",

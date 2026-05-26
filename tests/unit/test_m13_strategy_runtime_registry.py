@@ -9,6 +9,7 @@ from scripts.m13_daily_strategy_test_runner_lib import (
 
 
 class M13StrategyRuntimeRegistryTest(unittest.TestCase):
+    PA008_BROKER_RISK_CAP_SHADOW_ID = "M10-PA-008-broker-risk-cap-shadow"
     PA012_TARGET_STOP_NORMALIZED_RESCUE_ID = (
         "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
     )
@@ -85,6 +86,7 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
             "M10-PA-002-m14-modify-20260522": "M10-PA-002",
             "M10-PA-004-MBF-QC-m14-modify-20260522": "M10-PA-004-MBF-QC",
             "M10-PA-007-m14-modify-20260522": "M10-PA-007",
+            self.PA008_BROKER_RISK_CAP_SHADOW_ID: "M10-PA-008",
             "M10-PA-009-m14-modify-20260522": "M10-PA-009",
             "M10-PA-012-m14-modify-20260522": "M10-PA-012",
             self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID: "M10-PA-012",
@@ -104,6 +106,7 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
             "M10-PA-002-m14-modify-20260522",
             "M10-PA-004-MBF-QC-m14-modify-20260522",
             "M10-PA-007-m14-modify-20260522",
+            self.PA008_BROKER_RISK_CAP_SHADOW_ID,
             "M10-PA-009-m14-modify-20260522",
             "M10-PA-012-m14-modify-20260522",
             self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID,
@@ -133,6 +136,12 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
         )
         self.assertEqual(shadow["runtime_accounts"][0]["variant_id"], "target_stop_risk_normalized_1_0r_shadow")
         self.assertIn("frozen M10-PA-012-m14-modify-20260522 rescue runtime", shadow["next_action"])
+
+        broker_shadow = rows[self.PA008_BROKER_RISK_CAP_SHADOW_ID]
+        self.assertEqual(broker_shadow["detector_id"], "m14_broker_blocker_pa008_quantity_cap_adapter")
+        self.assertEqual(broker_shadow["runtime_accounts"][0]["runtime_id"], "M10-PA-008-broker-risk-cap-shadow-1d")
+        self.assertEqual(broker_shadow["runtime_accounts"][0]["variant_id"], "broker_risk_cap_shadow")
+        self.assertIn("broker readiness blocked status", broker_shadow["next_action"])
 
 
 if __name__ == "__main__":

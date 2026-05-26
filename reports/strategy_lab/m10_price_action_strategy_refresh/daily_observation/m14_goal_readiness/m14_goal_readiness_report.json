@@ -95,7 +95,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T21:40:00Z",
+  "generated_at": "2026-05-26T22:10:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own 10 trading-day A/B evidence before final promote/modify/reject."
@@ -143,13 +143,13 @@
     {
       "action": "Collect 10 trading-day A/B evidence for connected rescue runtimes",
       "boundary": "Connected rescue runtime is not a promotion or approval.",
-      "evidence": "9/10 rescue strategies have M13 ledger evidence; 0 ready for manual review",
+      "evidence": "9/11 rescue strategies have M13 ledger evidence; 0 ready for manual review",
       "priority": "P0"
     },
     {
       "action": "Work the rescue optimization backlog before the 10-day A/B window completes",
       "boundary": "Optimization backlog cannot change broker/live approval or count as promotion evidence.",
-      "evidence": "9 actionable; 8 zero-signal connected variants; 0 signal-to-account no-op variants",
+      "evidence": "10 actionable; 8 zero-signal connected variants; 0 signal-to-account no-op variants",
       "priority": "P0"
     },
     {
@@ -195,7 +195,7 @@
       "priority": "P1"
     }
   ],
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 10/10 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/10 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 9 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
   "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "rescue_ab_evidence": {
     "collecting_evidence_count": 9,
@@ -203,8 +203,9 @@
     "evidence_ready_for_manual_review_strategy_ids": [],
     "m13_ledger_observed_strategy_count": 9,
     "min_ab_trading_days": 10,
-    "no_m13_ledger_evidence_count": 1,
+    "no_m13_ledger_evidence_count": 2,
     "no_m13_ledger_evidence_strategy_ids": [
+      "M10-PA-008-broker-risk-cap-shadow",
       "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
     ],
     "pending_evidence_strategy_ids": [
@@ -212,6 +213,7 @@
       "M10-PA-002-m14-modify-20260522",
       "M10-PA-004-MBF-QC-m14-modify-20260522",
       "M10-PA-007-m14-modify-20260522",
+      "M10-PA-008-broker-risk-cap-shadow",
       "M10-PA-009-m14-modify-20260522",
       "M10-PA-011-ORB-R1",
       "M10-PA-012-m14-modify-20260522",
@@ -219,12 +221,12 @@
       "M10-PA-013-m14-modify-20260522",
       "M12-FTD-001-m14-modify-20260522"
     ],
-    "plain_language_result": "Rescue A/B evidence is observed for 9/10 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 1 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.",
+    "plain_language_result": "Rescue A/B evidence is observed for 9/11 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 2 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.",
     "promotion_allowed_count": 0,
-    "rescue_runtime_strategy_count": 10
+    "rescue_runtime_strategy_count": 11
   },
   "rescue_optimization_backlog": {
-    "actionable_before_10d_count": 9,
+    "actionable_before_10d_count": 10,
     "broker_blocker_reason_counts": {
       "consecutive_losses_limit": 1,
       "max_risk_per_order_exceeded": 1,
@@ -237,14 +239,15 @@
       "M10-PA-002-m14-modify-20260522",
       "M10-PA-004-MBF-QC-m14-modify-20260522",
       "M10-PA-007-m14-modify-20260522",
+      "M10-PA-008-broker-risk-cap-shadow",
       "M10-PA-009-m14-modify-20260522",
       "M10-PA-012-m14-modify-20260522",
       "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow",
       "M10-PA-013-m14-modify-20260522",
       "M12-FTD-001-m14-modify-20260522"
     ],
-    "plain_language_result": "Rescue optimization backlog has 10 rescue rows; 9 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
-    "rescue_strategy_count": 10,
+    "plain_language_result": "Rescue optimization backlog has 11 rescue rows; 10 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+    "rescue_strategy_count": 11,
     "signal_generated_no_account_operation_count": 0,
     "wait_for_more_ab_evidence_count": 1,
     "zero_signal_after_connection_count": 8
@@ -257,10 +260,10 @@
     "pending_rescue_strategy_ids": [],
     "planned_action_covered_count": 10,
     "planned_action_row_count": 10,
-    "registered_rescue_account_count": 11,
-    "registered_rescue_strategy_count": 10,
+    "registered_rescue_account_count": 12,
+    "registered_rescue_strategy_count": 11,
     "rescue_ready_for_ab_evidence_collection": true,
-    "rescue_runtime_connected_strategy_count": 10
+    "rescue_runtime_connected_strategy_count": 11
   },
   "rescue_target_stop_diagnostics": {
     "diagnosed_runtime_count": 1,

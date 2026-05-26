@@ -1,8 +1,8 @@
 # M14 Rescue Optimization Backlog
 
-- Generated at: `2026-05-26T18:50:00Z`
-- Rescue rows: `10`
-- Actionable before 10-day A/B completion: `9`
+- Generated at: `2026-05-26T22:10:00Z`
+- Rescue rows: `11`
+- Actionable before 10-day A/B completion: `10`
 - Zero-signal connected variants: `8`
 - Signal without account operation variants: `0`
 - Broker dry-run blockers: `3`
@@ -49,6 +49,16 @@
 - Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
 - Optimization family: `detector_threshold_source_mapping_timeframe`
 - Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
+
+### M10-PA-008-broker-risk-cap-shadow
+
+- Priority: `P0`
+- Issue: `missing_rescue_ledger`
+- Work state: `actionable_before_10d`
+- Evidence days: `0/10`
+- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
+- Optimization family: `ab_evidence_collection`
+- Action: Let the next M12.47-owned refresh generate the first M13 rescue ledger row; if it is still absent after that run, audit the ledger path.
 
 ### M10-PA-009-m14-modify-20260522
 
@@ -117,4 +127,4 @@
 
 ## Summary
 
-Rescue optimization backlog has 10 rescue rows; 9 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.
+Rescue optimization backlog has 11 rescue rows; 10 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.

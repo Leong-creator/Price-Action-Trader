@@ -70,6 +70,10 @@ PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID = "m14_rescue_pa004_mbf_qc_risk_compres
 PA011_ORB_REBUILD_VARIANT_ID = "M10-PA-011-ORB-R1"
 PA011_ORB_REBUILD_ADAPTER_ID = "m14_rescue_pa011_failed_orb_retest_adapter"
 PA012_ORB_QUALITY_RESCUE_ADAPTER_ID = "m14_rescue_orb_quality_filter_adapter"
+PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID = "M10-PA-008-broker-risk-cap-shadow"
+PA008_BROKER_RISK_CAP_SHADOW_ADAPTER_ID = "m14_broker_blocker_pa008_quantity_cap_adapter"
+PA008_BROKER_RISK_CAP_SHADOW_RUNTIME_VARIANT_ID = "broker_risk_cap_shadow"
+PA008_BROKER_RISK_CAP_MAX_RISK_AMOUNT = Decimal("100.00")
 PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID = (
     "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
 )
@@ -91,6 +95,7 @@ RESCUE_PARENT_STRATEGIES = {
     "M10-PA-002-m14-modify-20260522": "M10-PA-002",
     PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID: PA004_MOMENTUM_QUALITY_VARIANT_ID,
     "M10-PA-007-m14-modify-20260522": "M10-PA-007",
+    PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID: "M10-PA-008",
     "M10-PA-009-m14-modify-20260522": "M10-PA-009",
     "M10-PA-012-m14-modify-20260522": "M10-PA-012",
     PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID: "M10-PA-012",
@@ -154,6 +159,7 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-002-m14-modify-20260522-1d", "strategy_id": "M10-PA-002-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-002 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-004-MBF-QC-m14-modify-20260522-1d", "strategy_id": PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID, "timeframe": "1d", "lane": "rescue", "display_name": "PA004-MBF-QC 风险压缩救援账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-007-m14-modify-20260522-1d", "strategy_id": "M10-PA-007-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-007 救援日线账户", "variant_id": "m14_modify_20260522"},
+    {"account_id": f"{PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID}-1d", "strategy_id": PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID, "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-008 风险上限影子账户", "variant_id": PA008_BROKER_RISK_CAP_SHADOW_RUNTIME_VARIANT_ID},
     {"account_id": "M10-PA-009-m14-modify-20260522-1d", "strategy_id": "M10-PA-009-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-009 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-012-m14-modify-20260522-5m", "strategy_id": "M10-PA-012-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-012 救援五分钟账户", "variant_id": "m14_modify_20260522"},
     {"account_id": f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m", "strategy_id": PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID, "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-012 1.0R目标修复影子账户", "variant_id": PA012_TARGET_STOP_NORMALIZED_RESCUE_RUNTIME_VARIANT_ID},
@@ -690,6 +696,8 @@ def runtime_source_strategy_id(spec: dict[str, str]) -> str:
 def rescue_input_source_type_for_spec(spec: dict[str, str]) -> str:
     if spec["strategy_id"] == PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID:
         return PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID
+    if spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID:
+        return PA008_BROKER_RISK_CAP_SHADOW_ADAPTER_ID
     if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
         return PA011_ORB_REBUILD_ADAPTER_ID
     if spec["strategy_id"] == "M10-PA-012-m14-modify-20260522":
@@ -702,12 +710,37 @@ def rescue_input_source_type_for_spec(spec: dict[str, str]) -> str:
 def rescue_min_reward_r_for_spec(spec: dict[str, str]) -> Decimal:
     if spec["strategy_id"] == PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID:
         return Decimal("1.50")
+    if spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID:
+        return Decimal("1.00")
     if spec["strategy_id"] == PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
         return Decimal("1.00")
     return Decimal("1.20")
 
 
 def normalize_rescue_signal_row(spec: dict[str, str], row: dict[str, str]) -> dict[str, str]:
+    if spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID:
+        clone = dict(row)
+        entry = decimal_or_none(row.get("hypothetical_entry_price", ""))
+        stop = decimal_or_none(row.get("hypothetical_stop_price", ""))
+        if entry is None or stop is None or entry <= ZERO or stop <= ZERO:
+            return clone
+        risk = abs(entry - stop)
+        if risk <= ZERO:
+            return clone
+        original_quantity = row.get("hypothetical_quantity", "")
+        quantity_cap = (PA008_BROKER_RISK_CAP_MAX_RISK_AMOUNT / risk).quantize(Decimal("0.0001"))
+        source_quantity = decimal_or_none(original_quantity)
+        if source_quantity is None or source_quantity <= ZERO or source_quantity > quantity_cap:
+            clone["hypothetical_quantity"] = str(quantity_cap)
+        clone["broker_risk_cap_policy"] = "max_risk_per_order_100_usd_shadow"
+        clone["broker_risk_cap_max_risk_amount"] = money(PA008_BROKER_RISK_CAP_MAX_RISK_AMOUNT)
+        clone["broker_risk_cap_original_quantity"] = original_quantity
+        clone["broker_risk_cap_quantity_cap"] = str(quantity_cap)
+        clone["broker_risk_cap_shadow_prep_ref"] = (
+            "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/"
+            "m14_2_broker_readiness/broker_blocker_shadow_ab_prep.json#prepare_quantity_cap_shadow_runtime"
+        )
+        return clone
     if spec["strategy_id"] != PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
         return dict(row)
     clone = dict(row)
@@ -733,7 +766,8 @@ def rescue_signal_filter(spec: dict[str, str], row: dict[str, str]) -> bool:
         return True
     if row.get("symbol") in {"TQQQ", "SQQQ"}:
         return False
-    if row.get("direction") != "看涨":
+    allowed_directions = {"看涨", "看跌"} if spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID else {"看涨"}
+    if row.get("direction") not in allowed_directions:
         return False
     entry = decimal_or_none(row.get("hypothetical_entry_price", ""))
     stop = decimal_or_none(row.get("hypothetical_stop_price", ""))
@@ -748,6 +782,8 @@ def rescue_signal_filter(spec: dict[str, str], row: dict[str, str]) -> bool:
     max_risk_percent = (
         Decimal("4.00")
         if spec["strategy_id"] == PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID
+        else Decimal("10.00")
+        if spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID
         else Decimal("6.00")
         if spec["timeframe"] == "1d"
         else Decimal("2.50")
@@ -785,6 +821,12 @@ def filter_rescue_signal_rows(spec: dict[str, str], rows: list[dict[str, str]]) 
                 f"{spec['display_name']} 复用父策略 {runtime_source_strategy_id(spec)} 的扫描结果，"
                 "只在影子账户中把目标价规范化为 entry + 1.0R 风险距离；"
                 "PA012 baseline 和 frozen rescue runtime 均保持独立不覆盖。"
+            )
+        elif spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID:
+            clone["review_status"] = (
+                f"{spec['display_name']} 复用父策略 {runtime_source_strategy_id(spec)} 的扫描结果，"
+                "只在影子账户中测试每笔最大风险金额 100.00 的数量上限；"
+                "M10-PA-008 baseline 和 broker readiness blocked 状态均保持独立不覆盖。"
             )
         else:
             clone["review_status"] = (
@@ -1689,6 +1731,12 @@ def holding_days_limit(spec: dict[str, str], history: dict[str, str]) -> int:
     return max(1, min(20, int(avg)))
 
 
+def max_risk_amount_for_spec(spec: dict[str, str]) -> Decimal | None:
+    if spec["strategy_id"] == PA008_BROKER_RISK_CAP_SHADOW_VARIANT_ID:
+        return PA008_BROKER_RISK_CAP_MAX_RISK_AMOUNT
+    return None
+
+
 def open_new_positions(
     account: dict[str, Any],
     spec: dict[str, str],
@@ -1719,8 +1767,13 @@ def open_new_positions(
             continue
         current_equity = money_to_decimal(account["equity"])
         available_cash = money_to_decimal(account["cash"])
-        risk_budget = (current_equity * DEFAULT_ACCOUNT_RISK_RATE).quantize(MONEY)
+        uncapped_risk_budget = (current_equity * DEFAULT_ACCOUNT_RISK_RATE).quantize(MONEY)
+        risk_budget = uncapped_risk_budget
+        max_risk_amount = max_risk_amount_for_spec(spec)
+        if max_risk_amount is not None and max_risk_amount > ZERO:
+            risk_budget = min(risk_budget, max_risk_amount)
         max_risk_qty = risk_budget / risk_per_share
+        uncapped_risk_qty = uncapped_risk_budget / risk_per_share
         max_cash_qty = available_cash / entry if entry > ZERO else ZERO
         qty = min(max_risk_qty, max_cash_qty).quantize(Decimal("0.0001"))
         if qty <= ZERO:
@@ -1754,6 +1807,18 @@ def open_new_positions(
             "source_refs": row.get("source_refs", ""),
             "spec_ref": row.get("spec_ref", ""),
         }
+        ledger_extra: dict[str, str] = {}
+        if max_risk_amount is not None:
+            broker_risk_cap_applied = risk_budget < uncapped_risk_budget
+            cap_fields = {
+                "broker_risk_cap_policy": "max_risk_per_order_100_usd_shadow",
+                "broker_risk_cap_amount": money(max_risk_amount),
+                "broker_risk_cap_applied": str(broker_risk_cap_applied).lower(),
+                "broker_risk_cap_uncapped_risk_budget": money(uncapped_risk_budget),
+                "broker_risk_cap_uncapped_quantity": str(uncapped_risk_qty.quantize(Decimal("0.0001"))),
+            }
+            position.update(cap_fields)
+            ledger_extra.update(cap_fields)
         account["open_positions"].append(position)
         account["processed_signal_ids"].append(signal_id)
         opened += 1
@@ -1773,6 +1838,7 @@ def open_new_positions(
                 "target_price": money(target),
                 "quantity": str(qty),
                 "reserved_notional": money(reserved_notional),
+                **ledger_extra,
             }
         )
     return new_ledger, opened

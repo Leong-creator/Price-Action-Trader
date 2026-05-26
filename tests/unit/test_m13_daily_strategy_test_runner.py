@@ -128,6 +128,10 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
                 "zero_signal",
             )
             self.assertEqual(
+                states[("M10-PA-008-broker-risk-cap-shadow", "M10-PA-008-broker-risk-cap-shadow-1d")],
+                "zero_signal",
+            )
+            self.assertEqual(
                 states[("M10-PA-009-m14-modify-20260522", "M10-PA-009-m14-modify-20260522-1d")],
                 "zero_signal",
             )
@@ -263,6 +267,11 @@ class M13DailyStrategyTestRunnerTest(unittest.TestCase):
             self.assertEqual(pa009_rescue["test_states"], "zero_signal")
             self.assertEqual(pa009_rescue["challenge_status"], "ready_for_10_day_challenge")
             self.assertEqual(pa009_rescue["goal_blocked"], "false")
+            pa008_broker_shadow = by_id["M10-PA-008-broker-risk-cap-shadow"]
+            self.assertEqual(pa008_broker_shadow["required_for_goal"], "false")
+            self.assertEqual(pa008_broker_shadow["test_states"], "zero_signal")
+            self.assertEqual(pa008_broker_shadow["challenge_status"], "ready_for_10_day_challenge")
+            self.assertEqual(pa008_broker_shadow["goal_blocked"], "false")
             pa013_rescue = by_id["M10-PA-013-m14-modify-20260522"]
             self.assertEqual(pa013_rescue["required_for_goal"], "false")
             self.assertEqual(pa013_rescue["test_states"], "zero_signal")

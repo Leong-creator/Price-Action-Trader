@@ -3,9 +3,9 @@
   "all_registered_rescue_inputs_connected": true,
   "broker_connection": false,
   "connected_not_passed_policy": "Runtime connection proves input coverage only; promotion, modification, or rejection still requires 10 trading-day A/B ledger evidence.",
-  "connected_rescue_strategy_count": 10,
+  "connected_rescue_strategy_count": 11,
   "coverage_complete_but_not_promoted": true,
-  "generated_at": "2026-05-26T18:45:00Z",
+  "generated_at": "2026-05-26T22:10:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "live_execution": false,
@@ -21,7 +21,7 @@
   "paper_trading_approval": false,
   "pending_planned_action_strategy_ids": [],
   "pending_rescue_strategy_ids": [],
-  "plain_language_result": "Registered rescue runtime coverage is 10/10 strategies and 11 accounts. Planned rescue/rebuild action coverage is 10/10. Connected does not mean passed or approved; every rescue runtime still needs 10 trading-day A/B ledger evidence. No broker connection, real order, live execution, or paper-trading approval was enabled.",
+  "plain_language_result": "Registered rescue runtime coverage is 11/11 strategies and 12 accounts. Planned rescue/rebuild action coverage is 10/10. Connected does not mean passed or approved; every rescue runtime still needs 10 trading-day A/B ledger evidence. No broker connection, real order, live execution, or paper-trading approval was enabled.",
   "planned_action_covered_count": 10,
   "planned_action_row_count": 10,
   "planned_action_rows": [
@@ -266,8 +266,8 @@
     }
   ],
   "real_order": false,
-  "registered_rescue_account_count": 11,
-  "registered_rescue_strategy_count": 10,
+  "registered_rescue_account_count": 12,
+  "registered_rescue_strategy_count": 11,
   "registry_ref": "config/examples/m13_strategy_runtime_registry.json",
   "rescue_plan_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
   "rows": [
@@ -401,6 +401,39 @@
       ],
       "variant_ids": [
         "m14_modify_20260522"
+      ]
+    },
+    {
+      "account_spec_runtime_ids": [
+        "M10-PA-008-broker-risk-cap-shadow-1d"
+      ],
+      "broker_connection": false,
+      "coverage_status": "connected_not_promoted",
+      "detector_id": "m14_broker_blocker_pa008_quantity_cap_adapter",
+      "detector_status": "connected",
+      "disconnected_account_spec_runtime_ids": [],
+      "input_source_types": [
+        "m14_broker_blocker_pa008_quantity_cap_adapter"
+      ],
+      "live_execution": false,
+      "mismatched_account_spec_runtime_ids": [],
+      "missing_account_spec_runtime_ids": [],
+      "needs_ab_trading_days": 10,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parent_strategy_id": "M10-PA-008",
+      "promotion_status": "not_promoted_requires_10_day_ab_evidence",
+      "real_order": false,
+      "required_for_goal": false,
+      "runtime_ids": [
+        "M10-PA-008-broker-risk-cap-shadow-1d"
+      ],
+      "strategy_id": "M10-PA-008-broker-risk-cap-shadow",
+      "timeframes": [
+        "1d"
+      ],
+      "variant_ids": [
+        "broker_risk_cap_shadow"
       ]
     },
     {
