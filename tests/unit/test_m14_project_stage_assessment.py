@@ -165,6 +165,28 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_visual_confirmation_can_draft_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_visual_confirmation_can_create_strategy_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_visual_confirmation_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_gate_row_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_question_required_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_question_confirmed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_question_pending_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_case_required_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_case_confirmed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_case_pending_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_complete_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_future_spec_unblocked_count"], 0)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_ready_for_future_spec_draft_count"],
+                0,
+            )
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_invalid_count"], 0)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_can_create_strategy_now_count"],
+                0,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_parameter_mutation_allowed_count"],
+                0,
+            )
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -269,6 +291,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["strategy_source_visual_confirmation_status"],
                 "manual_confirmation_packet_ready_no_confirmation_recorded",
             )
+            self.assertEqual(
+                result["stage_assessment"]["strategy_source_visual_confirmation_response_status"],
+                "manual_response_gate_pending_no_future_spec_unblocked",
+            )
             self.assertTrue(
                 any(
                     "Strategy source reextract review has 2 packets" in item
@@ -284,6 +310,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertTrue(
                 any(
                     "Strategy source visual confirmation packet has 2 rows" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    "Strategy source visual confirmation response gate has 2 rows" in item
                     for item in result["stage_assessment"]["next_required_evidence"]
                 )
             )
@@ -409,6 +441,30 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             )
             self.assertFalse(result["strategy_source_visual_confirmation_packet"]["manual_m12_37_once_allowed"])
             self.assertFalse(result["strategy_source_visual_confirmation_packet"]["strategy_state_mutation_allowed"])
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_response_gate"][
+                    "source_visual_confirmation_response_gate_row_count"
+                ],
+                2,
+            )
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_response_gate"]["question_response_pending_count"],
+                6,
+            )
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_response_gate"]["case_response_pending_count"],
+                10,
+            )
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_response_gate"]["future_spec_unblocked_count"],
+                0,
+            )
+            self.assertFalse(
+                result["strategy_source_visual_confirmation_response_gate"]["manual_m12_37_once_allowed"]
+            )
+            self.assertFalse(
+                result["strategy_source_visual_confirmation_response_gate"]["strategy_state_mutation_allowed"]
+            )
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -454,6 +510,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy source reextract review status: `source_reextract_review_ready_no_strategy_creation_or_mutation`", md)
             self.assertIn("Strategy source visual alignment rows/cases/checksum/ready/manual-required: `2/10/10/2/2`", md)
             self.assertIn("Strategy source visual alignment status: `source_visual_alignment_ready_for_manual_review_no_strategy_creation_or_mutation`", md)
+            self.assertIn("Strategy source visual confirmation response rows/questions pending/cases pending/complete/unblocked: `2/6/10/0/0`", md)
+            self.assertIn("Strategy source visual confirmation response status: `manual_response_gate_pending_no_future_spec_unblocked`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
             self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `24/23/7`", md)
@@ -490,6 +548,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_source_reextract_review_path = root / "strategy_source_reextract_review.json"
         strategy_source_visual_alignment_gate_path = root / "strategy_source_visual_alignment_gate.json"
         strategy_source_visual_confirmation_packet_path = root / "strategy_source_visual_confirmation_packet.json"
+        strategy_source_visual_confirmation_response_gate_path = (
+            root / "strategy_source_visual_confirmation_response_gate.json"
+        )
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -974,6 +1035,30 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_source_visual_confirmation_response_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_visual_confirmation_response_gate_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "question_response_required_count": 6,
+                        "question_response_confirmed_count": 0,
+                        "question_response_pending_count": 6,
+                        "case_response_required_count": 10,
+                        "case_response_confirmed_count": 0,
+                        "case_response_pending_count": 10,
+                        "manual_visual_confirmation_complete_count": 0,
+                        "future_spec_unblocked_count": 0,
+                        "ready_for_future_source_reextract_spec_draft_count": 0,
+                        "invalid_response_count": 0,
+                        "can_create_strategy_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source visual confirmation response gate fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -1075,6 +1160,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         ),
                         "m14_strategy_source_visual_confirmation_packet": str(
                             strategy_source_visual_confirmation_packet_path
+                        ),
+                        "m14_strategy_source_visual_confirmation_response_gate": str(
+                            strategy_source_visual_confirmation_response_gate_path
                         ),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),

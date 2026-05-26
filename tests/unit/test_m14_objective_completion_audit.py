@@ -98,6 +98,49 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                 result["summary"]["strategy_source_visual_confirmation_parameter_mutation_allowed_count"],
                 0,
             )
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_gate_row_count"], 2)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_question_required_count"],
+                6,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_question_confirmed_count"],
+                0,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_question_pending_count"],
+                6,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_case_required_count"],
+                10,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_case_confirmed_count"],
+                0,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_case_pending_count"],
+                10,
+            )
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_complete_count"], 0)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_future_spec_unblocked_count"],
+                0,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_ready_for_future_spec_draft_count"],
+                0,
+            )
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_response_invalid_count"], 0)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_can_create_strategy_now_count"],
+                0,
+            )
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_confirmation_response_parameter_mutation_allowed_count"],
+                0,
+            )
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
@@ -150,6 +193,10 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("source visual confirmation packet has 2 rows", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("6 confirmation questions", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("0 recorded confirmations", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("source visual confirmation response gate has 2 rows", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("6 pending question responses", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("10 pending case responses", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("0 complete confirmations", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn(
                 "m14_strategy_source_recheck_triage",
                 rows["source_reextract_path_ready"]["source_refs"],
@@ -168,6 +215,10 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             )
             self.assertIn(
                 "m14_strategy_source_visual_confirmation_packet",
+                rows["source_reextract_path_ready"]["source_refs"],
+            )
+            self.assertIn(
+                "m14_strategy_source_visual_confirmation_response_gate",
                 rows["source_reextract_path_ready"]["source_refs"],
             )
             self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
@@ -192,6 +243,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("Source reextract review packets/atoms/answers/draftable/visual-required: `2/10/6/2/2`", md)
             self.assertIn("Source visual alignment gate rows/cases/checksum/ready/manual-required: `2/10/10/2/2`", md)
             self.assertIn("Source visual confirmation packet rows/questions/cases/ready/recorded/unblocked: `2/6/10/2/0/0`", md)
+            self.assertIn("Source visual confirmation response gate rows/questions pending/cases pending/complete/unblocked: `2/6/10/0/0`", md)
             self.assertIn("source_reextract_path_ready", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
@@ -222,6 +274,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
         source_reextract_review_path = root / "source_reextract_review.json"
         source_visual_alignment_gate_path = root / "source_visual_alignment_gate.json"
         source_visual_confirmation_packet_path = root / "source_visual_confirmation_packet.json"
+        source_visual_confirmation_response_gate_path = root / "source_visual_confirmation_response_gate.json"
         external_map_path = root / "external_map.json"
         broker_plan_path = root / "broker_plan.json"
         config_path = root / "config.json"
@@ -526,6 +579,30 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        source_visual_confirmation_response_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_visual_confirmation_response_gate_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "question_response_required_count": 6,
+                        "question_response_confirmed_count": 0,
+                        "question_response_pending_count": 6,
+                        "case_response_required_count": 10,
+                        "case_response_confirmed_count": 0,
+                        "case_response_pending_count": 10,
+                        "manual_visual_confirmation_complete_count": 0,
+                        "future_spec_unblocked_count": 0,
+                        "ready_for_future_source_reextract_spec_draft_count": 0,
+                        "invalid_response_count": 0,
+                        "can_create_strategy_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source visual confirmation response gate fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         external_map_path.write_text(
             json.dumps(
                 {
@@ -575,6 +652,9 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "m14_strategy_source_visual_alignment_gate": str(source_visual_alignment_gate_path),
                         "m14_strategy_source_visual_confirmation_packet": str(
                             source_visual_confirmation_packet_path
+                        ),
+                        "m14_strategy_source_visual_confirmation_response_gate": str(
+                            source_visual_confirmation_response_gate_path
                         ),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_2_broker_readiness_plan": str(broker_plan_path),
