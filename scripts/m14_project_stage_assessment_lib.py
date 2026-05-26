@@ -35,6 +35,7 @@ class ProjectStageAssessmentConfig:
     strategy_source_reextract_plan_path: Path
     strategy_source_reextract_review_path: Path
     strategy_source_visual_alignment_gate_path: Path
+    strategy_source_visual_confirmation_packet_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     post_fresh_refresh_recompute_checklist_path: Path
@@ -100,6 +101,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         strategy_source_visual_alignment_gate_path=resolve_repo_path(
             inputs["m14_strategy_source_visual_alignment_gate"]
         ),
+        strategy_source_visual_confirmation_packet_path=resolve_repo_path(
+            inputs["m14_strategy_source_visual_confirmation_packet"]
+        ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         post_fresh_refresh_recompute_checklist_path=resolve_repo_path(
@@ -150,6 +154,7 @@ def run_m14_project_stage_assessment(
     source_reextract_plan = read_json(config.strategy_source_reextract_plan_path)
     source_reextract_review = read_json(config.strategy_source_reextract_review_path)
     source_visual_alignment_gate = read_json(config.strategy_source_visual_alignment_gate_path)
+    source_visual_confirmation_packet = read_json(config.strategy_source_visual_confirmation_packet_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
     post_fresh_checklist = read_json(config.post_fresh_refresh_recompute_checklist_path)
@@ -177,6 +182,7 @@ def run_m14_project_stage_assessment(
         source_reextract_plan,
         source_reextract_review,
         source_visual_alignment_gate,
+        source_visual_confirmation_packet,
         objective_audit,
         objective_execution,
         post_fresh_checklist,
@@ -228,6 +234,9 @@ def run_m14_project_stage_assessment(
             "m14_strategy_source_visual_alignment_gate": project_path(
                 config.strategy_source_visual_alignment_gate_path
             ),
+            "m14_strategy_source_visual_confirmation_packet": project_path(
+                config.strategy_source_visual_confirmation_packet_path
+            ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
             "m14_post_fresh_refresh_recompute_checklist": project_path(
@@ -253,6 +262,7 @@ def run_m14_project_stage_assessment(
             source_reextract_plan,
             source_reextract_review,
             source_visual_alignment_gate,
+            source_visual_confirmation_packet,
             objective_audit,
             objective_execution,
             post_fresh_checklist,
@@ -282,6 +292,9 @@ def run_m14_project_stage_assessment(
         "strategy_source_reextract_review": build_strategy_source_reextract_review(source_reextract_review),
         "strategy_source_visual_alignment_gate": build_strategy_source_visual_alignment_gate(
             source_visual_alignment_gate
+        ),
+        "strategy_source_visual_confirmation_packet": build_strategy_source_visual_confirmation_packet(
+            source_visual_confirmation_packet
         ),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
@@ -339,6 +352,7 @@ def build_summary(
     source_reextract_plan: dict[str, Any],
     source_reextract_review: dict[str, Any],
     source_visual_alignment_gate: dict[str, Any],
+    source_visual_confirmation_packet: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -366,6 +380,7 @@ def build_summary(
     source_reextract_summary = source_reextract_plan.get("summary", {})
     source_reextract_review_summary = source_reextract_review.get("summary", {})
     source_visual_alignment_summary = source_visual_alignment_gate.get("summary", {})
+    source_visual_confirmation_summary = source_visual_confirmation_packet.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     post_fresh_summary = post_fresh_checklist.get("summary", {})
@@ -795,6 +810,39 @@ def build_summary(
         "strategy_source_visual_alignment_parameter_mutation_allowed_count": int_or_zero(
             source_visual_alignment_summary.get("parameter_mutation_allowed_now_count")
         ),
+        "strategy_source_visual_confirmation_packet_row_count": int_or_zero(
+            source_visual_confirmation_summary.get("source_visual_confirmation_packet_row_count")
+        ),
+        "strategy_source_visual_confirmation_candidate_strategy_count": int_or_zero(
+            source_visual_confirmation_summary.get("candidate_strategy_count")
+        ),
+        "strategy_source_visual_confirmation_item_count": int_or_zero(
+            source_visual_confirmation_summary.get("confirmation_item_count")
+        ),
+        "strategy_source_visual_confirmation_case_count": int_or_zero(
+            source_visual_confirmation_summary.get("confirmation_case_row_count")
+        ),
+        "strategy_source_visual_confirmation_packet_ready_count": int_or_zero(
+            source_visual_confirmation_summary.get("packet_ready_count")
+        ),
+        "strategy_source_visual_confirmation_required_count": int_or_zero(
+            source_visual_confirmation_summary.get("manual_visual_confirmation_required_count")
+        ),
+        "strategy_source_visual_confirmation_recorded_count": int_or_zero(
+            source_visual_confirmation_summary.get("manual_visual_confirmation_recorded_count")
+        ),
+        "strategy_source_visual_confirmation_future_spec_unblocked_count": int_or_zero(
+            source_visual_confirmation_summary.get("future_spec_unblocked_count")
+        ),
+        "strategy_source_visual_confirmation_can_draft_now_count": int_or_zero(
+            source_visual_confirmation_summary.get("can_draft_future_source_reextract_spec_now_count")
+        ),
+        "strategy_source_visual_confirmation_can_create_strategy_now_count": int_or_zero(
+            source_visual_confirmation_summary.get("can_create_strategy_now_count")
+        ),
+        "strategy_source_visual_confirmation_parameter_mutation_allowed_count": int_or_zero(
+            source_visual_confirmation_summary.get("parameter_mutation_allowed_now_count")
+        ),
         "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
         "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
         "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -862,6 +910,7 @@ def build_stage_assessment(
     source_reextract_plan: dict[str, Any],
     source_reextract_review: dict[str, Any],
     source_visual_alignment_gate: dict[str, Any],
+    source_visual_confirmation_packet: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -902,6 +951,7 @@ def build_stage_assessment(
         "strategy_source_reextract_plan_status": "source_reextract_plan_ready_no_strategy_creation_or_mutation",
         "strategy_source_reextract_review_status": "source_reextract_review_ready_no_strategy_creation_or_mutation",
         "strategy_source_visual_alignment_status": "source_visual_alignment_ready_for_manual_review_no_strategy_creation_or_mutation",
+        "strategy_source_visual_confirmation_status": "manual_confirmation_packet_ready_no_confirmation_recorded",
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
         ),
@@ -1002,6 +1052,14 @@ def build_stage_assessment(
                 f"{summary['strategy_source_visual_alignment_manual_confirmation_required_count']} manual-confirmation-required rows."
             ),
             (
+                f"Strategy source visual confirmation packet has {summary['strategy_source_visual_confirmation_packet_row_count']} rows, "
+                f"{summary['strategy_source_visual_confirmation_item_count']} confirmation questions, "
+                f"{summary['strategy_source_visual_confirmation_case_count']} case rows, "
+                f"{summary['strategy_source_visual_confirmation_packet_ready_count']} packet-ready rows, "
+                f"{summary['strategy_source_visual_confirmation_recorded_count']} recorded confirmations, and "
+                f"{summary['strategy_source_visual_confirmation_future_spec_unblocked_count']} future specs unblocked."
+            ),
+            (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
                 f"{summary['objective_audit_blocked_count']} blocked and "
                 f"{summary['objective_audit_in_progress_count']} in progress."
@@ -1043,6 +1101,9 @@ def build_stage_assessment(
         ),
         "strategy_source_visual_alignment_plain_result": str(
             source_visual_alignment_gate.get("plain_language_result", "")
+        ),
+        "strategy_source_visual_confirmation_plain_result": str(
+            source_visual_confirmation_packet.get("plain_language_result", "")
         ),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
         "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
@@ -1450,6 +1511,39 @@ def build_strategy_source_visual_alignment_gate(source_visual_alignment_gate: di
     }
 
 
+def build_strategy_source_visual_confirmation_packet(
+    source_visual_confirmation_packet: dict[str, Any],
+) -> dict[str, Any]:
+    summary = source_visual_confirmation_packet.get("summary", {})
+    return {
+        "source_visual_confirmation_packet_row_count": int_or_zero(
+            summary.get("source_visual_confirmation_packet_row_count")
+        ),
+        "candidate_strategy_count": int_or_zero(summary.get("candidate_strategy_count")),
+        "confirmation_item_count": int_or_zero(summary.get("confirmation_item_count")),
+        "confirmation_case_row_count": int_or_zero(summary.get("confirmation_case_row_count")),
+        "packet_ready_count": int_or_zero(summary.get("packet_ready_count")),
+        "manual_visual_confirmation_required_count": int_or_zero(
+            summary.get("manual_visual_confirmation_required_count")
+        ),
+        "manual_visual_confirmation_recorded_count": int_or_zero(
+            summary.get("manual_visual_confirmation_recorded_count")
+        ),
+        "future_spec_unblocked_count": int_or_zero(summary.get("future_spec_unblocked_count")),
+        "can_draft_future_source_reextract_spec_now_count": int_or_zero(
+            summary.get("can_draft_future_source_reextract_spec_now_count")
+        ),
+        "can_create_strategy_now_count": int_or_zero(summary.get("can_create_strategy_now_count")),
+        "parameter_mutation_allowed_now_count": int_or_zero(
+            summary.get("parameter_mutation_allowed_now_count")
+        ),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "strategy_state_mutation_allowed": False,
+        "plain_language_result": str(source_visual_confirmation_packet.get("plain_language_result", "")),
+    }
+
+
 def build_objective_completion_audit(objective_audit: dict[str, Any]) -> dict[str, Any]:
     summary = objective_audit.get("summary", {})
     assessment = objective_audit.get("objective_completion_assessment", {})
@@ -1699,6 +1793,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_source_visual_alignment_case_count']} visual cases, "
         f"{summary['strategy_source_visual_alignment_checksum_match_count']} checksum matches, and "
         f"{summary['strategy_source_visual_alignment_ready_count']} rows ready for manual visual alignment. "
+        f"Strategy source visual confirmation packet has {summary['strategy_source_visual_confirmation_packet_row_count']} rows, "
+        f"{summary['strategy_source_visual_confirmation_item_count']} confirmation questions, "
+        f"{summary['strategy_source_visual_confirmation_case_count']} case rows, and "
+        f"{summary['strategy_source_visual_confirmation_recorded_count']} recorded confirmations. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -1760,6 +1858,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy source reextract review create/close/promote/discard/mutation allowed: `{summary['strategy_source_reextract_review_can_create_strategy_now_count']}/{summary['strategy_source_reextract_review_can_close_gap_now_count']}/{summary['strategy_source_reextract_review_can_promote_now_count']}/{summary['strategy_source_reextract_review_can_discard_now_count']}/{summary['strategy_source_reextract_review_parameter_mutation_allowed_count']}`",
         f"- Strategy source visual alignment rows/cases/checksum/ready/manual-required: `{summary['strategy_source_visual_alignment_gate_row_count']}/{summary['strategy_source_visual_alignment_case_count']}/{summary['strategy_source_visual_alignment_checksum_match_count']}/{summary['strategy_source_visual_alignment_ready_count']}/{summary['strategy_source_visual_alignment_manual_confirmation_required_count']}`",
         f"- Strategy source visual alignment draft/create/mutation allowed: `{summary['strategy_source_visual_alignment_can_draft_now_count']}/{summary['strategy_source_visual_alignment_can_create_strategy_now_count']}/{summary['strategy_source_visual_alignment_parameter_mutation_allowed_count']}`",
+        f"- Strategy source visual confirmation rows/questions/cases/ready/recorded/unblocked: `{summary['strategy_source_visual_confirmation_packet_row_count']}/{summary['strategy_source_visual_confirmation_item_count']}/{summary['strategy_source_visual_confirmation_case_count']}/{summary['strategy_source_visual_confirmation_packet_ready_count']}/{summary['strategy_source_visual_confirmation_recorded_count']}/{summary['strategy_source_visual_confirmation_future_spec_unblocked_count']}`",
+        f"- Strategy source visual confirmation draft/create/mutation allowed: `{summary['strategy_source_visual_confirmation_can_draft_now_count']}/{summary['strategy_source_visual_confirmation_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_parameter_mutation_allowed_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -1792,6 +1892,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy source reextract plan status: `{payload['stage_assessment']['strategy_source_reextract_plan_status']}`",
         f"- Strategy source reextract review status: `{payload['stage_assessment']['strategy_source_reextract_review_status']}`",
         f"- Strategy source visual alignment status: `{payload['stage_assessment']['strategy_source_visual_alignment_status']}`",
+        f"- Strategy source visual confirmation status: `{payload['stage_assessment']['strategy_source_visual_confirmation_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Post-fresh recompute status: `{payload['stage_assessment']['post_fresh_recompute_status']}`",

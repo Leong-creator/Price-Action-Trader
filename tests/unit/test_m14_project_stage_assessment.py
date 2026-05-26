@@ -156,6 +156,15 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_visual_alignment_can_draft_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_visual_alignment_can_create_strategy_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_visual_alignment_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_packet_row_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_item_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_case_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_packet_ready_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_recorded_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_future_spec_unblocked_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_can_draft_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_confirmation_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -256,6 +265,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["strategy_source_visual_alignment_status"],
                 "source_visual_alignment_ready_for_manual_review_no_strategy_creation_or_mutation",
             )
+            self.assertEqual(
+                result["stage_assessment"]["strategy_source_visual_confirmation_status"],
+                "manual_confirmation_packet_ready_no_confirmation_recorded",
+            )
             self.assertTrue(
                 any(
                     "Strategy source reextract review has 2 packets" in item
@@ -265,6 +278,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertTrue(
                 any(
                     "Strategy source visual alignment gate has 2 rows" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    "Strategy source visual confirmation packet has 2 rows" in item
                     for item in result["stage_assessment"]["next_required_evidence"]
                 )
             )
@@ -373,6 +392,23 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             )
             self.assertFalse(result["strategy_source_visual_alignment_gate"]["manual_m12_37_once_allowed"])
             self.assertFalse(result["strategy_source_visual_alignment_gate"]["strategy_state_mutation_allowed"])
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_packet"]["source_visual_confirmation_packet_row_count"],
+                2,
+            )
+            self.assertEqual(result["strategy_source_visual_confirmation_packet"]["confirmation_item_count"], 6)
+            self.assertEqual(result["strategy_source_visual_confirmation_packet"]["confirmation_case_row_count"], 10)
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_packet"]["manual_visual_confirmation_recorded_count"],
+                0,
+            )
+            self.assertEqual(result["strategy_source_visual_confirmation_packet"]["future_spec_unblocked_count"], 0)
+            self.assertEqual(
+                result["strategy_source_visual_confirmation_packet"]["can_draft_future_source_reextract_spec_now_count"],
+                0,
+            )
+            self.assertFalse(result["strategy_source_visual_confirmation_packet"]["manual_m12_37_once_allowed"])
+            self.assertFalse(result["strategy_source_visual_confirmation_packet"]["strategy_state_mutation_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -453,6 +489,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_source_reextract_plan_path = root / "strategy_source_reextract_plan.json"
         strategy_source_reextract_review_path = root / "strategy_source_reextract_review.json"
         strategy_source_visual_alignment_gate_path = root / "strategy_source_visual_alignment_gate.json"
+        strategy_source_visual_confirmation_packet_path = root / "strategy_source_visual_confirmation_packet.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -916,6 +953,27 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_source_visual_confirmation_packet_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_visual_confirmation_packet_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "confirmation_item_count": 6,
+                        "confirmation_case_row_count": 10,
+                        "packet_ready_count": 2,
+                        "manual_visual_confirmation_required_count": 2,
+                        "manual_visual_confirmation_recorded_count": 0,
+                        "future_spec_unblocked_count": 0,
+                        "can_draft_future_source_reextract_spec_now_count": 0,
+                        "can_create_strategy_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source visual confirmation fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -1014,6 +1072,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_source_reextract_review": str(strategy_source_reextract_review_path),
                         "m14_strategy_source_visual_alignment_gate": str(
                             strategy_source_visual_alignment_gate_path
+                        ),
+                        "m14_strategy_source_visual_confirmation_packet": str(
+                            strategy_source_visual_confirmation_packet_path
                         ),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
