@@ -25,6 +25,10 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(result["internal_simulation_gate"]["approved_internal_sim_strategy_ids"], ["M10-PA-004"])
             self.assertEqual(result["rescue_status"]["rescue_runtime_connected_strategy_count"], 2)
             self.assertTrue(result["rescue_status"]["rescue_ready_for_ab_evidence_collection"])
+            self.assertEqual(result["rescue_ab_evidence"]["m13_ledger_observed_strategy_count"], 2)
+            self.assertEqual(result["rescue_ab_evidence"]["rescue_runtime_strategy_count"], 2)
+            self.assertEqual(result["rescue_ab_evidence"]["evidence_ready_for_manual_review_count"], 0)
+            self.assertEqual(result["rescue_ab_evidence"]["promotion_allowed_count"], 0)
             self.assertEqual(result["broker_readiness"]["mode"], "paper_dry_run_only")
             self.assertEqual(result["broker_readiness"]["dry_run_ready_count"], 1)
             self.assertEqual(result["broker_readiness"]["blocked_count"], 1)
@@ -47,6 +51,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(persisted["project_stage_label"], result["project_stage_label"])
             md = (root / "readiness.md").read_text(encoding="utf-8")
             self.assertIn("Internal simulated-account ready strategies", md)
+            self.assertIn("Rescue A/B Evidence", md)
             self.assertIn("Completion Assessment", md)
 
     def test_unsafe_config_is_rejected(self) -> None:
@@ -65,6 +70,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         gate_path = root / "gate.json"
         rescue_plan_path = root / "rescue_plan.json"
         rescue_coverage_path = root / "rescue_coverage.json"
+        rescue_ab_path = root / "rescue_ab.json"
         broker_path = root / "broker.json"
         config_path = root / "config.json"
         summary_path.write_text(
@@ -161,6 +167,40 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        rescue_ab_path.write_text(
+            json.dumps(
+                {
+                    "min_ab_trading_days": 10,
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "rescue_runtime_strategy_count": 2,
+                        "m13_ledger_observed_strategy_count": 2,
+                        "collecting_evidence_count": 2,
+                        "evidence_ready_for_manual_review_count": 0,
+                        "no_m13_ledger_evidence_count": 0,
+                        "promotion_allowed_count": 0,
+                        "pending_evidence_strategy_ids": [
+                            "M10-PA-001-m14-modify-20260522",
+                            "M10-PA-011-ORB-R1",
+                        ],
+                        "no_m13_ledger_evidence_strategy_ids": [],
+                        "evidence_ready_for_manual_review_strategy_ids": [],
+                    },
+                    "plain_language_result": "fixture rescue A/B evidence summary",
+                }
+            ),
+            encoding="utf-8",
+        )
         broker_path.write_text(
             json.dumps(
                 {
@@ -187,6 +227,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_paper_trial_gate": str(gate_path),
                         "m14_strategy_rescue_plan": str(rescue_plan_path),
                         "m14_rescue_runtime_coverage": str(rescue_coverage_path),
+                        "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
                         "m14_2_broker_readiness_plan": str(broker_path),
                     },
                     "outputs": {

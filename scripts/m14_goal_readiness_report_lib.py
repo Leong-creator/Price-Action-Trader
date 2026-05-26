@@ -21,6 +21,7 @@ class GoalReadinessConfig:
     paper_gate_path: Path
     rescue_plan_path: Path
     rescue_coverage_path: Path
+    rescue_ab_evidence_path: Path
     broker_readiness_path: Path
     readiness_json_path: Path
     readiness_md_path: Path
@@ -50,6 +51,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         paper_gate_path=resolve_repo_path(inputs["m14_paper_trial_gate"]),
         rescue_plan_path=resolve_repo_path(inputs["m14_strategy_rescue_plan"]),
         rescue_coverage_path=resolve_repo_path(inputs["m14_rescue_runtime_coverage"]),
+        rescue_ab_evidence_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
         broker_readiness_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         readiness_json_path=resolve_repo_path(outputs["readiness_json"]),
         readiness_md_path=resolve_repo_path(outputs["readiness_md"]),
@@ -82,6 +84,7 @@ def run_m14_goal_readiness_report(
     paper_gate = read_json(config.paper_gate_path)
     rescue_plan = read_json(config.rescue_plan_path)
     rescue_coverage = read_json(config.rescue_coverage_path)
+    rescue_ab_evidence = read_json(config.rescue_ab_evidence_path)
     broker_readiness = read_json(config.broker_readiness_path)
 
     gate_rows = list(paper_gate.get("rows", []))
@@ -91,7 +94,7 @@ def run_m14_goal_readiness_report(
         int_or_zero(summary.get("effective_challenge_trading_days")) >= int_or_zero(summary.get("required_challenge_trading_days"))
         and str(summary.get("challenge_progress_label", "")) == "10/10"
     )
-    boundaries = build_boundaries(summary, paper_gate, rescue_coverage, broker_readiness)
+    boundaries = build_boundaries(summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
     boundaries_ok = all(boundaries.values())
     internal_sim_ready = bool(ten_day_complete and approved_ids and boundaries_ok)
     rescue_ready = bool(
@@ -111,6 +114,7 @@ def run_m14_goal_readiness_report(
             "m14_paper_trial_gate": project_path(config.paper_gate_path),
             "m14_strategy_rescue_plan": project_path(config.rescue_plan_path),
             "m14_rescue_runtime_coverage": project_path(config.rescue_coverage_path),
+            "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_path),
         },
         "challenge": {
@@ -142,6 +146,7 @@ def run_m14_goal_readiness_report(
             "pending_planned_action_strategy_ids": list(rescue_coverage.get("pending_planned_action_strategy_ids", [])),
             "next_required_evidence": str(rescue_coverage.get("next_required_evidence", "")),
         },
+        "rescue_ab_evidence": build_rescue_ab_evidence_summary(rescue_ab_evidence),
         "broker_readiness": {
             "mode": str(broker_readiness.get("mode", "")),
             "dry_run_ready_count": int_or_zero(broker_readiness.get("dry_run_ready_count")),
@@ -180,27 +185,49 @@ def build_boundaries(
     summary: dict[str, Any],
     paper_gate: dict[str, Any],
     rescue_coverage: dict[str, Any],
+    rescue_ab_evidence: dict[str, Any],
     broker_readiness: dict[str, Any],
 ) -> dict[str, bool]:
     return {
         "paper_simulated_only": all(
             boundary_flag(item, "paper_simulated_only")
-            for item in (summary, paper_gate, rescue_coverage)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence)
         ),
         "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
         "broker_connection_disabled": not any(
             bool(item.get("broker_connection", item.get("broker_paper_connection", item.get("broker_connection_enabled", False))))
-            for item in (summary, paper_gate, rescue_coverage, broker_readiness)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
         ),
-        "real_order_disabled": not bool(broker_readiness.get("real_order_enabled", False)) and not bool(rescue_coverage.get("real_order", False)),
+        "real_order_disabled": (
+            not bool(broker_readiness.get("real_order_enabled", False))
+            and not bool(rescue_coverage.get("real_order", False))
+            and not bool(rescue_ab_evidence.get("real_order", False))
+        ),
         "live_execution_disabled": not any(
             bool(item.get("live_execution", item.get("live_execution_enabled", False)))
-            for item in (summary, paper_gate, rescue_coverage, broker_readiness)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
         ),
         "paper_trading_approval_disabled": not any(
             bool(item.get("paper_trading_approval", False))
-            for item in (summary, paper_gate, rescue_coverage, broker_readiness)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
         ),
+    }
+
+
+def build_rescue_ab_evidence_summary(rescue_ab_evidence: dict[str, Any]) -> dict[str, Any]:
+    summary = rescue_ab_evidence.get("summary", {})
+    return {
+        "min_ab_trading_days": int_or_zero(rescue_ab_evidence.get("min_ab_trading_days")),
+        "rescue_runtime_strategy_count": int_or_zero(summary.get("rescue_runtime_strategy_count")),
+        "m13_ledger_observed_strategy_count": int_or_zero(summary.get("m13_ledger_observed_strategy_count")),
+        "collecting_evidence_count": int_or_zero(summary.get("collecting_evidence_count")),
+        "evidence_ready_for_manual_review_count": int_or_zero(summary.get("evidence_ready_for_manual_review_count")),
+        "no_m13_ledger_evidence_count": int_or_zero(summary.get("no_m13_ledger_evidence_count")),
+        "promotion_allowed_count": int_or_zero(summary.get("promotion_allowed_count")),
+        "pending_evidence_strategy_ids": list(summary.get("pending_evidence_strategy_ids", [])),
+        "no_m13_ledger_evidence_strategy_ids": list(summary.get("no_m13_ledger_evidence_strategy_ids", [])),
+        "evidence_ready_for_manual_review_strategy_ids": list(summary.get("evidence_ready_for_manual_review_strategy_ids", [])),
+        "plain_language_result": str(rescue_ab_evidence.get("plain_language_result", "")),
     }
 
 
@@ -268,8 +295,9 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
             "priority": "P0",
             "action": "Collect 10 trading-day A/B evidence for connected rescue runtimes",
             "evidence": (
-                f"{payload['rescue_status']['rescue_runtime_connected_strategy_count']}/"
-                f"{payload['rescue_status']['registered_rescue_strategy_count']} rescue strategies connected"
+                f"{payload['rescue_ab_evidence']['m13_ledger_observed_strategy_count']}/"
+                f"{payload['rescue_ab_evidence']['rescue_runtime_strategy_count']} rescue strategies have M13 ledger evidence; "
+                f"{payload['rescue_ab_evidence']['evidence_ready_for_manual_review_count']} ready for manual review"
             ),
             "boundary": "Connected rescue runtime is not a promotion or approval.",
         },
@@ -298,13 +326,17 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
 def build_plain_language_result(payload: dict[str, Any]) -> str:
     approved = payload["internal_simulation_gate"]["approved_internal_sim_strategy_ids"]
     rescue = payload["rescue_status"]
+    rescue_ab = payload["rescue_ab_evidence"]
     broker = payload["broker_readiness"]
     return (
         f"Project is at {payload['project_stage_label']}. "
         f"10-day challenge complete: {payload['challenge']['challenge_progress_label']}. "
         f"{len(approved)} strategies can continue internal simulated-account testing only: {', '.join(approved) or 'none'}. "
         f"Rescue coverage is {rescue['rescue_runtime_connected_strategy_count']}/{rescue['registered_rescue_strategy_count']} strategies "
-        f"and {rescue['planned_action_covered_count']}/{rescue['planned_action_row_count']} planned actions, but rescue variants still need 10-day A/B evidence. "
+        f"and {rescue['planned_action_covered_count']}/{rescue['planned_action_row_count']} planned actions. "
+        f"Rescue A/B evidence is now {rescue_ab['m13_ledger_observed_strategy_count']}/{rescue_ab['rescue_runtime_strategy_count']} strategies observed, "
+        f"{rescue_ab['evidence_ready_for_manual_review_count']} ready for manual review, "
+        f"promotion allowed {rescue_ab['promotion_allowed_count']}. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -329,6 +361,18 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
     ]
     for key, value in payload["internal_simulation_gate"]["gate_counts"].items():
         lines.append(f"- `{key}`: `{value}`")
+    rescue_ab = payload["rescue_ab_evidence"]
+    lines.extend(
+        [
+            "",
+            "## Rescue A/B Evidence",
+            "",
+            f"- Observed rescue strategies: `{rescue_ab['m13_ledger_observed_strategy_count']}/{rescue_ab['rescue_runtime_strategy_count']}`",
+            f"- Collecting evidence: `{rescue_ab['collecting_evidence_count']}`",
+            f"- Ready for manual review: `{rescue_ab['evidence_ready_for_manual_review_count']}`",
+            f"- Promotion allowed: `{rescue_ab['promotion_allowed_count']}`",
+        ]
+    )
     lines.extend(["", "## Next Actions", ""])
     for item in payload["next_actions"]:
         lines.append(f"- `{item['priority']}` {item['action']} Evidence: {item['evidence']} Boundary: {item['boundary']}")

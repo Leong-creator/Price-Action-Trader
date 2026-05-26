@@ -1,6 +1,6 @@
 # M14 Goal Readiness Report
 
-- Generated at: `2026-05-26T13:00:00Z`
+- Generated at: `2026-05-26T00:06:37Z`
 - Project stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge progress: `10/10`
 - Internal simulated-account ready strategies: `M10-PA-004, M10-PA-005, M10-PA-008`
@@ -8,7 +8,7 @@
 
 ## Plain Result
 
-Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions, but rescue variants still need 10-day A/B evidence. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.
+Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.
 
 ## Gate Counts
 
@@ -18,10 +18,17 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 - `not_approved_parallel_modify_testing`: `1`
 - `not_approved_rejected`: `1`
 
+## Rescue A/B Evidence
+
+- Observed rescue strategies: `9/9`
+- Collecting evidence: `9`
+- Ready for manual review: `0`
+- Promotion allowed: `0`
+
 ## Next Actions
 
 - `P0` Run approved strategies in internal simulated-account testing only Evidence: M10-PA-004, M10-PA-005, M10-PA-008 Boundary: No broker connection, no real order, no live execution.
-- `P0` Collect 10 trading-day A/B evidence for connected rescue runtimes Evidence: 9/9 rescue strategies connected Boundary: Connected rescue runtime is not a promotion or approval.
+- `P0` Collect 10 trading-day A/B evidence for connected rescue runtimes Evidence: 9/9 rescue strategies have M13 ledger evidence; 0 ready for manual review Boundary: Connected rescue runtime is not a promotion or approval.
 - `P1` Keep M14.2 broker readiness in dry-run preview mode Evidence: 5 dry-run ready, 3 blocked Boundary: Manual user approval is still required before any broker paper/live path.
 - `P1` Treat the current artifact set as a recompute/audit snapshot until the next trading session refresh Evidence: history_recompute_from_existing_challenge Boundary: Do not manually run M12.37 once-mode; M12.47 owns session launch.
 
