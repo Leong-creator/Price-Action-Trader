@@ -1,6 +1,6 @@
 # M14 Internal Sim Trial Acceptance Gate
 
-- Generated at: `2026-05-26T16:00:00Z`
+- Generated at: `2026-05-26T19:12:00Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge progress: `10/10`
 - Approved trial strategies: `3`
@@ -21,7 +21,7 @@
 
 - `pass` `internal_sim_trial_start_gate`: 3/3 approved strategies launch-ready; 4/4 approved runtime inputs connected. Pass: Wait for M12.47 to own the next trading-window refresh. Fail: Hold affected strategy until gate/runtime/input mapping is repaired.
 - `waiting` `m12_47_fresh_refresh_gate`: fresh_refresh_observed=False; source_quote=fallback_quotes_only Pass: Evaluate post-refresh trial rows and rescue watches. Fail: Keep current plan as waiting; do not manually run M12.37 once-mode.
-- `waiting` `post_fresh_recompute_gate`: checklist steps=26; acceptance gates=8; two_pass_required=True. Pass: Rerun M14 read-only recompute sequence and then refresh project stage assessment. Fail: Do not declare objective complete until recompute artifacts are refreshed.
+- `waiting` `post_fresh_recompute_gate`: checklist steps=27; acceptance gates=9; two_pass_required=True. Pass: Rerun M14 read-only recompute sequence and then refresh project stage assessment. Fail: Do not declare objective complete until recompute artifacts are refreshed.
 - `pass` `legacy_history_metric_exclusion_gate`: legacy inputs blocker/next-step=0/0 Pass: Keep account-dashboard history metrics display-only. Fail: Block strategy planning until legacy history input is removed.
 - `pass` `broker_live_boundary_gate`: can_start_broker_paper=False; manual_m12_37_once_allowed=False Pass: Continue internal simulated-account trial only. Fail: Stop and inspect boundary regression before further readiness work.
 
@@ -38,4 +38,4 @@
 - `2` `review_post_refresh_outcomes`: `python scripts/run_m14_rescue_post_refresh_outcome_review.py`
 - `14` `refresh_internal_sim_next_session_plan`: `python scripts/run_m14_internal_sim_next_session_plan.py`
 - `23` `strategy_next_step_readiness_matrix_refresh`: `python scripts/run_m14_strategy_next_step_readiness_matrix.py`
-- `26` `project_stage_assessment_refresh`: `python scripts/run_m14_project_stage_assessment.py`
+- `27` `project_stage_assessment_refresh`: `python scripts/run_m14_project_stage_assessment.py`

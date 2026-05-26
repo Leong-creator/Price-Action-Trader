@@ -30,6 +30,7 @@ class PostFreshRefreshRecomputeChecklistConfig:
     stage: str
     project_stage_label: str
     internal_sim_next_session_plan_path: Path
+    internal_sim_trial_acceptance_gate_path: Path
     rescue_post_refresh_outcome_review_path: Path
     rescue_ab_evidence_tracker_path: Path
     rescue_next_refresh_readiness_path: Path
@@ -67,6 +68,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> PostFreshRefreshRecom
         stage=str(payload["stage"]),
         project_stage_label=str(payload["project_stage_label"]),
         internal_sim_next_session_plan_path=resolve_repo_path(inputs["m14_internal_sim_next_session_plan"]),
+        internal_sim_trial_acceptance_gate_path=resolve_repo_path(
+            inputs["m14_internal_sim_trial_acceptance_gate"]
+        ),
         rescue_post_refresh_outcome_review_path=resolve_repo_path(
             inputs["m14_rescue_post_refresh_outcome_review"]
         ),
@@ -117,6 +121,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
     config = config or load_config()
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     next_session = read_json(config.internal_sim_next_session_plan_path)
+    trial_acceptance = read_json(config.internal_sim_trial_acceptance_gate_path)
     post_refresh = read_json(config.rescue_post_refresh_outcome_review_path)
     rescue_ab = read_json(config.rescue_ab_evidence_tracker_path)
     next_refresh = read_json(config.rescue_next_refresh_readiness_path)
@@ -132,6 +137,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
 
     source_summary = build_source_summary(
         next_session=next_session,
+        trial_acceptance=trial_acceptance,
         post_refresh=post_refresh,
         rescue_ab=rescue_ab,
         next_refresh=next_refresh,
@@ -174,6 +180,9 @@ def run_m14_post_fresh_refresh_recompute_checklist(
         "m14_trading_date": summary["m14_trading_date"],
         "input_refs": {
             "m14_internal_sim_next_session_plan": project_path(config.internal_sim_next_session_plan_path),
+            "m14_internal_sim_trial_acceptance_gate": project_path(
+                config.internal_sim_trial_acceptance_gate_path
+            ),
             "m14_rescue_post_refresh_outcome_review": project_path(
                 config.rescue_post_refresh_outcome_review_path
             ),
@@ -238,6 +247,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
 def build_source_summary(
     *,
     next_session: dict[str, Any],
+    trial_acceptance: dict[str, Any],
     post_refresh: dict[str, Any],
     rescue_ab: dict[str, Any],
     next_refresh: dict[str, Any],
@@ -252,6 +262,7 @@ def build_source_summary(
     next_step_matrix: dict[str, Any],
 ) -> dict[str, Any]:
     next_summary = next_session.get("summary", {})
+    trial_summary = trial_acceptance.get("summary", {})
     post_summary = post_refresh.get("summary", {})
     rescue_summary = rescue_ab.get("summary", {})
     next_refresh_summary = next_refresh.get("summary", {})
@@ -276,6 +287,34 @@ def build_source_summary(
             next_summary.get("approved_runtime_input_connected_count")
         ),
         "approved_runtime_input_count": int_or_zero(next_summary.get("approved_runtime_input_count")),
+        "trial_acceptance_approved_trial_strategy_count": int_or_zero(
+            trial_summary.get("approved_trial_strategy_count")
+        ),
+        "trial_acceptance_trial_start_ready_count": int_or_zero(
+            trial_summary.get("trial_start_ready_count")
+        ),
+        "trial_acceptance_can_start_internal_sim_trial_now": bool(
+            trial_summary.get("can_start_internal_sim_trial_now", False)
+        ),
+        "trial_acceptance_fresh_refresh_required_count": int_or_zero(
+            trial_summary.get("fresh_refresh_required_count")
+        ),
+        "trial_acceptance_global_gate_count": int_or_zero(trial_summary.get("global_gate_count")),
+        "trial_acceptance_global_gate_pass_count": int_or_zero(
+            dict(trial_summary.get("global_gate_state_counts", {})).get("pass")
+        ),
+        "trial_acceptance_global_gate_waiting_count": int_or_zero(
+            dict(trial_summary.get("global_gate_state_counts", {})).get("waiting")
+        ),
+        "trial_acceptance_legacy_historical_profit_planning_input_count": int_or_zero(
+            trial_summary.get("legacy_historical_profit_planning_input_count")
+        ),
+        "trial_acceptance_can_start_broker_paper": bool(
+            trial_summary.get("can_start_broker_paper", False)
+        ),
+        "trial_acceptance_broker_or_live_enabled": bool(
+            trial_summary.get("broker_or_live_enabled", False)
+        ),
         "fresh_refresh_observed": bool(post_summary.get("fresh_refresh_observed", False)),
         "source_quote": str(post_summary.get("source_quote", "")),
         "post_refresh_waiting_count": int_or_zero(post_summary.get("waiting_count")),
@@ -374,7 +413,8 @@ def build_source_summary(
                 "legacy_historical_profit_planning_input_count",
                 blocker_summary.get("legacy_historical_profit_planning_input_count"),
             )
-        ),
+        )
+        + int_or_zero(trial_summary.get("legacy_historical_profit_planning_input_count")),
         "two_pass_stabilization_required": True,
     }
 
@@ -577,6 +617,13 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Refresh the per-strategy next-step matrix after blocker and evidence burndown artifacts are current.",
         ),
         (
+            "internal_sim_trial_acceptance_gate_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_internal_sim_trial_acceptance_gate.py",
+            "Refresh approved internal-sim trial start and post-refresh acceptance gates while keeping legacy history metrics display-only.",
+        ),
+        (
             "strategy_pre_refresh_review_packet_refresh",
             "decision_stabilization",
             "read_only_script",
@@ -652,6 +699,9 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
         "strategy_next_step_readiness_matrix_refresh": (
             "per-strategy next-step rows should preserve 0 promotion, discard, parameter activation, broker paper, and legacy-history planning inputs."
         ),
+        "internal_sim_trial_acceptance_gate_refresh": (
+            "trial start-ready rows should match approved trial rows, broker/live stays disabled, and legacy-history planning inputs stay 0."
+        ),
         "strategy_pre_refresh_review_packet_refresh": (
             "review rows should stay review-only, with zero close/promote/discard/mutation allowed."
         ),
@@ -714,6 +764,23 @@ def build_acceptance_gates(summary: dict[str, Any]) -> list[dict[str, Any]]:
             summary["legacy_historical_profit_planning_input_count"] == 0,
             f"Current legacy_historical_profit_planning_input_count={summary['legacy_historical_profit_planning_input_count']}.",
         ),
+        acceptance_gate(
+            "internal_sim_trial_acceptance_gate",
+            "Approved internal-sim trial gate is ready without broker/live or legacy-history planning inputs.",
+            summary["trial_acceptance_trial_start_ready_count"]
+            == summary["trial_acceptance_approved_trial_strategy_count"]
+            and summary["trial_acceptance_can_start_internal_sim_trial_now"]
+            and summary["trial_acceptance_legacy_historical_profit_planning_input_count"] == 0
+            and not summary["trial_acceptance_can_start_broker_paper"]
+            and not summary["trial_acceptance_broker_or_live_enabled"],
+            (
+                f"trial ready/approved="
+                f"{summary['trial_acceptance_trial_start_ready_count']}/"
+                f"{summary['trial_acceptance_approved_trial_strategy_count']}; "
+                f"fresh-required={summary['trial_acceptance_fresh_refresh_required_count']}; "
+                f"legacy inputs={summary['trial_acceptance_legacy_historical_profit_planning_input_count']}."
+            ),
+        ),
     ]
 
 
@@ -747,6 +814,11 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_pre_refresh_review_audit_backfill_count']} supporting-artifact backfills. "
         f"Strategy next-step matrix currently has {summary['strategy_next_step_row_count']} rows and "
         f"{summary['strategy_next_step_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
+        f"Internal-sim trial acceptance has "
+        f"{summary['trial_acceptance_trial_start_ready_count']}/"
+        f"{summary['trial_acceptance_approved_trial_strategy_count']} start-ready rows, "
+        f"{summary['trial_acceptance_fresh_refresh_required_count']} fresh-refresh-required rows, and "
+        f"{summary['trial_acceptance_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
         "Manual M12.37 once-mode, broker/live, "
         "real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness "
         "mutation remain disabled."
@@ -771,6 +843,8 @@ def build_checklist_md(payload: dict[str, Any]) -> str:
         f"- Objective blocker rows/P0/P1/legacy-history-planning-inputs: `{summary['objective_blocker_burndown_row_count']}/{summary['objective_blocker_p0_count']}/{summary['objective_blocker_p1_count']}/{summary['objective_blocker_legacy_historical_profit_planning_input_count']}`",
         f"- Strategy next-step rows/approved/rescue-or-shadow/source-review: `{summary['strategy_next_step_row_count']}/{summary['strategy_next_step_approved_internal_sim_continue_count']}/{summary['strategy_next_step_rescue_or_shadow_review_count']}/{summary['strategy_next_step_source_review_or_plugin_research_count']}`",
         f"- Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `{summary['strategy_next_step_promotion_allowed_count']}/{summary['strategy_next_step_final_discard_allowed_count']}/{summary['strategy_next_step_parameter_activation_allowed_count']}/{summary['strategy_next_step_broker_paper_start_allowed_count']}/{summary['strategy_next_step_legacy_historical_profit_planning_input_count']}`",
+        f"- Internal-sim trial ready/approved/fresh-required/legacy-history inputs: `{summary['trial_acceptance_trial_start_ready_count']}/{summary['trial_acceptance_approved_trial_strategy_count']}/{summary['trial_acceptance_fresh_refresh_required_count']}/{summary['trial_acceptance_legacy_historical_profit_planning_input_count']}`",
+        f"- Internal-sim trial gates pass/waiting: `{summary['trial_acceptance_global_gate_pass_count']}/{summary['trial_acceptance_global_gate_waiting_count']}`",
         f"- Pre-refresh review audit rows/ready/waiting/backfill: `{summary['strategy_pre_refresh_review_audit_row_count']}/{summary['strategy_pre_refresh_review_audit_ready_now_count']}/{summary['strategy_pre_refresh_review_audit_wait_fresh_count']}/{summary['strategy_pre_refresh_review_audit_backfill_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution, no manual M12.37 once-mode.",
         "",

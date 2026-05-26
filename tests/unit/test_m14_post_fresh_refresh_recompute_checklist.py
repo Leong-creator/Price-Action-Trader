@@ -25,10 +25,17 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(result["schema_version"], "m14.post-fresh-refresh-recompute-checklist.v1")
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["source_quote"], "fallback_quotes_only")
-            self.assertEqual(result["summary"]["recompute_step_count"], 26)
-            self.assertEqual(result["summary"]["m14_script_step_count"], 25)
-            self.assertEqual(result["summary"]["acceptance_gate_count"], 8)
+            self.assertEqual(result["summary"]["recompute_step_count"], 27)
+            self.assertEqual(result["summary"]["m14_script_step_count"], 26)
+            self.assertEqual(result["summary"]["acceptance_gate_count"], 9)
             self.assertTrue(result["summary"]["two_pass_stabilization_required"])
+            self.assertEqual(result["summary"]["trial_acceptance_approved_trial_strategy_count"], 2)
+            self.assertEqual(result["summary"]["trial_acceptance_trial_start_ready_count"], 2)
+            self.assertTrue(result["summary"]["trial_acceptance_can_start_internal_sim_trial_now"])
+            self.assertEqual(result["summary"]["trial_acceptance_fresh_refresh_required_count"], 2)
+            self.assertEqual(result["summary"]["trial_acceptance_global_gate_pass_count"], 3)
+            self.assertEqual(result["summary"]["trial_acceptance_global_gate_waiting_count"], 2)
+            self.assertEqual(result["summary"]["trial_acceptance_legacy_historical_profit_planning_input_count"], 0)
             self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 2)
             self.assertEqual(result["summary"]["parameter_shadow_spec_candidate_variant_count"], 4)
             self.assertEqual(result["summary"]["strategy_decision_final_discard_allowed_count"], 0)
@@ -81,6 +88,10 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                 "python scripts/run_m14_strategy_next_step_readiness_matrix.py",
             )
             self.assertEqual(
+                steps["internal_sim_trial_acceptance_gate_refresh"]["command"],
+                "python scripts/run_m14_internal_sim_trial_acceptance_gate.py",
+            )
+            self.assertEqual(
                 steps["strategy_pre_refresh_review_packet_refresh"]["command"],
                 "python scripts/run_m14_strategy_pre_refresh_review_packet.py",
             )
@@ -102,15 +113,17 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(gates["no_final_discard_without_rescue_exhaustion_gate"]["state"], "passed")
             self.assertEqual(gates["broker_live_boundary_gate"]["state"], "passed")
             self.assertEqual(gates["legacy_history_metric_exclusion_gate"]["state"], "passed")
+            self.assertEqual(gates["internal_sim_trial_acceptance_gate"]["state"], "passed")
 
             persisted = json.loads((root / "checklist.json").read_text(encoding="utf-8"))
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "checklist.md").read_text(encoding="utf-8")
             self.assertIn("M14 Post-Fresh-Refresh Recompute Checklist", md)
-            self.assertIn("M14 read-only script steps: `25`", md)
+            self.assertIn("M14 read-only script steps: `26`", md)
             self.assertIn("Objective blocker rows/P0/P1/legacy-history-planning-inputs: `7/4/3/0`", md)
             self.assertIn("Strategy next-step rows/approved/rescue-or-shadow/source-review: `5/2/2/1`", md)
             self.assertIn("Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `0/0/0/0/0`", md)
+            self.assertIn("Internal-sim trial ready/approved/fresh-required/legacy-history inputs: `2/2/2/0`", md)
             self.assertIn("Pre-refresh review audit rows/ready/waiting/backfill: `4/1/2/1`", md)
             self.assertIn("Final discard allowed: `0`", md)
 
@@ -127,6 +140,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
 
     def _write_fixture(self, root: Path) -> Path:
         next_session_path = root / "next_session.json"
+        trial_acceptance_path = root / "trial_acceptance.json"
         post_refresh_path = root / "post_refresh.json"
         rescue_ab_path = root / "rescue_ab.json"
         next_refresh_path = root / "next_refresh.json"
@@ -151,6 +165,24 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                         "approved_runtime_input_connected_count": 4,
                         "approved_runtime_input_count": 4,
                     },
+                }
+            ),
+            encoding="utf-8",
+        )
+        trial_acceptance_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "approved_trial_strategy_count": 2,
+                        "trial_start_ready_count": 2,
+                        "can_start_internal_sim_trial_now": True,
+                        "fresh_refresh_required_count": 2,
+                        "global_gate_count": 5,
+                        "global_gate_state_counts": {"pass": 3, "waiting": 2},
+                        "legacy_historical_profit_planning_input_count": 0,
+                        "can_start_broker_paper": False,
+                        "broker_or_live_enabled": False,
+                    }
                 }
             ),
             encoding="utf-8",
@@ -309,6 +341,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                     "project_stage_label": "fixture post-refresh checklist",
                     "inputs": {
                         "m14_internal_sim_next_session_plan": str(next_session_path),
+                        "m14_internal_sim_trial_acceptance_gate": str(trial_acceptance_path),
                         "m14_rescue_post_refresh_outcome_review": str(post_refresh_path),
                         "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
                         "m14_rescue_next_refresh_readiness": str(next_refresh_path),

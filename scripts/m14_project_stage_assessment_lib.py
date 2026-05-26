@@ -11,6 +11,18 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m14_project_stage_assessment.json"
+FORBIDDEN_OPERATIONS = (
+    "broker_connection",
+    "real_order",
+    "live_execution",
+    "paper_trading_approval",
+    "manual_m12_37_once",
+    "m13_registry_mutation",
+    "m12_account_specs_mutation",
+    "broker_readiness_status_mutation",
+    "parameter_mutation",
+    "legacy_historical_profit_planning_input",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +31,7 @@ class ProjectStageAssessmentConfig:
     project_stage_label: str
     goal_readiness_report_path: Path
     internal_sim_next_session_plan_path: Path
+    internal_sim_trial_acceptance_gate_path: Path
     strategy_rescue_plan_path: Path
     rescue_optimization_backlog_path: Path
     rescue_post_refresh_outcome_review_path: Path
@@ -67,6 +80,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         project_stage_label=str(payload["project_stage_label"]),
         goal_readiness_report_path=resolve_repo_path(inputs["m14_goal_readiness_report"]),
         internal_sim_next_session_plan_path=resolve_repo_path(inputs["m14_internal_sim_next_session_plan"]),
+        internal_sim_trial_acceptance_gate_path=resolve_repo_path(
+            inputs["m14_internal_sim_trial_acceptance_gate"]
+        ),
         strategy_rescue_plan_path=resolve_repo_path(inputs["m14_strategy_rescue_plan"]),
         rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
         rescue_post_refresh_outcome_review_path=resolve_repo_path(
@@ -132,7 +148,7 @@ def validate_config(config: ProjectStageAssessmentConfig) -> None:
         raise ValueError("M14 project stage assessment must stay paper/simulated only")
     if not config.hard_boundaries.get("internal_simulated_account", False):
         raise ValueError("M14 project stage assessment must keep internal simulated accounts enabled")
-    for key in ("broker_connection", "real_order", "live_execution", "paper_trading_approval", "manual_m12_37_once"):
+    for key in FORBIDDEN_OPERATIONS:
         if config.hard_boundaries.get(key, False):
             raise ValueError(f"M14 project stage assessment cannot enable {key}")
 
@@ -146,6 +162,7 @@ def run_m14_project_stage_assessment(
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     goal = read_json(config.goal_readiness_report_path)
     next_session = read_json(config.internal_sim_next_session_plan_path)
+    trial_acceptance_gate = read_json(config.internal_sim_trial_acceptance_gate_path)
     rescue_plan = read_json(config.strategy_rescue_plan_path)
     backlog = read_json(config.rescue_optimization_backlog_path)
     post_refresh = read_json(config.rescue_post_refresh_outcome_review_path)
@@ -179,6 +196,7 @@ def run_m14_project_stage_assessment(
     summary = build_summary(
         goal,
         next_session,
+        trial_acceptance_gate,
         backlog,
         post_refresh,
         external_map,
@@ -212,6 +230,9 @@ def run_m14_project_stage_assessment(
         "input_refs": {
             "m14_goal_readiness_report": project_path(config.goal_readiness_report_path),
             "m14_internal_sim_next_session_plan": project_path(config.internal_sim_next_session_plan_path),
+            "m14_internal_sim_trial_acceptance_gate": project_path(
+                config.internal_sim_trial_acceptance_gate_path
+            ),
             "m14_strategy_rescue_plan": project_path(config.strategy_rescue_plan_path),
             "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
             "m14_rescue_post_refresh_outcome_review": project_path(
@@ -267,6 +288,7 @@ def run_m14_project_stage_assessment(
         "stage_assessment": build_stage_assessment(
             goal,
             next_session,
+            trial_acceptance_gate,
             backlog,
             post_refresh,
             external_map,
@@ -292,6 +314,9 @@ def run_m14_project_stage_assessment(
         ),
         "strategy_routes": strategy_routes,
         "next_fresh_refresh_acceptance": build_next_fresh_refresh_acceptance(next_session, goal),
+        "internal_sim_trial_acceptance_gate": build_internal_sim_trial_acceptance_gate(
+            trial_acceptance_gate
+        ),
         "rescue_policy": build_rescue_policy(goal, backlog),
         "rescue_post_refresh_outcome_review": build_post_refresh_outcome_review(post_refresh),
         "rescue_external_reference_map": build_external_reference_map(external_map),
@@ -348,6 +373,11 @@ def run_m14_project_stage_assessment(
             "live_execution": False,
             "paper_trading_approval": False,
             "manual_m12_37_once": False,
+            "m13_registry_mutation": False,
+            "m12_account_specs_mutation": False,
+            "broker_readiness_status_mutation": False,
+            "parameter_mutation": False,
+            "legacy_historical_profit_planning_input": False,
         },
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -356,6 +386,11 @@ def run_m14_project_stage_assessment(
         "live_execution": False,
         "paper_trading_approval": False,
         "manual_m12_37_once": False,
+        "m13_registry_mutation": False,
+        "m12_account_specs_mutation": False,
+        "broker_readiness_status_mutation": False,
+        "parameter_mutation": False,
+        "legacy_historical_profit_planning_input": False,
     }
     payload["plain_language_result"] = build_plain_language_result(payload)
     write_json(config.assessment_json_path, payload)
@@ -367,6 +402,7 @@ def run_m14_project_stage_assessment(
 def build_summary(
     goal: dict[str, Any],
     next_session: dict[str, Any],
+    trial_acceptance_gate: dict[str, Any],
     backlog: dict[str, Any],
     post_refresh: dict[str, Any],
     external_map: dict[str, Any],
@@ -397,6 +433,7 @@ def build_summary(
     next_refresh = goal.get("rescue_next_refresh_readiness", {})
     broker = goal.get("broker_readiness", {})
     next_summary = next_session.get("summary", {})
+    trial_acceptance_summary = trial_acceptance_gate.get("summary", {})
     backlog_summary = backlog.get("summary", {})
     post_summary = post_refresh.get("summary", {})
     external_summary = external_map.get("summary", {})
@@ -439,6 +476,45 @@ def build_summary(
         "next_session_mode": str(next_summary.get("next_session_mode", "")),
         "broker_watch_strategy_count": int_or_zero(next_summary.get("broker_watch_strategy_count")),
         "broker_watch_strategy_ids": list(next_summary.get("broker_watch_strategy_ids", [])),
+        "trial_acceptance_approved_trial_strategy_count": int_or_zero(
+            trial_acceptance_summary.get("approved_trial_strategy_count")
+        ),
+        "trial_acceptance_trial_start_ready_count": int_or_zero(
+            trial_acceptance_summary.get("trial_start_ready_count")
+        ),
+        "trial_acceptance_can_start_internal_sim_trial_now": bool(
+            trial_acceptance_summary.get("can_start_internal_sim_trial_now", False)
+        ),
+        "trial_acceptance_fresh_refresh_required_count": int_or_zero(
+            trial_acceptance_summary.get("fresh_refresh_required_count")
+        ),
+        "trial_acceptance_global_gate_count": int_or_zero(
+            trial_acceptance_summary.get("global_gate_count")
+        ),
+        "trial_acceptance_global_gate_state_counts": dict(
+            trial_acceptance_summary.get("global_gate_state_counts", {})
+        ),
+        "trial_acceptance_global_gate_pass_count": int_or_zero(
+            dict(trial_acceptance_summary.get("global_gate_state_counts", {})).get("pass")
+        ),
+        "trial_acceptance_global_gate_waiting_count": int_or_zero(
+            dict(trial_acceptance_summary.get("global_gate_state_counts", {})).get("waiting")
+        ),
+        "trial_acceptance_legacy_historical_profit_planning_input_count": int_or_zero(
+            trial_acceptance_summary.get("legacy_historical_profit_planning_input_count")
+        ),
+        "trial_acceptance_can_start_broker_paper": bool(
+            trial_acceptance_summary.get("can_start_broker_paper", False)
+        ),
+        "trial_acceptance_broker_or_live_enabled": bool(
+            trial_acceptance_summary.get("broker_or_live_enabled", False)
+        ),
+        "trial_acceptance_manual_m12_37_once_allowed": bool(
+            trial_acceptance_summary.get("manual_m12_37_once_allowed", False)
+        ),
+        "trial_acceptance_parameter_mutation_allowed_count": int_or_zero(
+            trial_acceptance_summary.get("parameter_mutation_allowed_count")
+        ),
         "rescue_runtime_strategy_count": int_or_zero(rescue_ab.get("rescue_runtime_strategy_count")),
         "rescue_m13_ledger_observed_strategy_count": int_or_zero(
             rescue_ab.get("m13_ledger_observed_strategy_count")
@@ -1017,6 +1093,7 @@ def build_summary(
 def build_stage_assessment(
     goal: dict[str, Any],
     next_session: dict[str, Any],
+    trial_acceptance_gate: dict[str, Any],
     backlog: dict[str, Any],
     post_refresh: dict[str, Any],
     external_map: dict[str, Any],
@@ -1055,6 +1132,16 @@ def build_stage_assessment(
             "ready_for_m12_47_supervised_next_session"
             if summary["can_run_next_internal_sim_session"]
             else "hold_until_internal_sim_readiness_repaired"
+        ),
+        "internal_sim_trial_acceptance_status": (
+            "trial_start_blocked_legacy_history_input_detected"
+            if summary["trial_acceptance_legacy_historical_profit_planning_input_count"]
+            else "trial_start_ready_waiting_for_m12_47_fresh_refresh_acceptance"
+            if summary["trial_acceptance_can_start_internal_sim_trial_now"]
+            and summary["trial_acceptance_fresh_refresh_required_count"]
+            else "trial_start_ready"
+            if summary["trial_acceptance_can_start_internal_sim_trial_now"]
+            else "trial_start_blocked"
         ),
         "rescue_status": "connected_but_not_promoted",
         "post_refresh_status": post_refresh_status,
@@ -1103,6 +1190,17 @@ def build_stage_assessment(
         "post_fresh_recompute_status": "checklist_ready_waiting_for_m12_47_fresh_refresh",
         "broker_status": "dry_run_preview_only_not_broker_paper",
         "next_required_evidence": [
+            (
+                f"Internal sim trial acceptance gate has "
+                f"{summary['trial_acceptance_trial_start_ready_count']}/"
+                f"{summary['trial_acceptance_approved_trial_strategy_count']} trial rows start-ready, "
+                f"{summary['trial_acceptance_fresh_refresh_required_count']} fresh-refresh-required rows, "
+                f"global gates pass/waiting="
+                f"{summary['trial_acceptance_global_gate_pass_count']}/"
+                f"{summary['trial_acceptance_global_gate_waiting_count']}, "
+                f"and legacy-history planning inputs="
+                f"{summary['trial_acceptance_legacy_historical_profit_planning_input_count']}."
+            ),
             (
                 f"{summary['rescue_runtime_strategy_count']} rescue runtimes must collect their own A/B evidence; "
                 f"{summary['rescue_m13_ledger_observed_strategy_count']} currently have M13 ledger evidence."
@@ -1243,6 +1341,9 @@ def build_stage_assessment(
             ),
         ],
         "next_session_plain_result": str(next_session.get("plain_language_result", "")),
+        "internal_sim_trial_acceptance_plain_result": list(
+            trial_acceptance_gate.get("plain_language_result", [])
+        ),
         "goal_plain_result": str(goal.get("plain_language_result", "")),
         "backlog_plain_result": str(backlog.get("plain_language_result", "")),
         "post_refresh_plain_result": str(post_refresh.get("plain_language_result", "")),
@@ -1783,6 +1884,36 @@ def build_strategy_next_step_readiness_matrix(strategy_next_step: dict[str, Any]
     }
 
 
+def build_internal_sim_trial_acceptance_gate(trial_acceptance_gate: dict[str, Any]) -> dict[str, Any]:
+    summary = trial_acceptance_gate.get("summary", {})
+    return {
+        "approved_trial_strategy_count": int_or_zero(summary.get("approved_trial_strategy_count")),
+        "trial_start_ready_count": int_or_zero(summary.get("trial_start_ready_count")),
+        "can_start_internal_sim_trial_now": bool(
+            summary.get("can_start_internal_sim_trial_now", False)
+        ),
+        "fresh_refresh_required_count": int_or_zero(summary.get("fresh_refresh_required_count")),
+        "post_refresh_fresh_refresh_observed": bool(
+            summary.get("post_refresh_fresh_refresh_observed", False)
+        ),
+        "post_refresh_source_quote": str(summary.get("post_refresh_source_quote", "")),
+        "post_refresh_waiting_count": int_or_zero(summary.get("post_refresh_waiting_count")),
+        "global_gate_count": int_or_zero(summary.get("global_gate_count")),
+        "global_gate_state_counts": dict(summary.get("global_gate_state_counts", {})),
+        "legacy_historical_profit_planning_input_count": int_or_zero(
+            summary.get("legacy_historical_profit_planning_input_count")
+        ),
+        "manual_m12_37_once_allowed": False,
+        "can_start_broker_paper": False,
+        "broker_or_live_enabled": False,
+        "paper_trading_approval": False,
+        "parameter_mutation_allowed_count": int_or_zero(
+            summary.get("parameter_mutation_allowed_count")
+        ),
+        "plain_language_result": list(trial_acceptance_gate.get("plain_language_result", [])),
+    }
+
+
 def build_objective_completion_audit(objective_audit: dict[str, Any]) -> dict[str, Any]:
     summary = objective_audit.get("summary", {})
     assessment = objective_audit.get("objective_completion_assessment", {})
@@ -2054,6 +2185,15 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_next_step_final_discard_allowed_count']}/"
         f"{summary['strategy_next_step_parameter_activation_allowed_count']}/"
         f"{summary['strategy_next_step_broker_paper_start_allowed_count']}. "
+        f"Internal sim trial acceptance gate has "
+        f"{summary['trial_acceptance_trial_start_ready_count']}/"
+        f"{summary['trial_acceptance_approved_trial_strategy_count']} trial rows start-ready, "
+        f"{summary['trial_acceptance_fresh_refresh_required_count']} fresh-refresh-required rows, "
+        f"global gates pass/waiting="
+        f"{summary['trial_acceptance_global_gate_pass_count']}/"
+        f"{summary['trial_acceptance_global_gate_waiting_count']}, and "
+        f"legacy-history planning input count="
+        f"{summary['trial_acceptance_legacy_historical_profit_planning_input_count']}. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -2122,6 +2262,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy source visual confirmation response create/mutation/invalid allowed: `{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_response_parameter_mutation_allowed_count']}/{summary['strategy_source_visual_confirmation_response_invalid_count']}`",
         f"- Strategy next-step rows/approved/rescue-or-shadow/source-review: `{summary['strategy_next_step_row_count']}/{summary['strategy_next_step_approved_internal_sim_continue_count']}/{summary['strategy_next_step_rescue_or_shadow_review_count']}/{summary['strategy_next_step_source_review_or_plugin_research_count']}`",
         f"- Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `{summary['strategy_next_step_promotion_allowed_count']}/{summary['strategy_next_step_final_discard_allowed_count']}/{summary['strategy_next_step_parameter_activation_allowed_count']}/{summary['strategy_next_step_broker_paper_start_allowed_count']}/{summary['strategy_next_step_legacy_historical_profit_planning_input_count']}`",
+        f"- Internal sim trial ready/approved/fresh-required/legacy-history inputs: `{summary['trial_acceptance_trial_start_ready_count']}/{summary['trial_acceptance_approved_trial_strategy_count']}/{summary['trial_acceptance_fresh_refresh_required_count']}/{summary['trial_acceptance_legacy_historical_profit_planning_input_count']}`",
+        f"- Internal sim trial gates pass/waiting: `{summary['trial_acceptance_global_gate_pass_count']}/{summary['trial_acceptance_global_gate_waiting_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -2139,6 +2281,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         "",
         f"- Decision: `{payload['stage_assessment']['stage_decision']}`",
         f"- Internal sim status: `{payload['stage_assessment']['internal_sim_status']}`",
+        f"- Internal sim trial acceptance status: `{payload['stage_assessment']['internal_sim_trial_acceptance_status']}`",
         f"- Rescue status: `{payload['stage_assessment']['rescue_status']}`",
         f"- Post-refresh status: `{payload['stage_assessment']['post_refresh_status']}`",
         f"- External reference status: `{payload['stage_assessment']['external_reference_status']}`",

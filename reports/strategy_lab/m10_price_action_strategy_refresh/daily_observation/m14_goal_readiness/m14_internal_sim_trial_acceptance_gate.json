@@ -1,7 +1,7 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T16:00:00Z",
+  "generated_at": "2026-05-26T19:12:00Z",
   "global_acceptance_gates": [
     {
       "evidence": "3/3 approved strategies launch-ready; 4/4 approved runtime inputs connected.",
@@ -18,7 +18,7 @@
       "state": "waiting"
     },
     {
-      "evidence": "checklist steps=26; acceptance gates=8; two_pass_required=True.",
+      "evidence": "checklist steps=27; acceptance gates=9; two_pass_required=True.",
       "fail_action": "Do not declare objective complete until recompute artifacts are refreshed.",
       "gate_id": "post_fresh_recompute_gate",
       "pass_action": "Rerun M14 read-only recompute sequence and then refresh project stage assessment.",
@@ -119,7 +119,7 @@
       "command": "python scripts/run_m14_project_stage_assessment.py",
       "live_execution": false,
       "manual_m12_37_once_allowed": false,
-      "order": 26,
+      "order": 27,
       "parameter_mutation": false,
       "real_order": false,
       "required_timing": "after_m12_47_supervisor_fresh_refresh",
@@ -164,8 +164,8 @@
     "next_session_mode": "m12_47_supervised_fresh_refresh_only",
     "paper_trading_approval": false,
     "parameter_mutation_allowed_count": 0,
-    "post_fresh_recompute_acceptance_gate_count": 8,
-    "post_fresh_recompute_step_count": 26,
+    "post_fresh_recompute_acceptance_gate_count": 9,
+    "post_fresh_recompute_step_count": 27,
     "post_refresh_fresh_refresh_observed": false,
     "post_refresh_source_quote": "fallback_quotes_only",
     "post_refresh_waiting_count": 13,

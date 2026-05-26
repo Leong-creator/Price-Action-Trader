@@ -27,6 +27,16 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertTrue(result["summary"]["can_run_next_internal_sim_session"])
             self.assertEqual(result["summary"]["approved_runtime_input_connected_count"], 3)
             self.assertEqual(result["summary"]["approved_runtime_input_count"], 3)
+            self.assertEqual(result["summary"]["trial_acceptance_approved_trial_strategy_count"], 2)
+            self.assertEqual(result["summary"]["trial_acceptance_trial_start_ready_count"], 2)
+            self.assertTrue(result["summary"]["trial_acceptance_can_start_internal_sim_trial_now"])
+            self.assertEqual(result["summary"]["trial_acceptance_fresh_refresh_required_count"], 2)
+            self.assertEqual(result["summary"]["trial_acceptance_global_gate_count"], 5)
+            self.assertEqual(result["summary"]["trial_acceptance_global_gate_pass_count"], 3)
+            self.assertEqual(result["summary"]["trial_acceptance_global_gate_waiting_count"], 2)
+            self.assertEqual(result["summary"]["trial_acceptance_legacy_historical_profit_planning_input_count"], 0)
+            self.assertFalse(result["summary"]["trial_acceptance_can_start_broker_paper"])
+            self.assertFalse(result["summary"]["trial_acceptance_broker_or_live_enabled"])
             self.assertEqual(result["summary"]["rescue_runtime_strategy_count"], 2)
             self.assertEqual(result["summary"]["rescue_m13_ledger_observed_strategy_count"], 1)
             self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 1)
@@ -219,9 +229,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["objective_execution_p0_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_waiting_for_fresh_refresh_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_manual_execution_allowed_count"], 0)
-            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 26)
-            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 25)
-            self.assertEqual(result["summary"]["post_fresh_recompute_acceptance_gate_count"], 8)
+            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 27)
+            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 26)
+            self.assertEqual(result["summary"]["post_fresh_recompute_acceptance_gate_count"], 9)
             self.assertTrue(result["summary"]["post_fresh_recompute_two_pass_required"])
             self.assertEqual(result["summary"]["post_fresh_recompute_parameter_mutation_allowed_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
@@ -260,6 +270,21 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["post_refresh_status"],
                 "waiting_for_m12_47_fresh_refresh",
             )
+            self.assertEqual(
+                result["stage_assessment"]["internal_sim_trial_acceptance_status"],
+                "trial_start_ready_waiting_for_m12_47_fresh_refresh_acceptance",
+            )
+            self.assertTrue(
+                any(
+                    "Internal sim trial acceptance gate has 2/2 trial rows start-ready" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertEqual(
+                result["internal_sim_trial_acceptance_gate"]["legacy_historical_profit_planning_input_count"],
+                0,
+            )
+            self.assertFalse(result["internal_sim_trial_acceptance_gate"]["broker_or_live_enabled"])
             self.assertEqual(result["rescue_post_refresh_outcome_review"]["watch_rows"], 4)
             self.assertEqual(result["rescue_post_refresh_outcome_review"]["waiting_count"], 4)
             self.assertFalse(result["rescue_post_refresh_outcome_review"]["manual_m12_37_once_allowed"])
@@ -526,8 +551,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["objective_execution_plan"]["execution_action_count"], 7)
             self.assertEqual(result["objective_execution_plan"]["p0_action_count"], 5)
             self.assertEqual(result["objective_execution_plan"]["manual_execution_allowed_count"], 0)
-            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 26)
-            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 25)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 27)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 26)
             self.assertFalse(
                 result["post_fresh_refresh_recompute_checklist"]["manual_m12_37_once_allowed"]
             )
@@ -571,9 +596,11 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy next-step rows/approved/rescue-or-shadow/source-review: `5/2/2/1`", md)
             self.assertIn("Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `0/0/0/0/0`", md)
             self.assertIn("Strategy next-step readiness status: `route_matrix_ready_legacy_history_excluded_no_promotion_or_mutation`", md)
+            self.assertIn("Internal sim trial ready/approved/fresh-required/legacy-history inputs: `2/2/2/0`", md)
+            self.assertIn("Internal sim trial acceptance status: `trial_start_ready_waiting_for_m12_47_fresh_refresh_acceptance`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
-            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `26/25/8`", md)
+            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `27/26/9`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -590,6 +617,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
     def _write_fixture(self, root: Path) -> Path:
         goal_path = root / "goal.json"
         next_session_path = root / "next_session.json"
+        trial_acceptance_gate_path = root / "trial_acceptance_gate.json"
         rescue_plan_path = root / "rescue_plan.json"
         backlog_path = root / "backlog.json"
         post_refresh_path = root / "post_refresh.json"
@@ -713,6 +741,34 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         }
                     ],
                     "plain_language_result": "Next-session fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
+        trial_acceptance_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "approved_trial_strategy_count": 2,
+                        "trial_start_ready_count": 2,
+                        "can_start_internal_sim_trial_now": True,
+                        "fresh_refresh_required_count": 2,
+                        "post_refresh_fresh_refresh_observed": False,
+                        "post_refresh_source_quote": "fallback_quotes_only",
+                        "post_refresh_waiting_count": 4,
+                        "global_gate_count": 5,
+                        "global_gate_state_counts": {"pass": 3, "waiting": 2},
+                        "legacy_historical_profit_planning_input_count": 0,
+                        "manual_m12_37_once_allowed": False,
+                        "can_start_broker_paper": False,
+                        "broker_or_live_enabled": False,
+                        "paper_trading_approval": False,
+                        "parameter_mutation_allowed_count": 0,
+                    },
+                    "plain_language_result": [
+                        "Internal simulated-account trial start gate is ready for 2/2 approved strategies.",
+                        "Fresh refresh still required for 2 trial rows.",
+                    ],
                 }
             ),
             encoding="utf-8",
@@ -1200,10 +1256,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             json.dumps(
                 {
                     "summary": {
-                        "recompute_step_count": 26,
-                        "m14_script_step_count": 25,
-                        "acceptance_gate_count": 8,
-                        "requires_m12_47_fresh_refresh_step_count": 24,
+                        "recompute_step_count": 27,
+                        "m14_script_step_count": 26,
+                        "acceptance_gate_count": 9,
+                        "requires_m12_47_fresh_refresh_step_count": 27,
                         "two_pass_stabilization_required": True,
                         "fresh_refresh_observed": False,
                         "source_quote": "fallback_quotes_only",
@@ -1223,6 +1279,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                     "inputs": {
                         "m14_goal_readiness_report": str(goal_path),
                         "m14_internal_sim_next_session_plan": str(next_session_path),
+                        "m14_internal_sim_trial_acceptance_gate": str(trial_acceptance_gate_path),
                         "m14_strategy_rescue_plan": str(rescue_plan_path),
                         "m14_rescue_optimization_backlog": str(backlog_path),
                         "m14_rescue_post_refresh_outcome_review": str(post_refresh_path),
@@ -1270,6 +1327,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m12_account_specs_mutation": False,
                         "broker_readiness_status_mutation": False,
                         "parameter_mutation": False,
+                        "legacy_historical_profit_planning_input": False,
                     },
                 }
             ),
