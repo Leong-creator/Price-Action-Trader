@@ -48,6 +48,11 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["parameter_experiment_broker_blocker_count"], 1)
             self.assertEqual(result["summary"]["parameter_experiment_target_stop_count"], 1)
             self.assertEqual(result["summary"]["parameter_experiment_m13_registry_mutation_count"], 0)
+            self.assertEqual(result["summary"]["parameter_activation_gate_row_count"], 4)
+            self.assertEqual(result["summary"]["parameter_activation_shadow_review_candidate_count"], 0)
+            self.assertEqual(result["summary"]["parameter_activation_waiting_for_fresh_refresh_count"], 3)
+            self.assertEqual(result["summary"]["parameter_activation_implementation_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["parameter_activation_parameter_mutation_allowed_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
             self.assertEqual(result["summary"]["broker_dry_run_blocked_count"], 1)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
@@ -97,9 +102,17 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["parameter_experiment_status"],
                 "queued_for_post_refresh_review_no_mutation",
             )
+            self.assertEqual(
+                result["stage_assessment"]["parameter_activation_status"],
+                "waiting_for_fresh_refresh_no_activation",
+            )
             self.assertEqual(result["rescue_parameter_experiment_queue"]["experiment_row_count"], 4)
             self.assertEqual(result["rescue_parameter_experiment_queue"]["allowed_now_count"], 0)
             self.assertFalse(result["rescue_parameter_experiment_queue"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["rescue_parameter_activation_gate"]["gate_row_count"], 4)
+            self.assertEqual(result["rescue_parameter_activation_gate"]["shadow_review_candidate_count"], 0)
+            self.assertEqual(result["rescue_parameter_activation_gate"]["implementation_mutation_allowed_count"], 0)
+            self.assertFalse(result["rescue_parameter_activation_gate"]["manual_m12_37_once_allowed"])
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertEqual(
                 result["rescue_policy"]["policy"],
@@ -117,6 +130,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("External reference rescue/broker rows: `3/1`", md)
             self.assertIn("Parameter experiment rows: `4`", md)
             self.assertIn("Parameter experiments allowed now: `0`", md)
+            self.assertIn("Parameter activation shadow-review candidates: `0`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -138,6 +152,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         post_refresh_path = root / "post_refresh.json"
         external_map_path = root / "external_map.json"
         parameter_queue_path = root / "parameter_queue.json"
+        activation_gate_path = root / "activation_gate.json"
         config_path = root / "config.json"
 
         goal_path.write_text(
@@ -333,6 +348,27 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        activation_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "gate_row_count": 4,
+                        "shadow_review_candidate_count": 0,
+                        "first_ledger_ready_count": 0,
+                        "waiting_for_fresh_refresh_count": 3,
+                        "evidence_failed_count": 0,
+                        "manual_review_required_count": 0,
+                        "implementation_mutation_allowed_count": 0,
+                        "parameter_mutation_allowed_count": 0,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    },
+                    "plain_language_result": "Activation gate fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -347,6 +383,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_rescue_post_refresh_outcome_review": str(post_refresh_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
+                        "m14_rescue_parameter_activation_gate": str(activation_gate_path),
                     },
                     "outputs": {
                         "assessment_json": str(root / "assessment.json"),

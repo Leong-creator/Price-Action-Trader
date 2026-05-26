@@ -1,6 +1,6 @@
 # M14 Project Stage Assessment
 
-- Generated at: `2026-05-26T20:05:00Z`
+- Generated at: `2026-05-26T21:05:00Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
 - Next session ready: `True`
@@ -15,12 +15,14 @@
 - Parameter experiment rows: `14`
 - Parameter experiments allowed now: `0`
 - Parameter experiments blocked until fresh refresh: `10`
+- Parameter activation shadow-review candidates: `0`
+- Parameter activation implementation mutations allowed: `0`
 - Broker dry-run ready/blocked: `5/3`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
 
 ## Plain Result
 
-Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.
+Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.
 
 ## Stage Assessment
 
@@ -30,6 +32,7 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 - Post-refresh status: `waiting_for_m12_47_fresh_refresh`
 - External reference status: `architecture_reference_only_no_external_override`
 - Parameter experiment status: `queued_for_post_refresh_review_no_mutation`
+- Parameter activation status: `waiting_for_fresh_refresh_no_activation`
 - Broker status: `dry_run_preview_only_not_broker_paper`
 
 ## Route Counts

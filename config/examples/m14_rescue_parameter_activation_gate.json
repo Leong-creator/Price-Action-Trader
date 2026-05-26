@@ -1,0 +1,24 @@
+{
+  "schema_version": "m14.rescue-parameter-activation-gate.config.v1",
+  "stage": "M14.rescue_parameter_activation_gate",
+  "inputs": {
+    "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json",
+    "m14_rescue_post_refresh_outcome_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_post_refresh_outcome_review.json"
+  },
+  "outputs": {
+    "activation_gate_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_activation_gate.json",
+    "activation_gate_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_activation_gate.md"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false,
+    "manual_m12_37_once": false,
+    "m13_registry_mutation": false,
+    "m12_account_specs_mutation": false,
+    "broker_readiness_status_mutation": false,
+    "parameter_mutation": false
+  }
+}
