@@ -30,6 +30,7 @@ class ProjectStageAssessmentConfig:
     strategy_evidence_gap_matrix_path: Path
     strategy_evidence_gap_burndown_path: Path
     strategy_pre_refresh_review_packet_path: Path
+    strategy_pre_refresh_review_audit_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     post_fresh_refresh_recompute_checklist_path: Path
@@ -80,6 +81,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         strategy_pre_refresh_review_packet_path=resolve_repo_path(
             inputs["m14_strategy_pre_refresh_review_packet"]
         ),
+        strategy_pre_refresh_review_audit_path=resolve_repo_path(
+            inputs["m14_strategy_pre_refresh_review_audit"]
+        ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         post_fresh_refresh_recompute_checklist_path=resolve_repo_path(
@@ -125,6 +129,7 @@ def run_m14_project_stage_assessment(
     evidence_gap_matrix = read_json(config.strategy_evidence_gap_matrix_path)
     evidence_gap_burndown = read_json(config.strategy_evidence_gap_burndown_path)
     pre_refresh_review = read_json(config.strategy_pre_refresh_review_packet_path)
+    pre_refresh_audit = read_json(config.strategy_pre_refresh_review_audit_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
     post_fresh_checklist = read_json(config.post_fresh_refresh_recompute_checklist_path)
@@ -147,6 +152,7 @@ def run_m14_project_stage_assessment(
         evidence_gap_matrix,
         evidence_gap_burndown,
         pre_refresh_review,
+        pre_refresh_audit,
         objective_audit,
         objective_execution,
         post_fresh_checklist,
@@ -183,6 +189,9 @@ def run_m14_project_stage_assessment(
             "m14_strategy_pre_refresh_review_packet": project_path(
                 config.strategy_pre_refresh_review_packet_path
             ),
+            "m14_strategy_pre_refresh_review_audit": project_path(
+                config.strategy_pre_refresh_review_audit_path
+            ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
             "m14_post_fresh_refresh_recompute_checklist": project_path(
@@ -203,6 +212,7 @@ def run_m14_project_stage_assessment(
             evidence_gap_matrix,
             evidence_gap_burndown,
             pre_refresh_review,
+            pre_refresh_audit,
             objective_audit,
             objective_execution,
             post_fresh_checklist,
@@ -223,6 +233,9 @@ def run_m14_project_stage_assessment(
         ),
         "strategy_pre_refresh_review_packet": build_strategy_pre_refresh_review_packet(
             pre_refresh_review
+        ),
+        "strategy_pre_refresh_review_audit": build_strategy_pre_refresh_review_audit(
+            pre_refresh_audit
         ),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
@@ -275,6 +288,7 @@ def build_summary(
     evidence_gap_matrix: dict[str, Any],
     evidence_gap_burndown: dict[str, Any],
     pre_refresh_review: dict[str, Any],
+    pre_refresh_audit: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -297,6 +311,7 @@ def build_summary(
     evidence_gap_summary = evidence_gap_matrix.get("summary", {})
     burndown_summary = evidence_gap_burndown.get("summary", {})
     pre_refresh_summary = pre_refresh_review.get("summary", {})
+    pre_refresh_audit_summary = pre_refresh_audit.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     post_fresh_summary = post_fresh_checklist.get("summary", {})
@@ -531,6 +546,45 @@ def build_summary(
         "strategy_pre_refresh_review_parameter_mutation_allowed_count": int_or_zero(
             pre_refresh_summary.get("parameter_mutation_allowed_now_count")
         ),
+        "strategy_pre_refresh_review_audit_row_count": int_or_zero(
+            pre_refresh_audit_summary.get("audit_row_count")
+        ),
+        "strategy_pre_refresh_review_audit_ready_now_count": int_or_zero(
+            pre_refresh_audit_summary.get("ready_for_artifact_review_now_count")
+        ),
+        "strategy_pre_refresh_review_audit_wait_fresh_count": int_or_zero(
+            pre_refresh_audit_summary.get("pre_review_ready_wait_fresh_evidence_count")
+        ),
+        "strategy_pre_refresh_review_audit_backfill_count": int_or_zero(
+            pre_refresh_audit_summary.get("needs_supporting_artifact_backfill_count")
+        ),
+        "strategy_pre_refresh_review_audit_external_required_count": int_or_zero(
+            pre_refresh_audit_summary.get("external_reference_required_count")
+        ),
+        "strategy_pre_refresh_review_audit_external_ready_count": int_or_zero(
+            pre_refresh_audit_summary.get("external_reference_ready_count")
+        ),
+        "strategy_pre_refresh_review_audit_shadow_required_count": int_or_zero(
+            pre_refresh_audit_summary.get("shadow_parameter_required_count")
+        ),
+        "strategy_pre_refresh_review_audit_shadow_ready_count": int_or_zero(
+            pre_refresh_audit_summary.get("shadow_parameter_artifact_ready_count")
+        ),
+        "strategy_pre_refresh_review_audit_decision_ladder_present_count": int_or_zero(
+            pre_refresh_audit_summary.get("decision_ladder_present_count")
+        ),
+        "strategy_pre_refresh_review_audit_can_close_gap_now_count": int_or_zero(
+            pre_refresh_audit_summary.get("review_can_close_gap_now_count")
+        ),
+        "strategy_pre_refresh_review_audit_can_promote_now_count": int_or_zero(
+            pre_refresh_audit_summary.get("review_can_promote_now_count")
+        ),
+        "strategy_pre_refresh_review_audit_can_discard_now_count": int_or_zero(
+            pre_refresh_audit_summary.get("review_can_discard_now_count")
+        ),
+        "strategy_pre_refresh_review_audit_parameter_mutation_allowed_count": int_or_zero(
+            pre_refresh_audit_summary.get("parameter_mutation_allowed_now_count")
+        ),
         "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
         "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
         "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -593,6 +647,7 @@ def build_stage_assessment(
     evidence_gap_matrix: dict[str, Any],
     evidence_gap_burndown: dict[str, Any],
     pre_refresh_review: dict[str, Any],
+    pre_refresh_audit: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -624,6 +679,11 @@ def build_stage_assessment(
         "strategy_evidence_gap_status": "open_gaps_waiting_for_refresh_and_rescue_evidence",
         "strategy_evidence_gap_burndown_status": "ordered_queue_ready_waiting_for_refresh_and_rescue_review",
         "strategy_pre_refresh_review_status": "review_packet_ready_no_gap_closure_or_mutation",
+        "strategy_pre_refresh_review_audit_status": (
+            "supporting_artifacts_ready_no_gap_closure_or_mutation"
+            if summary["strategy_pre_refresh_review_audit_backfill_count"] == 0
+            else "supporting_artifact_backfill_needed_no_gap_closure_or_mutation"
+        ),
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
         ),
@@ -691,6 +751,12 @@ def build_stage_assessment(
                 f"{summary['strategy_pre_refresh_review_can_close_gap_now_count']} rows allowed to close gaps now."
             ),
             (
+                f"Strategy pre-refresh review audit has {summary['strategy_pre_refresh_review_audit_row_count']} rows, "
+                f"{summary['strategy_pre_refresh_review_audit_ready_now_count']} ready now, "
+                f"{summary['strategy_pre_refresh_review_audit_wait_fresh_count']} waiting for fresh evidence, and "
+                f"{summary['strategy_pre_refresh_review_audit_backfill_count']} needing supporting artifact backfill."
+            ),
+            (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
                 f"{summary['objective_audit_blocked_count']} blocked and "
                 f"{summary['objective_audit_in_progress_count']} in progress."
@@ -724,6 +790,7 @@ def build_stage_assessment(
             evidence_gap_burndown.get("plain_language_result", "")
         ),
         "strategy_pre_refresh_review_plain_result": str(pre_refresh_review.get("plain_language_result", "")),
+        "strategy_pre_refresh_review_audit_plain_result": str(pre_refresh_audit.get("plain_language_result", "")),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
         "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
         "post_fresh_recompute_plain_result": str(post_fresh_checklist.get("plain_language_result", "")),
@@ -950,6 +1017,40 @@ def build_strategy_pre_refresh_review_packet(pre_refresh_review: dict[str, Any])
         "manual_m12_37_once_allowed": False,
         "broker_or_live_enabled": False,
         "plain_language_result": str(pre_refresh_review.get("plain_language_result", "")),
+    }
+
+
+def build_strategy_pre_refresh_review_audit(pre_refresh_audit: dict[str, Any]) -> dict[str, Any]:
+    summary = pre_refresh_audit.get("summary", {})
+    return {
+        "audit_row_count": int_or_zero(summary.get("audit_row_count")),
+        "ready_for_artifact_review_now_count": int_or_zero(
+            summary.get("ready_for_artifact_review_now_count")
+        ),
+        "pre_review_ready_wait_fresh_evidence_count": int_or_zero(
+            summary.get("pre_review_ready_wait_fresh_evidence_count")
+        ),
+        "needs_supporting_artifact_backfill_count": int_or_zero(
+            summary.get("needs_supporting_artifact_backfill_count")
+        ),
+        "external_reference_required_count": int_or_zero(
+            summary.get("external_reference_required_count")
+        ),
+        "external_reference_ready_count": int_or_zero(summary.get("external_reference_ready_count")),
+        "shadow_parameter_required_count": int_or_zero(summary.get("shadow_parameter_required_count")),
+        "shadow_parameter_artifact_ready_count": int_or_zero(
+            summary.get("shadow_parameter_artifact_ready_count")
+        ),
+        "decision_ladder_present_count": int_or_zero(summary.get("decision_ladder_present_count")),
+        "review_can_close_gap_now_count": int_or_zero(summary.get("review_can_close_gap_now_count")),
+        "review_can_promote_now_count": int_or_zero(summary.get("review_can_promote_now_count")),
+        "review_can_discard_now_count": int_or_zero(summary.get("review_can_discard_now_count")),
+        "parameter_mutation_allowed_now_count": int_or_zero(
+            summary.get("parameter_mutation_allowed_now_count")
+        ),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(pre_refresh_audit.get("plain_language_result", "")),
     }
 
 
@@ -1181,6 +1282,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_pre_refresh_review_fresh_dependent_count']} still fresh-dependent, "
         f"{summary['strategy_pre_refresh_review_artifact_only_count']} artifact-only, and "
         f"{summary['strategy_pre_refresh_review_can_close_gap_now_count']} allowed to close gaps now. "
+        f"Strategy pre-refresh review audit has {summary['strategy_pre_refresh_review_audit_row_count']} rows, "
+        f"{summary['strategy_pre_refresh_review_audit_ready_now_count']} ready now, "
+        f"{summary['strategy_pre_refresh_review_audit_wait_fresh_count']} waiting for fresh evidence, and "
+        f"{summary['strategy_pre_refresh_review_audit_backfill_count']} needing supporting artifact backfill. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -1231,6 +1336,9 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy pre-refresh review rows/P0/P1/P2: `{summary['strategy_pre_refresh_review_row_count']}/{summary['strategy_pre_refresh_review_p0_count']}/{summary['strategy_pre_refresh_review_p1_count']}/{summary['strategy_pre_refresh_review_p2_count']}`",
         f"- Strategy pre-refresh review fresh-dependent/artifact-only/external-reference: `{summary['strategy_pre_refresh_review_fresh_dependent_count']}/{summary['strategy_pre_refresh_review_artifact_only_count']}/{summary['strategy_pre_refresh_review_external_reference_count']}`",
         f"- Strategy pre-refresh review close/promote/discard/mutation allowed: `{summary['strategy_pre_refresh_review_can_close_gap_now_count']}/{summary['strategy_pre_refresh_review_can_promote_now_count']}/{summary['strategy_pre_refresh_review_can_discard_now_count']}/{summary['strategy_pre_refresh_review_parameter_mutation_allowed_count']}`",
+        f"- Strategy pre-refresh review audit rows/ready/waiting/backfill: `{summary['strategy_pre_refresh_review_audit_row_count']}/{summary['strategy_pre_refresh_review_audit_ready_now_count']}/{summary['strategy_pre_refresh_review_audit_wait_fresh_count']}/{summary['strategy_pre_refresh_review_audit_backfill_count']}`",
+        f"- Strategy pre-refresh review audit external/shadow ready: `{summary['strategy_pre_refresh_review_audit_external_ready_count']}/{summary['strategy_pre_refresh_review_audit_external_required_count']}` and `{summary['strategy_pre_refresh_review_audit_shadow_ready_count']}/{summary['strategy_pre_refresh_review_audit_shadow_required_count']}`",
+        f"- Strategy pre-refresh review audit close/promote/discard/mutation allowed: `{summary['strategy_pre_refresh_review_audit_can_close_gap_now_count']}/{summary['strategy_pre_refresh_review_audit_can_promote_now_count']}/{summary['strategy_pre_refresh_review_audit_can_discard_now_count']}/{summary['strategy_pre_refresh_review_audit_parameter_mutation_allowed_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -1258,6 +1366,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy evidence gap status: `{payload['stage_assessment']['strategy_evidence_gap_status']}`",
         f"- Strategy evidence gap burndown status: `{payload['stage_assessment']['strategy_evidence_gap_burndown_status']}`",
         f"- Strategy pre-refresh review status: `{payload['stage_assessment']['strategy_pre_refresh_review_status']}`",
+        f"- Strategy pre-refresh review audit status: `{payload['stage_assessment']['strategy_pre_refresh_review_audit_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Post-fresh recompute status: `{payload['stage_assessment']['post_fresh_recompute_status']}`",

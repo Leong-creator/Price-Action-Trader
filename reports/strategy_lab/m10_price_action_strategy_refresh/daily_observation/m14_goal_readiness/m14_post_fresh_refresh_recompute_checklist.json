@@ -87,7 +87,7 @@
   ],
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T23:59:50Z",
+  "generated_at": "2026-05-27T00:20:10Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -111,7 +111,8 @@
     "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json",
     "m14_rescue_parameter_shadow_spec": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_shadow_spec.json",
     "m14_rescue_post_refresh_outcome_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_post_refresh_outcome_review.json",
-    "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json"
+    "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json",
+    "m14_strategy_pre_refresh_review_audit": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_pre_refresh_review_audit.json"
   },
   "internal_simulated_account": true,
   "live_execution": false,
@@ -122,7 +123,7 @@
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "parameter_mutation": false,
-  "plain_language_result": "Post-fresh-refresh recompute checklist has 23 steps, including 22 read-only M14 script steps and 7 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.",
+  "plain_language_result": "Post-fresh-refresh recompute checklist has 24 steps, including 23 read-only M14 script steps and 7 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Pre-refresh review audit has 19 rows, with 0 supporting-artifact backfills. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.",
   "preconditions": [
     {
       "evidence": "fresh_refresh_observed=False; quote_source=fallback_quotes_only.",
@@ -612,6 +613,27 @@
       "step_type": "read_only_script"
     },
     {
+      "acceptance_hint": "artifact backfill rows should stay explainable; current backfill count is 0.",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "command": "python scripts/run_m14_strategy_pre_refresh_review_audit.py",
+      "current_state": "waiting_for_m12_47_fresh_refresh",
+      "expected_effect": "Audit supporting artifact coverage for pre-refresh review rows before final assessment.",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once_allowed": false,
+      "order": 23,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "phase": "decision_stabilization",
+      "real_order": false,
+      "required_timing": "after_m12_47_supervisor_fresh_refresh",
+      "requires_m12_47_fresh_refresh": true,
+      "step_id": "strategy_pre_refresh_review_audit_refresh",
+      "step_type": "read_only_script"
+    },
+    {
       "acceptance_hint": "goal_complete must remain false unless objective audit proves every requirement.",
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
@@ -622,7 +644,7 @@
       "m12_account_specs_mutation": false,
       "m13_registry_mutation": false,
       "manual_m12_37_once_allowed": false,
-      "order": 23,
+      "order": 24,
       "paper_trading_approval": false,
       "parameter_mutation": false,
       "phase": "final_assessment",
@@ -645,7 +667,7 @@
     "fresh_refresh_observed": false,
     "m12_account_specs_mutation_count": 0,
     "m13_registry_mutation_count": 0,
-    "m14_script_step_count": 22,
+    "m14_script_step_count": 23,
     "m14_trading_date": "2026-05-22",
     "manual_m12_37_once_allowed": false,
     "next_refresh_parameter_change_allowed_now_count": 0,
@@ -664,7 +686,7 @@
     "parameter_shadow_spec_candidate_variant_count": 14,
     "parameter_shadow_spec_row_count": 14,
     "phase_counts": {
-      "decision_stabilization": 8,
+      "decision_stabilization": 9,
       "evidence_recompute": 2,
       "final_assessment": 1,
       "goal_readiness_recompute": 3,
@@ -677,8 +699,8 @@
     "post_refresh_passed_count": 0,
     "post_refresh_waiting_count": 13,
     "precondition_count": 3,
-    "recompute_step_count": 23,
-    "requires_m12_47_fresh_refresh_step_count": 23,
+    "recompute_step_count": 24,
+    "requires_m12_47_fresh_refresh_step_count": 24,
     "rescue_m13_ledger_observed_strategy_count": 9,
     "rescue_no_m13_ledger_evidence_count": 2,
     "rescue_promotion_allowed_count": 0,
@@ -687,6 +709,10 @@
     "strategy_decision_final_discard_allowed_count": 0,
     "strategy_decision_ladder_row_count": 20,
     "strategy_decision_promotion_candidate_count": 0,
+    "strategy_pre_refresh_review_audit_backfill_count": 0,
+    "strategy_pre_refresh_review_audit_ready_now_count": 7,
+    "strategy_pre_refresh_review_audit_row_count": 19,
+    "strategy_pre_refresh_review_audit_wait_fresh_count": 12,
     "two_pass_stabilization_required": true
   }
 }

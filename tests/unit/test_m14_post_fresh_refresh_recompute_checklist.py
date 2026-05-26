@@ -25,13 +25,17 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(result["schema_version"], "m14.post-fresh-refresh-recompute-checklist.v1")
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["source_quote"], "fallback_quotes_only")
-            self.assertEqual(result["summary"]["recompute_step_count"], 23)
-            self.assertEqual(result["summary"]["m14_script_step_count"], 22)
+            self.assertEqual(result["summary"]["recompute_step_count"], 24)
+            self.assertEqual(result["summary"]["m14_script_step_count"], 23)
             self.assertEqual(result["summary"]["acceptance_gate_count"], 7)
             self.assertTrue(result["summary"]["two_pass_stabilization_required"])
             self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 2)
             self.assertEqual(result["summary"]["parameter_shadow_spec_candidate_variant_count"], 4)
             self.assertEqual(result["summary"]["strategy_decision_final_discard_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_row_count"], 4)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_ready_now_count"], 1)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_wait_fresh_count"], 2)
+            self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_backfill_count"], 1)
             self.assertEqual(result["summary"]["parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["manual_m12_37_once"])
             self.assertFalse(result["broker_connection"])
@@ -62,6 +66,10 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                 steps["strategy_pre_refresh_review_packet_refresh"]["command"],
                 "python scripts/run_m14_strategy_pre_refresh_review_packet.py",
             )
+            self.assertEqual(
+                steps["strategy_pre_refresh_review_audit_refresh"]["command"],
+                "python scripts/run_m14_strategy_pre_refresh_review_audit.py",
+            )
             for row in result["recompute_steps"]:
                 self.assertNotIn("run_m12_37_intraday_auto_loop.py", row["command"])
                 self.assertFalse(row["manual_m12_37_once_allowed"])
@@ -79,7 +87,8 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "checklist.md").read_text(encoding="utf-8")
             self.assertIn("M14 Post-Fresh-Refresh Recompute Checklist", md)
-            self.assertIn("M14 read-only script steps: `22`", md)
+            self.assertIn("M14 read-only script steps: `23`", md)
+            self.assertIn("Pre-refresh review audit rows/ready/waiting/backfill: `4/1/2/1`", md)
             self.assertIn("Final discard allowed: `0`", md)
 
     def test_rejects_manual_once_boundary(self) -> None:
@@ -102,6 +111,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
         activation_gate_path = root / "activation_gate.json"
         shadow_spec_path = root / "shadow_spec.json"
         decision_ladder_path = root / "decision_ladder.json"
+        pre_refresh_audit_path = root / "pre_refresh_audit.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         config_path = root / "config.json"
@@ -198,6 +208,19 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        pre_refresh_audit_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "audit_row_count": 4,
+                        "ready_for_artifact_review_now_count": 1,
+                        "pre_review_ready_wait_fresh_evidence_count": 2,
+                        "needs_supporting_artifact_backfill_count": 1,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -237,6 +260,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                         "m14_rescue_parameter_activation_gate": str(activation_gate_path),
                         "m14_rescue_parameter_shadow_spec": str(shadow_spec_path),
                         "m14_strategy_decision_ladder": str(decision_ladder_path),
+                        "m14_strategy_pre_refresh_review_audit": str(pre_refresh_audit_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                     },

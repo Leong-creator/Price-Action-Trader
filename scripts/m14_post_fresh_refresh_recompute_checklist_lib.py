@@ -36,6 +36,7 @@ class PostFreshRefreshRecomputeChecklistConfig:
     rescue_parameter_activation_gate_path: Path
     rescue_parameter_shadow_spec_path: Path
     strategy_decision_ladder_path: Path
+    strategy_pre_refresh_review_audit_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     checklist_json_path: Path
@@ -76,6 +77,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> PostFreshRefreshRecom
         ),
         rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
         strategy_decision_ladder_path=resolve_repo_path(inputs["m14_strategy_decision_ladder"]),
+        strategy_pre_refresh_review_audit_path=resolve_repo_path(
+            inputs["m14_strategy_pre_refresh_review_audit"]
+        ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         checklist_json_path=resolve_repo_path(outputs["checklist_json"]),
@@ -113,6 +117,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
     shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
     decision_ladder = read_json(config.strategy_decision_ladder_path)
+    pre_refresh_audit = read_json(config.strategy_pre_refresh_review_audit_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
 
@@ -125,6 +130,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
         activation_gate=activation_gate,
         shadow_spec=shadow_spec,
         decision_ladder=decision_ladder,
+        pre_refresh_audit=pre_refresh_audit,
         objective_audit=objective_audit,
         objective_execution=objective_execution,
     )
@@ -170,6 +176,9 @@ def run_m14_post_fresh_refresh_recompute_checklist(
             ),
             "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
             "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
+            "m14_strategy_pre_refresh_review_audit": project_path(
+                config.strategy_pre_refresh_review_audit_path
+            ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
         },
@@ -219,6 +228,7 @@ def build_source_summary(
     activation_gate: dict[str, Any],
     shadow_spec: dict[str, Any],
     decision_ladder: dict[str, Any],
+    pre_refresh_audit: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
 ) -> dict[str, Any]:
@@ -230,6 +240,7 @@ def build_source_summary(
     activation_summary = activation_gate.get("summary", {})
     shadow_summary = shadow_spec.get("summary", {})
     decision_summary = decision_ladder.get("summary", {})
+    pre_refresh_audit_summary = pre_refresh_audit.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     return {
@@ -281,6 +292,18 @@ def build_source_summary(
         ),
         "strategy_decision_promotion_candidate_count": int_or_zero(
             decision_summary.get("promotion_candidate_count")
+        ),
+        "strategy_pre_refresh_review_audit_row_count": int_or_zero(
+            pre_refresh_audit_summary.get("audit_row_count")
+        ),
+        "strategy_pre_refresh_review_audit_ready_now_count": int_or_zero(
+            pre_refresh_audit_summary.get("ready_for_artifact_review_now_count")
+        ),
+        "strategy_pre_refresh_review_audit_wait_fresh_count": int_or_zero(
+            pre_refresh_audit_summary.get("pre_review_ready_wait_fresh_evidence_count")
+        ),
+        "strategy_pre_refresh_review_audit_backfill_count": int_or_zero(
+            pre_refresh_audit_summary.get("needs_supporting_artifact_backfill_count")
         ),
         "objective_complete": bool(objective_summary.get("objective_complete", False)),
         "objective_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -485,6 +508,13 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Refresh the pre-refresh artifact review packet before final assessment.",
         ),
         (
+            "strategy_pre_refresh_review_audit_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_pre_refresh_review_audit.py",
+            "Audit supporting artifact coverage for pre-refresh review rows before final assessment.",
+        ),
+        (
             "project_stage_assessment_refresh",
             "final_assessment",
             "read_only_script",
@@ -541,6 +571,9 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
         "strategy_evidence_gap_burndown_refresh": "P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.",
         "strategy_pre_refresh_review_packet_refresh": (
             "review rows should stay review-only, with zero close/promote/discard/mutation allowed."
+        ),
+        "strategy_pre_refresh_review_audit_refresh": (
+            f"artifact backfill rows should stay explainable; current backfill count is {summary['strategy_pre_refresh_review_audit_backfill_count']}."
         ),
         "project_stage_assessment_refresh": "goal_complete must remain false unless objective audit proves every requirement.",
     }
@@ -619,7 +652,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"fresh_refresh_observed={summary['fresh_refresh_observed']}, quote_source={summary['source_quote']}, "
         f"post-refresh waiting rows={summary['post_refresh_waiting_count']}. "
         f"The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at "
-        f"{summary['strategy_decision_final_discard_allowed_count']}. Manual M12.37 once-mode, broker/live, "
+        f"{summary['strategy_decision_final_discard_allowed_count']}. Pre-refresh review audit has "
+        f"{summary['strategy_pre_refresh_review_audit_row_count']} rows, with "
+        f"{summary['strategy_pre_refresh_review_audit_backfill_count']} supporting-artifact backfills. "
+        "Manual M12.37 once-mode, broker/live, "
         "real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness "
         "mutation remain disabled."
     )
@@ -640,6 +676,7 @@ def build_checklist_md(payload: dict[str, Any]) -> str:
         f"- Rescue no-ledger count: `{summary['rescue_no_m13_ledger_evidence_count']}`",
         f"- Parameter shadow specs/variants: `{summary['parameter_shadow_spec_row_count']}/{summary['parameter_shadow_spec_candidate_variant_count']}`",
         f"- Final discard allowed: `{summary['strategy_decision_final_discard_allowed_count']}`",
+        f"- Pre-refresh review audit rows/ready/waiting/backfill: `{summary['strategy_pre_refresh_review_audit_row_count']}/{summary['strategy_pre_refresh_review_audit_ready_now_count']}/{summary['strategy_pre_refresh_review_audit_wait_fresh_count']}/{summary['strategy_pre_refresh_review_audit_backfill_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution, no manual M12.37 once-mode.",
         "",
         "## Plain Result",
