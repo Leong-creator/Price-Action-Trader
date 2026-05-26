@@ -1,7 +1,7 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T13:25:00Z",
+  "generated_at": "2026-05-26T14:28:21Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -29,7 +29,8 @@
     "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json",
     "m14_strategy_evidence_gap_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_evidence_gap_matrix.json",
     "m14_strategy_source_recheck_triage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_recheck_triage.json",
-    "m14_strategy_source_reextract_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_reextract_plan.json"
+    "m14_strategy_source_reextract_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_reextract_plan.json",
+    "m14_strategy_source_reextract_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_reextract_review.json"
   },
   "internal_simulated_account": true,
   "live_execution": false,
@@ -53,7 +54,7 @@
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "parameter_mutation": false,
-  "plain_language_result": "Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates; the source reextract plan now carries 7 rows, 2 future candidates, and 16 source-review tasks. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.",
+  "plain_language_result": "Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates; the source reextract plan now carries 7 rows, 2 future candidates, and 16 source-review tasks; the source reextract review now carries 2 packets, 10 source-backed atoms, and 2 draftable future specs after visual alignment. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.",
   "project_stage_label": "M14 user objective completion audit",
   "real_order": false,
   "requirement_rows": [
@@ -224,7 +225,7 @@
       "blocker": "",
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
-      "evidence": "Source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 future source-reextract candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds; source reextract plan has 7 rows, 2 future candidates, 16 review tasks, and 16 review questions; create/close/promote/discard/mutation allowed now is 0/0/0/0/0.",
+      "evidence": "Source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 future source-reextract candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds; source reextract plan has 7 rows, 2 future candidates, 16 review tasks, and 16 review questions; source reextract review has 2 packets, 10 source-backed atoms, 6 source-review answers, 2 draftable future specs, and 2 visual-review-required rows; create/close/promote/discard/mutation allowed now is 0/0/0/0/0.",
       "internal_simulated_account": true,
       "label": "Original-source recheck and future source-reextract candidates are tracked before creating new strategies.",
       "live_execution": false,
@@ -239,7 +240,8 @@
       "requirement_id": "source_reextract_path_ready",
       "source_refs": [
         "m14_strategy_source_recheck_triage",
-        "m14_strategy_source_reextract_plan"
+        "m14_strategy_source_reextract_plan",
+        "m14_strategy_source_reextract_review"
       ],
       "state": "in_progress"
     },
@@ -464,8 +466,19 @@
     "strategy_source_reextract_parameter_mutation_allowed_count": 0,
     "strategy_source_reextract_plan_row_count": 7,
     "strategy_source_reextract_research_hold_count": 2,
+    "strategy_source_reextract_review_answer_count": 6,
+    "strategy_source_reextract_review_can_close_gap_now_count": 0,
+    "strategy_source_reextract_review_can_create_strategy_now_count": 0,
+    "strategy_source_reextract_review_can_discard_now_count": 0,
+    "strategy_source_reextract_review_can_promote_now_count": 0,
+    "strategy_source_reextract_review_candidate_strategy_count": 2,
+    "strategy_source_reextract_review_future_spec_draftable_count": 2,
+    "strategy_source_reextract_review_parameter_mutation_allowed_count": 0,
     "strategy_source_reextract_review_question_count": 16,
+    "strategy_source_reextract_review_row_count": 2,
+    "strategy_source_reextract_review_source_atom_count": 10,
     "strategy_source_reextract_review_task_count": 16,
+    "strategy_source_reextract_review_visual_required_count": 2,
     "strategy_source_reextract_supporting_only_count": 2,
     "ten_day_challenge_complete": true
   }

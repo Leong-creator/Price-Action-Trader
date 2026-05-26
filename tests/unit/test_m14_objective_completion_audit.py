@@ -61,6 +61,17 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_reextract_review_question_count"], 6)
             self.assertEqual(result["summary"]["strategy_source_reextract_can_create_strategy_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_reextract_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_row_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_candidate_strategy_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_source_atom_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_answer_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_visual_required_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_future_spec_draftable_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_can_close_gap_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_can_promote_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_can_discard_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_reextract_review_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
@@ -104,12 +115,19 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("1 future source-reextract candidates", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("source reextract plan has 3 rows", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("7 review tasks", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("source reextract review has 2 packets", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("10 source-backed atoms", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("2 draftable future specs", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn(
                 "m14_strategy_source_recheck_triage",
                 rows["source_reextract_path_ready"]["source_refs"],
             )
             self.assertIn(
                 "m14_strategy_source_reextract_plan",
+                rows["source_reextract_path_ready"]["source_refs"],
+            )
+            self.assertIn(
+                "m14_strategy_source_reextract_review",
                 rows["source_reextract_path_ready"]["source_refs"],
             )
             self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
@@ -131,6 +149,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `6/4/1/3/2`", md)
             self.assertIn("Source recheck rows/future-reextract: `3/1`", md)
             self.assertIn("Source reextract plan rows/future/tasks/questions: `3/1/7/6`", md)
+            self.assertIn("Source reextract review packets/atoms/answers/draftable/visual-required: `2/10/6/2/2`", md)
             self.assertIn("source_reextract_path_ready", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
@@ -158,6 +177,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
         evidence_gap_matrix_path = root / "evidence_gap_matrix.json"
         source_recheck_path = root / "source_recheck.json"
         source_reextract_plan_path = root / "source_reextract_plan.json"
+        source_reextract_review_path = root / "source_reextract_review.json"
         external_map_path = root / "external_map.json"
         broker_plan_path = root / "broker_plan.json"
         config_path = root / "config.json"
@@ -397,6 +417,27 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        source_reextract_review_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_reextract_review_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "source_backed_atom_count": 10,
+                        "source_review_answer_count": 6,
+                        "future_spec_draftable_count": 2,
+                        "visual_review_required_count": 2,
+                        "can_create_strategy_now_count": 0,
+                        "can_close_gap_now_count": 0,
+                        "can_promote_now_count": 0,
+                        "can_discard_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source reextract review fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         external_map_path.write_text(
             json.dumps(
                 {
@@ -442,6 +483,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "m14_strategy_evidence_gap_matrix": str(evidence_gap_matrix_path),
                         "m14_strategy_source_recheck_triage": str(source_recheck_path),
                         "m14_strategy_source_reextract_plan": str(source_reextract_plan_path),
+                        "m14_strategy_source_reextract_review": str(source_reextract_review_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_2_broker_readiness_plan": str(broker_plan_path),
                     },
