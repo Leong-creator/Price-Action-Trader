@@ -27,6 +27,7 @@ class ProjectStageAssessmentConfig:
     rescue_parameter_activation_gate_path: Path
     rescue_parameter_shadow_spec_path: Path
     strategy_decision_ladder_path: Path
+    strategy_evidence_gap_matrix_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     post_fresh_refresh_recompute_checklist_path: Path
@@ -70,6 +71,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         ),
         rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
         strategy_decision_ladder_path=resolve_repo_path(inputs["m14_strategy_decision_ladder"]),
+        strategy_evidence_gap_matrix_path=resolve_repo_path(inputs["m14_strategy_evidence_gap_matrix"]),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         post_fresh_refresh_recompute_checklist_path=resolve_repo_path(
@@ -112,6 +114,7 @@ def run_m14_project_stage_assessment(
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
     parameter_shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
     decision_ladder = read_json(config.strategy_decision_ladder_path)
+    evidence_gap_matrix = read_json(config.strategy_evidence_gap_matrix_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
     post_fresh_checklist = read_json(config.post_fresh_refresh_recompute_checklist_path)
@@ -131,6 +134,7 @@ def run_m14_project_stage_assessment(
         activation_gate,
         parameter_shadow_spec,
         decision_ladder,
+        evidence_gap_matrix,
         objective_audit,
         objective_execution,
         post_fresh_checklist,
@@ -160,6 +164,7 @@ def run_m14_project_stage_assessment(
             ),
             "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
             "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
+            "m14_strategy_evidence_gap_matrix": project_path(config.strategy_evidence_gap_matrix_path),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
             "m14_post_fresh_refresh_recompute_checklist": project_path(
@@ -177,6 +182,7 @@ def run_m14_project_stage_assessment(
             activation_gate,
             parameter_shadow_spec,
             decision_ladder,
+            evidence_gap_matrix,
             objective_audit,
             objective_execution,
             post_fresh_checklist,
@@ -191,6 +197,7 @@ def run_m14_project_stage_assessment(
         "rescue_parameter_activation_gate": build_parameter_activation_gate(activation_gate),
         "rescue_parameter_shadow_spec": build_parameter_shadow_spec(parameter_shadow_spec),
         "strategy_decision_ladder": build_strategy_decision_ladder(decision_ladder),
+        "strategy_evidence_gap_matrix": build_strategy_evidence_gap_matrix(evidence_gap_matrix),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
         "post_fresh_refresh_recompute_checklist": build_post_fresh_refresh_recompute_checklist(
@@ -239,6 +246,7 @@ def build_summary(
     activation_gate: dict[str, Any],
     parameter_shadow_spec: dict[str, Any],
     decision_ladder: dict[str, Any],
+    evidence_gap_matrix: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -258,6 +266,7 @@ def build_summary(
     activation_summary = activation_gate.get("summary", {})
     shadow_spec_summary = parameter_shadow_spec.get("summary", {})
     decision_ladder_summary = decision_ladder.get("summary", {})
+    evidence_gap_summary = evidence_gap_matrix.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     post_fresh_summary = post_fresh_checklist.get("summary", {})
@@ -402,6 +411,31 @@ def build_summary(
         "strategy_decision_parameter_mutation_allowed_count": int_or_zero(
             decision_ladder_summary.get("parameter_mutation_allowed_count")
         ),
+        "strategy_evidence_gap_row_count": int_or_zero(evidence_gap_summary.get("strategy_gap_row_count")),
+        "strategy_evidence_open_gap_row_count": int_or_zero(
+            evidence_gap_summary.get("open_evidence_gap_row_count")
+        ),
+        "strategy_evidence_requires_fresh_refresh_count": int_or_zero(
+            evidence_gap_summary.get("requires_m12_47_fresh_refresh_count")
+        ),
+        "strategy_evidence_wait_first_ledger_gap_count": int_or_zero(
+            evidence_gap_summary.get("wait_first_ledger_gap_count")
+        ),
+        "strategy_evidence_rescue_10_day_ab_gap_count": int_or_zero(
+            evidence_gap_summary.get("rescue_10_day_ab_gap_count")
+        ),
+        "strategy_evidence_shadow_review_gap_count": int_or_zero(
+            evidence_gap_summary.get("shadow_review_gap_count")
+        ),
+        "strategy_evidence_final_discard_allowed_count": int_or_zero(
+            evidence_gap_summary.get("final_discard_allowed_count")
+        ),
+        "strategy_evidence_promotion_candidate_count": int_or_zero(
+            evidence_gap_summary.get("promotion_candidate_count")
+        ),
+        "strategy_evidence_parameter_mutation_allowed_count": int_or_zero(
+            evidence_gap_summary.get("parameter_mutation_allowed_count")
+        ),
         "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
         "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
         "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -461,6 +495,7 @@ def build_stage_assessment(
     activation_gate: dict[str, Any],
     parameter_shadow_spec: dict[str, Any],
     decision_ladder: dict[str, Any],
+    evidence_gap_matrix: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -489,6 +524,7 @@ def build_stage_assessment(
         "parameter_activation_status": "waiting_for_fresh_refresh_no_activation",
         "parameter_shadow_spec_status": "shadow_specs_prepared_no_mutation",
         "strategy_decision_ladder_status": "no_final_discard_until_rescue_exhausted",
+        "strategy_evidence_gap_status": "open_gaps_waiting_for_refresh_and_rescue_evidence",
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
         ),
@@ -537,6 +573,12 @@ def build_stage_assessment(
                 f"{summary['strategy_decision_final_discard_allowed_count']} final-discard rows allowed."
             ),
             (
+                f"Strategy evidence gap matrix has {summary['strategy_evidence_gap_row_count']} rows, "
+                f"{summary['strategy_evidence_open_gap_row_count']} open-gap rows, "
+                f"{summary['strategy_evidence_requires_fresh_refresh_count']} waiting for fresh refresh, and "
+                f"{summary['strategy_evidence_final_discard_allowed_count']} final-discard rows allowed."
+            ),
+            (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
                 f"{summary['objective_audit_blocked_count']} blocked and "
                 f"{summary['objective_audit_in_progress_count']} in progress."
@@ -565,6 +607,7 @@ def build_stage_assessment(
         "parameter_activation_plain_result": str(activation_gate.get("plain_language_result", "")),
         "parameter_shadow_spec_plain_result": str(parameter_shadow_spec.get("plain_language_result", "")),
         "strategy_decision_ladder_plain_result": str(decision_ladder.get("plain_language_result", "")),
+        "strategy_evidence_gap_plain_result": str(evidence_gap_matrix.get("plain_language_result", "")),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
         "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
         "post_fresh_recompute_plain_result": str(post_fresh_checklist.get("plain_language_result", "")),
@@ -709,6 +752,26 @@ def build_strategy_decision_ladder(decision_ladder: dict[str, Any]) -> dict[str,
         "manual_m12_37_once_allowed": False,
         "broker_or_live_enabled": False,
         "plain_language_result": str(decision_ladder.get("plain_language_result", "")),
+    }
+
+
+def build_strategy_evidence_gap_matrix(evidence_gap_matrix: dict[str, Any]) -> dict[str, Any]:
+    summary = evidence_gap_matrix.get("summary", {})
+    return {
+        "strategy_gap_row_count": int_or_zero(summary.get("strategy_gap_row_count")),
+        "open_evidence_gap_row_count": int_or_zero(summary.get("open_evidence_gap_row_count")),
+        "requires_m12_47_fresh_refresh_count": int_or_zero(
+            summary.get("requires_m12_47_fresh_refresh_count")
+        ),
+        "wait_first_ledger_gap_count": int_or_zero(summary.get("wait_first_ledger_gap_count")),
+        "rescue_10_day_ab_gap_count": int_or_zero(summary.get("rescue_10_day_ab_gap_count")),
+        "shadow_review_gap_count": int_or_zero(summary.get("shadow_review_gap_count")),
+        "final_discard_allowed_count": int_or_zero(summary.get("final_discard_allowed_count")),
+        "promotion_candidate_count": int_or_zero(summary.get("promotion_candidate_count")),
+        "parameter_mutation_allowed_count": int_or_zero(summary.get("parameter_mutation_allowed_count")),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(evidence_gap_matrix.get("plain_language_result", "")),
     }
 
 
@@ -927,6 +990,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Strategy decision ladder has {summary['strategy_decision_approved_next_step_count']} approved next-step rows, "
         f"{summary['strategy_decision_rescue_continue_count']} rescue-continuation rows, and "
         f"{summary['strategy_decision_final_discard_allowed_count']} final discards allowed. "
+        f"Strategy evidence gap matrix has {summary['strategy_evidence_open_gap_row_count']} open rows, "
+        f"{summary['strategy_evidence_requires_fresh_refresh_count']} waiting for M12.47 fresh refresh, "
+        f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
+        f"{summary['strategy_evidence_rescue_10_day_ab_gap_count']} rescue 10-day A/B gaps. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -968,6 +1035,9 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Parameter shadow spec mutation allowed: `{summary['parameter_shadow_spec_parameter_mutation_allowed_count']}`",
         f"- Strategy decision rows/approved-next/rescue/final-discard: `{summary['strategy_decision_ladder_row_count']}/{summary['strategy_decision_approved_next_step_count']}/{summary['strategy_decision_rescue_continue_count']}/{summary['strategy_decision_final_discard_allowed_count']}`",
         f"- Strategy decision mutation allowed: `{summary['strategy_decision_parameter_mutation_allowed_count']}`",
+        f"- Strategy evidence gap rows/open/fresh-refresh: `{summary['strategy_evidence_gap_row_count']}/{summary['strategy_evidence_open_gap_row_count']}/{summary['strategy_evidence_requires_fresh_refresh_count']}`",
+        f"- Strategy evidence first-ledger/10-day/shadow gaps: `{summary['strategy_evidence_wait_first_ledger_gap_count']}/{summary['strategy_evidence_rescue_10_day_ab_gap_count']}/{summary['strategy_evidence_shadow_review_gap_count']}`",
+        f"- Strategy evidence final-discard/promotion/mutation allowed: `{summary['strategy_evidence_final_discard_allowed_count']}/{summary['strategy_evidence_promotion_candidate_count']}/{summary['strategy_evidence_parameter_mutation_allowed_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -992,6 +1062,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Parameter activation status: `{payload['stage_assessment']['parameter_activation_status']}`",
         f"- Parameter shadow spec status: `{payload['stage_assessment']['parameter_shadow_spec_status']}`",
         f"- Strategy decision ladder status: `{payload['stage_assessment']['strategy_decision_ladder_status']}`",
+        f"- Strategy evidence gap status: `{payload['stage_assessment']['strategy_evidence_gap_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Post-fresh recompute status: `{payload['stage_assessment']['post_fresh_recompute_status']}`",

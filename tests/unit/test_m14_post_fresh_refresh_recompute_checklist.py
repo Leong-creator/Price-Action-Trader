@@ -25,8 +25,8 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(result["schema_version"], "m14.post-fresh-refresh-recompute-checklist.v1")
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["source_quote"], "fallback_quotes_only")
-            self.assertEqual(result["summary"]["recompute_step_count"], 20)
-            self.assertEqual(result["summary"]["m14_script_step_count"], 19)
+            self.assertEqual(result["summary"]["recompute_step_count"], 21)
+            self.assertEqual(result["summary"]["m14_script_step_count"], 20)
             self.assertEqual(result["summary"]["acceptance_gate_count"], 7)
             self.assertTrue(result["summary"]["two_pass_stabilization_required"])
             self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 2)
@@ -50,6 +50,10 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                 steps["objective_audit_after_ladder"]["command"],
                 "python scripts/run_m14_objective_completion_audit.py",
             )
+            self.assertEqual(
+                steps["strategy_evidence_gap_matrix_refresh"]["command"],
+                "python scripts/run_m14_strategy_evidence_gap_matrix.py",
+            )
             for row in result["recompute_steps"]:
                 self.assertNotIn("run_m12_37_intraday_auto_loop.py", row["command"])
                 self.assertFalse(row["manual_m12_37_once_allowed"])
@@ -67,7 +71,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "checklist.md").read_text(encoding="utf-8")
             self.assertIn("M14 Post-Fresh-Refresh Recompute Checklist", md)
-            self.assertIn("M14 read-only script steps: `19`", md)
+            self.assertIn("M14 read-only script steps: `20`", md)
             self.assertIn("Final discard allowed: `0`", md)
 
     def test_rejects_manual_once_boundary(self) -> None:

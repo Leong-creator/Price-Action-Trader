@@ -1,0 +1,29 @@
+{
+  "schema_version": "m14.strategy-evidence-gap-matrix.config.v1",
+  "stage": "M14.strategy_evidence_gap_matrix",
+  "inputs": {
+    "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json",
+    "m14_rescue_ab_evidence_tracker": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_ab_evidence_tracker.json",
+    "m14_rescue_parameter_shadow_spec": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_shadow_spec.json",
+    "m14_objective_completion_audit": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_objective_completion_audit.json",
+    "m14_objective_execution_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_objective_execution_plan.json",
+    "m14_post_fresh_refresh_recompute_checklist": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_post_fresh_refresh_recompute_checklist.json"
+  },
+  "outputs": {
+    "gap_matrix_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_evidence_gap_matrix.json",
+    "gap_matrix_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_evidence_gap_matrix.md"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "internal_simulated_account": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false,
+    "manual_m12_37_once": false,
+    "m13_registry_mutation": false,
+    "m12_account_specs_mutation": false,
+    "broker_readiness_status_mutation": false,
+    "parameter_mutation": false
+  }
+}

@@ -1,10 +1,10 @@
 # M14 Post-Fresh-Refresh Recompute Checklist
 
-- Generated at: `2026-05-27T00:10:00Z`
+- Generated at: `2026-05-26T16:25:00Z`
 - Fresh refresh observed: `False`
 - Quote source: `fallback_quotes_only`
-- Recompute steps: `20`
-- M14 read-only script steps: `19`
+- Recompute steps: `21`
+- M14 read-only script steps: `20`
 - Acceptance gates: `7`
 - Two-pass stabilization required: `True`
 - Rescue no-ledger count: `2`
@@ -14,7 +14,7 @@
 
 ## Plain Result
 
-Post-fresh-refresh recompute checklist has 20 steps, including 19 read-only M14 script steps and 7 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.
+Post-fresh-refresh recompute checklist has 21 steps, including 20 read-only M14 script steps and 7 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.
 
 ## Preconditions
 
@@ -92,15 +92,19 @@ Post-fresh-refresh recompute checklist has 20 steps, including 19 read-only M14 
    - Command: `python scripts/run_m14_strategy_decision_ladder.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: final discard allowed should remain 0 until rescue routes and 10-day A/B evidence are exhausted.
-18. `objective_audit_after_ladder` (decision_stabilization)
+18. `strategy_evidence_gap_matrix_refresh` (decision_stabilization)
+   - Command: `python scripts/run_m14_strategy_evidence_gap_matrix.py`
+   - Current state: `waiting_for_m12_47_fresh_refresh`
+   - Acceptance hint: open-gap rows should explain exactly which evidence remains missing per strategy.
+19. `objective_audit_after_ladder` (decision_stabilization)
    - Command: `python scripts/run_m14_objective_completion_audit.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: Regenerate the artifact and inspect summary plus hard-boundary flags.
-19. `objective_execution_after_ladder` (decision_stabilization)
+20. `objective_execution_after_ladder` (decision_stabilization)
    - Command: `python scripts/run_m14_objective_execution_plan.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: Regenerate the artifact and inspect summary plus hard-boundary flags.
-20. `project_stage_assessment_refresh` (final_assessment)
+21. `project_stage_assessment_refresh` (final_assessment)
    - Command: `python scripts/run_m14_project_stage_assessment.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: goal_complete must remain false unless objective audit proves every requirement.

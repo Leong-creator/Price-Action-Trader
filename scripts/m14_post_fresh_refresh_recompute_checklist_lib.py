@@ -450,6 +450,13 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Refresh strategy-level advance/rescue/hold/discard ladder.",
         ),
         (
+            "strategy_evidence_gap_matrix_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_evidence_gap_matrix.py",
+            "Refresh per-strategy evidence gaps before the final project stage assessment.",
+        ),
+        (
             "objective_audit_after_ladder",
             "decision_stabilization",
             "read_only_script",
@@ -516,6 +523,7 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
         "strategy_decision_ladder_refresh": (
             f"final discard allowed should remain 0 until rescue routes and 10-day A/B evidence are exhausted."
         ),
+        "strategy_evidence_gap_matrix_refresh": "open-gap rows should explain exactly which evidence remains missing per strategy.",
         "project_stage_assessment_refresh": "goal_complete must remain false unless objective audit proves every requirement.",
     }
     return hints.get(step_id, "Regenerate the artifact and inspect summary plus hard-boundary flags.")
