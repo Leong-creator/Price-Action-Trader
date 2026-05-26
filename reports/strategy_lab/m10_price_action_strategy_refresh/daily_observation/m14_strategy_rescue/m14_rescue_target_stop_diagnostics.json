@@ -1,0 +1,263 @@
+{
+  "broker_connection": false,
+  "generated_at": "2026-05-26T17:15:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "live_execution": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "m12_dashboard_data": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+    "m14_rescue_zero_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_zero_signal_diagnostics.json"
+  },
+  "live_execution": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "Target/stop diagnostics reviewed 1 rescue runtimes that were reward/R candidates. Target/stop issues remain on 1 runtimes. Issue counts: {'target_reward_below_1r_after_quality_gates': 1}. This is read-only and simulated; no broker connection, real order, live execution, or paper-trading approval is enabled.",
+  "real_order": false,
+  "rows": [
+    {
+      "broker_connection": false,
+      "bullish_source_row_count": 16,
+      "dominant_target_stop_issue": "target_reward_below_1r_after_quality_gates",
+      "live_execution": false,
+      "non_leveraged_bullish_valid_count": 15,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parent_strategy_id": "M10-PA-012",
+      "real_order": false,
+      "recommended_action": "Inspect and shadow-test the ORB target/stop generator before lowering min-R; try measured-move/opening-range-height or normalized 1.0R targets only in simulated diagnostics.",
+      "reward_ge_1_0_count": 0,
+      "reward_ge_1_1_count": 0,
+      "reward_ge_1_2_count": 0,
+      "reward_r_max": "0.9819",
+      "reward_r_median": "0.9568",
+      "reward_r_min": "0.7159",
+      "risk_gate_pass_count": 12,
+      "runtime_id": "M10-PA-012-m14-modify-20260522-5m",
+      "sample_rows": [
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "383.3700",
+          "latest_price_source": "m12_12_cached_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "2.7200",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9819",
+          "risk": "2.7700",
+          "risk_gate_pass": true,
+          "risk_percent": "0.7225",
+          "stop": "380.6000",
+          "symbol": "GOOG",
+          "target": "386.0900",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "59.5700",
+          "latest_price_source": "m12_12_cached_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "0.7200",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9730",
+          "risk": "0.7400",
+          "risk_gate_pass": true,
+          "risk_percent": "1.2422",
+          "stop": "58.8300",
+          "symbol": "XLE",
+          "target": "60.2900",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "181.3500",
+          "latest_price_source": "m12_12_cached_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "1.5400",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9686",
+          "risk": "1.5900",
+          "risk_gate_pass": true,
+          "risk_percent": "0.8768",
+          "stop": "179.7600",
+          "symbol": "XLK",
+          "target": "182.8900",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "171.9700",
+          "latest_price_source": "m12_12_cached_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "1.5040",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9678",
+          "risk": "1.5540",
+          "risk_gate_pass": true,
+          "risk_percent": "0.9036",
+          "stop": "170.4160",
+          "symbol": "XLI",
+          "target": "173.4740",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "507.3900",
+          "latest_price_source": "m12_12_cached_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "1.6050",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9611",
+          "risk": "1.6700",
+          "risk_gate_pass": true,
+          "risk_percent": "0.3291",
+          "stop": "505.7200",
+          "symbol": "DIA",
+          "target": "508.9950",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "387.4660",
+          "latest_price_source": "m12_12_cached_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "3.0200",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9599",
+          "risk": "3.1460",
+          "risk_gate_pass": true,
+          "risk_percent": "0.8119",
+          "stop": "384.3200",
+          "symbol": "GOOGL",
+          "target": "390.4860",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "309.1000",
+          "latest_price_source": "candidate_reference_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "3.1000",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9538",
+          "risk": "3.2500",
+          "risk_gate_pass": true,
+          "risk_percent": "1.0514",
+          "stop": "305.8500",
+          "symbol": "AAPL",
+          "target": "312.2000",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        },
+        {
+          "blockers": [
+            "target_reward_below_1r"
+          ],
+          "direction": "看涨",
+          "direction_gate_pass": true,
+          "entry": "427.9050",
+          "latest_price_source": "m12_27_readonly_kline_fallback",
+          "leveraged_etf_excluded": false,
+          "max_risk_percent": "2.5000",
+          "reward": "6.7300",
+          "reward_pass_1_0": false,
+          "reward_pass_1_1": false,
+          "reward_pass_1_2": false,
+          "reward_r": "0.9101",
+          "risk": "7.3950",
+          "risk_gate_pass": true,
+          "risk_percent": "1.7282",
+          "stop": "420.5100",
+          "symbol": "TSLA",
+          "target": "434.6350",
+          "timeframe": "5m",
+          "valid_price_geometry": true
+        }
+      ],
+      "source_row_count": 47,
+      "source_zero_signal_issue": "reward_filter_blocks_all",
+      "strategy_id": "M10-PA-012-m14-modify-20260522",
+      "timeframe": "5m",
+      "valid_price_geometry_count": 47
+    }
+  ],
+  "schema_version": "m14.rescue-target-stop-diagnostics.v1",
+  "stage": "M14.rescue_target_stop_diagnostics",
+  "summary": {
+    "diagnosed_runtime_count": 1,
+    "dominant_target_stop_issue_counts": {
+      "target_reward_below_1r_after_quality_gates": 1
+    },
+    "parent_strategy_ids": [
+      "M10-PA-012"
+    ],
+    "reward_ge_1_0_runtime_count": 0,
+    "reward_ge_1_1_runtime_count": 0,
+    "reward_ge_1_2_runtime_count": 0,
+    "runtime_ids": [
+      "M10-PA-012-m14-modify-20260522-5m"
+    ],
+    "shadow_candidate_runtime_count": 0,
+    "strategy_ids": [
+      "M10-PA-012-m14-modify-20260522"
+    ],
+    "target_stop_issue_runtime_count": 1
+  }
+}

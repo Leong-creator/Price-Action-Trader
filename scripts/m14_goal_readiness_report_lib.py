@@ -24,6 +24,7 @@ class GoalReadinessConfig:
     rescue_ab_evidence_path: Path
     rescue_optimization_backlog_path: Path
     rescue_zero_signal_diagnostics_path: Path
+    rescue_target_stop_diagnostics_path: Path
     broker_readiness_path: Path
     readiness_json_path: Path
     readiness_md_path: Path
@@ -56,6 +57,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         rescue_ab_evidence_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
         rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
         rescue_zero_signal_diagnostics_path=resolve_repo_path(inputs["m14_rescue_zero_signal_diagnostics"]),
+        rescue_target_stop_diagnostics_path=resolve_repo_path(inputs["m14_rescue_target_stop_diagnostics"]),
         broker_readiness_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         readiness_json_path=resolve_repo_path(outputs["readiness_json"]),
         readiness_md_path=resolve_repo_path(outputs["readiness_md"]),
@@ -91,6 +93,7 @@ def run_m14_goal_readiness_report(
     rescue_ab_evidence = read_json(config.rescue_ab_evidence_path)
     rescue_optimization_backlog = read_json(config.rescue_optimization_backlog_path)
     rescue_zero_signal_diagnostics = read_json(config.rescue_zero_signal_diagnostics_path)
+    rescue_target_stop_diagnostics = read_json(config.rescue_target_stop_diagnostics_path)
     broker_readiness = read_json(config.broker_readiness_path)
 
     gate_rows = list(paper_gate.get("rows", []))
@@ -107,6 +110,7 @@ def run_m14_goal_readiness_report(
         rescue_ab_evidence,
         rescue_optimization_backlog,
         rescue_zero_signal_diagnostics,
+        rescue_target_stop_diagnostics,
         broker_readiness,
     )
     boundaries_ok = all(boundaries.values())
@@ -131,6 +135,7 @@ def run_m14_goal_readiness_report(
             "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_path),
             "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
             "m14_rescue_zero_signal_diagnostics": project_path(config.rescue_zero_signal_diagnostics_path),
+            "m14_rescue_target_stop_diagnostics": project_path(config.rescue_target_stop_diagnostics_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_path),
         },
         "challenge": {
@@ -165,6 +170,7 @@ def run_m14_goal_readiness_report(
         "rescue_ab_evidence": build_rescue_ab_evidence_summary(rescue_ab_evidence),
         "rescue_optimization_backlog": build_rescue_optimization_backlog_summary(rescue_optimization_backlog),
         "rescue_zero_signal_diagnostics": build_rescue_zero_signal_diagnostics_summary(rescue_zero_signal_diagnostics),
+        "rescue_target_stop_diagnostics": build_rescue_target_stop_diagnostics_summary(rescue_target_stop_diagnostics),
         "broker_readiness": {
             "mode": str(broker_readiness.get("mode", "")),
             "dry_run_ready_count": int_or_zero(broker_readiness.get("dry_run_ready_count")),
@@ -206,6 +212,7 @@ def build_boundaries(
     rescue_ab_evidence: dict[str, Any],
     rescue_optimization_backlog: dict[str, Any],
     rescue_zero_signal_diagnostics: dict[str, Any],
+    rescue_target_stop_diagnostics: dict[str, Any],
     broker_readiness: dict[str, Any],
 ) -> dict[str, bool]:
     return {
@@ -218,6 +225,7 @@ def build_boundaries(
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
+                rescue_target_stop_diagnostics,
             )
         ),
         "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
@@ -230,6 +238,7 @@ def build_boundaries(
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
+                rescue_target_stop_diagnostics,
                 broker_readiness,
             )
         ),
@@ -239,6 +248,7 @@ def build_boundaries(
             and not bool(rescue_ab_evidence.get("real_order", False))
             and not bool(rescue_optimization_backlog.get("real_order", False))
             and not bool(rescue_zero_signal_diagnostics.get("real_order", False))
+            and not bool(rescue_target_stop_diagnostics.get("real_order", False))
         ),
         "live_execution_disabled": not any(
             bool(item.get("live_execution", item.get("live_execution_enabled", False)))
@@ -249,6 +259,7 @@ def build_boundaries(
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
+                rescue_target_stop_diagnostics,
                 broker_readiness,
             )
         ),
@@ -261,6 +272,7 @@ def build_boundaries(
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
                 rescue_zero_signal_diagnostics,
+                rescue_target_stop_diagnostics,
                 broker_readiness,
             )
         ),
@@ -316,6 +328,23 @@ def build_rescue_zero_signal_diagnostics_summary(diagnostics: dict[str, Any]) ->
         "shadow_reward_min_r_pass_counts": dict(summary.get("shadow_reward_min_r_pass_counts", {})),
         "dominant_issue_counts": dict(summary.get("dominant_issue_counts", {})),
         "rejection_reason_counts": dict(summary.get("rejection_reason_counts", {})),
+        "plain_language_result": str(diagnostics.get("plain_language_result", "")),
+    }
+
+
+def build_rescue_target_stop_diagnostics_summary(diagnostics: dict[str, Any]) -> dict[str, Any]:
+    summary = diagnostics.get("summary", {})
+    return {
+        "diagnosed_runtime_count": int_or_zero(summary.get("diagnosed_runtime_count")),
+        "target_stop_issue_runtime_count": int_or_zero(summary.get("target_stop_issue_runtime_count")),
+        "shadow_candidate_runtime_count": int_or_zero(summary.get("shadow_candidate_runtime_count")),
+        "reward_ge_1_0_runtime_count": int_or_zero(summary.get("reward_ge_1_0_runtime_count")),
+        "reward_ge_1_1_runtime_count": int_or_zero(summary.get("reward_ge_1_1_runtime_count")),
+        "reward_ge_1_2_runtime_count": int_or_zero(summary.get("reward_ge_1_2_runtime_count")),
+        "runtime_ids": list(summary.get("runtime_ids", [])),
+        "strategy_ids": list(summary.get("strategy_ids", [])),
+        "parent_strategy_ids": list(summary.get("parent_strategy_ids", [])),
+        "dominant_target_stop_issue_counts": dict(summary.get("dominant_target_stop_issue_counts", {})),
         "plain_language_result": str(diagnostics.get("plain_language_result", "")),
     }
 
@@ -431,6 +460,20 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "boundary": "Fresh-data rerun and shadow parameter tests only; no broker/live approval.",
             },
         )
+    target_stop = payload.get("rescue_target_stop_diagnostics", {})
+    if int_or_zero(target_stop.get("target_stop_issue_runtime_count")):
+        actions.insert(
+            4,
+            {
+                "priority": "P0",
+                "action": "Use PA012 target/stop diagnostics before changing rescue runtime thresholds",
+                "evidence": (
+                    f"{target_stop['target_stop_issue_runtime_count']} target/stop issue runtimes; "
+                    f"issue counts {target_stop['dominant_target_stop_issue_counts']}"
+                ),
+                "boundary": "Target/stop fixes stay shadow-only until 10 trading-day A/B evidence exists.",
+            },
+        )
     if not payload["challenge"]["m12_current_day_runtime_ready"]:
         actions.append(
             {
@@ -449,6 +492,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
     rescue_ab = payload["rescue_ab_evidence"]
     backlog = payload["rescue_optimization_backlog"]
     diagnostics = payload["rescue_zero_signal_diagnostics"]
+    target_stop = payload["rescue_target_stop_diagnostics"]
     broker = payload["broker_readiness"]
     return (
         f"Project is at {payload['project_stage_label']}. "
@@ -466,6 +510,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{diagnostics['quality_filter_blocked_runtime_count']} need filter/parameter work, "
         f"{diagnostics['parent_source_absent_runtime_count']} need source mapping, "
         f"{diagnostics['parent_detector_zero_signal_runtime_count']} should keep same-timeframe mapping and wait for parent detector evidence. "
+        f"Target/stop diagnosis reviewed {target_stop['diagnosed_runtime_count']} reward/R runtimes, "
+        f"with {target_stop['target_stop_issue_runtime_count']} still needing target/stop geometry work before threshold changes. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -527,6 +573,19 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Parent-detector same-timeframe zero-signal: `{diagnostics['parent_detector_zero_signal_runtime_count']}`",
             f"- Potential entries if fresh quote gate clears: `{diagnostics['potential_signal_if_fresh_quote_count']}`",
             f"- Shadow reward min-R pass counts: `{diagnostics['shadow_reward_min_r_pass_counts']}`",
+        ]
+    )
+    target_stop = payload["rescue_target_stop_diagnostics"]
+    lines.extend(
+        [
+            "",
+            "## Rescue Target/Stop Diagnostics",
+            "",
+            f"- Diagnosed reward/R runtimes: `{target_stop['diagnosed_runtime_count']}`",
+            f"- Target/stop issue runtimes: `{target_stop['target_stop_issue_runtime_count']}`",
+            f"- Shadow-candidate runtimes: `{target_stop['shadow_candidate_runtime_count']}`",
+            f"- Reward >= 1.0R runtime count: `{target_stop['reward_ge_1_0_runtime_count']}`",
+            f"- Dominant target/stop issues: `{target_stop['dominant_target_stop_issue_counts']}`",
         ]
     )
     lines.extend(["", "## Next Actions", ""])
