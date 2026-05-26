@@ -19,6 +19,7 @@
     "real_order": false,
     "live_execution": false,
     "paper_trading_approval": false,
-    "manual_m12_37_once": false
+    "manual_m12_37_once": false,
+    "legacy_historical_profit_planning_input": false
   }
 }

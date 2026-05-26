@@ -1,19 +1,21 @@
 # M14 Internal Sim Next Session Plan
 
-- Generated at: `2026-05-26T06:11:39Z`
+- Generated at: `2026-05-26T15:00:00Z`
 - Mode: `m12_47_supervised_fresh_refresh_only`
 - Can run next internal sim session: `True`
 - Approved launch-ready strategies: `3/3`
 - Approved runtime input coverage: `4/4`
 - Broker watch strategies: `2`
 - Rescue watch rows: `13`
+- Legacy history metric planning inputs: `0`
 - Manual M12.37 once-mode allowed: `False`
 - Broker paper start allowed: `False`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
+- Legacy history metrics from the account dashboard are display-only and cannot affect strategy planning.
 
 ## Plain Result
 
-Next internal simulated-account session is ready in m12_47_supervised_fresh_refresh_only mode: 3/3 approved strategies and 4/4 approved runtimes are connected. 2 approved strategies need broker dry-run blocker watch; 13 rescue watch rows and 2 first-ledger watches remain for the next fresh refresh. Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled.
+Next internal simulated-account session is ready in m12_47_supervised_fresh_refresh_only mode: 3/3 approved strategies and 4/4 approved runtimes are connected. 2 approved strategies need broker dry-run blocker watch; 13 rescue watch rows and 2 first-ledger watches remain for the next fresh refresh. Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled. Legacy historical profit planning inputs: 0.
 
 ## Strategy Session Rows
 
@@ -25,7 +27,7 @@ Next internal simulated-account session is ready in m12_47_supervised_fresh_refr
 - M13 signal/open/close: `0/0/0`
 - Broker dry-run ready/blocked: `0/0`
 - Linked next-refresh watches: `0`
-- Acceptance checks: `m12_47_supervised_fresh_refresh_only, m13_signal_and_account_ledgers_refresh_after_session, m14_gate_stays_approved_internal_sim_only, no_broker_connection_no_real_order_no_live_execution`
+- Acceptance checks: `m12_47_supervised_fresh_refresh_only, m13_signal_and_account_ledgers_refresh_after_session, m14_gate_stays_approved_internal_sim_only, legacy_history_metrics_display_only_not_planning_input, no_broker_connection_no_real_order_no_live_execution`
 
 ### M10-PA-005
 
@@ -35,7 +37,7 @@ Next internal simulated-account session is ready in m12_47_supervised_fresh_refr
 - M13 signal/open/close: `329/8/8`
 - Broker dry-run ready/blocked: `5/2`
 - Linked next-refresh watches: `2`
-- Acceptance checks: `m12_47_supervised_fresh_refresh_only, m13_signal_and_account_ledgers_refresh_after_session, m14_gate_stays_approved_internal_sim_only, no_broker_connection_no_real_order_no_live_execution, broker_dry_run_blockers_remain_watch_only, pa005_rule_shadow_recheck_after_fresh_refresh`
+- Acceptance checks: `m12_47_supervised_fresh_refresh_only, m13_signal_and_account_ledgers_refresh_after_session, m14_gate_stays_approved_internal_sim_only, legacy_history_metrics_display_only_not_planning_input, no_broker_connection_no_real_order_no_live_execution, broker_dry_run_blockers_remain_watch_only, pa005_rule_shadow_recheck_after_fresh_refresh`
 
 ### M10-PA-008
 
@@ -45,7 +47,7 @@ Next internal simulated-account session is ready in m12_47_supervised_fresh_refr
 - M13 signal/open/close: `1/1/0`
 - Broker dry-run ready/blocked: `0/1`
 - Linked next-refresh watches: `1`
-- Acceptance checks: `m12_47_supervised_fresh_refresh_only, m13_signal_and_account_ledgers_refresh_after_session, m14_gate_stays_approved_internal_sim_only, no_broker_connection_no_real_order_no_live_execution, broker_dry_run_blockers_remain_watch_only, first_rescue_ledger_watch_after_fresh_refresh`
+- Acceptance checks: `m12_47_supervised_fresh_refresh_only, m13_signal_and_account_ledgers_refresh_after_session, m14_gate_stays_approved_internal_sim_only, legacy_history_metrics_display_only_not_planning_input, no_broker_connection_no_real_order_no_live_execution, broker_dry_run_blockers_remain_watch_only, first_rescue_ledger_watch_after_fresh_refresh`
 
 ## Global Watch Rows
 
@@ -53,6 +55,7 @@ Next internal simulated-account session is ready in m12_47_supervised_fresh_refr
 - `P0` `rescue_next_refresh_matrix`: 13 rescue watch rows can be evaluated after the next fresh run.
 - `P0` `first_rescue_ledger_watch`: 2 rescue runtimes currently need first M13 ledger evidence.
 - `P0` `broker_live_boundary_check`: broker_connection=false, real_order=false, live_execution=false, paper_trading_approval=false.
+- `P0` `legacy_history_metric_boundary_check`: legacy_historical_profit_planning_input=false for every strategy planning row.
 
 ## Execution Protocol
 

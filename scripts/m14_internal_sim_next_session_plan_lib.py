@@ -11,6 +11,14 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m14_internal_sim_next_session_plan.json"
+FORBIDDEN_OPERATIONS = (
+    "broker_connection",
+    "real_order",
+    "live_execution",
+    "paper_trading_approval",
+    "manual_m12_37_once",
+    "legacy_historical_profit_planning_input",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +72,7 @@ def validate_config(config: InternalSimNextSessionPlanConfig) -> None:
         raise ValueError("M14 internal simulated next-session plan must stay paper/simulated only")
     if not config.hard_boundaries.get("internal_simulated_account", False):
         raise ValueError("M14 internal simulated next-session plan must keep internal simulated account enabled")
-    for key in ("broker_connection", "real_order", "live_execution", "paper_trading_approval", "manual_m12_37_once"):
+    for key in FORBIDDEN_OPERATIONS:
         if config.hard_boundaries.get(key, False):
             raise ValueError(f"M14 internal simulated next-session plan cannot enable {key}")
 
@@ -112,6 +120,7 @@ def run_m14_internal_sim_next_session_plan(
             "live_execution": False,
             "paper_trading_approval": False,
             "manual_m12_37_once": False,
+            "legacy_historical_profit_planning_input": False,
         },
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -120,6 +129,7 @@ def run_m14_internal_sim_next_session_plan(
         "live_execution": False,
         "paper_trading_approval": False,
         "manual_m12_37_once": False,
+        "legacy_historical_profit_planning_input": False,
     }
     payload["plain_language_result"] = build_plain_language_result(payload)
     write_json(config.plan_json_path, payload)
@@ -177,6 +187,7 @@ def build_strategy_session_rows(
                 "real_order": False,
                 "live_execution": False,
                 "paper_trading_approval": False,
+                "legacy_historical_profit_planning_input": False,
             }
         )
     return rows
@@ -187,6 +198,7 @@ def acceptance_checks(launch_row: dict[str, Any], linked_watch_rows: list[dict[s
         "m12_47_supervised_fresh_refresh_only",
         "m13_signal_and_account_ledgers_refresh_after_session",
         "m14_gate_stays_approved_internal_sim_only",
+        "legacy_history_metrics_display_only_not_planning_input",
         "no_broker_connection_no_real_order_no_live_execution",
     ]
     if int_or_zero(launch_row.get("broker_dry_run_blocked_count")):
@@ -238,6 +250,14 @@ def build_global_watch_rows(next_refresh: dict[str, Any], rescue_ab: dict[str, A
             "pass_action": "Keep broker readiness in dry-run preview only.",
             "fail_action": "Stop and inspect boundary regression before any further readiness work.",
         },
+        {
+            "watch_id": "legacy_history_metric_boundary_check",
+            "priority": "P0",
+            "watch_type": "planning_boundary_check",
+            "expected_after_refresh": "legacy_historical_profit_planning_input=false for every strategy planning row.",
+            "pass_action": "Keep account-dashboard history metrics display-only.",
+            "fail_action": "Block strategy planning until the legacy history metric input is removed.",
+        },
     ]
     return rows
 
@@ -278,6 +298,9 @@ def build_summary(
         "parameter_change_allowed_now_count": int_or_zero(next_refresh_summary.get("parameter_change_allowed_now_count")),
         "no_m13_ledger_evidence_count": int_or_zero(rescue_summary.get("no_m13_ledger_evidence_count")),
         "promotion_allowed_count": int_or_zero(rescue_summary.get("promotion_allowed_count")),
+        "legacy_historical_profit_planning_input_count": sum(
+            1 for row in strategy_rows if row["legacy_historical_profit_planning_input"]
+        ),
         "manual_m12_37_once_allowed": False,
         "can_start_broker_paper": False,
         "broker_or_live_enabled": False,
@@ -318,7 +341,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"and {summary['approved_runtime_input_connected_count']}/{summary['approved_runtime_input_count']} approved runtimes are connected. "
         f"{summary['broker_watch_strategy_count']} approved strategies need broker dry-run blocker watch; "
         f"{summary['rescue_next_refresh_watch_rows']} rescue watch rows and {summary['first_ledger_watch_count']} first-ledger watches remain for the next fresh refresh. "
-        "Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled."
+        "Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled. "
+        f"Legacy historical profit planning inputs: {summary['legacy_historical_profit_planning_input_count']}."
     )
 
 
@@ -334,9 +358,11 @@ def build_plan_md(payload: dict[str, Any]) -> str:
         f"- Approved runtime input coverage: `{summary['approved_runtime_input_connected_count']}/{summary['approved_runtime_input_count']}`",
         f"- Broker watch strategies: `{summary['broker_watch_strategy_count']}`",
         f"- Rescue watch rows: `{summary['rescue_next_refresh_watch_rows']}`",
+        f"- Legacy history metric planning inputs: `{summary['legacy_historical_profit_planning_input_count']}`",
         f"- Manual M12.37 once-mode allowed: `{summary['manual_m12_37_once_allowed']}`",
         f"- Broker paper start allowed: `{summary['can_start_broker_paper']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
+        "- Legacy history metrics from the account dashboard are display-only and cannot affect strategy planning.",
         "",
         "## Plain Result",
         "",

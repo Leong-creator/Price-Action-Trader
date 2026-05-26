@@ -27,20 +27,32 @@ class M14InternalSimNextSessionPlanTest(unittest.TestCase):
             self.assertEqual(result["summary"]["approved_runtime_input_connected_count"], 3)
             self.assertEqual(result["summary"]["approved_runtime_input_count"], 3)
             self.assertEqual(result["summary"]["broker_watch_strategy_count"], 1)
+            self.assertEqual(result["summary"]["global_watch_row_count"], 5)
             self.assertEqual(result["summary"]["rescue_next_refresh_watch_rows"], 3)
             self.assertEqual(result["summary"]["first_ledger_watch_count"], 1)
             self.assertEqual(result["summary"]["broker_rule_shadow_watch_count"], 2)
             self.assertEqual(result["summary"]["parameter_change_allowed_now_count"], 0)
             self.assertFalse(result["summary"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["summary"]["legacy_historical_profit_planning_input_count"], 0)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
             self.assertFalse(result["broker_connection"])
             self.assertFalse(result["real_order"])
             self.assertFalse(result["live_execution"])
             self.assertFalse(result["paper_trading_approval"])
             self.assertFalse(result["manual_m12_37_once"])
+            self.assertFalse(result["legacy_historical_profit_planning_input"])
+            self.assertIn(
+                "legacy_history_metric_boundary_check",
+                {row["watch_id"] for row in result["global_watch_rows"]},
+            )
 
             rows = {row["strategy_id"]: row for row in result["strategy_session_rows"]}
             self.assertEqual(rows["M10-PA-004"]["session_action"], "continue_internal_simulated_account_testing")
+            self.assertFalse(rows["M10-PA-004"]["legacy_historical_profit_planning_input"])
+            self.assertIn(
+                "legacy_history_metrics_display_only_not_planning_input",
+                rows["M10-PA-004"]["acceptance_checks"],
+            )
             self.assertEqual(
                 rows["M10-PA-005"]["session_action"],
                 "continue_internal_sim_and_watch_broker_dry_run_blockers",
@@ -52,6 +64,8 @@ class M14InternalSimNextSessionPlanTest(unittest.TestCase):
             self.assertIn("M14 Internal Sim Next Session Plan", md)
             self.assertIn("Manual M12.37 once-mode allowed: `False`", md)
             self.assertIn("Broker paper start allowed: `False`", md)
+            self.assertIn("Legacy history metric planning inputs: `0`", md)
+            self.assertIn("display-only and cannot affect strategy planning", md)
 
     def test_rejects_manual_m12_37_or_live_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -62,6 +76,17 @@ class M14InternalSimNextSessionPlanTest(unittest.TestCase):
             config_path.write_text(json.dumps(payload), encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "manual_m12_37_once"):
+                load_config(config_path)
+
+    def test_rejects_legacy_historical_profit_planning_input_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = self._write_fixture(root)
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            payload["hard_boundaries"]["legacy_historical_profit_planning_input"] = True
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "legacy_historical_profit_planning_input"):
                 load_config(config_path)
 
     def _write_fixture(self, root: Path) -> Path:
@@ -185,6 +210,7 @@ class M14InternalSimNextSessionPlanTest(unittest.TestCase):
                         "live_execution": False,
                         "paper_trading_approval": False,
                         "manual_m12_37_once": False,
+                        "legacy_historical_profit_planning_input": False,
                     },
                 }
             ),

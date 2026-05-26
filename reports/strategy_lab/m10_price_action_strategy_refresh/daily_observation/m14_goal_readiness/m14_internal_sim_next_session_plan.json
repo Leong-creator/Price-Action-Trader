@@ -22,7 +22,7 @@
       "step": "review_internal_sim_and_rescue_evidence"
     }
   ],
-  "generated_at": "2026-05-26T06:11:39Z",
+  "generated_at": "2026-05-26T15:00:00Z",
   "global_watch_rows": [
     {
       "expected_after_refresh": "Approved strategies remain launch-ready and all approved runtime inputs stay connected.",
@@ -55,11 +55,20 @@
       "priority": "P0",
       "watch_id": "broker_live_boundary_check",
       "watch_type": "boundary_check"
+    },
+    {
+      "expected_after_refresh": "legacy_historical_profit_planning_input=false for every strategy planning row.",
+      "fail_action": "Block strategy planning until the legacy history metric input is removed.",
+      "pass_action": "Keep account-dashboard history metrics display-only.",
+      "priority": "P0",
+      "watch_id": "legacy_history_metric_boundary_check",
+      "watch_type": "planning_boundary_check"
     }
   ],
   "hard_boundaries": {
     "broker_connection": false,
     "internal_simulated_account": true,
+    "legacy_historical_profit_planning_input": false,
     "live_execution": false,
     "manual_m12_37_once": false,
     "paper_simulated_only": true,
@@ -73,12 +82,13 @@
     "m14_rescue_next_refresh_readiness": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_next_refresh_readiness.json"
   },
   "internal_simulated_account": true,
+  "legacy_historical_profit_planning_input": false,
   "live_execution": false,
   "m14_trading_date": "2026-05-22",
   "manual_m12_37_once": false,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "Next internal simulated-account session is ready in m12_47_supervised_fresh_refresh_only mode: 3/3 approved strategies and 4/4 approved runtimes are connected. 2 approved strategies need broker dry-run blocker watch; 13 rescue watch rows and 2 first-ledger watches remain for the next fresh refresh. Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled.",
+  "plain_language_result": "Next internal simulated-account session is ready in m12_47_supervised_fresh_refresh_only mode: 3/3 approved strategies and 4/4 approved runtimes are connected. 2 approved strategies need broker dry-run blocker watch; 13 rescue watch rows and 2 first-ledger watches remain for the next fresh refresh. Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled. Legacy historical profit planning inputs: 0.",
   "project_stage_label": "M14 internal simulated-account next-session plan",
   "real_order": false,
   "schema_version": "m14.internal-sim-next-session-plan.v1",
@@ -89,6 +99,7 @@
         "m12_47_supervised_fresh_refresh_only",
         "m13_signal_and_account_ledgers_refresh_after_session",
         "m14_gate_stays_approved_internal_sim_only",
+        "legacy_history_metrics_display_only_not_planning_input",
         "no_broker_connection_no_real_order_no_live_execution"
       ],
       "broker_blocker_reason_counts": {},
@@ -99,6 +110,7 @@
       "can_start_broker_paper": false,
       "display_name": "Broad channel boundary reversal long-only runtime",
       "internal_sim_launch_status": "ready_internal_sim_continue",
+      "legacy_historical_profit_planning_input": false,
       "linked_next_refresh_family_counts": {},
       "linked_next_refresh_watch_count": 0,
       "live_execution": false,
@@ -124,6 +136,7 @@
         "m12_47_supervised_fresh_refresh_only",
         "m13_signal_and_account_ledgers_refresh_after_session",
         "m14_gate_stays_approved_internal_sim_only",
+        "legacy_history_metrics_display_only_not_planning_input",
         "no_broker_connection_no_real_order_no_live_execution",
         "broker_dry_run_blockers_remain_watch_only",
         "pa005_rule_shadow_recheck_after_fresh_refresh"
@@ -140,6 +153,7 @@
       "can_start_broker_paper": false,
       "display_name": "Range geometry experimental runtime",
       "internal_sim_launch_status": "ready_internal_sim_continue_with_broker_dry_run_watch",
+      "legacy_historical_profit_planning_input": false,
       "linked_next_refresh_family_counts": {
         "broker_rule_shadow_recheck": 2
       },
@@ -169,6 +183,7 @@
         "m12_47_supervised_fresh_refresh_only",
         "m13_signal_and_account_ledgers_refresh_after_session",
         "m14_gate_stays_approved_internal_sim_only",
+        "legacy_history_metrics_display_only_not_planning_input",
         "no_broker_connection_no_real_order_no_live_execution",
         "broker_dry_run_blockers_remain_watch_only",
         "first_rescue_ledger_watch_after_fresh_refresh"
@@ -184,6 +199,7 @@
       "can_start_broker_paper": false,
       "display_name": "Visual strategy 008 experimental runtime",
       "internal_sim_launch_status": "ready_internal_sim_continue_with_broker_dry_run_watch",
+      "legacy_historical_profit_planning_input": false,
       "linked_next_refresh_family_counts": {
         "first_rescue_ledger_watch": 1
       },
@@ -221,9 +237,10 @@
     "can_run_next_internal_sim_session": true,
     "can_start_broker_paper": false,
     "first_ledger_watch_count": 2,
-    "global_watch_row_count": 4,
+    "global_watch_row_count": 5,
     "hard_boundary_violation_count": 0,
     "launch_ready_strategy_count": 3,
+    "legacy_historical_profit_planning_input_count": 0,
     "manual_m12_37_once_allowed": false,
     "next_session_mode": "m12_47_supervised_fresh_refresh_only",
     "no_m13_ledger_evidence_count": 2,
