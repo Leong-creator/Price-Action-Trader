@@ -37,6 +37,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["post_refresh_passed_count"], 0)
             self.assertEqual(result["summary"]["post_refresh_failed_count"], 0)
+            self.assertEqual(result["summary"]["external_reference_mapped_rescue_row_count"], 3)
+            self.assertEqual(result["summary"]["external_reference_broker_blocker_row_count"], 1)
+            self.assertEqual(result["summary"]["external_reference_project_count"], 2)
+            self.assertFalse(result["summary"]["external_reference_copy_trading_allowed"])
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
             self.assertEqual(result["summary"]["broker_dry_run_blocked_count"], 1)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
@@ -76,6 +80,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["rescue_post_refresh_outcome_review"]["watch_rows"], 4)
             self.assertEqual(result["rescue_post_refresh_outcome_review"]["waiting_count"], 4)
             self.assertFalse(result["rescue_post_refresh_outcome_review"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["rescue_external_reference_map"]["mapped_rescue_row_count"], 3)
+            self.assertFalse(result["rescue_external_reference_map"]["copy_trading_allowed"])
+            self.assertEqual(
+                result["stage_assessment"]["external_reference_status"],
+                "architecture_reference_only_no_external_override",
+            )
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertEqual(
                 result["rescue_policy"]["policy"],
@@ -90,6 +100,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Manual M12.37 once-mode allowed: `False`", md)
             self.assertIn("Post-refresh fresh refresh observed: `False`", md)
             self.assertIn("Post-refresh waiting/passed/failed: `4/0/0`", md)
+            self.assertIn("External reference rescue/broker rows: `3/1`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -109,6 +120,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         rescue_plan_path = root / "rescue_plan.json"
         backlog_path = root / "backlog.json"
         post_refresh_path = root / "post_refresh.json"
+        external_map_path = root / "external_map.json"
         config_path = root / "config.json"
 
         goal_path.write_text(
@@ -265,6 +277,25 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        external_map_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "mapped_rescue_row_count": 3,
+                        "broker_blocker_reference_row_count": 1,
+                        "p0_reference_row_count": 4,
+                        "external_reference_project_count": 2,
+                        "next_refresh_dependent_count": 4,
+                        "parameter_change_allowed_now_count": 0,
+                        "copy_trading_allowed": False,
+                        "external_decision_can_override_local_gate": False,
+                        "broker_or_live_enabled": False,
+                    },
+                    "plain_language_result": "External reference fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -277,6 +308,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_rescue_plan": str(rescue_plan_path),
                         "m14_rescue_optimization_backlog": str(backlog_path),
                         "m14_rescue_post_refresh_outcome_review": str(post_refresh_path),
+                        "m14_rescue_external_reference_map": str(external_map_path),
                     },
                     "outputs": {
                         "assessment_json": str(root / "assessment.json"),

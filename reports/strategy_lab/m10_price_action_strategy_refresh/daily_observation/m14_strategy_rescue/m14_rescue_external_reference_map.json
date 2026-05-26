@@ -1,0 +1,573 @@
+{
+  "broker_blocker_reference_rows": [
+    {
+      "blocked_count": 2,
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "live_execution": false,
+      "local_application": "Use a TradingAgents-style risk/portfolio split to decide whether the blocker is a sizing, exposure, or cooldown issue; keep broker readiness rows blocked until internal-sim evidence improves.",
+      "local_review_lanes": [
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "post_refresh_acceptance_check": "After the next M12.47-owned refresh, compare dry-run blocker counts and reason codes without unblocking broker readiness.",
+      "pre_refresh_action": "Prepare blocker comparison fields only; do not mutate broker readiness or run live/paper broker paths.",
+      "priority": "P0",
+      "real_order": false,
+      "reason_counts": {
+        "consecutive_losses_limit": 1,
+        "max_total_exposure_exceeded": 1
+      },
+      "reference_row_id": "m14-ext-ref-broker-m10-pa-005",
+      "strategy_id": "M10-PA-005"
+    },
+    {
+      "blocked_count": 1,
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "live_execution": false,
+      "local_application": "Use a TradingAgents-style risk/portfolio split to decide whether the blocker is a sizing, exposure, or cooldown issue; keep broker readiness rows blocked until internal-sim evidence improves.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "post_refresh_acceptance_check": "After the next M12.47-owned refresh, compare dry-run blocker counts and reason codes without unblocking broker readiness.",
+      "pre_refresh_action": "Prepare blocker comparison fields only; do not mutate broker readiness or run live/paper broker paths.",
+      "priority": "P0",
+      "real_order": false,
+      "reason_counts": {
+        "max_risk_per_order_exceeded": 1
+      },
+      "reference_row_id": "m14-ext-ref-broker-m10-pa-008",
+      "strategy_id": "M10-PA-008"
+    }
+  ],
+  "broker_connection": false,
+  "external_reference_patterns": [
+    {
+      "allowed_use": "Use as a local shadow signal scoreboard and experiment-exposure ledger after M12.47-owned refreshes.",
+      "forbidden_use": "No copy trading, broker sync, external operations, or direct execution.",
+      "pattern_id": "ai_trader_shadow_signal_scoreboard",
+      "project": "HKUDS/AI-Trader",
+      "source_basis": "Agent-native integration, signal feed/sync, paper-trading sandbox, and experiment exposure tracking.",
+      "url": "https://github.com/HKUDS/AI-Trader"
+    },
+    {
+      "allowed_use": "Use as a local review checklist that separates technical evidence, bull/bear objections, risk, and portfolio constraints.",
+      "forbidden_use": "No external LLM decision can override local M13/M14 ledgers, risk gates, or manual approval.",
+      "pattern_id": "tradingagents_role_decomposed_review",
+      "project": "TauricResearch/TradingAgents",
+      "source_basis": "Specialized analyst, researcher, trader, risk-management, and portfolio-manager roles with final simulated-exchange approval.",
+      "url": "https://github.com/TauricResearch/TradingAgents"
+    },
+    {
+      "allowed_use": "Use as a local audit trail for why a rescue parameter family is held, shadow-tested, promoted, modified, or rejected.",
+      "forbidden_use": "No automatic promotion, no parameter mutation, and no paper/live approval from an external review alone.",
+      "pattern_id": "tradingagents_persistent_decision_log",
+      "project": "TauricResearch/TradingAgents",
+      "source_basis": "Structured-output agents and persistent decision-log workflow.",
+      "url": "https://github.com/TauricResearch/TradingAgents"
+    }
+  ],
+  "generated_at": "2026-05-26T19:00:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "live_execution": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "m14_project_stage_assessment": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_project_stage_assessment.json",
+    "m14_rescue_next_refresh_readiness": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_next_refresh_readiness.json",
+    "m14_rescue_optimization_backlog": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_optimization_backlog.json",
+    "m14_rescue_target_stop_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_target_stop_diagnostics.json",
+    "m14_rescue_zero_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_zero_signal_diagnostics.json"
+  },
+  "live_execution": false,
+  "manual_m12_37_once": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": "External-reference map covered 11 rescue rows and 2 broker-blocker rows using 2 external projects as architecture references only. 13 checks still depend on the next M12.47-owned fresh refresh, parameter changes allowed now remain 0, and copy trading, external override, broker connection, real orders, live execution, paper approval, and manual M12.37 once-mode stay disabled.",
+  "real_order": false,
+  "rescue_reference_rows": [
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-001",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-001-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-001-m14-modify-20260522-1d"
+      ],
+      "strategy_id": "M10-PA-001-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-002",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-002-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-002-m14-modify-20260522-1d"
+      ],
+      "strategy_id": "M10-PA-002-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-004-MBF-QC",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-004-mbf-qc-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-004-MBF-QC-m14-modify-20260522-1d"
+      ],
+      "strategy_id": "M10-PA-004-MBF-QC-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-007",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-007-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-007-m14-modify-20260522-1d"
+      ],
+      "strategy_id": "M10-PA-007-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "missing_rescue_ledger",
+      "live_execution": false,
+      "local_application": "Treat external signal-sync ideas as a local ledger-chain checklist: registry, input spec, signal ledger, account ledger.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-008",
+      "post_refresh_acceptance_check": "A first M13 signal or account ledger row appears for the rescue runtime; then start its own 10-day evidence count.",
+      "pre_refresh_action": "Prepare mapping audit fields now; actual pass/fail waits for the next M12.47-owned fresh refresh.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "first_rescue_ledger_watch"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-008-broker-risk-cap-shadow",
+      "runtime_ids": [
+        "M10-PA-008-broker-risk-cap-shadow-1d"
+      ],
+      "strategy_id": "M10-PA-008-broker-risk-cap-shadow"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-009",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-009-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-009-m14-modify-20260522-1d"
+      ],
+      "strategy_id": "M10-PA-009-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "reward_filter_blocks_all",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use role-decomposed review to separate entry geometry, stop/target geometry, and reward/R policy before changing thresholds.",
+      "local_review_lanes": [
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-012",
+      "post_refresh_acceptance_check": "Normalized target/stop shadow runtime emits comparable M13 ledger evidence against the frozen rescue runtime.",
+      "pre_refresh_action": "Keep frozen runtime unchanged; use the existing target/stop shadow runtime as the only local comparison hook.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "target_stop_shadow_compare"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-012-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-012-m14-modify-20260522-5m"
+      ],
+      "strategy_id": "M10-PA-012-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "missing_rescue_ledger",
+      "live_execution": false,
+      "local_application": "Treat external signal-sync ideas as a local ledger-chain checklist: registry, input spec, signal ledger, account ledger.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-012",
+      "post_refresh_acceptance_check": "A first M13 signal or account ledger row appears for the rescue runtime; then start its own 10-day evidence count.",
+      "pre_refresh_action": "Prepare mapping audit fields now; actual pass/fail waits for the next M12.47-owned fresh refresh.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "first_rescue_ledger_watch"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-012-m14-modify-20260522-target-stop-risk-normalized-1-0r-shadow",
+      "runtime_ids": [
+        "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m"
+      ],
+      "strategy_id": "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-013",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck",
+        "parent_detector_evidence_wait"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-013-m14-modify-20260522",
+      "runtime_ids": [
+        "M10-PA-013-m14-modify-20260522-1d",
+        "M10-PA-013-m14-modify-20260522-5m"
+      ],
+      "strategy_id": "M10-PA-013-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "stale_quote_source_blocks_candidate",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "local_application": "Use a shadow signal scoreboard only after fresh M12.47 data; stale/fallback source rows cannot justify parameter changes.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M12-FTD-001",
+      "post_refresh_acceptance_check": "Fresh quote run produces nonzero source or signal evidence without using fallback quotes.",
+      "pre_refresh_action": "Do not tune thresholds now; wait for fresh quote evidence and compare source/signal counts.",
+      "priority": "P0",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [
+        "fresh_quote_recheck"
+      ],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m12-ftd-001-m14-modify-20260522",
+      "runtime_ids": [
+        "M12-FTD-001-m14-modify-20260522-1d"
+      ],
+      "strategy_id": "M12-FTD-001-m14-modify-20260522"
+    },
+    {
+      "broker_connection": false,
+      "copy_trading_allowed": false,
+      "dominant_zero_signal_issue": "",
+      "external_decision_can_override_local_gate": false,
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "issue_type": "collect_more_ab_evidence",
+      "live_execution": false,
+      "local_application": "Use a local scoreboard and decision log to keep baseline-vs-rescue evidence comparable until the 10-day rescue window is complete.",
+      "local_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_change_allowed_now": false,
+      "parent_strategy_id": "M10-PA-011",
+      "post_refresh_acceptance_check": "Continue local A/B evidence collection and record the decision-log reason for hold/modify/reject.",
+      "pre_refresh_action": "Keep collecting A/B evidence; no promotion or rejection before the 10-day rescue window is proven.",
+      "priority": "P2",
+      "promotion_gate": "10 rescue A/B trading days plus manual M14 review",
+      "readiness_families": [],
+      "real_order": false,
+      "reference_row_id": "m14-ext-ref-m10-pa-011-orb-r1",
+      "runtime_ids": [
+        "M10-PA-011-ORB-R1-5m"
+      ],
+      "strategy_id": "M10-PA-011-ORB-R1"
+    }
+  ],
+  "schema_version": "m14.rescue-external-reference-map.v1",
+  "stage": "M14.rescue_external_reference_map",
+  "summary": {
+    "broker_blocker_reference_row_count": 2,
+    "broker_or_live_enabled": false,
+    "copy_trading_allowed": false,
+    "external_decision_can_override_local_gate": false,
+    "external_reference_pattern_counts": {
+      "ai_trader_shadow_signal_scoreboard": 11,
+      "tradingagents_persistent_decision_log": 13,
+      "tradingagents_role_decomposed_review": 13
+    },
+    "external_reference_project_count": 2,
+    "issue_counts": {
+      "collect_more_ab_evidence": 1,
+      "missing_rescue_ledger": 2,
+      "zero_signal_after_connection": 8
+    },
+    "manual_m12_37_once_allowed": false,
+    "mapped_rescue_row_count": 11,
+    "next_refresh_dependent_count": 13,
+    "p0_reference_row_count": 12,
+    "parameter_change_allowed_now_count": 0,
+    "project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+    "ten_day_challenge_complete": true
+  }
+}

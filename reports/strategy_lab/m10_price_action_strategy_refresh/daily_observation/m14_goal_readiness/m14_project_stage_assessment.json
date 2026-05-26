@@ -18,7 +18,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T18:00:00Z",
+  "generated_at": "2026-05-26T19:05:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own A/B evidence and broker/live remains disabled."
@@ -35,6 +35,7 @@
   "input_refs": {
     "m14_goal_readiness_report": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_goal_readiness_report.json",
     "m14_internal_sim_next_session_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_internal_sim_next_session_plan.json",
+    "m14_rescue_external_reference_map": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_external_reference_map.json",
     "m14_rescue_optimization_backlog": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_optimization_backlog.json",
     "m14_rescue_post_refresh_outcome_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_post_refresh_outcome_review.json",
     "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json"
@@ -186,9 +187,21 @@
   },
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
   "project_stage_label": "M14 project stage assessment and strategy route map",
   "real_order": false,
+  "rescue_external_reference_map": {
+    "broker_blocker_reference_row_count": 2,
+    "broker_or_live_enabled": false,
+    "copy_trading_allowed": false,
+    "external_decision_can_override_local_gate": false,
+    "external_reference_project_count": 2,
+    "mapped_rescue_row_count": 11,
+    "next_refresh_dependent_count": 13,
+    "p0_reference_row_count": 12,
+    "parameter_change_allowed_now_count": 0,
+    "plain_language_result": "External-reference map covered 11 rescue rows and 2 broker-blocker rows using 2 external projects as architecture references only. 13 checks still depend on the next M12.47-owned fresh refresh, parameter changes allowed now remain 0, and copy trading, external override, broker connection, real orders, live execution, paper approval, and manual M12.37 once-mode stay disabled."
+  },
   "rescue_policy": {
     "actionable_before_10d_count": 10,
     "broker_blocker_reason_counts": {
@@ -235,12 +248,15 @@
     "backlog_plain_result": "Rescue optimization backlog has 11 rescue rows; 10 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
     "broker_status": "dry_run_preview_only_not_broker_paper",
     "current_phase": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+    "external_reference_plain_result": "External-reference map covered 11 rescue rows and 2 broker-blocker rows using 2 external projects as architecture references only. 13 checks still depend on the next M12.47-owned fresh refresh, parameter changes allowed now remain 0, and copy trading, external override, broker connection, real orders, live execution, paper approval, and manual M12.37 once-mode stay disabled.",
+    "external_reference_status": "architecture_reference_only_no_external_override",
     "goal_plain_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Internal launch readiness is 3/3 approved strategies, with 4/4 approved runtimes connected and 2 strategies needing broker dry-run blocker watch. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Next-refresh readiness tracks 13 rescue watch rows, including 7 fresh-quote rechecks, 2 first-ledger watches, 2 PA005 broker-rule rechecks, and 0 parameter changes allowed now. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker blocker rule shadow evidence has 2 PA005 rule-only rows (1 exposure ranker, 1 cooldown/quality) and 0 runtime registrations. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
     "internal_sim_status": "ready_for_m12_47_supervised_next_session",
     "next_required_evidence": [
       "11 rescue runtimes must collect their own A/B evidence; 9 currently have M13 ledger evidence.",
       "2 rescue runtimes need a first M13 ledger row after the next M12.47 refresh.",
       "Post-refresh review has 13 waiting, 0 passed/evidence, and 0 failed rows.",
+      "External-reference map covers 11 rescue rows and 2 broker-blocker rows as architecture references only.",
       "3 broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
     ],
     "next_session_plain_result": "Next internal simulated-account session is ready in m12_47_supervised_fresh_refresh_only mode: 3/3 approved strategies and 4/4 approved runtimes are connected. 2 approved strategies need broker dry-run blocker watch; 13 rescue watch rows and 2 first-ledger watches remain for the next fresh refresh. Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled.",
@@ -831,6 +847,12 @@
     "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
     "data_quality_state": "history_recompute_from_existing_challenge",
     "effective_challenge_trading_days": 10,
+    "external_reference_broker_blocker_row_count": 2,
+    "external_reference_copy_trading_allowed": false,
+    "external_reference_external_override_allowed": false,
+    "external_reference_mapped_rescue_row_count": 11,
+    "external_reference_p0_row_count": 12,
+    "external_reference_project_count": 2,
     "goal_complete": false,
     "launch_ready_strategy_count": 3,
     "manual_m12_37_once_allowed": false,

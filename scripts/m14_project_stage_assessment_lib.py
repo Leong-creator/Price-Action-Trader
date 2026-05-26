@@ -22,6 +22,7 @@ class ProjectStageAssessmentConfig:
     strategy_rescue_plan_path: Path
     rescue_optimization_backlog_path: Path
     rescue_post_refresh_outcome_review_path: Path
+    rescue_external_reference_map_path: Path
     assessment_json_path: Path
     assessment_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -53,6 +54,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         rescue_post_refresh_outcome_review_path=resolve_repo_path(
             inputs["m14_rescue_post_refresh_outcome_review"]
         ),
+        rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         assessment_json_path=resolve_repo_path(outputs["assessment_json"]),
         assessment_md_path=resolve_repo_path(outputs["assessment_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -85,13 +87,14 @@ def run_m14_project_stage_assessment(
     rescue_plan = read_json(config.strategy_rescue_plan_path)
     backlog = read_json(config.rescue_optimization_backlog_path)
     post_refresh = read_json(config.rescue_post_refresh_outcome_review_path)
+    external_map = read_json(config.rescue_external_reference_map_path)
 
     strategy_routes = build_strategy_routes(
         action_matrix=list(goal.get("strategy_action_matrix", [])),
         next_session_rows=list(next_session.get("strategy_session_rows", [])),
         rescue_plan_rows=list(rescue_plan.get("rows", [])),
     )
-    summary = build_summary(goal, next_session, backlog, post_refresh, strategy_routes)
+    summary = build_summary(goal, next_session, backlog, post_refresh, external_map, strategy_routes)
     payload: dict[str, Any] = {
         "schema_version": "m14.project-stage-assessment.v1",
         "stage": config.stage,
@@ -107,13 +110,15 @@ def run_m14_project_stage_assessment(
             "m14_rescue_post_refresh_outcome_review": project_path(
                 config.rescue_post_refresh_outcome_review_path
             ),
+            "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
         },
         "summary": summary,
-        "stage_assessment": build_stage_assessment(goal, next_session, backlog, post_refresh, summary),
+        "stage_assessment": build_stage_assessment(goal, next_session, backlog, post_refresh, external_map, summary),
         "strategy_routes": strategy_routes,
         "next_fresh_refresh_acceptance": build_next_fresh_refresh_acceptance(next_session, goal),
         "rescue_policy": build_rescue_policy(goal, backlog),
         "rescue_post_refresh_outcome_review": build_post_refresh_outcome_review(post_refresh),
+        "rescue_external_reference_map": build_external_reference_map(external_map),
         "external_reference_policy": dict(goal.get("external_reference_policy", {})),
         "goal_completion_assessment": {
             "goal_complete": False,
@@ -151,6 +156,7 @@ def build_summary(
     next_session: dict[str, Any],
     backlog: dict[str, Any],
     post_refresh: dict[str, Any],
+    external_map: dict[str, Any],
     strategy_routes: list[dict[str, Any]],
 ) -> dict[str, Any]:
     challenge = goal.get("challenge", {})
@@ -162,6 +168,7 @@ def build_summary(
     next_summary = next_session.get("summary", {})
     backlog_summary = backlog.get("summary", {})
     post_summary = post_refresh.get("summary", {})
+    external_summary = external_map.get("summary", {})
     route_counts = dict(sorted(Counter(str(row.get("route_category", "")) for row in strategy_routes).items()))
     return {
         "current_project_stage": str(goal.get("project_stage_label", "")),
@@ -203,6 +210,18 @@ def build_summary(
         "post_refresh_passed_count": int_or_zero(post_summary.get("passed_count")),
         "post_refresh_failed_count": int_or_zero(post_summary.get("failed_count")),
         "post_refresh_manual_m12_37_once_allowed": False,
+        "external_reference_mapped_rescue_row_count": int_or_zero(
+            external_summary.get("mapped_rescue_row_count")
+        ),
+        "external_reference_broker_blocker_row_count": int_or_zero(
+            external_summary.get("broker_blocker_reference_row_count")
+        ),
+        "external_reference_p0_row_count": int_or_zero(external_summary.get("p0_reference_row_count")),
+        "external_reference_project_count": int_or_zero(
+            external_summary.get("external_reference_project_count")
+        ),
+        "external_reference_copy_trading_allowed": False,
+        "external_reference_external_override_allowed": False,
         "rescue_actionable_before_10d_count": int_or_zero(
             backlog_summary.get("actionable_before_10d_count")
         ),
@@ -225,6 +244,7 @@ def build_stage_assessment(
     next_session: dict[str, Any],
     backlog: dict[str, Any],
     post_refresh: dict[str, Any],
+    external_map: dict[str, Any],
     summary: dict[str, Any],
 ) -> dict[str, Any]:
     post_refresh_status = (
@@ -245,6 +265,7 @@ def build_stage_assessment(
         ),
         "rescue_status": "connected_but_not_promoted",
         "post_refresh_status": post_refresh_status,
+        "external_reference_status": "architecture_reference_only_no_external_override",
         "broker_status": "dry_run_preview_only_not_broker_paper",
         "next_required_evidence": [
             (
@@ -259,6 +280,10 @@ def build_stage_assessment(
                 f"{summary['post_refresh_passed_count']} passed/evidence, and {summary['post_refresh_failed_count']} failed rows."
             ),
             (
+                f"External-reference map covers {summary['external_reference_mapped_rescue_row_count']} rescue rows "
+                f"and {summary['external_reference_broker_blocker_row_count']} broker-blocker rows as architecture references only."
+            ),
+            (
                 f"{summary['broker_dry_run_blocked_count']} broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
             ),
         ],
@@ -266,6 +291,7 @@ def build_stage_assessment(
         "goal_plain_result": str(goal.get("plain_language_result", "")),
         "backlog_plain_result": str(backlog.get("plain_language_result", "")),
         "post_refresh_plain_result": str(post_refresh.get("plain_language_result", "")),
+        "external_reference_plain_result": str(external_map.get("plain_language_result", "")),
     }
 
 
@@ -288,6 +314,26 @@ def build_post_refresh_outcome_review(post_refresh: dict[str, Any]) -> dict[str,
         "parameter_change_allowed_now_count": 0,
         "broker_or_live_enabled": False,
         "plain_language_result": str(post_refresh.get("plain_language_result", "")),
+    }
+
+
+def build_external_reference_map(external_map: dict[str, Any]) -> dict[str, Any]:
+    summary = external_map.get("summary", {})
+    return {
+        "mapped_rescue_row_count": int_or_zero(summary.get("mapped_rescue_row_count")),
+        "broker_blocker_reference_row_count": int_or_zero(
+            summary.get("broker_blocker_reference_row_count")
+        ),
+        "p0_reference_row_count": int_or_zero(summary.get("p0_reference_row_count")),
+        "external_reference_project_count": int_or_zero(summary.get("external_reference_project_count")),
+        "next_refresh_dependent_count": int_or_zero(summary.get("next_refresh_dependent_count")),
+        "parameter_change_allowed_now_count": int_or_zero(
+            summary.get("parameter_change_allowed_now_count")
+        ),
+        "copy_trading_allowed": False,
+        "external_decision_can_override_local_gate": False,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(external_map.get("plain_language_result", "")),
     }
 
 
@@ -428,6 +474,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{'reviewed' if summary['post_refresh_fresh_refresh_observed'] else 'waiting for fresh M12.47 data'} "
         f"with {summary['post_refresh_waiting_count']} waiting, {summary['post_refresh_passed_count']} passed/evidence, "
         f"and {summary['post_refresh_failed_count']} failed rows from quote_source={summary['post_refresh_source_quote']}. "
+        f"External references are mapped to {summary['external_reference_mapped_rescue_row_count']} rescue rows and "
+        f"{summary['external_reference_broker_blocker_row_count']} broker-blocker rows as architecture references only. "
         f"Broker readiness stays dry-run preview only: {summary['broker_dry_run_ready_count']} ready and {summary['broker_dry_run_blocked_count']} blocked; "
         "manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled."
     )
@@ -449,6 +497,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Post-refresh fresh refresh observed: `{summary['post_refresh_fresh_refresh_observed']}`",
         f"- Post-refresh quote source: `{summary['post_refresh_source_quote']}`",
         f"- Post-refresh waiting/passed/failed: `{summary['post_refresh_waiting_count']}/{summary['post_refresh_passed_count']}/{summary['post_refresh_failed_count']}`",
+        f"- External reference rescue/broker rows: `{summary['external_reference_mapped_rescue_row_count']}/{summary['external_reference_broker_blocker_row_count']}`",
         f"- Broker dry-run ready/blocked: `{summary['broker_dry_run_ready_count']}/{summary['broker_dry_run_blocked_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
         "",
@@ -462,6 +511,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Internal sim status: `{payload['stage_assessment']['internal_sim_status']}`",
         f"- Rescue status: `{payload['stage_assessment']['rescue_status']}`",
         f"- Post-refresh status: `{payload['stage_assessment']['post_refresh_status']}`",
+        f"- External reference status: `{payload['stage_assessment']['external_reference_status']}`",
         f"- Broker status: `{payload['stage_assessment']['broker_status']}`",
         "",
         "## Route Counts",

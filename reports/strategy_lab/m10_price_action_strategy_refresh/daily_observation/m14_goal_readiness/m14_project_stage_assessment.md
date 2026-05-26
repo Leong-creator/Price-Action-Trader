@@ -1,6 +1,6 @@
 # M14 Project Stage Assessment
 
-- Generated at: `2026-05-26T18:00:00Z`
+- Generated at: `2026-05-26T19:05:00Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
 - Next session ready: `True`
@@ -11,12 +11,13 @@
 - Post-refresh fresh refresh observed: `False`
 - Post-refresh quote source: `fallback_quotes_only`
 - Post-refresh waiting/passed/failed: `13/0/0`
+- External reference rescue/broker rows: `11/2`
 - Broker dry-run ready/blocked: `5/3`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
 
 ## Plain Result
 
-Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.
+Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.
 
 ## Stage Assessment
 
@@ -24,6 +25,7 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 - Internal sim status: `ready_for_m12_47_supervised_next_session`
 - Rescue status: `connected_but_not_promoted`
 - Post-refresh status: `waiting_for_m12_47_fresh_refresh`
+- External reference status: `architecture_reference_only_no_external_override`
 - Broker status: `dry_run_preview_only_not_broker_paper`
 
 ## Route Counts
