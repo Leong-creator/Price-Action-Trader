@@ -33,6 +33,7 @@ class ObjectiveCompletionAuditConfig:
     strategy_source_visual_alignment_gate_path: Path
     strategy_source_visual_confirmation_packet_path: Path
     strategy_source_visual_confirmation_response_gate_path: Path
+    strategy_future_source_reextract_spec_prep_path: Path
     rescue_external_reference_map_path: Path
     broker_readiness_plan_path: Path
     audit_json_path: Path
@@ -91,6 +92,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveCompletionAu
         strategy_source_visual_confirmation_response_gate_path=resolve_repo_path(
             inputs["m14_strategy_source_visual_confirmation_response_gate"]
         ),
+        strategy_future_source_reextract_spec_prep_path=resolve_repo_path(
+            inputs["m14_strategy_future_source_reextract_spec_prep"]
+        ),
         rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         broker_readiness_plan_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         audit_json_path=resolve_repo_path(outputs["audit_json"]),
@@ -118,6 +122,7 @@ def validate_config(config: ObjectiveCompletionAuditConfig) -> None:
         "m12_account_specs_mutation",
         "broker_readiness_status_mutation",
         "parameter_mutation",
+        "legacy_historical_profit_planning_input",
     )
     for key in forbidden_true_keys:
         if config.hard_boundaries.get(key, False):
@@ -149,6 +154,7 @@ def run_m14_objective_completion_audit(
     source_visual_confirmation_response_gate = read_json(
         config.strategy_source_visual_confirmation_response_gate_path
     )
+    future_source_reextract_spec_prep = read_json(config.strategy_future_source_reextract_spec_prep_path)
     external_map = read_json(config.rescue_external_reference_map_path)
     broker_plan = read_json(config.broker_readiness_plan_path)
 
@@ -169,6 +175,7 @@ def run_m14_objective_completion_audit(
         source_visual_alignment_gate=source_visual_alignment_gate,
         source_visual_confirmation_packet=source_visual_confirmation_packet,
         source_visual_confirmation_response_gate=source_visual_confirmation_response_gate,
+        future_source_reextract_spec_prep=future_source_reextract_spec_prep,
         external_map=external_map,
         broker_plan=broker_plan,
     )
@@ -230,6 +237,9 @@ def run_m14_objective_completion_audit(
             "m14_strategy_source_visual_confirmation_response_gate": project_path(
                 config.strategy_source_visual_confirmation_response_gate_path
             ),
+            "m14_strategy_future_source_reextract_spec_prep": project_path(
+                config.strategy_future_source_reextract_spec_prep_path
+            ),
             "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_plan_path),
         },
@@ -258,6 +268,7 @@ def run_m14_objective_completion_audit(
             "m12_account_specs_mutation": False,
             "broker_readiness_status_mutation": False,
             "parameter_mutation": False,
+            "legacy_historical_profit_planning_input": False,
         },
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -270,6 +281,7 @@ def run_m14_objective_completion_audit(
         "m12_account_specs_mutation": False,
         "broker_readiness_status_mutation": False,
         "parameter_mutation": False,
+        "legacy_historical_profit_planning_input": False,
     }
     payload["plain_language_result"] = build_plain_language_result(payload)
     write_json(config.audit_json_path, payload)
@@ -296,6 +308,7 @@ def build_summary(
     source_visual_alignment_gate: dict[str, Any],
     source_visual_confirmation_packet: dict[str, Any],
     source_visual_confirmation_response_gate: dict[str, Any],
+    future_source_reextract_spec_prep: dict[str, Any],
     external_map: dict[str, Any],
     broker_plan: dict[str, Any],
 ) -> dict[str, Any]:
@@ -316,6 +329,7 @@ def build_summary(
     source_visual_alignment_summary = source_visual_alignment_gate.get("summary", {})
     source_visual_confirmation_summary = source_visual_confirmation_packet.get("summary", {})
     source_visual_confirmation_response_summary = source_visual_confirmation_response_gate.get("summary", {})
+    future_spec_prep_summary = future_source_reextract_spec_prep.get("summary", {})
     external_summary = external_map.get("summary", {})
     parameter_shadow_mutation_allowed_count = int_or_zero(
         stage_summary.get(
@@ -1004,6 +1018,48 @@ def build_summary(
                 source_visual_confirmation_response_summary.get("parameter_mutation_allowed_now_count"),
             )
         ),
+        "strategy_future_source_reextract_spec_prep_row_count": int_or_zero(
+            future_spec_prep_summary.get("future_source_reextract_spec_prep_row_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_candidate_strategy_count": int_or_zero(
+            future_spec_prep_summary.get("candidate_strategy_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_source_atom_count": int_or_zero(
+            future_spec_prep_summary.get("source_backed_atom_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_answer_count": int_or_zero(
+            future_spec_prep_summary.get("source_review_answer_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_conditional_draft_count": int_or_zero(
+            future_spec_prep_summary.get("conditional_spec_draft_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_unblocked_count": int_or_zero(
+            future_spec_prep_summary.get("future_spec_unblocked_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_blocked_visual_count": int_or_zero(
+            future_spec_prep_summary.get("blocked_until_manual_visual_confirmation_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_pending_confirmation_count": int_or_zero(
+            future_spec_prep_summary.get("manual_confirmation_pending_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_can_create_strategy_now_count": int_or_zero(
+            future_spec_prep_summary.get("strategy_creation_allowed_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_can_close_gap_now_count": int_or_zero(
+            future_spec_prep_summary.get("can_close_gap_now_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_can_promote_now_count": int_or_zero(
+            future_spec_prep_summary.get("can_promote_now_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_can_discard_now_count": int_or_zero(
+            future_spec_prep_summary.get("can_discard_now_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_parameter_mutation_allowed_count": int_or_zero(
+            future_spec_prep_summary.get("parameter_mutation_allowed_now_count")
+        ),
+        "strategy_future_source_reextract_spec_prep_legacy_history_input_count": int_or_zero(
+            future_spec_prep_summary.get("legacy_historical_profit_planning_input_count")
+        ),
         "fresh_refresh_observed": bool(
             activation_summary.get(
                 "fresh_refresh_observed",
@@ -1212,6 +1268,7 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             and summary["strategy_source_visual_alignment_gate_row_count"] > 0
             and summary["strategy_source_visual_confirmation_packet_row_count"] > 0
             and summary["strategy_source_visual_confirmation_response_gate_row_count"] > 0
+            and summary["strategy_future_source_reextract_spec_prep_row_count"] > 0
             else "blocked",
             (
                 f"Source recheck triage has {summary['strategy_source_recheck_row_count']} artifact-only rows, "
@@ -1251,12 +1308,20 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"with {summary['strategy_source_visual_confirmation_response_review_pack_question_count']} questions and "
                 f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
                 f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present; "
+                f"future source-reextract spec prep has "
+                f"{summary['strategy_future_source_reextract_spec_prep_row_count']} rows, "
+                f"{summary['strategy_future_source_reextract_spec_prep_conditional_draft_count']} conditional drafts, "
+                f"{summary['strategy_future_source_reextract_spec_prep_unblocked_count']} unblocked drafts, "
+                f"{summary['strategy_future_source_reextract_spec_prep_blocked_visual_count']} visual-blocked drafts, "
+                f"{summary['strategy_future_source_reextract_spec_prep_pending_confirmation_count']} pending confirmations, "
+                f"and legacy-history planning inputs "
+                f"{summary['strategy_future_source_reextract_spec_prep_legacy_history_input_count']}; "
                 f"create/close/promote/discard/mutation allowed now is "
-                f"{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/"
-                f"{summary['strategy_source_reextract_review_can_close_gap_now_count']}/"
-                f"{summary['strategy_source_reextract_review_can_promote_now_count']}/"
-                f"{summary['strategy_source_reextract_review_can_discard_now_count']}/"
-                f"{summary['strategy_source_visual_confirmation_response_parameter_mutation_allowed_count']}."
+                f"{summary['strategy_future_source_reextract_spec_prep_can_create_strategy_now_count']}/"
+                f"{summary['strategy_future_source_reextract_spec_prep_can_close_gap_now_count']}/"
+                f"{summary['strategy_future_source_reextract_spec_prep_can_promote_now_count']}/"
+                f"{summary['strategy_future_source_reextract_spec_prep_can_discard_now_count']}/"
+                f"{summary['strategy_future_source_reextract_spec_prep_parameter_mutation_allowed_count']}."
             ),
             ""
             if summary["strategy_source_recheck_row_count"] > 0
@@ -1265,7 +1330,8 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             and summary["strategy_source_visual_alignment_gate_row_count"] > 0
             and summary["strategy_source_visual_confirmation_packet_row_count"] > 0
             and summary["strategy_source_visual_confirmation_response_gate_row_count"] > 0
-            else "Source recheck triage, source reextract plan, source reextract review, source visual alignment gate, source visual confirmation packet, or response gate artifact is missing.",
+            and summary["strategy_future_source_reextract_spec_prep_row_count"] > 0
+            else "Source recheck triage, source reextract plan, source reextract review, source visual alignment gate, source visual confirmation packet, response gate, or future spec prep artifact is missing.",
             "Use this queue to review original source refs and visual packs; do not create, promote, discard, or mutate a strategy from source review alone.",
             [
                 "m14_strategy_source_recheck_triage",
@@ -1274,6 +1340,7 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "m14_strategy_source_visual_alignment_gate",
                 "m14_strategy_source_visual_confirmation_packet",
                 "m14_strategy_source_visual_confirmation_response_gate",
+                "m14_strategy_future_source_reextract_spec_prep",
             ],
         ),
         requirement_row(
@@ -1408,7 +1475,12 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']} future specs unblocked; "
         f"its manual review pack is ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} "
         f"with {summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
-        f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present. "
+        f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present; "
+        f"future source-reextract spec prep has {summary['strategy_future_source_reextract_spec_prep_row_count']} rows, "
+        f"{summary['strategy_future_source_reextract_spec_prep_conditional_draft_count']} conditional drafts, "
+        f"{summary['strategy_future_source_reextract_spec_prep_unblocked_count']} unblocked, "
+        f"{summary['strategy_future_source_reextract_spec_prep_blocked_visual_count']} visual-blocked, and "
+        f"legacy-history planning inputs={summary['strategy_future_source_reextract_spec_prep_legacy_history_input_count']}. "
         f"Evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows, "
         f"including {summary['strategy_evidence_requires_fresh_refresh_count']} fresh-refresh waits, "
         f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
@@ -1447,6 +1519,8 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Source visual confirmation response gate rows/questions pending/cases pending/complete/unblocked: `{summary['strategy_source_visual_confirmation_response_gate_row_count']}/{summary['strategy_source_visual_confirmation_response_question_pending_count']}/{summary['strategy_source_visual_confirmation_response_case_pending_count']}/{summary['strategy_source_visual_confirmation_response_complete_count']}/{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']}`",
         f"- Source visual confirmation response review pack ready/questions/assets existing/assets total: `{summary['strategy_source_visual_confirmation_response_review_pack_ready']}/{summary['strategy_source_visual_confirmation_response_review_pack_question_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']}`",
         f"- Source visual confirmation response create/mutation/invalid allowed: `{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_response_parameter_mutation_allowed_count']}/{summary['strategy_source_visual_confirmation_response_invalid_count']}`",
+        f"- Future source-reextract spec prep rows/drafts/unblocked/visual-blocked/pending-confirmations: `{summary['strategy_future_source_reextract_spec_prep_row_count']}/{summary['strategy_future_source_reextract_spec_prep_conditional_draft_count']}/{summary['strategy_future_source_reextract_spec_prep_unblocked_count']}/{summary['strategy_future_source_reextract_spec_prep_blocked_visual_count']}/{summary['strategy_future_source_reextract_spec_prep_pending_confirmation_count']}`",
+        f"- Future source-reextract spec prep create/close/promote/discard/mutation/legacy-history inputs: `{summary['strategy_future_source_reextract_spec_prep_can_create_strategy_now_count']}/{summary['strategy_future_source_reextract_spec_prep_can_close_gap_now_count']}/{summary['strategy_future_source_reextract_spec_prep_can_promote_now_count']}/{summary['strategy_future_source_reextract_spec_prep_can_discard_now_count']}/{summary['strategy_future_source_reextract_spec_prep_parameter_mutation_allowed_count']}/{summary['strategy_future_source_reextract_spec_prep_legacy_history_input_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",
         f"- Parameter activation candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",

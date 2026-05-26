@@ -1,0 +1,574 @@
+{
+  "broker_connection": false,
+  "broker_readiness_status_mutation": false,
+  "future_source_reextract_spec_prep_rows": [
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "can_close_gap_now": false,
+      "can_create_strategy_now": false,
+      "can_discard_now": false,
+      "can_promote_now": false,
+      "candidate_entry_logic": "Model as first MA test or first opposite-side close after a sustained trend gap-bar run.",
+      "candidate_exit_logic": "Keep position sizing tied to stop distance instead of tightening stops to fit a fixed quantity.",
+      "candidate_invalidation_logic": "Require explicit opposite breakout/follow-through before treating tight-channel continuation as failed.",
+      "catalog_title": "Tight Channel Trend Continuation",
+      "conditional_spec_draft": {
+        "activation_boundary": "manual_visual_confirmation_and_manual_m14_review_required_before_strategy_state_change",
+        "entry": "Model as first MA test or first opposite-side close after a sustained trend gap-bar run.",
+        "exit_or_risk": "Keep position sizing tied to stop distance instead of tightening stops to fit a fixed quantity.",
+        "invalidation": "Require explicit opposite breakout/follow-through before treating tight-channel continuation as failed.",
+        "proxy_fields": [
+          "trend_direction",
+          "pullback_bar_count",
+          "pullback_depth_vs_average_bar",
+          "moving_average_gap_bar",
+          "gap_close_or_overlap",
+          "opposite_breakout_follow_through"
+        ],
+        "setup": "tight_channel_small_pullback_trend_continuation",
+        "state": "blocked_until_manual_visual_confirmation"
+      },
+      "draft_state": "blocked_until_manual_visual_confirmation",
+      "future_spec_gate_state": "blocked_until_manual_visual_confirmation_recorded",
+      "future_spec_id": "M10-PA-003-future-source-reextract-v0",
+      "future_spec_readiness": "draftable_after_visual_case_alignment",
+      "internal_simulated_account": true,
+      "legacy_historical_profit_planning_input": false,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_confirmation_pending_case_ids": [
+        "M10-PA-003-positive-001",
+        "M10-PA-003-positive-002",
+        "M10-PA-003-positive-003",
+        "M10-PA-003-counterexample-001",
+        "M10-PA-003-boundary-001"
+      ],
+      "manual_confirmation_pending_count": 8,
+      "manual_confirmation_pending_question_ids": [
+        "tight_channel_geometry_visible",
+        "higher_timeframe_breakout_context",
+        "failure_boundary_visible"
+      ],
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "manual_visual_confirmation_complete": false,
+      "ohlcv_proxy_assessment": {
+        "approximable_fields": [
+          "trend_direction",
+          "pullback_bar_count",
+          "pullback_depth_vs_average_bar",
+          "moving_average_gap_bar",
+          "gap_close_or_overlap",
+          "opposite_breakout_follow_through"
+        ],
+        "proxy_state": "partially_ohlcv_approximable",
+        "visual_first_fields": [
+          "channel_tightness_quality",
+          "higher_timeframe_breakout_alignment"
+        ]
+      },
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "planning_input_policy": {
+        "decision_basis": "source_atoms_visual_confirmation_internal_sim_evidence_only",
+        "historical_net_profit_display_only": true,
+        "legacy_historical_profit_planning_input": false
+      },
+      "prep_id": "future_source_reextract_spec_prep::M10-PA-003",
+      "priority": "P2",
+      "real_order": false,
+      "required_before_activation": [
+        "manual_visual_question::tight_channel_geometry_visible",
+        "manual_visual_question::higher_timeframe_breakout_context",
+        "manual_visual_question::failure_boundary_visible",
+        "manual_visual_case::M10-PA-003-positive-001",
+        "manual_visual_case::M10-PA-003-positive-002",
+        "manual_visual_case::M10-PA-003-positive-003",
+        "manual_visual_case::M10-PA-003-counterexample-001",
+        "manual_visual_case::M10-PA-003-boundary-001",
+        "manual_m14_draft_review",
+        "strategy_state_change_review",
+        "simulated_backtest_or_shadow_spec_before_runtime_use",
+        "m12_47_supervised_readonly_refresh_before_any_gate_closure"
+      ],
+      "setup_hypothesis": "tight_channel_small_pullback_trend_continuation",
+      "source_backed_atom_count": 5,
+      "source_backed_atoms": [
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "Tight channels are treated like higher-timeframe breakouts; when unclear, trade only with the trend.",
+          "field": "context",
+          "implementation_hint": "Use higher-timeframe breakout context and block counter-trend entries in tight-channel state.",
+          "locator_summary": "part1 p987-p992",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "A tight/small-pullback trend has shallow pullbacks, often 1-3 bars, and pullbacks smaller than about two average bars or two to three minimum scalps.",
+          "field": "setup_definition",
+          "implementation_hint": "Approximate with pullback depth, pullback bar count, average bar size, and trend-direction persistence.",
+          "locator_summary": "part1 p1398-p1406",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "After 20 or more bars above the moving average, the first pullback to the average or first close below it can become a trend-continuation reversal entry.",
+          "field": "entry_trigger",
+          "implementation_hint": "Model as first MA test or first opposite-side close after a sustained trend gap-bar run.",
+          "locator_summary": "part1 p1006-p1007",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "Correct stops can be far in strong trends; strong traders use wider stops below the last trend leg and trail after new extremes.",
+          "field": "risk_management",
+          "implementation_hint": "Keep position sizing tied to stop distance instead of tightening stops to fit a fixed quantity.",
+          "locator_summary": "part1 p1004-p1005",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "A strong trend can reverse, but it needs stronger contrary evidence such as wedge/MAG failure, all trend-continuation setups failing, and opposite breakout with follow-through.",
+          "field": "invalidation",
+          "implementation_hint": "Require explicit opposite breakout/follow-through before treating tight-channel continuation as failed.",
+          "locator_summary": "part1 p1000-p1001",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md"
+        }
+      ],
+      "source_refs_reviewed": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014E_trends_tight_channel_small_pullback.md"
+          },
+          "matched_keywords": [
+            "tight channel",
+            "small pullback",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "title": "Video 14E: Trends - Tight Channel and Small Pullback Trend"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_017A_tight_channels_micro_channels_definitions.md"
+          },
+          "matched_keywords": [
+            "tight channel",
+            "micro channel",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+          "title": "Video 17A: Tight Channels and Micro Channels - Definitions, Measurements, and Trading Direction"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_014C_trends_types_spike_channel_traps.md"
+          },
+          "matched_keywords": [
+            "tight channel",
+            "small pullback",
+            "紧密通道",
+            "小回调",
+            "channel"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+          "title": "Video 14C: Trends - Types, Spike and Channel, Traps and Breakouts"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "channel"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p2"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 11
+          },
+          "matched_keywords": [
+            "channel"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p11"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 1
+          },
+          "matched_keywords": [
+            "tight channel",
+            "channel"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p1"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "channel"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 市场周期.pdf",
+          "title": "方方土视频笔记 - 市场周期 p2"
+        }
+      ],
+      "source_review_answer_count": 3,
+      "source_review_answers": [
+        {
+          "answer": "Tightness is defined by tradeability and pullback size: higher-timeframe breakout behavior, pullbacks around 1-3/1-4 bars, smaller than about two average bars or two to three minimum scalps, and poor counter-trend profitability.",
+          "evidence_state": "source_supported",
+          "question_id": "tight_channel_vs_ordinary_channel"
+        },
+        {
+          "answer": "Continuation weakens when gaps close, pullbacks overlap breakout points, the market shifts toward broad-channel/TR behavior, or opposite breakout/follow-through appears after failed continuation setups.",
+          "evidence_state": "source_supported",
+          "question_id": "minimum_pullback_or_failure_condition"
+        },
+        {
+          "answer": "Pullback depth/count, average bar size, MA tests, gap bars, and opposite breakout/follow-through are OHLCV-approximable; channel-quality and example matching still require visual review.",
+          "evidence_state": "source_supported_visual_review_required",
+          "question_id": "ohlcv_approximation_boundary"
+        }
+      ],
+      "strategy_id": "M10-PA-003",
+      "strategy_state_mutation": false,
+      "visual_confirmation_required": true
+    },
+    {
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "can_close_gap_now": false,
+      "can_create_strategy_now": false,
+      "can_discard_now": false,
+      "can_promote_now": false,
+      "candidate_entry_logic": "Split future spec into early visual-review entry and confirmed opposite-breakout entry; do not merge them into one trigger.",
+      "candidate_exit_logic": "Require TBTL tracking and allow a final-climax exception before promoting reversal evidence.",
+      "candidate_invalidation_logic": "Block promotion unless visual review confirms failed breakout/exhaustion rather than measuring-gap trend continuation.",
+      "catalog_title": "Final Flag or Climax TBTL Reversal",
+      "conditional_spec_draft": {
+        "activation_boundary": "manual_visual_confirmation_and_manual_m14_review_required_before_strategy_state_change",
+        "entry": "Split future spec into early visual-review entry and confirmed opposite-breakout entry; do not merge them into one trigger.",
+        "exit_or_risk": "Require TBTL tracking and allow a final-climax exception before promoting reversal evidence.",
+        "invalidation": "Block promotion unless visual review confirms failed breakout/exhaustion rather than measuring-gap trend continuation.",
+        "proxy_fields": [
+          "late_trend_bar_count",
+          "large_body_rank",
+          "gap_or_negative_gap",
+          "follow_through_bar_count",
+          "tbtl_bar_count",
+          "support_resistance_proxy"
+        ],
+        "setup": "climax_exhaustion_gap_tbtl_reversal",
+        "state": "blocked_until_manual_visual_confirmation"
+      },
+      "draft_state": "blocked_until_manual_visual_confirmation",
+      "future_spec_gate_state": "blocked_until_manual_visual_confirmation_recorded",
+      "future_spec_id": "M10-PA-010-future-source-reextract-v0",
+      "future_spec_readiness": "draftable_as_visual_first_dual_route_spec",
+      "internal_simulated_account": true,
+      "legacy_historical_profit_planning_input": false,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_confirmation_pending_case_ids": [
+        "M10-PA-010-positive-001",
+        "M10-PA-010-positive-002",
+        "M10-PA-010-positive-003",
+        "M10-PA-010-counterexample-001",
+        "M10-PA-010-boundary-001"
+      ],
+      "manual_confirmation_pending_count": 8,
+      "manual_confirmation_pending_question_ids": [
+        "climax_vs_measuring_gap_visible",
+        "tbtl_or_trading_range_context",
+        "early_vs_confirmed_reversal_split"
+      ],
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "manual_visual_confirmation_complete": false,
+      "ohlcv_proxy_assessment": {
+        "approximable_fields": [
+          "late_trend_bar_count",
+          "large_body_rank",
+          "gap_or_negative_gap",
+          "follow_through_bar_count",
+          "tbtl_bar_count",
+          "support_resistance_proxy"
+        ],
+        "proxy_state": "visual_first_with_ohlcv_support",
+        "visual_first_fields": [
+          "final_flag_shape",
+          "wedge_or_vacuum_context",
+          "failed_breakout_quality"
+        ]
+      },
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "planning_input_policy": {
+        "decision_basis": "source_atoms_visual_confirmation_internal_sim_evidence_only",
+        "historical_net_profit_display_only": true,
+        "legacy_historical_profit_planning_input": false
+      },
+      "prep_id": "future_source_reextract_spec_prep::M10-PA-010",
+      "priority": "P2",
+      "real_order": false,
+      "required_before_activation": [
+        "manual_visual_question::climax_vs_measuring_gap_visible",
+        "manual_visual_question::tbtl_or_trading_range_context",
+        "manual_visual_question::early_vs_confirmed_reversal_split",
+        "manual_visual_case::M10-PA-010-positive-001",
+        "manual_visual_case::M10-PA-010-positive-002",
+        "manual_visual_case::M10-PA-010-positive-003",
+        "manual_visual_case::M10-PA-010-counterexample-001",
+        "manual_visual_case::M10-PA-010-boundary-001",
+        "manual_m14_draft_review",
+        "strategy_state_change_review",
+        "simulated_backtest_or_shadow_spec_before_runtime_use",
+        "m12_47_supervised_readonly_refresh_before_any_gate_closure"
+      ],
+      "setup_hypothesis": "climax_exhaustion_gap_tbtl_reversal",
+      "source_backed_atom_count": 5,
+      "source_backed_atoms": [
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "A climax is a late move-ending breakout; most climaxes lead first to a 3-10 bar trading range, not automatically to a new opposite trend.",
+          "field": "context",
+          "implementation_hint": "Mark late-trend acceleration as decision-zone context, not immediate reversal permission.",
+          "locator_summary": "part2 p802-p810",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "After about 10-20 or 20+ bars, a large trend bar near support/resistance can be either measuring gap or exhaustion gap; follow-through and gap closure decide the label.",
+          "field": "setup_definition",
+          "implementation_hint": "Track late trend age, large-body rank, gap/overlap state, and next-bar follow-through before assigning reversal state.",
+          "locator_summary": "part2 p842-p847",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "After exhaustion, early counter-trend entries have better reward/risk but lower probability; waiting for strong opposite breakout raises probability with worse reward/risk.",
+          "field": "entry_trigger",
+          "implementation_hint": "Split future spec into early visual-review entry and confirmed opposite-breakout entry; do not merge them into one trigger.",
+          "locator_summary": "part2 p848-p853",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "Consecutive sell climaxes often imply TBTL or trading range, but a final 5-10 bar sell vacuum can still appear before the larger correction.",
+          "field": "target_management",
+          "implementation_hint": "Require TBTL tracking and allow a final-climax exception before promoting reversal evidence.",
+          "locator_summary": "part2 p879-p883",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md"
+        },
+        {
+          "evidence_state": "source_supported",
+          "extracted_rule": "Strong micro-channel pressure means the first reversal can fail; final buy climax can still resolve roughly 50/50 between reversal and trend resumption.",
+          "field": "invalidation",
+          "implementation_hint": "Block promotion unless visual review confirms failed breakout/exhaustion rather than measuring-gap trend continuation.",
+          "locator_summary": "part2 p884-p886",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md"
+        }
+      ],
+      "source_refs_reviewed": [
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md"
+          },
+          "matched_keywords": [
+            "final flag",
+            "climax",
+            "exhaustion",
+            "高潮"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+          "title": "Video 29A: Climaxes - Breakouts, Exhaustion, Vacuums, and Support/Resistance"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md"
+          },
+          "matched_keywords": [
+            "climax",
+            "tbtl",
+            "exhaustion",
+            "高潮"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md",
+          "title": "Video 29C: Climaxes - Climactic Reversals, Exhaustion Gaps, and Measuring Gaps"
+        },
+        {
+          "locator": {
+            "kind": "markdown_unit",
+            "path": "units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md"
+          },
+          "matched_keywords": [
+            "climax",
+            "tbtl",
+            "exhaustion",
+            "高潮"
+          ],
+          "source_family": "brooks_v2_manual_transcript",
+          "source_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+          "title": "Video 29E: Climaxes - Options Firms and Failed Consecutive Climaxes"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 7
+          },
+          "matched_keywords": [
+            "exhaustion"
+          ],
+          "source_family": "fangfangtu_youtube_transcript",
+          "source_ref": "raw:knowledge/raw/youtube/fangfangtu/transcripts/Price_Action方方土.pdf",
+          "title": "fangfangtu YouTube transcript p7"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 5
+          },
+          "matched_keywords": [
+            "climax"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 楔形.pdf",
+          "title": "方方土视频笔记 - 楔形 p5"
+        },
+        {
+          "locator": {
+            "kind": "pdf_page",
+            "page_no": 2
+          },
+          "matched_keywords": [
+            "tbtl"
+          ],
+          "source_family": "fangfangtu_notes",
+          "source_ref": "raw:knowledge/raw/notes/方方土视频笔记 - 新手篇.pdf",
+          "title": "方方土视频笔记 - 新手篇 p2"
+        }
+      ],
+      "source_review_answer_count": 3,
+      "source_review_answers": [
+        {
+          "answer": "The reviewed sources support late-trend acceleration, exhaustion gap, failed breakout, TBTL, support/resistance, and final-flag language, but final-flag classification remains visual-first.",
+          "evidence_state": "source_supported_visual_review_required",
+          "question_id": "climax_final_flag_failed_breakout_boundary"
+        },
+        {
+          "answer": "A climax alone is not enough. Confirmation needs follow-through failure, gap closure or negative gap, support/resistance reaction, or a strong opposite breakout depending on early-versus-confirmed entry route.",
+          "evidence_state": "source_supported",
+          "question_id": "required_reversal_confirmation"
+        },
+        {
+          "answer": "Late trend age, bar count, large-body rank, gaps, follow-through, and TBTL tracking are OHLCV-approximable; wedge/final flag, exhaustion versus measuring-gap interpretation, and failed-breakout quality require visual review.",
+          "evidence_state": "source_supported_visual_review_required",
+          "question_id": "visual_vs_ohlcv_boundary"
+        }
+      ],
+      "strategy_id": "M10-PA-010",
+      "strategy_state_mutation": false,
+      "visual_confirmation_required": true
+    }
+  ],
+  "generated_at": "2026-05-26T19:55:30Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "broker_readiness_status_mutation": false,
+    "internal_simulated_account": true,
+    "legacy_historical_profit_planning_input": false,
+    "live_execution": false,
+    "m12_account_specs_mutation": false,
+    "m13_registry_mutation": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "parameter_mutation": false,
+    "real_order": false,
+    "strategy_state_mutation": false
+  },
+  "input_refs": {
+    "m14_strategy_source_reextract_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_reextract_review.json",
+    "m14_strategy_source_visual_confirmation_response_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_response_gate.json"
+  },
+  "internal_simulated_account": true,
+  "legacy_historical_profit_planning_input": false,
+  "live_execution": false,
+  "m12_account_specs_mutation": false,
+  "m13_registry_mutation": false,
+  "manual_m12_37_once": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "parameter_mutation": false,
+  "plain_language_result": "Future source-reextract spec prep produced 2 conditional draft rows from 10 source-backed atoms and 6 source-review answers. 0 rows are unblocked for manual M14 draft review, while 2 remain blocked until manual visual confirmation. Legacy historical profit planning inputs remain 0. The prep cannot create strategies, close gaps, promote, discard, mutate parameters, run M12.37 manually, or enable broker/live.",
+  "real_order": false,
+  "schema_version": "m14.strategy-future-source-reextract-spec-prep.v1",
+  "spec_prep_policy": {
+    "allowed_now": "Carry source-backed atoms into conditional draft scaffolds and list the visual/manual gates required before activation.",
+    "completion_rule": "A row can move to manual M14 draft review only after all visual questions and cases are confirmed with evidence.",
+    "not_allowed_now": "No strategy creation, gap closure, promotion, discard, parameter mutation, registry/account mutation, broker/live path, paper approval, manual M12.37 once-mode, or legacy historical profit planning input.",
+    "purpose": "Prepare conditional future source-reextract spec drafts from source review and visual confirmation gates."
+  },
+  "stage": "M14.strategy_future_source_reextract_spec_prep",
+  "strategy_state_mutation": false,
+  "summary": {
+    "blocked_until_manual_visual_confirmation_count": 2,
+    "broker_or_live_enabled": false,
+    "can_close_gap_now_count": 0,
+    "can_discard_now_count": 0,
+    "can_promote_now_count": 0,
+    "candidate_strategy_count": 2,
+    "challenge_progress_label": "10/10",
+    "conditional_spec_draft_count": 2,
+    "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+    "future_source_reextract_spec_prep_row_count": 2,
+    "future_spec_unblocked_count": 0,
+    "legacy_historical_profit_planning_input_count": 0,
+    "m14_trading_date": "2026-05-22",
+    "manual_confirmation_pending_count": 16,
+    "manual_m12_37_once_allowed": false,
+    "manual_visual_confirmation_complete_count": 0,
+    "parameter_mutation_allowed_now_count": 0,
+    "response_gate_row_count": 2,
+    "source_backed_atom_count": 10,
+    "source_review_answer_count": 6,
+    "source_review_row_count": 2,
+    "strategy_creation_allowed_count": 0,
+    "strategy_state_mutation_allowed": false
+  }
+}

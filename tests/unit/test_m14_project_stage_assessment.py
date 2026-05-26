@@ -210,6 +210,14 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["summary"]["strategy_source_visual_confirmation_response_parameter_mutation_allowed_count"],
                 0,
             )
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_row_count"], 2)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_conditional_draft_count"], 2)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_unblocked_count"], 0)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_blocked_visual_count"], 2)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_pending_confirmation_count"], 16)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_future_source_reextract_spec_prep_legacy_history_input_count"], 0)
             self.assertEqual(result["summary"]["strategy_next_step_row_count"], 5)
             self.assertEqual(result["summary"]["strategy_next_step_approved_internal_sim_continue_count"], 2)
             self.assertEqual(result["summary"]["strategy_next_step_rescue_or_shadow_review_count"], 2)
@@ -369,6 +377,16 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertTrue(
                 any(
                     "10/10 local case assets present" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertEqual(
+                result["stage_assessment"]["strategy_future_source_reextract_spec_prep_status"],
+                "conditional_specs_prepared_waiting_for_manual_visual_confirmation",
+            )
+            self.assertTrue(
+                any(
+                    "Strategy future source-reextract spec prep has 2 rows" in item
                     for item in result["stage_assessment"]["next_required_evidence"]
                 )
             )
@@ -537,6 +555,20 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertFalse(
                 result["strategy_source_visual_confirmation_response_gate"]["strategy_state_mutation_allowed"]
             )
+            self.assertEqual(
+                result["strategy_future_source_reextract_spec_prep"]["future_source_reextract_spec_prep_row_count"],
+                2,
+            )
+            self.assertEqual(
+                result["strategy_future_source_reextract_spec_prep"]["conditional_spec_draft_count"],
+                2,
+            )
+            self.assertEqual(
+                result["strategy_future_source_reextract_spec_prep"]["legacy_historical_profit_planning_input_count"],
+                0,
+            )
+            self.assertFalse(result["strategy_future_source_reextract_spec_prep"]["manual_m12_37_once_allowed"])
+            self.assertFalse(result["strategy_future_source_reextract_spec_prep"]["strategy_state_mutation_allowed"])
             self.assertEqual(result["strategy_next_step_readiness_matrix"]["strategy_next_step_row_count"], 5)
             self.assertEqual(result["strategy_next_step_readiness_matrix"]["approved_internal_sim_continue_count"], 2)
             self.assertEqual(result["strategy_next_step_readiness_matrix"]["rescue_or_shadow_review_count"], 2)
@@ -593,6 +625,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy source visual confirmation response rows/questions pending/cases pending/complete/unblocked: `2/6/10/0/0`", md)
             self.assertIn("Strategy source visual confirmation response review pack ready/questions/assets existing/assets total: `True/6/10/10`", md)
             self.assertIn("Strategy source visual confirmation response status: `manual_response_gate_pending_no_future_spec_unblocked`", md)
+            self.assertIn("Strategy future source-reextract spec prep rows/drafts/unblocked/visual-blocked/pending-confirmations: `2/2/0/2/16`", md)
+            self.assertIn("Strategy future source-reextract spec prep create/close/promote/discard/mutation/legacy-history inputs: `0/0/0/0/0/0`", md)
+            self.assertIn("Strategy future source-reextract spec prep status: `conditional_specs_prepared_waiting_for_manual_visual_confirmation`", md)
             self.assertIn("Strategy next-step rows/approved/rescue-or-shadow/source-review: `5/2/2/1`", md)
             self.assertIn("Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `0/0/0/0/0`", md)
             self.assertIn("Strategy next-step readiness status: `route_matrix_ready_legacy_history_excluded_no_promotion_or_mutation`", md)
@@ -638,6 +673,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_source_visual_confirmation_response_gate_path = (
             root / "strategy_source_visual_confirmation_response_gate.json"
         )
+        strategy_future_source_reextract_spec_prep_path = root / "strategy_future_source_reextract_spec_prep.json"
         strategy_next_step_readiness_matrix_path = root / "strategy_next_step_readiness_matrix.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
@@ -1179,6 +1215,30 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_future_source_reextract_spec_prep_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "future_source_reextract_spec_prep_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "source_backed_atom_count": 10,
+                        "source_review_answer_count": 6,
+                        "conditional_spec_draft_count": 2,
+                        "future_spec_unblocked_count": 0,
+                        "blocked_until_manual_visual_confirmation_count": 2,
+                        "manual_confirmation_pending_count": 16,
+                        "strategy_creation_allowed_count": 0,
+                        "can_close_gap_now_count": 0,
+                        "can_promote_now_count": 0,
+                        "can_discard_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    },
+                    "plain_language_result": "Future source reextract spec prep fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         strategy_next_step_readiness_matrix_path.write_text(
             json.dumps(
                 {
@@ -1303,6 +1363,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         ),
                         "m14_strategy_source_visual_confirmation_response_gate": str(
                             strategy_source_visual_confirmation_response_gate_path
+                        ),
+                        "m14_strategy_future_source_reextract_spec_prep": str(
+                            strategy_future_source_reextract_spec_prep_path
                         ),
                         "m14_strategy_next_step_readiness_matrix": str(
                             strategy_next_step_readiness_matrix_path

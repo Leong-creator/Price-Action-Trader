@@ -1,0 +1,27 @@
+{
+  "schema_version": "m14.strategy-future-source-reextract-spec-prep.config.v1",
+  "stage": "M14.strategy_future_source_reextract_spec_prep",
+  "inputs": {
+    "m14_strategy_source_reextract_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_reextract_review.json",
+    "m14_strategy_source_visual_confirmation_response_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_response_gate.json"
+  },
+  "outputs": {
+    "future_source_reextract_spec_prep_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_future_source_reextract_spec_prep.json",
+    "future_source_reextract_spec_prep_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_future_source_reextract_spec_prep.md"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "internal_simulated_account": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false,
+    "manual_m12_37_once": false,
+    "m13_registry_mutation": false,
+    "m12_account_specs_mutation": false,
+    "broker_readiness_status_mutation": false,
+    "parameter_mutation": false,
+    "strategy_state_mutation": false,
+    "legacy_historical_profit_planning_input": false
+  }
+}
