@@ -26,6 +26,9 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
             self.assertEqual(result["summary"]["blocker_burndown_row_count"], 7)
             self.assertEqual(result["summary"]["p0_blocker_count"], 4)
             self.assertEqual(result["summary"]["p1_blocker_count"], 3)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_prep_row_count"], 2)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_prep_unblocked_count"], 0)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_prep_pending_confirmation_count"], 16)
             self.assertEqual(result["summary"]["legacy_historical_profit_planning_input_count"], 0)
             self.assertTrue(result["summary"]["legacy_historical_profit_ignored"])
             self.assertFalse(result["broker_connection"])
@@ -66,6 +69,7 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "blocker.md").read_text(encoding="utf-8")
             self.assertIn("M14 Objective Blocker Burndown", md)
+            self.assertIn("Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `2/2/0/2/16`", md)
             self.assertIn("Legacy history metric planning inputs: `0`", md)
             self.assertIn("historical_net_profit", md)
 
@@ -85,6 +89,7 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
         stage_path = root / "stage.json"
         evidence_path = root / "evidence.json"
         visual_path = root / "visual.json"
+        future_spec_path = root / "future_spec.json"
         config_path = root / "config.json"
         objective_path.write_text(
             json.dumps(
@@ -175,6 +180,21 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        future_spec_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "future_source_reextract_spec_prep_row_count": 2,
+                        "conditional_spec_draft_count": 2,
+                        "future_spec_unblocked_count": 0,
+                        "blocked_until_manual_visual_confirmation_count": 2,
+                        "manual_confirmation_pending_count": 16,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -185,6 +205,7 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
                         "m14_project_stage_assessment": str(stage_path),
                         "m14_strategy_evidence_gap_burndown": str(evidence_path),
                         "m14_strategy_source_visual_confirmation_response_gate": str(visual_path),
+                        "m14_strategy_future_source_reextract_spec_prep": str(future_spec_path),
                     },
                     "outputs": {
                         "blocker_burndown_json": str(root / "blocker.json"),

@@ -33,6 +33,7 @@ class StrategyNextStepReadinessMatrixConfig:
     strategy_evidence_gap_burndown_path: Path
     objective_blocker_burndown_path: Path
     strategy_source_visual_confirmation_response_gate_path: Path
+    strategy_future_source_reextract_spec_prep_path: Path
     rescue_ab_evidence_tracker_path: Path
     rescue_parameter_shadow_spec_path: Path
     next_step_matrix_json_path: Path
@@ -64,6 +65,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> StrategyNextStepReadi
         objective_blocker_burndown_path=resolve_repo_path(inputs["m14_objective_blocker_burndown"]),
         strategy_source_visual_confirmation_response_gate_path=resolve_repo_path(
             inputs["m14_strategy_source_visual_confirmation_response_gate"]
+        ),
+        strategy_future_source_reextract_spec_prep_path=resolve_repo_path(
+            inputs["m14_strategy_future_source_reextract_spec_prep"]
         ),
         rescue_ab_evidence_tracker_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
         rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
@@ -99,6 +103,7 @@ def run_m14_strategy_next_step_readiness_matrix(
     gap_burndown = read_json(config.strategy_evidence_gap_burndown_path)
     objective_blocker = read_json(config.objective_blocker_burndown_path)
     visual_gate = read_json(config.strategy_source_visual_confirmation_response_gate_path)
+    future_spec_prep = read_json(config.strategy_future_source_reextract_spec_prep_path)
     rescue_ab = read_json(config.rescue_ab_evidence_tracker_path)
     shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
 
@@ -108,6 +113,7 @@ def run_m14_strategy_next_step_readiness_matrix(
     rescue_rows = [dict(row) for row in rescue_ab.get("rows", [])]
     shadow_rows = [dict(row) for row in shadow_spec.get("spec_rows", [])]
     visual_rows = [dict(row) for row in visual_gate.get("response_gate_rows", [])]
+    future_spec_rows = [dict(row) for row in future_spec_prep.get("future_source_reextract_spec_prep_rows", [])]
 
     decision_by_strategy = {str(row.get("strategy_id", "")): row for row in decision_rows}
     gap_by_strategy = {str(row.get("strategy_id", "")): row for row in gap_rows}
@@ -115,6 +121,7 @@ def run_m14_strategy_next_step_readiness_matrix(
     rescue_by_strategy = index_rows_by_strategy(rescue_rows)
     shadow_by_strategy = index_rows_by_strategy(shadow_rows)
     visual_by_strategy = index_rows_by_strategy(visual_rows)
+    future_spec_by_strategy = index_rows_by_strategy(future_spec_rows)
 
     strategy_ids = {
         strategy_id
@@ -130,6 +137,7 @@ def run_m14_strategy_next_step_readiness_matrix(
             rescue_rows=rescue_by_strategy.get(strategy_id, []),
             shadow_rows=shadow_by_strategy.get(strategy_id, []),
             visual_rows=visual_by_strategy.get(strategy_id, []),
+            future_spec_rows=future_spec_by_strategy.get(strategy_id, []),
         )
         for strategy_id in strategy_ids
     ]
@@ -141,6 +149,7 @@ def run_m14_strategy_next_step_readiness_matrix(
         gap_burndown=gap_burndown,
         objective_blocker=objective_blocker,
         visual_gate=visual_gate,
+        future_spec_prep=future_spec_prep,
         rescue_ab=rescue_ab,
         shadow_spec=shadow_spec,
         matrix_rows=matrix_rows,
@@ -157,6 +166,9 @@ def run_m14_strategy_next_step_readiness_matrix(
             "m14_strategy_source_visual_confirmation_response_gate": project_path(
                 config.strategy_source_visual_confirmation_response_gate_path
             ),
+            "m14_strategy_future_source_reextract_spec_prep": project_path(
+                config.strategy_future_source_reextract_spec_prep_path
+            ),
             "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_tracker_path),
             "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
         },
@@ -166,7 +178,7 @@ def run_m14_strategy_next_step_readiness_matrix(
             "purpose": "Give one per-strategy next-step route without changing strategy state.",
             "approved_strategy_rule": "Approved strategies may only continue through the next M12.47-supervised internal simulated-account refresh.",
             "rescue_rule": "Weak or variant strategies stay in rescue A/B, first-ledger watch, or shadow-parameter review until evidence is complete.",
-            "source_review_rule": "Source-visual and plugin research rows remain review-only until manual confirmation is complete.",
+            "source_review_rule": "Source-visual, future source-reextract spec prep, and plugin research rows remain review-only until manual confirmation is complete.",
             "legacy_history_metric_rule": "Legacy account-dashboard history metrics are display-only and are excluded from strategy planning.",
             "mutation_rule": "No parameter, registry, account-spec, broker-readiness, broker/live, or manual M12.37 once-mode mutation is allowed.",
         },
@@ -190,13 +202,17 @@ def build_matrix_row(
     rescue_rows: list[dict[str, Any]],
     shadow_rows: list[dict[str, Any]],
     visual_rows: list[dict[str, Any]],
+    future_spec_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
     route_category = first_non_empty(decision_row.get("route_category"), gap_row.get("route_category"), burndown_row.get("route_category"))
     burn_down_lane = str(burndown_row.get("burn_down_lane", ""))
     gap_state = str(gap_row.get("gap_state") or burndown_row.get("gap_state", ""))
     next_step_type = next_step_type_for(route_category, burn_down_lane, gap_state, gap_row, burndown_row)
     current_bucket = current_bucket_for(route_category, burn_down_lane, next_step_type)
-    required_next_evidence = required_evidence_for(gap_row, burndown_row, visual_rows)
+    required_next_evidence = required_evidence_for(gap_row, burndown_row, visual_rows, future_spec_rows)
+    future_spec_legacy_input = any(
+        bool(row.get("legacy_historical_profit_planning_input")) for row in future_spec_rows
+    )
     can_continue_internal_sim_now = bool(first_bool(gap_row.get("can_continue_internal_sim_now"), burndown_row.get("can_continue_internal_sim_now"), decision_row.get("can_advance_next_step")))
     can_promote_now = bool(first_bool(gap_row.get("can_promote_now"), burndown_row.get("can_promote_now"), decision_row.get("can_promote_now")))
     final_discard_allowed = bool(first_bool(gap_row.get("final_discard_allowed"), burndown_row.get("final_discard_allowed"), decision_row.get("final_discard_allowed")))
@@ -230,7 +246,7 @@ def build_matrix_row(
         "broker_paper_start_allowed": False,
         "manual_m12_37_once_allowed": False,
         "broker_or_live_enabled": False,
-        "legacy_historical_profit_planning_input": False,
+        "legacy_historical_profit_planning_input": future_spec_legacy_input,
         "required_next_evidence": required_next_evidence,
         "blocked_by": sorted(set(listify(burndown_row.get("blocked_by")) + listify(gap_row.get("missing_evidence_categories")))),
         "allowed_operations": safe_allowed_operations(burndown_row),
@@ -249,6 +265,23 @@ def build_matrix_row(
         "visual_response_gate_count": len(visual_rows),
         "visual_question_pending_count": sum(int_or_zero(row.get("question_response_pending_count")) for row in visual_rows),
         "visual_case_pending_count": sum(int_or_zero(row.get("case_response_pending_count")) for row in visual_rows),
+        "future_source_reextract_spec_prep_count": len(future_spec_rows),
+        "future_source_reextract_spec_prep_draft_states": sorted(
+            {str(row.get("draft_state", "")) for row in future_spec_rows if row.get("draft_state")}
+        ),
+        "future_source_reextract_spec_unblocked_count": sum(
+            bool(row.get("manual_visual_confirmation_complete")) for row in future_spec_rows
+        ),
+        "future_source_reextract_spec_blocked_count": sum(
+            str(row.get("draft_state", "")) != "ready_for_manual_m14_draft_review"
+            for row in future_spec_rows
+        ),
+        "future_source_reextract_spec_pending_confirmation_count": sum(
+            int_or_zero(row.get("manual_confirmation_pending_count")) for row in future_spec_rows
+        ),
+        "future_source_reextract_spec_legacy_historical_profit_planning_input_count": sum(
+            bool(row.get("legacy_historical_profit_planning_input")) for row in future_spec_rows
+        ),
         "next_action": next_action_for(next_step_type),
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -271,6 +304,7 @@ def build_summary(
     gap_burndown: dict[str, Any],
     objective_blocker: dict[str, Any],
     visual_gate: dict[str, Any],
+    future_spec_prep: dict[str, Any],
     rescue_ab: dict[str, Any],
     shadow_spec: dict[str, Any],
     matrix_rows: list[dict[str, Any]],
@@ -280,6 +314,7 @@ def build_summary(
     gap_summary = gap_matrix.get("summary", {})
     burndown_summary = gap_burndown.get("summary", {})
     visual_summary = visual_gate.get("summary", {})
+    future_spec_summary = future_spec_prep.get("summary", {})
     rescue_summary = rescue_ab.get("summary", {})
     shadow_summary = shadow_spec.get("summary", {})
     route_counts = Counter(row["route_category"] for row in matrix_rows)
@@ -325,8 +360,9 @@ def build_summary(
             objective_summary.get("broker_paper_start_allowed_count")
         ),
         "manual_m12_37_once_allowed_count": 0,
-        "legacy_historical_profit_planning_input_count": sum(
-            1 for row in matrix_rows if row["legacy_historical_profit_planning_input"]
+        "legacy_historical_profit_planning_input_count": max(
+            sum(1 for row in matrix_rows if row["legacy_historical_profit_planning_input"]),
+            int_or_zero(future_spec_summary.get("legacy_historical_profit_planning_input_count")),
         ),
         "legacy_historical_profit_ignored": bool(
             objective_summary.get("legacy_historical_profit_ignored", True)
@@ -355,6 +391,24 @@ def build_summary(
         ),
         "source_visual_future_spec_unblocked_count": int_or_zero(
             visual_summary.get("future_spec_unblocked_count")
+        ),
+        "future_source_reextract_spec_prep_row_count": int_or_zero(
+            future_spec_summary.get("future_source_reextract_spec_prep_row_count")
+        ),
+        "future_source_reextract_spec_conditional_draft_count": int_or_zero(
+            future_spec_summary.get("conditional_spec_draft_count")
+        ),
+        "future_source_reextract_spec_unblocked_count": int_or_zero(
+            future_spec_summary.get("future_spec_unblocked_count")
+        ),
+        "future_source_reextract_spec_blocked_visual_count": int_or_zero(
+            future_spec_summary.get("blocked_until_manual_visual_confirmation_count")
+        ),
+        "future_source_reextract_spec_pending_confirmation_count": int_or_zero(
+            future_spec_summary.get("manual_confirmation_pending_count")
+        ),
+        "future_source_reextract_spec_legacy_historical_profit_planning_input_count": int_or_zero(
+            future_spec_summary.get("legacy_historical_profit_planning_input_count")
         ),
         "objective_complete": bool(objective_summary.get("objective_complete", False)),
         "can_run_next_internal_sim_session": bool(objective_summary.get("can_run_next_internal_sim_session", False)),
@@ -414,6 +468,7 @@ def required_evidence_for(
     gap_row: dict[str, Any],
     burndown_row: dict[str, Any],
     visual_rows: list[dict[str, Any]],
+    future_spec_rows: list[dict[str, Any]],
 ) -> list[str]:
     evidence = (
         listify(burndown_row.get("next_evidence_to_collect"))
@@ -424,6 +479,10 @@ def required_evidence_for(
         evidence.append("manual_source_visual_question_responses")
     if any(int_or_zero(row.get("case_response_pending_count")) for row in visual_rows):
         evidence.append("manual_source_visual_case_responses")
+    if any(int_or_zero(row.get("manual_confirmation_pending_count")) for row in future_spec_rows):
+        evidence.append("future_source_reextract_spec_manual_visual_confirmation")
+    if any(str(row.get("draft_state", "")) != "ready_for_manual_m14_draft_review" for row in future_spec_rows):
+        evidence.append("future_source_reextract_spec_prep_review_only")
     return sorted({str(item) for item in evidence if str(item)})
 
 
@@ -520,6 +579,12 @@ def build_plain_language_result(payload: dict[str, Any]) -> list[str]:
             "Legacy historical profit metrics are display-only: "
             f"planning input count is {summary['legacy_historical_profit_planning_input_count']}."
         ),
+        (
+            "Future source-reextract spec prep remains conditional: "
+            f"{summary['future_source_reextract_spec_prep_row_count']} rows, "
+            f"{summary['future_source_reextract_spec_unblocked_count']} unblocked, "
+            f"{summary['future_source_reextract_spec_pending_confirmation_count']} pending confirmations."
+        ),
     ]
 
 
@@ -540,6 +605,7 @@ def build_matrix_md(payload: dict[str, Any]) -> str:
         f"{summary['parameter_activation_allowed_count']}/"
         f"{summary['broker_paper_start_allowed_count']}`",
         f"- Legacy history metric planning inputs: `{summary['legacy_historical_profit_planning_input_count']}`",
+        f"- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `{summary['future_source_reextract_spec_prep_row_count']}/{summary['future_source_reextract_spec_conditional_draft_count']}/{summary['future_source_reextract_spec_unblocked_count']}/{summary['future_source_reextract_spec_blocked_visual_count']}/{summary['future_source_reextract_spec_pending_confirmation_count']}`",
         f"- M12.37 manual once allowed: `{summary['manual_m12_37_once_allowed']}`",
         f"- Broker/live enabled: `{summary['broker_or_live_enabled']}`",
         "",

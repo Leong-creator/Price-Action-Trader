@@ -39,6 +39,7 @@ class PostFreshRefreshRecomputeChecklistConfig:
     rescue_parameter_shadow_spec_path: Path
     strategy_decision_ladder_path: Path
     strategy_pre_refresh_review_audit_path: Path
+    strategy_future_source_reextract_spec_prep_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     objective_blocker_burndown_path: Path
@@ -87,6 +88,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> PostFreshRefreshRecom
         strategy_pre_refresh_review_audit_path=resolve_repo_path(
             inputs["m14_strategy_pre_refresh_review_audit"]
         ),
+        strategy_future_source_reextract_spec_prep_path=resolve_repo_path(
+            inputs["m14_strategy_future_source_reextract_spec_prep"]
+        ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         objective_blocker_burndown_path=resolve_repo_path(inputs["m14_objective_blocker_burndown"]),
@@ -130,6 +134,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
     shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
     decision_ladder = read_json(config.strategy_decision_ladder_path)
     pre_refresh_audit = read_json(config.strategy_pre_refresh_review_audit_path)
+    future_spec_prep = read_json(config.strategy_future_source_reextract_spec_prep_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
     objective_blocker = read_json(config.objective_blocker_burndown_path)
@@ -146,6 +151,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
         shadow_spec=shadow_spec,
         decision_ladder=decision_ladder,
         pre_refresh_audit=pre_refresh_audit,
+        future_spec_prep=future_spec_prep,
         objective_audit=objective_audit,
         objective_execution=objective_execution,
         objective_blocker=objective_blocker,
@@ -198,6 +204,9 @@ def run_m14_post_fresh_refresh_recompute_checklist(
             "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
             "m14_strategy_pre_refresh_review_audit": project_path(
                 config.strategy_pre_refresh_review_audit_path
+            ),
+            "m14_strategy_future_source_reextract_spec_prep": project_path(
+                config.strategy_future_source_reextract_spec_prep_path
             ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
@@ -256,6 +265,7 @@ def build_source_summary(
     shadow_spec: dict[str, Any],
     decision_ladder: dict[str, Any],
     pre_refresh_audit: dict[str, Any],
+    future_spec_prep: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     objective_blocker: dict[str, Any],
@@ -271,6 +281,7 @@ def build_source_summary(
     shadow_summary = shadow_spec.get("summary", {})
     decision_summary = decision_ladder.get("summary", {})
     pre_refresh_audit_summary = pre_refresh_audit.get("summary", {})
+    future_spec_summary = future_spec_prep.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     blocker_summary = objective_blocker.get("summary", {})
@@ -365,6 +376,24 @@ def build_source_summary(
         "strategy_pre_refresh_review_audit_backfill_count": int_or_zero(
             pre_refresh_audit_summary.get("needs_supporting_artifact_backfill_count")
         ),
+        "future_source_reextract_spec_prep_row_count": int_or_zero(
+            future_spec_summary.get("future_source_reextract_spec_prep_row_count")
+        ),
+        "future_source_reextract_spec_conditional_draft_count": int_or_zero(
+            future_spec_summary.get("conditional_spec_draft_count")
+        ),
+        "future_source_reextract_spec_unblocked_count": int_or_zero(
+            future_spec_summary.get("future_spec_unblocked_count")
+        ),
+        "future_source_reextract_spec_blocked_visual_count": int_or_zero(
+            future_spec_summary.get("blocked_until_manual_visual_confirmation_count")
+        ),
+        "future_source_reextract_spec_pending_confirmation_count": int_or_zero(
+            future_spec_summary.get("manual_confirmation_pending_count")
+        ),
+        "future_source_reextract_spec_legacy_historical_profit_planning_input_count": int_or_zero(
+            future_spec_summary.get("legacy_historical_profit_planning_input_count")
+        ),
         "objective_complete": bool(objective_summary.get("objective_complete", False)),
         "objective_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
         "objective_in_progress_count": int_or_zero(objective_summary.get("in_progress_count")),
@@ -408,13 +437,16 @@ def build_source_summary(
             next_step_summary.get("legacy_historical_profit_planning_input_count")
         ),
         "parameter_mutation_allowed_count": 0,
-        "legacy_historical_profit_planning_input_count": int_or_zero(
-            next_step_summary.get(
-                "legacy_historical_profit_planning_input_count",
-                blocker_summary.get("legacy_historical_profit_planning_input_count"),
+        "legacy_historical_profit_planning_input_count": max(
+            int_or_zero(
+                next_step_summary.get(
+                    "legacy_historical_profit_planning_input_count",
+                    blocker_summary.get("legacy_historical_profit_planning_input_count"),
+                )
             )
-        )
-        + int_or_zero(trial_summary.get("legacy_historical_profit_planning_input_count")),
+            + int_or_zero(trial_summary.get("legacy_historical_profit_planning_input_count")),
+            int_or_zero(future_spec_summary.get("legacy_historical_profit_planning_input_count")),
+        ),
         "two_pass_stabilization_required": True,
     }
 
@@ -596,18 +628,32 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Final execution queue pass after the final audit.",
         ),
         (
-            "objective_blocker_burndown_refresh",
-            "decision_stabilization",
-            "read_only_script",
-            "python scripts/run_m14_objective_blocker_burndown.py",
-            "Refresh objective blockers and legacy history metric exclusion before strategy next-step routing.",
-        ),
-        (
             "strategy_evidence_gap_burndown_refresh",
             "decision_stabilization",
             "read_only_script",
             "python scripts/run_m14_strategy_evidence_gap_burndown.py",
             "Refresh the ordered strategy evidence gap burn-down queue before final assessment.",
+        ),
+        (
+            "strategy_source_visual_confirmation_response_gate_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_source_visual_confirmation_response_gate.py",
+            "Refresh manual visual-confirmation response gates before any future source-reextract spec prep.",
+        ),
+        (
+            "strategy_future_source_reextract_spec_prep_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_future_source_reextract_spec_prep.py",
+            "Refresh conditional future source-reextract spec prep while keeping legacy history metrics display-only.",
+        ),
+        (
+            "objective_blocker_burndown_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_objective_blocker_burndown.py",
+            "Refresh objective blockers and legacy history metric exclusion after evidence burndown and source spec prep are current.",
         ),
         (
             "strategy_next_step_readiness_matrix_refresh",
@@ -693,6 +739,12 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
         ),
         "strategy_evidence_gap_matrix_refresh": "open-gap rows should explain exactly which evidence remains missing per strategy.",
         "strategy_evidence_gap_burndown_refresh": "P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.",
+        "strategy_source_visual_confirmation_response_gate_refresh": (
+            "manual visual responses should be re-read; pending question and case counts must remain explicit."
+        ),
+        "strategy_future_source_reextract_spec_prep_refresh": (
+            "conditional future source-reextract spec prep should stay blocked until manual visual confirmation, with legacy-history planning inputs at 0."
+        ),
         "objective_blocker_burndown_refresh": (
             "legacy historical profit planning input count must stay 0 while objective blockers refresh."
         ),
@@ -812,6 +864,11 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_decision_final_discard_allowed_count']}. Pre-refresh review audit has "
         f"{summary['strategy_pre_refresh_review_audit_row_count']} rows, with "
         f"{summary['strategy_pre_refresh_review_audit_backfill_count']} supporting-artifact backfills. "
+        f"Future source-reextract spec prep has "
+        f"{summary['future_source_reextract_spec_prep_row_count']} rows, "
+        f"{summary['future_source_reextract_spec_unblocked_count']} unblocked rows, "
+        f"{summary['future_source_reextract_spec_pending_confirmation_count']} pending confirmations, and "
+        f"{summary['future_source_reextract_spec_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
         f"Strategy next-step matrix currently has {summary['strategy_next_step_row_count']} rows and "
         f"{summary['strategy_next_step_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
         f"Internal-sim trial acceptance has "
@@ -846,6 +903,7 @@ def build_checklist_md(payload: dict[str, Any]) -> str:
         f"- Internal-sim trial ready/approved/fresh-required/legacy-history inputs: `{summary['trial_acceptance_trial_start_ready_count']}/{summary['trial_acceptance_approved_trial_strategy_count']}/{summary['trial_acceptance_fresh_refresh_required_count']}/{summary['trial_acceptance_legacy_historical_profit_planning_input_count']}`",
         f"- Internal-sim trial gates pass/waiting: `{summary['trial_acceptance_global_gate_pass_count']}/{summary['trial_acceptance_global_gate_waiting_count']}`",
         f"- Pre-refresh review audit rows/ready/waiting/backfill: `{summary['strategy_pre_refresh_review_audit_row_count']}/{summary['strategy_pre_refresh_review_audit_ready_now_count']}/{summary['strategy_pre_refresh_review_audit_wait_fresh_count']}/{summary['strategy_pre_refresh_review_audit_backfill_count']}`",
+        f"- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending/legacy-history inputs: `{summary['future_source_reextract_spec_prep_row_count']}/{summary['future_source_reextract_spec_conditional_draft_count']}/{summary['future_source_reextract_spec_unblocked_count']}/{summary['future_source_reextract_spec_blocked_visual_count']}/{summary['future_source_reextract_spec_pending_confirmation_count']}/{summary['future_source_reextract_spec_legacy_historical_profit_planning_input_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution, no manual M12.37 once-mode.",
         "",
         "## Plain Result",

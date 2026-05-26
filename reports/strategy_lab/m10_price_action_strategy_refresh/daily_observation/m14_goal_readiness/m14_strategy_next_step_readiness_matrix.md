@@ -1,11 +1,12 @@
 # M14 Strategy Next-Step Readiness Matrix
 
-- Generated at: `2026-05-26T18:44:55Z`
+- Generated at: `2026-05-26T20:09:06Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge progress: `10/10`
 - Strategy rows: `20`
 - Continue internal sim / promote / discard / activate parameters / broker paper: `3/0/0/0/0`
 - Legacy history metric planning inputs: `0`
+- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `2/2/0/2/16`
 - M12.37 manual once allowed: `False`
 - Broker/live enabled: `False`
 
@@ -31,9 +32,9 @@ Legacy account-dashboard history metrics are display-only and cannot affect stra
 | M10-PA-004-MBF | rescue_or_shadow_review | continue_rescue_ab_collection | False | False | False | False | 10 trading-day rescue A/B evidence, 10 trading-day rescue A/B evidence window., manual M14 review after machine evidence is complete, manual_m14_review, rescue_10_day_ab_window |
 | M10-PA-011 | rescue_or_shadow_review | rebuild_detector_then_ab | False | False | False | False | 10 trading-day rescue A/B evidence, M12.47-supervised M12/M13 refreshed artifacts, M14 parameter shadow spec and activation gate, Next M12.47-supervised fresh refresh and post-run M13 ledger update., m12_47_fresh_refresh, +4 more |
 | AI-TRADER-EXTERNAL | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review |
-| M10-PA-003 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review, +2 more |
+| M10-PA-003 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., future_source_reextract_spec_manual_visual_confirmation, future_source_reextract_spec_prep_review_only, independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, +4 more |
 | M10-PA-006 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review |
-| M10-PA-010 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review, +2 more |
+| M10-PA-010 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., future_source_reextract_spec_manual_visual_confirmation, future_source_reextract_spec_prep_review_only, independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, +4 more |
 | M10-PA-014 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review |
 | M10-PA-015 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review |
 | M10-PA-016 | source_review_or_plugin_research | source_visual_or_plugin_research | False | False | False | False | Independent strategy evidence beyond plugin or research-only coverage., independent strategy evidence beyond shadow/plugin/research coverage, independent_strategy_evidence_missing, manual M14 review after machine evidence is complete, manual_m14_review |

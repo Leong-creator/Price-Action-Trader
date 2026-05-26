@@ -1,6 +1,6 @@
 # M14 Objective Blocker Burndown
 
-- Generated at: `2026-05-26T17:54:57Z`
+- Generated at: `2026-05-26T20:09:02Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Objective complete: `False`
 - Challenge: `10/10`
@@ -8,12 +8,13 @@
 - Approved internal-sim strategies: `3` (`M10-PA-004, M10-PA-005, M10-PA-008`)
 - Rescue first-ledger / 10-day A/B / shadow-review gaps: `2/10/11`
 - Visual confirmation pending questions / cases: `6/10`
+- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `2/2/0/2/16`
 - Legacy history metric planning inputs: `0`
 - Boundary: internal simulated accounts only; no broker/live, no real orders, no paper approval, no manual M12.37 once-mode, no parameter mutation.
 
 ## Plain Result
 
-Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still not complete: 10-day challenge is 10/10, 3 strategies may continue internal simulation, but 2 rescue runtimes need first ledger evidence, 10 rescue A/B gaps remain, and 6 question plus 10 case visual confirmations are pending. Legacy historical net-profit/history-return dashboard fields are explicitly ignored for planning. Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled.
+Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still not complete: 10-day challenge is 10/10, 3 strategies may continue internal simulation, but 2 rescue runtimes need first ledger evidence, 10 rescue A/B gaps remain, and 6 question plus 10 case visual confirmations are pending. Future source-reextract prep has 2 rows, 0 unblocked, and 0 legacy-history planning inputs. Legacy historical net-profit/history-return dashboard fields are explicitly ignored for planning. Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled.
 
 ## Legacy Metric Exclusion
 
@@ -92,10 +93,10 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 
 - Category: `source_reextract`
 - State: `manual_visual_confirmation_pending`
-- Evidence: Review pack ready=True with 10/10 local case assets; 6 question responses and 10 case responses are pending; future spec unblocked count is 0.
-- Next action: Use the static visual review pack for manual confirmation, then rerun the response gate before drafting any future source-reextract spec.
+- Evidence: Review pack ready=True with 10/10 local case assets; 6 question responses and 10 case responses are pending; future spec unblocked count is 0; spec-prep conditional/unblocked/blocked rows are 2/0/2, pending confirmations=16, legacy-history planning inputs=0.
+- Next action: Use the static visual review pack for manual confirmation, rerun the response gate and future spec prep, then draft only after manual M14 review.
 - Waiting on: `manual_visual_confirmation_response`
-- Allowed now: `manual_review_pack_review`
+- Allowed now: `manual_review_pack_review, conditional_spec_prep_review`
 - Strategy promotion / discard allowed: `False/False`
 - Parameter activation allowed: `False`
 - Broker paper start allowed: `False`

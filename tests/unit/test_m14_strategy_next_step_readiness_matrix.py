@@ -30,6 +30,9 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             self.assertEqual(result["summary"]["final_discard_allowed_count"], 0)
             self.assertEqual(result["summary"]["parameter_activation_allowed_count"], 0)
             self.assertEqual(result["summary"]["broker_paper_start_allowed_count"], 0)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_prep_row_count"], 1)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_unblocked_count"], 0)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_pending_confirmation_count"], 8)
             self.assertEqual(result["summary"]["legacy_historical_profit_planning_input_count"], 0)
             self.assertTrue(result["summary"]["legacy_historical_profit_ignored"])
             self.assertFalse(result["broker_connection"])
@@ -53,6 +56,12 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             self.assertEqual(rows["M10-PA-003"]["current_bucket"], "source_review_or_plugin_research")
             self.assertEqual(rows["M10-PA-003"]["visual_question_pending_count"], 3)
             self.assertEqual(rows["M10-PA-003"]["visual_case_pending_count"], 5)
+            self.assertEqual(rows["M10-PA-003"]["future_source_reextract_spec_prep_count"], 1)
+            self.assertEqual(rows["M10-PA-003"]["future_source_reextract_spec_pending_confirmation_count"], 8)
+            self.assertIn(
+                "future_source_reextract_spec_manual_visual_confirmation",
+                rows["M10-PA-003"]["required_next_evidence"],
+            )
             for row in result["matrix_rows"]:
                 self.assertFalse(row["promotion_allowed"])
                 self.assertFalse(row["final_discard_allowed"])
@@ -67,6 +76,7 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "matrix.md").read_text(encoding="utf-8")
             self.assertIn("M14 Strategy Next-Step Readiness Matrix", md)
+            self.assertIn("Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `1/1/0/1/8`", md)
             self.assertIn("Legacy history metric planning inputs: `0`", md)
             self.assertIn("M10-PA-004", md)
 
@@ -87,6 +97,7 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
         burndown_path = root / "burndown.json"
         blocker_path = root / "blocker.json"
         visual_path = root / "visual.json"
+        future_spec_path = root / "future_spec.json"
         rescue_path = root / "rescue.json"
         shadow_path = root / "shadow.json"
         config_path = root / "config.json"
@@ -189,6 +200,30 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        future_spec_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "future_source_reextract_spec_prep_row_count": 1,
+                        "conditional_spec_draft_count": 1,
+                        "future_spec_unblocked_count": 0,
+                        "blocked_until_manual_visual_confirmation_count": 1,
+                        "manual_confirmation_pending_count": 8,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    },
+                    "future_source_reextract_spec_prep_rows": [
+                        {
+                            "strategy_id": "M10-PA-003",
+                            "draft_state": "blocked_until_manual_visual_confirmation",
+                            "manual_visual_confirmation_complete": False,
+                            "manual_confirmation_pending_count": 8,
+                            "legacy_historical_profit_planning_input": False,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         rescue_path.write_text(
             json.dumps(
                 {
@@ -247,6 +282,7 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
                         "m14_strategy_evidence_gap_burndown": str(burndown_path),
                         "m14_objective_blocker_burndown": str(blocker_path),
                         "m14_strategy_source_visual_confirmation_response_gate": str(visual_path),
+                        "m14_strategy_future_source_reextract_spec_prep": str(future_spec_path),
                         "m14_rescue_ab_evidence_tracker": str(rescue_path),
                         "m14_rescue_parameter_shadow_spec": str(shadow_path),
                     },

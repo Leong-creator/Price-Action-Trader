@@ -32,6 +32,7 @@ class ObjectiveBlockerBurndownConfig:
     project_stage_assessment_path: Path
     strategy_evidence_gap_burndown_path: Path
     strategy_source_visual_confirmation_response_gate_path: Path
+    strategy_future_source_reextract_spec_prep_path: Path
     blocker_burndown_json_path: Path
     blocker_burndown_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -62,6 +63,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveBlockerBurnd
         ),
         strategy_source_visual_confirmation_response_gate_path=resolve_repo_path(
             inputs["m14_strategy_source_visual_confirmation_response_gate"]
+        ),
+        strategy_future_source_reextract_spec_prep_path=resolve_repo_path(
+            inputs["m14_strategy_future_source_reextract_spec_prep"]
         ),
         blocker_burndown_json_path=resolve_repo_path(outputs["blocker_burndown_json"]),
         blocker_burndown_md_path=resolve_repo_path(outputs["blocker_burndown_md"]),
@@ -94,16 +98,22 @@ def run_m14_objective_blocker_burndown(
     project_stage = read_json(config.project_stage_assessment_path)
     evidence_burndown = read_json(config.strategy_evidence_gap_burndown_path)
     visual_response_gate = read_json(config.strategy_source_visual_confirmation_response_gate_path)
+    future_spec_prep = read_json(config.strategy_future_source_reextract_spec_prep_path)
 
     summary = build_summary(
         objective_audit=objective_audit,
         project_stage=project_stage,
         evidence_burndown=evidence_burndown,
         visual_response_gate=visual_response_gate,
+        future_spec_prep=future_spec_prep,
     )
     blocker_rows = build_blocker_rows(summary)
     blocker_rows.sort(key=lambda row: (priority_rank(row["priority"]), int(row["sequence_rank"])))
-    summary.update(build_row_summary(blocker_rows))
+    row_summary = build_row_summary(blocker_rows)
+    summary.update(row_summary)
+    summary["legacy_historical_profit_planning_input_count"] = int_or_zero(
+        summary.get("future_source_reextract_spec_prep_legacy_historical_profit_planning_input_count")
+    ) + int_or_zero(row_summary.get("blocker_row_legacy_historical_profit_planning_input_count"))
 
     payload: dict[str, Any] = {
         "schema_version": "m14.objective-blocker-burndown.v1",
@@ -118,6 +128,9 @@ def run_m14_objective_blocker_burndown(
             "m14_strategy_source_visual_confirmation_response_gate": project_path(
                 config.strategy_source_visual_confirmation_response_gate_path
             ),
+            "m14_strategy_future_source_reextract_spec_prep": project_path(
+                config.strategy_future_source_reextract_spec_prep_path
+            ),
         },
         "summary": summary,
         "blocker_rows": blocker_rows,
@@ -125,7 +138,8 @@ def run_m14_objective_blocker_burndown(
             "purpose": "Summarize the remaining objective blockers without changing strategy state.",
             "evidence_rule": (
                 "Planning may use M14 objective audit, project stage, evidence gap burndown, "
-                "source visual confirmation response gate, M13 ledger evidence, and M12.47-owned fresh-refresh status."
+                "source visual confirmation response gate, future source-reextract spec prep, "
+                "M13 ledger evidence, and M12.47-owned fresh-refresh status."
             ),
             "legacy_history_metric_rule": (
                 "Legacy dashboard history fields are excluded from promotion, rescue priority, "
@@ -151,11 +165,13 @@ def build_summary(
     project_stage: dict[str, Any],
     evidence_burndown: dict[str, Any],
     visual_response_gate: dict[str, Any],
+    future_spec_prep: dict[str, Any],
 ) -> dict[str, Any]:
     objective_summary = objective_audit.get("summary", {})
     stage_summary = project_stage.get("summary", {})
     evidence_summary = evidence_burndown.get("summary", {})
     visual_summary = visual_response_gate.get("summary", {})
+    future_spec_summary = future_spec_prep.get("summary", {})
     return {
         "current_project_stage": str(
             objective_summary.get("current_project_stage")
@@ -261,13 +277,33 @@ def build_summary(
         "source_visual_future_spec_unblocked_count": int_or_zero(
             visual_summary.get("future_spec_unblocked_count")
         ),
+        "future_source_reextract_spec_prep_row_count": int_or_zero(
+            future_spec_summary.get("future_source_reextract_spec_prep_row_count")
+        ),
+        "future_source_reextract_spec_prep_conditional_draft_count": int_or_zero(
+            future_spec_summary.get("conditional_spec_draft_count")
+        ),
+        "future_source_reextract_spec_prep_unblocked_count": int_or_zero(
+            future_spec_summary.get("future_spec_unblocked_count")
+        ),
+        "future_source_reextract_spec_prep_blocked_visual_count": int_or_zero(
+            future_spec_summary.get("blocked_until_manual_visual_confirmation_count")
+        ),
+        "future_source_reextract_spec_prep_pending_confirmation_count": int_or_zero(
+            future_spec_summary.get("manual_confirmation_pending_count")
+        ),
+        "future_source_reextract_spec_prep_legacy_historical_profit_planning_input_count": int_or_zero(
+            future_spec_summary.get("legacy_historical_profit_planning_input_count")
+        ),
         "broker_dry_run_ready_count": int_or_zero(stage_summary.get("broker_dry_run_ready_count")),
         "broker_dry_run_blocked_count": int_or_zero(stage_summary.get("broker_dry_run_blocked_count")),
         "can_start_broker_paper": False,
         "broker_or_live_enabled": False,
         "manual_m12_37_once_allowed": False,
         "legacy_historical_profit_ignored": True,
-        "legacy_historical_profit_planning_input_count": 0,
+        "legacy_historical_profit_planning_input_count": int_or_zero(
+            future_spec_summary.get("legacy_historical_profit_planning_input_count")
+        ),
     }
 
 
@@ -360,11 +396,18 @@ def build_blocker_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['source_visual_review_pack_case_asset_count']} local case assets; "
                 f"{summary['source_visual_question_pending_count']} question responses and "
                 f"{summary['source_visual_case_pending_count']} case responses are pending; "
-                f"future spec unblocked count is {summary['source_visual_future_spec_unblocked_count']}."
+                f"future spec unblocked count is {summary['source_visual_future_spec_unblocked_count']}; "
+                f"spec-prep conditional/unblocked/blocked rows are "
+                f"{summary['future_source_reextract_spec_prep_conditional_draft_count']}/"
+                f"{summary['future_source_reextract_spec_prep_unblocked_count']}/"
+                f"{summary['future_source_reextract_spec_prep_blocked_visual_count']}, "
+                f"pending confirmations={summary['future_source_reextract_spec_prep_pending_confirmation_count']}, "
+                f"legacy-history planning inputs="
+                f"{summary['future_source_reextract_spec_prep_legacy_historical_profit_planning_input_count']}."
             ),
-            next_action="Use the static visual review pack for manual confirmation, then rerun the response gate before drafting any future source-reextract spec.",
+            next_action="Use the static visual review pack for manual confirmation, rerun the response gate and future spec prep, then draft only after manual M14 review.",
             waiting_on=["manual_visual_confirmation_response"],
-            allowed_now=["manual_review_pack_review"],
+            allowed_now=["manual_review_pack_review", "conditional_spec_prep_review"],
         ),
         blocker_row(
             blocker_id="broker_dry_run_watch_only",
@@ -440,7 +483,7 @@ def build_row_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "parameter_activation_allowed_count": sum(1 for row in rows if row["can_activate_parameter_now"]),
         "broker_paper_start_allowed_count": sum(1 for row in rows if row["can_start_broker_paper"]),
         "manual_m12_37_once_allowed_count": sum(1 for row in rows if row["manual_m12_37_once_allowed"]),
-        "legacy_historical_profit_planning_input_count": sum(
+        "blocker_row_legacy_historical_profit_planning_input_count": sum(
             1 for row in rows if row["legacy_historical_profit_planning_input"]
         ),
     }
@@ -458,6 +501,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_evidence_rescue_10_day_ab_gap_count']} rescue A/B gaps remain, "
         f"and {summary['source_visual_question_pending_count']} question plus "
         f"{summary['source_visual_case_pending_count']} case visual confirmations are pending. "
+        f"Future source-reextract prep has {summary['future_source_reextract_spec_prep_row_count']} rows, "
+        f"{summary['future_source_reextract_spec_prep_unblocked_count']} unblocked, and "
+        f"{summary['future_source_reextract_spec_prep_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
         "Legacy historical net-profit/history-return dashboard fields are explicitly ignored for planning. "
         "Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled."
     )
@@ -477,6 +523,7 @@ def build_burndown_md(payload: dict[str, Any]) -> str:
         f"- Approved internal-sim strategies: `{summary['approved_internal_sim_strategy_count']}` (`{', '.join(summary['approved_internal_sim_strategy_ids'])}`)",
         f"- Rescue first-ledger / 10-day A/B / shadow-review gaps: `{summary['rescue_no_m13_ledger_evidence_count']}/{summary['strategy_evidence_rescue_10_day_ab_gap_count']}/{summary['strategy_evidence_shadow_review_gap_count']}`",
         f"- Visual confirmation pending questions / cases: `{summary['source_visual_question_pending_count']}/{summary['source_visual_case_pending_count']}`",
+        f"- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `{summary['future_source_reextract_spec_prep_row_count']}/{summary['future_source_reextract_spec_prep_conditional_draft_count']}/{summary['future_source_reextract_spec_prep_unblocked_count']}/{summary['future_source_reextract_spec_prep_blocked_visual_count']}/{summary['future_source_reextract_spec_prep_pending_confirmation_count']}`",
         f"- Legacy history metric planning inputs: `{summary['legacy_historical_profit_planning_input_count']}`",
         "- Boundary: internal simulated accounts only; no broker/live, no real orders, no paper approval, no manual M12.37 once-mode, no parameter mutation.",
         "",

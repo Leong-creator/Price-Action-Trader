@@ -1,10 +1,10 @@
 # M14 Post-Fresh-Refresh Recompute Checklist
 
-- Generated at: `2026-05-26T19:13:00Z`
+- Generated at: `2026-05-26T20:09:30Z`
 - Fresh refresh observed: `False`
 - Quote source: `fallback_quotes_only`
-- Recompute steps: `27`
-- M14 read-only script steps: `26`
+- Recompute steps: `29`
+- M14 read-only script steps: `28`
 - Acceptance gates: `9`
 - Two-pass stabilization required: `True`
 - Rescue no-ledger count: `2`
@@ -16,11 +16,12 @@
 - Internal-sim trial ready/approved/fresh-required/legacy-history inputs: `3/3/3/0`
 - Internal-sim trial gates pass/waiting: `3/2`
 - Pre-refresh review audit rows/ready/waiting/backfill: `19/7/12/0`
+- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending/legacy-history inputs: `2/2/0/2/16/0`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution, no manual M12.37 once-mode.
 
 ## Plain Result
 
-Post-fresh-refresh recompute checklist has 27 steps, including 26 read-only M14 script steps and 9 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Pre-refresh review audit has 19 rows, with 0 supporting-artifact backfills. Strategy next-step matrix currently has 20 rows and 0 legacy-history planning inputs. Internal-sim trial acceptance has 3/3 start-ready rows, 3 fresh-refresh-required rows, and 0 legacy-history planning inputs. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.
+Post-fresh-refresh recompute checklist has 29 steps, including 28 read-only M14 script steps and 9 acceptance gates. Current evidence still waits for fresh refresh: fresh_refresh_observed=False, quote_source=fallback_quotes_only, post-refresh waiting rows=13. The checklist requires two-pass objective/decision stabilization and keeps final-discard allowed at 0. Pre-refresh review audit has 19 rows, with 0 supporting-artifact backfills. Future source-reextract spec prep has 2 rows, 0 unblocked rows, 16 pending confirmations, and 0 legacy-history planning inputs. Strategy next-step matrix currently has 20 rows and 0 legacy-history planning inputs. Internal-sim trial acceptance has 3/3 start-ready rows, 3 fresh-refresh-required rows, and 0 legacy-history planning inputs. Manual M12.37 once-mode, broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness mutation remain disabled.
 
 ## Preconditions
 
@@ -110,31 +111,39 @@ Post-fresh-refresh recompute checklist has 27 steps, including 26 read-only M14 
    - Command: `python scripts/run_m14_objective_execution_plan.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: Regenerate the artifact and inspect summary plus hard-boundary flags.
-21. `objective_blocker_burndown_refresh` (decision_stabilization)
-   - Command: `python scripts/run_m14_objective_blocker_burndown.py`
-   - Current state: `waiting_for_m12_47_fresh_refresh`
-   - Acceptance hint: legacy historical profit planning input count must stay 0 while objective blockers refresh.
-22. `strategy_evidence_gap_burndown_refresh` (decision_stabilization)
+21. `strategy_evidence_gap_burndown_refresh` (decision_stabilization)
    - Command: `python scripts/run_m14_strategy_evidence_gap_burndown.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.
-23. `strategy_next_step_readiness_matrix_refresh` (decision_stabilization)
+22. `strategy_source_visual_confirmation_response_gate_refresh` (decision_stabilization)
+   - Command: `python scripts/run_m14_strategy_source_visual_confirmation_response_gate.py`
+   - Current state: `waiting_for_m12_47_fresh_refresh`
+   - Acceptance hint: manual visual responses should be re-read; pending question and case counts must remain explicit.
+23. `strategy_future_source_reextract_spec_prep_refresh` (decision_stabilization)
+   - Command: `python scripts/run_m14_strategy_future_source_reextract_spec_prep.py`
+   - Current state: `waiting_for_m12_47_fresh_refresh`
+   - Acceptance hint: conditional future source-reextract spec prep should stay blocked until manual visual confirmation, with legacy-history planning inputs at 0.
+24. `objective_blocker_burndown_refresh` (decision_stabilization)
+   - Command: `python scripts/run_m14_objective_blocker_burndown.py`
+   - Current state: `waiting_for_m12_47_fresh_refresh`
+   - Acceptance hint: legacy historical profit planning input count must stay 0 while objective blockers refresh.
+25. `strategy_next_step_readiness_matrix_refresh` (decision_stabilization)
    - Command: `python scripts/run_m14_strategy_next_step_readiness_matrix.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: per-strategy next-step rows should preserve 0 promotion, discard, parameter activation, broker paper, and legacy-history planning inputs.
-24. `internal_sim_trial_acceptance_gate_refresh` (decision_stabilization)
+26. `internal_sim_trial_acceptance_gate_refresh` (decision_stabilization)
    - Command: `python scripts/run_m14_internal_sim_trial_acceptance_gate.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: trial start-ready rows should match approved trial rows, broker/live stays disabled, and legacy-history planning inputs stay 0.
-25. `strategy_pre_refresh_review_packet_refresh` (decision_stabilization)
+27. `strategy_pre_refresh_review_packet_refresh` (decision_stabilization)
    - Command: `python scripts/run_m14_strategy_pre_refresh_review_packet.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: review rows should stay review-only, with zero close/promote/discard/mutation allowed.
-26. `strategy_pre_refresh_review_audit_refresh` (decision_stabilization)
+28. `strategy_pre_refresh_review_audit_refresh` (decision_stabilization)
    - Command: `python scripts/run_m14_strategy_pre_refresh_review_audit.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: artifact backfill rows should stay explainable; current backfill count is 0.
-27. `project_stage_assessment_refresh` (final_assessment)
+29. `project_stage_assessment_refresh` (final_assessment)
    - Command: `python scripts/run_m14_project_stage_assessment.py`
    - Current state: `waiting_for_m12_47_fresh_refresh`
    - Acceptance hint: goal_complete must remain false unless objective audit proves every requirement.

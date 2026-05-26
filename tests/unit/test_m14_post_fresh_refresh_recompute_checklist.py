@@ -25,8 +25,8 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(result["schema_version"], "m14.post-fresh-refresh-recompute-checklist.v1")
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["source_quote"], "fallback_quotes_only")
-            self.assertEqual(result["summary"]["recompute_step_count"], 27)
-            self.assertEqual(result["summary"]["m14_script_step_count"], 26)
+            self.assertEqual(result["summary"]["recompute_step_count"], 29)
+            self.assertEqual(result["summary"]["m14_script_step_count"], 28)
             self.assertEqual(result["summary"]["acceptance_gate_count"], 9)
             self.assertTrue(result["summary"]["two_pass_stabilization_required"])
             self.assertEqual(result["summary"]["trial_acceptance_approved_trial_strategy_count"], 2)
@@ -53,6 +53,13 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_ready_now_count"], 1)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_wait_fresh_count"], 2)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_backfill_count"], 1)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_prep_row_count"], 2)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_unblocked_count"], 0)
+            self.assertEqual(result["summary"]["future_source_reextract_spec_pending_confirmation_count"], 16)
+            self.assertEqual(
+                result["summary"]["future_source_reextract_spec_legacy_historical_profit_planning_input_count"],
+                0,
+            )
             self.assertEqual(result["summary"]["parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["manual_m12_37_once"])
             self.assertFalse(result["broker_connection"])
@@ -78,6 +85,14 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(
                 steps["strategy_evidence_gap_burndown_refresh"]["command"],
                 "python scripts/run_m14_strategy_evidence_gap_burndown.py",
+            )
+            self.assertEqual(
+                steps["strategy_source_visual_confirmation_response_gate_refresh"]["command"],
+                "python scripts/run_m14_strategy_source_visual_confirmation_response_gate.py",
+            )
+            self.assertEqual(
+                steps["strategy_future_source_reextract_spec_prep_refresh"]["command"],
+                "python scripts/run_m14_strategy_future_source_reextract_spec_prep.py",
             )
             self.assertEqual(
                 steps["objective_blocker_burndown_refresh"]["command"],
@@ -119,12 +134,13 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "checklist.md").read_text(encoding="utf-8")
             self.assertIn("M14 Post-Fresh-Refresh Recompute Checklist", md)
-            self.assertIn("M14 read-only script steps: `26`", md)
+            self.assertIn("M14 read-only script steps: `28`", md)
             self.assertIn("Objective blocker rows/P0/P1/legacy-history-planning-inputs: `7/4/3/0`", md)
             self.assertIn("Strategy next-step rows/approved/rescue-or-shadow/source-review: `5/2/2/1`", md)
             self.assertIn("Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `0/0/0/0/0`", md)
             self.assertIn("Internal-sim trial ready/approved/fresh-required/legacy-history inputs: `2/2/2/0`", md)
             self.assertIn("Pre-refresh review audit rows/ready/waiting/backfill: `4/1/2/1`", md)
+            self.assertIn("Future source-reextract spec prep rows/drafts/unblocked/blocked/pending/legacy-history inputs: `2/2/0/2/16/0`", md)
             self.assertIn("Final discard allowed: `0`", md)
 
     def test_rejects_manual_once_boundary(self) -> None:
@@ -149,6 +165,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
         shadow_spec_path = root / "shadow_spec.json"
         decision_ladder_path = root / "decision_ladder.json"
         pre_refresh_audit_path = root / "pre_refresh_audit.json"
+        future_spec_path = root / "future_spec.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         objective_blocker_path = root / "objective_blocker.json"
@@ -278,6 +295,21 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        future_spec_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "future_source_reextract_spec_prep_row_count": 2,
+                        "conditional_spec_draft_count": 2,
+                        "future_spec_unblocked_count": 0,
+                        "blocked_until_manual_visual_confirmation_count": 2,
+                        "manual_confirmation_pending_count": 16,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -350,6 +382,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                         "m14_rescue_parameter_shadow_spec": str(shadow_spec_path),
                         "m14_strategy_decision_ladder": str(decision_ladder_path),
                         "m14_strategy_pre_refresh_review_audit": str(pre_refresh_audit_path),
+                        "m14_strategy_future_source_reextract_spec_prep": str(future_spec_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                         "m14_objective_blocker_burndown": str(objective_blocker_path),

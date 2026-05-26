@@ -506,7 +506,7 @@
       "visual_confirmation_required": true
     }
   ],
-  "generated_at": "2026-05-26T19:55:30Z",
+  "generated_at": "2026-05-26T20:08:58Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
