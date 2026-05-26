@@ -23,6 +23,10 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertTrue(result["challenge"]["ten_day_challenge_complete"])
             self.assertTrue(result["internal_simulation_gate"]["can_enter_internal_simulation_for_approved_strategies"])
             self.assertEqual(result["internal_simulation_gate"]["approved_internal_sim_strategy_ids"], ["M10-PA-004"])
+            self.assertEqual(result["internal_sim_launch_readiness"]["launch_ready_strategy_count"], 1)
+            self.assertEqual(result["internal_sim_launch_readiness"]["approved_internal_sim_strategy_count"], 1)
+            self.assertEqual(result["internal_sim_launch_readiness"]["m12_account_input_connected_runtime_count"], 1)
+            self.assertEqual(result["internal_sim_launch_readiness"]["broker_watch_strategy_count"], 0)
             self.assertEqual(result["rescue_status"]["rescue_runtime_connected_strategy_count"], 2)
             self.assertTrue(result["rescue_status"]["rescue_ready_for_ab_evidence_collection"])
             self.assertEqual(result["rescue_ab_evidence"]["m13_ledger_observed_strategy_count"], 2)
@@ -75,6 +79,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertTrue(all(result["execution_boundaries"].values()))
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertIn("no broker/live/real order approval", result["plain_language_result"])
+            self.assertIn("Internal launch readiness is 1/1 approved strategies", result["plain_language_result"])
             self.assertIn("Broker blocker shadow repair has 1 quantity-cap candidate", result["plain_language_result"])
             self.assertIn("Broker blocker shadow A/B prep has 1 runtime-registration candidate", result["plain_language_result"])
             self.assertIn("Broker blocker rule shadow evidence has 2 PA005 rule-only rows", result["plain_language_result"])
@@ -95,6 +100,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(persisted["project_stage_label"], result["project_stage_label"])
             md = (root / "readiness.md").read_text(encoding="utf-8")
             self.assertIn("Internal simulated-account ready strategies", md)
+            self.assertIn("Internal Sim Launch Readiness", md)
             self.assertIn("Rescue A/B Evidence", md)
             self.assertIn("Rescue Optimization Backlog", md)
             self.assertIn("Rescue Next Refresh Readiness", md)
@@ -120,6 +126,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
     def _write_fixture(self, root: Path) -> Path:
         summary_path = root / "summary.json"
         gate_path = root / "gate.json"
+        internal_launch_path = root / "internal_launch.json"
         rescue_plan_path = root / "rescue_plan.json"
         rescue_coverage_path = root / "rescue_coverage.json"
         rescue_ab_path = root / "rescue_ab.json"
@@ -168,6 +175,50 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         self._gate_row("M10-PA-001", "not_approved_modify_candidate", "modify"),
                         self._gate_row("M10-PA-011", "not_approved_rejected", "reject"),
                     ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        internal_launch_path.write_text(
+            json.dumps(
+                {
+                    "paper_simulated_only": True,
+                    "internal_simulated_account": True,
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "internal_simulated_account": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "approved_internal_sim_strategy_count": 1,
+                        "launch_ready_strategy_count": 1,
+                        "broker_watch_strategy_count": 0,
+                        "m13_registry_connected_strategy_count": 1,
+                        "m12_account_input_connected_runtime_count": 1,
+                        "m12_account_input_runtime_count": 1,
+                        "m13_scorecard_present_strategy_count": 1,
+                        "broker_dry_run_ready_count": 1,
+                        "broker_dry_run_blocked_count": 1,
+                        "source_risk_check_count": 2,
+                        "ten_day_challenge_complete": True,
+                        "can_continue_internal_simulated_account": True,
+                        "can_start_broker_paper": False,
+                        "manual_approval_required_before_broker_paper": True,
+                        "hard_boundary_violation_count": 0,
+                        "launch_status_counts": {
+                            "ready_internal_sim_continue": 1,
+                        },
+                        "broker_watch_strategy_ids": [],
+                        "launch_ready_strategy_ids": ["M10-PA-004"],
+                    },
+                    "plain_language_result": "fixture internal simulated launch readiness",
                 }
             ),
             encoding="utf-8",
@@ -600,6 +651,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                     "inputs": {
                         "m14_summary": str(summary_path),
                         "m14_paper_trial_gate": str(gate_path),
+                        "m14_internal_sim_launch_readiness": str(internal_launch_path),
                         "m14_strategy_rescue_plan": str(rescue_plan_path),
                         "m14_rescue_runtime_coverage": str(rescue_coverage_path),
                         "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),

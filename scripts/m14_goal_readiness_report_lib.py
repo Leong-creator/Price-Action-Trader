@@ -19,6 +19,7 @@ class GoalReadinessConfig:
     project_stage_label: str
     m14_summary_path: Path
     paper_gate_path: Path
+    internal_sim_launch_readiness_path: Path
     rescue_plan_path: Path
     rescue_coverage_path: Path
     rescue_ab_evidence_path: Path
@@ -57,6 +58,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         project_stage_label=str(payload["project_stage_label"]),
         m14_summary_path=resolve_repo_path(inputs["m14_summary"]),
         paper_gate_path=resolve_repo_path(inputs["m14_paper_trial_gate"]),
+        internal_sim_launch_readiness_path=resolve_repo_path(inputs["m14_internal_sim_launch_readiness"]),
         rescue_plan_path=resolve_repo_path(inputs["m14_strategy_rescue_plan"]),
         rescue_coverage_path=resolve_repo_path(inputs["m14_rescue_runtime_coverage"]),
         rescue_ab_evidence_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
@@ -102,6 +104,7 @@ def run_m14_goal_readiness_report(
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     summary = read_json(config.m14_summary_path)
     paper_gate = read_json(config.paper_gate_path)
+    internal_sim_launch_readiness = read_json(config.internal_sim_launch_readiness_path)
     rescue_plan = read_json(config.rescue_plan_path)
     rescue_coverage = read_json(config.rescue_coverage_path)
     rescue_ab_evidence = read_json(config.rescue_ab_evidence_path)
@@ -125,6 +128,7 @@ def run_m14_goal_readiness_report(
     boundaries = build_boundaries(
         summary,
         paper_gate,
+        internal_sim_launch_readiness,
         rescue_coverage,
         rescue_ab_evidence,
         rescue_optimization_backlog,
@@ -154,6 +158,7 @@ def run_m14_goal_readiness_report(
         "input_refs": {
             "m14_summary": project_path(config.m14_summary_path),
             "m14_paper_trial_gate": project_path(config.paper_gate_path),
+            "m14_internal_sim_launch_readiness": project_path(config.internal_sim_launch_readiness_path),
             "m14_strategy_rescue_plan": project_path(config.rescue_plan_path),
             "m14_rescue_runtime_coverage": project_path(config.rescue_coverage_path),
             "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_path),
@@ -187,6 +192,9 @@ def run_m14_goal_readiness_report(
             "gate_scope": str(paper_gate.get("gate_scope", "")),
             "gate_counts": gate_counts,
         },
+        "internal_sim_launch_readiness": build_internal_sim_launch_readiness_summary(
+            internal_sim_launch_readiness
+        ),
         "rescue_status": {
             "rescue_runtime_connected_strategy_count": int_or_zero(rescue_coverage.get("connected_rescue_strategy_count")),
             "registered_rescue_strategy_count": int_or_zero(rescue_coverage.get("registered_rescue_strategy_count")),
@@ -250,6 +258,7 @@ def run_m14_goal_readiness_report(
 def build_boundaries(
     summary: dict[str, Any],
     paper_gate: dict[str, Any],
+    internal_sim_launch_readiness: dict[str, Any],
     rescue_coverage: dict[str, Any],
     rescue_ab_evidence: dict[str, Any],
     rescue_optimization_backlog: dict[str, Any],
@@ -268,6 +277,7 @@ def build_boundaries(
             for item in (
                 summary,
                 paper_gate,
+                internal_sim_launch_readiness,
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
@@ -280,12 +290,17 @@ def build_boundaries(
                 broker_blocker_rule_shadow_evidence,
             )
         ),
-        "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
+        "internal_simulated_account": (
+            bool(summary.get("internal_simulated_account"))
+            and bool(paper_gate.get("internal_simulated_account"))
+            and boundary_flag(internal_sim_launch_readiness, "internal_simulated_account")
+        ),
         "broker_connection_disabled": not any(
             bool(item.get("broker_connection", item.get("broker_paper_connection", item.get("broker_connection_enabled", False))))
             for item in (
                 summary,
                 paper_gate,
+                internal_sim_launch_readiness,
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
@@ -301,6 +316,7 @@ def build_boundaries(
         ),
         "real_order_disabled": (
             not bool(broker_readiness.get("real_order_enabled", False))
+            and not bool(internal_sim_launch_readiness.get("real_order", False))
             and not bool(rescue_coverage.get("real_order", False))
             and not bool(rescue_ab_evidence.get("real_order", False))
             and not bool(rescue_optimization_backlog.get("real_order", False))
@@ -317,6 +333,7 @@ def build_boundaries(
             for item in (
                 summary,
                 paper_gate,
+                internal_sim_launch_readiness,
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
@@ -335,6 +352,7 @@ def build_boundaries(
             for item in (
                 summary,
                 paper_gate,
+                internal_sim_launch_readiness,
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
@@ -348,6 +366,37 @@ def build_boundaries(
                 broker_blocker_rule_shadow_evidence,
             )
         ),
+    }
+
+
+def build_internal_sim_launch_readiness_summary(readiness: dict[str, Any]) -> dict[str, Any]:
+    summary = readiness.get("summary", {})
+    return {
+        "approved_internal_sim_strategy_count": int_or_zero(summary.get("approved_internal_sim_strategy_count")),
+        "launch_ready_strategy_count": int_or_zero(summary.get("launch_ready_strategy_count")),
+        "broker_watch_strategy_count": int_or_zero(summary.get("broker_watch_strategy_count")),
+        "m13_registry_connected_strategy_count": int_or_zero(summary.get("m13_registry_connected_strategy_count")),
+        "m12_account_input_connected_runtime_count": int_or_zero(
+            summary.get("m12_account_input_connected_runtime_count")
+        ),
+        "m12_account_input_runtime_count": int_or_zero(summary.get("m12_account_input_runtime_count")),
+        "m13_scorecard_present_strategy_count": int_or_zero(summary.get("m13_scorecard_present_strategy_count")),
+        "broker_dry_run_ready_count": int_or_zero(summary.get("broker_dry_run_ready_count")),
+        "broker_dry_run_blocked_count": int_or_zero(summary.get("broker_dry_run_blocked_count")),
+        "source_risk_check_count": int_or_zero(summary.get("source_risk_check_count")),
+        "ten_day_challenge_complete": bool(summary.get("ten_day_challenge_complete", False)),
+        "can_continue_internal_simulated_account": bool(
+            summary.get("can_continue_internal_simulated_account", False)
+        ),
+        "can_start_broker_paper": bool(summary.get("can_start_broker_paper", False)),
+        "manual_approval_required_before_broker_paper": bool(
+            summary.get("manual_approval_required_before_broker_paper", True)
+        ),
+        "hard_boundary_violation_count": int_or_zero(summary.get("hard_boundary_violation_count")),
+        "launch_status_counts": dict(summary.get("launch_status_counts", {})),
+        "broker_watch_strategy_ids": list(summary.get("broker_watch_strategy_ids", [])),
+        "launch_ready_strategy_ids": list(summary.get("launch_ready_strategy_ids", [])),
+        "plain_language_result": str(readiness.get("plain_language_result", "")),
     }
 
 
@@ -619,6 +668,23 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
             "boundary": "Manual user approval is still required before any broker paper/live path.",
         },
     ]
+    internal_launch = payload.get("internal_sim_launch_readiness", {})
+    if int_or_zero(internal_launch.get("approved_internal_sim_strategy_count")):
+        actions.insert(
+            1,
+            {
+                "priority": "P0",
+                "action": "Use internal simulated-account launch readiness before the next approved-strategy refresh",
+                "evidence": (
+                    f"{internal_launch['launch_ready_strategy_count']}/"
+                    f"{internal_launch['approved_internal_sim_strategy_count']} approved strategies launch-ready; "
+                    f"{internal_launch['m12_account_input_connected_runtime_count']}/"
+                    f"{internal_launch['m12_account_input_runtime_count']} approved runtimes have account inputs; "
+                    f"{internal_launch['broker_watch_strategy_count']} strategies need broker dry-run blocker watch"
+                ),
+                "boundary": "This is an internal simulated-account checklist only; broker paper/live remains disabled.",
+            },
+        )
     backlog = payload.get("rescue_optimization_backlog", {})
     if int_or_zero(backlog.get("actionable_before_10d_count")):
         actions.insert(
@@ -756,6 +822,7 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 def build_plain_language_result(payload: dict[str, Any]) -> str:
     approved = payload["internal_simulation_gate"]["approved_internal_sim_strategy_ids"]
+    internal_launch = payload["internal_sim_launch_readiness"]
     rescue = payload["rescue_status"]
     rescue_ab = payload["rescue_ab_evidence"]
     backlog = payload["rescue_optimization_backlog"]
@@ -771,6 +838,11 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Project is at {payload['project_stage_label']}. "
         f"10-day challenge complete: {payload['challenge']['challenge_progress_label']}. "
         f"{len(approved)} strategies can continue internal simulated-account testing only: {', '.join(approved) or 'none'}. "
+        f"Internal launch readiness is {internal_launch['launch_ready_strategy_count']}/"
+        f"{internal_launch['approved_internal_sim_strategy_count']} approved strategies, with "
+        f"{internal_launch['m12_account_input_connected_runtime_count']}/"
+        f"{internal_launch['m12_account_input_runtime_count']} approved runtimes connected and "
+        f"{internal_launch['broker_watch_strategy_count']} strategies needing broker dry-run blocker watch. "
         f"Rescue coverage is {rescue['rescue_runtime_connected_strategy_count']}/{rescue['registered_rescue_strategy_count']} strategies "
         f"and {rescue['planned_action_covered_count']}/{rescue['planned_action_row_count']} planned actions. "
         f"Rescue A/B evidence is now {rescue_ab['m13_ledger_observed_strategy_count']}/{rescue_ab['rescue_runtime_strategy_count']} strategies observed, "
@@ -825,6 +897,21 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
     ]
     for key, value in payload["internal_simulation_gate"]["gate_counts"].items():
         lines.append(f"- `{key}`: `{value}`")
+    internal_launch = payload["internal_sim_launch_readiness"]
+    lines.extend(
+        [
+            "",
+            "## Internal Sim Launch Readiness",
+            "",
+            f"- Launch-ready approved strategies: `{internal_launch['launch_ready_strategy_count']}/{internal_launch['approved_internal_sim_strategy_count']}`",
+            f"- Approved runtime input coverage: `{internal_launch['m12_account_input_connected_runtime_count']}/{internal_launch['m12_account_input_runtime_count']}`",
+            f"- M13 registry connected strategies: `{internal_launch['m13_registry_connected_strategy_count']}`",
+            f"- Broker dry-run watch strategies: `{internal_launch['broker_watch_strategy_count']}`",
+            f"- Broker paper start allowed: `{internal_launch['can_start_broker_paper']}`",
+            f"- Hard boundary violations: `{internal_launch['hard_boundary_violation_count']}`",
+            f"- Launch status counts: `{internal_launch['launch_status_counts']}`",
+        ]
+    )
     rescue_ab = payload["rescue_ab_evidence"]
     lines.extend(
         [

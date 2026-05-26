@@ -1,0 +1,201 @@
+{
+  "challenge": {
+    "challenge_progress_label": "10/10",
+    "data_quality_state": "history_recompute_from_existing_challenge",
+    "effective_challenge_trading_days": 10,
+    "m12_current_day_runtime_ready": false,
+    "required_challenge_trading_days": 10,
+    "ten_day_challenge_complete": true
+  },
+  "execution_boundaries": {
+    "broker_connection_disabled": true,
+    "dry_run_only_not_broker_paper": true,
+    "internal_simulated_account": true,
+    "live_execution_disabled": true,
+    "paper_simulated_only": true,
+    "paper_trading_approval_disabled": true,
+    "real_order_disabled": true
+  },
+  "generated_at": "2026-05-26T05:58:22Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "internal_simulated_account": true,
+    "live_execution": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "m12_account_input_audit": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_input_audit.json",
+    "m13_daily_strategy_scorecard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m13_real_daily_strategy_testing/m13_daily_strategy_scorecard.json",
+    "m13_strategy_runtime_registry": "config/examples/m13_strategy_runtime_registry.json",
+    "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m14_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_challenge_summary.json"
+  },
+  "m14_trading_date": "2026-05-22",
+  "plain_language_result": "Internal simulated-account launch readiness: 3/3 approved strategies can continue internal simulation. Runtime inputs are connected for 4/4 approved runtimes. Broker dry-run remains preview-only: 5 ready rows, 3 blocked rows; broker paper/live stays disabled and still needs manual approval.",
+  "project_stage_label": "M14 approved internal simulated-account launch readiness",
+  "schema_version": "m14.internal-sim-launch-readiness.v1",
+  "stage": "M14.internal_sim_launch_readiness",
+  "strategy_rows": [
+    {
+      "broker_blocker_reason_counts": {},
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 0,
+      "broker_dry_run_ready_count": 0,
+      "can_continue_internal_simulated_account": true,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "decision": "promote",
+      "display_name": "Broad channel boundary reversal long-only runtime",
+      "gate_runtime_ids": [
+        "M10-PA-004-long-1d"
+      ],
+      "internal_sim_launch_status": "ready_internal_sim_continue",
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
+      "m12_account_input_status_counts": {
+        "connected_zero_signal_today": 1
+      },
+      "m13_close_count": 0,
+      "m13_open_count": 0,
+      "m13_runtime_registry_connected": true,
+      "m13_scorecard_present": true,
+      "m13_signal_count": 0,
+      "m13_test_states": "zero_signal",
+      "missing_account_input_runtime_ids": [],
+      "missing_registry_runtime_ids": [],
+      "next_action": "continue_internal_simulated_account_testing",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "approved_internal_sim_only",
+      "real_order": false,
+      "registry_runtime_ids": [
+        "M10-PA-004-long-1d"
+      ],
+      "required_trading_days": 10,
+      "strategy_id": "M10-PA-004"
+    },
+    {
+      "broker_blocker_reason_counts": {
+        "consecutive_losses_limit": 1,
+        "max_total_exposure_exceeded": 1,
+        "risk_decision_not_allow": 2
+      },
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 2,
+      "broker_dry_run_ready_count": 5,
+      "can_continue_internal_simulated_account": true,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "decision": "promote",
+      "display_name": "Range geometry experimental runtime",
+      "gate_runtime_ids": [
+        "M10-PA-005-1d",
+        "M10-PA-005-5m"
+      ],
+      "internal_sim_launch_status": "ready_internal_sim_continue_with_broker_dry_run_watch",
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 2,
+      "m12_account_input_runtime_count": 2,
+      "m12_account_input_status_counts": {
+        "connected_with_signal_today": 1,
+        "connected_zero_signal_today": 1
+      },
+      "m13_close_count": 8,
+      "m13_open_count": 8,
+      "m13_runtime_registry_connected": true,
+      "m13_scorecard_present": true,
+      "m13_signal_count": 329,
+      "m13_test_states": "signal_generated,zero_signal",
+      "missing_account_input_runtime_ids": [],
+      "missing_registry_runtime_ids": [],
+      "next_action": "continue_internal_simulated_account_testing_and_track_broker_dry_run_blockers",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "approved_internal_sim_only",
+      "real_order": false,
+      "registry_runtime_ids": [
+        "M10-PA-005-1d",
+        "M10-PA-005-5m"
+      ],
+      "required_trading_days": 10,
+      "strategy_id": "M10-PA-005"
+    },
+    {
+      "broker_blocker_reason_counts": {
+        "max_risk_per_order_exceeded": 1,
+        "risk_decision_not_allow": 1
+      },
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 1,
+      "broker_dry_run_ready_count": 0,
+      "can_continue_internal_simulated_account": true,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "decision": "promote",
+      "display_name": "Visual strategy 008 experimental runtime",
+      "gate_runtime_ids": [
+        "M10-PA-008-1d"
+      ],
+      "internal_sim_launch_status": "ready_internal_sim_continue_with_broker_dry_run_watch",
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
+      "m12_account_input_status_counts": {
+        "connected_with_signal_today": 1
+      },
+      "m13_close_count": 0,
+      "m13_open_count": 1,
+      "m13_runtime_registry_connected": true,
+      "m13_scorecard_present": true,
+      "m13_signal_count": 1,
+      "m13_test_states": "signal_generated",
+      "missing_account_input_runtime_ids": [],
+      "missing_registry_runtime_ids": [],
+      "next_action": "continue_internal_simulated_account_testing_and_track_broker_dry_run_blockers",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "approved_internal_sim_only",
+      "real_order": false,
+      "registry_runtime_ids": [
+        "M10-PA-008-1d"
+      ],
+      "required_trading_days": 10,
+      "strategy_id": "M10-PA-008"
+    }
+  ],
+  "summary": {
+    "approved_internal_sim_strategy_count": 3,
+    "broker_connection_enabled": false,
+    "broker_dry_run_blocked_count": 3,
+    "broker_dry_run_ready_count": 5,
+    "broker_watch_strategy_count": 2,
+    "broker_watch_strategy_ids": [
+      "M10-PA-005",
+      "M10-PA-008"
+    ],
+    "can_continue_internal_simulated_account": true,
+    "can_start_broker_paper": false,
+    "hard_boundary_violation_count": 0,
+    "launch_ready_strategy_count": 3,
+    "launch_ready_strategy_ids": [
+      "M10-PA-004",
+      "M10-PA-005",
+      "M10-PA-008"
+    ],
+    "launch_status_counts": {
+      "ready_internal_sim_continue": 1,
+      "ready_internal_sim_continue_with_broker_dry_run_watch": 2
+    },
+    "live_execution_enabled": false,
+    "m12_account_input_connected_runtime_count": 4,
+    "m12_account_input_runtime_count": 4,
+    "m13_registry_connected_strategy_count": 3,
+    "m13_scorecard_present_strategy_count": 3,
+    "manual_approval_required_before_broker_paper": true,
+    "paper_trading_approval": false,
+    "real_order_enabled": false,
+    "source_risk_check_count": 8,
+    "ten_day_challenge_complete": true
+  }
+}
