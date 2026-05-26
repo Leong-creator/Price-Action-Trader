@@ -25,6 +25,7 @@ class ProjectStageAssessmentConfig:
     rescue_external_reference_map_path: Path
     rescue_parameter_experiment_queue_path: Path
     rescue_parameter_activation_gate_path: Path
+    objective_completion_audit_path: Path
     assessment_json_path: Path
     assessment_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -63,6 +64,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         rescue_parameter_activation_gate_path=resolve_repo_path(
             inputs["m14_rescue_parameter_activation_gate"]
         ),
+        objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         assessment_json_path=resolve_repo_path(outputs["assessment_json"]),
         assessment_md_path=resolve_repo_path(outputs["assessment_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -98,6 +100,7 @@ def run_m14_project_stage_assessment(
     external_map = read_json(config.rescue_external_reference_map_path)
     parameter_queue = read_json(config.rescue_parameter_experiment_queue_path)
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
+    objective_audit = read_json(config.objective_completion_audit_path)
 
     strategy_routes = build_strategy_routes(
         action_matrix=list(goal.get("strategy_action_matrix", [])),
@@ -105,7 +108,15 @@ def run_m14_project_stage_assessment(
         rescue_plan_rows=list(rescue_plan.get("rows", [])),
     )
     summary = build_summary(
-        goal, next_session, backlog, post_refresh, external_map, parameter_queue, activation_gate, strategy_routes
+        goal,
+        next_session,
+        backlog,
+        post_refresh,
+        external_map,
+        parameter_queue,
+        activation_gate,
+        objective_audit,
+        strategy_routes,
     )
     payload: dict[str, Any] = {
         "schema_version": "m14.project-stage-assessment.v1",
@@ -129,10 +140,19 @@ def run_m14_project_stage_assessment(
             "m14_rescue_parameter_activation_gate": project_path(
                 config.rescue_parameter_activation_gate_path
             ),
+            "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
         },
         "summary": summary,
         "stage_assessment": build_stage_assessment(
-            goal, next_session, backlog, post_refresh, external_map, parameter_queue, activation_gate, summary
+            goal,
+            next_session,
+            backlog,
+            post_refresh,
+            external_map,
+            parameter_queue,
+            activation_gate,
+            objective_audit,
+            summary,
         ),
         "strategy_routes": strategy_routes,
         "next_fresh_refresh_acceptance": build_next_fresh_refresh_acceptance(next_session, goal),
@@ -141,12 +161,14 @@ def run_m14_project_stage_assessment(
         "rescue_external_reference_map": build_external_reference_map(external_map),
         "rescue_parameter_experiment_queue": build_parameter_experiment_queue(parameter_queue),
         "rescue_parameter_activation_gate": build_parameter_activation_gate(activation_gate),
+        "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "external_reference_policy": dict(goal.get("external_reference_policy", {})),
         "goal_completion_assessment": {
             "goal_complete": False,
             "reason": (
                 "The 10-day challenge is complete and approved strategies can continue internal simulation, "
-                "but rescue variants still need their own A/B evidence and broker/live remains disabled."
+                "but the objective audit remains not complete because rescue promotion, fresh-refresh review, "
+                "and parameter activation are still blocked or in progress."
             ),
         },
         "hard_boundaries": {
@@ -181,6 +203,7 @@ def build_summary(
     external_map: dict[str, Any],
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
+    objective_audit: dict[str, Any],
     strategy_routes: list[dict[str, Any]],
 ) -> dict[str, Any]:
     challenge = goal.get("challenge", {})
@@ -195,6 +218,7 @@ def build_summary(
     external_summary = external_map.get("summary", {})
     parameter_summary = parameter_queue.get("summary", {})
     activation_summary = activation_gate.get("summary", {})
+    objective_summary = objective_audit.get("summary", {})
     route_counts = dict(sorted(Counter(str(row.get("route_category", "")) for row in strategy_routes).items()))
     return {
         "current_project_stage": str(goal.get("project_stage_label", "")),
@@ -290,6 +314,13 @@ def build_summary(
         "parameter_activation_parameter_mutation_allowed_count": int_or_zero(
             activation_summary.get("parameter_mutation_allowed_count")
         ),
+        "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
+        "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
+        "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
+        "objective_audit_in_progress_count": int_or_zero(objective_summary.get("in_progress_count")),
+        "objective_audit_guardrail_count": int_or_zero(objective_summary.get("guardrail_count")),
+        "objective_audit_complete": bool(objective_summary.get("objective_complete", False)),
+        "objective_audit_blockers": list(objective_summary.get("objective_blockers", [])),
         "rescue_actionable_before_10d_count": int_or_zero(
             backlog_summary.get("actionable_before_10d_count")
         ),
@@ -315,6 +346,7 @@ def build_stage_assessment(
     external_map: dict[str, Any],
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
+    objective_audit: dict[str, Any],
     summary: dict[str, Any],
 ) -> dict[str, Any]:
     post_refresh_status = (
@@ -338,6 +370,9 @@ def build_stage_assessment(
         "external_reference_status": "architecture_reference_only_no_external_override",
         "parameter_experiment_status": "queued_for_post_refresh_review_no_mutation",
         "parameter_activation_status": "waiting_for_fresh_refresh_no_activation",
+        "objective_completion_status": (
+            "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
+        ),
         "broker_status": "dry_run_preview_only_not_broker_paper",
         "next_required_evidence": [
             (
@@ -366,6 +401,11 @@ def build_stage_assessment(
                 f"and {summary['parameter_activation_implementation_mutation_allowed_count']} implementation mutations allowed."
             ),
             (
+                f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
+                f"{summary['objective_audit_blocked_count']} blocked and "
+                f"{summary['objective_audit_in_progress_count']} in progress."
+            ),
+            (
                 f"{summary['broker_dry_run_blocked_count']} broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
             ),
         ],
@@ -376,6 +416,7 @@ def build_stage_assessment(
         "external_reference_plain_result": str(external_map.get("plain_language_result", "")),
         "parameter_experiment_plain_result": str(parameter_queue.get("plain_language_result", "")),
         "parameter_activation_plain_result": str(activation_gate.get("plain_language_result", "")),
+        "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
     }
 
 
@@ -467,6 +508,28 @@ def build_parameter_activation_gate(activation_gate: dict[str, Any]) -> dict[str
         "manual_m12_37_once_allowed": False,
         "broker_or_live_enabled": False,
         "plain_language_result": str(activation_gate.get("plain_language_result", "")),
+    }
+
+
+def build_objective_completion_audit(objective_audit: dict[str, Any]) -> dict[str, Any]:
+    summary = objective_audit.get("summary", {})
+    assessment = objective_audit.get("objective_completion_assessment", {})
+    return {
+        "objective_complete": bool(summary.get("objective_complete", False)),
+        "completion_state": str(assessment.get("completion_state", "")),
+        "requirement_count": int_or_zero(summary.get("requirement_count")),
+        "proven_count": int_or_zero(summary.get("proven_count")),
+        "blocked_count": int_or_zero(summary.get("blocked_count")),
+        "in_progress_count": int_or_zero(summary.get("in_progress_count")),
+        "guardrail_count": int_or_zero(summary.get("guardrail_count")),
+        "requirement_state_counts": dict(summary.get("requirement_state_counts", {})),
+        "objective_blockers": list(summary.get("objective_blockers", [])),
+        "broker_or_live_enabled": False,
+        "manual_m12_37_once_allowed": False,
+        "parameter_mutation_allowed_count": int_or_zero(
+            summary.get("parameter_mutation_allowed_count")
+        ),
+        "plain_language_result": str(objective_audit.get("plain_language_result", "")),
     }
 
 
@@ -621,6 +684,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['parameter_experiment_blocked_until_fresh_refresh_count']} waiting for fresh refresh evidence. "
         f"Activation gate shows {summary['parameter_activation_shadow_review_candidate_count']} shadow-review candidates "
         f"and {summary['parameter_activation_implementation_mutation_allowed_count']} implementation mutations allowed. "
+        f"Objective audit is complete={summary['objective_audit_complete']} with "
+        f"{summary['objective_audit_blocked_count']} blocked and "
+        f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
         f"Broker readiness stays dry-run preview only: {summary['broker_dry_run_ready_count']} ready and {summary['broker_dry_run_blocked_count']} blocked; "
         "manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled."
     )
@@ -648,6 +714,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Parameter experiments blocked until fresh refresh: `{summary['parameter_experiment_blocked_until_fresh_refresh_count']}`",
         f"- Parameter activation shadow-review candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",
         f"- Parameter activation implementation mutations allowed: `{summary['parameter_activation_implementation_mutation_allowed_count']}`",
+        f"- Objective audit complete: `{summary['objective_audit_complete']}`",
+        f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Broker dry-run ready/blocked: `{summary['broker_dry_run_ready_count']}/{summary['broker_dry_run_blocked_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
         "",
@@ -664,6 +732,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- External reference status: `{payload['stage_assessment']['external_reference_status']}`",
         f"- Parameter experiment status: `{payload['stage_assessment']['parameter_experiment_status']}`",
         f"- Parameter activation status: `{payload['stage_assessment']['parameter_activation_status']}`",
+        f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Broker status: `{payload['stage_assessment']['broker_status']}`",
         "",
         "## Route Counts",

@@ -1,0 +1,296 @@
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from scripts.m14_objective_completion_audit_lib import load_config, run_m14_objective_completion_audit
+
+
+class M14ObjectiveCompletionAuditTest(unittest.TestCase):
+    def test_builds_objective_audit_matrix(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = self._write_fixture(root)
+
+            result = run_m14_objective_completion_audit(
+                load_config(config_path),
+                generated_at="2026-05-26T22:00:00Z",
+            )
+
+            self.assertEqual(result["schema_version"], "m14.objective-completion-audit.v1")
+            self.assertFalse(result["summary"]["objective_complete"])
+            self.assertEqual(result["summary"]["current_project_stage"], "M14 fixture stage")
+            self.assertTrue(result["summary"]["ten_day_challenge_complete"])
+            self.assertEqual(result["summary"]["challenge_progress_label"], "10/10")
+            self.assertEqual(result["summary"]["approved_internal_sim_strategy_count"], 2)
+            self.assertEqual(result["summary"]["approved_internal_sim_strategy_ids"], ["M10-PA-004", "M10-PA-005"])
+            self.assertEqual(result["summary"]["rescue_runtime_strategy_count"], 2)
+            self.assertEqual(result["summary"]["rescue_m13_ledger_observed_strategy_count"], 1)
+            self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 1)
+            self.assertEqual(result["summary"]["rescue_promotion_allowed_count"], 0)
+            self.assertEqual(result["summary"]["parameter_experiment_row_count"], 4)
+            self.assertEqual(result["summary"]["parameter_activation_shadow_review_candidate_count"], 0)
+            self.assertFalse(result["summary"]["fresh_refresh_observed"])
+            self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
+            self.assertEqual(result["summary"]["external_reference_project_count"], 2)
+            self.assertFalse(result["summary"]["broker_or_live_enabled"])
+            self.assertFalse(result["summary"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["summary"]["requirement_count"], 12)
+            self.assertEqual(
+                result["summary"]["requirement_state_counts"],
+                {"blocked": 3, "guardrail": 3, "in_progress": 2, "proven": 4},
+            )
+            self.assertFalse(result["objective_completion_assessment"]["objective_complete"])
+
+            rows = {row["requirement_id"]: row for row in result["requirement_rows"]}
+            self.assertEqual(rows["project_stage_identified"]["state"], "proven")
+            self.assertEqual(rows["ten_day_challenge_complete"]["state"], "proven")
+            self.assertEqual(rows["weak_strategies_rescue_not_discarded"]["state"], "in_progress")
+            self.assertEqual(rows["rescue_evidence_sufficient_for_promotion"]["state"], "blocked")
+            self.assertEqual(rows["parameter_optimization_path_ready"]["state"], "in_progress")
+            self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
+            self.assertEqual(rows["broker_live_real_order_disabled"]["state"], "guardrail")
+            self.assertEqual(rows["manual_m12_37_once_disabled"]["state"], "guardrail")
+            for row in result["requirement_rows"]:
+                self.assertFalse(row["broker_connection"])
+                self.assertFalse(row["real_order"])
+                self.assertFalse(row["live_execution"])
+                self.assertFalse(row["manual_m12_37_once"])
+                self.assertFalse(row["parameter_mutation"])
+
+            persisted = json.loads((root / "audit.json").read_text(encoding="utf-8"))
+            self.assertEqual(persisted["summary"], result["summary"])
+            md = (root / "audit.md").read_text(encoding="utf-8")
+            self.assertIn("M14 Objective Completion Audit", md)
+            self.assertIn("Objective complete: `False`", md)
+            self.assertIn("fresh_refresh_required_before_parameter_activation", md)
+
+    def test_rejects_mutation_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = self._write_fixture(root)
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            payload["hard_boundaries"]["parameter_mutation"] = True
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "parameter_mutation"):
+                load_config(config_path)
+
+    def _write_fixture(self, root: Path) -> Path:
+        project_stage_path = root / "project_stage.json"
+        goal_path = root / "goal.json"
+        launch_path = root / "launch.json"
+        next_session_path = root / "next_session.json"
+        rescue_ab_path = root / "rescue_ab.json"
+        parameter_queue_path = root / "parameter_queue.json"
+        activation_gate_path = root / "activation_gate.json"
+        external_map_path = root / "external_map.json"
+        broker_plan_path = root / "broker_plan.json"
+        config_path = root / "config.json"
+
+        project_stage_path.write_text(
+            json.dumps(
+                {
+                    "m14_trading_date": "2026-05-22",
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "manual_m12_37_once": False,
+                    "summary": {
+                        "current_project_stage": "M14 fixture stage",
+                        "challenge_progress_label": "10/10",
+                        "ten_day_challenge_complete": True,
+                        "approved_internal_sim_strategy_count": 2,
+                        "approved_internal_sim_strategy_ids": ["M10-PA-004", "M10-PA-005"],
+                        "launch_ready_strategy_count": 2,
+                        "approved_runtime_input_connected_count": 3,
+                        "approved_runtime_input_count": 3,
+                        "can_run_next_internal_sim_session": True,
+                        "rescue_runtime_strategy_count": 2,
+                        "rescue_m13_ledger_observed_strategy_count": 1,
+                        "rescue_no_m13_ledger_evidence_count": 1,
+                        "rescue_promotion_allowed_count": 0,
+                        "parameter_experiment_row_count": 4,
+                        "parameter_experiment_allowed_now_count": 0,
+                        "parameter_experiment_blocked_until_fresh_refresh_count": 3,
+                        "parameter_activation_gate_row_count": 4,
+                        "parameter_activation_shadow_review_candidate_count": 0,
+                        "parameter_activation_waiting_for_fresh_refresh_count": 4,
+                        "parameter_activation_implementation_mutation_allowed_count": 0,
+                        "parameter_activation_parameter_mutation_allowed_count": 0,
+                        "post_refresh_fresh_refresh_observed": False,
+                        "post_refresh_waiting_count": 4,
+                        "post_refresh_source_quote": "fallback_quotes_only",
+                        "external_reference_project_count": 2,
+                        "external_reference_mapped_rescue_row_count": 3,
+                        "external_reference_broker_blocker_row_count": 1,
+                        "broker_dry_run_ready_count": 1,
+                        "broker_dry_run_blocked_count": 1,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        goal_path.write_text(
+            json.dumps(
+                {
+                    "project_stage_label": "M14 fixture stage",
+                    "m14_trading_date": "2026-05-22",
+                    "challenge": {
+                        "ten_day_challenge_complete": True,
+                        "challenge_progress_label": "10/10",
+                    },
+                    "internal_simulation_gate": {
+                        "approved_internal_sim_strategy_count": 2,
+                        "approved_internal_sim_strategy_ids": ["M10-PA-004", "M10-PA-005"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        launch_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "can_continue_internal_simulated_account": True,
+                        "launch_ready_strategy_count": 2,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        next_session_path.write_text(
+            json.dumps(
+                {
+                    "m14_trading_date": "2026-05-22",
+                    "summary": {
+                        "can_run_next_internal_sim_session": True,
+                        "approved_runtime_input_connected_count": 3,
+                        "approved_runtime_input_count": 3,
+                        "manual_m12_37_once_allowed": False,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        rescue_ab_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "rescue_runtime_strategy_count": 2,
+                        "m13_ledger_observed_strategy_count": 1,
+                        "no_m13_ledger_evidence_count": 1,
+                        "promotion_allowed_count": 0,
+                        "evidence_ready_for_manual_review_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        parameter_queue_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "experiment_row_count": 4,
+                        "allowed_now_count": 0,
+                        "blocked_until_fresh_refresh_count": 3,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        activation_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "gate_row_count": 4,
+                        "shadow_review_candidate_count": 0,
+                        "waiting_for_fresh_refresh_count": 4,
+                        "implementation_mutation_allowed_count": 0,
+                        "parameter_mutation_allowed_count": 0,
+                        "fresh_refresh_observed": False,
+                        "source_quote": "fallback_quotes_only",
+                        "manual_m12_37_once_allowed": False,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        external_map_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "external_reference_project_count": 2,
+                        "mapped_rescue_row_count": 3,
+                        "broker_blocker_reference_row_count": 1,
+                        "copy_trading_allowed": False,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        broker_plan_path.write_text(
+            json.dumps(
+                {
+                    "dry_run_ready_count": 1,
+                    "blocked_count": 1,
+                    "broker_connection_enabled": False,
+                    "real_order_enabled": False,
+                    "live_execution_enabled": False,
+                    "paper_trading_approval": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        config_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "m14.objective-completion-audit.config.v1",
+                    "stage": "M14.objective_completion_audit",
+                    "project_stage_label": "fixture objective completion audit",
+                    "inputs": {
+                        "m14_project_stage_assessment": str(project_stage_path),
+                        "m14_goal_readiness_report": str(goal_path),
+                        "m14_internal_sim_launch_readiness": str(launch_path),
+                        "m14_internal_sim_next_session_plan": str(next_session_path),
+                        "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
+                        "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
+                        "m14_rescue_parameter_activation_gate": str(activation_gate_path),
+                        "m14_rescue_external_reference_map": str(external_map_path),
+                        "m14_2_broker_readiness_plan": str(broker_plan_path),
+                    },
+                    "outputs": {
+                        "audit_json": str(root / "audit.json"),
+                        "audit_md": str(root / "audit.md"),
+                    },
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "internal_simulated_account": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                        "manual_m12_37_once": False,
+                        "m13_registry_mutation": False,
+                        "m12_account_specs_mutation": False,
+                        "broker_readiness_status_mutation": False,
+                        "parameter_mutation": False,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return config_path
+
+
+if __name__ == "__main__":
+    unittest.main()
