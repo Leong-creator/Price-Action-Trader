@@ -41,6 +41,13 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["external_reference_broker_blocker_row_count"], 1)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
             self.assertFalse(result["summary"]["external_reference_copy_trading_allowed"])
+            self.assertEqual(result["summary"]["parameter_experiment_row_count"], 4)
+            self.assertEqual(result["summary"]["parameter_experiment_allowed_now_count"], 0)
+            self.assertEqual(result["summary"]["parameter_experiment_blocked_until_fresh_refresh_count"], 3)
+            self.assertEqual(result["summary"]["parameter_experiment_shadow_runtime_wait_first_ledger_count"], 1)
+            self.assertEqual(result["summary"]["parameter_experiment_broker_blocker_count"], 1)
+            self.assertEqual(result["summary"]["parameter_experiment_target_stop_count"], 1)
+            self.assertEqual(result["summary"]["parameter_experiment_m13_registry_mutation_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
             self.assertEqual(result["summary"]["broker_dry_run_blocked_count"], 1)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
@@ -86,6 +93,13 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["external_reference_status"],
                 "architecture_reference_only_no_external_override",
             )
+            self.assertEqual(
+                result["stage_assessment"]["parameter_experiment_status"],
+                "queued_for_post_refresh_review_no_mutation",
+            )
+            self.assertEqual(result["rescue_parameter_experiment_queue"]["experiment_row_count"], 4)
+            self.assertEqual(result["rescue_parameter_experiment_queue"]["allowed_now_count"], 0)
+            self.assertFalse(result["rescue_parameter_experiment_queue"]["manual_m12_37_once_allowed"])
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertEqual(
                 result["rescue_policy"]["policy"],
@@ -101,6 +115,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Post-refresh fresh refresh observed: `False`", md)
             self.assertIn("Post-refresh waiting/passed/failed: `4/0/0`", md)
             self.assertIn("External reference rescue/broker rows: `3/1`", md)
+            self.assertIn("Parameter experiment rows: `4`", md)
+            self.assertIn("Parameter experiments allowed now: `0`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -121,6 +137,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         backlog_path = root / "backlog.json"
         post_refresh_path = root / "post_refresh.json"
         external_map_path = root / "external_map.json"
+        parameter_queue_path = root / "parameter_queue.json"
         config_path = root / "config.json"
 
         goal_path.write_text(
@@ -296,6 +313,26 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        parameter_queue_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "experiment_row_count": 4,
+                        "rescue_experiment_row_count": 3,
+                        "broker_blocker_experiment_count": 1,
+                        "allowed_now_count": 0,
+                        "blocked_until_fresh_refresh_count": 3,
+                        "shadow_runtime_wait_first_ledger_count": 1,
+                        "target_stop_experiment_count": 1,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    },
+                    "plain_language_result": "Parameter queue fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -309,6 +346,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_rescue_optimization_backlog": str(backlog_path),
                         "m14_rescue_post_refresh_outcome_review": str(post_refresh_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
+                        "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
                     },
                     "outputs": {
                         "assessment_json": str(root / "assessment.json"),
