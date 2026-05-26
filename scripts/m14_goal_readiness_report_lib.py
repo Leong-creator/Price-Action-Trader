@@ -22,6 +22,7 @@ class GoalReadinessConfig:
     rescue_plan_path: Path
     rescue_coverage_path: Path
     rescue_ab_evidence_path: Path
+    rescue_optimization_backlog_path: Path
     broker_readiness_path: Path
     readiness_json_path: Path
     readiness_md_path: Path
@@ -52,6 +53,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         rescue_plan_path=resolve_repo_path(inputs["m14_strategy_rescue_plan"]),
         rescue_coverage_path=resolve_repo_path(inputs["m14_rescue_runtime_coverage"]),
         rescue_ab_evidence_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
+        rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
         broker_readiness_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         readiness_json_path=resolve_repo_path(outputs["readiness_json"]),
         readiness_md_path=resolve_repo_path(outputs["readiness_md"]),
@@ -85,6 +87,7 @@ def run_m14_goal_readiness_report(
     rescue_plan = read_json(config.rescue_plan_path)
     rescue_coverage = read_json(config.rescue_coverage_path)
     rescue_ab_evidence = read_json(config.rescue_ab_evidence_path)
+    rescue_optimization_backlog = read_json(config.rescue_optimization_backlog_path)
     broker_readiness = read_json(config.broker_readiness_path)
 
     gate_rows = list(paper_gate.get("rows", []))
@@ -94,7 +97,14 @@ def run_m14_goal_readiness_report(
         int_or_zero(summary.get("effective_challenge_trading_days")) >= int_or_zero(summary.get("required_challenge_trading_days"))
         and str(summary.get("challenge_progress_label", "")) == "10/10"
     )
-    boundaries = build_boundaries(summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
+    boundaries = build_boundaries(
+        summary,
+        paper_gate,
+        rescue_coverage,
+        rescue_ab_evidence,
+        rescue_optimization_backlog,
+        broker_readiness,
+    )
     boundaries_ok = all(boundaries.values())
     internal_sim_ready = bool(ten_day_complete and approved_ids and boundaries_ok)
     rescue_ready = bool(
@@ -115,6 +125,7 @@ def run_m14_goal_readiness_report(
             "m14_strategy_rescue_plan": project_path(config.rescue_plan_path),
             "m14_rescue_runtime_coverage": project_path(config.rescue_coverage_path),
             "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_path),
+            "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_path),
         },
         "challenge": {
@@ -147,6 +158,7 @@ def run_m14_goal_readiness_report(
             "next_required_evidence": str(rescue_coverage.get("next_required_evidence", "")),
         },
         "rescue_ab_evidence": build_rescue_ab_evidence_summary(rescue_ab_evidence),
+        "rescue_optimization_backlog": build_rescue_optimization_backlog_summary(rescue_optimization_backlog),
         "broker_readiness": {
             "mode": str(broker_readiness.get("mode", "")),
             "dry_run_ready_count": int_or_zero(broker_readiness.get("dry_run_ready_count")),
@@ -186,30 +198,32 @@ def build_boundaries(
     paper_gate: dict[str, Any],
     rescue_coverage: dict[str, Any],
     rescue_ab_evidence: dict[str, Any],
+    rescue_optimization_backlog: dict[str, Any],
     broker_readiness: dict[str, Any],
 ) -> dict[str, bool]:
     return {
         "paper_simulated_only": all(
             boundary_flag(item, "paper_simulated_only")
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog)
         ),
         "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
         "broker_connection_disabled": not any(
             bool(item.get("broker_connection", item.get("broker_paper_connection", item.get("broker_connection_enabled", False))))
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog, broker_readiness)
         ),
         "real_order_disabled": (
             not bool(broker_readiness.get("real_order_enabled", False))
             and not bool(rescue_coverage.get("real_order", False))
             and not bool(rescue_ab_evidence.get("real_order", False))
+            and not bool(rescue_optimization_backlog.get("real_order", False))
         ),
         "live_execution_disabled": not any(
             bool(item.get("live_execution", item.get("live_execution_enabled", False)))
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog, broker_readiness)
         ),
         "paper_trading_approval_disabled": not any(
             bool(item.get("paper_trading_approval", False))
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, broker_readiness)
+            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog, broker_readiness)
         ),
     }
 
@@ -228,6 +242,24 @@ def build_rescue_ab_evidence_summary(rescue_ab_evidence: dict[str, Any]) -> dict
         "no_m13_ledger_evidence_strategy_ids": list(summary.get("no_m13_ledger_evidence_strategy_ids", [])),
         "evidence_ready_for_manual_review_strategy_ids": list(summary.get("evidence_ready_for_manual_review_strategy_ids", [])),
         "plain_language_result": str(rescue_ab_evidence.get("plain_language_result", "")),
+    }
+
+
+def build_rescue_optimization_backlog_summary(backlog: dict[str, Any]) -> dict[str, Any]:
+    summary = backlog.get("summary", {})
+    return {
+        "rescue_strategy_count": int_or_zero(summary.get("rescue_strategy_count")),
+        "actionable_before_10d_count": int_or_zero(summary.get("actionable_before_10d_count")),
+        "wait_for_more_ab_evidence_count": int_or_zero(summary.get("wait_for_more_ab_evidence_count")),
+        "zero_signal_after_connection_count": int_or_zero(summary.get("zero_signal_after_connection_count")),
+        "signal_generated_no_account_operation_count": int_or_zero(
+            summary.get("signal_generated_no_account_operation_count")
+        ),
+        "broker_dry_run_blocked_count": int_or_zero(summary.get("broker_dry_run_blocked_count")),
+        "broker_blocker_strategy_count": int_or_zero(summary.get("broker_blocker_strategy_count")),
+        "high_priority_strategy_ids": list(summary.get("high_priority_strategy_ids", [])),
+        "broker_blocker_reason_counts": dict(summary.get("broker_blocker_reason_counts", {})),
+        "plain_language_result": str(backlog.get("plain_language_result", "")),
     }
 
 
@@ -311,6 +343,21 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
             "boundary": "Manual user approval is still required before any broker paper/live path.",
         },
     ]
+    backlog = payload.get("rescue_optimization_backlog", {})
+    if int_or_zero(backlog.get("actionable_before_10d_count")):
+        actions.insert(
+            2,
+            {
+                "priority": "P0",
+                "action": "Work the rescue optimization backlog before the 10-day A/B window completes",
+                "evidence": (
+                    f"{backlog['actionable_before_10d_count']} actionable; "
+                    f"{backlog['zero_signal_after_connection_count']} zero-signal connected variants; "
+                    f"{backlog['signal_generated_no_account_operation_count']} signal-to-account no-op variants"
+                ),
+                "boundary": "Optimization backlog cannot change broker/live approval or count as promotion evidence.",
+            },
+        )
     if not payload["challenge"]["m12_current_day_runtime_ready"]:
         actions.append(
             {
@@ -327,6 +374,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
     approved = payload["internal_simulation_gate"]["approved_internal_sim_strategy_ids"]
     rescue = payload["rescue_status"]
     rescue_ab = payload["rescue_ab_evidence"]
+    backlog = payload["rescue_optimization_backlog"]
     broker = payload["broker_readiness"]
     return (
         f"Project is at {payload['project_stage_label']}. "
@@ -337,6 +385,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Rescue A/B evidence is now {rescue_ab['m13_ledger_observed_strategy_count']}/{rescue_ab['rescue_runtime_strategy_count']} strategies observed, "
         f"{rescue_ab['evidence_ready_for_manual_review_count']} ready for manual review, "
         f"promotion allowed {rescue_ab['promotion_allowed_count']}. "
+        f"Pre-10-day optimization backlog has {backlog['actionable_before_10d_count']} actionable items: "
+        f"{backlog['zero_signal_after_connection_count']} zero-signal and "
+        f"{backlog['signal_generated_no_account_operation_count']} signal-to-account no-op. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -371,6 +422,18 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Collecting evidence: `{rescue_ab['collecting_evidence_count']}`",
             f"- Ready for manual review: `{rescue_ab['evidence_ready_for_manual_review_count']}`",
             f"- Promotion allowed: `{rescue_ab['promotion_allowed_count']}`",
+        ]
+    )
+    backlog = payload["rescue_optimization_backlog"]
+    lines.extend(
+        [
+            "",
+            "## Rescue Optimization Backlog",
+            "",
+            f"- Actionable before 10-day A/B completion: `{backlog['actionable_before_10d_count']}`",
+            f"- Zero-signal connected variants: `{backlog['zero_signal_after_connection_count']}`",
+            f"- Signal-to-account no-op variants: `{backlog['signal_generated_no_account_operation_count']}`",
+            f"- Broker dry-run blockers: `{backlog['broker_dry_run_blocked_count']}`",
         ]
     )
     lines.extend(["", "## Next Actions", ""])

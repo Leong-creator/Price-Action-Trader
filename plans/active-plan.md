@@ -98,6 +98,7 @@
 - M14 rescue runtime 覆盖审计已落地：`scripts/run_m14_rescue_runtime_coverage.py` 当前证明 M13 registry 中 `9/9` 条 rescue 策略、`10` 个 M12 account specs 输入流均已接线，M14 rescue plan 中 `10/10` 个 rescue/rebuild 动作已有 runtime 覆盖；该审计只证明输入覆盖，不代表策略通过或准入，所有 rescue runtime 仍必须继续累计 10 个交易日 A/B ledger 后再判断 `promote / modify / reject`。
 - M14 goal readiness 总览已落地：`scripts/run_m14_goal_readiness_report.py` 当前把 M14 challenge、internal sim gate、rescue coverage 与 M14.2 broker dry-run 汇总成单一验收视图；结论是 10 日 challenge 已够，`M10-PA-004 / M10-PA-005 / M10-PA-008` 可继续内部模拟账户测试，弱策略救援变体已准备进入 10 日 A/B 取证，目标仍未完成，因为 rescue 变体尚未形成新 10 日证据且 broker/live 继续禁用。
 - M14 rescue A/B evidence tracker 已落地：`scripts/run_m14_rescue_ab_evidence_tracker.py` 当前把 rescue coverage、M14 gate、M13 scorecard 与 M13 signal/account ledger 合成取证门禁；最新结果显示 rescue runtime coverage 完整，rescue 变体自己的 M13 ledger evidence 已进入 `9/9` 条策略，9 条 rescue 变体均处于 `collecting_ab_evidence` 且当前各为 `1/10` 个 rescue A/B 交易日，父策略历史不得折算为 rescue 变体通过证据，promotion allowed 固定为 `0`。
+- M14 rescue optimization backlog 已落地：`scripts/run_m14_rescue_optimization_backlog.py` 当前把 rescue plan、rescue A/B evidence 与 M14.2 broker dry-run blocker 合成 10 日 A/B 未满前可提前做的优化队列；最新结果显示 `9/9` 条 rescue 变体均有 pre-10-day actionable backlog，其中 `8` 条为已接线但零信号，`1` 条为 `M10-PA-011-ORB-R1` 有信号但没有 account operation，另有 `M10-PA-005 / M10-PA-008` 的 `3` 个 broker dry-run 风控阻断需要继续用 sizing、exposure、cooldown 或 stop/target normalization 修复；该 backlog 不代表晋级，也不允许 broker/live。
 
 ## 2. 执行总原则
 

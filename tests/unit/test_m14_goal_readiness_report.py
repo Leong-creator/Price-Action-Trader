@@ -29,6 +29,9 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(result["rescue_ab_evidence"]["rescue_runtime_strategy_count"], 2)
             self.assertEqual(result["rescue_ab_evidence"]["evidence_ready_for_manual_review_count"], 0)
             self.assertEqual(result["rescue_ab_evidence"]["promotion_allowed_count"], 0)
+            self.assertEqual(result["rescue_optimization_backlog"]["actionable_before_10d_count"], 2)
+            self.assertEqual(result["rescue_optimization_backlog"]["zero_signal_after_connection_count"], 1)
+            self.assertEqual(result["rescue_optimization_backlog"]["signal_generated_no_account_operation_count"], 1)
             self.assertEqual(result["broker_readiness"]["mode"], "paper_dry_run_only")
             self.assertEqual(result["broker_readiness"]["dry_run_ready_count"], 1)
             self.assertEqual(result["broker_readiness"]["blocked_count"], 1)
@@ -52,6 +55,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             md = (root / "readiness.md").read_text(encoding="utf-8")
             self.assertIn("Internal simulated-account ready strategies", md)
             self.assertIn("Rescue A/B Evidence", md)
+            self.assertIn("Rescue Optimization Backlog", md)
             self.assertIn("Completion Assessment", md)
 
     def test_unsafe_config_is_rejected(self) -> None:
@@ -71,6 +75,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         rescue_plan_path = root / "rescue_plan.json"
         rescue_coverage_path = root / "rescue_coverage.json"
         rescue_ab_path = root / "rescue_ab.json"
+        rescue_backlog_path = root / "rescue_backlog.json"
         broker_path = root / "broker.json"
         config_path = root / "config.json"
         summary_path.write_text(
@@ -201,6 +206,41 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        rescue_backlog_path.write_text(
+            json.dumps(
+                {
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "rescue_strategy_count": 2,
+                        "actionable_before_10d_count": 2,
+                        "wait_for_more_ab_evidence_count": 0,
+                        "zero_signal_after_connection_count": 1,
+                        "signal_generated_no_account_operation_count": 1,
+                        "broker_dry_run_blocked_count": 1,
+                        "broker_blocker_strategy_count": 1,
+                        "high_priority_strategy_ids": [
+                            "M10-PA-001-m14-modify-20260522",
+                            "M10-PA-011-ORB-R1",
+                        ],
+                        "broker_blocker_reason_counts": {
+                            "max_total_exposure_exceeded": 1
+                        },
+                    },
+                    "plain_language_result": "fixture rescue optimization backlog",
+                }
+            ),
+            encoding="utf-8",
+        )
         broker_path.write_text(
             json.dumps(
                 {
@@ -228,6 +268,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_strategy_rescue_plan": str(rescue_plan_path),
                         "m14_rescue_runtime_coverage": str(rescue_coverage_path),
                         "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
+                        "m14_rescue_optimization_backlog": str(rescue_backlog_path),
                         "m14_2_broker_readiness_plan": str(broker_path),
                     },
                     "outputs": {
