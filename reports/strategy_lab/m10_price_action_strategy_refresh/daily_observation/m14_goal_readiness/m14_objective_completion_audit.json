@@ -1,7 +1,7 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T23:58:00Z",
+  "generated_at": "2026-05-27T00:45:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -27,7 +27,8 @@
     "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json",
     "m14_rescue_parameter_shadow_spec": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_shadow_spec.json",
     "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json",
-    "m14_strategy_evidence_gap_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_evidence_gap_matrix.json"
+    "m14_strategy_evidence_gap_matrix": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_evidence_gap_matrix.json",
+    "m14_strategy_source_recheck_triage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_recheck_triage.json"
   },
   "internal_simulated_account": true,
   "live_execution": false,
@@ -40,6 +41,7 @@
       "weak_strategies_rescue_not_discarded",
       "rescue_evidence_sufficient_for_promotion",
       "parameter_optimization_path_ready",
+      "source_reextract_path_ready",
       "fresh_refresh_required_before_parameter_activation",
       "objective_complete"
     ],
@@ -50,7 +52,7 @@
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "parameter_mutation": false,
-  "plain_language_result": "Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.",
+  "plain_language_result": "Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.",
   "project_stage_label": "M14 user objective completion audit",
   "real_order": false,
   "requirement_rows": [
@@ -218,6 +220,28 @@
       "state": "in_progress"
     },
     {
+      "blocker": "",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "evidence": "Source recheck triage has 7 artifact-only rows, 2 source/visual candidates, 2 future source-reextract candidates, 2 research-only holds, 2 supporting-only rows, and 1 external-reference holds; create/close/promote/discard/mutation allowed now is 0/0/0/0/0.",
+      "internal_simulated_account": true,
+      "label": "Original-source recheck and future source-reextract candidates are tracked before creating new strategies.",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "next_action": "Use this queue to review original source refs and visual packs; do not create, promote, discard, or mutate a strategy from source review alone.",
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "real_order": false,
+      "requirement_id": "source_reextract_path_ready",
+      "source_refs": [
+        "m14_strategy_source_recheck_triage"
+      ],
+      "state": "in_progress"
+    },
+    {
       "blocker": "Current evidence still waits for a fresh supervisor-owned refresh.",
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
@@ -358,7 +382,7 @@
     "external_reference_project_count": 2,
     "fresh_refresh_observed": false,
     "guardrail_count": 3,
-    "in_progress_count": 2,
+    "in_progress_count": 3,
     "launch_ready_strategy_count": 3,
     "m12_account_specs_mutation_count": 0,
     "m13_registry_mutation_count": 0,
@@ -368,6 +392,7 @@
       "weak_strategies_rescue_not_discarded",
       "rescue_evidence_sufficient_for_promotion",
       "parameter_optimization_path_ready",
+      "source_reextract_path_ready",
       "fresh_refresh_required_before_parameter_activation",
       "objective_complete"
     ],
@@ -388,11 +413,11 @@
     "parameter_shadow_spec_waiting_for_fresh_refresh_count": 12,
     "post_refresh_waiting_count": 13,
     "proven_count": 4,
-    "requirement_count": 12,
+    "requirement_count": 13,
     "requirement_state_counts": {
       "blocked": 3,
       "guardrail": 3,
-      "in_progress": 2,
+      "in_progress": 3,
       "proven": 4
     },
     "rescue_evidence_ready_for_manual_review_count": 0,
@@ -416,6 +441,17 @@
     "strategy_evidence_rescue_10_day_ab_gap_count": 10,
     "strategy_evidence_shadow_review_gap_count": 11,
     "strategy_evidence_wait_first_ledger_gap_count": 2,
+    "strategy_source_recheck_can_close_gap_now_count": 0,
+    "strategy_source_recheck_can_create_strategy_now_count": 0,
+    "strategy_source_recheck_can_discard_now_count": 0,
+    "strategy_source_recheck_can_promote_now_count": 0,
+    "strategy_source_recheck_external_hold_count": 1,
+    "strategy_source_recheck_future_reextract_candidate_count": 2,
+    "strategy_source_recheck_parameter_mutation_allowed_count": 0,
+    "strategy_source_recheck_research_hold_count": 2,
+    "strategy_source_recheck_row_count": 7,
+    "strategy_source_recheck_supporting_rule_count": 2,
+    "strategy_source_recheck_visual_candidate_count": 2,
     "ten_day_challenge_complete": true
   }
 }

@@ -27,6 +27,7 @@ class ObjectiveCompletionAuditConfig:
     rescue_parameter_shadow_spec_path: Path
     strategy_decision_ladder_path: Path
     strategy_evidence_gap_matrix_path: Path
+    strategy_source_recheck_triage_path: Path
     rescue_external_reference_map_path: Path
     broker_readiness_plan_path: Path
     audit_json_path: Path
@@ -67,6 +68,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveCompletionAu
         rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
         strategy_decision_ladder_path=resolve_repo_path(inputs["m14_strategy_decision_ladder"]),
         strategy_evidence_gap_matrix_path=resolve_repo_path(inputs["m14_strategy_evidence_gap_matrix"]),
+        strategy_source_recheck_triage_path=resolve_repo_path(
+            inputs["m14_strategy_source_recheck_triage"]
+        ),
         rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         broker_readiness_plan_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         audit_json_path=resolve_repo_path(outputs["audit_json"]),
@@ -117,6 +121,7 @@ def run_m14_objective_completion_audit(
     parameter_shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
     decision_ladder = read_json(config.strategy_decision_ladder_path)
     evidence_gap_matrix = read_json(config.strategy_evidence_gap_matrix_path)
+    source_recheck = read_json(config.strategy_source_recheck_triage_path)
     external_map = read_json(config.rescue_external_reference_map_path)
     broker_plan = read_json(config.broker_readiness_plan_path)
 
@@ -131,6 +136,7 @@ def run_m14_objective_completion_audit(
         parameter_shadow_spec=parameter_shadow_spec,
         decision_ladder=decision_ladder,
         evidence_gap_matrix=evidence_gap_matrix,
+        source_recheck=source_recheck,
         external_map=external_map,
         broker_plan=broker_plan,
     )
@@ -174,6 +180,9 @@ def run_m14_objective_completion_audit(
             "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
             "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
             "m14_strategy_evidence_gap_matrix": project_path(config.strategy_evidence_gap_matrix_path),
+            "m14_strategy_source_recheck_triage": project_path(
+                config.strategy_source_recheck_triage_path
+            ),
             "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_plan_path),
         },
@@ -234,6 +243,7 @@ def build_summary(
     parameter_shadow_spec: dict[str, Any],
     decision_ladder: dict[str, Any],
     evidence_gap_matrix: dict[str, Any],
+    source_recheck: dict[str, Any],
     external_map: dict[str, Any],
     broker_plan: dict[str, Any],
 ) -> dict[str, Any]:
@@ -248,6 +258,7 @@ def build_summary(
     parameter_shadow_summary = parameter_shadow_spec.get("summary", {})
     decision_summary = decision_ladder.get("summary", {})
     evidence_gap_summary = evidence_gap_matrix.get("summary", {})
+    source_recheck_summary = source_recheck.get("summary", {})
     external_summary = external_map.get("summary", {})
     parameter_shadow_mutation_allowed_count = int_or_zero(
         stage_summary.get(
@@ -473,6 +484,72 @@ def build_summary(
                 evidence_gap_summary.get("parameter_mutation_allowed_count"),
             )
         ),
+        "strategy_source_recheck_row_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_row_count",
+                source_recheck_summary.get("source_recheck_row_count"),
+            )
+        ),
+        "strategy_source_recheck_visual_candidate_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_visual_candidate_count",
+                source_recheck_summary.get("source_visual_recheck_candidate_count"),
+            )
+        ),
+        "strategy_source_recheck_research_hold_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_research_hold_count",
+                source_recheck_summary.get("research_only_risk_definition_hold_count"),
+            )
+        ),
+        "strategy_source_recheck_supporting_rule_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_supporting_rule_count",
+                source_recheck_summary.get("supporting_rule_attach_to_parent_count"),
+            )
+        ),
+        "strategy_source_recheck_external_hold_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_external_hold_count",
+                source_recheck_summary.get("external_reference_hold_count"),
+            )
+        ),
+        "strategy_source_recheck_future_reextract_candidate_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_future_reextract_candidate_count",
+                source_recheck_summary.get("eligible_for_future_source_reextract_count"),
+            )
+        ),
+        "strategy_source_recheck_can_create_strategy_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_can_create_strategy_now_count",
+                source_recheck_summary.get("standalone_strategy_creation_allowed_count"),
+            )
+        ),
+        "strategy_source_recheck_can_close_gap_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_can_close_gap_now_count",
+                source_recheck_summary.get("recheck_can_close_gap_now_count"),
+            )
+        ),
+        "strategy_source_recheck_can_promote_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_can_promote_now_count",
+                source_recheck_summary.get("recheck_can_promote_now_count"),
+            )
+        ),
+        "strategy_source_recheck_can_discard_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_can_discard_now_count",
+                source_recheck_summary.get("recheck_can_discard_now_count"),
+            )
+        ),
+        "strategy_source_recheck_parameter_mutation_allowed_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_recheck_parameter_mutation_allowed_count",
+                source_recheck_summary.get("parameter_mutation_allowed_now_count"),
+            )
+        ),
         "fresh_refresh_observed": bool(
             activation_summary.get(
                 "fresh_refresh_observed",
@@ -672,6 +749,28 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             ],
         ),
         requirement_row(
+            "source_reextract_path_ready",
+            "Original-source recheck and future source-reextract candidates are tracked before creating new strategies.",
+            "in_progress" if summary["strategy_source_recheck_row_count"] > 0 else "blocked",
+            (
+                f"Source recheck triage has {summary['strategy_source_recheck_row_count']} artifact-only rows, "
+                f"{summary['strategy_source_recheck_visual_candidate_count']} source/visual candidates, "
+                f"{summary['strategy_source_recheck_future_reextract_candidate_count']} future source-reextract candidates, "
+                f"{summary['strategy_source_recheck_research_hold_count']} research-only holds, "
+                f"{summary['strategy_source_recheck_supporting_rule_count']} supporting-only rows, and "
+                f"{summary['strategy_source_recheck_external_hold_count']} external-reference holds; "
+                f"create/close/promote/discard/mutation allowed now is "
+                f"{summary['strategy_source_recheck_can_create_strategy_now_count']}/"
+                f"{summary['strategy_source_recheck_can_close_gap_now_count']}/"
+                f"{summary['strategy_source_recheck_can_promote_now_count']}/"
+                f"{summary['strategy_source_recheck_can_discard_now_count']}/"
+                f"{summary['strategy_source_recheck_parameter_mutation_allowed_count']}."
+            ),
+            "" if summary["strategy_source_recheck_row_count"] > 0 else "No source recheck triage artifact is visible.",
+            "Use this queue to review original source refs and visual packs; do not create, promote, discard, or mutate a strategy from source review alone.",
+            ["m14_strategy_source_recheck_triage"],
+        ),
+        requirement_row(
             "fresh_refresh_required_before_parameter_activation",
             "Fresh M12.47-owned refresh is required before parameter activation.",
             "proven" if summary["fresh_refresh_observed"] and summary["post_refresh_waiting_count"] == 0 else "blocked",
@@ -781,6 +880,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"runtimes, {summary['parameter_experiment_row_count']} parameter experiment rows, "
         f"{summary['parameter_shadow_spec_candidate_variant_count']} parameter shadow variants, and "
         f"{summary['strategy_decision_rescue_continue_count']} rescue-continuation ladder rows. "
+        f"Source recheck triage tracks {summary['strategy_source_recheck_row_count']} artifact-only rows, "
+        f"including {summary['strategy_source_recheck_future_reextract_candidate_count']} future source-reextract candidates. "
         f"Evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows, "
         f"including {summary['strategy_evidence_requires_fresh_refresh_count']} fresh-refresh waits, "
         f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
@@ -809,6 +910,7 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Parameter shadow specs/variants: `{summary['parameter_shadow_spec_row_count']}/{summary['parameter_shadow_spec_candidate_variant_count']}`",
         f"- Strategy ladder rescue/final discard: `{summary['strategy_decision_rescue_continue_count']}/{summary['strategy_decision_final_discard_allowed_count']}`",
         f"- Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `{summary['strategy_evidence_open_gap_row_count']}/{summary['strategy_evidence_requires_fresh_refresh_count']}/{summary['strategy_evidence_wait_first_ledger_gap_count']}/{summary['strategy_evidence_rescue_10_day_ab_gap_count']}/{summary['strategy_evidence_shadow_review_gap_count']}`",
+        f"- Source recheck rows/future-reextract: `{summary['strategy_source_recheck_row_count']}/{summary['strategy_source_recheck_future_reextract_candidate_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",
         f"- Parameter activation candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",
