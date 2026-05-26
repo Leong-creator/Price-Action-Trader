@@ -32,6 +32,15 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(result["summary"]["rescue_promotion_allowed_count"], 0)
             self.assertEqual(result["summary"]["parameter_experiment_row_count"], 4)
             self.assertEqual(result["summary"]["parameter_activation_shadow_review_candidate_count"], 0)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_row_count"], 4)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_candidate_variant_count"], 4)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_waiting_for_fresh_refresh_count"], 3)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_decision_ladder_row_count"], 6)
+            self.assertEqual(result["summary"]["strategy_decision_approved_next_step_count"], 2)
+            self.assertEqual(result["summary"]["strategy_decision_rescue_continue_count"], 3)
+            self.assertEqual(result["summary"]["strategy_decision_final_discard_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_decision_promotion_candidate_count"], 0)
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
@@ -48,8 +57,18 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(rows["project_stage_identified"]["state"], "proven")
             self.assertEqual(rows["ten_day_challenge_complete"]["state"], "proven")
             self.assertEqual(rows["weak_strategies_rescue_not_discarded"]["state"], "in_progress")
+            self.assertIn("decision ladder keeps 3", rows["weak_strategies_rescue_not_discarded"]["evidence"])
+            self.assertIn(
+                "m14_strategy_decision_ladder",
+                rows["weak_strategies_rescue_not_discarded"]["source_refs"],
+            )
             self.assertEqual(rows["rescue_evidence_sufficient_for_promotion"]["state"], "blocked")
             self.assertEqual(rows["parameter_optimization_path_ready"]["state"], "in_progress")
+            self.assertIn("shadow specs cover 4", rows["parameter_optimization_path_ready"]["evidence"])
+            self.assertIn(
+                "m14_rescue_parameter_shadow_spec",
+                rows["parameter_optimization_path_ready"]["source_refs"],
+            )
             self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
             self.assertEqual(rows["broker_live_real_order_disabled"]["state"], "guardrail")
             self.assertEqual(rows["manual_m12_37_once_disabled"]["state"], "guardrail")
@@ -65,6 +84,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             md = (root / "audit.md").read_text(encoding="utf-8")
             self.assertIn("M14 Objective Completion Audit", md)
             self.assertIn("Objective complete: `False`", md)
+            self.assertIn("Parameter shadow specs/variants: `4/4`", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
     def test_rejects_mutation_boundary(self) -> None:
@@ -86,6 +106,8 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
         rescue_ab_path = root / "rescue_ab.json"
         parameter_queue_path = root / "parameter_queue.json"
         activation_gate_path = root / "activation_gate.json"
+        parameter_shadow_spec_path = root / "parameter_shadow_spec.json"
+        decision_ladder_path = root / "decision_ladder.json"
         external_map_path = root / "external_map.json"
         broker_plan_path = root / "broker_plan.json"
         config_path = root / "config.json"
@@ -225,6 +247,45 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        parameter_shadow_spec_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "spec_row_count": 4,
+                        "candidate_variant_count": 4,
+                        "waiting_for_fresh_refresh_count": 3,
+                        "implementation_mutation_allowed_count": 0,
+                        "parameter_mutation_allowed_count": 0,
+                        "broker_or_live_enabled": False,
+                        "manual_m12_37_once_allowed": False,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        decision_ladder_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "strategy_ladder_row_count": 6,
+                        "approved_next_step_count": 2,
+                        "rescue_continue_count": 3,
+                        "final_discard_allowed_count": 0,
+                        "promotion_candidate_count": 0,
+                        "parameter_mutation_allowed_count": 0,
+                        "broker_or_live_enabled": False,
+                        "manual_m12_37_once_allowed": False,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         external_map_path.write_text(
             json.dumps(
                 {
@@ -265,6 +326,8 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
                         "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
                         "m14_rescue_parameter_activation_gate": str(activation_gate_path),
+                        "m14_rescue_parameter_shadow_spec": str(parameter_shadow_spec_path),
+                        "m14_strategy_decision_ladder": str(decision_ladder_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_2_broker_readiness_plan": str(broker_plan_path),
                     },

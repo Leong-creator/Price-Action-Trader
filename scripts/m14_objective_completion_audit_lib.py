@@ -24,6 +24,8 @@ class ObjectiveCompletionAuditConfig:
     rescue_ab_evidence_tracker_path: Path
     rescue_parameter_experiment_queue_path: Path
     rescue_parameter_activation_gate_path: Path
+    rescue_parameter_shadow_spec_path: Path
+    strategy_decision_ladder_path: Path
     rescue_external_reference_map_path: Path
     broker_readiness_plan_path: Path
     audit_json_path: Path
@@ -61,6 +63,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveCompletionAu
         rescue_parameter_activation_gate_path=resolve_repo_path(
             inputs["m14_rescue_parameter_activation_gate"]
         ),
+        rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
+        strategy_decision_ladder_path=resolve_repo_path(inputs["m14_strategy_decision_ladder"]),
         rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         broker_readiness_plan_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         audit_json_path=resolve_repo_path(outputs["audit_json"]),
@@ -108,6 +112,8 @@ def run_m14_objective_completion_audit(
     rescue_ab = read_json(config.rescue_ab_evidence_tracker_path)
     parameter_queue = read_json(config.rescue_parameter_experiment_queue_path)
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
+    parameter_shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
+    decision_ladder = read_json(config.strategy_decision_ladder_path)
     external_map = read_json(config.rescue_external_reference_map_path)
     broker_plan = read_json(config.broker_readiness_plan_path)
 
@@ -119,6 +125,8 @@ def run_m14_objective_completion_audit(
         rescue_ab=rescue_ab,
         parameter_queue=parameter_queue,
         activation_gate=activation_gate,
+        parameter_shadow_spec=parameter_shadow_spec,
+        decision_ladder=decision_ladder,
         external_map=external_map,
         broker_plan=broker_plan,
     )
@@ -159,6 +167,8 @@ def run_m14_objective_completion_audit(
             "m14_rescue_parameter_activation_gate": project_path(
                 config.rescue_parameter_activation_gate_path
             ),
+            "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
+            "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
             "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_plan_path),
         },
@@ -169,8 +179,8 @@ def run_m14_objective_completion_audit(
             "completion_state": "not_complete",
             "reason": (
                 "Project stage, 10-day challenge, approved internal simulation, external-reference mapping, "
-                "and guardrails are proven, but rescue promotion, fresh-refresh review, and parameter activation "
-                "are still blocked or in progress."
+                "parameter shadow specs, strategy decision ladder, and guardrails are visible, but rescue "
+                "promotion, fresh-refresh review, and parameter activation are still blocked or in progress."
             ),
             "blocked_or_in_progress_requirement_ids": summary["objective_blockers"],
         },
@@ -215,6 +225,8 @@ def build_summary(
     rescue_ab: dict[str, Any],
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
+    parameter_shadow_spec: dict[str, Any],
+    decision_ladder: dict[str, Any],
     external_map: dict[str, Any],
     broker_plan: dict[str, Any],
 ) -> dict[str, Any]:
@@ -226,7 +238,21 @@ def build_summary(
     rescue_summary = rescue_ab.get("summary", {})
     parameter_summary = parameter_queue.get("summary", {})
     activation_summary = activation_gate.get("summary", {})
+    parameter_shadow_summary = parameter_shadow_spec.get("summary", {})
+    decision_summary = decision_ladder.get("summary", {})
     external_summary = external_map.get("summary", {})
+    parameter_shadow_mutation_allowed_count = int_or_zero(
+        stage_summary.get(
+            "parameter_shadow_spec_parameter_mutation_allowed_count",
+            parameter_shadow_summary.get("parameter_mutation_allowed_count"),
+        )
+    )
+    decision_parameter_mutation_allowed_count = int_or_zero(
+        stage_summary.get(
+            "strategy_decision_parameter_mutation_allowed_count",
+            decision_summary.get("parameter_mutation_allowed_count"),
+        )
+    )
     return {
         "current_project_stage": str(
             stage_summary.get("current_project_stage") or goal.get("project_stage_label", "")
@@ -341,6 +367,53 @@ def build_summary(
                 activation_summary.get("parameter_mutation_allowed_count"),
             )
         ),
+        "parameter_shadow_spec_row_count": int_or_zero(
+            stage_summary.get("parameter_shadow_spec_row_count", parameter_shadow_summary.get("spec_row_count"))
+        ),
+        "parameter_shadow_spec_candidate_variant_count": int_or_zero(
+            stage_summary.get(
+                "parameter_shadow_spec_candidate_variant_count",
+                parameter_shadow_summary.get("candidate_variant_count"),
+            )
+        ),
+        "parameter_shadow_spec_waiting_for_fresh_refresh_count": int_or_zero(
+            stage_summary.get(
+                "parameter_shadow_spec_waiting_for_fresh_refresh_count",
+                parameter_shadow_summary.get("waiting_for_fresh_refresh_count"),
+            )
+        ),
+        "parameter_shadow_spec_implementation_mutation_allowed_count": int_or_zero(
+            stage_summary.get(
+                "parameter_shadow_spec_implementation_mutation_allowed_count",
+                parameter_shadow_summary.get("implementation_mutation_allowed_count"),
+            )
+        ),
+        "parameter_shadow_spec_parameter_mutation_allowed_count": parameter_shadow_mutation_allowed_count,
+        "strategy_decision_ladder_row_count": int_or_zero(
+            stage_summary.get("strategy_decision_ladder_row_count", decision_summary.get("strategy_ladder_row_count"))
+        ),
+        "strategy_decision_approved_next_step_count": int_or_zero(
+            stage_summary.get(
+                "strategy_decision_approved_next_step_count",
+                decision_summary.get("approved_next_step_count"),
+            )
+        ),
+        "strategy_decision_rescue_continue_count": int_or_zero(
+            stage_summary.get("strategy_decision_rescue_continue_count", decision_summary.get("rescue_continue_count"))
+        ),
+        "strategy_decision_final_discard_allowed_count": int_or_zero(
+            stage_summary.get(
+                "strategy_decision_final_discard_allowed_count",
+                decision_summary.get("final_discard_allowed_count"),
+            )
+        ),
+        "strategy_decision_promotion_candidate_count": int_or_zero(
+            stage_summary.get(
+                "strategy_decision_promotion_candidate_count",
+                decision_summary.get("promotion_candidate_count"),
+            )
+        ),
+        "strategy_decision_parameter_mutation_allowed_count": decision_parameter_mutation_allowed_count,
         "fresh_refresh_observed": bool(
             activation_summary.get(
                 "fresh_refresh_observed",
@@ -394,6 +467,8 @@ def build_summary(
                 broker_plan.get("real_order_enabled"),
                 broker_plan.get("live_execution_enabled"),
                 broker_plan.get("paper_trading_approval"),
+                parameter_shadow_summary.get("broker_or_live_enabled"),
+                decision_summary.get("broker_or_live_enabled"),
             )
         ),
         "manual_m12_37_once_allowed": bool(
@@ -401,22 +476,32 @@ def build_summary(
             or stage_summary.get("manual_m12_37_once_allowed")
             or activation_summary.get("manual_m12_37_once_allowed")
             or next_summary.get("manual_m12_37_once_allowed")
+            or parameter_shadow_summary.get("manual_m12_37_once_allowed")
+            or decision_summary.get("manual_m12_37_once_allowed")
         ),
         "m13_registry_mutation_count": int_or_zero(
             activation_summary.get("m13_registry_mutation_count")
             or parameter_summary.get("m13_registry_mutation_count")
+            or parameter_shadow_summary.get("m13_registry_mutation_count")
+            or decision_summary.get("m13_registry_mutation_count")
         ),
         "m12_account_specs_mutation_count": int_or_zero(
             activation_summary.get("m12_account_specs_mutation_count")
             or parameter_summary.get("m12_account_specs_mutation_count")
+            or parameter_shadow_summary.get("m12_account_specs_mutation_count")
+            or decision_summary.get("m12_account_specs_mutation_count")
         ),
         "broker_readiness_status_mutation_count": int_or_zero(
             activation_summary.get("broker_readiness_status_mutation_count")
             or parameter_summary.get("broker_readiness_status_mutation_count")
+            or parameter_shadow_summary.get("broker_readiness_status_mutation_count")
+            or decision_summary.get("broker_readiness_status_mutation_count")
         ),
         "parameter_mutation_allowed_count": int_or_zero(
             activation_summary.get("parameter_mutation_allowed_count")
-        ),
+        )
+        + parameter_shadow_mutation_allowed_count
+        + decision_parameter_mutation_allowed_count,
     }
 
 
@@ -475,11 +560,14 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "in_progress" if summary["rescue_runtime_strategy_count"] > 0 else "blocked",
             (
                 f"{summary['rescue_runtime_strategy_count']} rescue runtimes exist; "
-                f"{summary['rescue_m13_ledger_observed_strategy_count']} have M13 ledger evidence."
+                f"{summary['rescue_m13_ledger_observed_strategy_count']} have M13 ledger evidence; "
+                f"decision ladder keeps {summary['strategy_decision_rescue_continue_count']} strategies "
+                f"in rescue/continuation and final-discard allowed remains "
+                f"{summary['strategy_decision_final_discard_allowed_count']}."
             ),
             "" if summary["rescue_runtime_strategy_count"] > 0 else "No rescue runtime coverage is visible.",
             "Continue rescue A/B collection, zero-signal diagnostics, and detector rebuild work before discarding.",
-            ["m14_rescue_ab_evidence_tracker", "m14_project_stage_assessment"],
+            ["m14_rescue_ab_evidence_tracker", "m14_strategy_decision_ladder", "m14_project_stage_assessment"],
         ),
         requirement_row(
             "rescue_evidence_sufficient_for_promotion",
@@ -500,12 +588,19 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "in_progress" if summary["parameter_experiment_row_count"] > 0 else "blocked",
             (
                 f"Parameter queue has {summary['parameter_experiment_row_count']} rows; "
+                f"shadow specs cover {summary['parameter_shadow_spec_row_count']} rows and "
+                f"{summary['parameter_shadow_spec_candidate_variant_count']} candidate variants; "
                 f"allowed-now changes {summary['parameter_experiment_allowed_now_count']}; "
-                f"activation shadow-review candidates {summary['parameter_activation_shadow_review_candidate_count']}."
+                f"activation shadow-review candidates {summary['parameter_activation_shadow_review_candidate_count']}; "
+                f"parameter mutations allowed {summary['parameter_mutation_allowed_count']}."
             ),
             "" if summary["parameter_experiment_row_count"] > 0 else "No parameter queue is visible.",
             "Use queued shadow review families only after fresh evidence appears.",
-            ["m14_rescue_parameter_experiment_queue", "m14_rescue_parameter_activation_gate"],
+            [
+                "m14_rescue_parameter_experiment_queue",
+                "m14_rescue_parameter_activation_gate",
+                "m14_rescue_parameter_shadow_spec",
+            ],
         ),
         requirement_row(
             "fresh_refresh_required_before_parameter_activation",
@@ -564,9 +659,11 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "blocked",
             (
                 "Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, "
-                "and parameter activation are not complete."
+                "and parameter activation are not complete; strategy ladder still allows "
+                f"{summary['strategy_decision_final_discard_allowed_count']} final discards and "
+                f"{summary['strategy_decision_promotion_candidate_count']} promotion candidates."
             ),
-            "Objective is not complete while rescue promotion is 0 and parameter activation candidates are 0.",
+            "Objective is not complete while rescue promotion is 0, fresh refresh is absent, and parameter activation candidates are 0.",
             "Continue internal simulation and rescue evidence collection under read-only/simulated guardrails.",
             ["m14_objective_completion_audit"],
         ),
@@ -611,11 +708,14 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Objective audit is not complete yet. Proven: project is at {summary['current_project_stage']}, "
         f"the 10-day challenge is {summary['challenge_progress_label']}, and approved internal simulated-account "
         f"strategies can continue: {approved}. In progress: {summary['rescue_runtime_strategy_count']} rescue "
-        f"runtimes and {summary['parameter_experiment_row_count']} parameter experiment rows. Blocked: rescue "
+        f"runtimes, {summary['parameter_experiment_row_count']} parameter experiment rows, "
+        f"{summary['parameter_shadow_spec_candidate_variant_count']} parameter shadow variants, and "
+        f"{summary['strategy_decision_rescue_continue_count']} rescue-continuation ladder rows. Blocked: rescue "
         f"promotion remains {summary['rescue_promotion_allowed_count']}, fresh refresh observed is "
         f"{summary['fresh_refresh_observed']} with {summary['post_refresh_waiting_count']} waiting rows, and "
         f"parameter activation has {summary['parameter_activation_shadow_review_candidate_count']} shadow-review "
-        "candidates. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, "
+        f"candidates. Final-discard allowed is {summary['strategy_decision_final_discard_allowed_count']}. "
+        "Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, "
         "and manual M12.37 once-mode remain disabled."
     )
 
@@ -632,6 +732,8 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Approved internal sim strategies: `{', '.join(summary['approved_internal_sim_strategy_ids'])}`",
         f"- Rescue evidence observed: `{summary['rescue_m13_ledger_observed_strategy_count']}/{summary['rescue_runtime_strategy_count']}`",
         f"- Rescue promotions allowed: `{summary['rescue_promotion_allowed_count']}`",
+        f"- Parameter shadow specs/variants: `{summary['parameter_shadow_spec_row_count']}/{summary['parameter_shadow_spec_candidate_variant_count']}`",
+        f"- Strategy ladder rescue/final discard: `{summary['strategy_decision_rescue_continue_count']}/{summary['strategy_decision_final_discard_allowed_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",
         f"- Parameter activation candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",

@@ -1,7 +1,7 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T22:00:00Z",
+  "generated_at": "2026-05-26T23:50:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -24,7 +24,9 @@
     "m14_rescue_ab_evidence_tracker": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_ab_evidence_tracker.json",
     "m14_rescue_external_reference_map": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_external_reference_map.json",
     "m14_rescue_parameter_activation_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_activation_gate.json",
-    "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json"
+    "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json",
+    "m14_rescue_parameter_shadow_spec": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_shadow_spec.json",
+    "m14_strategy_decision_ladder": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_decision_ladder.json"
   },
   "internal_simulated_account": true,
   "live_execution": false,
@@ -42,12 +44,12 @@
     ],
     "completion_state": "not_complete",
     "objective_complete": false,
-    "reason": "Project stage, 10-day challenge, approved internal simulation, external-reference mapping, and guardrails are proven, but rescue promotion, fresh-refresh review, and parameter activation are still blocked or in progress."
+    "reason": "Project stage, 10-day challenge, approved internal simulation, external-reference mapping, parameter shadow specs, strategy decision ladder, and guardrails are visible, but rescue promotion, fresh-refresh review, and parameter activation are still blocked or in progress."
   },
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "parameter_mutation": false,
-  "plain_language_result": "Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes and 14 parameter experiment rows. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.",
+  "plain_language_result": "Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.",
   "project_stage_label": "M14 user objective completion audit",
   "real_order": false,
   "requirement_rows": [
@@ -146,7 +148,7 @@
       "blocker": "",
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
-      "evidence": "11 rescue runtimes exist; 9 have M13 ledger evidence.",
+      "evidence": "11 rescue runtimes exist; 9 have M13 ledger evidence; decision ladder keeps 10 strategies in rescue/continuation and final-discard allowed remains 0.",
       "internal_simulated_account": true,
       "label": "Weak strategies have rescue or rebuild routes before any final discard.",
       "live_execution": false,
@@ -161,6 +163,7 @@
       "requirement_id": "weak_strategies_rescue_not_discarded",
       "source_refs": [
         "m14_rescue_ab_evidence_tracker",
+        "m14_strategy_decision_ladder",
         "m14_project_stage_assessment"
       ],
       "state": "in_progress"
@@ -191,7 +194,7 @@
       "blocker": "",
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
-      "evidence": "Parameter queue has 14 rows; allowed-now changes 0; activation shadow-review candidates 0.",
+      "evidence": "Parameter queue has 14 rows; shadow specs cover 14 rows and 14 candidate variants; allowed-now changes 0; activation shadow-review candidates 0; parameter mutations allowed 0.",
       "internal_simulated_account": true,
       "label": "Parameter optimization has a queued review path without mutating strategy state.",
       "live_execution": false,
@@ -206,7 +209,8 @@
       "requirement_id": "parameter_optimization_path_ready",
       "source_refs": [
         "m14_rescue_parameter_experiment_queue",
-        "m14_rescue_parameter_activation_gate"
+        "m14_rescue_parameter_activation_gate",
+        "m14_rescue_parameter_shadow_spec"
       ],
       "state": "in_progress"
     },
@@ -302,10 +306,10 @@
       "state": "guardrail"
     },
     {
-      "blocker": "Objective is not complete while rescue promotion is 0 and parameter activation candidates are 0.",
+      "blocker": "Objective is not complete while rescue promotion is 0, fresh refresh is absent, and parameter activation candidates are 0.",
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
-      "evidence": "Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, and parameter activation are not complete.",
+      "evidence": "Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, and parameter activation are not complete; strategy ladder still allows 0 final discards and 0 promotion candidates.",
       "internal_simulated_account": true,
       "label": "The full user objective is complete end to end.",
       "live_execution": false,
@@ -373,6 +377,11 @@
     "parameter_experiment_blocked_until_fresh_refresh_count": 10,
     "parameter_experiment_row_count": 14,
     "parameter_mutation_allowed_count": 0,
+    "parameter_shadow_spec_candidate_variant_count": 14,
+    "parameter_shadow_spec_implementation_mutation_allowed_count": 0,
+    "parameter_shadow_spec_parameter_mutation_allowed_count": 0,
+    "parameter_shadow_spec_row_count": 14,
+    "parameter_shadow_spec_waiting_for_fresh_refresh_count": 12,
     "post_refresh_waiting_count": 13,
     "proven_count": 4,
     "requirement_count": 12,
@@ -388,6 +397,12 @@
     "rescue_promotion_allowed_count": 0,
     "rescue_runtime_strategy_count": 11,
     "source_quote": "fallback_quotes_only",
+    "strategy_decision_approved_next_step_count": 3,
+    "strategy_decision_final_discard_allowed_count": 0,
+    "strategy_decision_ladder_row_count": 20,
+    "strategy_decision_parameter_mutation_allowed_count": 0,
+    "strategy_decision_promotion_candidate_count": 0,
+    "strategy_decision_rescue_continue_count": 10,
     "ten_day_challenge_complete": true
   }
 }

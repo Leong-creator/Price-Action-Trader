@@ -1,12 +1,14 @@
 # M14 Objective Completion Audit
 
-- Generated at: `2026-05-26T22:00:00Z`
+- Generated at: `2026-05-26T23:50:00Z`
 - Objective complete: `False`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
 - Approved internal sim strategies: `M10-PA-004, M10-PA-005, M10-PA-008`
 - Rescue evidence observed: `9/11`
 - Rescue promotions allowed: `0`
+- Parameter shadow specs/variants: `14/14`
+- Strategy ladder rescue/final discard: `10/0`
 - Fresh refresh observed: `False`
 - Post-refresh waiting rows: `13`
 - Parameter activation candidates: `0`
@@ -15,7 +17,7 @@
 
 ## Plain Result
 
-Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes and 14 parameter experiment rows. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.
+Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.
 
 ## Requirements
 
@@ -50,7 +52,7 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 ### weak_strategies_rescue_not_discarded
 
 - State: `in_progress`
-- Evidence: 11 rescue runtimes exist; 9 have M13 ledger evidence.
+- Evidence: 11 rescue runtimes exist; 9 have M13 ledger evidence; decision ladder keeps 10 strategies in rescue/continuation and final-discard allowed remains 0.
 - Blocker: None
 - Next action: Continue rescue A/B collection, zero-signal diagnostics, and detector rebuild work before discarding.
 
@@ -64,7 +66,7 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 ### parameter_optimization_path_ready
 
 - State: `in_progress`
-- Evidence: Parameter queue has 14 rows; allowed-now changes 0; activation shadow-review candidates 0.
+- Evidence: Parameter queue has 14 rows; shadow specs cover 14 rows and 14 candidate variants; allowed-now changes 0; activation shadow-review candidates 0; parameter mutations allowed 0.
 - Blocker: None
 - Next action: Use queued shadow review families only after fresh evidence appears.
 
@@ -99,6 +101,6 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 ### objective_complete
 
 - State: `blocked`
-- Evidence: Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, and parameter activation are not complete.
-- Blocker: Objective is not complete while rescue promotion is 0 and parameter activation candidates are 0.
+- Evidence: Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, and parameter activation are not complete; strategy ladder still allows 0 final discards and 0 promotion candidates.
+- Blocker: Objective is not complete while rescue promotion is 0, fresh refresh is absent, and parameter activation candidates are 0.
 - Next action: Continue internal simulation and rescue evidence collection under read-only/simulated guardrails.

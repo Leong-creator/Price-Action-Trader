@@ -413,7 +413,7 @@
       "success_condition": "Objective audit has no blocked or in-progress requirements and all guardrails remain intact."
     }
   ],
-  "generated_at": "2026-05-26T23:00:00Z",
+  "generated_at": "2026-05-26T23:55:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
