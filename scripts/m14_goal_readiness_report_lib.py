@@ -23,6 +23,7 @@ class GoalReadinessConfig:
     rescue_coverage_path: Path
     rescue_ab_evidence_path: Path
     rescue_optimization_backlog_path: Path
+    rescue_zero_signal_diagnostics_path: Path
     broker_readiness_path: Path
     readiness_json_path: Path
     readiness_md_path: Path
@@ -54,6 +55,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         rescue_coverage_path=resolve_repo_path(inputs["m14_rescue_runtime_coverage"]),
         rescue_ab_evidence_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
         rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
+        rescue_zero_signal_diagnostics_path=resolve_repo_path(inputs["m14_rescue_zero_signal_diagnostics"]),
         broker_readiness_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
         readiness_json_path=resolve_repo_path(outputs["readiness_json"]),
         readiness_md_path=resolve_repo_path(outputs["readiness_md"]),
@@ -88,6 +90,7 @@ def run_m14_goal_readiness_report(
     rescue_coverage = read_json(config.rescue_coverage_path)
     rescue_ab_evidence = read_json(config.rescue_ab_evidence_path)
     rescue_optimization_backlog = read_json(config.rescue_optimization_backlog_path)
+    rescue_zero_signal_diagnostics = read_json(config.rescue_zero_signal_diagnostics_path)
     broker_readiness = read_json(config.broker_readiness_path)
 
     gate_rows = list(paper_gate.get("rows", []))
@@ -103,6 +106,7 @@ def run_m14_goal_readiness_report(
         rescue_coverage,
         rescue_ab_evidence,
         rescue_optimization_backlog,
+        rescue_zero_signal_diagnostics,
         broker_readiness,
     )
     boundaries_ok = all(boundaries.values())
@@ -126,6 +130,7 @@ def run_m14_goal_readiness_report(
             "m14_rescue_runtime_coverage": project_path(config.rescue_coverage_path),
             "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_path),
             "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
+            "m14_rescue_zero_signal_diagnostics": project_path(config.rescue_zero_signal_diagnostics_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_path),
         },
         "challenge": {
@@ -159,6 +164,7 @@ def run_m14_goal_readiness_report(
         },
         "rescue_ab_evidence": build_rescue_ab_evidence_summary(rescue_ab_evidence),
         "rescue_optimization_backlog": build_rescue_optimization_backlog_summary(rescue_optimization_backlog),
+        "rescue_zero_signal_diagnostics": build_rescue_zero_signal_diagnostics_summary(rescue_zero_signal_diagnostics),
         "broker_readiness": {
             "mode": str(broker_readiness.get("mode", "")),
             "dry_run_ready_count": int_or_zero(broker_readiness.get("dry_run_ready_count")),
@@ -199,31 +205,64 @@ def build_boundaries(
     rescue_coverage: dict[str, Any],
     rescue_ab_evidence: dict[str, Any],
     rescue_optimization_backlog: dict[str, Any],
+    rescue_zero_signal_diagnostics: dict[str, Any],
     broker_readiness: dict[str, Any],
 ) -> dict[str, bool]:
     return {
         "paper_simulated_only": all(
             boundary_flag(item, "paper_simulated_only")
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog)
+            for item in (
+                summary,
+                paper_gate,
+                rescue_coverage,
+                rescue_ab_evidence,
+                rescue_optimization_backlog,
+                rescue_zero_signal_diagnostics,
+            )
         ),
         "internal_simulated_account": bool(summary.get("internal_simulated_account")) and bool(paper_gate.get("internal_simulated_account")),
         "broker_connection_disabled": not any(
             bool(item.get("broker_connection", item.get("broker_paper_connection", item.get("broker_connection_enabled", False))))
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog, broker_readiness)
+            for item in (
+                summary,
+                paper_gate,
+                rescue_coverage,
+                rescue_ab_evidence,
+                rescue_optimization_backlog,
+                rescue_zero_signal_diagnostics,
+                broker_readiness,
+            )
         ),
         "real_order_disabled": (
             not bool(broker_readiness.get("real_order_enabled", False))
             and not bool(rescue_coverage.get("real_order", False))
             and not bool(rescue_ab_evidence.get("real_order", False))
             and not bool(rescue_optimization_backlog.get("real_order", False))
+            and not bool(rescue_zero_signal_diagnostics.get("real_order", False))
         ),
         "live_execution_disabled": not any(
             bool(item.get("live_execution", item.get("live_execution_enabled", False)))
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog, broker_readiness)
+            for item in (
+                summary,
+                paper_gate,
+                rescue_coverage,
+                rescue_ab_evidence,
+                rescue_optimization_backlog,
+                rescue_zero_signal_diagnostics,
+                broker_readiness,
+            )
         ),
         "paper_trading_approval_disabled": not any(
             bool(item.get("paper_trading_approval", False))
-            for item in (summary, paper_gate, rescue_coverage, rescue_ab_evidence, rescue_optimization_backlog, broker_readiness)
+            for item in (
+                summary,
+                paper_gate,
+                rescue_coverage,
+                rescue_ab_evidence,
+                rescue_optimization_backlog,
+                rescue_zero_signal_diagnostics,
+                broker_readiness,
+            )
         ),
     }
 
@@ -260,6 +299,22 @@ def build_rescue_optimization_backlog_summary(backlog: dict[str, Any]) -> dict[s
         "high_priority_strategy_ids": list(summary.get("high_priority_strategy_ids", [])),
         "broker_blocker_reason_counts": dict(summary.get("broker_blocker_reason_counts", {})),
         "plain_language_result": str(backlog.get("plain_language_result", "")),
+    }
+
+
+def build_rescue_zero_signal_diagnostics_summary(diagnostics: dict[str, Any]) -> dict[str, Any]:
+    summary = diagnostics.get("summary", {})
+    return {
+        "zero_signal_runtime_count": int_or_zero(summary.get("zero_signal_runtime_count")),
+        "zero_signal_strategy_count": int_or_zero(summary.get("zero_signal_strategy_count")),
+        "parent_source_available_runtime_count": int_or_zero(summary.get("parent_source_available_runtime_count")),
+        "parent_source_absent_runtime_count": int_or_zero(summary.get("parent_source_absent_runtime_count")),
+        "quote_refresh_candidate_runtime_count": int_or_zero(summary.get("quote_refresh_candidate_runtime_count")),
+        "quality_filter_blocked_runtime_count": int_or_zero(summary.get("quality_filter_blocked_runtime_count")),
+        "potential_signal_if_fresh_quote_count": int_or_zero(summary.get("potential_signal_if_fresh_quote_count")),
+        "dominant_issue_counts": dict(summary.get("dominant_issue_counts", {})),
+        "rejection_reason_counts": dict(summary.get("rejection_reason_counts", {})),
+        "plain_language_result": str(diagnostics.get("plain_language_result", "")),
     }
 
 
@@ -358,6 +413,21 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "boundary": "Optimization backlog cannot change broker/live approval or count as promotion evidence.",
             },
         )
+    diagnostics = payload.get("rescue_zero_signal_diagnostics", {})
+    if int_or_zero(diagnostics.get("zero_signal_runtime_count")):
+        actions.insert(
+            3,
+            {
+                "priority": "P0",
+                "action": "Use zero-signal diagnostics before changing rescue parameters",
+                "evidence": (
+                    f"{diagnostics['quote_refresh_candidate_runtime_count']} quote-refresh candidates; "
+                    f"{diagnostics['quality_filter_blocked_runtime_count']} quality/filter candidates; "
+                    f"{diagnostics['parent_source_absent_runtime_count']} source-mapping candidates"
+                ),
+                "boundary": "Fresh-data rerun and shadow parameter tests only; no broker/live approval.",
+            },
+        )
     if not payload["challenge"]["m12_current_day_runtime_ready"]:
         actions.append(
             {
@@ -375,6 +445,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
     rescue = payload["rescue_status"]
     rescue_ab = payload["rescue_ab_evidence"]
     backlog = payload["rescue_optimization_backlog"]
+    diagnostics = payload["rescue_zero_signal_diagnostics"]
     broker = payload["broker_readiness"]
     return (
         f"Project is at {payload['project_stage_label']}. "
@@ -388,6 +459,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Pre-10-day optimization backlog has {backlog['actionable_before_10d_count']} actionable items: "
         f"{backlog['zero_signal_after_connection_count']} zero-signal and "
         f"{backlog['signal_generated_no_account_operation_count']} signal-to-account no-op. "
+        f"Zero-signal diagnosis: {diagnostics['quote_refresh_candidate_runtime_count']} should be rechecked after fresh quote refresh, "
+        f"{diagnostics['quality_filter_blocked_runtime_count']} need filter/parameter work, "
+        f"{diagnostics['parent_source_absent_runtime_count']} need source mapping. "
         f"Broker readiness remains {broker['mode']}: {broker['dry_run_ready_count']} dry-run ready, {broker['blocked_count']} blocked; no broker/live/real order approval."
     )
 
@@ -434,6 +508,19 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Zero-signal connected variants: `{backlog['zero_signal_after_connection_count']}`",
             f"- Signal-to-account no-op variants: `{backlog['signal_generated_no_account_operation_count']}`",
             f"- Broker dry-run blockers: `{backlog['broker_dry_run_blocked_count']}`",
+        ]
+    )
+    diagnostics = payload["rescue_zero_signal_diagnostics"]
+    lines.extend(
+        [
+            "",
+            "## Rescue Zero-Signal Diagnostics",
+            "",
+            f"- Zero-signal runtimes diagnosed: `{diagnostics['zero_signal_runtime_count']}`",
+            f"- Quote-refresh candidates: `{diagnostics['quote_refresh_candidate_runtime_count']}`",
+            f"- Quality/filter candidates: `{diagnostics['quality_filter_blocked_runtime_count']}`",
+            f"- Source-mapping candidates: `{diagnostics['parent_source_absent_runtime_count']}`",
+            f"- Potential entries if fresh quote gate clears: `{diagnostics['potential_signal_if_fresh_quote_count']}`",
         ]
     )
     lines.extend(["", "## Next Actions", ""])

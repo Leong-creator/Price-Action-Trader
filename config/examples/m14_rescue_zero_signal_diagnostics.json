@@ -1,0 +1,19 @@
+{
+  "schema_version": "m14.rescue-zero-signal-diagnostics.config.v1",
+  "stage": "M14.rescue_zero_signal_diagnostics",
+  "inputs": {
+    "m12_dashboard_data": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+    "m14_rescue_runtime_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_runtime_coverage.json"
+  },
+  "outputs": {
+    "diagnostics_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_zero_signal_diagnostics.json",
+    "diagnostics_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_zero_signal_diagnostics.md"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

@@ -32,6 +32,9 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(result["rescue_optimization_backlog"]["actionable_before_10d_count"], 2)
             self.assertEqual(result["rescue_optimization_backlog"]["zero_signal_after_connection_count"], 1)
             self.assertEqual(result["rescue_optimization_backlog"]["signal_generated_no_account_operation_count"], 1)
+            self.assertEqual(result["rescue_zero_signal_diagnostics"]["zero_signal_runtime_count"], 2)
+            self.assertEqual(result["rescue_zero_signal_diagnostics"]["quote_refresh_candidate_runtime_count"], 1)
+            self.assertEqual(result["rescue_zero_signal_diagnostics"]["quality_filter_blocked_runtime_count"], 1)
             self.assertEqual(result["broker_readiness"]["mode"], "paper_dry_run_only")
             self.assertEqual(result["broker_readiness"]["dry_run_ready_count"], 1)
             self.assertEqual(result["broker_readiness"]["blocked_count"], 1)
@@ -56,6 +59,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertIn("Internal simulated-account ready strategies", md)
             self.assertIn("Rescue A/B Evidence", md)
             self.assertIn("Rescue Optimization Backlog", md)
+            self.assertIn("Rescue Zero-Signal Diagnostics", md)
             self.assertIn("Completion Assessment", md)
 
     def test_unsafe_config_is_rejected(self) -> None:
@@ -76,6 +80,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         rescue_coverage_path = root / "rescue_coverage.json"
         rescue_ab_path = root / "rescue_ab.json"
         rescue_backlog_path = root / "rescue_backlog.json"
+        zero_signal_path = root / "zero_signal.json"
         broker_path = root / "broker.json"
         config_path = root / "config.json"
         summary_path.write_text(
@@ -241,6 +246,42 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        zero_signal_path.write_text(
+            json.dumps(
+                {
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "zero_signal_runtime_count": 2,
+                        "zero_signal_strategy_count": 2,
+                        "parent_source_available_runtime_count": 2,
+                        "parent_source_absent_runtime_count": 0,
+                        "quote_refresh_candidate_runtime_count": 1,
+                        "quality_filter_blocked_runtime_count": 1,
+                        "potential_signal_if_fresh_quote_count": 3,
+                        "dominant_issue_counts": {
+                            "stale_quote_source_blocks_candidate": 1,
+                            "reward_filter_blocks_all": 1,
+                        },
+                        "rejection_reason_counts": {
+                            "stale_quote_source": 3,
+                            "reward_r_below_min": 1,
+                        },
+                    },
+                    "plain_language_result": "fixture zero-signal diagnostics",
+                }
+            ),
+            encoding="utf-8",
+        )
         broker_path.write_text(
             json.dumps(
                 {
@@ -269,6 +310,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_rescue_runtime_coverage": str(rescue_coverage_path),
                         "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
                         "m14_rescue_optimization_backlog": str(rescue_backlog_path),
+                        "m14_rescue_zero_signal_diagnostics": str(zero_signal_path),
                         "m14_2_broker_readiness_plan": str(broker_path),
                     },
                     "outputs": {

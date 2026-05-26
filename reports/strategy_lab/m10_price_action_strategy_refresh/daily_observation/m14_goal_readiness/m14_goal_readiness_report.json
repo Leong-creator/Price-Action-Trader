@@ -45,7 +45,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T15:30:00Z",
+  "generated_at": "2026-05-26T15:45:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own 10 trading-day A/B evidence before final promote/modify/reject."
@@ -56,6 +56,7 @@
     "m14_rescue_ab_evidence_tracker": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_ab_evidence_tracker.json",
     "m14_rescue_optimization_backlog": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_optimization_backlog.json",
     "m14_rescue_runtime_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_runtime_coverage.json",
+    "m14_rescue_zero_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_zero_signal_diagnostics.json",
     "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
     "m14_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_challenge_summary.json"
   },
@@ -98,6 +99,12 @@
       "priority": "P0"
     },
     {
+      "action": "Use zero-signal diagnostics before changing rescue parameters",
+      "boundary": "Fresh-data rerun and shadow parameter tests only; no broker/live approval.",
+      "evidence": "7 quote-refresh candidates; 1 quality/filter candidates; 1 source-mapping candidates",
+      "priority": "P0"
+    },
+    {
       "action": "Keep M14.2 broker readiness in dry-run preview mode",
       "boundary": "Manual user approval is still required before any broker paper/live path.",
       "evidence": "5 dry-run ready, 3 blocked",
@@ -110,7 +117,7 @@
       "priority": "P1"
     }
   ],
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 8 actionable items: 8 zero-signal and 0 signal-to-account no-op. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 9/9 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/9 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 8 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 1 need source mapping. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
   "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "rescue_ab_evidence": {
     "collecting_evidence_count": 9,
@@ -172,6 +179,29 @@
     "registered_rescue_strategy_count": 9,
     "rescue_ready_for_ab_evidence_collection": true,
     "rescue_runtime_connected_strategy_count": 9
+  },
+  "rescue_zero_signal_diagnostics": {
+    "dominant_issue_counts": {
+      "parent_source_absent_for_timeframe": 1,
+      "reward_filter_blocks_all": 1,
+      "stale_quote_source_blocks_candidate": 7
+    },
+    "parent_source_absent_runtime_count": 1,
+    "parent_source_available_runtime_count": 8,
+    "plain_language_result": "Zero-signal rescue diagnostics reviewed 9 rescue runtimes. 7 are blocked mainly by stale/non-fresh quote source and should be rechecked on the next M12.47 fresh refresh; 1 need parameter/filter work; 1 have no parent source rows for the configured timeframe. Potential entries if fresh quote gate clears: 63. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+    "potential_signal_if_fresh_quote_count": 63,
+    "quality_filter_blocked_runtime_count": 1,
+    "quote_refresh_candidate_runtime_count": 7,
+    "rejection_reason_counts": {
+      "direction_not_long": 71,
+      "invalid_risk_reward": 1,
+      "leveraged_etf_excluded": 6,
+      "reward_r_below_min": 47,
+      "risk_percent_above_limit": 17,
+      "stale_quote_source": 164
+    },
+    "zero_signal_runtime_count": 9,
+    "zero_signal_strategy_count": 8
   },
   "schema_version": "m14.goal-readiness-report.v1",
   "stage": "M14.goal_readiness_report",
