@@ -32,6 +32,11 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(result["rescue_optimization_backlog"]["actionable_before_10d_count"], 2)
             self.assertEqual(result["rescue_optimization_backlog"]["zero_signal_after_connection_count"], 1)
             self.assertEqual(result["rescue_optimization_backlog"]["signal_generated_no_account_operation_count"], 1)
+            self.assertEqual(result["rescue_next_refresh_readiness"]["watch_rows"], 4)
+            self.assertEqual(result["rescue_next_refresh_readiness"]["fresh_quote_recheck_count"], 1)
+            self.assertEqual(result["rescue_next_refresh_readiness"]["first_ledger_watch_count"], 1)
+            self.assertEqual(result["rescue_next_refresh_readiness"]["broker_rule_shadow_watch_count"], 2)
+            self.assertEqual(result["rescue_next_refresh_readiness"]["parameter_change_allowed_now_count"], 0)
             self.assertEqual(result["rescue_zero_signal_diagnostics"]["zero_signal_runtime_count"], 2)
             self.assertEqual(result["rescue_zero_signal_diagnostics"]["quote_refresh_candidate_runtime_count"], 1)
             self.assertEqual(result["rescue_zero_signal_diagnostics"]["quality_filter_blocked_runtime_count"], 1)
@@ -73,6 +78,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertIn("Broker blocker shadow repair has 1 quantity-cap candidate", result["plain_language_result"])
             self.assertIn("Broker blocker shadow A/B prep has 1 runtime-registration candidate", result["plain_language_result"])
             self.assertIn("Broker blocker rule shadow evidence has 2 PA005 rule-only rows", result["plain_language_result"])
+            self.assertIn("Next-refresh readiness tracks 4 rescue watch rows", result["plain_language_result"])
 
             matrix = {row["strategy_id"]: row for row in result["strategy_action_matrix"]}
             self.assertEqual(matrix["M10-PA-004"]["next_action_category"], "continue_internal_simulation")
@@ -91,6 +97,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertIn("Internal simulated-account ready strategies", md)
             self.assertIn("Rescue A/B Evidence", md)
             self.assertIn("Rescue Optimization Backlog", md)
+            self.assertIn("Rescue Next Refresh Readiness", md)
             self.assertIn("Rescue Zero-Signal Diagnostics", md)
             self.assertIn("Rescue Target/Stop Diagnostics", md)
             self.assertIn("Rescue Target/Stop Shadow Normalization", md)
@@ -117,6 +124,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         rescue_coverage_path = root / "rescue_coverage.json"
         rescue_ab_path = root / "rescue_ab.json"
         rescue_backlog_path = root / "rescue_backlog.json"
+        next_refresh_path = root / "next_refresh.json"
         zero_signal_path = root / "zero_signal.json"
         target_stop_path = root / "target_stop.json"
         shadow_normalization_path = root / "shadow_normalization.json"
@@ -284,6 +292,53 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         },
                     },
                     "plain_language_result": "fixture rescue optimization backlog",
+                }
+            ),
+            encoding="utf-8",
+        )
+        next_refresh_path.write_text(
+            json.dumps(
+                {
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "readiness_status_mutation": False,
+                    "m13_registry_mutation": False,
+                    "m12_account_specs_mutation": False,
+                    "broker_readiness_status_mutation": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "source_rescue_backlog_rows": 2,
+                        "watch_rows": 4,
+                        "fresh_quote_recheck_count": 1,
+                        "first_ledger_watch_count": 1,
+                        "broker_rule_shadow_watch_count": 2,
+                        "target_stop_shadow_compare_count": 0,
+                        "parent_detector_wait_count": 0,
+                        "next_refresh_dependent_count": 4,
+                        "parameter_change_allowed_now_count": 0,
+                        "ready_for_next_m12_47_refresh_count": 4,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                        "broker_or_live_enabled": False,
+                        "readiness_family_counts": {
+                            "broker_rule_shadow_recheck": 2,
+                            "first_rescue_ledger_watch": 1,
+                            "fresh_quote_recheck": 1,
+                        },
+                        "readiness_state_counts": {
+                            "ready_for_next_m12_47_refresh": 4,
+                        },
+                    },
+                    "plain_language_result": "fixture rescue next refresh readiness",
                 }
             ),
             encoding="utf-8",
@@ -549,6 +604,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_rescue_runtime_coverage": str(rescue_coverage_path),
                         "m14_rescue_ab_evidence_tracker": str(rescue_ab_path),
                         "m14_rescue_optimization_backlog": str(rescue_backlog_path),
+                        "m14_rescue_next_refresh_readiness": str(next_refresh_path),
                         "m14_rescue_zero_signal_diagnostics": str(zero_signal_path),
                         "m14_rescue_target_stop_diagnostics": str(target_stop_path),
                         "m14_rescue_target_stop_shadow_normalization": str(shadow_normalization_path),

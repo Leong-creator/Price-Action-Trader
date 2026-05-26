@@ -23,6 +23,7 @@ class GoalReadinessConfig:
     rescue_coverage_path: Path
     rescue_ab_evidence_path: Path
     rescue_optimization_backlog_path: Path
+    rescue_next_refresh_readiness_path: Path
     rescue_zero_signal_diagnostics_path: Path
     rescue_target_stop_diagnostics_path: Path
     rescue_target_stop_shadow_normalization_path: Path
@@ -60,6 +61,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> GoalReadinessConfig:
         rescue_coverage_path=resolve_repo_path(inputs["m14_rescue_runtime_coverage"]),
         rescue_ab_evidence_path=resolve_repo_path(inputs["m14_rescue_ab_evidence_tracker"]),
         rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
+        rescue_next_refresh_readiness_path=resolve_repo_path(inputs["m14_rescue_next_refresh_readiness"]),
         rescue_zero_signal_diagnostics_path=resolve_repo_path(inputs["m14_rescue_zero_signal_diagnostics"]),
         rescue_target_stop_diagnostics_path=resolve_repo_path(inputs["m14_rescue_target_stop_diagnostics"]),
         rescue_target_stop_shadow_normalization_path=resolve_repo_path(
@@ -104,6 +106,7 @@ def run_m14_goal_readiness_report(
     rescue_coverage = read_json(config.rescue_coverage_path)
     rescue_ab_evidence = read_json(config.rescue_ab_evidence_path)
     rescue_optimization_backlog = read_json(config.rescue_optimization_backlog_path)
+    rescue_next_refresh_readiness = read_json(config.rescue_next_refresh_readiness_path)
     rescue_zero_signal_diagnostics = read_json(config.rescue_zero_signal_diagnostics_path)
     rescue_target_stop_diagnostics = read_json(config.rescue_target_stop_diagnostics_path)
     rescue_target_stop_shadow_normalization = read_json(config.rescue_target_stop_shadow_normalization_path)
@@ -125,6 +128,7 @@ def run_m14_goal_readiness_report(
         rescue_coverage,
         rescue_ab_evidence,
         rescue_optimization_backlog,
+        rescue_next_refresh_readiness,
         rescue_zero_signal_diagnostics,
         rescue_target_stop_diagnostics,
         rescue_target_stop_shadow_normalization,
@@ -154,6 +158,7 @@ def run_m14_goal_readiness_report(
             "m14_rescue_runtime_coverage": project_path(config.rescue_coverage_path),
             "m14_rescue_ab_evidence_tracker": project_path(config.rescue_ab_evidence_path),
             "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
+            "m14_rescue_next_refresh_readiness": project_path(config.rescue_next_refresh_readiness_path),
             "m14_rescue_zero_signal_diagnostics": project_path(config.rescue_zero_signal_diagnostics_path),
             "m14_rescue_target_stop_diagnostics": project_path(config.rescue_target_stop_diagnostics_path),
             "m14_rescue_target_stop_shadow_normalization": project_path(
@@ -197,6 +202,7 @@ def run_m14_goal_readiness_report(
         },
         "rescue_ab_evidence": build_rescue_ab_evidence_summary(rescue_ab_evidence),
         "rescue_optimization_backlog": build_rescue_optimization_backlog_summary(rescue_optimization_backlog),
+        "rescue_next_refresh_readiness": build_rescue_next_refresh_readiness_summary(rescue_next_refresh_readiness),
         "rescue_zero_signal_diagnostics": build_rescue_zero_signal_diagnostics_summary(rescue_zero_signal_diagnostics),
         "rescue_target_stop_diagnostics": build_rescue_target_stop_diagnostics_summary(rescue_target_stop_diagnostics),
         "rescue_target_stop_shadow_normalization": build_rescue_target_stop_shadow_normalization_summary(
@@ -247,6 +253,7 @@ def build_boundaries(
     rescue_coverage: dict[str, Any],
     rescue_ab_evidence: dict[str, Any],
     rescue_optimization_backlog: dict[str, Any],
+    rescue_next_refresh_readiness: dict[str, Any],
     rescue_zero_signal_diagnostics: dict[str, Any],
     rescue_target_stop_diagnostics: dict[str, Any],
     rescue_target_stop_shadow_normalization: dict[str, Any],
@@ -264,6 +271,7 @@ def build_boundaries(
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
+                rescue_next_refresh_readiness,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
                 rescue_target_stop_shadow_normalization,
@@ -281,6 +289,7 @@ def build_boundaries(
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
+                rescue_next_refresh_readiness,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
                 rescue_target_stop_shadow_normalization,
@@ -295,6 +304,7 @@ def build_boundaries(
             and not bool(rescue_coverage.get("real_order", False))
             and not bool(rescue_ab_evidence.get("real_order", False))
             and not bool(rescue_optimization_backlog.get("real_order", False))
+            and not bool(rescue_next_refresh_readiness.get("real_order", False))
             and not bool(rescue_zero_signal_diagnostics.get("real_order", False))
             and not bool(rescue_target_stop_diagnostics.get("real_order", False))
             and not bool(rescue_target_stop_shadow_normalization.get("real_order", False))
@@ -310,6 +320,7 @@ def build_boundaries(
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
+                rescue_next_refresh_readiness,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
                 rescue_target_stop_shadow_normalization,
@@ -327,6 +338,7 @@ def build_boundaries(
                 rescue_coverage,
                 rescue_ab_evidence,
                 rescue_optimization_backlog,
+                rescue_next_refresh_readiness,
                 rescue_zero_signal_diagnostics,
                 rescue_target_stop_diagnostics,
                 rescue_target_stop_shadow_normalization,
@@ -371,6 +383,33 @@ def build_rescue_optimization_backlog_summary(backlog: dict[str, Any]) -> dict[s
         "high_priority_strategy_ids": list(summary.get("high_priority_strategy_ids", [])),
         "broker_blocker_reason_counts": dict(summary.get("broker_blocker_reason_counts", {})),
         "plain_language_result": str(backlog.get("plain_language_result", "")),
+    }
+
+
+def build_rescue_next_refresh_readiness_summary(next_refresh_readiness: dict[str, Any]) -> dict[str, Any]:
+    summary = next_refresh_readiness.get("summary", {})
+    return {
+        "source_rescue_backlog_rows": int_or_zero(summary.get("source_rescue_backlog_rows")),
+        "watch_rows": int_or_zero(summary.get("watch_rows")),
+        "fresh_quote_recheck_count": int_or_zero(summary.get("fresh_quote_recheck_count")),
+        "first_ledger_watch_count": int_or_zero(summary.get("first_ledger_watch_count")),
+        "broker_rule_shadow_watch_count": int_or_zero(summary.get("broker_rule_shadow_watch_count")),
+        "target_stop_shadow_compare_count": int_or_zero(summary.get("target_stop_shadow_compare_count")),
+        "parent_detector_wait_count": int_or_zero(summary.get("parent_detector_wait_count")),
+        "next_refresh_dependent_count": int_or_zero(summary.get("next_refresh_dependent_count")),
+        "parameter_change_allowed_now_count": int_or_zero(summary.get("parameter_change_allowed_now_count")),
+        "ready_for_next_m12_47_refresh_count": int_or_zero(summary.get("ready_for_next_m12_47_refresh_count")),
+        "m13_registry_mutation_count": int_or_zero(summary.get("m13_registry_mutation_count")),
+        "m12_account_specs_mutation_count": int_or_zero(summary.get("m12_account_specs_mutation_count")),
+        "broker_readiness_status_mutation_count": int_or_zero(summary.get("broker_readiness_status_mutation_count")),
+        "broker_or_live_enabled": bool(summary.get("broker_or_live_enabled", False)),
+        "readiness_family_counts": dict(summary.get("readiness_family_counts", {})),
+        "readiness_state_counts": dict(summary.get("readiness_state_counts", {})),
+        "readiness_status_mutation": bool(next_refresh_readiness.get("readiness_status_mutation", False)),
+        "m13_registry_mutation": bool(next_refresh_readiness.get("m13_registry_mutation", False)),
+        "m12_account_specs_mutation": bool(next_refresh_readiness.get("m12_account_specs_mutation", False)),
+        "broker_readiness_status_mutation": bool(next_refresh_readiness.get("broker_readiness_status_mutation", False)),
+        "plain_language_result": str(next_refresh_readiness.get("plain_language_result", "")),
     }
 
 
@@ -611,10 +650,27 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "boundary": "Fresh-data rerun and shadow parameter tests only; no broker/live approval.",
             },
         )
+    next_refresh = payload.get("rescue_next_refresh_readiness", {})
+    if int_or_zero(next_refresh.get("watch_rows")):
+        actions.insert(
+            4,
+            {
+                "priority": "P0",
+                "action": "Use the rescue next-refresh readiness matrix after the next M12.47 fresh run",
+                "evidence": (
+                    f"{next_refresh['watch_rows']} watch rows; "
+                    f"{next_refresh['fresh_quote_recheck_count']} fresh-quote rechecks; "
+                    f"{next_refresh['first_ledger_watch_count']} first-ledger watches; "
+                    f"{next_refresh['broker_rule_shadow_watch_count']} PA005 broker-rule rechecks; "
+                    f"{next_refresh['parameter_change_allowed_now_count']} parameter changes allowed now"
+                ),
+                "boundary": "This matrix only defines post-refresh evidence checks; it cannot mutate runtimes or approve broker/live paths.",
+            },
+        )
     target_stop = payload.get("rescue_target_stop_diagnostics", {})
     if int_or_zero(target_stop.get("target_stop_issue_runtime_count")):
         actions.insert(
-            4,
+            5,
             {
                 "priority": "P0",
                 "action": "Use PA012 target/stop diagnostics before changing rescue runtime thresholds",
@@ -628,7 +684,7 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
     shadow_normalization = payload.get("rescue_target_stop_shadow_normalization", {})
     if int_or_zero(shadow_normalization.get("runtime_with_shadow_candidate_count")):
         actions.insert(
-            5,
+            6,
             {
                 "priority": "P0",
                 "action": "Collect first fresh M13 ledger row for the PA012 target/stop normalized shadow runtime",
@@ -643,7 +699,7 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
     shadow_repair = payload.get("broker_blocker_shadow_repair", {})
     if int_or_zero(shadow_repair.get("shadow_rows")):
         actions.insert(
-            6,
+            7,
             {
                 "priority": "P0",
                 "action": "Apply broker-blocker shadow repair plan only as internal simulated A/B prep",
@@ -658,7 +714,7 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
     shadow_ab_prep = payload.get("broker_blocker_shadow_ab_prep", {})
     if int_or_zero(shadow_ab_prep.get("ab_prep_rows")):
         actions.insert(
-            7,
+            8,
             {
                 "priority": "P0",
                 "action": "Use broker-blocker shadow A/B prep before registering any blocker repair runtime",
@@ -673,7 +729,7 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
     rule_shadow_evidence = payload.get("broker_blocker_rule_shadow_evidence", {})
     if int_or_zero(rule_shadow_evidence.get("rule_shadow_evidence_rows")):
         actions.insert(
-            8,
+            9,
             {
                 "priority": "P0",
                 "action": "Collect PA005 broker-blocker rule-only shadow evidence without registering a runtime",
@@ -703,6 +759,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
     rescue = payload["rescue_status"]
     rescue_ab = payload["rescue_ab_evidence"]
     backlog = payload["rescue_optimization_backlog"]
+    next_refresh = payload["rescue_next_refresh_readiness"]
     diagnostics = payload["rescue_zero_signal_diagnostics"]
     target_stop = payload["rescue_target_stop_diagnostics"]
     shadow_normalization = payload["rescue_target_stop_shadow_normalization"]
@@ -722,6 +779,11 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Pre-10-day optimization backlog has {backlog['actionable_before_10d_count']} actionable items: "
         f"{backlog['zero_signal_after_connection_count']} zero-signal and "
         f"{backlog['signal_generated_no_account_operation_count']} signal-to-account no-op. "
+        f"Next-refresh readiness tracks {next_refresh['watch_rows']} rescue watch rows, "
+        f"including {next_refresh['fresh_quote_recheck_count']} fresh-quote rechecks, "
+        f"{next_refresh['first_ledger_watch_count']} first-ledger watches, "
+        f"{next_refresh['broker_rule_shadow_watch_count']} PA005 broker-rule rechecks, "
+        f"and {next_refresh['parameter_change_allowed_now_count']} parameter changes allowed now. "
         f"Zero-signal diagnosis: {diagnostics['quote_refresh_candidate_runtime_count']} should be rechecked after fresh quote refresh, "
         f"{diagnostics['quality_filter_blocked_runtime_count']} need filter/parameter work, "
         f"{diagnostics['parent_source_absent_runtime_count']} need source mapping, "
@@ -785,6 +847,22 @@ def build_readiness_md(payload: dict[str, Any]) -> str:
             f"- Zero-signal connected variants: `{backlog['zero_signal_after_connection_count']}`",
             f"- Signal-to-account no-op variants: `{backlog['signal_generated_no_account_operation_count']}`",
             f"- Broker dry-run blockers: `{backlog['broker_dry_run_blocked_count']}`",
+        ]
+    )
+    next_refresh = payload["rescue_next_refresh_readiness"]
+    lines.extend(
+        [
+            "",
+            "## Rescue Next Refresh Readiness",
+            "",
+            f"- Watch rows: `{next_refresh['watch_rows']}`",
+            f"- Fresh-quote rechecks: `{next_refresh['fresh_quote_recheck_count']}`",
+            f"- First-ledger watches: `{next_refresh['first_ledger_watch_count']}`",
+            f"- PA005 broker-rule rechecks: `{next_refresh['broker_rule_shadow_watch_count']}`",
+            f"- Target/stop shadow comparisons: `{next_refresh['target_stop_shadow_compare_count']}`",
+            f"- Parent-detector waits: `{next_refresh['parent_detector_wait_count']}`",
+            f"- Parameter changes allowed now: `{next_refresh['parameter_change_allowed_now_count']}`",
+            f"- Readiness family counts: `{next_refresh['readiness_family_counts']}`",
         ]
     )
     diagnostics = payload["rescue_zero_signal_diagnostics"]

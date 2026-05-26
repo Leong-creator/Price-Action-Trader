@@ -124,7 +124,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T22:10:00Z",
+  "generated_at": "2026-05-26T22:35:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own 10 trading-day A/B evidence before final promote/modify/reject."
@@ -136,6 +136,7 @@
     "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json",
     "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
     "m14_rescue_ab_evidence_tracker": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_ab_evidence_tracker.json",
+    "m14_rescue_next_refresh_readiness": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_next_refresh_readiness.json",
     "m14_rescue_optimization_backlog": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_optimization_backlog.json",
     "m14_rescue_runtime_coverage": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_runtime_coverage.json",
     "m14_rescue_target_stop_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_target_stop_diagnostics.json",
@@ -189,6 +190,12 @@
       "priority": "P0"
     },
     {
+      "action": "Use the rescue next-refresh readiness matrix after the next M12.47 fresh run",
+      "boundary": "This matrix only defines post-refresh evidence checks; it cannot mutate runtimes or approve broker/live paths.",
+      "evidence": "13 watch rows; 7 fresh-quote rechecks; 2 first-ledger watches; 2 PA005 broker-rule rechecks; 0 parameter changes allowed now",
+      "priority": "P0"
+    },
+    {
       "action": "Use PA012 target/stop diagnostics before changing rescue runtime thresholds",
       "boundary": "Target/stop fixes stay shadow-only until 10 trading-day A/B evidence exists.",
       "evidence": "1 target/stop issue runtimes; issue counts {'target_reward_below_1r_after_quality_gates': 1}",
@@ -231,7 +238,7 @@
       "priority": "P1"
     }
   ],
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker blocker rule shadow evidence has 2 PA005 rule-only rows (1 exposure ranker, 1 cooldown/quality) and 0 runtime registrations. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Next-refresh readiness tracks 13 rescue watch rows, including 7 fresh-quote rechecks, 2 first-ledger watches, 2 PA005 broker-rule rechecks, and 0 parameter changes allowed now. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker blocker rule shadow evidence has 2 PA005 rule-only rows (1 exposure ranker, 1 cooldown/quality) and 0 runtime registrations. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
   "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "rescue_ab_evidence": {
     "collecting_evidence_count": 9,
@@ -260,6 +267,39 @@
     "plain_language_result": "Rescue A/B evidence is observed for 9/11 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 2 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.",
     "promotion_allowed_count": 0,
     "rescue_runtime_strategy_count": 11
+  },
+  "rescue_next_refresh_readiness": {
+    "broker_or_live_enabled": false,
+    "broker_readiness_status_mutation": false,
+    "broker_readiness_status_mutation_count": 0,
+    "broker_rule_shadow_watch_count": 2,
+    "first_ledger_watch_count": 2,
+    "fresh_quote_recheck_count": 7,
+    "m12_account_specs_mutation": false,
+    "m12_account_specs_mutation_count": 0,
+    "m13_registry_mutation": false,
+    "m13_registry_mutation_count": 0,
+    "next_refresh_dependent_count": 13,
+    "parameter_change_allowed_now_count": 0,
+    "parent_detector_wait_count": 1,
+    "plain_language_result": "Next-refresh rescue readiness tracks 13 rows: 7 fresh-quote rechecks, 2 first-ledger watches, 2 PA005 broker-rule shadow rechecks, 1 target/stop shadow comparisons, and 1 parent-detector waits. Parameter changes allowed now: 0. No registry, account-spec, broker readiness, broker connection, real order, live execution, or paper approval is changed.",
+    "readiness_family_counts": {
+      "broker_rule_shadow_recheck": 2,
+      "first_rescue_ledger_watch": 2,
+      "fresh_quote_recheck": 7,
+      "parent_detector_evidence_wait": 1,
+      "target_stop_shadow_compare": 1
+    },
+    "readiness_state_counts": {
+      "covered_by_shadow_runtime_wait_refresh": 1,
+      "ready_for_next_m12_47_refresh": 11,
+      "wait_same_timeframe_parent_evidence": 1
+    },
+    "readiness_status_mutation": false,
+    "ready_for_next_m12_47_refresh_count": 11,
+    "source_rescue_backlog_rows": 11,
+    "target_stop_shadow_compare_count": 1,
+    "watch_rows": 13
   },
   "rescue_optimization_backlog": {
     "actionable_before_10d_count": 10,
