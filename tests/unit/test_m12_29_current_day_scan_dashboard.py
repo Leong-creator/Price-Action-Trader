@@ -195,10 +195,24 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
 
     def test_broker_terminal_view_has_accounts_watchlists_news_and_pa004_split(self):
         _, result, output_dir = self.run_stage()
+        dashboard = result["dashboard"]
         terminal = result["dashboard"]["broker_terminal_view"]
         self.assertEqual(terminal["schema_version"], "m14.1.broker-terminal-view.v1")
         self.assertEqual(terminal["top_status"]["fully_ready_for_trading_display"], "false")
+        self.assertFalse(dashboard["legacy_history_metric_policy"]["legacy_history_metric_planning_input"])
+        self.assertFalse(terminal["legacy_history_metric_policy"]["legacy_history_metric_planning_input"])
+        self.assertIn(
+            "historical_net_profit",
+            terminal["legacy_history_metric_policy"]["excluded_metric_names"],
+        )
+        self.assertIn(
+            "strategy_promotion",
+            terminal["legacy_history_metric_policy"]["excluded_from_decisions"],
+        )
         self.assertEqual(len(terminal["strategy_accounts"]), len(ACCOUNT_SPECS))
+        for row in dashboard["strategy_scorecard_rows"]:
+            self.assertEqual(row["legacy_history_metric_planning_input"], "false")
+            self.assertEqual(row["historical_metric_decision_scope"], "legacy_display_only_not_m14_planning")
         for row in terminal["strategy_accounts"]:
             for key in (
                 "today_total_pnl",
@@ -240,6 +254,8 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         html = (output_dir / "m12_32_minute_readonly_dashboard.html").read_text(encoding="utf-8")
         self.assertNotIn("> %<", html)
         self.assertNotIn("% / %", html)
+        self.assertIn("历史净利润/历史收益字段仅作旧版回看参考", html)
+        self.assertIn("旧版历史净利润/历史收益类字段只保留为回看参考", html)
 
     def test_audit_only_snapshot_uses_notice_not_data_refresh_failure_panel(self):
         from scripts.m12_29_current_day_scan_dashboard_lib import build_dashboard_html

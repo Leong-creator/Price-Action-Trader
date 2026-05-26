@@ -114,6 +114,20 @@ TIMEFRAME_LABELS = {
 }
 EXTENDED_SESSION_MOVE_THRESHOLD = Decimal("3")
 RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES = frozenset({"longbridge_quote_readonly"})
+LEGACY_HISTORY_METRIC_NAMES = (
+    "historical_net_profit",
+    "historical_profit_factor",
+    "historical_return_percent",
+    "历史净利润",
+    "历史收益",
+)
+LEGACY_HISTORY_METRIC_EXCLUDED_DECISIONS = (
+    "strategy_promotion",
+    "rescue_priority",
+    "parameter_activation",
+    "broker_readiness",
+    "m14_objective_completion",
+)
 DEFAULT_MARKET_WATCHLIST_GROUPS = (
     {"group_id": "core_etf", "display_name": "核心指数/ETF", "symbols": ("SPY", "QQQ", "DIA", "IWM", "SMH", "SOXX", "XLK")},
     {"group_id": "magnificent_seven", "display_name": "美股七姐妹", "symbols": ("AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA")},
@@ -2197,6 +2211,8 @@ def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict
         "historical_final_equity": history.get("historical_final_equity", history.get("final_equity", "")),
         "historical_net_profit": history.get("historical_net_profit", history.get("net_profit", "")),
         "historical_average_holding_bars": history.get("historical_average_holding_bars", history.get("average_holding_bars", "")),
+        "legacy_history_metric_planning_input": "false",
+        "historical_metric_decision_scope": "legacy_display_only_not_m14_planning",
         "variant_label": history.get("variant_label", ""),
         "paper_trial_candidate_now": "false",
     }
@@ -2306,12 +2322,14 @@ def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[s
         "schema_version": "m12.46.ftd-account-monitor.v1",
         "stage": "M12.46.ftd_account_monitor",
         "accounts": rows,
+        "legacy_history_metric_policy": legacy_history_metric_policy(),
+        "legacy_history_metric_planning_input": False,
         "current_plain_status": f"FTD001 对照：原版 {baseline['today_total_pnl'] if baseline else '暂无'} / 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}",
         "risk_flags": risk_flags,
         "plain_language_summary": (
             f"FTD001 原版今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
             f"连亏保护版今日 {guard['today_total_pnl'] if guard else '暂无'}；"
-            f"重点看回撤、连亏和是否过度触发。"
+            f"重点看当前模拟回撤、连亏和是否过度触发；旧版历史收益只做回看，不参与 M14 规划。"
         ),
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -2570,6 +2588,28 @@ def source_config_output_path(config: M1229Config, filename: str) -> Path:
     return config.output_dir / "m12_12_current_day_source" / filename
 
 
+def legacy_history_metric_policy() -> dict[str, Any]:
+    return {
+        "schema_version": "m12.46.legacy-history-metric-policy.v1",
+        "legacy_history_metric_planning_input": False,
+        "legacy_history_metric_display_only": True,
+        "excluded_metric_names": list(LEGACY_HISTORY_METRIC_NAMES),
+        "excluded_from_decisions": list(LEGACY_HISTORY_METRIC_EXCLUDED_DECISIONS),
+        "replacement_evidence_sources": [
+            "m13_signal_ledger",
+            "m13_account_operation_ledger",
+            "m14_objective_completion_audit",
+            "m14_strategy_evidence_gap_burndown",
+            "m14_project_stage_assessment",
+            "m12_47_supervised_fresh_refresh_status",
+        ],
+        "plain_language_note": (
+            "旧版历史净利润/历史收益类字段只保留为回看参考，不参与策略晋级、救援排序、参数激活、"
+            "broker readiness 或 M14 目标完成判断。"
+        ),
+    }
+
+
 def load_market_watchlist_config(path: str | Path = MARKET_WATCHLIST_CONFIG_PATH) -> dict[str, Any]:
     config_path = resolve_repo_path(path)
     if not config_path.exists():
@@ -2638,6 +2678,7 @@ def build_broker_terminal_view(
             "data_freshness_warning": data_freshness_warning,
         },
         "strategy_accounts": account_rows,
+        "legacy_history_metric_policy": legacy_history_metric_policy(),
         "open_positions": [row for row in trade_ledger_rows if row.get("record_type") == "open_position"],
         "recent_orders_or_fills": trade_ledger_rows[:80],
         "signal_panel": runtime["signal_watchlist"][:120],
@@ -3107,6 +3148,7 @@ def build_accountized_dashboard_payload(
             "signal_watchlist": "信号观察清单",
             "audit_reports": "审计与历史报告",
         },
+        "legacy_history_metric_policy": legacy_history_metric_policy(),
         "broker_terminal_view": broker_terminal_view,
         "shared_account_view": mainline_overview,
         "mainline_account_view": mainline_overview,
@@ -3659,6 +3701,8 @@ def build_strategy_detail_views(rows: list[dict[str, str]], scorecards: list[dic
                 "historical_worst_symbol": card["historical_worst_symbol"],
                 "historical_best_timeframe": card["historical_best_timeframe"],
                 "historical_worst_timeframe": card["historical_worst_timeframe"],
+                "legacy_history_metric_planning_input": "false",
+                "historical_metric_decision_scope": "legacy_display_only_not_m14_planning",
                 "today_pnl_by_timeframe": {key: money(value) for key, value in sorted(timeframe_pnl.items())},
                 "plain_next_action": card["plain_next_action"],
                 "paper_trial_candidate_now": "false",
@@ -3818,6 +3862,8 @@ def build_ftd001_monitor(scorecards: list[dict[str, str]], detail_views: dict[st
         "historical_win_rate_percent": card["historical_win_rate_percent"] if card else "",
         "historical_max_drawdown_percent": card["historical_max_drawdown_percent"] if card else "",
         "historical_profit_factor": card["historical_profit_factor"] if card else "",
+        "legacy_history_metric_policy": legacy_history_metric_policy(),
+        "legacy_history_metric_planning_input": False,
         "today_opportunity_count": len(rows),
         "today_symbols": sorted({row["symbol"] for row in rows}),
         "today_timeframes": sorted({row["timeframe"] for row in rows}),
@@ -3852,9 +3898,10 @@ def build_ftd_plain_summary(card: dict[str, str] | None, rows: list[dict[str, st
     direction = "盈利" if today_pnl > ZERO else "亏损" if today_pnl < ZERO else "持平"
     symbols = ", ".join(sorted({row["symbol"] for row in rows})[:8]) or "暂无"
     return (
-        f"FTD001 历史收益 {card['historical_return_percent']}%，胜率 {card['historical_win_rate_percent']}%，"
+        f"FTD001 旧版历史收益参考 {card['historical_return_percent']}%，胜率 {card['historical_win_rate_percent']}%，"
         f"最大回撤 {card['historical_max_drawdown_percent']}%。今天触发 {len(rows)} 条，股票：{symbols}，"
         f"当前模拟{direction} {money(today_pnl)}。重点风险：{'，'.join(risk_flags)}。"
+        "历史指标不参与 M14 策略规划。"
     )
 
 
@@ -4029,8 +4076,9 @@ def build_observation_test_lane_md(lane: dict[str, Any]) -> str:
         "",
         f"- {lane['plain_language_result']}",
         "- 实验策略也已经入账；当天没触发，会显示为零触发和零开仓，而不是空挂状态。",
+        f"- {legacy_history_metric_policy()['plain_language_note']}",
         "",
-        "| 账户 | 周期 | 今日开仓 | 今日平仓 | 今日盈亏 | 当前权益 | 历史收益 | 最大回撤 |",
+        "| 账户 | 周期 | 今日开仓 | 今日平仓 | 今日盈亏 | 当前权益 | 历史收益（旧版参考） | 最大回撤（旧版参考） |",
         "|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in lane["rows"]:
@@ -4064,8 +4112,9 @@ def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
         "## 用人话结论",
         "",
         f"- {monitor['plain_language_summary']}",
+        f"- {legacy_history_metric_policy()['plain_language_note']}",
         "",
-        "| 版本 | 今日盈亏 | 当前权益 | 历史收益 | 胜率 | 最大回撤 |",
+        "| 版本 | 今日盈亏 | 当前权益 | 历史收益（旧版参考） | 胜率（旧版参考） | 最大回撤（旧版参考） |",
         "|---|---:|---:|---:|---:|---:|",
         f"| 原版 baseline | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('historical_return_percent', '')}% | {baseline.get('historical_win_rate_percent', '')}% | {baseline.get('historical_max_drawdown_percent', '')}% |",
         f"| 连亏保护 loss_streak_guard | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('historical_return_percent', '')}% | {guard.get('historical_win_rate_percent', '')}% | {guard.get('historical_max_drawdown_percent', '')}% |",
@@ -4079,6 +4128,12 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
     summary = dashboard.get("summary", {})
     terminal = dashboard.get("broker_terminal_view", {})
+    legacy_metric_policy = (
+        dashboard.get("legacy_history_metric_policy")
+        or terminal.get("legacy_history_metric_policy")
+        or legacy_history_metric_policy()
+    )
+    legacy_metric_note = str(legacy_metric_policy.get("plain_language_note", ""))
     mainline = dashboard["mainline_account_view"]
     experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
@@ -4228,14 +4283,14 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
       <div class="terminal-panel"><h2>持仓 / 信号 / PA004 对照</h2><div class="note">{html.escape(terminal.get('pa004_comparison', {}).get('plain_language_result', ''))}</div><div class="wrap"><table class="terminal-table"><thead>{table_head()}</thead><tbody>{terminal_position_rows}</tbody></table></div><h2>今日正式信号</h2><div class="wrap"><table class="terminal-table"><thead>{watchlist_head()}</thead><tbody>{terminal_signal_rows}</tbody></table></div><h2>PA004 baseline / MBF / QC 对照</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{pa004_terminal_rows}</tbody></table></div></div>
       <div class="terminal-panel"><h2>自选股与新闻</h2><div class="watch-grid">{terminal_watchlist_sections}</div>{terminal_news_sections}</div>
     </section>
-    <section class="panel"><h2>审计与历史报告</h2><div class="note">以下保留原账户成绩单、模拟交易明细、正式信号清单、账户输入审计和历史参考样例，用于回看与验证。首屏交易终端不改变任何策略、风控或执行结果。</div></section>
+    <section class="panel"><h2>审计与历史报告</h2><div class="note">以下保留原账户成绩单、模拟交易明细、正式信号清单、账户输入审计和历史参考样例，用于回看与验证。首屏交易终端不改变任何策略、风控或执行结果。{html.escape(legacy_metric_note)}</div></section>
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
     <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
     <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>历史收益</th><th>胜率</th><th>最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
     <section class="panel"><h2>盘前 / 盘后异动</h2><div class="note">{html.escape(extended_monitor['plain_language_summary'])}</div><div class="two-col"><div class="mini-card"><h2>盘前超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{premarket_rows}</tbody></table></div></div><div class="mini-card"><h2>盘后超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{postmarket_rows}</tbody></table></div></div></div><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{focus_rows}</tbody></table></div></section>
     <section class="panel"><h2>按 1d / 5m 分组测试</h2><div class="note">当前主计划只保留 1d 与 5m。信号按各自周期收盘确认，盘中每 60 秒只刷新报价和持仓盈亏。</div><div class="timeframes">{timeframe_sections}</div></section>
     <section class="panel"><h2>账户成绩单</h2><div class="note">每条独立账户都看得到本金、权益、今日盈亏、胜率和最大回撤；主线和实验分层展示，但都真实入账。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
-    <section class="panel"><h2>账户下钻</h2><div class="note">这里看每个账户的当前状态、开平仓数量、可用现金和历史参考指标。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
+    <section class="panel"><h2>账户下钻</h2><div class="note">这里看每个账户的当前状态、开平仓数量和可用现金。历史净利润/历史收益字段仅作旧版回看参考，不参与策略规划或准入判断。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
     <section class="panel"><h2>模拟交易明细</h2><div class="note">这里展示当前持仓和最近已平仓记录，按账户状态机推进，不再是旧的机会当前价覆盖。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
     <section class="panel"><h2>正式信号清单</h2><div class="note">这里只展示真正会进入账户测试的正式信号，不再把历史观察样例混进主线收益和机会统计。</div><div class="wrap"><table><thead>{watchlist_head()}</thead><tbody>{watch_rows}</tbody></table></div></section>
     <section class="panel"><h2>账户输入审计</h2><div class="note">这张表专门防止“名义上进测试、实际上还吃旧观察流”的老问题。所有进账户的策略都必须明确写清楚输入源。</div><div class="wrap"><table><thead><tr><th>账户</th><th>输入源</th><th>今日正式信号</th><th>可用正式行数</th><th>说明</th></tr></thead><tbody>{audit_rows}</tbody></table></div></section>
@@ -4424,7 +4479,7 @@ def strategy_scorecard_html(row: dict[str, str]) -> str:
 
 
 def strategy_detail_head() -> str:
-    return "<tr><th>账户</th><th>当前权益</th><th>可用现金</th><th>当前持仓</th><th>累计已平仓</th><th>今日开仓/平仓</th><th>历史净利润</th><th>历史收益/回撤</th></tr>"
+    return "<tr><th>账户</th><th>当前权益</th><th>可用现金</th><th>当前持仓</th><th>累计已平仓</th><th>今日开仓/平仓</th><th>历史净利润（旧版参考）</th><th>历史收益/回撤（旧版参考）</th></tr>"
 
 
 def strategy_detail_summary_html(row: dict[str, Any]) -> str:
