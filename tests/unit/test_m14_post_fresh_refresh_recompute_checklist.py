@@ -25,13 +25,23 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             self.assertEqual(result["schema_version"], "m14.post-fresh-refresh-recompute-checklist.v1")
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["source_quote"], "fallback_quotes_only")
-            self.assertEqual(result["summary"]["recompute_step_count"], 24)
-            self.assertEqual(result["summary"]["m14_script_step_count"], 23)
-            self.assertEqual(result["summary"]["acceptance_gate_count"], 7)
+            self.assertEqual(result["summary"]["recompute_step_count"], 26)
+            self.assertEqual(result["summary"]["m14_script_step_count"], 25)
+            self.assertEqual(result["summary"]["acceptance_gate_count"], 8)
             self.assertTrue(result["summary"]["two_pass_stabilization_required"])
             self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 2)
             self.assertEqual(result["summary"]["parameter_shadow_spec_candidate_variant_count"], 4)
             self.assertEqual(result["summary"]["strategy_decision_final_discard_allowed_count"], 0)
+            self.assertEqual(result["summary"]["objective_blocker_burndown_row_count"], 7)
+            self.assertEqual(result["summary"]["objective_blocker_p0_count"], 4)
+            self.assertEqual(result["summary"]["objective_blocker_p1_count"], 3)
+            self.assertEqual(result["summary"]["objective_blocker_legacy_historical_profit_planning_input_count"], 0)
+            self.assertEqual(result["summary"]["strategy_next_step_row_count"], 5)
+            self.assertEqual(result["summary"]["strategy_next_step_approved_internal_sim_continue_count"], 2)
+            self.assertEqual(result["summary"]["strategy_next_step_rescue_or_shadow_review_count"], 2)
+            self.assertEqual(result["summary"]["strategy_next_step_source_review_or_plugin_research_count"], 1)
+            self.assertEqual(result["summary"]["strategy_next_step_legacy_historical_profit_planning_input_count"], 0)
+            self.assertEqual(result["summary"]["legacy_historical_profit_planning_input_count"], 0)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_row_count"], 4)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_ready_now_count"], 1)
             self.assertEqual(result["summary"]["strategy_pre_refresh_review_audit_wait_fresh_count"], 2)
@@ -63,6 +73,14 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                 "python scripts/run_m14_strategy_evidence_gap_burndown.py",
             )
             self.assertEqual(
+                steps["objective_blocker_burndown_refresh"]["command"],
+                "python scripts/run_m14_objective_blocker_burndown.py",
+            )
+            self.assertEqual(
+                steps["strategy_next_step_readiness_matrix_refresh"]["command"],
+                "python scripts/run_m14_strategy_next_step_readiness_matrix.py",
+            )
+            self.assertEqual(
                 steps["strategy_pre_refresh_review_packet_refresh"]["command"],
                 "python scripts/run_m14_strategy_pre_refresh_review_packet.py",
             )
@@ -77,17 +95,22 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                 self.assertFalse(row["real_order"])
                 self.assertFalse(row["live_execution"])
                 self.assertFalse(row["parameter_mutation"])
+                self.assertFalse(row["legacy_historical_profit_planning_input"])
 
             gates = {row["gate_id"]: row for row in result["acceptance_gates"]}
             self.assertEqual(gates["fresh_refresh_source_gate"]["state"], "waiting")
             self.assertEqual(gates["no_final_discard_without_rescue_exhaustion_gate"]["state"], "passed")
             self.assertEqual(gates["broker_live_boundary_gate"]["state"], "passed")
+            self.assertEqual(gates["legacy_history_metric_exclusion_gate"]["state"], "passed")
 
             persisted = json.loads((root / "checklist.json").read_text(encoding="utf-8"))
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "checklist.md").read_text(encoding="utf-8")
             self.assertIn("M14 Post-Fresh-Refresh Recompute Checklist", md)
-            self.assertIn("M14 read-only script steps: `23`", md)
+            self.assertIn("M14 read-only script steps: `25`", md)
+            self.assertIn("Objective blocker rows/P0/P1/legacy-history-planning-inputs: `7/4/3/0`", md)
+            self.assertIn("Strategy next-step rows/approved/rescue-or-shadow/source-review: `5/2/2/1`", md)
+            self.assertIn("Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `0/0/0/0/0`", md)
             self.assertIn("Pre-refresh review audit rows/ready/waiting/backfill: `4/1/2/1`", md)
             self.assertIn("Final discard allowed: `0`", md)
 
@@ -114,6 +137,8 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
         pre_refresh_audit_path = root / "pre_refresh_audit.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
+        objective_blocker_path = root / "objective_blocker.json"
+        next_step_matrix_path = root / "next_step_matrix.json"
         config_path = root / "config.json"
 
         next_session_path.write_text(
@@ -245,6 +270,37 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        objective_blocker_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "blocker_burndown_row_count": 7,
+                        "p0_blocker_count": 4,
+                        "p1_blocker_count": 3,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        next_step_matrix_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "strategy_next_step_row_count": 5,
+                        "approved_internal_sim_continue_count": 2,
+                        "rescue_or_shadow_review_count": 2,
+                        "source_review_or_plugin_research_count": 1,
+                        "promotion_allowed_count": 0,
+                        "final_discard_allowed_count": 0,
+                        "parameter_activation_allowed_count": 0,
+                        "broker_paper_start_allowed_count": 0,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -263,6 +319,8 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                         "m14_strategy_pre_refresh_review_audit": str(pre_refresh_audit_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
+                        "m14_objective_blocker_burndown": str(objective_blocker_path),
+                        "m14_strategy_next_step_readiness_matrix": str(next_step_matrix_path),
                     },
                     "outputs": {
                         "checklist_json": str(root / "checklist.json"),
@@ -280,6 +338,7 @@ class M14PostFreshRefreshRecomputeChecklistTest(unittest.TestCase):
                         "m12_account_specs_mutation": False,
                         "broker_readiness_status_mutation": False,
                         "parameter_mutation": False,
+                        "legacy_historical_profit_planning_input": False,
                     },
                 }
             ),

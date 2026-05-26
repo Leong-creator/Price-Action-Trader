@@ -200,6 +200,15 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["summary"]["strategy_source_visual_confirmation_response_parameter_mutation_allowed_count"],
                 0,
             )
+            self.assertEqual(result["summary"]["strategy_next_step_row_count"], 5)
+            self.assertEqual(result["summary"]["strategy_next_step_approved_internal_sim_continue_count"], 2)
+            self.assertEqual(result["summary"]["strategy_next_step_rescue_or_shadow_review_count"], 2)
+            self.assertEqual(result["summary"]["strategy_next_step_source_review_or_plugin_research_count"], 1)
+            self.assertEqual(result["summary"]["strategy_next_step_promotion_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_next_step_final_discard_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_next_step_parameter_activation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_next_step_broker_paper_start_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_next_step_legacy_historical_profit_planning_input_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -210,9 +219,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["objective_execution_p0_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_waiting_for_fresh_refresh_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_manual_execution_allowed_count"], 0)
-            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 24)
-            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 23)
-            self.assertEqual(result["summary"]["post_fresh_recompute_acceptance_gate_count"], 7)
+            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 26)
+            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 25)
+            self.assertEqual(result["summary"]["post_fresh_recompute_acceptance_gate_count"], 8)
             self.assertTrue(result["summary"]["post_fresh_recompute_two_pass_required"])
             self.assertEqual(result["summary"]["post_fresh_recompute_parameter_mutation_allowed_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
@@ -335,6 +344,16 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertTrue(
                 any(
                     "10/10 local case assets present" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertEqual(
+                result["stage_assessment"]["strategy_next_step_readiness_status"],
+                "route_matrix_ready_legacy_history_excluded_no_promotion_or_mutation",
+            )
+            self.assertTrue(
+                any(
+                    "Strategy next-step readiness matrix has 5 rows" in item
                     for item in result["stage_assessment"]["next_required_evidence"]
                 )
             )
@@ -493,14 +512,22 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertFalse(
                 result["strategy_source_visual_confirmation_response_gate"]["strategy_state_mutation_allowed"]
             )
+            self.assertEqual(result["strategy_next_step_readiness_matrix"]["strategy_next_step_row_count"], 5)
+            self.assertEqual(result["strategy_next_step_readiness_matrix"]["approved_internal_sim_continue_count"], 2)
+            self.assertEqual(result["strategy_next_step_readiness_matrix"]["rescue_or_shadow_review_count"], 2)
+            self.assertEqual(
+                result["strategy_next_step_readiness_matrix"]["legacy_historical_profit_planning_input_count"],
+                0,
+            )
+            self.assertFalse(result["strategy_next_step_readiness_matrix"]["manual_m12_37_once_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
             self.assertEqual(result["objective_execution_plan"]["execution_action_count"], 7)
             self.assertEqual(result["objective_execution_plan"]["p0_action_count"], 5)
             self.assertEqual(result["objective_execution_plan"]["manual_execution_allowed_count"], 0)
-            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 24)
-            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 23)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 26)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 25)
             self.assertFalse(
                 result["post_fresh_refresh_recompute_checklist"]["manual_m12_37_once_allowed"]
             )
@@ -541,9 +568,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy source visual confirmation response rows/questions pending/cases pending/complete/unblocked: `2/6/10/0/0`", md)
             self.assertIn("Strategy source visual confirmation response review pack ready/questions/assets existing/assets total: `True/6/10/10`", md)
             self.assertIn("Strategy source visual confirmation response status: `manual_response_gate_pending_no_future_spec_unblocked`", md)
+            self.assertIn("Strategy next-step rows/approved/rescue-or-shadow/source-review: `5/2/2/1`", md)
+            self.assertIn("Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `0/0/0/0/0`", md)
+            self.assertIn("Strategy next-step readiness status: `route_matrix_ready_legacy_history_excluded_no_promotion_or_mutation`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
-            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `24/23/7`", md)
+            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `26/25/8`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -580,6 +610,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_source_visual_confirmation_response_gate_path = (
             root / "strategy_source_visual_confirmation_response_gate.json"
         )
+        strategy_next_step_readiness_matrix_path = root / "strategy_next_step_readiness_matrix.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -1092,6 +1123,25 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_next_step_readiness_matrix_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "strategy_next_step_row_count": 5,
+                        "approved_internal_sim_continue_count": 2,
+                        "rescue_or_shadow_review_count": 2,
+                        "source_review_or_plugin_research_count": 1,
+                        "requires_m12_47_fresh_refresh_count": 4,
+                        "promotion_allowed_count": 0,
+                        "final_discard_allowed_count": 0,
+                        "parameter_activation_allowed_count": 0,
+                        "broker_paper_start_allowed_count": 0,
+                        "legacy_historical_profit_planning_input_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -1150,9 +1200,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             json.dumps(
                 {
                     "summary": {
-                        "recompute_step_count": 24,
-                        "m14_script_step_count": 23,
-                        "acceptance_gate_count": 7,
+                        "recompute_step_count": 26,
+                        "m14_script_step_count": 25,
+                        "acceptance_gate_count": 8,
                         "requires_m12_47_fresh_refresh_step_count": 24,
                         "two_pass_stabilization_required": True,
                         "fresh_refresh_observed": False,
@@ -1196,6 +1246,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         ),
                         "m14_strategy_source_visual_confirmation_response_gate": str(
                             strategy_source_visual_confirmation_response_gate_path
+                        ),
+                        "m14_strategy_next_step_readiness_matrix": str(
+                            strategy_next_step_readiness_matrix_path
                         ),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),

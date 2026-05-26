@@ -37,6 +37,7 @@ class ProjectStageAssessmentConfig:
     strategy_source_visual_alignment_gate_path: Path
     strategy_source_visual_confirmation_packet_path: Path
     strategy_source_visual_confirmation_response_gate_path: Path
+    strategy_next_step_readiness_matrix_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     post_fresh_refresh_recompute_checklist_path: Path
@@ -108,6 +109,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         strategy_source_visual_confirmation_response_gate_path=resolve_repo_path(
             inputs["m14_strategy_source_visual_confirmation_response_gate"]
         ),
+        strategy_next_step_readiness_matrix_path=resolve_repo_path(
+            inputs["m14_strategy_next_step_readiness_matrix"]
+        ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         post_fresh_refresh_recompute_checklist_path=resolve_repo_path(
@@ -162,6 +166,7 @@ def run_m14_project_stage_assessment(
     source_visual_confirmation_response_gate = read_json(
         config.strategy_source_visual_confirmation_response_gate_path
     )
+    strategy_next_step = read_json(config.strategy_next_step_readiness_matrix_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
     post_fresh_checklist = read_json(config.post_fresh_refresh_recompute_checklist_path)
@@ -191,6 +196,7 @@ def run_m14_project_stage_assessment(
         source_visual_alignment_gate,
         source_visual_confirmation_packet,
         source_visual_confirmation_response_gate,
+        strategy_next_step,
         objective_audit,
         objective_execution,
         post_fresh_checklist,
@@ -248,6 +254,9 @@ def run_m14_project_stage_assessment(
             "m14_strategy_source_visual_confirmation_response_gate": project_path(
                 config.strategy_source_visual_confirmation_response_gate_path
             ),
+            "m14_strategy_next_step_readiness_matrix": project_path(
+                config.strategy_next_step_readiness_matrix_path
+            ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
             "m14_post_fresh_refresh_recompute_checklist": project_path(
@@ -275,6 +284,7 @@ def run_m14_project_stage_assessment(
             source_visual_alignment_gate,
             source_visual_confirmation_packet,
             source_visual_confirmation_response_gate,
+            strategy_next_step,
             objective_audit,
             objective_execution,
             post_fresh_checklist,
@@ -312,6 +322,9 @@ def run_m14_project_stage_assessment(
             build_strategy_source_visual_confirmation_response_gate(
                 source_visual_confirmation_response_gate
             )
+        ),
+        "strategy_next_step_readiness_matrix": build_strategy_next_step_readiness_matrix(
+            strategy_next_step
         ),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
@@ -371,6 +384,7 @@ def build_summary(
     source_visual_alignment_gate: dict[str, Any],
     source_visual_confirmation_packet: dict[str, Any],
     source_visual_confirmation_response_gate: dict[str, Any],
+    strategy_next_step: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -400,6 +414,7 @@ def build_summary(
     source_visual_alignment_summary = source_visual_alignment_gate.get("summary", {})
     source_visual_confirmation_summary = source_visual_confirmation_packet.get("summary", {})
     source_visual_confirmation_response_summary = source_visual_confirmation_response_gate.get("summary", {})
+    strategy_next_step_summary = strategy_next_step.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     post_fresh_summary = post_fresh_checklist.get("summary", {})
@@ -920,6 +935,36 @@ def build_summary(
         "strategy_source_visual_confirmation_response_parameter_mutation_allowed_count": int_or_zero(
             source_visual_confirmation_response_summary.get("parameter_mutation_allowed_now_count")
         ),
+        "strategy_next_step_row_count": int_or_zero(
+            strategy_next_step_summary.get("strategy_next_step_row_count")
+        ),
+        "strategy_next_step_approved_internal_sim_continue_count": int_or_zero(
+            strategy_next_step_summary.get("approved_internal_sim_continue_count")
+        ),
+        "strategy_next_step_rescue_or_shadow_review_count": int_or_zero(
+            strategy_next_step_summary.get("rescue_or_shadow_review_count")
+        ),
+        "strategy_next_step_source_review_or_plugin_research_count": int_or_zero(
+            strategy_next_step_summary.get("source_review_or_plugin_research_count")
+        ),
+        "strategy_next_step_promotion_allowed_count": int_or_zero(
+            strategy_next_step_summary.get("promotion_allowed_count")
+        ),
+        "strategy_next_step_final_discard_allowed_count": int_or_zero(
+            strategy_next_step_summary.get("final_discard_allowed_count")
+        ),
+        "strategy_next_step_parameter_activation_allowed_count": int_or_zero(
+            strategy_next_step_summary.get("parameter_activation_allowed_count")
+        ),
+        "strategy_next_step_broker_paper_start_allowed_count": int_or_zero(
+            strategy_next_step_summary.get("broker_paper_start_allowed_count")
+        ),
+        "strategy_next_step_legacy_historical_profit_planning_input_count": int_or_zero(
+            strategy_next_step_summary.get("legacy_historical_profit_planning_input_count")
+        ),
+        "strategy_next_step_requires_fresh_refresh_count": int_or_zero(
+            strategy_next_step_summary.get("requires_m12_47_fresh_refresh_count")
+        ),
         "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
         "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
         "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -989,6 +1034,7 @@ def build_stage_assessment(
     source_visual_alignment_gate: dict[str, Any],
     source_visual_confirmation_packet: dict[str, Any],
     source_visual_confirmation_response_gate: dict[str, Any],
+    strategy_next_step: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     post_fresh_checklist: dict[str, Any],
@@ -1036,6 +1082,15 @@ def build_stage_assessment(
             and summary["strategy_source_visual_confirmation_response_complete_count"]
             == summary["strategy_source_visual_confirmation_response_gate_row_count"]
             else "manual_response_gate_pending_no_future_spec_unblocked"
+        ),
+        "strategy_next_step_readiness_status": (
+            "route_matrix_ready_legacy_history_excluded_no_promotion_or_mutation"
+            if summary["strategy_next_step_legacy_historical_profit_planning_input_count"] == 0
+            and summary["strategy_next_step_promotion_allowed_count"] == 0
+            and summary["strategy_next_step_final_discard_allowed_count"] == 0
+            and summary["strategy_next_step_parameter_activation_allowed_count"] == 0
+            and summary["strategy_next_step_broker_paper_start_allowed_count"] == 0
+            else "route_matrix_requires_manual_review"
         ),
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
@@ -1154,6 +1209,18 @@ def build_stage_assessment(
                 f"review pack ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} with "
                 f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
                 f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present."
+            ),
+            (
+                f"Strategy next-step readiness matrix has {summary['strategy_next_step_row_count']} rows: "
+                f"{summary['strategy_next_step_approved_internal_sim_continue_count']} approved internal-sim refresh, "
+                f"{summary['strategy_next_step_rescue_or_shadow_review_count']} rescue or shadow-review, "
+                f"{summary['strategy_next_step_source_review_or_plugin_research_count']} source/plugin research, "
+                f"promotion/discard/parameter/broker-paper="
+                f"{summary['strategy_next_step_promotion_allowed_count']}/"
+                f"{summary['strategy_next_step_final_discard_allowed_count']}/"
+                f"{summary['strategy_next_step_parameter_activation_allowed_count']}/"
+                f"{summary['strategy_next_step_broker_paper_start_allowed_count']}, "
+                f"legacy-history planning inputs={summary['strategy_next_step_legacy_historical_profit_planning_input_count']}."
             ),
             (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
@@ -1685,6 +1752,37 @@ def build_strategy_source_visual_confirmation_response_gate(
     }
 
 
+def build_strategy_next_step_readiness_matrix(strategy_next_step: dict[str, Any]) -> dict[str, Any]:
+    summary = strategy_next_step.get("summary", {})
+    return {
+        "strategy_next_step_row_count": int_or_zero(summary.get("strategy_next_step_row_count")),
+        "approved_internal_sim_continue_count": int_or_zero(
+            summary.get("approved_internal_sim_continue_count")
+        ),
+        "rescue_or_shadow_review_count": int_or_zero(summary.get("rescue_or_shadow_review_count")),
+        "source_review_or_plugin_research_count": int_or_zero(
+            summary.get("source_review_or_plugin_research_count")
+        ),
+        "requires_m12_47_fresh_refresh_count": int_or_zero(
+            summary.get("requires_m12_47_fresh_refresh_count")
+        ),
+        "promotion_allowed_count": int_or_zero(summary.get("promotion_allowed_count")),
+        "final_discard_allowed_count": int_or_zero(summary.get("final_discard_allowed_count")),
+        "parameter_activation_allowed_count": int_or_zero(
+            summary.get("parameter_activation_allowed_count")
+        ),
+        "broker_paper_start_allowed_count": int_or_zero(
+            summary.get("broker_paper_start_allowed_count")
+        ),
+        "legacy_historical_profit_planning_input_count": int_or_zero(
+            summary.get("legacy_historical_profit_planning_input_count")
+        ),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(strategy_next_step.get("plain_language_result", "")),
+    }
+
+
 def build_objective_completion_audit(objective_audit: dict[str, Any]) -> dict[str, Any]:
     summary = objective_audit.get("summary", {})
     assessment = objective_audit.get("objective_completion_assessment", {})
@@ -1946,6 +2044,16 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"review pack ready={summary['strategy_source_visual_confirmation_response_review_pack_ready']} with "
         f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/"
         f"{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']} local case assets present. "
+        f"Strategy next-step matrix has {summary['strategy_next_step_row_count']} rows, "
+        f"{summary['strategy_next_step_approved_internal_sim_continue_count']} approved internal-sim refresh rows, "
+        f"{summary['strategy_next_step_rescue_or_shadow_review_count']} rescue/shadow-review rows, "
+        f"{summary['strategy_next_step_source_review_or_plugin_research_count']} source/plugin research rows, "
+        f"and legacy-history planning input count={summary['strategy_next_step_legacy_historical_profit_planning_input_count']}; "
+        f"promotion/discard/parameter/broker-paper allowed="
+        f"{summary['strategy_next_step_promotion_allowed_count']}/"
+        f"{summary['strategy_next_step_final_discard_allowed_count']}/"
+        f"{summary['strategy_next_step_parameter_activation_allowed_count']}/"
+        f"{summary['strategy_next_step_broker_paper_start_allowed_count']}. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -2012,6 +2120,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy source visual confirmation response rows/questions pending/cases pending/complete/unblocked: `{summary['strategy_source_visual_confirmation_response_gate_row_count']}/{summary['strategy_source_visual_confirmation_response_question_pending_count']}/{summary['strategy_source_visual_confirmation_response_case_pending_count']}/{summary['strategy_source_visual_confirmation_response_complete_count']}/{summary['strategy_source_visual_confirmation_response_future_spec_unblocked_count']}`",
         f"- Strategy source visual confirmation response review pack ready/questions/assets existing/assets total: `{summary['strategy_source_visual_confirmation_response_review_pack_ready']}/{summary['strategy_source_visual_confirmation_response_review_pack_question_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_exists_count']}/{summary['strategy_source_visual_confirmation_response_review_pack_asset_count']}`",
         f"- Strategy source visual confirmation response create/mutation/invalid allowed: `{summary['strategy_source_visual_confirmation_response_can_create_strategy_now_count']}/{summary['strategy_source_visual_confirmation_response_parameter_mutation_allowed_count']}/{summary['strategy_source_visual_confirmation_response_invalid_count']}`",
+        f"- Strategy next-step rows/approved/rescue-or-shadow/source-review: `{summary['strategy_next_step_row_count']}/{summary['strategy_next_step_approved_internal_sim_continue_count']}/{summary['strategy_next_step_rescue_or_shadow_review_count']}/{summary['strategy_next_step_source_review_or_plugin_research_count']}`",
+        f"- Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `{summary['strategy_next_step_promotion_allowed_count']}/{summary['strategy_next_step_final_discard_allowed_count']}/{summary['strategy_next_step_parameter_activation_allowed_count']}/{summary['strategy_next_step_broker_paper_start_allowed_count']}/{summary['strategy_next_step_legacy_historical_profit_planning_input_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -2046,6 +2156,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy source visual alignment status: `{payload['stage_assessment']['strategy_source_visual_alignment_status']}`",
         f"- Strategy source visual confirmation status: `{payload['stage_assessment']['strategy_source_visual_confirmation_status']}`",
         f"- Strategy source visual confirmation response status: `{payload['stage_assessment']['strategy_source_visual_confirmation_response_status']}`",
+        f"- Strategy next-step readiness status: `{payload['stage_assessment']['strategy_next_step_readiness_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Post-fresh recompute status: `{payload['stage_assessment']['post_fresh_recompute_status']}`",

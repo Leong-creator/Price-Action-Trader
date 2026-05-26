@@ -21,6 +21,7 @@ FORBIDDEN_OPERATIONS = (
     "m12_account_specs_mutation",
     "broker_readiness_status_mutation",
     "parameter_mutation",
+    "legacy_historical_profit_planning_input",
 )
 
 
@@ -39,6 +40,8 @@ class PostFreshRefreshRecomputeChecklistConfig:
     strategy_pre_refresh_review_audit_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
+    objective_blocker_burndown_path: Path
+    strategy_next_step_readiness_matrix_path: Path
     checklist_json_path: Path
     checklist_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -82,6 +85,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> PostFreshRefreshRecom
         ),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
+        objective_blocker_burndown_path=resolve_repo_path(inputs["m14_objective_blocker_burndown"]),
+        strategy_next_step_readiness_matrix_path=resolve_repo_path(
+            inputs["m14_strategy_next_step_readiness_matrix"]
+        ),
         checklist_json_path=resolve_repo_path(outputs["checklist_json"]),
         checklist_md_path=resolve_repo_path(outputs["checklist_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -120,6 +127,8 @@ def run_m14_post_fresh_refresh_recompute_checklist(
     pre_refresh_audit = read_json(config.strategy_pre_refresh_review_audit_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
+    objective_blocker = read_json(config.objective_blocker_burndown_path)
+    next_step_matrix = read_json(config.strategy_next_step_readiness_matrix_path)
 
     source_summary = build_source_summary(
         next_session=next_session,
@@ -133,6 +142,8 @@ def run_m14_post_fresh_refresh_recompute_checklist(
         pre_refresh_audit=pre_refresh_audit,
         objective_audit=objective_audit,
         objective_execution=objective_execution,
+        objective_blocker=objective_blocker,
+        next_step_matrix=next_step_matrix,
     )
     preconditions = build_preconditions(source_summary)
     recompute_steps = build_recompute_steps(source_summary)
@@ -181,6 +192,10 @@ def run_m14_post_fresh_refresh_recompute_checklist(
             ),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
+            "m14_objective_blocker_burndown": project_path(config.objective_blocker_burndown_path),
+            "m14_strategy_next_step_readiness_matrix": project_path(
+                config.strategy_next_step_readiness_matrix_path
+            ),
         },
         "summary": summary,
         "preconditions": preconditions,
@@ -198,6 +213,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
             "m12_account_specs_mutation": False,
             "broker_readiness_status_mutation": False,
             "parameter_mutation": False,
+            "legacy_historical_profit_planning_input": False,
         },
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -210,6 +226,7 @@ def run_m14_post_fresh_refresh_recompute_checklist(
         "m12_account_specs_mutation": False,
         "broker_readiness_status_mutation": False,
         "parameter_mutation": False,
+        "legacy_historical_profit_planning_input": False,
     }
     payload["plain_language_result"] = build_plain_language_result(payload)
     write_json(config.checklist_json_path, payload)
@@ -231,6 +248,8 @@ def build_source_summary(
     pre_refresh_audit: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
+    objective_blocker: dict[str, Any],
+    next_step_matrix: dict[str, Any],
 ) -> dict[str, Any]:
     next_summary = next_session.get("summary", {})
     post_summary = post_refresh.get("summary", {})
@@ -243,6 +262,8 @@ def build_source_summary(
     pre_refresh_audit_summary = pre_refresh_audit.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
+    blocker_summary = objective_blocker.get("summary", {})
+    next_step_summary = next_step_matrix.get("summary", {})
     return {
         "m14_trading_date": str(
             next_session.get("m14_trading_date")
@@ -312,7 +333,48 @@ def build_source_summary(
         "objective_execution_waiting_for_fresh_refresh_action_count": int_or_zero(
             execution_summary.get("waiting_for_fresh_refresh_action_count")
         ),
+        "objective_blocker_burndown_row_count": int_or_zero(
+            blocker_summary.get("blocker_burndown_row_count")
+        ),
+        "objective_blocker_p0_count": int_or_zero(blocker_summary.get("p0_blocker_count")),
+        "objective_blocker_p1_count": int_or_zero(blocker_summary.get("p1_blocker_count")),
+        "objective_blocker_legacy_historical_profit_planning_input_count": int_or_zero(
+            blocker_summary.get("legacy_historical_profit_planning_input_count")
+        ),
+        "strategy_next_step_row_count": int_or_zero(
+            next_step_summary.get("strategy_next_step_row_count")
+        ),
+        "strategy_next_step_approved_internal_sim_continue_count": int_or_zero(
+            next_step_summary.get("approved_internal_sim_continue_count")
+        ),
+        "strategy_next_step_rescue_or_shadow_review_count": int_or_zero(
+            next_step_summary.get("rescue_or_shadow_review_count")
+        ),
+        "strategy_next_step_source_review_or_plugin_research_count": int_or_zero(
+            next_step_summary.get("source_review_or_plugin_research_count")
+        ),
+        "strategy_next_step_promotion_allowed_count": int_or_zero(
+            next_step_summary.get("promotion_allowed_count")
+        ),
+        "strategy_next_step_final_discard_allowed_count": int_or_zero(
+            next_step_summary.get("final_discard_allowed_count")
+        ),
+        "strategy_next_step_parameter_activation_allowed_count": int_or_zero(
+            next_step_summary.get("parameter_activation_allowed_count")
+        ),
+        "strategy_next_step_broker_paper_start_allowed_count": int_or_zero(
+            next_step_summary.get("broker_paper_start_allowed_count")
+        ),
+        "strategy_next_step_legacy_historical_profit_planning_input_count": int_or_zero(
+            next_step_summary.get("legacy_historical_profit_planning_input_count")
+        ),
         "parameter_mutation_allowed_count": 0,
+        "legacy_historical_profit_planning_input_count": int_or_zero(
+            next_step_summary.get(
+                "legacy_historical_profit_planning_input_count",
+                blocker_summary.get("legacy_historical_profit_planning_input_count"),
+            )
+        ),
         "two_pass_stabilization_required": True,
     }
 
@@ -494,11 +556,25 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Final execution queue pass after the final audit.",
         ),
         (
+            "objective_blocker_burndown_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_objective_blocker_burndown.py",
+            "Refresh objective blockers and legacy history metric exclusion before strategy next-step routing.",
+        ),
+        (
             "strategy_evidence_gap_burndown_refresh",
             "decision_stabilization",
             "read_only_script",
             "python scripts/run_m14_strategy_evidence_gap_burndown.py",
             "Refresh the ordered strategy evidence gap burn-down queue before final assessment.",
+        ),
+        (
+            "strategy_next_step_readiness_matrix_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_next_step_readiness_matrix.py",
+            "Refresh the per-strategy next-step matrix after blocker and evidence burndown artifacts are current.",
         ),
         (
             "strategy_pre_refresh_review_packet_refresh",
@@ -548,6 +624,7 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "m13_registry_mutation": False,
                 "m12_account_specs_mutation": False,
                 "broker_readiness_status_mutation": False,
+                "legacy_historical_profit_planning_input": False,
             }
         )
     return steps
@@ -569,6 +646,12 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
         ),
         "strategy_evidence_gap_matrix_refresh": "open-gap rows should explain exactly which evidence remains missing per strategy.",
         "strategy_evidence_gap_burndown_refresh": "P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.",
+        "objective_blocker_burndown_refresh": (
+            "legacy historical profit planning input count must stay 0 while objective blockers refresh."
+        ),
+        "strategy_next_step_readiness_matrix_refresh": (
+            "per-strategy next-step rows should preserve 0 promotion, discard, parameter activation, broker paper, and legacy-history planning inputs."
+        ),
         "strategy_pre_refresh_review_packet_refresh": (
             "review rows should stay review-only, with zero close/promote/discard/mutation allowed."
         ),
@@ -625,6 +708,12 @@ def build_acceptance_gates(summary: dict[str, Any]) -> list[dict[str, Any]]:
             True,
             "All hard-boundary flags are forced false in this checklist.",
         ),
+        acceptance_gate(
+            "legacy_history_metric_exclusion_gate",
+            "Legacy account-dashboard historical profit/history return metrics remain excluded from strategy planning.",
+            summary["legacy_historical_profit_planning_input_count"] == 0,
+            f"Current legacy_historical_profit_planning_input_count={summary['legacy_historical_profit_planning_input_count']}.",
+        ),
     ]
 
 
@@ -640,6 +729,7 @@ def acceptance_gate(gate_id: str, label: str, passed: bool, evidence: str) -> di
         "live_execution": False,
         "paper_trading_approval": False,
         "parameter_mutation": False,
+        "legacy_historical_profit_planning_input": False,
     }
 
 
@@ -655,6 +745,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_decision_final_discard_allowed_count']}. Pre-refresh review audit has "
         f"{summary['strategy_pre_refresh_review_audit_row_count']} rows, with "
         f"{summary['strategy_pre_refresh_review_audit_backfill_count']} supporting-artifact backfills. "
+        f"Strategy next-step matrix currently has {summary['strategy_next_step_row_count']} rows and "
+        f"{summary['strategy_next_step_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
         "Manual M12.37 once-mode, broker/live, "
         "real orders, paper approval, parameter mutation, registry/account-spec mutation, and broker readiness "
         "mutation remain disabled."
@@ -676,6 +768,9 @@ def build_checklist_md(payload: dict[str, Any]) -> str:
         f"- Rescue no-ledger count: `{summary['rescue_no_m13_ledger_evidence_count']}`",
         f"- Parameter shadow specs/variants: `{summary['parameter_shadow_spec_row_count']}/{summary['parameter_shadow_spec_candidate_variant_count']}`",
         f"- Final discard allowed: `{summary['strategy_decision_final_discard_allowed_count']}`",
+        f"- Objective blocker rows/P0/P1/legacy-history-planning-inputs: `{summary['objective_blocker_burndown_row_count']}/{summary['objective_blocker_p0_count']}/{summary['objective_blocker_p1_count']}/{summary['objective_blocker_legacy_historical_profit_planning_input_count']}`",
+        f"- Strategy next-step rows/approved/rescue-or-shadow/source-review: `{summary['strategy_next_step_row_count']}/{summary['strategy_next_step_approved_internal_sim_continue_count']}/{summary['strategy_next_step_rescue_or_shadow_review_count']}/{summary['strategy_next_step_source_review_or_plugin_research_count']}`",
+        f"- Strategy next-step promote/discard/parameter/broker/legacy-history inputs: `{summary['strategy_next_step_promotion_allowed_count']}/{summary['strategy_next_step_final_discard_allowed_count']}/{summary['strategy_next_step_parameter_activation_allowed_count']}/{summary['strategy_next_step_broker_paper_start_allowed_count']}/{summary['strategy_next_step_legacy_historical_profit_planning_input_count']}`",
         f"- Pre-refresh review audit rows/ready/waiting/backfill: `{summary['strategy_pre_refresh_review_audit_row_count']}/{summary['strategy_pre_refresh_review_audit_ready_now_count']}/{summary['strategy_pre_refresh_review_audit_wait_fresh_count']}/{summary['strategy_pre_refresh_review_audit_backfill_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution, no manual M12.37 once-mode.",
         "",
