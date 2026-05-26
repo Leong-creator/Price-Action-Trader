@@ -21,6 +21,7 @@ class ProjectStageAssessmentConfig:
     internal_sim_next_session_plan_path: Path
     strategy_rescue_plan_path: Path
     rescue_optimization_backlog_path: Path
+    rescue_post_refresh_outcome_review_path: Path
     assessment_json_path: Path
     assessment_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -49,6 +50,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         internal_sim_next_session_plan_path=resolve_repo_path(inputs["m14_internal_sim_next_session_plan"]),
         strategy_rescue_plan_path=resolve_repo_path(inputs["m14_strategy_rescue_plan"]),
         rescue_optimization_backlog_path=resolve_repo_path(inputs["m14_rescue_optimization_backlog"]),
+        rescue_post_refresh_outcome_review_path=resolve_repo_path(
+            inputs["m14_rescue_post_refresh_outcome_review"]
+        ),
         assessment_json_path=resolve_repo_path(outputs["assessment_json"]),
         assessment_md_path=resolve_repo_path(outputs["assessment_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -80,13 +84,14 @@ def run_m14_project_stage_assessment(
     next_session = read_json(config.internal_sim_next_session_plan_path)
     rescue_plan = read_json(config.strategy_rescue_plan_path)
     backlog = read_json(config.rescue_optimization_backlog_path)
+    post_refresh = read_json(config.rescue_post_refresh_outcome_review_path)
 
     strategy_routes = build_strategy_routes(
         action_matrix=list(goal.get("strategy_action_matrix", [])),
         next_session_rows=list(next_session.get("strategy_session_rows", [])),
         rescue_plan_rows=list(rescue_plan.get("rows", [])),
     )
-    summary = build_summary(goal, next_session, backlog, strategy_routes)
+    summary = build_summary(goal, next_session, backlog, post_refresh, strategy_routes)
     payload: dict[str, Any] = {
         "schema_version": "m14.project-stage-assessment.v1",
         "stage": config.stage,
@@ -99,12 +104,16 @@ def run_m14_project_stage_assessment(
             "m14_internal_sim_next_session_plan": project_path(config.internal_sim_next_session_plan_path),
             "m14_strategy_rescue_plan": project_path(config.strategy_rescue_plan_path),
             "m14_rescue_optimization_backlog": project_path(config.rescue_optimization_backlog_path),
+            "m14_rescue_post_refresh_outcome_review": project_path(
+                config.rescue_post_refresh_outcome_review_path
+            ),
         },
         "summary": summary,
-        "stage_assessment": build_stage_assessment(goal, next_session, backlog, summary),
+        "stage_assessment": build_stage_assessment(goal, next_session, backlog, post_refresh, summary),
         "strategy_routes": strategy_routes,
         "next_fresh_refresh_acceptance": build_next_fresh_refresh_acceptance(next_session, goal),
         "rescue_policy": build_rescue_policy(goal, backlog),
+        "rescue_post_refresh_outcome_review": build_post_refresh_outcome_review(post_refresh),
         "external_reference_policy": dict(goal.get("external_reference_policy", {})),
         "goal_completion_assessment": {
             "goal_complete": False,
@@ -141,6 +150,7 @@ def build_summary(
     goal: dict[str, Any],
     next_session: dict[str, Any],
     backlog: dict[str, Any],
+    post_refresh: dict[str, Any],
     strategy_routes: list[dict[str, Any]],
 ) -> dict[str, Any]:
     challenge = goal.get("challenge", {})
@@ -151,6 +161,7 @@ def build_summary(
     broker = goal.get("broker_readiness", {})
     next_summary = next_session.get("summary", {})
     backlog_summary = backlog.get("summary", {})
+    post_summary = post_refresh.get("summary", {})
     route_counts = dict(sorted(Counter(str(row.get("route_category", "")) for row in strategy_routes).items()))
     return {
         "current_project_stage": str(goal.get("project_stage_label", "")),
@@ -183,6 +194,15 @@ def build_summary(
         "rescue_parameter_change_allowed_now_count": int_or_zero(
             next_refresh.get("parameter_change_allowed_now_count")
         ),
+        "post_refresh_fresh_refresh_observed": bool(post_summary.get("fresh_refresh_observed", False)),
+        "post_refresh_source_quote": str(post_summary.get("source_quote", "")),
+        "post_refresh_source_scan_date": str(post_summary.get("source_scan_date", "")),
+        "post_refresh_latest_ledger_trading_date": str(post_summary.get("latest_ledger_trading_date", "")),
+        "post_refresh_watch_rows": int_or_zero(post_summary.get("watch_rows")),
+        "post_refresh_waiting_count": int_or_zero(post_summary.get("waiting_count")),
+        "post_refresh_passed_count": int_or_zero(post_summary.get("passed_count")),
+        "post_refresh_failed_count": int_or_zero(post_summary.get("failed_count")),
+        "post_refresh_manual_m12_37_once_allowed": False,
         "rescue_actionable_before_10d_count": int_or_zero(
             backlog_summary.get("actionable_before_10d_count")
         ),
@@ -204,8 +224,14 @@ def build_stage_assessment(
     goal: dict[str, Any],
     next_session: dict[str, Any],
     backlog: dict[str, Any],
+    post_refresh: dict[str, Any],
     summary: dict[str, Any],
 ) -> dict[str, Any]:
+    post_refresh_status = (
+        "post_refresh_reviewed"
+        if summary["post_refresh_fresh_refresh_observed"]
+        else "waiting_for_m12_47_fresh_refresh"
+    )
     return {
         "current_phase": summary["current_project_stage"],
         "stage_decision": "continue_approved_internal_sim_and_collect_rescue_ab_evidence",
@@ -218,6 +244,7 @@ def build_stage_assessment(
             else "hold_until_internal_sim_readiness_repaired"
         ),
         "rescue_status": "connected_but_not_promoted",
+        "post_refresh_status": post_refresh_status,
         "broker_status": "dry_run_preview_only_not_broker_paper",
         "next_required_evidence": [
             (
@@ -228,12 +255,39 @@ def build_stage_assessment(
                 f"{summary['rescue_no_m13_ledger_evidence_count']} rescue runtimes need a first M13 ledger row after the next M12.47 refresh."
             ),
             (
+                f"Post-refresh review has {summary['post_refresh_waiting_count']} waiting, "
+                f"{summary['post_refresh_passed_count']} passed/evidence, and {summary['post_refresh_failed_count']} failed rows."
+            ),
+            (
                 f"{summary['broker_dry_run_blocked_count']} broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
             ),
         ],
         "next_session_plain_result": str(next_session.get("plain_language_result", "")),
         "goal_plain_result": str(goal.get("plain_language_result", "")),
         "backlog_plain_result": str(backlog.get("plain_language_result", "")),
+        "post_refresh_plain_result": str(post_refresh.get("plain_language_result", "")),
+    }
+
+
+def build_post_refresh_outcome_review(post_refresh: dict[str, Any]) -> dict[str, Any]:
+    summary = post_refresh.get("summary", {})
+    source_state = post_refresh.get("source_state", {})
+    return {
+        "fresh_refresh_observed": bool(summary.get("fresh_refresh_observed", False)),
+        "source_quote": str(summary.get("source_quote", "")),
+        "source_scan_date": str(summary.get("source_scan_date", "")),
+        "latest_ledger_trading_date": str(summary.get("latest_ledger_trading_date", "")),
+        "watch_rows": int_or_zero(summary.get("watch_rows")),
+        "waiting_count": int_or_zero(summary.get("waiting_count")),
+        "passed_count": int_or_zero(summary.get("passed_count")),
+        "failed_count": int_or_zero(summary.get("failed_count")),
+        "outcome_status_counts": dict(summary.get("outcome_status_counts", {})),
+        "readiness_family_counts": dict(summary.get("readiness_family_counts", {})),
+        "dashboard_generated_at": str(source_state.get("dashboard_generated_at", "")),
+        "manual_m12_37_once_allowed": False,
+        "parameter_change_allowed_now_count": 0,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(post_refresh.get("plain_language_result", "")),
     }
 
 
@@ -370,6 +424,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"with {summary['approved_runtime_input_connected_count']}/{summary['approved_runtime_input_count']} approved runtimes connected. "
         f"Rescue evidence is {summary['rescue_m13_ledger_observed_strategy_count']}/{summary['rescue_runtime_strategy_count']} observed, "
         f"{summary['rescue_no_m13_ledger_evidence_count']} need first ledger rows, and promotion allowed remains {summary['rescue_promotion_allowed_count']}. "
+        f"Post-refresh review is "
+        f"{'reviewed' if summary['post_refresh_fresh_refresh_observed'] else 'waiting for fresh M12.47 data'} "
+        f"with {summary['post_refresh_waiting_count']} waiting, {summary['post_refresh_passed_count']} passed/evidence, "
+        f"and {summary['post_refresh_failed_count']} failed rows from quote_source={summary['post_refresh_source_quote']}. "
         f"Broker readiness stays dry-run preview only: {summary['broker_dry_run_ready_count']} ready and {summary['broker_dry_run_blocked_count']} blocked; "
         "manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled."
     )
@@ -388,6 +446,9 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Approved runtime input coverage: `{summary['approved_runtime_input_connected_count']}/{summary['approved_runtime_input_count']}`",
         f"- Rescue evidence observed: `{summary['rescue_m13_ledger_observed_strategy_count']}/{summary['rescue_runtime_strategy_count']}`",
         f"- Rescue promotions allowed: `{summary['rescue_promotion_allowed_count']}`",
+        f"- Post-refresh fresh refresh observed: `{summary['post_refresh_fresh_refresh_observed']}`",
+        f"- Post-refresh quote source: `{summary['post_refresh_source_quote']}`",
+        f"- Post-refresh waiting/passed/failed: `{summary['post_refresh_waiting_count']}/{summary['post_refresh_passed_count']}/{summary['post_refresh_failed_count']}`",
         f"- Broker dry-run ready/blocked: `{summary['broker_dry_run_ready_count']}/{summary['broker_dry_run_blocked_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
         "",
@@ -400,6 +461,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Decision: `{payload['stage_assessment']['stage_decision']}`",
         f"- Internal sim status: `{payload['stage_assessment']['internal_sim_status']}`",
         f"- Rescue status: `{payload['stage_assessment']['rescue_status']}`",
+        f"- Post-refresh status: `{payload['stage_assessment']['post_refresh_status']}`",
         f"- Broker status: `{payload['stage_assessment']['broker_status']}`",
         "",
         "## Route Counts",

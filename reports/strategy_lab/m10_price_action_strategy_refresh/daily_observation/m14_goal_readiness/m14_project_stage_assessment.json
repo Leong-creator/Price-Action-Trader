@@ -18,7 +18,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T16:30:00Z",
+  "generated_at": "2026-05-26T18:00:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own A/B evidence and broker/live remains disabled."
@@ -36,6 +36,7 @@
     "m14_goal_readiness_report": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_goal_readiness_report.json",
     "m14_internal_sim_next_session_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_internal_sim_next_session_plan.json",
     "m14_rescue_optimization_backlog": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_optimization_backlog.json",
+    "m14_rescue_post_refresh_outcome_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_post_refresh_outcome_review.json",
     "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json"
   },
   "internal_simulated_account": true,
@@ -185,7 +186,7 @@
   },
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
   "project_stage_label": "M14 project stage assessment and strategy route map",
   "real_order": false,
   "rescue_policy": {
@@ -202,6 +203,31 @@
     "rule": "Approved strategies continue internal simulation; weak strategies collect rescue A/B evidence, run shadow parameter tests, or rebuild detectors before any final discard.",
     "zero_signal_after_connection_count": 8
   },
+  "rescue_post_refresh_outcome_review": {
+    "broker_or_live_enabled": false,
+    "dashboard_generated_at": "2026-05-26T00:06:37Z",
+    "failed_count": 0,
+    "fresh_refresh_observed": false,
+    "latest_ledger_trading_date": "2026-05-22",
+    "manual_m12_37_once_allowed": false,
+    "outcome_status_counts": {
+      "waiting_for_m12_47_fresh_refresh": 13
+    },
+    "parameter_change_allowed_now_count": 0,
+    "passed_count": 0,
+    "plain_language_result": "Post-refresh outcome review checked 13 rescue watch rows; still waiting for fresh M12.47 data because quote_source=fallback_quotes_only. Passed/evidence observed: 0; waiting: 13; failed: 0. First-ledger passed 0, fresh-quote rechecks passed 0, broker-rule evidence observed 0, target/stop shadow passed 0. No parameter change, registry mutation, account-spec mutation, broker readiness mutation, broker connection, real order, live execution, or paper approval is enabled.",
+    "readiness_family_counts": {
+      "broker_rule_shadow_recheck": 2,
+      "first_rescue_ledger_watch": 2,
+      "fresh_quote_recheck": 7,
+      "parent_detector_evidence_wait": 1,
+      "target_stop_shadow_compare": 1
+    },
+    "source_quote": "fallback_quotes_only",
+    "source_scan_date": "2026-05-22",
+    "waiting_count": 13,
+    "watch_rows": 13
+  },
   "schema_version": "m14.project-stage-assessment.v1",
   "source_project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "stage": "M14.project_stage_assessment",
@@ -214,9 +240,12 @@
     "next_required_evidence": [
       "11 rescue runtimes must collect their own A/B evidence; 9 currently have M13 ledger evidence.",
       "2 rescue runtimes need a first M13 ledger row after the next M12.47 refresh.",
+      "Post-refresh review has 13 waiting, 0 passed/evidence, and 0 failed rows.",
       "3 broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
     ],
     "next_session_plain_result": "Next internal simulated-account session is ready in m12_47_supervised_fresh_refresh_only mode: 3/3 approved strategies and 4/4 approved runtimes are connected. 2 approved strategies need broker dry-run blocker watch; 13 rescue watch rows and 2 first-ledger watches remain for the next fresh refresh. Manual M12.37 once-mode, broker paper, live execution, real orders, and paper-trading approval remain disabled.",
+    "post_refresh_plain_result": "Post-refresh outcome review checked 13 rescue watch rows; still waiting for fresh M12.47 data because quote_source=fallback_quotes_only. Passed/evidence observed: 0; waiting: 13; failed: 0. First-ledger passed 0, fresh-quote rechecks passed 0, broker-rule evidence observed 0, target/stop shadow passed 0. No parameter change, registry mutation, account-spec mutation, broker readiness mutation, broker connection, real order, live execution, or paper approval is enabled.",
+    "post_refresh_status": "waiting_for_m12_47_fresh_refresh",
     "rescue_status": "connected_but_not_promoted",
     "stage_decision": "continue_approved_internal_sim_and_collect_rescue_ab_evidence",
     "ten_day_status": "complete"
@@ -806,6 +835,15 @@
     "launch_ready_strategy_count": 3,
     "manual_m12_37_once_allowed": false,
     "next_session_mode": "m12_47_supervised_fresh_refresh_only",
+    "post_refresh_failed_count": 0,
+    "post_refresh_fresh_refresh_observed": false,
+    "post_refresh_latest_ledger_trading_date": "2026-05-22",
+    "post_refresh_manual_m12_37_once_allowed": false,
+    "post_refresh_passed_count": 0,
+    "post_refresh_source_quote": "fallback_quotes_only",
+    "post_refresh_source_scan_date": "2026-05-22",
+    "post_refresh_waiting_count": 13,
+    "post_refresh_watch_rows": 13,
     "required_challenge_trading_days": 10,
     "rescue_actionable_before_10d_count": 10,
     "rescue_m13_ledger_observed_strategy_count": 9,

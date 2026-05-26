@@ -31,6 +31,12 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["rescue_m13_ledger_observed_strategy_count"], 1)
             self.assertEqual(result["summary"]["rescue_no_m13_ledger_evidence_count"], 1)
             self.assertEqual(result["summary"]["rescue_promotion_allowed_count"], 0)
+            self.assertFalse(result["summary"]["post_refresh_fresh_refresh_observed"])
+            self.assertEqual(result["summary"]["post_refresh_source_quote"], "fallback_quotes_only")
+            self.assertEqual(result["summary"]["post_refresh_watch_rows"], 4)
+            self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
+            self.assertEqual(result["summary"]["post_refresh_passed_count"], 0)
+            self.assertEqual(result["summary"]["post_refresh_failed_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
             self.assertEqual(result["summary"]["broker_dry_run_blocked_count"], 1)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
@@ -63,6 +69,13 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["stage_decision"],
                 "continue_approved_internal_sim_and_collect_rescue_ab_evidence",
             )
+            self.assertEqual(
+                result["stage_assessment"]["post_refresh_status"],
+                "waiting_for_m12_47_fresh_refresh",
+            )
+            self.assertEqual(result["rescue_post_refresh_outcome_review"]["watch_rows"], 4)
+            self.assertEqual(result["rescue_post_refresh_outcome_review"]["waiting_count"], 4)
+            self.assertFalse(result["rescue_post_refresh_outcome_review"]["manual_m12_37_once_allowed"])
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertEqual(
                 result["rescue_policy"]["policy"],
@@ -75,6 +88,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             md = (root / "assessment.md").read_text(encoding="utf-8")
             self.assertIn("M14 Project Stage Assessment", md)
             self.assertIn("Manual M12.37 once-mode allowed: `False`", md)
+            self.assertIn("Post-refresh fresh refresh observed: `False`", md)
+            self.assertIn("Post-refresh waiting/passed/failed: `4/0/0`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -93,6 +108,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         next_session_path = root / "next_session.json"
         rescue_plan_path = root / "rescue_plan.json"
         backlog_path = root / "backlog.json"
+        post_refresh_path = root / "post_refresh.json"
         config_path = root / "config.json"
 
         goal_path.write_text(
@@ -222,6 +238,33 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        post_refresh_path.write_text(
+            json.dumps(
+                {
+                    "source_state": {
+                        "dashboard_generated_at": "2026-05-26T16:00:00Z",
+                    },
+                    "summary": {
+                        "fresh_refresh_observed": False,
+                        "source_quote": "fallback_quotes_only",
+                        "source_scan_date": "2026-05-22",
+                        "latest_ledger_trading_date": "2026-05-22",
+                        "watch_rows": 4,
+                        "waiting_count": 4,
+                        "passed_count": 0,
+                        "failed_count": 0,
+                        "outcome_status_counts": {"waiting_for_m12_47_fresh_refresh": 4},
+                        "readiness_family_counts": {
+                            "first_rescue_ledger_watch": 1,
+                            "fresh_quote_recheck": 3,
+                        },
+                        "manual_m12_37_once_allowed": False,
+                    },
+                    "plain_language_result": "Post-refresh fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -233,6 +276,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_internal_sim_next_session_plan": str(next_session_path),
                         "m14_strategy_rescue_plan": str(rescue_plan_path),
                         "m14_rescue_optimization_backlog": str(backlog_path),
+                        "m14_rescue_post_refresh_outcome_review": str(post_refresh_path),
                     },
                     "outputs": {
                         "assessment_json": str(root / "assessment.json"),
