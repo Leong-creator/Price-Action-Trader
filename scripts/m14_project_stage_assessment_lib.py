@@ -29,6 +29,7 @@ class ProjectStageAssessmentConfig:
     strategy_decision_ladder_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
+    post_fresh_refresh_recompute_checklist_path: Path
     assessment_json_path: Path
     assessment_md_path: Path
     hard_boundaries: dict[str, bool]
@@ -71,6 +72,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         strategy_decision_ladder_path=resolve_repo_path(inputs["m14_strategy_decision_ladder"]),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
+        post_fresh_refresh_recompute_checklist_path=resolve_repo_path(
+            inputs["m14_post_fresh_refresh_recompute_checklist"]
+        ),
         assessment_json_path=resolve_repo_path(outputs["assessment_json"]),
         assessment_md_path=resolve_repo_path(outputs["assessment_md"]),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -110,6 +114,7 @@ def run_m14_project_stage_assessment(
     decision_ladder = read_json(config.strategy_decision_ladder_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
+    post_fresh_checklist = read_json(config.post_fresh_refresh_recompute_checklist_path)
 
     strategy_routes = build_strategy_routes(
         action_matrix=list(goal.get("strategy_action_matrix", [])),
@@ -128,6 +133,7 @@ def run_m14_project_stage_assessment(
         decision_ladder,
         objective_audit,
         objective_execution,
+        post_fresh_checklist,
         strategy_routes,
     )
     payload: dict[str, Any] = {
@@ -156,6 +162,9 @@ def run_m14_project_stage_assessment(
             "m14_strategy_decision_ladder": project_path(config.strategy_decision_ladder_path),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
+            "m14_post_fresh_refresh_recompute_checklist": project_path(
+                config.post_fresh_refresh_recompute_checklist_path
+            ),
         },
         "summary": summary,
         "stage_assessment": build_stage_assessment(
@@ -170,6 +179,7 @@ def run_m14_project_stage_assessment(
             decision_ladder,
             objective_audit,
             objective_execution,
+            post_fresh_checklist,
             summary,
         ),
         "strategy_routes": strategy_routes,
@@ -183,6 +193,9 @@ def run_m14_project_stage_assessment(
         "strategy_decision_ladder": build_strategy_decision_ladder(decision_ladder),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
+        "post_fresh_refresh_recompute_checklist": build_post_fresh_refresh_recompute_checklist(
+            post_fresh_checklist
+        ),
         "external_reference_policy": dict(goal.get("external_reference_policy", {})),
         "goal_completion_assessment": {
             "goal_complete": False,
@@ -228,6 +241,7 @@ def build_summary(
     decision_ladder: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
+    post_fresh_checklist: dict[str, Any],
     strategy_routes: list[dict[str, Any]],
 ) -> dict[str, Any]:
     challenge = goal.get("challenge", {})
@@ -246,6 +260,7 @@ def build_summary(
     decision_ladder_summary = decision_ladder.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
+    post_fresh_summary = post_fresh_checklist.get("summary", {})
     route_counts = dict(sorted(Counter(str(row.get("route_category", "")) for row in strategy_routes).items()))
     return {
         "current_project_stage": str(goal.get("project_stage_label", "")),
@@ -402,6 +417,23 @@ def build_summary(
         "objective_execution_manual_execution_allowed_count": int_or_zero(
             execution_summary.get("manual_execution_allowed_count")
         ),
+        "post_fresh_recompute_step_count": int_or_zero(post_fresh_summary.get("recompute_step_count")),
+        "post_fresh_recompute_m14_script_step_count": int_or_zero(
+            post_fresh_summary.get("m14_script_step_count")
+        ),
+        "post_fresh_recompute_acceptance_gate_count": int_or_zero(
+            post_fresh_summary.get("acceptance_gate_count")
+        ),
+        "post_fresh_recompute_requires_fresh_refresh_step_count": int_or_zero(
+            post_fresh_summary.get("requires_m12_47_fresh_refresh_step_count")
+        ),
+        "post_fresh_recompute_two_pass_required": bool(
+            post_fresh_summary.get("two_pass_stabilization_required", False)
+        ),
+        "post_fresh_recompute_manual_m12_37_once_allowed": False,
+        "post_fresh_recompute_parameter_mutation_allowed_count": int_or_zero(
+            post_fresh_summary.get("parameter_mutation_allowed_count")
+        ),
         "rescue_actionable_before_10d_count": int_or_zero(
             backlog_summary.get("actionable_before_10d_count")
         ),
@@ -431,6 +463,7 @@ def build_stage_assessment(
     decision_ladder: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
+    post_fresh_checklist: dict[str, Any],
     summary: dict[str, Any],
 ) -> dict[str, Any]:
     post_refresh_status = (
@@ -464,6 +497,7 @@ def build_stage_assessment(
             if summary["objective_execution_waiting_for_fresh_refresh_action_count"]
             else "ready_queue_no_fresh_refresh_blocker"
         ),
+        "post_fresh_recompute_status": "checklist_ready_waiting_for_m12_47_fresh_refresh",
         "broker_status": "dry_run_preview_only_not_broker_paper",
         "next_required_evidence": [
             (
@@ -513,6 +547,12 @@ def build_stage_assessment(
                 f"{summary['objective_execution_waiting_for_fresh_refresh_action_count']} waiting for a fresh refresh."
             ),
             (
+                f"Post-fresh-refresh recompute checklist has {summary['post_fresh_recompute_step_count']} steps, "
+                f"{summary['post_fresh_recompute_m14_script_step_count']} read-only M14 script steps, "
+                f"{summary['post_fresh_recompute_acceptance_gate_count']} acceptance gates, and "
+                f"two-pass stabilization required={summary['post_fresh_recompute_two_pass_required']}."
+            ),
+            (
                 f"{summary['broker_dry_run_blocked_count']} broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
             ),
         ],
@@ -527,6 +567,7 @@ def build_stage_assessment(
         "strategy_decision_ladder_plain_result": str(decision_ladder.get("plain_language_result", "")),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
         "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
+        "post_fresh_recompute_plain_result": str(post_fresh_checklist.get("plain_language_result", "")),
     }
 
 
@@ -710,6 +751,25 @@ def build_objective_execution_plan(objective_execution: dict[str, Any]) -> dict[
     }
 
 
+def build_post_fresh_refresh_recompute_checklist(checklist: dict[str, Any]) -> dict[str, Any]:
+    summary = checklist.get("summary", {})
+    return {
+        "recompute_step_count": int_or_zero(summary.get("recompute_step_count")),
+        "m14_script_step_count": int_or_zero(summary.get("m14_script_step_count")),
+        "acceptance_gate_count": int_or_zero(summary.get("acceptance_gate_count")),
+        "requires_m12_47_fresh_refresh_step_count": int_or_zero(
+            summary.get("requires_m12_47_fresh_refresh_step_count")
+        ),
+        "two_pass_stabilization_required": bool(summary.get("two_pass_stabilization_required", False)),
+        "fresh_refresh_observed": bool(summary.get("fresh_refresh_observed", False)),
+        "source_quote": str(summary.get("source_quote", "")),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "parameter_mutation_allowed_count": int_or_zero(summary.get("parameter_mutation_allowed_count")),
+        "plain_language_result": str(checklist.get("plain_language_result", "")),
+    }
+
+
 def build_strategy_routes(
     *,
     action_matrix: list[dict[str, Any]],
@@ -873,6 +933,10 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"Objective execution plan has {summary['objective_execution_action_count']} actions, "
         f"{summary['objective_execution_p0_action_count']} P0, and "
         f"{summary['objective_execution_waiting_for_fresh_refresh_action_count']} waiting for fresh refresh. "
+        f"Post-fresh-refresh recompute checklist has {summary['post_fresh_recompute_step_count']} steps, "
+        f"{summary['post_fresh_recompute_m14_script_step_count']} read-only M14 script steps, "
+        f"{summary['post_fresh_recompute_acceptance_gate_count']} acceptance gates, and "
+        f"two-pass stabilization required={summary['post_fresh_recompute_two_pass_required']}. "
         f"Broker readiness stays dry-run preview only: {summary['broker_dry_run_ready_count']} ready and {summary['broker_dry_run_blocked_count']} blocked; "
         "manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled."
     )
@@ -908,6 +972,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
         f"- Objective execution manual actions allowed: `{summary['objective_execution_manual_execution_allowed_count']}`",
+        f"- Post-fresh recompute steps/M14 scripts/gates: `{summary['post_fresh_recompute_step_count']}/{summary['post_fresh_recompute_m14_script_step_count']}/{summary['post_fresh_recompute_acceptance_gate_count']}`",
+        f"- Post-fresh two-pass stabilization required: `{summary['post_fresh_recompute_two_pass_required']}`",
         f"- Broker dry-run ready/blocked: `{summary['broker_dry_run_ready_count']}/{summary['broker_dry_run_blocked_count']}`",
         "- Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.",
         "",
@@ -928,6 +994,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Strategy decision ladder status: `{payload['stage_assessment']['strategy_decision_ladder_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
+        f"- Post-fresh recompute status: `{payload['stage_assessment']['post_fresh_recompute_status']}`",
         f"- Broker status: `{payload['stage_assessment']['broker_status']}`",
         "",
         "## Route Counts",

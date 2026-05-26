@@ -76,6 +76,11 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["objective_execution_p0_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_waiting_for_fresh_refresh_action_count"], 5)
             self.assertEqual(result["summary"]["objective_execution_manual_execution_allowed_count"], 0)
+            self.assertEqual(result["summary"]["post_fresh_recompute_step_count"], 20)
+            self.assertEqual(result["summary"]["post_fresh_recompute_m14_script_step_count"], 19)
+            self.assertEqual(result["summary"]["post_fresh_recompute_acceptance_gate_count"], 7)
+            self.assertTrue(result["summary"]["post_fresh_recompute_two_pass_required"])
+            self.assertEqual(result["summary"]["post_fresh_recompute_parameter_mutation_allowed_count"], 0)
             self.assertEqual(result["summary"]["broker_dry_run_ready_count"], 1)
             self.assertEqual(result["summary"]["broker_dry_run_blocked_count"], 1)
             self.assertFalse(result["summary"]["can_start_broker_paper"])
@@ -166,6 +171,11 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["objective_execution_plan"]["execution_action_count"], 7)
             self.assertEqual(result["objective_execution_plan"]["p0_action_count"], 5)
             self.assertEqual(result["objective_execution_plan"]["manual_execution_allowed_count"], 0)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["recompute_step_count"], 20)
+            self.assertEqual(result["post_fresh_refresh_recompute_checklist"]["m14_script_step_count"], 19)
+            self.assertFalse(
+                result["post_fresh_refresh_recompute_checklist"]["manual_m12_37_once_allowed"]
+            )
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertEqual(
                 result["rescue_policy"]["policy"],
@@ -188,6 +198,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy decision rows/approved-next/rescue/final-discard: `5/2/2/0`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
+            self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `20/19/7`", md)
             self.assertIn("approved_internal_sim_continue", md)
 
     def test_rejects_live_or_manual_once_boundary(self) -> None:
@@ -214,6 +225,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_decision_ladder_path = root / "strategy_decision_ladder.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
+        post_fresh_checklist_path = root / "post_fresh_checklist.json"
         config_path = root / "config.json"
 
         goal_path.write_text(
@@ -528,6 +540,24 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        post_fresh_checklist_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "recompute_step_count": 20,
+                        "m14_script_step_count": 19,
+                        "acceptance_gate_count": 7,
+                        "requires_m12_47_fresh_refresh_step_count": 20,
+                        "two_pass_stabilization_required": True,
+                        "fresh_refresh_observed": False,
+                        "source_quote": "fallback_quotes_only",
+                        "parameter_mutation_allowed_count": 0,
+                    },
+                    "plain_language_result": "Post-fresh checklist fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -547,6 +577,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_decision_ladder": str(strategy_decision_ladder_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
+                        "m14_post_fresh_refresh_recompute_checklist": str(post_fresh_checklist_path),
                     },
                     "outputs": {
                         "assessment_json": str(root / "assessment.json"),
