@@ -1,6 +1,6 @@
 # M14 Strategy Evidence Gap Matrix
 
-- Generated at: `2026-05-26T16:30:00Z`
+- Generated at: `2026-05-26T23:59:52Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
 - Strategy gap rows: `20`

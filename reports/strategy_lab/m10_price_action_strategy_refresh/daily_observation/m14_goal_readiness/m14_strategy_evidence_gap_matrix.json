@@ -1712,7 +1712,7 @@
       "strategy_id": "M10-PA-016"
     }
   ],
-  "generated_at": "2026-05-26T16:30:00Z",
+  "generated_at": "2026-05-26T23:59:52Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -1785,7 +1785,7 @@
     "parameter_mutation_allowed_count": 0,
     "parameter_shadow_variant_count": 14,
     "post_fresh_recompute_acceptance_gate_count": 7,
-    "post_fresh_recompute_step_count": 21,
+    "post_fresh_recompute_step_count": 22,
     "promotion_candidate_count": 0,
     "requires_m12_47_fresh_refresh_count": 12,
     "rescue_10_day_ab_gap_count": 10,

@@ -471,6 +471,13 @@ def build_recompute_steps(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "Final execution queue pass after the final audit.",
         ),
         (
+            "strategy_evidence_gap_burndown_refresh",
+            "decision_stabilization",
+            "read_only_script",
+            "python scripts/run_m14_strategy_evidence_gap_burndown.py",
+            "Refresh the ordered strategy evidence gap burn-down queue before final assessment.",
+        ),
+        (
             "project_stage_assessment_refresh",
             "final_assessment",
             "read_only_script",
@@ -524,6 +531,7 @@ def acceptance_hint_for(step_id: str, summary: dict[str, Any]) -> str:
             f"final discard allowed should remain 0 until rescue routes and 10-day A/B evidence are exhausted."
         ),
         "strategy_evidence_gap_matrix_refresh": "open-gap rows should explain exactly which evidence remains missing per strategy.",
+        "strategy_evidence_gap_burndown_refresh": "P0/P1/P2 rows should translate open gaps into an ordered rescue/internal-sim queue.",
         "project_stage_assessment_refresh": "goal_complete must remain false unless objective audit proves every requirement.",
     }
     return hints.get(step_id, "Regenerate the artifact and inspect summary plus hard-boundary flags.")
