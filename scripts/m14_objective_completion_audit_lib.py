@@ -30,6 +30,7 @@ class ObjectiveCompletionAuditConfig:
     strategy_source_recheck_triage_path: Path
     strategy_source_reextract_plan_path: Path
     strategy_source_reextract_review_path: Path
+    strategy_source_visual_alignment_gate_path: Path
     rescue_external_reference_map_path: Path
     broker_readiness_plan_path: Path
     audit_json_path: Path
@@ -78,6 +79,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ObjectiveCompletionAu
         ),
         strategy_source_reextract_review_path=resolve_repo_path(
             inputs["m14_strategy_source_reextract_review"]
+        ),
+        strategy_source_visual_alignment_gate_path=resolve_repo_path(
+            inputs["m14_strategy_source_visual_alignment_gate"]
         ),
         rescue_external_reference_map_path=resolve_repo_path(inputs["m14_rescue_external_reference_map"]),
         broker_readiness_plan_path=resolve_repo_path(inputs["m14_2_broker_readiness_plan"]),
@@ -132,6 +136,7 @@ def run_m14_objective_completion_audit(
     source_recheck = read_json(config.strategy_source_recheck_triage_path)
     source_reextract_plan = read_json(config.strategy_source_reextract_plan_path)
     source_reextract_review = read_json(config.strategy_source_reextract_review_path)
+    source_visual_alignment_gate = read_json(config.strategy_source_visual_alignment_gate_path)
     external_map = read_json(config.rescue_external_reference_map_path)
     broker_plan = read_json(config.broker_readiness_plan_path)
 
@@ -149,6 +154,7 @@ def run_m14_objective_completion_audit(
         source_recheck=source_recheck,
         source_reextract_plan=source_reextract_plan,
         source_reextract_review=source_reextract_review,
+        source_visual_alignment_gate=source_visual_alignment_gate,
         external_map=external_map,
         broker_plan=broker_plan,
     )
@@ -200,6 +206,9 @@ def run_m14_objective_completion_audit(
             ),
             "m14_strategy_source_reextract_review": project_path(
                 config.strategy_source_reextract_review_path
+            ),
+            "m14_strategy_source_visual_alignment_gate": project_path(
+                config.strategy_source_visual_alignment_gate_path
             ),
             "m14_rescue_external_reference_map": project_path(config.rescue_external_reference_map_path),
             "m14_2_broker_readiness_plan": project_path(config.broker_readiness_plan_path),
@@ -264,6 +273,7 @@ def build_summary(
     source_recheck: dict[str, Any],
     source_reextract_plan: dict[str, Any],
     source_reextract_review: dict[str, Any],
+    source_visual_alignment_gate: dict[str, Any],
     external_map: dict[str, Any],
     broker_plan: dict[str, Any],
 ) -> dict[str, Any]:
@@ -281,6 +291,7 @@ def build_summary(
     source_recheck_summary = source_recheck.get("summary", {})
     source_reextract_summary = source_reextract_plan.get("summary", {})
     source_reextract_review_summary = source_reextract_review.get("summary", {})
+    source_visual_alignment_summary = source_visual_alignment_gate.get("summary", {})
     external_summary = external_map.get("summary", {})
     parameter_shadow_mutation_allowed_count = int_or_zero(
         stage_summary.get(
@@ -716,6 +727,84 @@ def build_summary(
                 source_reextract_review_summary.get("parameter_mutation_allowed_now_count"),
             )
         ),
+        "strategy_source_visual_alignment_gate_row_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_gate_row_count",
+                source_visual_alignment_summary.get("source_visual_alignment_gate_row_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_candidate_strategy_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_candidate_strategy_count",
+                source_visual_alignment_summary.get("candidate_strategy_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_case_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_case_count",
+                source_visual_alignment_summary.get("visual_case_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_checksum_match_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_checksum_match_count",
+                source_visual_alignment_summary.get("checksum_match_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_ready_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_ready_count",
+                source_visual_alignment_summary.get("ready_for_manual_visual_alignment_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_manual_confirmation_required_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_manual_confirmation_required_count",
+                source_visual_alignment_summary.get("manual_visual_confirmation_required_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_future_spec_blocked_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_future_spec_blocked_count",
+                source_visual_alignment_summary.get("future_spec_blocked_until_visual_confirmation_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_current_asset_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_current_asset_count",
+                source_visual_alignment_summary.get("current_worktree_asset_exists_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_old_asset_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_old_asset_count",
+                source_visual_alignment_summary.get("old_worktree_asset_exists_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_missing_asset_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_missing_asset_count",
+                source_visual_alignment_summary.get("missing_asset_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_can_draft_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_can_draft_now_count",
+                source_visual_alignment_summary.get("can_draft_future_source_reextract_spec_now_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_can_create_strategy_now_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_can_create_strategy_now_count",
+                source_visual_alignment_summary.get("can_create_strategy_now_count"),
+            )
+        ),
+        "strategy_source_visual_alignment_parameter_mutation_allowed_count": int_or_zero(
+            stage_summary.get(
+                "strategy_source_visual_alignment_parameter_mutation_allowed_count",
+                source_visual_alignment_summary.get("parameter_mutation_allowed_now_count"),
+            )
+        ),
         "fresh_refresh_observed": bool(
             activation_summary.get(
                 "fresh_refresh_observed",
@@ -921,6 +1010,7 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             if summary["strategy_source_recheck_row_count"] > 0
             and summary["strategy_source_reextract_plan_row_count"] > 0
             and summary["strategy_source_reextract_review_row_count"] > 0
+            and summary["strategy_source_visual_alignment_gate_row_count"] > 0
             else "blocked",
             (
                 f"Source recheck triage has {summary['strategy_source_recheck_row_count']} artifact-only rows, "
@@ -938,23 +1028,30 @@ def build_requirement_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['strategy_source_reextract_review_answer_count']} source-review answers, "
                 f"{summary['strategy_source_reextract_review_future_spec_draftable_count']} draftable future specs, and "
                 f"{summary['strategy_source_reextract_review_visual_required_count']} visual-review-required rows; "
+                f"source visual alignment gate has {summary['strategy_source_visual_alignment_gate_row_count']} rows, "
+                f"{summary['strategy_source_visual_alignment_case_count']} visual cases, "
+                f"{summary['strategy_source_visual_alignment_checksum_match_count']} checksum matches, "
+                f"{summary['strategy_source_visual_alignment_ready_count']} ready-for-manual-alignment rows, and "
+                f"{summary['strategy_source_visual_alignment_manual_confirmation_required_count']} manual-confirmation-required rows; "
                 f"create/close/promote/discard/mutation allowed now is "
-                f"{summary['strategy_source_reextract_review_can_create_strategy_now_count']}/"
+                f"{summary['strategy_source_visual_alignment_can_create_strategy_now_count']}/"
                 f"{summary['strategy_source_reextract_review_can_close_gap_now_count']}/"
                 f"{summary['strategy_source_reextract_review_can_promote_now_count']}/"
                 f"{summary['strategy_source_reextract_review_can_discard_now_count']}/"
-                f"{summary['strategy_source_reextract_review_parameter_mutation_allowed_count']}."
+                f"{summary['strategy_source_visual_alignment_parameter_mutation_allowed_count']}."
             ),
             ""
             if summary["strategy_source_recheck_row_count"] > 0
             and summary["strategy_source_reextract_plan_row_count"] > 0
             and summary["strategy_source_reextract_review_row_count"] > 0
-            else "Source recheck triage, source reextract plan, or source reextract review artifact is missing.",
+            and summary["strategy_source_visual_alignment_gate_row_count"] > 0
+            else "Source recheck triage, source reextract plan, source reextract review, or source visual alignment gate artifact is missing.",
             "Use this queue to review original source refs and visual packs; do not create, promote, discard, or mutate a strategy from source review alone.",
             [
                 "m14_strategy_source_recheck_triage",
                 "m14_strategy_source_reextract_plan",
                 "m14_strategy_source_reextract_review",
+                "m14_strategy_source_visual_alignment_gate",
             ],
         ),
         requirement_row(
@@ -1074,7 +1171,11 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['strategy_source_reextract_review_task_count']} source-review tasks; "
         f"the source reextract review now carries {summary['strategy_source_reextract_review_row_count']} packets, "
         f"{summary['strategy_source_reextract_review_source_atom_count']} source-backed atoms, and "
-        f"{summary['strategy_source_reextract_review_future_spec_draftable_count']} draftable future specs after visual alignment. "
+        f"{summary['strategy_source_reextract_review_future_spec_draftable_count']} draftable future specs after visual alignment; "
+        f"the visual alignment gate has {summary['strategy_source_visual_alignment_gate_row_count']} rows, "
+        f"{summary['strategy_source_visual_alignment_case_count']} visual cases, and "
+        f"{summary['strategy_source_visual_alignment_ready_count']} rows ready for manual visual alignment, "
+        f"but {summary['strategy_source_visual_alignment_manual_confirmation_required_count']} still require manual visual confirmation. "
         f"Evidence gap matrix still has {summary['strategy_evidence_open_gap_row_count']} open rows, "
         f"including {summary['strategy_evidence_requires_fresh_refresh_count']} fresh-refresh waits, "
         f"{summary['strategy_evidence_wait_first_ledger_gap_count']} first-ledger gaps, and "
@@ -1106,6 +1207,8 @@ def build_audit_md(payload: dict[str, Any]) -> str:
         f"- Source recheck rows/future-reextract: `{summary['strategy_source_recheck_row_count']}/{summary['strategy_source_recheck_future_reextract_candidate_count']}`",
         f"- Source reextract plan rows/future/tasks/questions: `{summary['strategy_source_reextract_plan_row_count']}/{summary['strategy_source_reextract_future_candidate_count']}/{summary['strategy_source_reextract_review_task_count']}/{summary['strategy_source_reextract_review_question_count']}`",
         f"- Source reextract review packets/atoms/answers/draftable/visual-required: `{summary['strategy_source_reextract_review_row_count']}/{summary['strategy_source_reextract_review_source_atom_count']}/{summary['strategy_source_reextract_review_answer_count']}/{summary['strategy_source_reextract_review_future_spec_draftable_count']}/{summary['strategy_source_reextract_review_visual_required_count']}`",
+        f"- Source visual alignment gate rows/cases/checksum/ready/manual-required: `{summary['strategy_source_visual_alignment_gate_row_count']}/{summary['strategy_source_visual_alignment_case_count']}/{summary['strategy_source_visual_alignment_checksum_match_count']}/{summary['strategy_source_visual_alignment_ready_count']}/{summary['strategy_source_visual_alignment_manual_confirmation_required_count']}`",
+        f"- Source visual alignment draft/create/mutation allowed: `{summary['strategy_source_visual_alignment_can_draft_now_count']}/{summary['strategy_source_visual_alignment_can_create_strategy_now_count']}/{summary['strategy_source_visual_alignment_parameter_mutation_allowed_count']}`",
         f"- Fresh refresh observed: `{summary['fresh_refresh_observed']}`",
         f"- Post-refresh waiting rows: `{summary['post_refresh_waiting_count']}`",
         f"- Parameter activation candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",

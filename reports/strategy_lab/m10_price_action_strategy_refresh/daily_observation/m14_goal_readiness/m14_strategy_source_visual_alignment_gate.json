@@ -1,0 +1,514 @@
+{
+  "alignment_rows": [
+    {
+      "alignment_id": "source_visual_alignment::M10-PA-003",
+      "all_assets_available": true,
+      "all_checksums_match": true,
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "can_close_gap_now": false,
+      "can_create_strategy_now": false,
+      "can_discard_now": false,
+      "can_draft_future_source_reextract_spec_now": false,
+      "can_promote_now": false,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "case_rows": [
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "case_id": "M10-PA-003-positive-001",
+          "case_type": "positive",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Clear channel break followed by opposite follow-through.",
+            "Late entry after a climactic channel extension without room to target."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp",
+          "evidence_page": 987,
+          "evidence_video_id": "video_014E",
+          "matched_terms": [
+            "tight channel",
+            "higher time frame",
+            "only look",
+            "紧密通道"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+            "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0987_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014E_trends_tight_channel_small_pullback.md",
+          "case_id": "M10-PA-003-positive-002",
+          "case_type": "positive",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Clear channel break followed by opposite follow-through.",
+            "Late entry after a climactic channel extension without room to target."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp",
+          "evidence_page": 988,
+          "evidence_video_id": "video_014E",
+          "matched_terms": [
+            "tight channel",
+            "higher time frame",
+            "紧密通道"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+            "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014E/part1_p0988_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_017A_tight_channels_micro_channels_definitions.md",
+          "case_id": "M10-PA-003-positive-003",
+          "case_type": "positive",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Clear channel break followed by opposite follow-through.",
+            "Late entry after a climactic channel extension without room to target."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp",
+          "evidence_page": 1397,
+          "evidence_video_id": "video_017A",
+          "matched_terms": [
+            "tight channel",
+            "higher time frame",
+            "only look",
+            "紧密通道"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Trade with the channel direction after small pullbacks, avoiding early countertrend fades.",
+            "Treat first reversal attempts as minor unless there is a strong breakout of the channel."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_017A/part1_p1397_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+          "case_id": "M10-PA-003-counterexample-001",
+          "case_type": "counterexample",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Clear channel break followed by opposite follow-through.",
+            "Late entry after a climactic channel extension without room to target."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp",
+          "evidence_page": 936,
+          "evidence_video_id": "video_014C",
+          "matched_terms": [
+            "trading range",
+            "broad"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Late entry after a climactic channel extension without room to target."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0936_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_014C_trends_types_spike_channel_traps.md",
+          "case_id": "M10-PA-003-boundary-001",
+          "case_type": "boundary",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Clear channel break followed by opposite follow-through.",
+            "Late entry after a climactic channel extension without room to target."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp",
+          "evidence_page": 942,
+          "evidence_video_id": "video_014C",
+          "matched_terms": [
+            "usually",
+            "sometimes",
+            "sometimes",
+            "usually",
+            "可能",
+            "通常"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Clear channel break followed by opposite follow-through."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_014C/part1_p0942_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        }
+      ],
+      "catalog_title": "Tight Channel Trend Continuation",
+      "future_spec_gate_state": "blocked_until_manual_visual_confirmation",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "manual_visual_confirmation_required": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "priority": "P2",
+      "real_order": false,
+      "required_case_mix_ready": true,
+      "review_id": "source_reextract_review::M10-PA-003",
+      "setup_hypothesis": "tight_channel_small_pullback_trend_continuation",
+      "source_backed_atom_count": 5,
+      "source_review_answer_count": 3,
+      "strategy_id": "M10-PA-003",
+      "strategy_state_mutation": false,
+      "visual_alignment_questions": [
+        {
+          "acceptance_signal": "Small pullbacks stay shallow and mostly fail to create attractive counter-trend swings.",
+          "question": "Does the case visibly show a tight channel or small-pullback trend rather than an ordinary broad channel?",
+          "question_id": "tight_channel_geometry_visible"
+        },
+        {
+          "acceptance_signal": "Trend direction and follow-through remain dominant enough to block counter-trend entries.",
+          "question": "Does the chart context support treating the tight channel like a higher-timeframe breakout?",
+          "question_id": "higher_timeframe_breakout_context"
+        },
+        {
+          "acceptance_signal": "Opposite breakout/follow-through is visually distinguishable from normal small pullback noise.",
+          "question": "Do counterexample and boundary cases show channel break or opposite follow-through conditions clearly enough to define invalidation?",
+          "question_id": "failure_boundary_visible"
+        }
+      ],
+      "visual_alignment_state": "ready_for_manual_visual_alignment",
+      "visual_pack_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-003.json",
+      "visual_pack_present": true,
+      "visual_pack_review_status": "agent_selected_pending_manual_review",
+      "visual_pack_status": "visual_pack_ready"
+    },
+    {
+      "alignment_id": "source_visual_alignment::M10-PA-010",
+      "all_assets_available": true,
+      "all_checksums_match": true,
+      "broker_connection": false,
+      "broker_or_live_enabled": false,
+      "broker_readiness_status_mutation": false,
+      "can_close_gap_now": false,
+      "can_create_strategy_now": false,
+      "can_discard_now": false,
+      "can_draft_future_source_reextract_spec_now": false,
+      "can_promote_now": false,
+      "case_count": 5,
+      "case_counts": {
+        "boundary": 1,
+        "counterexample": 1,
+        "positive": 3
+      },
+      "case_rows": [
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+          "case_id": "M10-PA-010-positive-001",
+          "case_type": "positive",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Climax continues as a strong trend without reversal follow-through.",
+            "Countertrend entry before the trend shows exhaustion."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0877_crop.webp",
+          "evidence_page": 877,
+          "evidence_video_id": "video_029E",
+          "matched_terms": [
+            "climax",
+            "高潮"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+            "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0877_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029C_climaxes_climactic_reversals_gaps_exhaustion_measuring.md",
+          "case_id": "M10-PA-010-positive-002",
+          "case_type": "positive",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Climax continues as a strong trend without reversal follow-through.",
+            "Countertrend entry before the trend shows exhaustion."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/part2_p0835_crop.webp",
+          "evidence_page": 835,
+          "evidence_video_id": "video_029C",
+          "matched_terms": [
+            "climax",
+            "climactic reversal",
+            "高潮"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+            "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029C/part2_p0835_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029E_climaxes_options_firms_failed_consecutive_climaxes.md",
+          "case_id": "M10-PA-010-positive-003",
+          "case_type": "positive",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Climax continues as a strong trend without reversal follow-through.",
+            "Countertrend entry before the trend shows exhaustion."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0885_crop.webp",
+          "evidence_page": 885,
+          "evidence_video_id": "video_029E",
+          "matched_terms": [
+            "climax",
+            "exhaustion",
+            "tbtl",
+            "高潮"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Look for late-trend final flag or climax behavior, then require a reversal entry with follow-through.",
+            "Treat TBTL as a testing and review hypothesis, not a standalone entry without context."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029E/part2_p0885_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+          "case_id": "M10-PA-010-counterexample-001",
+          "case_type": "counterexample",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Climax continues as a strong trend without reversal follow-through.",
+            "Countertrend entry before the trend shows exhaustion."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0807_crop.webp",
+          "evidence_page": 807,
+          "evidence_video_id": "video_029A",
+          "matched_terms": [
+            "every trend bar",
+            "continues"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Countertrend entry before the trend shows exhaustion."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0807_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        },
+        {
+          "brooks_unit_ref": "raw:knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/units/video_029A_climaxes_definition_breakout_exhaustion_vacuum_support_resistance.md",
+          "case_id": "M10-PA-010-boundary-001",
+          "case_type": "boundary",
+          "checksum_match": true,
+          "disqualifiers": [
+            "Climax continues as a strong trend without reversal follow-through.",
+            "Countertrend entry before the trend shows exhaustion."
+          ],
+          "evidence_asset_location": "old_m10_worktree",
+          "evidence_image_logical_path": "knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0803_crop.webp",
+          "evidence_page": 803,
+          "evidence_video_id": "video_029A",
+          "matched_terms": [
+            "acceleration",
+            "usually fails",
+            "usually",
+            "can be",
+            "可能",
+            "通常"
+          ],
+          "ohlcv_approximation_risk": "High visual dependency: OHLCV can approximate sequence and extremes, but cannot confirm drawn channel quality, trapped-trader context, or chart readability without image review.",
+          "pack_checksum_resolved": true,
+          "pack_evidence_exists": true,
+          "pattern_decision_points": [
+            "Match the Brooks v2 chart context before treating the setup as mechanically testable.",
+            "Confirm the pattern geometry before translating it into OHLCV approximation rules.",
+            "Climax continues as a strong trend without reversal follow-through."
+          ],
+          "resolved_evidence_path": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh/knowledge/raw/brooks/transcribed_v2/al_brooks_price_action_course_v2/assets/evidence/video_029A/part2_p0803_crop.webp",
+          "review_status": "agent_selected_pending_manual_review"
+        }
+      ],
+      "catalog_title": "Final Flag or Climax TBTL Reversal",
+      "future_spec_gate_state": "blocked_until_manual_visual_confirmation",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_m12_37_once_allowed": false,
+      "manual_visual_confirmation_required": true,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "parameter_mutation_allowed_now": false,
+      "priority": "P2",
+      "real_order": false,
+      "required_case_mix_ready": true,
+      "review_id": "source_reextract_review::M10-PA-010",
+      "setup_hypothesis": "climax_exhaustion_gap_tbtl_reversal",
+      "source_backed_atom_count": 5,
+      "source_review_answer_count": 3,
+      "strategy_id": "M10-PA-010",
+      "strategy_state_mutation": false,
+      "visual_alignment_questions": [
+        {
+          "acceptance_signal": "Follow-through, gap closure, support/resistance reaction, or failed-breakout behavior is visible.",
+          "question": "Does the visual case separate exhaustion climax behavior from measuring-gap continuation?",
+          "question_id": "climax_vs_measuring_gap_visible"
+        },
+        {
+          "acceptance_signal": "The post-climax reaction can be labeled as TBTL/TR evidence without forcing a reversal entry.",
+          "question": "Does the case support TBTL or trading-range expectation after the climax instead of immediate opposite-trend assumptions?",
+          "question_id": "tbtl_or_trading_range_context"
+        },
+        {
+          "acceptance_signal": "The chart makes entry route, risk, and follow-through confirmation visually distinct.",
+          "question": "Can early low-probability reversal entries be separated from confirmed opposite-breakout entries?",
+          "question_id": "early_vs_confirmed_reversal_split"
+        }
+      ],
+      "visual_alignment_state": "ready_for_manual_visual_alignment",
+      "visual_pack_path": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases/M10-PA-010.json",
+      "visual_pack_present": true,
+      "visual_pack_review_status": "agent_selected_pending_manual_review",
+      "visual_pack_status": "visual_pack_ready"
+    }
+  ],
+  "broker_connection": false,
+  "broker_readiness_status_mutation": false,
+  "gate_policy": {
+    "allowed_now": "Verify visual case pack coverage, evidence asset availability, checksum match, and source-backed visual questions.",
+    "completion_rule": "Rows can become ready for human visual alignment, but future specs remain blocked until manual visual confirmation is recorded.",
+    "not_allowed_now": "No strategy creation, gap closure, promotion, discard, parameter mutation, registry/account mutation, broker/live path, paper approval, or manual M12.37 once-mode.",
+    "purpose": "Check whether source-reextract candidates have enough local visual evidence for manual visual alignment."
+  },
+  "generated_at": "2026-05-26T14:52:41Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "broker_readiness_status_mutation": false,
+    "internal_simulated_account": true,
+    "live_execution": false,
+    "m12_account_specs_mutation": false,
+    "m13_registry_mutation": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "parameter_mutation": false,
+    "real_order": false,
+    "strategy_state_mutation": false
+  },
+  "input_refs": {
+    "m14_strategy_source_reextract_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_reextract_review.json",
+    "old_m10_worktree_root": "/home/hgl/projects/Price-Action-Trader-m10-price-action-strategy-refresh",
+    "visual_golden_case_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/visual_golden_cases"
+  },
+  "internal_simulated_account": true,
+  "live_execution": false,
+  "m12_account_specs_mutation": false,
+  "m13_registry_mutation": false,
+  "manual_m12_37_once": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "parameter_mutation": false,
+  "plain_language_result": "Source visual alignment gate checked 2 candidate rows with 10 visual cases. 2 rows have complete visual packs and checksum-matched local assets, but 2 rows still require manual visual confirmation before future specs. The gate cannot draft specs now, create strategies, close gaps, promote, discard, mutate parameters, run M12.37 manually, or enable broker/live.",
+  "real_order": false,
+  "schema_version": "m14.strategy-source-visual-alignment-gate.v1",
+  "stage": "M14.strategy_source_visual_alignment_gate",
+  "strategy_state_mutation": false,
+  "summary": {
+    "boundary_case_count": 2,
+    "broker_or_live_enabled": false,
+    "can_close_gap_now_count": 0,
+    "can_create_strategy_now_count": 0,
+    "can_discard_now_count": 0,
+    "can_draft_future_source_reextract_spec_now_count": 0,
+    "can_promote_now_count": 0,
+    "candidate_strategy_count": 2,
+    "case_type_counts": {
+      "boundary": 2,
+      "counterexample": 2,
+      "positive": 6
+    },
+    "challenge_progress_label": "10/10",
+    "checksum_match_count": 10,
+    "counterexample_case_count": 2,
+    "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+    "current_worktree_asset_exists_count": 0,
+    "evidence_asset_location_counts": {
+      "old_m10_worktree": 10
+    },
+    "future_spec_blocked_until_visual_confirmation_count": 2,
+    "m14_trading_date": "2026-05-22",
+    "manual_m12_37_once_allowed": false,
+    "manual_visual_confirmation_required_count": 2,
+    "missing_asset_count": 0,
+    "old_worktree_asset_exists_count": 10,
+    "pack_checksum_resolved_count": 10,
+    "pack_evidence_exists_count": 10,
+    "parameter_mutation_allowed_now_count": 0,
+    "positive_case_count": 6,
+    "ready_for_manual_visual_alignment_count": 2,
+    "source_visual_alignment_gate_row_count": 2,
+    "strategy_state_mutation_allowed": false,
+    "visual_case_count": 10
+  }
+}

@@ -142,6 +142,20 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_reextract_review_can_promote_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_reextract_review_can_discard_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_reextract_review_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_gate_row_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_case_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_positive_case_count"], 6)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_counterexample_case_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_boundary_case_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_checksum_match_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_ready_count"], 2)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_alignment_manual_confirmation_required_count"],
+                2,
+            )
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_can_draft_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_can_create_strategy_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -238,9 +252,19 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 result["stage_assessment"]["strategy_source_reextract_review_status"],
                 "source_reextract_review_ready_no_strategy_creation_or_mutation",
             )
+            self.assertEqual(
+                result["stage_assessment"]["strategy_source_visual_alignment_status"],
+                "source_visual_alignment_ready_for_manual_review_no_strategy_creation_or_mutation",
+            )
             self.assertTrue(
                 any(
                     "Strategy source reextract review has 2 packets" in item
+                    for item in result["stage_assessment"]["next_required_evidence"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    "Strategy source visual alignment gate has 2 rows" in item
                     for item in result["stage_assessment"]["next_required_evidence"]
                 )
             )
@@ -329,6 +353,26 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             )
             self.assertFalse(result["strategy_source_reextract_review"]["manual_m12_37_once_allowed"])
             self.assertFalse(result["strategy_source_reextract_review"]["strategy_state_mutation_allowed"])
+            self.assertEqual(
+                result["strategy_source_visual_alignment_gate"]["source_visual_alignment_gate_row_count"],
+                2,
+            )
+            self.assertEqual(result["strategy_source_visual_alignment_gate"]["visual_case_count"], 10)
+            self.assertEqual(result["strategy_source_visual_alignment_gate"]["checksum_match_count"], 10)
+            self.assertEqual(
+                result["strategy_source_visual_alignment_gate"]["ready_for_manual_visual_alignment_count"],
+                2,
+            )
+            self.assertEqual(
+                result["strategy_source_visual_alignment_gate"]["manual_visual_confirmation_required_count"],
+                2,
+            )
+            self.assertEqual(
+                result["strategy_source_visual_alignment_gate"]["can_draft_future_source_reextract_spec_now_count"],
+                0,
+            )
+            self.assertFalse(result["strategy_source_visual_alignment_gate"]["manual_m12_37_once_allowed"])
+            self.assertFalse(result["strategy_source_visual_alignment_gate"]["strategy_state_mutation_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -372,6 +416,8 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Strategy source reextract plan create/close/promote/discard/mutation allowed: `0/0/0/0/0`", md)
             self.assertIn("Strategy source reextract review packets/atoms/answers/draftable/visual-required: `2/10/6/2/2`", md)
             self.assertIn("Strategy source reextract review status: `source_reextract_review_ready_no_strategy_creation_or_mutation`", md)
+            self.assertIn("Strategy source visual alignment rows/cases/checksum/ready/manual-required: `2/10/10/2/2`", md)
+            self.assertIn("Strategy source visual alignment status: `source_visual_alignment_ready_for_manual_review_no_strategy_creation_or_mutation`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
             self.assertIn("Post-fresh recompute steps/M14 scripts/gates: `24/23/7`", md)
@@ -406,6 +452,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         strategy_source_recheck_triage_path = root / "strategy_source_recheck_triage.json"
         strategy_source_reextract_plan_path = root / "strategy_source_reextract_plan.json"
         strategy_source_reextract_review_path = root / "strategy_source_reextract_review.json"
+        strategy_source_visual_alignment_gate_path = root / "strategy_source_visual_alignment_gate.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         post_fresh_checklist_path = root / "post_fresh_checklist.json"
@@ -843,6 +890,32 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        strategy_source_visual_alignment_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_visual_alignment_gate_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "visual_case_count": 10,
+                        "positive_case_count": 6,
+                        "counterexample_case_count": 2,
+                        "boundary_case_count": 2,
+                        "checksum_match_count": 10,
+                        "current_worktree_asset_exists_count": 0,
+                        "old_worktree_asset_exists_count": 10,
+                        "missing_asset_count": 0,
+                        "ready_for_manual_visual_alignment_count": 2,
+                        "manual_visual_confirmation_required_count": 2,
+                        "future_spec_blocked_until_visual_confirmation_count": 2,
+                        "can_draft_future_source_reextract_spec_now_count": 0,
+                        "can_create_strategy_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source visual alignment fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -939,6 +1012,9 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_strategy_source_recheck_triage": str(strategy_source_recheck_triage_path),
                         "m14_strategy_source_reextract_plan": str(strategy_source_reextract_plan_path),
                         "m14_strategy_source_reextract_review": str(strategy_source_reextract_review_path),
+                        "m14_strategy_source_visual_alignment_gate": str(
+                            strategy_source_visual_alignment_gate_path
+                        ),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                         "m14_post_fresh_refresh_recompute_checklist": str(post_fresh_checklist_path),

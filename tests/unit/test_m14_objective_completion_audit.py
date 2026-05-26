@@ -72,6 +72,20 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_source_reextract_review_can_promote_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_reextract_review_can_discard_now_count"], 0)
             self.assertEqual(result["summary"]["strategy_source_reextract_review_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_gate_row_count"], 2)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_case_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_checksum_match_count"], 10)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_ready_count"], 2)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_alignment_manual_confirmation_required_count"],
+                2,
+            )
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_can_draft_now_count"], 0)
+            self.assertEqual(result["summary"]["strategy_source_visual_alignment_can_create_strategy_now_count"], 0)
+            self.assertEqual(
+                result["summary"]["strategy_source_visual_alignment_parameter_mutation_allowed_count"],
+                0,
+            )
             self.assertFalse(result["summary"]["fresh_refresh_observed"])
             self.assertEqual(result["summary"]["post_refresh_waiting_count"], 4)
             self.assertEqual(result["summary"]["external_reference_project_count"], 2)
@@ -118,6 +132,9 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("source reextract review has 2 packets", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("10 source-backed atoms", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn("2 draftable future specs", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("source visual alignment gate has 2 rows", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("10 visual cases", rows["source_reextract_path_ready"]["evidence"])
+            self.assertIn("2 manual-confirmation-required rows", rows["source_reextract_path_ready"]["evidence"])
             self.assertIn(
                 "m14_strategy_source_recheck_triage",
                 rows["source_reextract_path_ready"]["source_refs"],
@@ -128,6 +145,10 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             )
             self.assertIn(
                 "m14_strategy_source_reextract_review",
+                rows["source_reextract_path_ready"]["source_refs"],
+            )
+            self.assertIn(
+                "m14_strategy_source_visual_alignment_gate",
                 rows["source_reextract_path_ready"]["source_refs"],
             )
             self.assertEqual(rows["fresh_refresh_required_before_parameter_activation"]["state"], "blocked")
@@ -150,6 +171,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             self.assertIn("Source recheck rows/future-reextract: `3/1`", md)
             self.assertIn("Source reextract plan rows/future/tasks/questions: `3/1/7/6`", md)
             self.assertIn("Source reextract review packets/atoms/answers/draftable/visual-required: `2/10/6/2/2`", md)
+            self.assertIn("Source visual alignment gate rows/cases/checksum/ready/manual-required: `2/10/10/2/2`", md)
             self.assertIn("source_reextract_path_ready", md)
             self.assertIn("fresh_refresh_required_before_parameter_activation", md)
 
@@ -178,6 +200,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
         source_recheck_path = root / "source_recheck.json"
         source_reextract_plan_path = root / "source_reextract_plan.json"
         source_reextract_review_path = root / "source_reextract_review.json"
+        source_visual_alignment_gate_path = root / "source_visual_alignment_gate.json"
         external_map_path = root / "external_map.json"
         broker_plan_path = root / "broker_plan.json"
         config_path = root / "config.json"
@@ -438,6 +461,29 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        source_visual_alignment_gate_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "source_visual_alignment_gate_row_count": 2,
+                        "candidate_strategy_count": 2,
+                        "visual_case_count": 10,
+                        "checksum_match_count": 10,
+                        "ready_for_manual_visual_alignment_count": 2,
+                        "manual_visual_confirmation_required_count": 2,
+                        "future_spec_blocked_until_visual_confirmation_count": 2,
+                        "current_worktree_asset_exists_count": 0,
+                        "old_worktree_asset_exists_count": 10,
+                        "missing_asset_count": 0,
+                        "can_draft_future_source_reextract_spec_now_count": 0,
+                        "can_create_strategy_now_count": 0,
+                        "parameter_mutation_allowed_now_count": 0,
+                    },
+                    "plain_language_result": "Source visual alignment fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         external_map_path.write_text(
             json.dumps(
                 {
@@ -484,6 +530,7 @@ class M14ObjectiveCompletionAuditTest(unittest.TestCase):
                         "m14_strategy_source_recheck_triage": str(source_recheck_path),
                         "m14_strategy_source_reextract_plan": str(source_reextract_plan_path),
                         "m14_strategy_source_reextract_review": str(source_reextract_review_path),
+                        "m14_strategy_source_visual_alignment_gate": str(source_visual_alignment_gate_path),
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_2_broker_readiness_plan": str(broker_plan_path),
                     },
