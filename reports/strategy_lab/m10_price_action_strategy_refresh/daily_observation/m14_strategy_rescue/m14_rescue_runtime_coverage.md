@@ -1,8 +1,8 @@
 # M14 Rescue Runtime Coverage
 
-- Generated at: `2026-05-26T12:00:00Z`
-- Registered rescue strategies connected: `9/9`
-- Registered rescue accounts: `10`
+- Generated at: `2026-05-26T18:45:00Z`
+- Registered rescue strategies connected: `10/10`
+- Registered rescue accounts: `11`
 - Planned rescue/rebuild actions covered: `10/10`
 - Boundary: internal simulated only; no broker connection, no real orders, no live execution.
 - Policy: Connected does not mean passed or approved; 10 trading-day A/B ledger evidence is still required.
@@ -68,7 +68,16 @@
 - Parent: `M10-PA-012`
 - Detector: `m14_rescue_orb_quality_filter_adapter` / `connected`
 - Runtime ids: `M10-PA-012-m14-modify-20260522-5m`
-- Input source types: `m14_rescue_parent_quality_filter_adapter`
+- Input source types: `m14_rescue_orb_quality_filter_adapter`
+- Coverage: `connected_not_promoted`
+- Promotion status: `not_promoted_requires_10_day_ab_evidence`
+
+### M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow
+
+- Parent: `M10-PA-012`
+- Detector: `m14_rescue_pa012_target_stop_risk_normalized_1_0r_adapter` / `connected`
+- Runtime ids: `M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m`
+- Input source types: `m14_rescue_pa012_target_stop_risk_normalized_1_0r_adapter`
 - Coverage: `connected_not_promoted`
 - Promotion status: `not_promoted_requires_10_day_ab_evidence`
 
@@ -146,7 +155,7 @@
 - Plan lane: `rescue_candidate`
 - Next variant: `M10-PA-012-m14-modify-20260522`
 - Coverage: `covered_by_rescue_runtime`
-- Covered by: `M10-PA-012-m14-modify-20260522`
+- Covered by: `M10-PA-012-m14-modify-20260522, M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow`
 
 ### M10-PA-013
 
@@ -164,4 +173,4 @@
 
 ## Summary
 
-Registered rescue runtime coverage is 9/9 strategies and 10 accounts. Planned rescue/rebuild action coverage is 10/10. Connected does not mean passed or approved; every rescue runtime still needs 10 trading-day A/B ledger evidence. No broker connection, real order, live execution, or paper-trading approval was enabled.
+Registered rescue runtime coverage is 10/10 strategies and 11 accounts. Planned rescue/rebuild action coverage is 10/10. Connected does not mean passed or approved; every rescue runtime still needs 10 trading-day A/B ledger evidence. No broker connection, real order, live execution, or paper-trading approval was enabled.

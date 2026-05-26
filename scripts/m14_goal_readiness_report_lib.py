@@ -515,13 +515,13 @@ def build_next_actions(payload: dict[str, Any]) -> list[dict[str, str]]:
             5,
             {
                 "priority": "P0",
-                "action": "Prepare the PA012 target/stop shadow normalization candidate for fresh-data A/B evidence",
+                "action": "Collect first fresh M13 ledger row for the PA012 target/stop normalized shadow runtime",
                 "evidence": (
                     f"{shadow_normalization['best_variant_candidate_row_count']}/"
                     f"{shadow_normalization['source_candidate_row_count']} eligible rows pass the best shadow variant; "
                     f"best variants {shadow_normalization['best_variant_id_counts']}"
                 ),
-                "boundary": "Shadow candidate is not a runtime change, promotion, or broker approval.",
+                "boundary": "Connected shadow runtime is still simulated-only and requires 10 rescue A/B trading days before review.",
             },
         )
     if not payload["challenge"]["m12_current_day_runtime_ready"]:

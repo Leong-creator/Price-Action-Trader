@@ -243,7 +243,7 @@ def classify_rescue_issue(
         return (
             "missing_rescue_ledger",
             "P0",
-            "Fix the rescue runtime ledger path before waiting for more trading days.",
+            "Let the next M12.47-owned refresh generate the first M13 rescue ledger row; if it is still absent after that run, audit the ledger path.",
         )
     if evidence_status == "evidence_ready_for_manual_review" or remaining_days <= 0:
         return (

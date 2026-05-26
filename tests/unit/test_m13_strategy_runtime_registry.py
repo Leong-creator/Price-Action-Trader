@@ -9,6 +9,10 @@ from scripts.m13_daily_strategy_test_runner_lib import (
 
 
 class M13StrategyRuntimeRegistryTest(unittest.TestCase):
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_ID = (
+        "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
+    )
+
     def test_registry_declares_required_daily_states(self):
         config = load_config()
         registry = load_registry(config.registry_path)
@@ -83,6 +87,7 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
             "M10-PA-007-m14-modify-20260522": "M10-PA-007",
             "M10-PA-009-m14-modify-20260522": "M10-PA-009",
             "M10-PA-012-m14-modify-20260522": "M10-PA-012",
+            self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID: "M10-PA-012",
             "M10-PA-013-m14-modify-20260522": "M10-PA-013",
             "M12-FTD-001-m14-modify-20260522": "M12-FTD-001",
             "M10-PA-011-ORB-R1": "M10-PA-011",
@@ -101,6 +106,7 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
             "M10-PA-007-m14-modify-20260522",
             "M10-PA-009-m14-modify-20260522",
             "M10-PA-012-m14-modify-20260522",
+            self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID,
             "M10-PA-013-m14-modify-20260522",
             "M12-FTD-001-m14-modify-20260522",
             "M10-PA-011-ORB-R1",
@@ -118,6 +124,15 @@ class M13StrategyRuntimeRegistryTest(unittest.TestCase):
                 else:
                     self.assertIn("not yet connected", row["next_action"])
                 self.assertIn("Do not overwrite", row["next_action"])
+
+        shadow = rows[self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID]
+        self.assertEqual(shadow["detector_id"], "m14_rescue_pa012_target_stop_risk_normalized_1_0r_adapter")
+        self.assertEqual(
+            shadow["runtime_accounts"][0]["runtime_id"],
+            f"{self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID}-5m",
+        )
+        self.assertEqual(shadow["runtime_accounts"][0]["variant_id"], "target_stop_risk_normalized_1_0r_shadow")
+        self.assertIn("frozen M10-PA-012-m14-modify-20260522 rescue runtime", shadow["next_action"])
 
 
 if __name__ == "__main__":

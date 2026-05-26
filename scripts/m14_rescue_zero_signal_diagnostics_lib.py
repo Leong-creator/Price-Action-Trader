@@ -17,6 +17,9 @@ HUNDRED = Decimal("100")
 FRESH_QUOTE_SOURCE = "longbridge_quote_readonly"
 LEVERAGED_ETFS = frozenset({"TQQQ", "SQQQ"})
 SHADOW_REWARD_MIN_R_VALUES = (Decimal("1.00"), Decimal("1.10"), Decimal("1.20"))
+PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID = (
+    "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,6 +280,10 @@ def rescue_filter_rejection_reasons(
     entry = decimal_or_none(row.get("hypothetical_entry_price", ""))
     stop = decimal_or_none(row.get("hypothetical_stop_price", ""))
     target = decimal_or_none(row.get("hypothetical_target_price", ""))
+    if strategy_id == PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID and entry is not None and stop is not None:
+        risk = abs(entry - stop)
+        if entry > ZERO and stop > ZERO and risk > ZERO:
+            target = entry + risk
     if entry is None or stop is None or target is None or entry <= ZERO or stop <= ZERO or target <= ZERO:
         reasons.append("invalid_prices")
     else:
@@ -296,6 +303,8 @@ def rescue_filter_rejection_reasons(
 
 
 def default_min_reward_r(strategy_id: str) -> Decimal:
+    if strategy_id == PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
+        return Decimal("1.00")
     return Decimal("1.50") if strategy_id == "M10-PA-004-MBF-QC-m14-modify-20260522" else Decimal("1.20")
 
 

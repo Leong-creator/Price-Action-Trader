@@ -12,6 +12,10 @@ from scripts.m14_rescue_runtime_coverage_lib import (
 
 
 class M14RescueRuntimeCoverageTest(unittest.TestCase):
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_ID = (
+        "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
+    )
+
     def test_runner_audits_registered_rescue_runtime_coverage_without_promotion(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -23,9 +27,9 @@ class M14RescueRuntimeCoverageTest(unittest.TestCase):
             )
 
             self.assertEqual(result["schema_version"], "m14.rescue-runtime-coverage.v1")
-            self.assertEqual(result["registered_rescue_strategy_count"], 9)
-            self.assertEqual(result["registered_rescue_account_count"], 10)
-            self.assertEqual(result["connected_rescue_strategy_count"], 9)
+            self.assertEqual(result["registered_rescue_strategy_count"], 10)
+            self.assertEqual(result["registered_rescue_account_count"], 11)
+            self.assertEqual(result["connected_rescue_strategy_count"], 10)
             self.assertEqual(result["pending_rescue_strategy_ids"], [])
             self.assertTrue(result["all_registered_rescue_inputs_connected"])
             self.assertTrue(result["coverage_complete_but_not_promoted"])
@@ -38,6 +42,7 @@ class M14RescueRuntimeCoverageTest(unittest.TestCase):
             rows = {row["strategy_id"]: row for row in result["rows"]}
             self.assertIn("M10-PA-004-MBF-QC-m14-modify-20260522", rows)
             self.assertIn("M10-PA-011-ORB-R1", rows)
+            self.assertIn(self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID, rows)
             for row in rows.values():
                 self.assertEqual(row["coverage_status"], "connected_not_promoted")
                 self.assertEqual(row["promotion_status"], "not_promoted_requires_10_day_ab_evidence")
@@ -59,9 +64,17 @@ class M14RescueRuntimeCoverageTest(unittest.TestCase):
                 "m14_rescue_pa011_failed_orb_retest_adapter",
                 rows["M10-PA-011-ORB-R1"]["input_source_types"],
             )
+            self.assertIn(
+                "m14_rescue_orb_quality_filter_adapter",
+                rows["M10-PA-012-m14-modify-20260522"]["input_source_types"],
+            )
+            self.assertIn(
+                "m14_rescue_pa012_target_stop_risk_normalized_1_0r_adapter",
+                rows[self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID]["input_source_types"],
+            )
 
             persisted = json.loads((root / "coverage.json").read_text(encoding="utf-8"))
-            self.assertEqual(persisted["connected_rescue_strategy_count"], 9)
+            self.assertEqual(persisted["connected_rescue_strategy_count"], 10)
             md = (root / "coverage.md").read_text(encoding="utf-8")
             self.assertIn("Connected does not mean passed or approved", md)
 

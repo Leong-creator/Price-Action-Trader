@@ -9,6 +9,10 @@ from scripts.m14_rescue_zero_signal_diagnostics_lib import load_config, run_m14_
 
 
 class M14RescueZeroSignalDiagnosticsTest(unittest.TestCase):
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_ID = (
+        "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
+    )
+
     def test_diagnostics_classifies_zero_signal_root_causes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -39,6 +43,90 @@ class M14RescueZeroSignalDiagnosticsTest(unittest.TestCase):
             persisted = json.loads((root / "diagnostics.json").read_text(encoding="utf-8"))
             self.assertEqual(persisted["summary"], result["summary"])
             self.assertIn("Quote-refresh candidates", (root / "diagnostics.md").read_text(encoding="utf-8"))
+
+    def test_pa012_target_stop_normalized_shadow_uses_1r_target_before_classifying_zero_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            dashboard_path = root / "dashboard.json"
+            coverage_path = root / "coverage.json"
+            config_path = root / "config.json"
+            dashboard_path.write_text(
+                json.dumps(
+                    {
+                        "account_input_audit": {
+                            "rows": [
+                                self._audit_row(
+                                    f"{self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID}-5m",
+                                    self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID,
+                                    "5m",
+                                )
+                            ]
+                        },
+                        "signal_watchlist": [
+                            self._source_row(
+                                "M10-PA-012",
+                                "5m",
+                                "MSFT",
+                                "看涨",
+                                "100",
+                                "99",
+                                "100.50",
+                                "cached_quote",
+                            )
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            coverage_path.write_text(
+                json.dumps(
+                    {
+                        "rows": [
+                            self._coverage_row(
+                                f"{self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID}-5m",
+                                self.PA012_TARGET_STOP_NORMALIZED_RESCUE_ID,
+                                "M10-PA-012",
+                            )
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m14.rescue-zero-signal-diagnostics.config.v1",
+                        "stage": "M14.rescue_zero_signal_diagnostics",
+                        "inputs": {
+                            "m12_dashboard_data": str(dashboard_path),
+                            "m14_rescue_runtime_coverage": str(coverage_path),
+                        },
+                        "outputs": {
+                            "diagnostics_json": str(root / "diagnostics.json"),
+                            "diagnostics_md": str(root / "diagnostics.md"),
+                        },
+                        "hard_boundaries": {
+                            "paper_simulated_only": True,
+                            "broker_connection": False,
+                            "real_order": False,
+                            "live_execution": False,
+                            "paper_trading_approval": False,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_m14_rescue_zero_signal_diagnostics(
+                load_config(config_path),
+                generated_at="2026-05-26T15:30:00Z",
+            )
+
+        row = result["rows"][0]
+        self.assertEqual(row["dominant_issue"], "stale_quote_source_blocks_candidate")
+        self.assertEqual(row["eligible_if_fresh_quote_count"], 1)
+        self.assertEqual(row["shadow_reward_min_r_pass_counts"]["1.0R"], 1)
+        self.assertNotIn("reward_r_below_min", row["rejection_reason_counts"])
 
     def test_unsafe_config_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

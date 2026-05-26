@@ -69,6 +69,12 @@ PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID = "M10-PA-004-MBF-QC-m14-modify-2026052
 PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID = "m14_rescue_pa004_mbf_qc_risk_compression_adapter"
 PA011_ORB_REBUILD_VARIANT_ID = "M10-PA-011-ORB-R1"
 PA011_ORB_REBUILD_ADAPTER_ID = "m14_rescue_pa011_failed_orb_retest_adapter"
+PA012_ORB_QUALITY_RESCUE_ADAPTER_ID = "m14_rescue_orb_quality_filter_adapter"
+PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID = (
+    "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
+)
+PA012_TARGET_STOP_NORMALIZED_RESCUE_ADAPTER_ID = "m14_rescue_pa012_target_stop_risk_normalized_1_0r_adapter"
+PA012_TARGET_STOP_NORMALIZED_RESCUE_RUNTIME_VARIANT_ID = "target_stop_risk_normalized_1_0r_shadow"
 EXPERIMENTAL_STRATEGIES = (
     "M10-PA-005",
     "M10-PA-007",
@@ -87,6 +93,7 @@ RESCUE_PARENT_STRATEGIES = {
     "M10-PA-007-m14-modify-20260522": "M10-PA-007",
     "M10-PA-009-m14-modify-20260522": "M10-PA-009",
     "M10-PA-012-m14-modify-20260522": "M10-PA-012",
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID: "M10-PA-012",
     "M10-PA-013-m14-modify-20260522": "M10-PA-013",
     "M12-FTD-001-m14-modify-20260522": "M12-FTD-001",
     PA011_ORB_REBUILD_VARIANT_ID: "M10-PA-011",
@@ -149,6 +156,7 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-007-m14-modify-20260522-1d", "strategy_id": "M10-PA-007-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-007 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-009-m14-modify-20260522-1d", "strategy_id": "M10-PA-009-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-009 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-012-m14-modify-20260522-5m", "strategy_id": "M10-PA-012-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-012 救援五分钟账户", "variant_id": "m14_modify_20260522"},
+    {"account_id": f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m", "strategy_id": PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID, "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-012 1.0R目标修复影子账户", "variant_id": PA012_TARGET_STOP_NORMALIZED_RESCUE_RUNTIME_VARIANT_ID},
     {"account_id": "M10-PA-013-m14-modify-20260522-1d", "strategy_id": "M10-PA-013-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M10-PA-013 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-013-m14-modify-20260522-5m", "strategy_id": "M10-PA-013-m14-modify-20260522", "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-013 救援五分钟账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M12-FTD-001-m14-modify-20260522-1d", "strategy_id": "M12-FTD-001-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M12-FTD-001 救援日线账户", "variant_id": "m14_modify_20260522"},
@@ -684,7 +692,40 @@ def rescue_input_source_type_for_spec(spec: dict[str, str]) -> str:
         return PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID
     if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
         return PA011_ORB_REBUILD_ADAPTER_ID
+    if spec["strategy_id"] == "M10-PA-012-m14-modify-20260522":
+        return PA012_ORB_QUALITY_RESCUE_ADAPTER_ID
+    if spec["strategy_id"] == PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
+        return PA012_TARGET_STOP_NORMALIZED_RESCUE_ADAPTER_ID
     return "m14_rescue_parent_quality_filter_adapter"
+
+
+def rescue_min_reward_r_for_spec(spec: dict[str, str]) -> Decimal:
+    if spec["strategy_id"] == PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID:
+        return Decimal("1.50")
+    if spec["strategy_id"] == PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
+        return Decimal("1.00")
+    return Decimal("1.20")
+
+
+def normalize_rescue_signal_row(spec: dict[str, str], row: dict[str, str]) -> dict[str, str]:
+    if spec["strategy_id"] != PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
+        return dict(row)
+    clone = dict(row)
+    if row.get("direction") != "看涨":
+        return clone
+    entry = decimal_or_none(row.get("hypothetical_entry_price", ""))
+    stop = decimal_or_none(row.get("hypothetical_stop_price", ""))
+    if entry is None or stop is None or entry <= ZERO or stop <= ZERO:
+        return clone
+    risk = abs(entry - stop)
+    if risk <= ZERO:
+        return clone
+    original_target = row.get("hypothetical_target_price", "")
+    clone["hypothetical_target_price"] = money(entry + risk)
+    clone["target_stop_policy"] = "risk_normalized_1_0r_shadow"
+    clone["target_stop_original_target_price"] = original_target
+    clone["target_stop_normalized_reward_r"] = "1.00"
+    return clone
 
 
 def rescue_signal_filter(spec: dict[str, str], row: dict[str, str]) -> bool:
@@ -701,7 +742,7 @@ def rescue_signal_filter(spec: dict[str, str], row: dict[str, str]) -> bool:
         return False
     risk = abs(entry - stop)
     reward = abs(target - entry)
-    min_reward_r = Decimal("1.50") if spec["strategy_id"] == PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID else Decimal("1.20")
+    min_reward_r = rescue_min_reward_r_for_spec(spec)
     if risk <= ZERO or reward <= ZERO or reward < risk * min_reward_r:
         return False
     max_risk_percent = (
@@ -723,9 +764,10 @@ def filter_rescue_signal_rows(spec: dict[str, str], rows: list[dict[str, str]]) 
         return rows
     filtered: list[dict[str, str]] = []
     for row in rows:
-        if not rescue_signal_filter(spec, row):
+        candidate = normalize_rescue_signal_row(spec, row)
+        if not rescue_signal_filter(spec, candidate):
             continue
-        clone = dict(row)
+        clone = dict(candidate)
         clone["strategy_id"] = spec["strategy_id"]
         clone["variant_id"] = spec["variant_id"]
         clone["strategy_title"] = spec["display_name"]
@@ -738,12 +780,20 @@ def filter_rescue_signal_rows(spec: dict[str, str], rows: list[dict[str, str]]) 
                 "但进一步要求看涨、非杠杆 ETF、最大风险不超过 4%、至少 1.5R 目标空间；"
                 "PA004 baseline、MBF、MBF-QC 都保持独立不覆盖。"
             )
+        elif spec["strategy_id"] == PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID:
+            clone["review_status"] = (
+                f"{spec['display_name']} 复用父策略 {runtime_source_strategy_id(spec)} 的扫描结果，"
+                "只在影子账户中把目标价规范化为 entry + 1.0R 风险距离；"
+                "PA012 baseline 和 frozen rescue runtime 均保持独立不覆盖。"
+            )
         else:
             clone["review_status"] = (
                 f"{spec['display_name']} 复用父策略 {runtime_source_strategy_id(spec)} 的扫描结果，"
                 "但只保留看涨、低风险、至少 1.2R 目标空间的信号；baseline 保持独立不覆盖。"
             )
-        clone["notes"] = "M14 rescue A/B adapter entry; simulated-only and not approved for live execution."
+        clone["notes"] = (
+            "M14 rescue A/B adapter entry; simulated-only and not approved for live execution."
+        )
         filtered.append(clone)
     return filtered
 

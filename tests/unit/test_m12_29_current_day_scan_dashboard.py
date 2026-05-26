@@ -13,6 +13,10 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     DEFAULT_ACCOUNT_EQUITY,
     PA011_ORB_REBUILD_ADAPTER_ID,
     PA011_ORB_REBUILD_VARIANT_ID,
+    PA012_ORB_QUALITY_RESCUE_ADAPTER_ID,
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_ADAPTER_ID,
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_RUNTIME_VARIANT_ID,
+    PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID,
     PA004_MOMENTUM_QUALITY_RESCUE_ADAPTER_ID,
     PA004_MOMENTUM_QUALITY_RESCUE_VARIANT_ID,
     PA004_MOMENTUM_QUALITY_VARIANT_ID,
@@ -25,6 +29,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     build_dashboard_update_status,
     build_extended_session_monitor,
     current_us_scan_date,
+    filter_rescue_signal_rows,
     load_config,
     market_session_status,
     pa011_orb_rebuild_signal,
@@ -316,6 +321,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("M10-PA-007-m14-modify-20260522", rescue_ids)
         self.assertIn("M10-PA-009-m14-modify-20260522", rescue_ids)
         self.assertIn("M10-PA-012-m14-modify-20260522", rescue_ids)
+        self.assertIn(PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID, rescue_ids)
         self.assertIn("M10-PA-013-m14-modify-20260522", rescue_ids)
         self.assertIn("M12-FTD-001-m14-modify-20260522", rescue_ids)
         self.assertIn(PA011_ORB_REBUILD_VARIANT_ID, rescue_ids)
@@ -347,6 +353,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "M10-PA-007-m14-modify-20260522",
                 "M10-PA-009-m14-modify-20260522",
                 "M10-PA-012-m14-modify-20260522",
+                PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID,
                 "M10-PA-013-m14-modify-20260522",
                 "M12-FTD-001-m14-modify-20260522",
                 PA011_ORB_REBUILD_VARIANT_ID,
@@ -462,6 +469,42 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertFalse(rescue_signal_filter(spec, base_row | {"hypothetical_target_price": "105.00", "hypothetical_stop_price": "96.00"}))
         self.assertFalse(rescue_signal_filter(spec, base_row | {"symbol": "TQQQ", "hypothetical_stop_price": "96.00"}))
 
+    def test_pa012_target_stop_normalized_rescue_uses_shadow_1r_without_changing_frozen_rescue(self):
+        base_row = {
+            "symbol": "QCOM",
+            "direction": "看涨",
+            "hypothetical_entry_price": "100.00",
+            "hypothetical_stop_price": "98.00",
+            "hypothetical_target_price": "101.90",
+            "signal_date": "2026-05-11",
+            "signal_time": "2026-05-11T09:35:00-04:00",
+            "latest_price_source": "longbridge_quote_readonly",
+            "timeframe": "5m",
+        }
+        frozen_spec = {
+            "strategy_id": "M10-PA-012-m14-modify-20260522",
+            "timeframe": "5m",
+            "variant_id": "m14_modify_20260522",
+            "display_name": "M10-PA-012 救援五分钟账户",
+        }
+        shadow_spec = {
+            "strategy_id": PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID,
+            "timeframe": "5m",
+            "variant_id": PA012_TARGET_STOP_NORMALIZED_RESCUE_RUNTIME_VARIANT_ID,
+            "display_name": "M10-PA-012 1.0R目标修复影子账户",
+        }
+
+        self.assertFalse(rescue_signal_filter(frozen_spec, base_row))
+        filtered = filter_rescue_signal_rows(shadow_spec, [base_row])
+
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["hypothetical_target_price"], "102.00")
+        self.assertEqual(filtered[0]["target_stop_original_target_price"], "101.90")
+        self.assertEqual(filtered[0]["target_stop_normalized_reward_r"], "1.00")
+        self.assertEqual(filtered[0]["signal_source_type"], PA012_TARGET_STOP_NORMALIZED_RESCUE_ADAPTER_ID)
+        self.assertIn("1.0R", filtered[0]["review_status"])
+        self.assertIn("frozen rescue runtime", filtered[0]["review_status"])
+
     def test_pa011_orb_rebuild_requires_failed_opening_range_retest(self):
         bars = [
             SimpleNamespace(timestamp="2026-05-11T09:30:00-04:00", open=Decimal("100.00"), high=Decimal("100.60"), low=Decimal("99.50"), close=Decimal("100.10")),
@@ -502,6 +545,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "M10-PA-007-m14-modify-20260522-1d",
                 "M10-PA-009-m14-modify-20260522-1d",
                 "M10-PA-012-m14-modify-20260522-5m",
+                f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m",
                 "M10-PA-013-m14-modify-20260522-1d",
                 "M10-PA-013-m14-modify-20260522-5m",
                 "M12-FTD-001-m14-modify-20260522-1d",
@@ -519,6 +563,14 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             rescue_source_by_runtime["M10-PA-011-ORB-R1-5m"],
             PA011_ORB_REBUILD_ADAPTER_ID,
         )
+        self.assertEqual(
+            rescue_source_by_runtime["M10-PA-012-m14-modify-20260522-5m"],
+            PA012_ORB_QUALITY_RESCUE_ADAPTER_ID,
+        )
+        self.assertEqual(
+            rescue_source_by_runtime[f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m"],
+            PA012_TARGET_STOP_NORMALIZED_RESCUE_ADAPTER_ID,
+        )
         self.assertTrue(
             all(
                 row["input_source_type"] == "m14_rescue_parent_quality_filter_adapter"
@@ -526,6 +578,8 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 if row["runtime_id"] not in {
                     "M10-PA-004-MBF-QC-m14-modify-20260522-1d",
                     "M10-PA-011-ORB-R1-5m",
+                    "M10-PA-012-m14-modify-20260522-5m",
+                    f"{PA012_TARGET_STOP_NORMALIZED_RESCUE_VARIANT_ID}-5m",
                 }
             )
         )
