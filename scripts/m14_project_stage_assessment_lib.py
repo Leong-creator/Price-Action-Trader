@@ -25,6 +25,7 @@ class ProjectStageAssessmentConfig:
     rescue_external_reference_map_path: Path
     rescue_parameter_experiment_queue_path: Path
     rescue_parameter_activation_gate_path: Path
+    rescue_parameter_shadow_spec_path: Path
     objective_completion_audit_path: Path
     objective_execution_plan_path: Path
     assessment_json_path: Path
@@ -65,6 +66,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> ProjectStageAssessmen
         rescue_parameter_activation_gate_path=resolve_repo_path(
             inputs["m14_rescue_parameter_activation_gate"]
         ),
+        rescue_parameter_shadow_spec_path=resolve_repo_path(inputs["m14_rescue_parameter_shadow_spec"]),
         objective_completion_audit_path=resolve_repo_path(inputs["m14_objective_completion_audit"]),
         objective_execution_plan_path=resolve_repo_path(inputs["m14_objective_execution_plan"]),
         assessment_json_path=resolve_repo_path(outputs["assessment_json"]),
@@ -102,6 +104,7 @@ def run_m14_project_stage_assessment(
     external_map = read_json(config.rescue_external_reference_map_path)
     parameter_queue = read_json(config.rescue_parameter_experiment_queue_path)
     activation_gate = read_json(config.rescue_parameter_activation_gate_path)
+    parameter_shadow_spec = read_json(config.rescue_parameter_shadow_spec_path)
     objective_audit = read_json(config.objective_completion_audit_path)
     objective_execution = read_json(config.objective_execution_plan_path)
 
@@ -118,6 +121,7 @@ def run_m14_project_stage_assessment(
         external_map,
         parameter_queue,
         activation_gate,
+        parameter_shadow_spec,
         objective_audit,
         objective_execution,
         strategy_routes,
@@ -144,6 +148,7 @@ def run_m14_project_stage_assessment(
             "m14_rescue_parameter_activation_gate": project_path(
                 config.rescue_parameter_activation_gate_path
             ),
+            "m14_rescue_parameter_shadow_spec": project_path(config.rescue_parameter_shadow_spec_path),
             "m14_objective_completion_audit": project_path(config.objective_completion_audit_path),
             "m14_objective_execution_plan": project_path(config.objective_execution_plan_path),
         },
@@ -156,6 +161,7 @@ def run_m14_project_stage_assessment(
             external_map,
             parameter_queue,
             activation_gate,
+            parameter_shadow_spec,
             objective_audit,
             objective_execution,
             summary,
@@ -167,6 +173,7 @@ def run_m14_project_stage_assessment(
         "rescue_external_reference_map": build_external_reference_map(external_map),
         "rescue_parameter_experiment_queue": build_parameter_experiment_queue(parameter_queue),
         "rescue_parameter_activation_gate": build_parameter_activation_gate(activation_gate),
+        "rescue_parameter_shadow_spec": build_parameter_shadow_spec(parameter_shadow_spec),
         "objective_completion_audit": build_objective_completion_audit(objective_audit),
         "objective_execution_plan": build_objective_execution_plan(objective_execution),
         "external_reference_policy": dict(goal.get("external_reference_policy", {})),
@@ -210,6 +217,7 @@ def build_summary(
     external_map: dict[str, Any],
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
+    parameter_shadow_spec: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     strategy_routes: list[dict[str, Any]],
@@ -226,6 +234,7 @@ def build_summary(
     external_summary = external_map.get("summary", {})
     parameter_summary = parameter_queue.get("summary", {})
     activation_summary = activation_gate.get("summary", {})
+    shadow_spec_summary = parameter_shadow_spec.get("summary", {})
     objective_summary = objective_audit.get("summary", {})
     execution_summary = objective_execution.get("summary", {})
     route_counts = dict(sorted(Counter(str(row.get("route_category", "")) for row in strategy_routes).items()))
@@ -323,6 +332,28 @@ def build_summary(
         "parameter_activation_parameter_mutation_allowed_count": int_or_zero(
             activation_summary.get("parameter_mutation_allowed_count")
         ),
+        "parameter_shadow_spec_row_count": int_or_zero(shadow_spec_summary.get("spec_row_count")),
+        "parameter_shadow_spec_candidate_variant_count": int_or_zero(
+            shadow_spec_summary.get("candidate_variant_count")
+        ),
+        "parameter_shadow_spec_waiting_for_fresh_refresh_count": int_or_zero(
+            shadow_spec_summary.get("waiting_for_fresh_refresh_count")
+        ),
+        "parameter_shadow_spec_target_stop_variant_count": int_or_zero(
+            shadow_spec_summary.get("target_stop_shadow_variant_count")
+        ),
+        "parameter_shadow_spec_broker_quantity_variant_count": int_or_zero(
+            shadow_spec_summary.get("broker_quantity_cap_variant_count")
+        ),
+        "parameter_shadow_spec_broker_rule_variant_count": int_or_zero(
+            shadow_spec_summary.get("broker_rule_shadow_variant_count")
+        ),
+        "parameter_shadow_spec_parameter_mutation_allowed_count": int_or_zero(
+            shadow_spec_summary.get("parameter_mutation_allowed_count")
+        ),
+        "parameter_shadow_spec_implementation_mutation_allowed_count": int_or_zero(
+            shadow_spec_summary.get("implementation_mutation_allowed_count")
+        ),
         "objective_audit_requirement_count": int_or_zero(objective_summary.get("requirement_count")),
         "objective_audit_proven_count": int_or_zero(objective_summary.get("proven_count")),
         "objective_audit_blocked_count": int_or_zero(objective_summary.get("blocked_count")),
@@ -363,6 +394,7 @@ def build_stage_assessment(
     external_map: dict[str, Any],
     parameter_queue: dict[str, Any],
     activation_gate: dict[str, Any],
+    parameter_shadow_spec: dict[str, Any],
     objective_audit: dict[str, Any],
     objective_execution: dict[str, Any],
     summary: dict[str, Any],
@@ -388,6 +420,7 @@ def build_stage_assessment(
         "external_reference_status": "architecture_reference_only_no_external_override",
         "parameter_experiment_status": "queued_for_post_refresh_review_no_mutation",
         "parameter_activation_status": "waiting_for_fresh_refresh_no_activation",
+        "parameter_shadow_spec_status": "shadow_specs_prepared_no_mutation",
         "objective_completion_status": (
             "complete" if summary["objective_audit_complete"] else "blocked_or_in_progress"
         ),
@@ -424,6 +457,11 @@ def build_stage_assessment(
                 f"and {summary['parameter_activation_implementation_mutation_allowed_count']} implementation mutations allowed."
             ),
             (
+                f"Parameter shadow spec has {summary['parameter_shadow_spec_row_count']} rows and "
+                f"{summary['parameter_shadow_spec_candidate_variant_count']} candidate variants, with "
+                f"{summary['parameter_shadow_spec_waiting_for_fresh_refresh_count']} waiting for fresh evidence."
+            ),
+            (
                 f"Objective completion audit has {summary['objective_audit_requirement_count']} requirements, "
                 f"{summary['objective_audit_blocked_count']} blocked and "
                 f"{summary['objective_audit_in_progress_count']} in progress."
@@ -444,6 +482,7 @@ def build_stage_assessment(
         "external_reference_plain_result": str(external_map.get("plain_language_result", "")),
         "parameter_experiment_plain_result": str(parameter_queue.get("plain_language_result", "")),
         "parameter_activation_plain_result": str(activation_gate.get("plain_language_result", "")),
+        "parameter_shadow_spec_plain_result": str(parameter_shadow_spec.get("plain_language_result", "")),
         "objective_completion_plain_result": str(objective_audit.get("plain_language_result", "")),
         "objective_execution_plain_result": str(objective_execution.get("plain_language_result", "")),
     }
@@ -537,6 +576,33 @@ def build_parameter_activation_gate(activation_gate: dict[str, Any]) -> dict[str
         "manual_m12_37_once_allowed": False,
         "broker_or_live_enabled": False,
         "plain_language_result": str(activation_gate.get("plain_language_result", "")),
+    }
+
+
+def build_parameter_shadow_spec(parameter_shadow_spec: dict[str, Any]) -> dict[str, Any]:
+    summary = parameter_shadow_spec.get("summary", {})
+    return {
+        "spec_row_count": int_or_zero(summary.get("spec_row_count")),
+        "candidate_variant_count": int_or_zero(summary.get("candidate_variant_count")),
+        "waiting_for_fresh_refresh_count": int_or_zero(summary.get("waiting_for_fresh_refresh_count")),
+        "target_stop_shadow_variant_count": int_or_zero(summary.get("target_stop_shadow_variant_count")),
+        "broker_quantity_cap_variant_count": int_or_zero(summary.get("broker_quantity_cap_variant_count")),
+        "broker_rule_shadow_variant_count": int_or_zero(summary.get("broker_rule_shadow_variant_count")),
+        "ready_for_manual_shadow_review_count": int_or_zero(
+            summary.get("ready_for_manual_shadow_review_count")
+        ),
+        "implementation_mutation_allowed_count": int_or_zero(
+            summary.get("implementation_mutation_allowed_count")
+        ),
+        "parameter_mutation_allowed_count": int_or_zero(summary.get("parameter_mutation_allowed_count")),
+        "m13_registry_mutation_count": int_or_zero(summary.get("m13_registry_mutation_count")),
+        "m12_account_specs_mutation_count": int_or_zero(summary.get("m12_account_specs_mutation_count")),
+        "broker_readiness_status_mutation_count": int_or_zero(
+            summary.get("broker_readiness_status_mutation_count")
+        ),
+        "manual_m12_37_once_allowed": False,
+        "broker_or_live_enabled": False,
+        "plain_language_result": str(parameter_shadow_spec.get("plain_language_result", "")),
     }
 
 
@@ -730,6 +796,9 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['parameter_experiment_blocked_until_fresh_refresh_count']} waiting for fresh refresh evidence. "
         f"Activation gate shows {summary['parameter_activation_shadow_review_candidate_count']} shadow-review candidates "
         f"and {summary['parameter_activation_implementation_mutation_allowed_count']} implementation mutations allowed. "
+        f"Parameter shadow specs now cover {summary['parameter_shadow_spec_row_count']} rows and "
+        f"{summary['parameter_shadow_spec_candidate_variant_count']} candidate variants, with "
+        f"{summary['parameter_shadow_spec_parameter_mutation_allowed_count']} parameter mutations allowed. "
         f"Objective audit is complete={summary['objective_audit_complete']} with "
         f"{summary['objective_audit_blocked_count']} blocked and "
         f"{summary['objective_audit_in_progress_count']} in-progress requirements. "
@@ -763,6 +832,8 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- Parameter experiments blocked until fresh refresh: `{summary['parameter_experiment_blocked_until_fresh_refresh_count']}`",
         f"- Parameter activation shadow-review candidates: `{summary['parameter_activation_shadow_review_candidate_count']}`",
         f"- Parameter activation implementation mutations allowed: `{summary['parameter_activation_implementation_mutation_allowed_count']}`",
+        f"- Parameter shadow spec rows/variants/waiting-fresh-refresh: `{summary['parameter_shadow_spec_row_count']}/{summary['parameter_shadow_spec_candidate_variant_count']}/{summary['parameter_shadow_spec_waiting_for_fresh_refresh_count']}`",
+        f"- Parameter shadow spec mutation allowed: `{summary['parameter_shadow_spec_parameter_mutation_allowed_count']}`",
         f"- Objective audit complete: `{summary['objective_audit_complete']}`",
         f"- Objective audit requirements/proven/blocked/in-progress/guardrail: `{summary['objective_audit_requirement_count']}/{summary['objective_audit_proven_count']}/{summary['objective_audit_blocked_count']}/{summary['objective_audit_in_progress_count']}/{summary['objective_audit_guardrail_count']}`",
         f"- Objective execution actions/P0/waiting-fresh-refresh: `{summary['objective_execution_action_count']}/{summary['objective_execution_p0_action_count']}/{summary['objective_execution_waiting_for_fresh_refresh_action_count']}`",
@@ -783,6 +854,7 @@ def build_assessment_md(payload: dict[str, Any]) -> str:
         f"- External reference status: `{payload['stage_assessment']['external_reference_status']}`",
         f"- Parameter experiment status: `{payload['stage_assessment']['parameter_experiment_status']}`",
         f"- Parameter activation status: `{payload['stage_assessment']['parameter_activation_status']}`",
+        f"- Parameter shadow spec status: `{payload['stage_assessment']['parameter_shadow_spec_status']}`",
         f"- Objective completion status: `{payload['stage_assessment']['objective_completion_status']}`",
         f"- Objective execution status: `{payload['stage_assessment']['objective_execution_status']}`",
         f"- Broker status: `{payload['stage_assessment']['broker_status']}`",

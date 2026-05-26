@@ -18,7 +18,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T23:05:00Z",
+  "generated_at": "2026-05-26T23:25:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but the objective audit remains not complete because rescue promotion, fresh-refresh review, and parameter activation are still blocked or in progress."
@@ -41,6 +41,7 @@
     "m14_rescue_optimization_backlog": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_optimization_backlog.json",
     "m14_rescue_parameter_activation_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_activation_gate.json",
     "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json",
+    "m14_rescue_parameter_shadow_spec": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_shadow_spec.json",
     "m14_rescue_post_refresh_outcome_review": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_post_refresh_outcome_review.json",
     "m14_strategy_rescue_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json"
   },
@@ -239,7 +240,7 @@
   },
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Objective audit is complete=False with 3 blocked and 2 in-progress requirements. Objective execution plan has 7 actions, 5 P0, and 5 waiting for fresh refresh. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge is 10/10 and complete. Approved internal simulated-account strategies: M10-PA-004, M10-PA-005, M10-PA-008. Next session is ready in m12_47_supervised_fresh_refresh_only mode, with 4/4 approved runtimes connected. Rescue evidence is 9/11 observed, 2 need first ledger rows, and promotion allowed remains 0. Post-refresh review is waiting for fresh M12.47 data with 13 waiting, 0 passed/evidence, and 0 failed rows from quote_source=fallback_quotes_only. External references are mapped to 11 rescue rows and 2 broker-blocker rows as architecture references only. Parameter experiments are queued in 14 rows, with allowed-now changes at 0 and 10 waiting for fresh refresh evidence. Activation gate shows 0 shadow-review candidates and 0 implementation mutations allowed. Parameter shadow specs now cover 14 rows and 14 candidate variants, with 0 parameter mutations allowed. Objective audit is complete=False with 3 blocked and 2 in-progress requirements. Objective execution plan has 7 actions, 5 P0, and 5 waiting for fresh refresh. Broker readiness stays dry-run preview only: 5 ready and 3 blocked; manual M12.37 once-mode, broker paper, live execution, real orders, and paper approval remain disabled.",
   "project_stage_label": "M14 project stage assessment and strategy route map",
   "real_order": false,
   "rescue_external_reference_map": {
@@ -284,6 +285,23 @@
     "rescue_experiment_row_count": 11,
     "shadow_runtime_wait_first_ledger_count": 2,
     "target_stop_experiment_count": 1
+  },
+  "rescue_parameter_shadow_spec": {
+    "broker_or_live_enabled": false,
+    "broker_quantity_cap_variant_count": 1,
+    "broker_readiness_status_mutation_count": 0,
+    "broker_rule_shadow_variant_count": 2,
+    "candidate_variant_count": 14,
+    "implementation_mutation_allowed_count": 0,
+    "m12_account_specs_mutation_count": 0,
+    "m13_registry_mutation_count": 0,
+    "manual_m12_37_once_allowed": false,
+    "parameter_mutation_allowed_count": 0,
+    "plain_language_result": "Parameter shadow spec prepared 14 rows and 14 candidate variants. 12 rows still wait for M12.47-owned fresh evidence, 1 target/stop shadow variant and 3 broker-blocker shadow variants are specified. This is a review/spec artifact only: parameter mutation, implementation mutation, registry/account-spec mutation, broker readiness mutation, broker/live, real orders, paper approval, and manual M12.37 once-mode remain disabled.",
+    "ready_for_manual_shadow_review_count": 0,
+    "spec_row_count": 14,
+    "target_stop_shadow_variant_count": 1,
+    "waiting_for_fresh_refresh_count": 12
   },
   "rescue_policy": {
     "actionable_before_10d_count": 10,
@@ -344,6 +362,7 @@
       "External-reference map covers 11 rescue rows and 2 broker-blocker rows as architecture references only.",
       "Parameter experiment queue has 14 rows, 0 allowed now, and 10 waiting for a fresh refresh.",
       "Parameter activation gate has 14 rows, 0 shadow-review candidates, and 0 implementation mutations allowed.",
+      "Parameter shadow spec has 14 rows and 14 candidate variants, with 12 waiting for fresh evidence.",
       "Objective completion audit has 12 requirements, 3 blocked and 2 in progress.",
       "Objective execution plan has 7 actions, 5 P0, and 5 waiting for a fresh refresh.",
       "3 broker dry-run blocker rows must stay watch-only until repaired in internal simulation."
@@ -357,6 +376,8 @@
     "parameter_activation_status": "waiting_for_fresh_refresh_no_activation",
     "parameter_experiment_plain_result": "Parameter experiment queue prepared 14 rows: 11 rescue rows and 3 broker-blocker rows. Allowed-now changes remain 0; 10 rows wait for the next M12.47-owned fresh refresh and 2 rows wait for first M13 ledger evidence. The queue only defines shadow/review families; it does not mutate M13 registry, M12 account specs, broker readiness, broker connection, paper approval, live execution, real orders, or manual M12.37 once-mode.",
     "parameter_experiment_status": "queued_for_post_refresh_review_no_mutation",
+    "parameter_shadow_spec_plain_result": "Parameter shadow spec prepared 14 rows and 14 candidate variants. 12 rows still wait for M12.47-owned fresh evidence, 1 target/stop shadow variant and 3 broker-blocker shadow variants are specified. This is a review/spec artifact only: parameter mutation, implementation mutation, registry/account-spec mutation, broker readiness mutation, broker/live, real orders, paper approval, and manual M12.37 once-mode remain disabled.",
+    "parameter_shadow_spec_status": "shadow_specs_prepared_no_mutation",
     "post_refresh_plain_result": "Post-refresh outcome review checked 13 rescue watch rows; still waiting for fresh M12.47 data because quote_source=fallback_quotes_only. Passed/evidence observed: 0; waiting: 13; failed: 0. First-ledger passed 0, fresh-quote rechecks passed 0, broker-rule evidence observed 0, target/stop shadow passed 0. No parameter change, registry mutation, account-spec mutation, broker readiness mutation, broker connection, real order, live execution, or paper approval is enabled.",
     "post_refresh_status": "waiting_for_m12_47_fresh_refresh",
     "rescue_status": "connected_but_not_promoted",
@@ -987,6 +1008,14 @@
     "parameter_experiment_row_count": 14,
     "parameter_experiment_shadow_runtime_wait_first_ledger_count": 2,
     "parameter_experiment_target_stop_count": 1,
+    "parameter_shadow_spec_broker_quantity_variant_count": 1,
+    "parameter_shadow_spec_broker_rule_variant_count": 2,
+    "parameter_shadow_spec_candidate_variant_count": 14,
+    "parameter_shadow_spec_implementation_mutation_allowed_count": 0,
+    "parameter_shadow_spec_parameter_mutation_allowed_count": 0,
+    "parameter_shadow_spec_row_count": 14,
+    "parameter_shadow_spec_target_stop_variant_count": 1,
+    "parameter_shadow_spec_waiting_for_fresh_refresh_count": 12,
     "post_refresh_failed_count": 0,
     "post_refresh_fresh_refresh_observed": false,
     "post_refresh_latest_ledger_trading_date": "2026-05-22",

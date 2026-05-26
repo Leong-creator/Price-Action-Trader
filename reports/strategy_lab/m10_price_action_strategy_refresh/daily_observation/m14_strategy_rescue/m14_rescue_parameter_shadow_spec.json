@@ -1,0 +1,1122 @@
+{
+  "broker_connection": false,
+  "broker_readiness_status_mutation": false,
+  "generated_at": "2026-05-26T23:20:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "broker_readiness_status_mutation": false,
+    "live_execution": false,
+    "m12_account_specs_mutation": false,
+    "m13_registry_mutation": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "parameter_mutation": false,
+    "real_order": false
+  },
+  "input_refs": {
+    "m14_2_broker_blocker_rule_shadow_evidence": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_rule_shadow_evidence.json",
+    "m14_2_broker_blocker_shadow_ab_prep": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_ab_prep.json",
+    "m14_rescue_external_reference_map": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_external_reference_map.json",
+    "m14_rescue_parameter_activation_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_activation_gate.json",
+    "m14_rescue_parameter_experiment_queue": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_parameter_experiment_queue.json",
+    "m14_rescue_target_stop_shadow_normalization": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_target_stop_shadow_normalization.json"
+  },
+  "live_execution": false,
+  "m12_account_specs_mutation": false,
+  "m13_registry_mutation": false,
+  "manual_m12_37_once": false,
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "parameter_mutation": false,
+  "plain_language_result": "Parameter shadow spec prepared 14 rows and 14 candidate variants. 12 rows still wait for M12.47-owned fresh evidence, 1 target/stop shadow variant and 3 broker-blocker shadow variants are specified. This is a review/spec artifact only: parameter mutation, implementation mutation, registry/account-spec mutation, broker readiness mutation, broker/live, real orders, paper approval, and manual M12.37 once-mode remain disabled.",
+  "real_order": false,
+  "schema_version": "m14.rescue-parameter-shadow-spec.v1",
+  "spec_rows": [
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days if a later parameter variant is created.",
+        "Fresh quote source without fallback-only state.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Source-row and signal-count comparison before any detector or threshold change.",
+        "fresh M12.47-owned quote refresh",
+        "source-row and signal-count comparison"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "source_quote_and_signal_count",
+      "candidate_parameter_family": "quote_source_freshness_gate",
+      "candidate_variants": [
+        {
+          "change_summary": "Recheck the existing rescue runtime with fresh Longbridge readonly quotes before changing any detector or threshold.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "eligible_if_fresh_quote_count": 12,
+            "parameter_change": "none_before_fresh_evidence",
+            "quote_source_required": "longbridge_quote_readonly"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned quote refresh",
+            "source-row and signal-count comparison"
+          ],
+          "variant_id": "fresh_quote_recheck_no_parameter_change",
+          "variant_type": "fresh_quote_recheck"
+        }
+      ],
+      "dominant_issue": "stale_quote_source_blocks_candidate",
+      "experiment_family": "fresh_quote_gate_recheck",
+      "experiment_row_id": "m14-param-exp-m10-pa-001-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-001-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-001",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-001-m14-modify-20260522-1d"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-001-m14-modify-20260522",
+      "spec_state": "fresh_recheck_spec_ready_wait_refresh",
+      "strategy_id": "M10-PA-001-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days if a later parameter variant is created.",
+        "Fresh quote source without fallback-only state.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Source-row and signal-count comparison before any detector or threshold change.",
+        "fresh M12.47-owned quote refresh",
+        "source-row and signal-count comparison"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "source_quote_and_signal_count",
+      "candidate_parameter_family": "quote_source_freshness_gate",
+      "candidate_variants": [
+        {
+          "change_summary": "Recheck the existing rescue runtime with fresh Longbridge readonly quotes before changing any detector or threshold.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "eligible_if_fresh_quote_count": 2,
+            "parameter_change": "none_before_fresh_evidence",
+            "quote_source_required": "longbridge_quote_readonly"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned quote refresh",
+            "source-row and signal-count comparison"
+          ],
+          "variant_id": "fresh_quote_recheck_no_parameter_change",
+          "variant_type": "fresh_quote_recheck"
+        }
+      ],
+      "dominant_issue": "stale_quote_source_blocks_candidate",
+      "experiment_family": "fresh_quote_gate_recheck",
+      "experiment_row_id": "m14-param-exp-m10-pa-002-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-002-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-002",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-002-m14-modify-20260522-1d"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-002-m14-modify-20260522",
+      "spec_state": "fresh_recheck_spec_ready_wait_refresh",
+      "strategy_id": "M10-PA-002-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days if a later parameter variant is created.",
+        "Fresh quote source without fallback-only state.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Source-row and signal-count comparison before any detector or threshold change.",
+        "fresh M12.47-owned quote refresh",
+        "source-row and signal-count comparison"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "source_quote_and_signal_count",
+      "candidate_parameter_family": "quote_source_freshness_gate",
+      "candidate_variants": [
+        {
+          "change_summary": "Recheck the existing rescue runtime with fresh Longbridge readonly quotes before changing any detector or threshold.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "eligible_if_fresh_quote_count": 1,
+            "parameter_change": "none_before_fresh_evidence",
+            "quote_source_required": "longbridge_quote_readonly"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned quote refresh",
+            "source-row and signal-count comparison"
+          ],
+          "variant_id": "fresh_quote_recheck_no_parameter_change",
+          "variant_type": "fresh_quote_recheck"
+        }
+      ],
+      "dominant_issue": "stale_quote_source_blocks_candidate",
+      "experiment_family": "fresh_quote_gate_recheck",
+      "experiment_row_id": "m14-param-exp-m10-pa-004-mbf-qc-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-004-mbf-qc-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-004-MBF-QC",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-004-MBF-QC-m14-modify-20260522-1d"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-004-mbf-qc-m14-modify-20260522",
+      "spec_state": "fresh_recheck_spec_ready_wait_refresh",
+      "strategy_id": "M10-PA-004-MBF-QC-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "Cooldown state remains active where required.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "No override of consecutive-loss protection.",
+        "Quality-veto comparison for later same-session entries.",
+        "fresh internal-sim rule comparison",
+        "no readiness-status mutation",
+        "risk halt and exposure guardrails preserved"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "cooldown_quality_veto",
+      "candidate_parameter_family": "cooldown_quality_veto",
+      "candidate_variants": [
+        {
+          "change_summary": "Preserve the loss-streak halt and compare later same-session entries against cooldown/quality-veto checks; the blocked source row remains blocked.",
+          "comparison_baseline": "original_blocked_internal_sim_risk_check",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "proposed_shadow_strategy_id": "M10-PA-005-broker-cooldown-quality-shadow",
+            "rule_family": "cooldown_quality_veto",
+            "shadow_rule_decision": "preserve_loss_streak_halt_and_veto_lower_quality_later_entries",
+            "source_reason_codes": [
+              "consecutive_losses_limit"
+            ],
+            "symbol": "XLV",
+            "timeframe": "5m"
+          },
+          "required_evidence": [
+            "fresh internal-sim rule comparison",
+            "no readiness-status mutation",
+            "risk halt and exposure guardrails preserved"
+          ],
+          "variant_id": "broker_cooldown_quality_shadow",
+          "variant_type": "broker_cooldown_quality_shadow"
+        }
+      ],
+      "dominant_issue": "consecutive_losses_limit",
+      "experiment_family": "cooldown_quality_veto_shadow",
+      "experiment_row_id": "m14-param-exp-broker-m10-pa-005-consecutive-losses-limit",
+      "external_reference_pattern_ids": [
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-broker-m10-pa-005-consecutive-losses-limit",
+      "implementation_mutation_allowed": false,
+      "issue_type": "broker_dry_run_blocker",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-005",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-broker-m10-pa-005-consecutive-losses-limit",
+      "spec_state": "shadow_spec_prepared_wait_fresh_refresh",
+      "strategy_id": "M10-PA-005",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "Decision log explaining kept, deferred, or rejected entries.",
+        "Exposure-ranked comparison row in internal simulation.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "No skipped risk gate or forced readiness unblock.",
+        "fresh internal-sim rule comparison",
+        "no readiness-status mutation",
+        "risk halt and exposure guardrails preserved"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "portfolio_exposure_ordering",
+      "candidate_parameter_family": "portfolio_exposure_ranker",
+      "candidate_variants": [
+        {
+          "change_summary": "Compare future same-strategy internal-sim signals by total exposure headroom and rank; lower-ranked entries remain deferred until headroom exists.",
+          "comparison_baseline": "original_blocked_internal_sim_risk_check",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "proposed_shadow_strategy_id": "M10-PA-005-broker-exposure-ranker-shadow",
+            "rule_family": "portfolio_exposure_ranker",
+            "shadow_rule_decision": "defer_until_exposure_headroom_returns",
+            "source_reason_codes": [
+              "max_total_exposure_exceeded"
+            ],
+            "symbol": "XLY",
+            "timeframe": "5m"
+          },
+          "required_evidence": [
+            "fresh internal-sim rule comparison",
+            "no readiness-status mutation",
+            "risk halt and exposure guardrails preserved"
+          ],
+          "variant_id": "broker_exposure_ranker_shadow",
+          "variant_type": "broker_exposure_ranker_shadow"
+        }
+      ],
+      "dominant_issue": "max_total_exposure_exceeded",
+      "experiment_family": "exposure_ranker_shadow",
+      "experiment_row_id": "m14-param-exp-broker-m10-pa-005-max-total-exposure-exceeded",
+      "external_reference_pattern_ids": [
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-broker-m10-pa-005-max-total-exposure-exceeded",
+      "implementation_mutation_allowed": false,
+      "issue_type": "broker_dry_run_blocker",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-005",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-broker-m10-pa-005-max-total-exposure-exceeded",
+      "spec_state": "shadow_spec_prepared_wait_fresh_refresh",
+      "strategy_id": "M10-PA-005",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days if a later parameter variant is created.",
+        "Fresh quote source without fallback-only state.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Source-row and signal-count comparison before any detector or threshold change.",
+        "fresh M12.47-owned quote refresh",
+        "source-row and signal-count comparison"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "source_quote_and_signal_count",
+      "candidate_parameter_family": "quote_source_freshness_gate",
+      "candidate_variants": [
+        {
+          "change_summary": "Recheck the existing rescue runtime with fresh Longbridge readonly quotes before changing any detector or threshold.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "eligible_if_fresh_quote_count": 5,
+            "parameter_change": "none_before_fresh_evidence",
+            "quote_source_required": "longbridge_quote_readonly"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned quote refresh",
+            "source-row and signal-count comparison"
+          ],
+          "variant_id": "fresh_quote_recheck_no_parameter_change",
+          "variant_type": "fresh_quote_recheck"
+        }
+      ],
+      "dominant_issue": "stale_quote_source_blocks_candidate",
+      "experiment_family": "fresh_quote_gate_recheck",
+      "experiment_row_id": "m14-param-exp-m10-pa-007-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-007-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-007",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-007-m14-modify-20260522-1d"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-007-m14-modify-20260522",
+      "spec_state": "fresh_recheck_spec_ready_wait_refresh",
+      "strategy_id": "M10-PA-007-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Original broker readiness row remains blocked until explicit approval.",
+        "Risk amount at or below 100.",
+        "Same signal with capped quantity in internal simulation.",
+        "fresh internal-sim dry-run row",
+        "original broker readiness row remains blocked",
+        "risk amount at or below the existing limit"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "position_sizing_risk_cap",
+      "candidate_parameter_family": "position_size_quantity_cap",
+      "candidate_variants": [
+        {
+          "change_summary": "Shadow-test the quantity cap that brings per-order risk back to the existing internal limit.",
+          "comparison_baseline": "original_blocked_internal_sim_risk_check",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "proposed_quantity": "5.2083",
+            "proposed_risk_amount": "100",
+            "proposed_shadow_runtime_id": "M10-PA-008-broker-risk-cap-shadow-1d",
+            "source_quantity": "5.2469",
+            "source_risk_amount": "100.74",
+            "symbol": "ADBE",
+            "timeframe": "1d"
+          },
+          "required_evidence": [
+            "fresh internal-sim dry-run row",
+            "risk amount at or below the existing limit",
+            "original broker readiness row remains blocked"
+          ],
+          "variant_id": "broker_risk_cap_shadow",
+          "variant_type": "broker_quantity_cap_shadow"
+        }
+      ],
+      "dominant_issue": "max_risk_per_order_exceeded",
+      "experiment_family": "quantity_cap_shadow",
+      "experiment_row_id": "m14-param-exp-broker-m10-pa-008-max-risk-per-order-exceeded",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-broker-m10-pa-008-max-risk-per-order-exceeded",
+      "implementation_mutation_allowed": false,
+      "issue_type": "broker_dry_run_blocker",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-008",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-broker-m10-pa-008-max-risk-per-order-exceeded",
+      "spec_state": "shadow_spec_prepared_wait_fresh_refresh",
+      "strategy_id": "M10-PA-008",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "First rescue-specific M13 signal or account ledger row.",
+        "M12.47-owned fresh refresh, not manual M12.37 once-mode.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Then a full 10 rescue A/B trading-day evidence window before promote/modify/reject.",
+        "first M13 signal or account ledger row"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "registry_to_signal_to_account_ledger",
+      "candidate_parameter_family": "registry_input_signal_account_ledger_mapping",
+      "candidate_variants": [
+        {
+          "change_summary": "Audit registry, M12 account input, signal ledger, and account ledger mapping before any parameter decision.",
+          "comparison_baseline": "runtime_mapping_contract",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "parameter_change": "none",
+            "runtime_ids": [
+              "M10-PA-008-broker-risk-cap-shadow-1d"
+            ]
+          },
+          "required_evidence": [
+            "first M13 signal or account ledger row"
+          ],
+          "variant_id": "ledger_mapping_audit_no_parameter_change",
+          "variant_type": "ledger_mapping_audit"
+        }
+      ],
+      "dominant_issue": "",
+      "experiment_family": "ledger_path_mapping_audit",
+      "experiment_row_id": "m14-param-exp-m10-pa-008-broker-risk-cap-shadow",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-008-broker-risk-cap-shadow",
+      "implementation_mutation_allowed": false,
+      "issue_type": "missing_rescue_ledger",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-008",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-008-broker-risk-cap-shadow-1d"
+      ],
+      "source_experiment_status": "shadow_runtime_wait_first_ledger",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-008-broker-risk-cap-shadow",
+      "spec_state": "wait_first_ledger_before_parameter_decision",
+      "strategy_id": "M10-PA-008-broker-risk-cap-shadow",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days if a later parameter variant is created.",
+        "Fresh quote source without fallback-only state.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Source-row and signal-count comparison before any detector or threshold change.",
+        "fresh M12.47-owned quote refresh",
+        "source-row and signal-count comparison"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "source_quote_and_signal_count",
+      "candidate_parameter_family": "quote_source_freshness_gate",
+      "candidate_variants": [
+        {
+          "change_summary": "Recheck the existing rescue runtime with fresh Longbridge readonly quotes before changing any detector or threshold.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "eligible_if_fresh_quote_count": 1,
+            "parameter_change": "none_before_fresh_evidence",
+            "quote_source_required": "longbridge_quote_readonly"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned quote refresh",
+            "source-row and signal-count comparison"
+          ],
+          "variant_id": "fresh_quote_recheck_no_parameter_change",
+          "variant_type": "fresh_quote_recheck"
+        }
+      ],
+      "dominant_issue": "stale_quote_source_blocks_candidate",
+      "experiment_family": "fresh_quote_gate_recheck",
+      "experiment_row_id": "m14-param-exp-m10-pa-009-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-009-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-009",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-009-m14-modify-20260522-1d"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-009-m14-modify-20260522",
+      "spec_state": "fresh_recheck_spec_ready_wait_refresh",
+      "strategy_id": "M10-PA-009-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days before any min-R or target/stop policy decision.",
+        "10 rescue A/B trading days before any policy decision",
+        "Frozen rescue runtime remains unchanged.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Normalized target/stop shadow runtime emits its own M13 ledger evidence.",
+        "first M13 ledger row for the target/stop shadow runtime",
+        "fresh M12.47-owned refresh"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "target_stop_normalization_reward_r",
+      "candidate_parameter_family": "target_stop_geometry_normalization_not_lowering_frozen_min_r",
+      "candidate_variants": [
+        {
+          "change_summary": "Shadow-test normalized 1.0R target geometry without lowering the frozen runtime min-R threshold.",
+          "comparison_baseline": "frozen_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "best_variant_candidate_count": 12,
+            "current_reward_ge_1_0_count": 0,
+            "current_reward_r_max": "0.9819",
+            "current_reward_r_min": "0.7159",
+            "eligible_candidate_count": 12,
+            "shadow_runtime_id": "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow",
+            "target_rule": "entry_plus_1_0r"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned refresh",
+            "first M13 ledger row for the target/stop shadow runtime",
+            "10 rescue A/B trading days before any policy decision"
+          ],
+          "variant_id": "risk_normalized_1_0r",
+          "variant_type": "target_stop_shadow"
+        }
+      ],
+      "dominant_issue": "reward_filter_blocks_all",
+      "experiment_family": "target_stop_reward_geometry_shadow",
+      "experiment_row_id": "m14-param-exp-m10-pa-012-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-012-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-012",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-012-m14-modify-20260522-5m"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-012-m14-modify-20260522",
+      "spec_state": "shadow_spec_prepared_wait_fresh_refresh",
+      "strategy_id": "M10-PA-012-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "First rescue-specific M13 signal or account ledger row.",
+        "M12.47-owned fresh refresh, not manual M12.37 once-mode.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Then a full 10 rescue A/B trading-day evidence window before promote/modify/reject.",
+        "first M13 signal or account ledger row"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "registry_to_signal_to_account_ledger",
+      "candidate_parameter_family": "registry_input_signal_account_ledger_mapping",
+      "candidate_variants": [
+        {
+          "change_summary": "Audit registry, M12 account input, signal ledger, and account ledger mapping before any parameter decision.",
+          "comparison_baseline": "runtime_mapping_contract",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "parameter_change": "none",
+            "runtime_ids": [
+              "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m"
+            ]
+          },
+          "required_evidence": [
+            "first M13 signal or account ledger row"
+          ],
+          "variant_id": "ledger_mapping_audit_no_parameter_change",
+          "variant_type": "ledger_mapping_audit"
+        }
+      ],
+      "dominant_issue": "",
+      "experiment_family": "ledger_path_mapping_audit",
+      "experiment_row_id": "m14-param-exp-m10-pa-012-m14-modify-20260522-target-stop-risk-normalized-1-0r-shadow",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-012-m14-modify-20260522-target-stop-risk-normalized-1-0r-shadow",
+      "implementation_mutation_allowed": false,
+      "issue_type": "missing_rescue_ledger",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-012",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m"
+      ],
+      "source_experiment_status": "shadow_runtime_wait_first_ledger",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-012-m14-modify-20260522-target-stop-risk-normalized-1-0r-shadow",
+      "spec_state": "wait_first_ledger_before_parameter_decision",
+      "strategy_id": "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days after a mapped variant exists.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "No cross-timeframe remap without a separate detector redesign review.",
+        "Same-timeframe parent detector evidence.",
+        "fresh same-timeframe parent detector source rows"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "same_timeframe_parent_detector",
+      "candidate_parameter_family": "same_timeframe_parent_detector_mapping",
+      "candidate_variants": [
+        {
+          "change_summary": "Require same-timeframe parent detector evidence before remapping or rebuilding the rescue detector.",
+          "comparison_baseline": "same_timeframe_parent_detector",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "cross_timeframe_remap": "not_allowed_without_separate_review",
+            "parent_strategy_id": "M10-PA-013"
+          },
+          "required_evidence": [
+            "fresh same-timeframe parent detector source rows"
+          ],
+          "variant_id": "same_timeframe_parent_detector_evidence",
+          "variant_type": "parent_detector_review"
+        }
+      ],
+      "dominant_issue": "parent_detector_zero_signal_for_timeframe",
+      "experiment_family": "parent_detector_timeframe_mapping_review",
+      "experiment_row_id": "m14-param-exp-m10-pa-013-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-013-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-013",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": false,
+      "runtime_ids": [
+        "M10-PA-013-m14-modify-20260522-1d",
+        "M10-PA-013-m14-modify-20260522-5m"
+      ],
+      "source_experiment_status": "blocked_until_parent_detector_evidence",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-013-m14-modify-20260522",
+      "spec_state": "wait_parent_detector_evidence_before_spec",
+      "strategy_id": "M10-PA-013-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "10 rescue A/B trading days if a later parameter variant is created.",
+        "Fresh quote source without fallback-only state.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "Source-row and signal-count comparison before any detector or threshold change.",
+        "fresh M12.47-owned quote refresh",
+        "source-row and signal-count comparison"
+      ],
+      "activation_gate_reason": "No fresh M12.47-owned refresh is visible yet.",
+      "activation_gate_state": "waiting_for_m12_47_fresh_refresh",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "source_quote_and_signal_count",
+      "candidate_parameter_family": "quote_source_freshness_gate",
+      "candidate_variants": [
+        {
+          "change_summary": "Recheck the existing rescue runtime with fresh Longbridge readonly quotes before changing any detector or threshold.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "eligible_if_fresh_quote_count": 3,
+            "parameter_change": "none_before_fresh_evidence",
+            "quote_source_required": "longbridge_quote_readonly"
+          },
+          "required_evidence": [
+            "fresh M12.47-owned quote refresh",
+            "source-row and signal-count comparison"
+          ],
+          "variant_id": "fresh_quote_recheck_no_parameter_change",
+          "variant_type": "fresh_quote_recheck"
+        }
+      ],
+      "dominant_issue": "stale_quote_source_blocks_candidate",
+      "experiment_family": "fresh_quote_gate_recheck",
+      "experiment_row_id": "m14-param-exp-m12-ftd-001-m14-modify-20260522",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m12-ftd-001-m14-modify-20260522",
+      "implementation_mutation_allowed": false,
+      "issue_type": "zero_signal_after_connection",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M12-FTD-001",
+      "priority": "P0",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "runtime_ids": [
+        "M12-FTD-001-m14-modify-20260522-1d"
+      ],
+      "source_experiment_status": "blocked_until_fresh_refresh",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m12-ftd-001-m14-modify-20260522",
+      "spec_state": "fresh_recheck_spec_ready_wait_refresh",
+      "strategy_id": "M12-FTD-001-m14-modify-20260522",
+      "variant_count": 1
+    },
+    {
+      "acceptance_criteria": [
+        "Comparable baseline-vs-rescue ledger rows.",
+        "Full 10 rescue A/B trading-day window.",
+        "Manual M14 review before promote/modify/reject.",
+        "No M13 registry, M12 account-spec, broker-readiness, implementation, or parameter mutation from this spec.",
+        "No broker connection, live execution, real order, paper approval, or manual M12.37 once-mode.",
+        "full 10 rescue A/B trading-day window"
+      ],
+      "activation_gate_reason": "This row already has active rescue evidence; keep collecting the 10-day A/B window.",
+      "activation_gate_state": "continue_ab_collection_only",
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "candidate_change_scope": "no_parameter_change",
+      "candidate_parameter_family": "none_ab_evidence_only",
+      "candidate_variants": [
+        {
+          "change_summary": "Keep collecting the current rescue runtime's own 10-trading-day A/B evidence.",
+          "comparison_baseline": "current_rescue_runtime",
+          "parameter_mutation_allowed": false,
+          "parameter_values": {
+            "observed_trading_days_count": 1,
+            "parameter_change": "none",
+            "remaining_ab_trading_days": 9
+          },
+          "required_evidence": [
+            "full 10 rescue A/B trading-day window"
+          ],
+          "variant_id": "continue_current_rescue_ab_window",
+          "variant_type": "ab_evidence_only"
+        }
+      ],
+      "dominant_issue": "",
+      "experiment_family": "continue_ab_evidence_collection",
+      "experiment_row_id": "m14-param-exp-m10-pa-011-orb-r1",
+      "external_reference_pattern_ids": [
+        "ai_trader_shadow_signal_scoreboard",
+        "tradingagents_persistent_decision_log",
+        "tradingagents_role_decomposed_review"
+      ],
+      "external_review_lanes": [
+        "shadow_signal_scoreboard",
+        "technical_evidence_review",
+        "bull_bear_objection_review",
+        "risk_portfolio_review",
+        "decision_log_audit"
+      ],
+      "gate_row_id": "m14-param-gate-m14-param-exp-m10-pa-011-orb-r1",
+      "implementation_mutation_allowed": false,
+      "issue_type": "collect_more_ab_evidence",
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_mutation_allowed": false,
+      "parent_strategy_id": "M10-PA-011",
+      "priority": "P2",
+      "ready_for_manual_shadow_review": false,
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": false,
+      "runtime_ids": [
+        "M10-PA-011-ORB-R1-5m"
+      ],
+      "source_experiment_status": "collect_more_ab_evidence",
+      "spec_row_id": "m14-param-spec-m14-param-exp-m10-pa-011-orb-r1",
+      "spec_state": "continue_ab_collection_no_new_parameter_spec",
+      "strategy_id": "M10-PA-011-ORB-R1",
+      "variant_count": 1
+    }
+  ],
+  "stage": "M14.rescue_parameter_shadow_spec",
+  "summary": {
+    "activation_gate_row_count": 14,
+    "broker_or_live_enabled": false,
+    "broker_quantity_cap_variant_count": 1,
+    "broker_readiness_status_mutation_count": 0,
+    "broker_rule_shadow_variant_count": 2,
+    "candidate_variant_count": 14,
+    "candidate_variant_type_counts": {
+      "ab_evidence_only": 1,
+      "broker_cooldown_quality_shadow": 1,
+      "broker_exposure_ranker_shadow": 1,
+      "broker_quantity_cap_shadow": 1,
+      "fresh_quote_recheck": 6,
+      "ledger_mapping_audit": 2,
+      "parent_detector_review": 1,
+      "target_stop_shadow": 1
+    },
+    "continue_ab_only_count": 1,
+    "copy_trading_allowed": false,
+    "experiment_family_counts": {
+      "continue_ab_evidence_collection": 1,
+      "cooldown_quality_veto_shadow": 1,
+      "exposure_ranker_shadow": 1,
+      "fresh_quote_gate_recheck": 6,
+      "ledger_path_mapping_audit": 2,
+      "parent_detector_timeframe_mapping_review": 1,
+      "quantity_cap_shadow": 1,
+      "target_stop_reward_geometry_shadow": 1
+    },
+    "external_override_allowed": false,
+    "fresh_recheck_variant_count": 6,
+    "fresh_refresh_observed": false,
+    "implementation_mutation_allowed_count": 0,
+    "m12_account_specs_mutation_count": 0,
+    "m13_registry_mutation_count": 0,
+    "manual_m12_37_once_allowed": false,
+    "parameter_mutation_allowed_count": 0,
+    "parent_detector_wait_count": 1,
+    "project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
+    "ready_for_manual_shadow_review_count": 0,
+    "source_experiment_row_count": 14,
+    "source_quote": "fallback_quotes_only",
+    "spec_row_count": 14,
+    "spec_state_counts": {
+      "continue_ab_collection_no_new_parameter_spec": 1,
+      "fresh_recheck_spec_ready_wait_refresh": 6,
+      "shadow_spec_prepared_wait_fresh_refresh": 4,
+      "wait_first_ledger_before_parameter_decision": 2,
+      "wait_parent_detector_evidence_before_spec": 1
+    },
+    "target_stop_shadow_variant_count": 1,
+    "wait_first_ledger_count": 2,
+    "waiting_for_fresh_refresh_count": 12
+  }
+}

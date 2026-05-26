@@ -53,6 +53,13 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["summary"]["parameter_activation_waiting_for_fresh_refresh_count"], 3)
             self.assertEqual(result["summary"]["parameter_activation_implementation_mutation_allowed_count"], 0)
             self.assertEqual(result["summary"]["parameter_activation_parameter_mutation_allowed_count"], 0)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_row_count"], 4)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_candidate_variant_count"], 4)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_waiting_for_fresh_refresh_count"], 3)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_target_stop_variant_count"], 1)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_broker_quantity_variant_count"], 1)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_broker_rule_variant_count"], 1)
+            self.assertEqual(result["summary"]["parameter_shadow_spec_parameter_mutation_allowed_count"], 0)
             self.assertFalse(result["summary"]["objective_audit_complete"])
             self.assertEqual(result["summary"]["objective_audit_requirement_count"], 12)
             self.assertEqual(result["summary"]["objective_audit_proven_count"], 4)
@@ -117,6 +124,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                 "waiting_for_fresh_refresh_no_activation",
             )
             self.assertEqual(
+                result["stage_assessment"]["parameter_shadow_spec_status"],
+                "shadow_specs_prepared_no_mutation",
+            )
+            self.assertEqual(
                 result["stage_assessment"]["objective_completion_status"],
                 "blocked_or_in_progress",
             )
@@ -131,6 +142,10 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertEqual(result["rescue_parameter_activation_gate"]["shadow_review_candidate_count"], 0)
             self.assertEqual(result["rescue_parameter_activation_gate"]["implementation_mutation_allowed_count"], 0)
             self.assertFalse(result["rescue_parameter_activation_gate"]["manual_m12_37_once_allowed"])
+            self.assertEqual(result["rescue_parameter_shadow_spec"]["spec_row_count"], 4)
+            self.assertEqual(result["rescue_parameter_shadow_spec"]["candidate_variant_count"], 4)
+            self.assertEqual(result["rescue_parameter_shadow_spec"]["parameter_mutation_allowed_count"], 0)
+            self.assertFalse(result["rescue_parameter_shadow_spec"]["manual_m12_37_once_allowed"])
             self.assertEqual(result["objective_completion_audit"]["requirement_count"], 12)
             self.assertFalse(result["objective_completion_audit"]["objective_complete"])
             self.assertEqual(result["objective_completion_audit"]["blocked_count"], 3)
@@ -155,6 +170,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             self.assertIn("Parameter experiment rows: `4`", md)
             self.assertIn("Parameter experiments allowed now: `0`", md)
             self.assertIn("Parameter activation shadow-review candidates: `0`", md)
+            self.assertIn("Parameter shadow spec rows/variants/waiting-fresh-refresh: `4/4/3`", md)
             self.assertIn("Objective audit complete: `False`", md)
             self.assertIn("Objective execution actions/P0/waiting-fresh-refresh: `7/5/5`", md)
             self.assertIn("approved_internal_sim_continue", md)
@@ -179,6 +195,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
         external_map_path = root / "external_map.json"
         parameter_queue_path = root / "parameter_queue.json"
         activation_gate_path = root / "activation_gate.json"
+        parameter_shadow_spec_path = root / "parameter_shadow_spec.json"
         objective_audit_path = root / "objective_audit.json"
         objective_execution_path = root / "objective_execution.json"
         config_path = root / "config.json"
@@ -397,6 +414,28 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        parameter_shadow_spec_path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "spec_row_count": 4,
+                        "candidate_variant_count": 4,
+                        "waiting_for_fresh_refresh_count": 3,
+                        "target_stop_shadow_variant_count": 1,
+                        "broker_quantity_cap_variant_count": 1,
+                        "broker_rule_shadow_variant_count": 1,
+                        "ready_for_manual_shadow_review_count": 0,
+                        "implementation_mutation_allowed_count": 0,
+                        "parameter_mutation_allowed_count": 0,
+                        "m13_registry_mutation_count": 0,
+                        "m12_account_specs_mutation_count": 0,
+                        "broker_readiness_status_mutation_count": 0,
+                    },
+                    "plain_language_result": "Parameter shadow spec fixture plain result.",
+                }
+            ),
+            encoding="utf-8",
+        )
         objective_audit_path.write_text(
             json.dumps(
                 {
@@ -466,6 +505,7 @@ class M14ProjectStageAssessmentTest(unittest.TestCase):
                         "m14_rescue_external_reference_map": str(external_map_path),
                         "m14_rescue_parameter_experiment_queue": str(parameter_queue_path),
                         "m14_rescue_parameter_activation_gate": str(activation_gate_path),
+                        "m14_rescue_parameter_shadow_spec": str(parameter_shadow_spec_path),
                         "m14_objective_completion_audit": str(objective_audit_path),
                         "m14_objective_execution_plan": str(objective_execution_path),
                     },
