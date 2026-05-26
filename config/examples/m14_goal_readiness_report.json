@@ -12,7 +12,8 @@
     "m14_rescue_zero_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_zero_signal_diagnostics.json",
     "m14_rescue_target_stop_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_target_stop_diagnostics.json",
     "m14_rescue_target_stop_shadow_normalization": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_rescue_target_stop_shadow_normalization.json",
-    "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json"
+    "m14_2_broker_readiness_plan": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_readiness_plan.json",
+    "m14_2_broker_blocker_shadow_repair": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/broker_blocker_shadow_repair.json"
   },
   "outputs": {
     "readiness_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_goal_readiness_report.json",

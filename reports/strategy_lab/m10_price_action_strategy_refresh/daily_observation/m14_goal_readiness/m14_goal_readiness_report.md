@@ -1,6 +1,6 @@
 # M14 Goal Readiness Report
 
-- Generated at: `2026-05-26T18:55:00Z`
+- Generated at: `2026-05-26T21:20:00Z`
 - Project stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge progress: `10/10`
 - Internal simulated-account ready strategies: `M10-PA-004, M10-PA-005, M10-PA-008`
@@ -8,7 +8,7 @@
 
 ## Plain Result
 
-Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 10/10 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/10 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 9 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.
+Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Rescue coverage is 10/10 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/10 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 9 actionable items: 8 zero-signal and 0 signal-to-account no-op. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.
 
 ## Gate Counts
 
@@ -58,6 +58,15 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 - Best variant counts: `{'risk_normalized_1_0r': 1}`
 - Runtime ids: `M10-PA-012-m14-modify-20260522-5m`
 
+## Broker Blocker Shadow Repair
+
+- Source blocked rows: `3`
+- Quantity-cap candidates: `1`
+- Exposure deferrals: `1`
+- Cooldown halts: `1`
+- Original readiness mutation: `False`
+- Shadow action counts: `{'apply_quantity_cap': 1, 'defer_until_exposure_frees': 1, 'keep_loss_streak_halt': 1}`
+
 ## Next Actions
 
 - `P0` Run approved strategies in internal simulated-account testing only Evidence: M10-PA-004, M10-PA-005, M10-PA-008 Boundary: No broker connection, no real order, no live execution.
@@ -66,6 +75,7 @@ Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaff
 - `P0` Use zero-signal diagnostics before changing rescue parameters Evidence: 7 quote-refresh candidates; 1 quality/filter candidates; 0 source-mapping candidates; 1 parent-detector zero-signal candidates Boundary: Fresh-data rerun and shadow parameter tests only; no broker/live approval.
 - `P0` Use PA012 target/stop diagnostics before changing rescue runtime thresholds Evidence: 1 target/stop issue runtimes; issue counts {'target_reward_below_1r_after_quality_gates': 1} Boundary: Target/stop fixes stay shadow-only until 10 trading-day A/B evidence exists.
 - `P0` Collect first fresh M13 ledger row for the PA012 target/stop normalized shadow runtime Evidence: 12/12 eligible rows pass the best shadow variant; best variants {'risk_normalized_1_0r': 1} Boundary: Connected shadow runtime is still simulated-only and requires 10 rescue A/B trading days before review.
+- `P0` Apply broker-blocker shadow repair plan only as internal simulated A/B prep Evidence: 1 quantity-cap candidate; 1 exposure deferrals; 1 cooldown halts Boundary: Original broker readiness rows remain blocked; no broker/live approval or readiness mutation.
 - `P1` Keep M14.2 broker readiness in dry-run preview mode Evidence: 5 dry-run ready, 3 blocked Boundary: Manual user approval is still required before any broker paper/live path.
 - `P1` Treat the current artifact set as a recompute/audit snapshot until the next trading session refresh Evidence: history_recompute_from_existing_challenge Boundary: Do not manually run M12.37 once-mode; M12.47 owns session launch.
 

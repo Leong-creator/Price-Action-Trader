@@ -51,9 +51,14 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertEqual(result["broker_readiness"]["mode"], "paper_dry_run_only")
             self.assertEqual(result["broker_readiness"]["dry_run_ready_count"], 1)
             self.assertEqual(result["broker_readiness"]["blocked_count"], 1)
+            self.assertEqual(result["broker_blocker_shadow_repair"]["risk_cap_candidate_count"], 1)
+            self.assertEqual(result["broker_blocker_shadow_repair"]["defer_for_exposure_count"], 1)
+            self.assertEqual(result["broker_blocker_shadow_repair"]["cooldown_defer_count"], 1)
+            self.assertFalse(result["broker_blocker_shadow_repair"]["readiness_status_mutation"])
             self.assertTrue(all(result["execution_boundaries"].values()))
             self.assertFalse(result["goal_completion_assessment"]["goal_complete"])
             self.assertIn("no broker/live/real order approval", result["plain_language_result"])
+            self.assertIn("Broker blocker shadow repair has 1 quantity-cap candidate", result["plain_language_result"])
 
             matrix = {row["strategy_id"]: row for row in result["strategy_action_matrix"]}
             self.assertEqual(matrix["M10-PA-004"]["next_action_category"], "continue_internal_simulation")
@@ -75,6 +80,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             self.assertIn("Rescue Zero-Signal Diagnostics", md)
             self.assertIn("Rescue Target/Stop Diagnostics", md)
             self.assertIn("Rescue Target/Stop Shadow Normalization", md)
+            self.assertIn("Broker Blocker Shadow Repair", md)
             self.assertIn("Completion Assessment", md)
 
     def test_unsafe_config_is_rejected(self) -> None:
@@ -99,6 +105,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
         target_stop_path = root / "target_stop.json"
         shadow_normalization_path = root / "shadow_normalization.json"
         broker_path = root / "broker.json"
+        broker_shadow_repair_path = root / "broker_shadow_repair.json"
         config_path = root / "config.json"
         summary_path.write_text(
             json.dumps(
@@ -378,6 +385,45 @@ class M14GoalReadinessReportTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        broker_shadow_repair_path.write_text(
+            json.dumps(
+                {
+                    "broker_connection": False,
+                    "real_order": False,
+                    "live_execution": False,
+                    "paper_trading_approval": False,
+                    "readiness_status_mutation": False,
+                    "hard_boundaries": {
+                        "paper_simulated_only": True,
+                        "broker_connection": False,
+                        "real_order": False,
+                        "live_execution": False,
+                        "paper_trading_approval": False,
+                    },
+                    "summary": {
+                        "source_blocked_rows": 3,
+                        "shadow_rows": 3,
+                        "strategy_count": 2,
+                        "risk_cap_candidate_count": 1,
+                        "defer_for_exposure_count": 1,
+                        "cooldown_defer_count": 1,
+                        "would_change_original_readiness_count": 0,
+                        "broker_or_live_enabled": False,
+                        "shadow_action_counts": {
+                            "apply_quantity_cap": 1,
+                            "defer_until_exposure_frees": 1,
+                            "keep_loss_streak_halt": 1,
+                        },
+                        "shadow_status_counts": {
+                            "defer_not_repair": 2,
+                            "shadow_repair_candidate": 1,
+                        },
+                    },
+                    "plain_language_result": "fixture broker blocker shadow repair",
+                }
+            ),
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -395,6 +441,7 @@ class M14GoalReadinessReportTest(unittest.TestCase):
                         "m14_rescue_target_stop_diagnostics": str(target_stop_path),
                         "m14_rescue_target_stop_shadow_normalization": str(shadow_normalization_path),
                         "m14_2_broker_readiness_plan": str(broker_path),
+                        "m14_2_broker_blocker_shadow_repair": str(broker_shadow_repair_path),
                     },
                     "outputs": {
                         "readiness_json": str(root / "readiness.json"),
