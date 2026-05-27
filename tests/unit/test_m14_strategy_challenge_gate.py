@@ -8,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from scripts.m14_strategy_challenge_gate_lib import (
+    build_paper_trial_gate,
     build_strategy_aggregates,
     build_strategy_decision_rows,
     load_config,
@@ -201,8 +202,10 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.assertEqual(second["summary"]["appended_challenge_day_row_count"], 0)
             rows = read_jsonl(output_dir / "m14_challenge_day_ledger.jsonl")
             self.assertEqual(len(rows), 2)
-            gate = {row["strategy_id"]: row for row in second["paper_gate"]["rows"]}
-            self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "not_approved_data_quality")
+            gate = {row["runtime_id"]: row for row in second["paper_gate"]["rows"]}
+            self.assertEqual(gate["M10-PA-001-1d"]["paper_trial_gate"], "pause_runtime")
+            self.assertEqual(gate["M10-PA-001-1d"]["action_state"], "pause_runtime")
+            self.assertFalse(gate["M10-PA-001-1d"]["paper_candidate"])
             self.assertIn("fallback quotes / no-fetch", second["summary"]["data_freshness_warning"])
 
     def test_degraded_days_are_audit_only_and_do_not_poison_valid_challenge_progress(self):
@@ -214,16 +217,18 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.write_jsonl(output_dir / "m14_challenge_day_ledger.jsonl", [degraded])
             self.write_fixture(m13_dir=m13_dir, m12_dir=m12_dir, trading_date="2026-05-08", data_ready=True)
             result = run_m14_strategy_challenge_gate(config, generated_at="2026-05-08T17:00:00Z", trading_date="2026-05-08")
-            aggregate = result["strategy_aggregates"]["M10-PA-001"]
-            gate = {row["strategy_id"]: row for row in result["paper_gate"]["rows"]}
+            aggregate = result["strategy_aggregates"]["M10-PA-001-1d"]
+            gate = {row["runtime_id"]: row for row in result["paper_gate"]["rows"]}
             self.assertEqual(aggregate["observed_trading_days"], 2)
             self.assertEqual(aggregate["completed_trading_days"], 1)
             self.assertEqual(aggregate["data_mismatch_days"], 0)
             self.assertEqual(aggregate["observed_data_mismatch_days"], 1)
             self.assertEqual(result["summary"]["effective_challenge_trading_days"], 1)
             self.assertEqual(result["summary"]["challenge_progress_label"], "1/10")
-            self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "not_approved_challenge_incomplete")
-            self.assertIn("fully-ready", gate["M10-PA-001"]["gate_reason"])
+            self.assertEqual(gate["M10-PA-001-1d"]["paper_trial_gate"], "repair_now")
+            self.assertEqual(gate["M10-PA-001-1d"]["action_state"], "repair_now")
+            self.assertFalse(gate["M10-PA-001-1d"]["paper_candidate"])
+            self.assertIn("concrete repair", gate["M10-PA-001-1d"]["gate_reason"])
 
     def test_audit_only_degraded_day_does_not_block_promotion_after_ten_valid_days(self):
         temp, config, m13_dir, m12_dir, output_dir = self.build_dirs()
@@ -248,12 +253,12 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.write_jsonl(output_dir / "m14_challenge_day_ledger.jsonl", existing)
             self.write_fixture(m13_dir=m13_dir, m12_dir=m12_dir, trading_date="2026-05-12", data_ready=True)
             result = run_m14_strategy_challenge_gate(config, generated_at="2026-05-12T17:00:00Z", trading_date="2026-05-12")
-            aggregate = result["strategy_aggregates"]["M10-PA-001"]
-            gate = {row["strategy_id"]: row for row in result["paper_gate"]["rows"]}
+            aggregate = result["strategy_aggregates"]["M10-PA-001-1d"]
+            gate = {row["runtime_id"]: row for row in result["paper_gate"]["rows"]}
             self.assertEqual(aggregate["completed_trading_days"], 10)
             self.assertEqual(aggregate["data_mismatch_days"], 0)
             self.assertEqual(aggregate["observed_data_mismatch_days"], 1)
-            self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "approved_internal_sim_only")
+            self.assertEqual(gate["M10-PA-001-1d"]["paper_trial_gate"], "approved_internal_sim_only")
 
     def test_recompute_only_updates_gate_without_new_challenge_rows(self):
         temp, config, m13_dir, m12_dir, output_dir = self.build_dirs()
@@ -275,15 +280,18 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             ]
             self.write_jsonl(output_dir / "m14_challenge_day_ledger.jsonl", existing)
             result = run_m14_strategy_challenge_recompute(config, generated_at="2026-05-12T17:00:00Z", trading_date="2026-05-08")
-            gate = {row["strategy_id"]: row for row in result["paper_gate"]["rows"]}
+            gate = {row["runtime_id"]: row for row in result["paper_gate"]["rows"]}
             rows = read_jsonl(output_dir / "m14_challenge_day_ledger.jsonl")
             goal_status = read_json(output_dir / "m14_goal_status.json")
             self.assertEqual(len(rows), 10)
             self.assertTrue(result["summary"]["recompute_only"])
-            self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "approved_internal_sim_only")
+            self.assertEqual(gate["M10-PA-001-1d"]["paper_trial_gate"], "approved_internal_sim_only")
             self.assertEqual(goal_status["challenge_progress_label"], "10/10")
             self.assertEqual(goal_status["paper_trial_gate_approved_count"], 1)
             self.assertEqual(goal_status["approved_internal_sim_strategy_ids"], ["M10-PA-001"])
+            decision_ledger_text = (output_dir / "m14_strategy_decision_ledger.jsonl").read_text(encoding="utf-8")
+            self.assertNotIn("continue_testing", decision_ledger_text)
+            self.assertNotIn("not_approved_modify_candidate", decision_ledger_text)
 
     def test_challenge_corrections_are_appended_without_mutating_base_ledger(self):
         temp, config, m13_dir, m12_dir, output_dir = self.build_dirs()
@@ -306,7 +314,7 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.assertEqual(len(correction_rows), 1)
             self.assertEqual(correction_rows[0]["runtime_id"], "M10-PA-001-1d")
             self.assertEqual(correction_rows[0]["realized_pnl"], "-100.00")
-            aggregate = second["strategy_aggregates"]["M10-PA-001"]
+            aggregate = second["strategy_aggregates"]["M10-PA-001-1d"]
             self.assertEqual(aggregate["net_pnl_r"], "-1")
             self.assertEqual(first["summary"]["appended_challenge_day_row_count"], 2)
 
@@ -326,10 +334,71 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
                 aggregates=aggregates,
             )
             decision = decisions[0]
-            self.assertEqual(decision["decision"], "modify")
+            self.assertEqual(decision["decision"], "repair_now")
+            self.assertEqual(decision["action_state"], "repair_now")
             self.assertTrue(decision["circuit_breaker_triggered"])
-            self.assertTrue(decision["frozen"])
-            self.assertEqual(decision["next_variant_id"], "M10-PA-001-m14-modify-20260508")
+            self.assertFalse(decision["frozen"])
+            self.assertEqual(decision["position_size_multiplier"], "0.1")
+            self.assertEqual(decision["next_variant_id"], "M10-PA-001-m14-repair-20260508")
+
+    def test_profitable_high_drawdown_runtime_is_risk_limited_not_rejected(self):
+        temp, config, _, _, _ = self.build_dirs()
+        with temp:
+            rows = []
+            for day in ["2026-05-04", "2026-05-05", "2026-05-06"]:
+                row = self.base_challenge_row(day, realized_pnl="250.00")
+                row["strategy_id"] = "M10-PA-005"
+                row["runtime_id"] = "M10-PA-005-5m"
+                row["timeframe"] = "5m"
+                row["max_drawdown_percent"] = "20.30"
+                rows.append(row)
+            aggregates = build_strategy_aggregates(config, rows)
+            decisions = build_strategy_decision_rows(
+                config=config,
+                generated_at="2026-05-08T17:00:00Z",
+                trading_date=date.fromisoformat("2026-05-08"),
+                aggregates=aggregates,
+            )
+            decision = decisions[0]
+            self.assertEqual(decision["runtime_id"], "M10-PA-005-5m")
+            self.assertEqual(decision["decision"], "risk_limited_advance")
+            self.assertEqual(decision["position_size_multiplier"], "0.25")
+            self.assertTrue(decision["paper_candidate"])
+
+    def test_same_parent_1d_and_5m_are_independent_runtime_gate_rows(self):
+        temp, config, _, _, _ = self.build_dirs()
+        with temp:
+            rows = []
+            for runtime_id, timeframe, realized in [
+                ("M10-PA-013-1d", "1d", "-25.00"),
+                ("M10-PA-013-5m", "5m", "150.00"),
+            ]:
+                row = self.base_challenge_row("2026-05-04", realized_pnl=realized)
+                row["strategy_id"] = "M10-PA-013"
+                row["runtime_id"] = runtime_id
+                row["timeframe"] = timeframe
+                rows.append(row)
+            aggregates = build_strategy_aggregates(config, rows)
+            decisions = build_strategy_decision_rows(
+                config=config,
+                generated_at="2026-05-08T17:00:00Z",
+                trading_date=date.fromisoformat("2026-05-08"),
+                aggregates=aggregates,
+            )
+            paper_gate = {
+                row["runtime_id"]: row
+                for row in build_paper_trial_gate(
+                    config,
+                    "2026-05-08T17:00:00Z",
+                    {row["runtime_id"]: row for row in decisions},
+                    aggregates,
+                )["rows"]
+            }
+
+            self.assertEqual(set(paper_gate), {"M10-PA-013-1d", "M10-PA-013-5m"})
+            self.assertEqual(paper_gate["M10-PA-013-5m"]["action_state"], "risk_limited_advance")
+            self.assertEqual(paper_gate["M10-PA-013-5m"]["position_size_multiplier"], "0.5")
+            self.assertEqual(paper_gate["M10-PA-013-1d"]["action_state"], "repair_now")
 
     def test_pa004_mbf_starts_parallel_variant_but_original_keeps_testing(self):
         temp, config, _, _, _ = self.build_dirs()
@@ -361,8 +430,8 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
                 aggregates=aggregates,
             )
             decision = decisions[0]
-            self.assertEqual(decision["decision"], "continue_testing")
-            self.assertEqual(decision["decision_reason"], "parallel_modify_variant_started_continue_original_to_10d")
+            self.assertEqual(decision["decision"], "risk_limited_advance")
+            self.assertEqual(decision["decision_reason"], "parallel_repair_variant_started_size_limited_original")
             self.assertTrue(decision["circuit_breaker_triggered"])
             self.assertFalse(decision["frozen"])
             self.assertTrue(decision["modify_candidate"])
@@ -388,8 +457,8 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             ]
             self.write_jsonl(output_dir / "m14_challenge_day_ledger.jsonl", existing)
             result = run_m14_strategy_challenge_gate(config, generated_at="2026-05-08T17:00:00Z", trading_date="2026-05-08")
-            gate = {row["strategy_id"]: row for row in result["paper_gate"]["rows"]}
-            self.assertEqual(gate["M10-PA-001"]["paper_trial_gate"], "approved_internal_sim_only")
+            gate = {row["runtime_id"]: row for row in result["paper_gate"]["rows"]}
+            self.assertEqual(gate["M10-PA-001-1d"]["paper_trial_gate"], "approved_internal_sim_only")
             actions = [row["action"] for row in result["appended_execution_rows"]]
             self.assertLess(actions.index("risk_check"), actions.index("simulated_fill"))
             fill_rows = [row for row in result["appended_execution_rows"] if row["action"] == "simulated_fill"]

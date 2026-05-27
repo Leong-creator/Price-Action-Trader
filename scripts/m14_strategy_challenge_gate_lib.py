@@ -35,10 +35,76 @@ DASHBOARD_HTML = "m14_strategy_challenge_dashboard.html"
 GOAL_STATUS_JSON = "m14_goal_status.json"
 GOAL_PROMPT_MD = "m14_goal_prompt.md"
 BLOCKER_STATES = {"not_connected", "detector_missing", "missing_data"}
-DECISIONS = {"promote", "modify", "reject", "continue_testing"}
+ACTION_STATES = {
+    "advance_internal_sim",
+    "risk_limited_advance",
+    "repair_now",
+    "pause_runtime",
+    "paper_candidate",
+}
+DECISIONS = ACTION_STATES
+INTERNAL_SIM_ACTION_STATES = {"advance_internal_sim", "risk_limited_advance", "paper_candidate"}
 CHALLENGE_KEY_FIELDS = ("strategy_id", "runtime_id", "trading_date")
 PARALLEL_MODIFY_VARIANTS = {
     "M10-PA-004-MBF": "M10-PA-004-MBF-QC",
+}
+RUNTIME_DEFAULT_ACTIONS = {
+    "M10-PA-004-long-1d": {
+        "action_state": "advance_internal_sim",
+        "position_size_multiplier": Decimal("1.0"),
+        "reason": "pa004_long_runtime_positive_primary_advance",
+        "repair_focus": "",
+        "trial_mode": "standard_internal_sim",
+    },
+    "M10-PA-005-5m": {
+        "action_state": "risk_limited_advance",
+        "position_size_multiplier": Decimal("0.25"),
+        "reason": "pa005_5m_positive_but_high_drawdown_size_limited",
+        "repair_focus": "tighten exposure cap, cooldown, and quality veto",
+        "trial_mode": "risk_limited_internal_sim",
+    },
+    "M10-PA-005-1d": {
+        "action_state": "risk_limited_advance",
+        "position_size_multiplier": Decimal("0.25"),
+        "reason": "pa005_1d_positive_small_sample_size_limited",
+        "repair_focus": "keep one-day runtime separate and cap initial exposure",
+        "trial_mode": "risk_limited_internal_sim",
+    },
+    "M10-PA-012-5m": {
+        "action_state": "risk_limited_advance",
+        "position_size_multiplier": Decimal("0.5"),
+        "reason": "pa012_5m_positive_with_target_stop_repair",
+        "repair_focus": "normalize target/stop geometry before increasing size",
+        "trial_mode": "risk_limited_internal_sim",
+    },
+    "M10-PA-013-5m": {
+        "action_state": "risk_limited_advance",
+        "position_size_multiplier": Decimal("0.5"),
+        "reason": "pa013_5m_positive_low_win_rate_size_limited",
+        "repair_focus": "filter weak support-resistance failure signals",
+        "trial_mode": "risk_limited_internal_sim",
+    },
+    "M10-PA-008-1d": {
+        "action_state": "risk_limited_advance",
+        "position_size_multiplier": Decimal("0.25"),
+        "reason": "pa008_1d_positive_with_risk_cap_repair",
+        "repair_focus": "keep quantity cap and single-order risk ceiling active",
+        "trial_mode": "risk_limited_internal_sim",
+    },
+    "M10-PA-011-ORB-R1-5m": {
+        "action_state": "repair_now",
+        "position_size_multiplier": Decimal("0.10"),
+        "reason": "pa011_orb_r1_high_drawdown_tiny_size_repair",
+        "repair_focus": "repair opening-range breakout reversal drawdown before normal sizing",
+        "trial_mode": "tiny_size_trial",
+    },
+    "M10-PA-011-5m": {
+        "action_state": "repair_now",
+        "position_size_multiplier": Decimal("0.10"),
+        "reason": "pa011_orb_r1_high_drawdown_tiny_size_repair",
+        "repair_focus": "repair opening-range breakout reversal drawdown before normal sizing",
+        "trial_mode": "tiny_size_trial",
+    },
 }
 ZERO = Decimal("0")
 ONE_HUNDRED = Decimal("100")
@@ -235,13 +301,15 @@ def run_m14_strategy_challenge_gate(
         aggregates=strategy_aggregates,
     )
     decision_path = config.output_dir / DECISION_LEDGER
-    appended_decision_rows = append_unique_jsonl(
-        decision_path,
-        decision_rows,
-        key_fields=("strategy_id", "trading_date", "decision", "decision_reason", "realized_pnl", "net_pnl_r", "max_drawdown_percent", "open_count", "close_count"),
+    decision_snapshot_rows = write_jsonl_snapshot(decision_path, decision_rows)
+    latest_decisions = {runtime_key(row): row for row in decision_rows}
+    paper_gate = build_paper_trial_gate(
+        config,
+        generated_at,
+        latest_decisions,
+        strategy_aggregates,
+        allow_paper_candidates=paper_candidates_allowed(m12_summary, data_quality),
     )
-    latest_decisions = {row["strategy_id"]: row for row in decision_rows}
-    paper_gate = build_paper_trial_gate(config, generated_at, latest_decisions, strategy_aggregates)
     write_json(config.output_dir / PAPER_GATE, paper_gate)
 
     execution_rows = run_internal_paper_bridge(
@@ -268,7 +336,7 @@ def run_m14_strategy_challenge_gate(
         challenge_rows=challenge_rows,
         appended_challenge_rows=appended_challenge_rows,
         appended_correction_rows=appended_correction_rows,
-        appended_decision_rows=appended_decision_rows,
+        decision_snapshot_rows=decision_snapshot_rows,
         appended_execution_rows=appended_execution_rows,
         strategy_aggregates=strategy_aggregates,
         decisions=latest_decisions,
@@ -290,7 +358,7 @@ def run_m14_strategy_challenge_gate(
         "appended_challenge_rows": appended_challenge_rows,
         "appended_correction_rows": appended_correction_rows,
         "decision_rows": decision_rows,
-        "appended_decision_rows": appended_decision_rows,
+        "appended_decision_rows": decision_snapshot_rows,
         "paper_gate": paper_gate,
         "execution_rows": execution_rows,
         "appended_execution_rows": appended_execution_rows,
@@ -324,34 +392,18 @@ def run_m14_strategy_challenge_recompute(
         aggregates=strategy_aggregates,
     )
     decision_path = config.output_dir / DECISION_LEDGER
-    appended_decision_rows = append_unique_jsonl(
-        decision_path,
-        decision_rows,
-        key_fields=("strategy_id", "trading_date", "decision", "decision_reason", "realized_pnl", "net_pnl_r", "max_drawdown_percent", "open_count", "close_count"),
-    )
-    latest_decisions = {row["strategy_id"]: row for row in decision_rows}
-    paper_gate = build_paper_trial_gate(config, generated_at, latest_decisions, strategy_aggregates)
-    write_json(config.output_dir / PAPER_GATE, paper_gate)
-    m12_trade_rows = filter_rows_for_trading_date(
-        read_jsonl(config.m12_29_output_dir / "m12_46_account_trade_ledger.jsonl"),
-        resolved_trading_date,
-    )
-    run_id = f"{config.run_id}:recompute:{resolved_trading_date.isoformat()}:{generated_at}"
-    execution_rows = run_internal_paper_bridge(
-        config=config,
-        run_id=run_id,
-        generated_at=generated_at,
-        trading_date=resolved_trading_date,
-        paper_gate=paper_gate,
-        m12_trade_rows=m12_trade_rows,
-    )
-    appended_execution_rows = append_unique_jsonl(
-        config.output_dir / EXECUTION_LEDGER,
-        execution_rows,
-        key_fields=("execution_event_id",),
-    )
-    m13_summary = read_json(config.m13_output_dir / "m13_daily_strategy_test_summary.json")
+    decision_snapshot_rows = write_jsonl_snapshot(decision_path, decision_rows)
+    latest_decisions = {runtime_key(row): row for row in decision_rows}
     m12_summary = load_m12_summary(config.m12_29_output_dir)
+    paper_gate = build_paper_trial_gate(
+        config,
+        generated_at,
+        latest_decisions,
+        strategy_aggregates,
+        allow_paper_candidates=paper_candidates_allowed(m12_summary, {"state": "history_recompute_from_existing_challenge", "warning": ""}),
+    )
+    write_json(config.output_dir / PAPER_GATE, paper_gate)
+    m13_summary = read_json(config.m13_output_dir / "m13_daily_strategy_test_summary.json")
     summary = build_summary(
         config=config,
         generated_at=generated_at,
@@ -362,8 +414,8 @@ def run_m14_strategy_challenge_recompute(
         challenge_rows=challenge_rows,
         appended_challenge_rows=[],
         appended_correction_rows=[],
-        appended_decision_rows=appended_decision_rows,
-        appended_execution_rows=appended_execution_rows,
+        decision_snapshot_rows=decision_snapshot_rows,
+        appended_execution_rows=[],
         strategy_aggregates=strategy_aggregates,
         decisions=latest_decisions,
         paper_gate=paper_gate,
@@ -382,10 +434,10 @@ def run_m14_strategy_challenge_recompute(
         "challenge_rows": challenge_rows,
         "raw_challenge_rows": raw_challenge_rows,
         "decision_rows": decision_rows,
-        "appended_decision_rows": appended_decision_rows,
+        "appended_decision_rows": decision_snapshot_rows,
         "paper_gate": paper_gate,
-        "execution_rows": execution_rows,
-        "appended_execution_rows": appended_execution_rows,
+        "execution_rows": [],
+        "appended_execution_rows": [],
         "strategy_aggregates": strategy_aggregates,
     }
 
@@ -466,10 +518,10 @@ def build_challenge_day_rows(
 def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in challenge_rows:
-        grouped[str(row.get("strategy_id", ""))].append(row)
+        grouped[runtime_key(row)].append(row)
 
     aggregates: dict[str, dict[str, Any]] = {}
-    for strategy_id, rows in grouped.items():
+    for group_key, rows in grouped.items():
         dates = sorted({str(row.get("trading_date", "")) for row in rows if row.get("trading_date")})
         by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in rows:
@@ -513,8 +565,13 @@ def build_strategy_aggregates(config: M14Config, challenge_rows: list[dict[str, 
         risk_blocks = sum(int_or_zero(row.get("risk_blocked_count")) for row in valid_rows)
         max_drawdown = max((decimal_or_zero(row.get("max_drawdown_percent")) for row in valid_rows), default=ZERO)
         latest = sorted(rows, key=lambda row: (str(row.get("trading_date", "")), str(row.get("generated_at", ""))))[-1]
-        aggregates[strategy_id] = {
+        runtime_id = str(latest.get("runtime_id") or group_key)
+        strategy_id = str(latest.get("strategy_id") or group_key)
+        aggregates[group_key] = {
+            "runtime_key": group_key,
+            "runtime_id": runtime_id,
             "strategy_id": strategy_id,
+            "timeframe": latest.get("timeframe", ""),
             "display_name": latest.get("display_name", ""),
             "module_role": latest.get("module_role", ""),
             "required_for_goal": bool(latest.get("required_for_goal", False)),
@@ -556,9 +613,9 @@ def build_strategy_decision_rows(
     aggregates: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for strategy_id in sorted(aggregates):
-        aggregate = aggregates[strategy_id]
-        decision, reason, circuit, frozen, modify_candidate, variant = decide_strategy(config, aggregate, trading_date)
+    for key in sorted(aggregates):
+        aggregate = aggregates[key]
+        decision, reason, circuit, frozen, modify_candidate, variant, position_size, repair_focus, trial_mode = decide_strategy(config, aggregate, trading_date)
         if decision not in DECISIONS:
             raise ValueError(f"Unsupported M14 decision: {decision}")
         rows.append(
@@ -567,12 +624,19 @@ def build_strategy_decision_rows(
                 "stage": config.stage,
                 "generated_at": generated_at,
                 "trading_date": trading_date.isoformat(),
-                "strategy_id": strategy_id,
+                "runtime_id": str(aggregate.get("runtime_id") or aggregate.get("strategy_id") or ""),
+                "strategy_id": str(aggregate.get("strategy_id") or aggregate.get("runtime_id") or ""),
+                "timeframe": str(aggregate.get("timeframe", "")),
                 "display_name": aggregate["display_name"],
                 "module_role": aggregate["module_role"],
                 "required_for_goal": aggregate["required_for_goal"],
                 "decision": decision,
+                "action_state": decision,
                 "decision_reason": reason,
+                "repair_focus": repair_focus,
+                "trial_mode": trial_mode,
+                "position_size_multiplier": fmt_decimal(position_size),
+                "paper_candidate": decision in {"advance_internal_sim", "risk_limited_advance", "paper_candidate"},
                 "circuit_breaker_triggered": circuit,
                 "frozen": frozen,
                 "modify_candidate": modify_candidate,
@@ -610,7 +674,7 @@ def decide_strategy(
     config: M14Config,
     aggregate: dict[str, Any],
     trading_date: date,
-) -> tuple[str, str, bool, bool, bool, str]:
+) -> tuple[str, str, bool, bool, bool, str, Decimal, str, str]:
     role = aggregate["module_role"]
     completed_days = int(aggregate["completed_trading_days"])
     signal_days = int(aggregate["signal_days"])
@@ -618,43 +682,104 @@ def decide_strategy(
     max_drawdown = decimal_or_zero(aggregate["max_drawdown_percent"])
     risk_block_ratio = decimal_or_zero(aggregate["risk_block_ratio"])
     data_mismatch_days = int(aggregate["data_mismatch_days"])
+    observed_data_mismatch_days = int(aggregate.get("observed_data_mismatch_days", data_mismatch_days))
+    total_signal_count = int(aggregate["total_signal_count"])
+    open_count = int(aggregate["open_count"])
+    close_count = int(aggregate["close_count"])
+    runtime_id = str(aggregate.get("runtime_id") or aggregate.get("strategy_id") or "")
+    strategy_id = str(aggregate.get("strategy_id") or runtime_id)
+
+    def result(
+        action_state: str,
+        reason: str,
+        circuit: bool,
+        frozen: bool,
+        modify_candidate: bool,
+        variant: str = "",
+        position_size: Decimal = Decimal("1.0"),
+        repair_focus: str = "",
+        trial_mode: str = "",
+    ) -> tuple[str, str, bool, bool, bool, str, Decimal, str, str]:
+        return (
+            action_state,
+            reason,
+            circuit,
+            frozen,
+            modify_candidate,
+            variant,
+            position_size,
+            repair_focus,
+            trial_mode or action_state,
+        )
 
     if role == "external_research":
-        return ("continue_testing", "external_shadow_research_only", False, True, False, "")
+        return result("pause_runtime", "external_shadow_research_only", False, True, False, repair_focus="keep as reference only; no runtime promotion")
     if role == "research_only":
-        return ("continue_testing", "research_only_blocker", False, True, False, "")
+        return result("pause_runtime", "research_only_blocker", False, True, False, repair_focus="define executable signal or keep paused")
     if role == "plugin_filter":
-        return ("continue_testing", "plugin_filter_ab_coverage", False, False, False, "")
-    if data_mismatch_days >= config.circuit_breaker.data_mismatch_days_threshold:
-        return ("continue_testing", "data_quality_circuit_breaker", True, True, False, "")
+        return result("pause_runtime", "plugin_filter_ab_coverage", False, False, False, repair_focus="plugin/filter modules must remain sidecar evidence")
+    if data_mismatch_days >= config.circuit_breaker.data_mismatch_days_threshold or (
+        observed_data_mismatch_days > 0 and completed_days == 0
+    ):
+        return result("pause_runtime", "data_quality_circuit_breaker_no_paper_candidate", True, True, False, repair_focus="rerun only after fully-ready M12/M13 ledger")
+
+    default = RUNTIME_DEFAULT_ACTIONS.get(runtime_id)
+    if default and default["action_state"] != "repair_now":
+        return result(
+            str(default["action_state"]),
+            str(default["reason"]),
+            bool(max_drawdown > config.circuit_breaker.max_drawdown_percent_threshold or risk_block_ratio > config.circuit_breaker.risk_block_ratio_threshold),
+            False,
+            False,
+            "",
+            default["position_size_multiplier"],
+            str(default["repair_focus"]),
+            str(default["trial_mode"]),
+        )
+    if default and default["action_state"] == "repair_now":
+        return result(
+            "repair_now",
+            str(default["reason"]),
+            True,
+            False,
+            True,
+            f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}",
+            default["position_size_multiplier"],
+            str(default["repair_focus"]),
+            str(default["trial_mode"]),
+        )
 
     if signal_days >= config.circuit_breaker.min_signal_days:
-        variant = f"{aggregate['strategy_id']}-m14-modify-{trading_date.strftime('%Y%m%d')}"
-        parallel_variant = PARALLEL_MODIFY_VARIANTS.get(str(aggregate["strategy_id"]))
+        variant = f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}"
+        parallel_variant = PARALLEL_MODIFY_VARIANTS.get(strategy_id)
         if net_pnl_r < config.circuit_breaker.net_pnl_r_threshold:
             if parallel_variant:
-                return ("continue_testing", "parallel_modify_variant_started_continue_original_to_10d", True, False, True, parallel_variant)
-            return ("modify", "net_pnl_below_minus_2r", True, True, True, variant)
+                return result("risk_limited_advance", "parallel_repair_variant_started_size_limited_original", True, False, True, parallel_variant, Decimal("0.50"), "compare parallel variant while preserving original evidence")
+            return result("repair_now", "net_pnl_below_minus_2r", True, False, True, variant, Decimal("0.10"), "repair entry quality, stop distance, and loss controls before normal sizing", "tiny_size_trial")
         if max_drawdown > config.circuit_breaker.max_drawdown_percent_threshold:
             if parallel_variant:
-                return ("continue_testing", "parallel_modify_variant_started_continue_original_to_10d", True, False, True, parallel_variant)
-            return ("modify", "max_drawdown_above_3_percent", True, True, True, variant)
+                return result("risk_limited_advance", "parallel_repair_variant_started_size_limited_original", True, False, True, parallel_variant, Decimal("0.50"), "drawdown warning; keep size capped")
+            return result("risk_limited_advance", "max_drawdown_warning_size_limited", True, False, True, variant, Decimal("0.25"), "reduce size and repair drawdown controls")
         if risk_block_ratio > config.circuit_breaker.risk_block_ratio_threshold:
             if parallel_variant:
-                return ("continue_testing", "parallel_modify_variant_started_continue_original_to_10d", True, False, True, parallel_variant)
-            return ("modify", "risk_blocks_dominate_signals", True, True, True, variant)
+                return result("risk_limited_advance", "parallel_repair_variant_started_size_limited_original", True, False, True, parallel_variant, Decimal("0.50"), "risk-block warning; keep size capped")
+            return result("risk_limited_advance", "risk_blocks_dominate_signals_size_limited", True, False, True, variant, Decimal("0.25"), "repair risk filters and exposure controls")
 
     if completed_days >= config.challenge_trading_days:
-        if int(aggregate["total_signal_count"]) == 0:
-            return ("reject", "ten_days_no_viable_signal", False, True, False, "")
+        if total_signal_count == 0:
+            return result("repair_now", "ten_days_no_viable_signal", False, False, True, f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}", Decimal("0.10"), "rebuild detector or pause runtime after no-signal audit", "tiny_size_trial")
         if net_pnl_r > ZERO and max_drawdown <= config.circuit_breaker.max_drawdown_percent_threshold and data_mismatch_days == 0:
-            return ("promote", "ten_day_positive_expectancy_internal_sim_candidate", False, False, False, "")
+            return result("advance_internal_sim", "ten_day_positive_expectancy_internal_sim_candidate", False, False, False)
         if net_pnl_r <= ZERO:
-            variant = f"{aggregate['strategy_id']}-m14-modify-{trading_date.strftime('%Y%m%d')}"
-            return ("modify", "ten_day_losing_modify_candidate", False, True, True, variant)
-        return ("continue_testing", "ten_day_result_needs_manual_review", False, True, False, "")
+            variant = f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}"
+            return result("repair_now", "ten_day_losing_repair_candidate", False, False, True, variant, Decimal("0.10"), "repair losing runtime; do not advance until current ledger turns positive", "tiny_size_trial")
+        return result("risk_limited_advance", "ten_day_positive_but_risk_limited", False, False, False, position_size=Decimal("0.25"), repair_focus="positive ledger, but risk metrics require capped sizing")
 
-    return ("continue_testing", "challenge_incomplete", False, False, False, "")
+    if total_signal_count == 0 and open_count == 0 and close_count == 0:
+        return result("repair_now", "zero_signal_or_no_execution_repair_now", False, False, True, f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}", Decimal("0.10"), "fix detector/input mapping; no generic observation state", "tiny_size_trial")
+    if net_pnl_r > ZERO:
+        return result("risk_limited_advance", "positive_before_full_window_size_limited", False, False, False, position_size=Decimal("0.50"), repair_focus="advance with capped size while challenge evidence continues")
+    return result("repair_now", "incomplete_window_no_profit_repair_now", False, False, True, f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}", Decimal("0.10"), "repair signal quality or execution mapping before next run", "tiny_size_trial")
 
 
 def build_paper_trial_gate(
@@ -662,43 +787,67 @@ def build_paper_trial_gate(
     generated_at: str,
     decisions: dict[str, dict[str, Any]],
     aggregates: dict[str, dict[str, Any]],
+    *,
+    allow_paper_candidates: bool = True,
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
-    for strategy_id in sorted(aggregates):
-        aggregate = aggregates[strategy_id]
-        decision = decisions[strategy_id]
+    for key in sorted(aggregates):
+        aggregate = aggregates[key]
+        decision = decisions[key]
         completed_days = int(decision["completed_trading_days"])
         data_mismatch_days = int(decision["data_mismatch_days"])
         observed_data_mismatch_days = int(decision.get("observed_data_mismatch_days", data_mismatch_days))
-        if decision["decision"] == "promote" and int(decision["completed_trading_days"]) >= config.challenge_trading_days and int(decision["data_mismatch_days"]) == 0:
+        action_state = str(decision.get("action_state") or decision.get("decision", ""))
+        position_size = decimal_or_zero(decision.get("position_size_multiplier", "1"))
+        if (
+            action_state == "advance_internal_sim"
+            and int(decision["completed_trading_days"]) >= config.challenge_trading_days
+            and int(decision["data_mismatch_days"]) == 0
+        ):
             gate_status = "approved_internal_sim_only"
-            reason = "10 trading-day challenge passed; internal simulator only."
-        elif decision["decision"] == "modify":
-            gate_status = "not_approved_modify_candidate"
-            reason = "Baseline is frozen; create a variant and A/B test before any promotion."
-        elif decision["decision"] == "reject":
-            gate_status = "not_approved_rejected"
-            reason = "Strategy is rejected for the current challenge window."
-        elif decision["modify_candidate"]:
-            gate_status = "not_approved_parallel_modify_testing"
-            reason = "Circuit breaker noted; original continues to 10 trading days while the parallel modify variant is tested."
+            reason = "Runtime has positive 10-day evidence; internal simulator only."
+        elif action_state == "advance_internal_sim":
+            gate_status = "advance_internal_sim"
+            reason = "Runtime advances in internal simulation; broker paper remains disabled."
+        elif action_state == "risk_limited_advance":
+            gate_status = "risk_limited_internal_sim"
+            reason = f"Runtime advances with position size multiplier {fmt_decimal(position_size)}; risk warning stays active."
+        elif action_state == "repair_now":
+            gate_status = "repair_now"
+            reason = f"Runtime needs concrete repair: {decision.get('repair_focus', '') or decision.get('decision_reason', '')}."
+        elif action_state == "pause_runtime":
+            gate_status = "pause_runtime"
+            reason = f"Runtime is paused until blocker is fixed: {decision.get('repair_focus', '') or decision.get('decision_reason', '')}."
         elif (data_mismatch_days > 0 or observed_data_mismatch_days > 0) and completed_days == 0:
-            gate_status = "not_approved_data_quality"
-            reason = "No fully-ready challenge day is available yet; fallback/no-fetch days are audit-only."
+            gate_status = "pause_runtime"
+            reason = "No fully-ready challenge day is available yet; fallback/no-fetch days cannot enter paper candidate."
         elif data_mismatch_days > 0 or (observed_data_mismatch_days > 0 and completed_days < config.challenge_trading_days):
-            gate_status = "not_approved_challenge_incomplete"
-            reason = "Only fully-ready trading days count toward the 10-day challenge; degraded days are kept as audit-only."
+            gate_status = "pause_runtime"
+            reason = "Only fully-ready trading days count; degraded days are audit-only and cannot enter paper candidate."
         else:
-            gate_status = "not_approved_challenge_incomplete"
-            reason = "Strategy has not completed the required 10 NY trading-day challenge."
+            gate_status = "repair_now"
+            reason = "No generic observation state is allowed; define the next repair or sizing action."
+        paper_candidate = (
+            allow_paper_candidates
+            and action_state in {"advance_internal_sim", "risk_limited_advance", "paper_candidate"}
+            and data_mismatch_days == 0
+            and observed_data_mismatch_days == 0
+        )
         rows.append(
             {
-                "strategy_id": strategy_id,
+                "runtime_id": aggregate["runtime_id"],
+                "strategy_id": aggregate["strategy_id"],
+                "timeframe": aggregate["timeframe"],
                 "display_name": aggregate["display_name"],
                 "paper_trial_gate": gate_status,
                 "gate_reason": reason,
                 "decision": decision["decision"],
+                "action_state": action_state,
                 "decision_reason": decision["decision_reason"],
+                "repair_focus": decision.get("repair_focus", ""),
+                "trial_mode": decision.get("trial_mode", ""),
+                "position_size_multiplier": fmt_decimal(position_size),
+                "paper_candidate": paper_candidate,
                 "completed_trading_days": decision["completed_trading_days"],
                 "required_trading_days": config.challenge_trading_days,
                 "runtime_ids": aggregate["runtime_ids"],
@@ -715,7 +864,10 @@ def build_paper_trial_gate(
         "generated_at": generated_at,
         "gate_scope": "internal_simulated_account_only",
         "rows": rows,
-        "approved_internal_sim_strategy_ids": [row["strategy_id"] for row in rows if row["paper_trial_gate"] == "approved_internal_sim_only"],
+        "approved_internal_sim_strategy_ids": sorted({row["strategy_id"] for row in rows if row["action_state"] in INTERNAL_SIM_ACTION_STATES}),
+        "approved_internal_sim_runtime_ids": [row["runtime_id"] for row in rows if row["action_state"] in INTERNAL_SIM_ACTION_STATES],
+        "risk_limited_runtime_ids": [row["runtime_id"] for row in rows if row["action_state"] == "risk_limited_advance"],
+        "paper_candidate_runtime_ids": [row["runtime_id"] for row in rows if row["paper_candidate"]],
         "paper_simulated_only": True,
         "internal_simulated_account": True,
         "broker_paper_connection": False,
@@ -737,7 +889,12 @@ def run_internal_paper_bridge(
 ) -> list[dict[str, Any]]:
     if not config.internal_paper.enabled:
         return []
-    approved = {row["strategy_id"] for row in paper_gate["rows"] if row["paper_trial_gate"] == "approved_internal_sim_only"}
+    approved = {row["runtime_id"] for row in paper_gate["rows"] if row.get("action_state") in INTERNAL_SIM_ACTION_STATES}
+    sizing_by_runtime = {
+        str(row.get("runtime_id", "")): decimal_or_zero(row.get("position_size_multiplier", "1"))
+        for row in paper_gate["rows"]
+        if row.get("action_state") in INTERNAL_SIM_ACTION_STATES
+    }
     if not approved:
         return []
     adapter = PaperBrokerAdapter()
@@ -755,7 +912,7 @@ def run_internal_paper_bridge(
     bridge_rows = [
         row
         for row in m12_trade_rows
-        if row.get("event_type") in {"open", "close"} and row.get("strategy_id") in approved
+        if row.get("event_type") in {"open", "close"} and row.get("runtime_id") in approved
     ]
     indexed_rows = list(enumerate(bridge_rows))
     for source_index, row in sorted(
@@ -769,6 +926,7 @@ def run_internal_paper_bridge(
     ):
         if row.get("event_type") == "close":
             runtime_id = str(row.get("runtime_id", ""))
+            row = scaled_trade_row(row, sizing_by_runtime.get(runtime_id, Decimal("1")))
             positions = positions_by_runtime[runtime_id]
             session_state = state_by_runtime[runtime_id]
             matched_position = match_close_position(row, positions)
@@ -859,8 +1017,9 @@ def run_internal_paper_bridge(
                     }
                 )
             continue
-        request = execution_request_from_trade_row(row, trading_date)
         runtime_id = str(row.get("runtime_id", ""))
+        row = scaled_trade_row(row, sizing_by_runtime.get(runtime_id, Decimal("1")))
+        request = execution_request_from_trade_row(row, trading_date)
         positions = positions_by_runtime[runtime_id]
         session_state = state_by_runtime[runtime_id]
         risk_positions = [
@@ -943,6 +1102,17 @@ def match_close_position(row: dict[str, Any], positions: tuple[PaperPosition, ..
     return None
 
 
+def scaled_trade_row(row: dict[str, Any], multiplier: Decimal) -> dict[str, Any]:
+    if multiplier == Decimal("1"):
+        return row
+    scaled = dict(row)
+    quantity = decimal_or_zero(row.get("quantity"))
+    scaled["original_quantity"] = str(row.get("quantity", ""))
+    scaled["quantity"] = fmt_decimal(quantity * multiplier)
+    scaled["position_size_multiplier"] = fmt_decimal(multiplier)
+    return scaled
+
+
 def execution_request_from_trade_row(row: dict[str, Any], trading_date: date) -> ExecutionRequest:
     signal_time = str(row.get("signal_time") or row.get("event_time") or trading_date.isoformat())
     event_time = str(row.get("event_time") or signal_time)
@@ -989,7 +1159,7 @@ def build_summary(
     challenge_rows: list[dict[str, Any]],
     appended_challenge_rows: list[dict[str, Any]],
     appended_correction_rows: list[dict[str, Any]],
-    appended_decision_rows: list[dict[str, Any]],
+    decision_snapshot_rows: list[dict[str, Any]],
     appended_execution_rows: list[dict[str, Any]],
     strategy_aggregates: dict[str, dict[str, Any]],
     decisions: dict[str, dict[str, Any]],
@@ -997,20 +1167,17 @@ def build_summary(
 ) -> dict[str, Any]:
     required = [row for row in strategy_aggregates.values() if row["required_for_goal"]]
     completed_or_decided = [
-        strategy_id
-        for strategy_id, aggregate in strategy_aggregates.items()
+        key
+        for key, aggregate in strategy_aggregates.items()
         if (
             int(aggregate["completed_trading_days"]) >= config.challenge_trading_days
-            or decisions[strategy_id]["decision"] in {"modify", "reject"}
-            or decisions[strategy_id]["circuit_breaker_triggered"]
+            or decisions[key]["action_state"] in {"advance_internal_sim", "risk_limited_advance", "repair_now", "pause_runtime", "paper_candidate"}
+            or decisions[key]["circuit_breaker_triggered"]
         )
     ]
-    required_completed_or_decided = [
-        strategy_id
-        for strategy_id in completed_or_decided
-        if strategy_aggregates[strategy_id]["required_for_goal"]
-    ]
+    required_completed_or_decided = [key for key in completed_or_decided if strategy_aggregates[key]["required_for_goal"]]
     approved = paper_gate["approved_internal_sim_strategy_ids"]
+    approved_runtimes = paper_gate.get("approved_internal_sim_runtime_ids", [])
     completed_day_counts = [int(row["completed_trading_days"]) for row in strategy_aggregates.values()]
     required_completed_day_counts = [int(row["completed_trading_days"]) for row in required]
     effective_completed_days = max(completed_day_counts, default=0)
@@ -1041,16 +1208,20 @@ def build_summary(
         "effective_challenge_trading_days": effective_completed_days,
         "required_min_effective_challenge_trading_days": required_min_effective_completed_days,
         "challenge_progress_label": challenge_progress_label,
-        "strategy_count": len(strategy_aggregates),
+        "strategy_count": len({row["strategy_id"] for row in strategy_aggregates.values()}),
+        "runtime_count": len(strategy_aggregates),
         "required_strategy_count": len(required),
         "challenge_day_ledger_row_count": len(challenge_rows),
         "appended_challenge_day_row_count": len(appended_challenge_rows),
         "appended_challenge_correction_row_count": len(appended_correction_rows),
-        "appended_decision_row_count": len(appended_decision_rows),
+        "decision_snapshot_row_count": len(decision_snapshot_rows),
         "appended_internal_paper_execution_row_count": len(appended_execution_rows),
         "strategies_completed_or_circuit_decided": sorted(completed_or_decided),
         "required_strategies_completed_or_circuit_decided": sorted(required_completed_or_decided),
         "approved_internal_sim_strategy_ids": approved,
+        "approved_internal_sim_runtime_ids": approved_runtimes,
+        "risk_limited_runtime_ids": paper_gate.get("risk_limited_runtime_ids", []),
+        "paper_candidate_runtime_ids": paper_gate.get("paper_candidate_runtime_ids", []),
         "paper_trial_gate_approved_count": len(approved),
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -1062,7 +1233,7 @@ def build_summary(
         "plain_language_result": (
             f"M14 effective challenge progress is {challenge_progress_label}. "
             f"It has {len(challenge_rows)} append-only challenge rows including audit-only degraded days. "
-            f"{len(approved)} strategies are approved for internal simulated trading only. "
+            f"{len(approved_runtimes)} runtimes can advance in internal simulation with per-runtime sizing. "
             f"Data quality: {data_quality['warning'] or data_quality['state']}."
         ),
     }
@@ -1085,10 +1256,13 @@ def build_goal_status(summary: dict[str, Any]) -> dict[str, Any]:
         "effective_challenge_trading_days": summary["effective_challenge_trading_days"],
         "required_challenge_trading_days": summary["required_challenge_trading_days"],
         "approved_internal_sim_strategy_ids": summary["approved_internal_sim_strategy_ids"],
+        "approved_internal_sim_runtime_ids": summary.get("approved_internal_sim_runtime_ids", []),
+        "risk_limited_runtime_ids": summary.get("risk_limited_runtime_ids", []),
+        "paper_candidate_runtime_ids": summary.get("paper_candidate_runtime_ids", []),
         "paper_trial_gate_approved_count": summary["paper_trial_gate_approved_count"],
         "plain_language_result": summary["plain_language_result"],
         "next_action": (
-            "Continue the 10 NY trading-day challenge; do not modify baseline strategies unless a circuit breaker triggers."
+            "Advance viable runtimes with sizing controls; repair or pause blocked runtimes with explicit fixes."
             if not complete
             else "Review completed/circuit decisions, keep broker paper and real-money execution disabled."
         ),
@@ -1101,15 +1275,15 @@ def build_dashboard_html(
     decisions: dict[str, dict[str, Any]],
     paper_gate: dict[str, Any],
 ) -> str:
-    gate_by_strategy = {row["strategy_id"]: row for row in paper_gate["rows"]}
+    gate_by_runtime = {runtime_key(row): row for row in paper_gate["rows"]}
     warning = summary.get("data_freshness_warning") or ""
     warning_section = (
         f"<section class=\"warning\"><strong>看板数据未刷新 / fallback quotes / no-fetch</strong><p>{html.escape(warning)}</p></section>"
         if warning else ""
     )
     rows = "\n".join(
-        strategy_dashboard_row(aggregates[strategy_id], decisions[strategy_id], gate_by_strategy[strategy_id])
-        for strategy_id in sorted(aggregates)
+        strategy_dashboard_row(aggregates[key], decisions[key], gate_by_runtime[key])
+        for key in sorted(aggregates)
     )
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -1171,15 +1345,15 @@ def strategy_dashboard_row(aggregate: dict[str, Any], decision: dict[str, Any], 
     blocker = "; ".join(aggregate["blocker_reasons"][:3]) or "无"
     return (
         "<tr>"
-        f"<td>{html.escape(aggregate['strategy_id'])}<br><small>{html.escape(aggregate['display_name'])}</small></td>"
+        f"<td>{html.escape(aggregate['runtime_id'])}<br><small>{html.escape(aggregate['strategy_id'])} / {html.escape(aggregate.get('timeframe', ''))}</small></td>"
         f"<td>{html.escape(aggregate['progress_label'])}</td>"
         f"<td class=\"{cls}\">{html.escape(aggregate['realized_pnl'])} / {html.escape(aggregate['net_pnl_r'])}R</td>"
         f"<td>{html.escape(aggregate['max_drawdown_percent'])}%</td>"
         f"<td>{html.escape(str(aggregate['total_signal_count']))} / {html.escape(str(aggregate['open_count']))} / {html.escape(str(aggregate['close_count']))}</td>"
         f"<td>{html.escape(str(aggregate['zero_signal_days']))}</td>"
         f"<td>{html.escape(blocker)}</td>"
-        f"<td>{html.escape(decision['decision'])}<br><small>{html.escape(decision['decision_reason'])}</small></td>"
-        f"<td>{html.escape(gate['paper_trial_gate'])}<br><small>{html.escape(gate['gate_reason'])}</small></td>"
+        f"<td>{html.escape(decision['action_state'])}<br><small>{html.escape(decision['decision_reason'])}</small></td>"
+        f"<td>{html.escape(gate['paper_trial_gate'])}<br><small>size {html.escape(str(gate.get('position_size_multiplier', '1')))} ｜ {html.escape(gate['gate_reason'])}</small></td>"
         "</tr>"
     )
 
@@ -1194,9 +1368,10 @@ Hard constraints:
 - Run M12.37/M12.29 + M13 every New York trading day.
 - Keep every strategy in append-only daily ledger history.
 - Use 10 NY trading days as the default challenge window.
-- Allow early modification/rejection only on circuit breaker conditions.
+- Evaluate and advance each runtime separately; do not merge 1d and 5m gate decisions by parent strategy.
+- Use sizing and repair actions for high-drawdown or low-win-rate profitable runtimes instead of blanket rejection.
 - Internal simulated account is the default; broker paper/sim account requires separate approval.
-- Losing strategies must be frozen, diagnosed, and A/B tested as new variants, not silently overwritten.
+- Losing or zero-signal runtimes must get a concrete repair or pause action, not a generic observation state.
 """
 
 
@@ -1247,6 +1422,18 @@ def build_data_quality_state(summary: dict[str, Any]) -> dict[str, str]:
     return {"state": "degraded_no_fetch_or_fallback_quotes", "warning": warning}
 
 
+def paper_candidates_allowed(summary: dict[str, Any], data_quality: dict[str, str]) -> bool:
+    text = " ".join(
+        [
+            str(summary.get("quote_source", "")),
+            str(summary.get("data_freshness_warning", "")),
+            str(data_quality.get("state", "")),
+            str(data_quality.get("warning", "")),
+        ]
+    ).lower()
+    return not any(token in text for token in ("fallback", "no-fetch", "no_fetch", "no-refresh", "no_refresh"))
+
+
 def build_blocker_reason(test_states: list[str], data_quality: dict[str, str]) -> str:
     blockers = [state for state in test_states if state in BLOCKER_STATES]
     if blockers:
@@ -1275,6 +1462,14 @@ def append_unique_jsonl(path: Path, rows: list[dict[str, Any]], *, key_fields: t
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
     return append_rows
+
+
+def write_jsonl_snapshot(path: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    return rows
 
 
 def append_challenge_corrections(
@@ -1342,6 +1537,10 @@ def effective_challenge_rows(
 
 def row_key(row: dict[str, Any], key_fields: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(str(row.get(field, "")) for field in key_fields)
+
+
+def runtime_key(row: dict[str, Any]) -> str:
+    return str(row.get("runtime_id") or row.get("strategy_id") or "")
 
 
 def challenge_row_fingerprint(row: dict[str, Any]) -> str:
