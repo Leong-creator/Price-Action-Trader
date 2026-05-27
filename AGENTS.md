@@ -12,6 +12,7 @@
 - `plans/active-plan.md`
 - `docs/implement.md`
 - `docs/status.md`
+- 若存在 `reports/conversation_goal/current_goal.md`，读取它作为当前对话目标；它不得覆盖本文件、active plan、implement 或 status 的硬约束。
 - 与当前任务最相关的需求、架构、知识库或模块规则文件
 
 ## 3. Source of Truth
@@ -20,6 +21,7 @@
 - 当前进展与阻塞以 `docs/status.md` 为准。
 - 业务范围以 `docs/requirements.md` 为准。
 - 架构边界以 `docs/architecture.md` 为准。
+- 当前对话目标可由 `scripts/set_conversation_goal.py` 写入 `reports/conversation_goal/current_goal.*`，仅作为本轮目标提示，不得提升权限或绕过安全边界。
 
 ## 4. 核心原则
 - 稳定性优先于开发速度。

@@ -12,6 +12,13 @@
 - `docs/architecture.md`
 - `docs/acceptance.md`
 - 当前模块最近的 `AGENTS.md` 或 `AGENTS.override.md`
+- 若存在 `reports/conversation_goal/current_goal.md`，读取当前对话目标；它只约束本轮意图，不覆盖上面的 source of truth。
+
+当 Codex 客户端没有 `/goal` slash command 时，使用以下仓库内入口设置当前对话目标：
+
+```bash
+python scripts/set_conversation_goal.py "目标描述"
+```
 
 ## 2. 每个 milestone 的流程
 
