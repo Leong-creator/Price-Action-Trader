@@ -114,20 +114,15 @@ TIMEFRAME_LABELS = {
 }
 EXTENDED_SESSION_MOVE_THRESHOLD = Decimal("3")
 RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES = frozenset({"longbridge_quote_readonly"})
-LEGACY_HISTORY_METRIC_NAMES = (
-    "historical_net_profit",
-    "historical_profit_factor",
-    "historical_return_percent",
-    "历史净利润",
-    "历史收益",
+LEGACY_HISTORY_OUTPUT_KEYS = frozenset(
+    {
+        "legacy_history_metric_policy",
+        "legacy_history_metric_planning_input",
+        "legacy_history_metric_display_only",
+        "historical_metric_decision_scope",
+    }
 )
-LEGACY_HISTORY_METRIC_EXCLUDED_DECISIONS = (
-    "strategy_promotion",
-    "rescue_priority",
-    "parameter_activation",
-    "broker_readiness",
-    "m14_objective_completion",
-)
+LEGACY_HISTORY_OUTPUT_KEY_FRAGMENTS = ("历史净利润", "历史收益", "历史盈利因子")
 DEFAULT_MARKET_WATCHLIST_GROUPS = (
     {"group_id": "core_etf", "display_name": "核心指数/ETF", "symbols": ("SPY", "QQQ", "DIA", "IWM", "SMH", "SOXX", "XLK")},
     {"group_id": "magnificent_seven", "display_name": "美股七姐妹", "symbols": ("AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA")},
@@ -200,6 +195,11 @@ FORBIDDEN_OUTPUT_TEXT = (
     "account_id",
     "cash_balance",
     "position_qty",
+    "historical_net_profit",
+    "historical_profit_factor",
+    "历史净利润",
+    "历史收益",
+    "历史盈利因子",
 )
 
 
@@ -411,6 +411,7 @@ def run_m12_29_current_day_scan_dashboard(
     (config.output_dir / "m11_8_paper_trial_gate_recheck.md").write_text(build_gate_md(gate), encoding="utf-8")
     (config.output_dir / "m12_29_current_day_scan_report.md").write_text(build_report_md(summary), encoding="utf-8")
     (config.output_dir / "m12_29_handoff.md").write_text(build_handoff_md(config, summary), encoding="utf-8")
+    purge_legacy_history_outputs(config.output_dir)
     assert_no_forbidden_output(config.output_dir)
     return {
         "summary": summary,
@@ -1449,8 +1450,6 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
                 "trade_count": pilot.get("trade_count") or metric.get("trade_count", ""),
                 "historical_initial_capital": pilot.get("initial_capital") or metric.get("initial_capital", ""),
                 "historical_final_equity": pilot.get("final_equity") or metric.get("final_equity", ""),
-                "historical_net_profit": pilot.get("net_profit") or metric.get("net_profit", ""),
-                "historical_profit_factor": pilot.get("profit_factor") or metric.get("profit_factor", ""),
                 "historical_average_holding_bars": pilot.get("average_holding_bars") or metric.get("average_holding_bars", ""),
                 "historical_best_symbol": pilot.get("best_symbol") or metric.get("best_symbol", ""),
                 "historical_worst_symbol": pilot.get("worst_symbol") or metric.get("worst_symbol", ""),
@@ -1476,8 +1475,6 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
             "trade_count": str(best_ftd.get("trade_count", "")),
             "historical_initial_capital": best_ftd.get("initial_capital", ""),
             "historical_final_equity": best_ftd.get("final_equity", ""),
-            "historical_net_profit": best_ftd.get("net_profit", ""),
-            "historical_profit_factor": best_ftd.get("profit_factor", ""),
             "historical_average_holding_bars": best_ftd.get("average_holding_bars", ""),
             "historical_best_symbol": "",
             "historical_worst_symbol": "",
@@ -1504,8 +1501,6 @@ def build_strategy_closure_rows(config: M1229Config) -> list[dict[str, str]]:
                 "trade_count": "",
                 "historical_initial_capital": "",
                 "historical_final_equity": "",
-                "historical_net_profit": "",
-                "historical_profit_factor": "",
                 "historical_average_holding_bars": "",
                 "historical_best_symbol": "",
                 "historical_worst_symbol": "",
@@ -1575,8 +1570,6 @@ def build_account_history_lookup(config: M1229Config, closure_rows: list[dict[st
                         "max_drawdown_percent": variant_history.get("max_drawdown_percent", ""),
                         "historical_initial_capital": variant_history.get("initial_capital", ""),
                         "historical_final_equity": variant_history.get("final_equity", ""),
-                        "historical_net_profit": variant_history.get("net_profit", ""),
-                        "historical_profit_factor": variant_history.get("profit_factor", ""),
                         "historical_average_holding_bars": variant_history.get("average_holding_bars", ""),
                         "variant_label": variant_history.get("variant_title", spec["variant_id"]),
                     }
@@ -2203,16 +2196,6 @@ def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict
         "max_drawdown_percent": account["max_drawdown_percent"],
         "cumulative_return_percent": account["cumulative_return_percent"],
         "symbols": ", ".join(symbols[:10]),
-        "historical_return_percent": history.get("return_percent", ""),
-        "historical_win_rate_percent": history.get("win_rate_percent", ""),
-        "historical_max_drawdown_percent": history.get("max_drawdown_percent", ""),
-        "historical_profit_factor": history.get("historical_profit_factor", ""),
-        "historical_initial_capital": history.get("historical_initial_capital", history.get("initial_capital", "")),
-        "historical_final_equity": history.get("historical_final_equity", history.get("final_equity", "")),
-        "historical_net_profit": history.get("historical_net_profit", history.get("net_profit", "")),
-        "historical_average_holding_bars": history.get("historical_average_holding_bars", history.get("average_holding_bars", "")),
-        "legacy_history_metric_planning_input": "false",
-        "historical_metric_decision_scope": "legacy_display_only_not_m14_planning",
         "variant_label": history.get("variant_label", ""),
         "paper_trial_candidate_now": "false",
     }
@@ -2308,28 +2291,24 @@ def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[s
     guard = next((row for row in rows if row["variant_id"] == "loss_streak_guard"), None)
     active = guard or baseline
     risk_flags: list[str] = []
-    if active and decimal_or_none(active.get("historical_max_drawdown_percent", "")) and decimal_or_none(active["historical_max_drawdown_percent"]) >= Decimal("40"):
-        risk_flags.append("历史最大回撤高")
-    if active and decimal_or_none(active.get("historical_profit_factor", "")) and decimal_or_none(active["historical_profit_factor"]) <= Decimal("1.10"):
-        risk_flags.append("盈利因子偏薄")
+    if active and decimal_or_none(active.get("max_drawdown_percent", "")) and decimal_or_none(active["max_drawdown_percent"]) >= Decimal("20"):
+        risk_flags.append("当前回撤偏高")
     if active and money_to_decimal(active.get("today_total_pnl", "0")) < ZERO:
         risk_flags.append("今日暂时亏损")
     if baseline and int(baseline["today_signal_count"]) > 10:
         risk_flags.append("触发过密")
     if not risk_flags:
-        risk_flags.append("继续观察")
+        risk_flags.append("risk_clear")
     return {
         "schema_version": "m12.46.ftd-account-monitor.v1",
         "stage": "M12.46.ftd_account_monitor",
         "accounts": rows,
-        "legacy_history_metric_policy": legacy_history_metric_policy(),
-        "legacy_history_metric_planning_input": False,
         "current_plain_status": f"FTD001 对照：原版 {baseline['today_total_pnl'] if baseline else '暂无'} / 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}",
         "risk_flags": risk_flags,
         "plain_language_summary": (
             f"FTD001 原版今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
             f"连亏保护版今日 {guard['today_total_pnl'] if guard else '暂无'}；"
-            f"重点看当前模拟回撤、连亏和是否过度触发；旧版历史收益只做回看，不参与 M14 规划。"
+            f"重点看当前模拟回撤、连亏和是否过度触发。"
         ),
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -2588,28 +2567,6 @@ def source_config_output_path(config: M1229Config, filename: str) -> Path:
     return config.output_dir / "m12_12_current_day_source" / filename
 
 
-def legacy_history_metric_policy() -> dict[str, Any]:
-    return {
-        "schema_version": "m12.46.legacy-history-metric-policy.v1",
-        "legacy_history_metric_planning_input": False,
-        "legacy_history_metric_display_only": True,
-        "excluded_metric_names": list(LEGACY_HISTORY_METRIC_NAMES),
-        "excluded_from_decisions": list(LEGACY_HISTORY_METRIC_EXCLUDED_DECISIONS),
-        "replacement_evidence_sources": [
-            "m13_signal_ledger",
-            "m13_account_operation_ledger",
-            "m14_objective_completion_audit",
-            "m14_strategy_evidence_gap_burndown",
-            "m14_project_stage_assessment",
-            "m12_47_supervised_fresh_refresh_status",
-        ],
-        "plain_language_note": (
-            "旧版历史净利润/历史收益类字段只保留为回看参考，不参与策略晋级、救援排序、参数激活、"
-            "broker readiness 或 M14 目标完成判断。"
-        ),
-    }
-
-
 def load_market_watchlist_config(path: str | Path = MARKET_WATCHLIST_CONFIG_PATH) -> dict[str, Any]:
     config_path = resolve_repo_path(path)
     if not config_path.exists():
@@ -2678,7 +2635,6 @@ def build_broker_terminal_view(
             "data_freshness_warning": data_freshness_warning,
         },
         "strategy_accounts": account_rows,
-        "legacy_history_metric_policy": legacy_history_metric_policy(),
         "open_positions": [row for row in trade_ledger_rows if row.get("record_type") == "open_position"],
         "recent_orders_or_fills": trade_ledger_rows[:80],
         "signal_panel": runtime["signal_watchlist"][:120],
@@ -2709,8 +2665,14 @@ def build_terminal_account_rows(runtime: dict[str, Any], m14_context: dict[str, 
     for row in runtime["account_rows"]:
         total_pnl = money(money_to_decimal(row["equity"]) - money_to_decimal(row["starting_capital"]))
         audit = audit_by_runtime.get(row["runtime_id"], {})
-        gate = m14_context["paper_gate_by_strategy"].get(row["strategy_id"], {})
-        decision = m14_context["decision_by_strategy"].get(row["strategy_id"], {})
+        gate = (
+            m14_context["paper_gate_by_runtime"].get(row["runtime_id"])
+            or m14_context["paper_gate_by_strategy"].get(row["strategy_id"], {})
+        )
+        decision = (
+            m14_context["decision_by_runtime"].get(row["runtime_id"])
+            or m14_context["decision_by_strategy"].get(row["strategy_id"], {})
+        )
         rows.append(
             {
                 "runtime_id": row["runtime_id"],
@@ -2732,7 +2694,7 @@ def build_terminal_account_rows(runtime: dict[str, Any], m14_context: dict[str, 
                 "today_closed_count": row["today_closed_count"],
                 "win_rate_percent": row["win_rate_percent"],
                 "max_drawdown_percent": row["max_drawdown_percent"],
-                "m14_decision": str(decision.get("decision", "not_available")),
+                "m14_decision": str(decision.get("action_state") or decision.get("decision", "not_available")),
                 "m14_decision_reason": str(decision.get("decision_reason", "")),
                 "paper_trial_gate": str(gate.get("paper_trial_gate", "not_approved_or_pending")),
                 "gate_reason": str(gate.get("gate_reason", "")),
@@ -2782,14 +2744,20 @@ def load_m14_terminal_context(config: M1229Config) -> dict[str, Any]:
         m14_goal_status = str(m14_summary.get("plain_language_result", "available"))
         paper_trial_gate_approved_count = str(m14_summary.get("paper_trial_gate_approved_count", "0"))
     gate_by_strategy: dict[str, dict[str, Any]] = {}
+    gate_by_runtime: dict[str, dict[str, Any]] = {}
     if m14_gate_path.exists():
         gate = load_json(m14_gate_path)
         gate_by_strategy = {row["strategy_id"]: row for row in gate.get("rows", []) if row.get("strategy_id")}
+        gate_by_runtime = {row["runtime_id"]: row for row in gate.get("rows", []) if row.get("runtime_id")}
     latest_decisions: dict[str, dict[str, Any]] = {}
+    latest_decisions_by_runtime: dict[str, dict[str, Any]] = {}
     for row in read_jsonl(m14_decision_path):
         strategy_id = row.get("strategy_id")
         if strategy_id:
             latest_decisions[strategy_id] = row
+        runtime_id = row.get("runtime_id")
+        if runtime_id:
+            latest_decisions_by_runtime[runtime_id] = row
     return {
         "m13_goal_path": m13_goal_path,
         "m14_summary_path": m14_summary_path,
@@ -2798,7 +2766,9 @@ def load_m14_terminal_context(config: M1229Config) -> dict[str, Any]:
         "m14_goal_status": m14_goal_status,
         "paper_trial_gate_approved_count": paper_trial_gate_approved_count,
         "paper_gate_by_strategy": gate_by_strategy,
+        "paper_gate_by_runtime": gate_by_runtime,
         "decision_by_strategy": latest_decisions,
+        "decision_by_runtime": latest_decisions_by_runtime,
     }
 
 
@@ -3146,9 +3116,8 @@ def build_accountized_dashboard_payload(
             "extended_session_monitor": "盘前 / 盘后异动",
             "trade_ledger": "模拟交易明细",
             "signal_watchlist": "信号观察清单",
-            "audit_reports": "审计与历史报告",
+            "audit_reports": "审计与报告",
         },
-        "legacy_history_metric_policy": legacy_history_metric_policy(),
         "broker_terminal_view": broker_terminal_view,
         "shared_account_view": mainline_overview,
         "mainline_account_view": mainline_overview,
@@ -3642,19 +3611,6 @@ def build_strategy_scorecards(rows: list[dict[str, str]], closure_rows: list[dic
                 "simulated_pnl_today": money(pnl),
                 "simulated_return_today_percent": pct(pnl / DEFAULT_EQUITY * HUNDRED),
                 "floating_positive_percent": positive_percent(strategy_rows),
-                "historical_return_percent": closure.get("return_percent", ""),
-                "historical_win_rate_percent": closure.get("win_rate_percent", ""),
-                "historical_max_drawdown_percent": closure.get("max_drawdown_percent", ""),
-                "historical_trade_count": closure.get("trade_count", ""),
-                "historical_initial_capital": closure.get("historical_initial_capital", ""),
-                "historical_final_equity": closure.get("historical_final_equity", ""),
-                "historical_net_profit": closure.get("historical_net_profit", ""),
-                "historical_profit_factor": closure.get("historical_profit_factor", ""),
-                "historical_average_holding_bars": closure.get("historical_average_holding_bars", ""),
-                "historical_best_symbol": closure.get("historical_best_symbol", ""),
-                "historical_worst_symbol": closure.get("historical_worst_symbol", ""),
-                "historical_best_timeframe": closure.get("historical_best_timeframe", ""),
-                "historical_worst_timeframe": closure.get("historical_worst_timeframe", ""),
                 "average_simulated_pnl_per_opportunity": money(pnl / Decimal(len(active))) if active else "0.00",
                 "top_symbols": ", ".join(symbols[:8]),
                 "plain_next_action": closure["plain_reason"],
@@ -3690,19 +3646,6 @@ def build_strategy_detail_views(rows: list[dict[str, str]], scorecards: list[dic
                 "worst_symbol_today": best_key_by_pnl(symbol_pnl, reverse=False),
                 "timeframe_breakdown": dict(sorted(timeframe_counts.items())),
                 "bucket_breakdown": dict(sorted(bucket_counts.items())),
-                "historical_return_percent": card["historical_return_percent"],
-                "historical_win_rate_percent": card["historical_win_rate_percent"],
-                "historical_max_drawdown_percent": card["historical_max_drawdown_percent"],
-                "historical_trade_count": card["historical_trade_count"],
-                "historical_profit_factor": card["historical_profit_factor"],
-                "historical_net_profit": card["historical_net_profit"],
-                "historical_final_equity": card["historical_final_equity"],
-                "historical_best_symbol": card["historical_best_symbol"],
-                "historical_worst_symbol": card["historical_worst_symbol"],
-                "historical_best_timeframe": card["historical_best_timeframe"],
-                "historical_worst_timeframe": card["historical_worst_timeframe"],
-                "legacy_history_metric_planning_input": "false",
-                "historical_metric_decision_scope": "legacy_display_only_not_m14_planning",
                 "today_pnl_by_timeframe": {key: money(value) for key, value in sorted(timeframe_pnl.items())},
                 "plain_next_action": card["plain_next_action"],
                 "paper_trial_candidate_now": "false",
@@ -3729,9 +3672,6 @@ def build_observation_test_lane(scorecards: list[dict[str, str]], detail_views: 
                 "unique_symbol_count": card["unique_symbol_count"],
                 "today_simulated_pnl": card["simulated_pnl_today"],
                 "positive_opportunity_percent": card["floating_positive_percent"],
-                "historical_return_percent": card["historical_return_percent"],
-                "historical_win_rate_percent": card["historical_win_rate_percent"],
-                "historical_max_drawdown_percent": card["historical_max_drawdown_percent"],
                 "timeframes_today": ", ".join(sorted({row.get("timeframe", "") for row in events if row.get("timeframe")})),
                 "symbols_today": card["top_symbols"],
                 "daily_result_plain": (
@@ -3758,15 +3698,15 @@ def build_observation_test_lane(scorecards: list[dict[str, str]], detail_views: 
 
 def observation_hint(card: dict[str, str], has_event: bool) -> str:
     if card["strategy_id"] == "M10-PA-004":
-        return "只做多版继续观察；做空版暂停，不单独展示成一条割裂策略。"
+        return "只做多版进入内部模拟推进；做空版暂停，不单独展示成一条割裂策略。"
     if not has_event:
-        return "继续自动观察，等真实触发样本积累后再决定升级或降级。"
+        return "今日无触发，下一步检查 detector 输入和可交易样本，不写空泛观察。"
     pnl = money_to_decimal(card["simulated_pnl_today"])
     if pnl > ZERO:
-        return "今日样本暂时为正，继续观察，不直接升级。"
+        return "今日样本为正，进入风险受限推进或内部模拟推进判断。"
     if pnl < ZERO:
-        return "今日样本暂时为负，继续看是否连续偏弱。"
-    return "今日触发但盈亏接近持平，继续观察。"
+        return "今日样本为负，下一步立即做入场质量、止损和仓位修复。"
+    return "今日触发但盈亏接近持平，下一步检查信号质量和成本敏感性。"
 
 
 def build_timeframe_views(rows: list[dict[str, str]], scorecards: list[dict[str, str]]) -> dict[str, Any]:
@@ -3837,13 +3777,7 @@ def build_ftd001_monitor(scorecards: list[dict[str, str]], detail_views: dict[st
     detail = detail_views.get("M12-FTD-001", {})
     rows = detail.get("opportunity_rows", [])
     today_pnl = money_to_decimal(card["simulated_pnl_today"]) if card else ZERO
-    historical_drawdown = decimal_or_none(card.get("historical_max_drawdown_percent", "")) if card else None
-    historical_profit_factor = decimal_or_none(card.get("historical_profit_factor", "")) if card else None
     risk_flags: list[str] = []
-    if historical_drawdown is not None and historical_drawdown >= Decimal("40"):
-        risk_flags.append("历史最大回撤高")
-    if historical_profit_factor is not None and historical_profit_factor <= Decimal("1.10"):
-        risk_flags.append("盈利因子偏薄")
     if today_pnl < ZERO:
         risk_flags.append("今日暂时亏损")
     if len(rows) > 10:
@@ -3851,19 +3785,13 @@ def build_ftd001_monitor(scorecards: list[dict[str, str]], detail_views: dict[st
     if len({row["symbol"] for row in rows}) <= 2 and rows:
         risk_flags.append("信号集中度偏高")
     if not risk_flags:
-        risk_flags.append("继续观察")
+        risk_flags.append("risk_clear")
     return {
         "schema_version": "m12.36.ftd001-monitor.v1",
         "stage": "M12.36.ftd001_focus_monitor",
         "strategy_id": "M12-FTD-001",
         "strategy_title": card["strategy_title"] if card else "方方土日线趋势顺势信号K",
         "current_status": card["current_status"] if card else "每日测试",
-        "historical_return_percent": card["historical_return_percent"] if card else "",
-        "historical_win_rate_percent": card["historical_win_rate_percent"] if card else "",
-        "historical_max_drawdown_percent": card["historical_max_drawdown_percent"] if card else "",
-        "historical_profit_factor": card["historical_profit_factor"] if card else "",
-        "legacy_history_metric_policy": legacy_history_metric_policy(),
-        "legacy_history_metric_planning_input": False,
         "today_opportunity_count": len(rows),
         "today_symbols": sorted({row["symbol"] for row in rows}),
         "today_timeframes": sorted({row["timeframe"] for row in rows}),
@@ -3871,7 +3799,7 @@ def build_ftd001_monitor(scorecards: list[dict[str, str]], detail_views: dict[st
         "today_positive_opportunity_percent": positive_percent(rows),
         "current_consecutive_loss_proxy": consecutive_loss_proxy(rows),
         "risk_flags": risk_flags,
-        "drawdown_watch": "true" if "历史最大回撤高" in risk_flags else "false",
+        "drawdown_watch": "false",
         "current_plain_status": f"FTD001：{risk_flags[0]}",
         "plain_language_summary": build_ftd_plain_summary(card, rows, today_pnl, risk_flags),
         "paper_simulated_only": True,
@@ -3898,10 +3826,8 @@ def build_ftd_plain_summary(card: dict[str, str] | None, rows: list[dict[str, st
     direction = "盈利" if today_pnl > ZERO else "亏损" if today_pnl < ZERO else "持平"
     symbols = ", ".join(sorted({row["symbol"] for row in rows})[:8]) or "暂无"
     return (
-        f"FTD001 旧版历史收益参考 {card['historical_return_percent']}%，胜率 {card['historical_win_rate_percent']}%，"
-        f"最大回撤 {card['historical_max_drawdown_percent']}%。今天触发 {len(rows)} 条，股票：{symbols}，"
+        f"FTD001 今天触发 {len(rows)} 条，股票：{symbols}，"
         f"当前模拟{direction} {money(today_pnl)}。重点风险：{'，'.join(risk_flags)}。"
-        "历史指标不参与 M14 策略规划。"
     )
 
 
@@ -3950,7 +3876,7 @@ def observer_alerts(summary: dict[str, Any], shared_account: dict[str, Any], ftd
     alerts: list[dict[str, str]] = []
     if money_to_decimal(shared_account["day_simulated_pnl"]) < ZERO:
         alerts.append({"level": "注意", "message": "今日总模拟盈亏暂时为负，需要看是否集中在单一策略或周期。"})
-    if ftd001_monitor["risk_flags"] and ftd001_monitor["risk_flags"] != ["继续观察"]:
+    if ftd001_monitor["risk_flags"] and ftd001_monitor["risk_flags"] != ["risk_clear"]:
         alerts.append({"level": "重点", "message": "FTD001 触发风险观察：" + "，".join(ftd001_monitor["risk_flags"])})
     if summary["candidate_date_warning"]:
         alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
@@ -4053,11 +3979,9 @@ def build_report_md(summary: dict[str, Any]) -> str:
 
 
 def build_strategy_closure_md(rows: list[dict[str, str]]) -> str:
-    lines = ["# M12.30 策略全量收口表", "", "| 策略 | 最终状态 | 收益% | 胜率% | 最大回撤% | 说明 |", "|---|---:|---:|---:|---:|---|"]
+    lines = ["# M12.30 策略全量收口表", "", "| 策略 | 最终状态 | 说明 |", "|---|---:|---|"]
     for row in rows:
-        lines.append(
-            f"| {row['strategy_id']} {row['strategy_title']} | {row['final_status']} | {row['return_percent']} | {row['win_rate_percent']} | {row['max_drawdown_percent']} | {row['plain_reason']} |"
-        )
+        lines.append(f"| {row['strategy_id']} {row['strategy_title']} | {row['final_status']} | {row['plain_reason']} |")
     return "\n".join(lines) + "\n"
 
 
@@ -4076,14 +4000,13 @@ def build_observation_test_lane_md(lane: dict[str, Any]) -> str:
         "",
         f"- {lane['plain_language_result']}",
         "- 实验策略也已经入账；当天没触发，会显示为零触发和零开仓，而不是空挂状态。",
-        f"- {legacy_history_metric_policy()['plain_language_note']}",
         "",
-        "| 账户 | 周期 | 今日开仓 | 今日平仓 | 今日盈亏 | 当前权益 | 历史收益（旧版参考） | 最大回撤（旧版参考） |",
-        "|---|---|---:|---:|---:|---:|---:|---:|",
+        "| 账户 | 周期 | 今日开仓 | 今日平仓 | 今日盈亏 | 当前权益 | 当前最大回撤 |",
+        "|---|---|---:|---:|---:|---:|---:|",
     ]
     for row in lane["rows"]:
         lines.append(
-            f"| {row['display_name']} | {row['timeframe']} | {row['today_opened_count']} | {row['today_closed_count']} | {row['today_total_pnl']} | {row['equity']} | {row['historical_return_percent']}% | {row['max_drawdown_percent']}% |"
+            f"| {row['display_name']} | {row['timeframe']} | {row['today_opened_count']} | {row['today_closed_count']} | {row['today_total_pnl']} | {row['equity']} | {row['max_drawdown_percent']}% |"
         )
     return "\n".join(lines) + "\n"
 
@@ -4112,12 +4035,11 @@ def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
         "## 用人话结论",
         "",
         f"- {monitor['plain_language_summary']}",
-        f"- {legacy_history_metric_policy()['plain_language_note']}",
         "",
-        "| 版本 | 今日盈亏 | 当前权益 | 历史收益（旧版参考） | 胜率（旧版参考） | 最大回撤（旧版参考） |",
-        "|---|---:|---:|---:|---:|---:|",
-        f"| 原版 baseline | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('historical_return_percent', '')}% | {baseline.get('historical_win_rate_percent', '')}% | {baseline.get('historical_max_drawdown_percent', '')}% |",
-        f"| 连亏保护 loss_streak_guard | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('historical_return_percent', '')}% | {guard.get('historical_win_rate_percent', '')}% | {guard.get('historical_max_drawdown_percent', '')}% |",
+        "| 版本 | 今日盈亏 | 当前权益 | 当前胜率 | 当前最大回撤 |",
+        "|---|---:|---:|---:|---:|",
+        f"| 原版 baseline | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('win_rate_percent', '')}% | {baseline.get('max_drawdown_percent', '')}% |",
+        f"| 连亏保护 loss_streak_guard | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('win_rate_percent', '')}% | {guard.get('max_drawdown_percent', '')}% |",
         "",
         f"- 风险标记：{'，'.join(monitor['risk_flags'])}",
     ]
@@ -4128,12 +4050,6 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
     summary = dashboard.get("summary", {})
     terminal = dashboard.get("broker_terminal_view", {})
-    legacy_metric_policy = (
-        dashboard.get("legacy_history_metric_policy")
-        or terminal.get("legacy_history_metric_policy")
-        or legacy_history_metric_policy()
-    )
-    legacy_metric_note = str(legacy_metric_policy.get("plain_language_note", ""))
     mainline = dashboard["mainline_account_view"]
     experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
@@ -4283,18 +4199,18 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
       <div class="terminal-panel"><h2>持仓 / 信号 / PA004 对照</h2><div class="note">{html.escape(terminal.get('pa004_comparison', {}).get('plain_language_result', ''))}</div><div class="wrap"><table class="terminal-table"><thead>{table_head()}</thead><tbody>{terminal_position_rows}</tbody></table></div><h2>今日正式信号</h2><div class="wrap"><table class="terminal-table"><thead>{watchlist_head()}</thead><tbody>{terminal_signal_rows}</tbody></table></div><h2>PA004 baseline / MBF / QC 对照</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{pa004_terminal_rows}</tbody></table></div></div>
       <div class="terminal-panel"><h2>自选股与新闻</h2><div class="watch-grid">{terminal_watchlist_sections}</div>{terminal_news_sections}</div>
     </section>
-    <section class="panel"><h2>审计与历史报告</h2><div class="note">以下保留原账户成绩单、模拟交易明细、正式信号清单、账户输入审计和历史参考样例，用于回看与验证。首屏交易终端不改变任何策略、风控或执行结果。{html.escape(legacy_metric_note)}</div></section>
+    <section class="panel"><h2>审计与报告</h2><div class="note">以下保留原账户成绩单、模拟交易明细、正式信号清单、账户输入审计和参考样例，用于回看与验证。首屏交易终端不改变任何策略、风控或执行结果。</div></section>
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
     <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
-    <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>历史收益</th><th>胜率</th><th>最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
+    <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>当前胜率</th><th>当前最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
     <section class="panel"><h2>盘前 / 盘后异动</h2><div class="note">{html.escape(extended_monitor['plain_language_summary'])}</div><div class="two-col"><div class="mini-card"><h2>盘前超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{premarket_rows}</tbody></table></div></div><div class="mini-card"><h2>盘后超过 {html.escape(extended_monitor['threshold_percent'])}%</h2><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{postmarket_rows}</tbody></table></div></div></div><div class="wrap"><table><thead>{extended_session_head()}</thead><tbody>{focus_rows}</tbody></table></div></section>
     <section class="panel"><h2>按 1d / 5m 分组测试</h2><div class="note">当前主计划只保留 1d 与 5m。信号按各自周期收盘确认，盘中每 60 秒只刷新报价和持仓盈亏。</div><div class="timeframes">{timeframe_sections}</div></section>
     <section class="panel"><h2>账户成绩单</h2><div class="note">每条独立账户都看得到本金、权益、今日盈亏、胜率和最大回撤；主线和实验分层展示，但都真实入账。</div><div class="wrap"><table><thead>{strategy_scorecard_head()}</thead><tbody>{strategy_scorecard_rows}</tbody></table></div></section>
-    <section class="panel"><h2>账户下钻</h2><div class="note">这里看每个账户的当前状态、开平仓数量和可用现金。历史净利润/历史收益字段仅作旧版回看参考，不参与策略规划或准入判断。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
+    <section class="panel"><h2>账户下钻</h2><div class="note">这里看每个账户的当前状态、开平仓数量、可用现金、当前收益和当前回撤。</div><div class="wrap"><table><thead>{strategy_detail_head()}</thead><tbody>{strategy_detail_rows}</tbody></table></div></section>
     <section class="panel"><h2>模拟交易明细</h2><div class="note">这里展示当前持仓和最近已平仓记录，按账户状态机推进，不再是旧的机会当前价覆盖。</div><div class="wrap"><table><thead>{table_head()}</thead><tbody>{today_rows}</tbody></table></div></section>
     <section class="panel"><h2>正式信号清单</h2><div class="note">这里只展示真正会进入账户测试的正式信号，不再把历史观察样例混进主线收益和机会统计。</div><div class="wrap"><table><thead>{watchlist_head()}</thead><tbody>{watch_rows}</tbody></table></div></section>
     <section class="panel"><h2>账户输入审计</h2><div class="note">这张表专门防止“名义上进测试、实际上还吃旧观察流”的老问题。所有进账户的策略都必须明确写清楚输入源。</div><div class="wrap"><table><thead><tr><th>账户</th><th>输入源</th><th>今日正式信号</th><th>可用正式行数</th><th>说明</th></tr></thead><tbody>{audit_rows}</tbody></table></div></section>
-    <section class="panel"><h2>历史参考样例（不入账）</h2><div class="note">这里只放回看和复盘用的旧样例，不参与今日主线收益，也不会触发新开仓。</div><div class="wrap"><table><thead>{watchlist_head()}</thead><tbody>{reference_rows}</tbody></table></div></section>
+    <section class="panel"><h2>参考样例（不入账）</h2><div class="note">这里只放回看和复盘用的旧样例，不参与今日主线收益，也不会触发新开仓。</div><div class="wrap"><table><thead>{watchlist_head()}</thead><tbody>{reference_rows}</tbody></table></div></section>
     <section class="panel"><h2>策略状态</h2><div class="wrap"><table><thead><tr><th>策略</th><th>名称</th><th>状态</th><th>说明</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
   </main>
 </body>
@@ -4429,7 +4345,7 @@ def watchlist_head() -> str:
 
 
 def strategy_scorecard_head() -> str:
-    return "<tr><th>账户</th><th>分层</th><th>周期</th><th>今日开仓</th><th>今日平仓</th><th>今日盈亏</th><th>当前权益</th><th>胜率</th><th>最大回撤</th><th>历史收益</th></tr>"
+    return "<tr><th>账户</th><th>分层</th><th>周期</th><th>今日开仓</th><th>今日平仓</th><th>今日盈亏</th><th>当前权益</th><th>胜率</th><th>最大回撤</th><th>累计收益</th></tr>"
 
 
 def timeframe_view_html(view: dict[str, Any]) -> str:
@@ -4473,13 +4389,13 @@ def strategy_scorecard_html(row: dict[str, str]) -> str:
         f"<td>{html.escape(row['equity'])}</td>"
         f"<td>{html.escape(percent_or_na(row.get('win_rate_percent', '')))}</td>"
         f"<td>{html.escape(percent_or_na(row.get('max_drawdown_percent', '')))}</td>"
-        f"<td>{html.escape(percent_or_na(row.get('historical_return_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('cumulative_return_percent', '')))}</td>"
         "</tr>"
     )
 
 
 def strategy_detail_head() -> str:
-    return "<tr><th>账户</th><th>当前权益</th><th>可用现金</th><th>当前持仓</th><th>累计已平仓</th><th>今日开仓/平仓</th><th>历史净利润（旧版参考）</th><th>历史收益/回撤（旧版参考）</th></tr>"
+    return "<tr><th>账户</th><th>当前权益</th><th>可用现金</th><th>当前持仓</th><th>累计已平仓</th><th>今日开仓/平仓</th><th>累计收益</th><th>胜率/当前回撤</th></tr>"
 
 
 def strategy_detail_summary_html(row: dict[str, Any]) -> str:
@@ -4491,8 +4407,8 @@ def strategy_detail_summary_html(row: dict[str, Any]) -> str:
         f"<td>{html.escape(row['open_position_count'])}</td>"
         f"<td>{html.escape(row['closed_trade_count'])}</td>"
         f"<td>{html.escape(row['today_opened_count'])}/{html.escape(row['today_closed_count'])}</td>"
-        f"<td>{html.escape(row['historical_net_profit'])}</td>"
-        f"<td>{html.escape(percent_pair_or_na(row.get('historical_return_percent', ''), row.get('historical_max_drawdown_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('cumulative_return_percent', '')))}</td>"
+        f"<td>{html.escape(percent_pair_or_na(row.get('win_rate_percent', ''), row.get('max_drawdown_percent', '')))}</td>"
         "</tr>"
     )
 
@@ -4559,9 +4475,8 @@ def ftd_account_row_html(row: dict[str, str]) -> str:
         f"<td>{html.escape(label)}</td>"
         f"<td>{html.escape(row['today_total_pnl'])}</td>"
         f"<td>{html.escape(row['equity'])}</td>"
-        f"<td>{html.escape(percent_or_na(row.get('historical_return_percent', '')))}</td>"
-        f"<td>{html.escape(percent_or_na(row.get('historical_win_rate_percent', '')))}</td>"
-        f"<td>{html.escape(percent_or_na(row.get('historical_max_drawdown_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('win_rate_percent', '')))}</td>"
+        f"<td>{html.escape(percent_or_na(row.get('max_drawdown_percent', '')))}</td>"
         "</tr>"
     )
 
@@ -4649,6 +4564,7 @@ def metrics_by_strategy(path: Path, *, cohort_id: str | None = None) -> dict[str
 
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [strip_legacy_history_metrics(row) for row in rows]
     if not rows:
         path.write_text("", encoding="utf-8")
         return
@@ -4661,6 +4577,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    payload = strip_legacy_history_metrics(payload)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -4668,11 +4585,79 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
+            row = strip_legacy_history_metrics(row)
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def strip_legacy_history_metrics(value: Any) -> Any:
+    if isinstance(value, dict):
+        cleaned: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if (
+                key_text.startswith("historical_")
+                or key_text in LEGACY_HISTORY_OUTPUT_KEYS
+                or any(fragment in key_text for fragment in LEGACY_HISTORY_OUTPUT_KEY_FRAGMENTS)
+            ):
+                continue
+            cleaned[key] = strip_legacy_history_metrics(item)
+        return cleaned
+    if isinstance(value, list):
+        return [strip_legacy_history_metrics(item) for item in value]
+    return value
+
+
+def purge_legacy_history_outputs(output_dir: Path) -> None:
+    for path in output_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if not has_legacy_history_text(text):
+            continue
+        if path.suffix == ".json":
+            write_json(path, json.loads(text))
+            continue
+        if path.suffix == ".jsonl":
+            rows = [strip_legacy_history_metrics(json.loads(line)) for line in text.splitlines() if line.strip()]
+            rows = [row for row in rows if not has_legacy_history_text(json.dumps(row, ensure_ascii=False))]
+            write_jsonl(path, rows)
+            continue
+        if path.suffix == ".csv":
+            write_csv(path, list(csv.DictReader(text.splitlines())))
+            continue
+        if path.name == "m12_12_readonly_daily_dashboard.html":
+            write_legacy_dashboard_tombstone(path)
+            continue
+        if path.suffix in {".md", ".html", ".txt"}:
+            lines = [
+                line for line in text.splitlines()
+                if not has_legacy_history_text(line)
+            ]
+            if path.suffix == ".md" and not any("旧版收益率指标已废弃" in line for line in lines):
+                lines.append("")
+                lines.append("- 旧版收益率指标已废弃，不再展示，也不参与策略判断。")
+            path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def has_legacy_history_text(text: str) -> bool:
+    return any(token in text for token in ("historical_", "历史净利润", "历史收益", "历史盈利因子"))
+
+
+def write_legacy_dashboard_tombstone(path: Path) -> None:
+    path.write_text(
+        "<!doctype html>\n"
+        "<html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>M12.12 旧看板已废弃</title></head>"
+        "<body><h1>M12.12 旧看板已废弃</h1>"
+        "<p>旧版收益率指标已移除。请使用同目录上级的 M12.32 当前模拟账户看板。</p>"
+        "<p>本文件仅作为旧流程占位，不再展示旧收益、旧盈利因子或旧净利润。</p>"
+        "</body></html>\n",
+        encoding="utf-8",
+    )
 
 
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    row = strip_legacy_history_metrics(row)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
