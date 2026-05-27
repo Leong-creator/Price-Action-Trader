@@ -1,0 +1,10 @@
+{
+  "title": "M15 Longbridge paper preflight",
+  "stage": "M15.longbridge_paper_preflight",
+  "paper_gate_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_paper_preflight",
+  "cli_name": "longbridge",
+  "market": "US",
+  "default_order_type": "limit",
+  "regular_hours_only": true
+}
