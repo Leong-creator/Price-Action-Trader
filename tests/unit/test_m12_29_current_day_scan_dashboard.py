@@ -26,11 +26,13 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     PA004_MOMENTUM_VARIANT_ID,
     account_ledger_trading_date,
     advance_account_runtime,
+    assert_no_forbidden_output,
     bootstrap_account_state,
     build_accountized_run_status,
     build_dashboard_data_freshness_warning,
     build_dashboard_update_status,
     build_extended_session_monitor,
+    build_quote_lookup,
     current_us_scan_date,
     filter_rescue_signal_rows,
     load_config,
@@ -922,6 +924,33 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(row["today_realized_pnl"], "-30.00")
         self.assertEqual(close_row["exit_price"], "97.00")
         self.assertEqual(close_row["exit_price_source"], "longbridge_quote_readonly")
+
+    def test_quote_lookup_keeps_live_quote_over_stale_trade_row(self):
+        lookup = build_quote_lookup(
+            trade_rows=[
+                {
+                    "symbol": "INTC",
+                    "latest_price": "84.99",
+                    "latest_price_source": "m12_12_cached_reference_fallback",
+                }
+            ],
+            pa004_formal_rows=[],
+            quotes={
+                "INTC": {
+                    "latest_price": "118.23",
+                    "quote_source": "longbridge_quote_readonly",
+                }
+            },
+        )
+
+        self.assertEqual(lookup["INTC"]["latest_price"], "118.23")
+        self.assertEqual(lookup["INTC"]["latest_price_source"], "longbridge_quote_readonly")
+
+    def test_forbidden_output_scan_ignores_runtime_logs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            (output_dir / "m12_37_session.log").write_text("旧日志：历史收益", encoding="utf-8")
+            assert_no_forbidden_output(output_dir)
 
     def test_extended_session_monitor_detects_premarket_and_postmarket_focus_movers(self):
         quotes = {

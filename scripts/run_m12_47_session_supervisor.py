@@ -217,7 +217,12 @@ def dashboard_json_path(config: SupervisorConfig) -> Path:
 def read_json_if_exists(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    return load_json(path)
+    for _ in range(3):
+        try:
+            return load_json(path)
+        except json.JSONDecodeError:
+            time.sleep(0.2)
+    return {}
 
 
 def process_alive(pid: int | None) -> bool:

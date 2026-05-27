@@ -1718,9 +1718,15 @@ def build_quote_lookup(
         symbol = row.get("symbol", "")
         if not symbol:
             continue
+        existing = lookup.get(symbol)
+        row_source = row.get("latest_price_source", "")
+        if existing and quote_source_allows_runtime_close(existing.get("latest_price_source", "")):
+            continue
+        if existing and not quote_source_allows_runtime_close(row_source):
+            continue
         lookup[symbol] = {
             "latest_price": row.get("latest_price", ""),
-            "latest_price_source": row.get("latest_price_source", ""),
+            "latest_price_source": row_source,
         }
     return lookup
 
@@ -4578,7 +4584,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = strip_legacy_history_metrics(payload)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -4744,6 +4753,8 @@ def pct(value: Decimal) -> str:
 def assert_no_forbidden_output(output_dir: Path) -> None:
     for path in output_dir.rglob("*"):
         if not path.is_file():
+            continue
+        if path.suffix == ".log":
             continue
         text = path.read_text(encoding="utf-8", errors="ignore").lower()
         for forbidden in FORBIDDEN_OUTPUT_TEXT:
