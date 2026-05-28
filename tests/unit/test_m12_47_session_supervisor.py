@@ -14,6 +14,7 @@ from scripts.run_m12_47_session_supervisor import (
     load_config,
     print_status,
     should_trip_failure_breaker,
+    stale_dashboard_restart_reason,
     status_path,
 )
 
@@ -289,6 +290,36 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         )
         self.assertIn("连续 3 次", payload["failure_reason"])
         self.assertFalse(payload["live_execution"])
+
+    def test_stale_dashboard_restart_reason_detects_alive_child_without_refresh(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T14:00:00Z"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            phase = build_window_state(config, "2026-05-05T14:20:30Z")
+
+            reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:00:00Z")
+
+        self.assertIn("dashboard_stale", reason)
+
+    def test_stale_dashboard_restart_reason_respects_child_start_grace(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T14:00:00Z"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            phase = build_window_state(config, "2026-05-05T14:20:30Z")
+
+            reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:18:00Z")
+
+        self.assertEqual(reason, "")
 
     def test_print_status_persists_dead_supervisor_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:

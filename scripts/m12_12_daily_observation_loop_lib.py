@@ -55,6 +55,7 @@ HUNDRED = Decimal("100")
 DEFAULT_SIMULATED_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
 QUANTITY = Decimal("0.0001")
+MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES = 3
 CSV_NAME_RE = re.compile(
     r"^(?P<market>[a-z]+)_(?P<symbol>.+)_(?P<interval>[^_]+)_(?P<start>\d{4}-\d{2}-\d{2})_(?P<end>\d{4}-\d{2}-\d{2})_(?P<source>[^.]+)\.csv$"
 )
@@ -357,6 +358,8 @@ def run_fetch_plan(
     results: list[dict[str, Any]] = []
     targets = build_fetch_targets(config, symbols)
     executed = 0
+    consecutive_provider_failures = 0
+    provider_circuit_reason = ""
     for target in targets:
         existing = best_cache_file(config.local_data_roots, target.symbol, target.timeframe, target.target_start, target.target_end)
         force_current_intraday = (
@@ -370,6 +373,9 @@ def run_fetch_plan(
         if not fetch_enabled:
             results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason="fetch_disabled"))
             continue
+        if provider_circuit_reason:
+            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=provider_circuit_reason))
+            continue
         if executed >= budget:
             results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason="fetch_budget_exhausted"))
             continue
@@ -381,10 +387,35 @@ def run_fetch_plan(
             write_cache_csv(target.destination, rows)
             write_cache_metadata(target.destination, target, rows, anomalies, generated_at)
             executed += 1
+            consecutive_provider_failures = 0
             results.append(fetch_result(target, "fetched", target.destination, generated_at, row_count=len(rows), anomaly_count=len(anomalies)))
         except Exception as exc:  # pragma: no cover - runtime provider path
-            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=str(exc)))
+            skipped_reason = str(exc)
+            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=skipped_reason))
+            if is_provider_level_fetch_failure(skipped_reason):
+                consecutive_provider_failures += 1
+                if consecutive_provider_failures >= MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES:
+                    provider_circuit_reason = (
+                        "fetch_provider_circuit_open_after_"
+                        f"{MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES}_failures: {skipped_reason}"
+                    )
+            else:
+                consecutive_provider_failures = 0
     return results
+
+
+def is_provider_level_fetch_failure(reason: str) -> bool:
+    lowered = reason.lower()
+    return any(
+        token in lowered
+        for token in (
+            "longbridge kline history failed",
+            "timeout after",
+            "authenticated",
+            "quote permission",
+            "provider returned no usable rows",
+        )
+    )
 
 
 def build_fetch_targets(config: M1212Config, symbols: list[str]) -> list[FetchTarget]:

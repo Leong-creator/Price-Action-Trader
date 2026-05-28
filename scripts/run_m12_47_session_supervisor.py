@@ -214,6 +214,17 @@ def dashboard_json_path(config: SupervisorConfig) -> Path:
     return config.output_dir / "m12_32_minute_readonly_dashboard_data.json"
 
 
+def m1237_refresh_seconds(config: SupervisorConfig) -> int:
+    try:
+        payload = json.loads(config.source_m12_37_config_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return 60
+    try:
+        return max(int(payload.get("refresh_seconds", 60)), 1)
+    except (TypeError, ValueError):
+        return 60
+
+
 def read_json_if_exists(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -267,6 +278,8 @@ def build_status_payload(
     restart_count: int,
     failure_state: str = "",
     failure_reason: str = "",
+    stale_dashboard_restart_count: int = 0,
+    last_restart_reason: str = "",
 ) -> dict[str, Any]:
     dashboard = read_json_if_exists(dashboard_json_path(config))
     dashboard_generated_at = dashboard.get("generated_at", "")
@@ -287,6 +300,8 @@ def build_status_payload(
         "child_started_at": child_started_at,
         "child_last_exit_code": "" if child_last_exit_code is None else str(child_last_exit_code),
         "restart_count": restart_count,
+        "stale_dashboard_restart_count": stale_dashboard_restart_count,
+        "last_restart_reason": last_restart_reason,
         "failure_state": failure_state,
         "failure_reason": failure_reason,
         "next_session_start_new_york": phase["next_session_start_new_york"],
@@ -586,6 +601,39 @@ def sync_manifest_status_overlay(config: SupervisorConfig, payload: dict[str, An
     return True
 
 
+def parse_utc_timestamp(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, str], child_started_at: str) -> str:
+    if phase.get("session_should_run") != "true":
+        return ""
+    now_dt = parse_utc_timestamp(phase.get("generated_at", ""))
+    child_started_dt = parse_utc_timestamp(child_started_at)
+    if now_dt is None or child_started_dt is None:
+        return ""
+    refresh_seconds = m1237_refresh_seconds(config)
+    child_grace_seconds = max(refresh_seconds * 15, 900)
+    child_age_seconds = int((now_dt - child_started_dt).total_seconds())
+    if child_age_seconds < child_grace_seconds:
+        return ""
+    dashboard = read_json_if_exists(dashboard_json_path(config))
+    dashboard_generated_at = str(dashboard.get("generated_at") or dashboard.get("summary", {}).get("generated_at") or "")
+    dashboard_dt = parse_utc_timestamp(dashboard_generated_at)
+    stale_after_seconds = max(refresh_seconds * 5, 600)
+    if dashboard_dt is None:
+        return f"dashboard_missing_after_child_age_{child_age_seconds}s"
+    dashboard_age_seconds = int((now_dt - dashboard_dt).total_seconds())
+    if dashboard_age_seconds > stale_after_seconds:
+        return f"dashboard_stale_{dashboard_age_seconds}s_over_{stale_after_seconds}s"
+    return ""
+
+
 def write_failure_dossier(config: SupervisorConfig, payload: dict[str, Any]) -> None:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(failure_dossier_path(config), payload)
@@ -661,6 +709,8 @@ def run_foreground(config: SupervisorConfig) -> int:
     consecutive_failures = 0
     failure_state = ""
     failure_reason = ""
+    stale_dashboard_restart_count = 0
+    last_restart_reason = ""
     shutting_down = False
 
     def handle_term(signum, frame):  # type: ignore[no-untyped-def]
@@ -693,6 +743,21 @@ def run_foreground(config: SupervisorConfig) -> int:
                 failure_reason = failure_payload["failure_reason"]
                 write_failure_dossier(config, failure_payload)
                 should_run = False
+            if should_run and child_running and child is not None:
+                stale_reason = stale_dashboard_restart_reason(config, phase, child_started_at)
+                if stale_reason:
+                    stale_dashboard_restart_count += 1
+                    last_restart_reason = stale_reason
+                    child.terminate()
+                    try:
+                        child.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait(timeout=10)
+                    child_last_exit_code = child.returncode
+                    child = None
+                    child_running = False
+                    consecutive_failures = 0
             if should_run and not child_running:
                 child = spawn_m1237_session(config)
                 child_started_at = phase["generated_at"]
@@ -719,6 +784,8 @@ def run_foreground(config: SupervisorConfig) -> int:
                     restart_count=restart_count,
                     failure_state=failure_state,
                     failure_reason=failure_reason,
+                    stale_dashboard_restart_count=stale_dashboard_restart_count,
+                    last_restart_reason=last_restart_reason,
                 ),
             )
             time.sleep(config.check_interval_seconds)
@@ -801,6 +868,8 @@ def print_status(config: SupervisorConfig) -> int:
         restart_count=int(stored.get("restart_count", 0)) if stored else 0,
         failure_state=stored.get("failure_state", "") if stored else "",
         failure_reason=stored.get("failure_reason", "") if stored else "",
+        stale_dashboard_restart_count=int(stored.get("stale_dashboard_restart_count", 0)) if stored else 0,
+        last_restart_reason=stored.get("last_restart_reason", "") if stored else "",
     )
     write_status(config, payload)
     dashboard_synced = sync_dashboard_status_overlay(config, payload)
@@ -818,6 +887,8 @@ def print_status(config: SupervisorConfig) -> int:
             restart_count=int(stored.get("restart_count", 0)) if stored else 0,
             failure_state=stored.get("failure_state", "") if stored else "",
             failure_reason=stored.get("failure_reason", "") if stored else "",
+            stale_dashboard_restart_count=int(stored.get("stale_dashboard_restart_count", 0)) if stored else 0,
+            last_restart_reason=stored.get("last_restart_reason", "") if stored else "",
         )
         write_status(config, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))

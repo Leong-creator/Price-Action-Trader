@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts import m12_12_daily_observation_loop_lib as MODULE
 
@@ -62,6 +63,28 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertEqual(visual["needs_user_review_count"], 10)
         self.assertFalse(visual["paper_gate_evidence_now"])
         self.assertFalse(summary["paper_gate_recheck"]["approval_for_paper_trading_trial"])
+
+    def test_fetch_plan_opens_provider_circuit_after_repeated_longbridge_failures(self) -> None:
+        config = MODULE.load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            test_config = replace(config, output_dir=Path(tmp), local_data_roots=(Path(tmp) / "empty_local_data",))
+            with patch(
+                "scripts.m12_12_daily_observation_loop_lib.fetch_target_rows",
+                side_effect=RuntimeError("longbridge kline history failed for SPY.US: timeout after 6s"),
+            ):
+                rows = MODULE.run_fetch_plan(
+                    test_config,
+                    ["SPY", "QQQ", "IWM", "DIA"],
+                    generated_at="2026-05-05T14:00:00Z",
+                    execute_fetch=True,
+                    max_native_fetches=20,
+                    force_refresh_current_intraday=True,
+                )
+
+        circuit_rows = [row for row in rows if "fetch_provider_circuit_open_after_3_failures" in row.get("skipped_reason", "")]
+        self.assertGreaterEqual(len(circuit_rows), 1)
+        self.assertEqual(rows[0]["status"], "deferred")
+        self.assertIn("longbridge kline history failed", rows[0]["skipped_reason"])
 
     def test_checked_in_artifacts_are_client_facing_and_no_real_trading_boundary(self) -> None:
         self.assertTrue(OUTPUT_DIR.exists(), "Run scripts/run_m12_12_daily_observation_loop.py before full validation")
