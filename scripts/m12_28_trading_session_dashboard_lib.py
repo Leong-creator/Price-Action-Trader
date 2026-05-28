@@ -250,13 +250,16 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
     lb_symbols = [build_longbridge_symbol(symbol, market) for symbol in symbols]
     command = ["quote", *lb_symbols, "--format", "json"]
     _assert_readonly_command(command)
-    completed = subprocess.run(
-        [cli_path, *command],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
-    )
+    try:
+        completed = subprocess.run(
+            [cli_path, *command],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"longbridge quote timed out after {LONGRIDGE_QUOTE_TIMEOUT_SECONDS}s") from exc
     if completed.returncode != 0:
         detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
         raise RuntimeError(detail or f"longbridge quote failed with {completed.returncode}")

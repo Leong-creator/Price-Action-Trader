@@ -2507,6 +2507,7 @@ def build_accountized_summary(
         "source_m12_12_candidate_count": len(trade_rows),
         "quote_count": quote_manifest.get("quote_count", 0),
         "quote_source": quote_manifest.get("quote_source", ""),
+        "quote_error": quote_manifest.get("error", ""),
         "today_candidate_count": len(current_rows),
         "old_candidate_count": len(old_rows),
         "visible_opportunity_count": len(trade_rows) + len(pa004_formal_rows),
@@ -2560,7 +2561,7 @@ def build_dashboard_data_freshness_warning(
     if current_day_runtime_ready and current_day_scan_complete and not fallback_or_no_fetch:
         return ""
     return (
-        "看板数据未刷新 / fallback quotes / no-fetch："
+        "看板已生成但数据源降级 / fallback quotes / no-fetch："
         f"quote_source={quote_source or 'unknown'}，"
         f"current_day_runtime_ready={str(current_day_runtime_ready).lower()}，"
         f"current_day_scan_complete={str(current_day_scan_complete).lower()}，"

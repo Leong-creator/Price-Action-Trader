@@ -97,6 +97,46 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertTrue((output_dir / "m12_38_codex_observer_latest.json").exists())
             self.assertTrue((output_dir / "m12_38_codex_observer_inbox.jsonl").exists())
 
+    def test_manifest_exposes_data_freshness_fields_from_m12_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            fake_result = {
+                "summary": {
+                    "scan_date": "2026-05-25",
+                    "quote_source": "fallback_after_quote_error",
+                    "quote_count": 45,
+                    "quote_error": "connect timeout",
+                    "current_day_runtime_ready": False,
+                    "current_day_scan_complete": False,
+                    "data_freshness_warning": "看板已生成但数据源降级 / fallback quotes / no-fetch",
+                },
+                "dashboard": {
+                    "codex_observer": {
+                        "recommended_codex_message": "测试消息",
+                    },
+                },
+            }
+            with patch(
+                "scripts.run_m12_37_intraday_auto_loop.run_m12_29_current_day_scan_dashboard",
+                return_value=fake_result,
+            ):
+                outcome = run_once(
+                    config,
+                    generated_at="2026-05-25T14:00:00Z",
+                    execute_fetch=False,
+                    refresh_quotes=False,
+                )
+
+            manifest = outcome["manifest"]
+            self.assertEqual(manifest["quote_source"], "fallback_after_quote_error")
+            self.assertEqual(manifest["quote_count"], 45)
+            self.assertEqual(manifest["quote_error"], "connect timeout")
+            self.assertFalse(manifest["current_day_runtime_ready"])
+            self.assertFalse(manifest["current_day_scan_complete"])
+            self.assertIn("fallback quotes / no-fetch", manifest["data_freshness_warning"])
+
     def test_regular_session_manifest_allows_loop(self):
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "m12_37"

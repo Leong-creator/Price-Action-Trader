@@ -149,6 +149,7 @@ def run_once(
             reason="market_not_in_monitoring_window",
         )
     observer = result["dashboard"]["codex_observer"]
+    summary = result["summary"]
     manifest = {
         "schema_version": "m12.37.auto-runner-manifest.v1",
         "stage": config.stage,
@@ -165,6 +166,12 @@ def run_once(
         "latest_dashboard_html": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard.html"),
         "latest_observer_json": project_path(m12_29_config.output_dir / "m12_38_codex_observer_latest.json"),
         "observer_inbox": project_path(m12_29_config.output_dir / "m12_38_codex_observer_inbox.jsonl"),
+        "quote_source": summary.get("quote_source", ""),
+        "quote_count": summary.get("quote_count", 0),
+        "quote_error": summary.get("quote_error", ""),
+        "current_day_runtime_ready": bool(summary.get("current_day_runtime_ready", False)),
+        "current_day_scan_complete": bool(summary.get("current_day_scan_complete", False)),
+        "data_freshness_warning": summary.get("data_freshness_warning", ""),
         "plain_language_result": observer["recommended_codex_message"],
         "post_run_strategy_ledgers": post_run_strategy_ledgers,
         "paper_simulated_only": True,

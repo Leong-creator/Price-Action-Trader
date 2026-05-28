@@ -116,7 +116,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             current_5m_ready_symbols=0,
             runtime_readiness_note="fixture",
         )
-        self.assertIn("看板数据未刷新", warning)
+        self.assertIn("看板已生成但数据源降级", warning)
         self.assertIn("fallback quotes / no-fetch", warning)
         self.assertEqual(
             build_dashboard_data_freshness_warning(

@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from subprocess import TimeoutExpired
+from unittest.mock import patch
 
 from scripts import m12_28_trading_session_dashboard_lib as MODULE
 
@@ -84,6 +86,15 @@ class M1228TradingSessionDashboardTests(unittest.TestCase):
 
         self.assertEqual(dashboard["pa004_long_observation_rows"], [])
         self.assertEqual(dashboard["summary"]["pa004_long_observation_count"], 0)
+
+    def test_quote_timeout_error_is_concise(self) -> None:
+        with patch("scripts.m12_28_trading_session_dashboard_lib.shutil.which", return_value="/usr/bin/longbridge"):
+            with patch(
+                "scripts.m12_28_trading_session_dashboard_lib.subprocess.run",
+                side_effect=TimeoutExpired(cmd=["longbridge", "quote"], timeout=MODULE.LONGRIDGE_QUOTE_TIMEOUT_SECONDS),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "longbridge quote timed out after 6s"):
+                    MODULE.fetch_longbridge_quotes(["INTC"], "US", "2026-05-28T16:00:00Z")
 
     def test_checked_in_outputs_keep_readonly_boundaries(self) -> None:
         self.assertTrue(OUTPUT_DIR.exists(), "Run scripts/run_m12_28_trading_session_dashboard.py before full validation")
