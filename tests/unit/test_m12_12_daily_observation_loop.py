@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -72,19 +73,87 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
                 "scripts.m12_12_daily_observation_loop_lib.fetch_target_rows",
                 side_effect=RuntimeError("longbridge kline history failed for SPY.US: timeout after 6s"),
             ):
-                rows = MODULE.run_fetch_plan(
-                    test_config,
-                    ["SPY", "QQQ", "IWM", "DIA"],
-                    generated_at="2026-05-05T14:00:00Z",
-                    execute_fetch=True,
-                    max_native_fetches=20,
-                    force_refresh_current_intraday=True,
-                )
+                with patch(
+                    "scripts.m12_12_daily_observation_loop_lib.fetch_public_fallback_rows",
+                    side_effect=RuntimeError("public fallback unavailable"),
+                ):
+                    rows = MODULE.run_fetch_plan(
+                        test_config,
+                        ["SPY", "QQQ", "IWM", "DIA"],
+                        generated_at="2026-05-05T14:00:00Z",
+                        execute_fetch=True,
+                        max_native_fetches=20,
+                        force_refresh_current_intraday=True,
+                    )
 
         circuit_rows = [row for row in rows if "fetch_provider_circuit_open_after_3_failures" in row.get("skipped_reason", "")]
         self.assertGreaterEqual(len(circuit_rows), 1)
         self.assertEqual(rows[0]["status"], "deferred")
         self.assertIn("longbridge kline history failed", rows[0]["skipped_reason"])
+
+    def test_public_daily_fallback_appends_current_day_to_existing_cache(self) -> None:
+        config = MODULE.load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            existing = Path(tmp) / "us_INTC_1d_2010-06-29_2026-05-28_longbridge.csv"
+            MODULE.write_cache_csv(
+                existing,
+                [
+                    {
+                        "symbol": "INTC",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2010-06-29T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "10.00",
+                        "high": "11.00",
+                        "low": "9.00",
+                        "close": "10.50",
+                        "volume": "1000",
+                    },
+                    {
+                        "symbol": "INTC",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-05-28T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "120.00",
+                        "high": "121.00",
+                        "low": "119.00",
+                        "close": "120.89",
+                        "volume": "2000",
+                    },
+                ],
+            )
+            target = MODULE.FetchTarget(
+                symbol="INTC",
+                timeframe="1d",
+                target_start=date(2010, 6, 29),
+                target_end=date(2026, 5, 29),
+                fetch_mode="full_daily",
+                destination=Path(tmp) / "out.csv",
+            )
+            with patch(
+                "scripts.m12_12_daily_observation_loop_lib.fetch_yahoo_chart_rows",
+                return_value=(
+                    {
+                        "symbol": "INTC",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-05-29T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "120.00",
+                        "high": "126.64",
+                        "low": "117.66",
+                        "close": "118.1850",
+                        "volume": "53760261",
+                    },
+                ),
+            ):
+                rows = MODULE.fetch_public_fallback_rows(config, target, existing)
+
+        self.assertEqual(rows[-1]["timestamp"], "2026-05-29T16:00:00")
+        self.assertEqual(rows[-1]["close"], "118.1850")
+        self.assertEqual(len(rows), 3)
 
     def test_checked_in_artifacts_are_client_facing_and_no_real_trading_boundary(self) -> None:
         self.assertTrue(OUTPUT_DIR.exists(), "Run scripts/run_m12_12_daily_observation_loop.py before full validation")

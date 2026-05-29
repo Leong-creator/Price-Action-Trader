@@ -113,7 +113,9 @@ TIMEFRAME_LABELS = {
     "5m": "5m 五分钟测试",
 }
 EXTENDED_SESSION_MOVE_THRESHOLD = Decimal("3")
-RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES = frozenset({"longbridge_quote_readonly"})
+RUNTIME_CLOSE_ALLOWED_QUOTE_SOURCES = frozenset(
+    {"longbridge_quote_readonly", "yahoo_chart_readonly_after_longbridge_error"}
+)
 LEGACY_HISTORY_OUTPUT_KEYS = frozenset(
     {
         "legacy_history_metric_policy",

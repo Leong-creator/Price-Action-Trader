@@ -96,6 +96,36 @@ class M1228TradingSessionDashboardTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "longbridge quote timed out after 6s"):
                     MODULE.fetch_longbridge_quotes(["INTC"], "US", "2026-05-28T16:00:00Z")
 
+    def test_build_quotes_uses_yahoo_chart_after_longbridge_error(self) -> None:
+        config = MODULE.load_config()
+        yahoo_quote = {
+            "INTC": {
+                "symbol": "INTC",
+                "latest_price": "118.19",
+                "previous_close": "120.89",
+                "open": "120.00",
+                "high": "126.64",
+                "low": "117.66",
+                "volume": "53760261",
+                "quote_status": "regularMarket",
+                "quote_timestamp": "2026-05-29T16:00:00Z",
+                "quote_source": MODULE.YAHOO_CHART_QUOTE_SOURCE,
+            }
+        }
+        with patch(
+            "scripts.m12_28_trading_session_dashboard_lib.fetch_longbridge_quotes",
+            side_effect=RuntimeError("longbridge quote timed out after 6s"),
+        ):
+            with patch(
+                "scripts.m12_28_trading_session_dashboard_lib.fetch_yahoo_chart_quotes",
+                return_value=yahoo_quote,
+            ):
+                quotes, manifest = MODULE.build_quotes(config, ["INTC"], "2026-05-29T16:00:00Z", enabled=True)
+
+        self.assertEqual(quotes["INTC"]["latest_price"], "118.19")
+        self.assertEqual(manifest["quote_source"], MODULE.YAHOO_CHART_QUOTE_SOURCE)
+        self.assertIn("longbridge_quote_error=longbridge quote timed out after 6s", manifest["error"])
+
     def test_checked_in_outputs_keep_readonly_boundaries(self) -> None:
         self.assertTrue(OUTPUT_DIR.exists(), "Run scripts/run_m12_28_trading_session_dashboard.py before full validation")
         expected = {

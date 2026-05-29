@@ -7,12 +7,16 @@ import html
 import json
 import re
 import sys
+import urllib.parse
+import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
+from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +60,8 @@ DEFAULT_SIMULATED_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
 QUANTITY = Decimal("0.0001")
 MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES = 3
+PUBLIC_YAHOO_CHART_SOURCE = "yahoo_chart_readonly_after_longbridge_error"
+PUBLIC_YAHOO_CHART_TIMEOUT_SECONDS = 4
 CSV_NAME_RE = re.compile(
     r"^(?P<market>[a-z]+)_(?P<symbol>.+)_(?P<interval>[^_]+)_(?P<start>\d{4}-\d{2}-\d{2})_(?P<end>\d{4}-\d{2}-\d{2})_(?P<source>[^.]+)\.csv$"
 )
@@ -374,7 +380,42 @@ def run_fetch_plan(
             results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason="fetch_disabled"))
             continue
         if provider_circuit_reason:
-            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=provider_circuit_reason))
+            try:
+                rows = fetch_public_fallback_rows(config, target, existing)
+                rows, anomalies = sanitize_vendor_rows(rows)
+                if not rows:
+                    raise RuntimeError("public provider returned no usable rows")
+                write_cache_csv(target.destination, rows)
+                write_cache_metadata(
+                    target.destination,
+                    target,
+                    rows,
+                    anomalies,
+                    generated_at,
+                    source=PUBLIC_YAHOO_CHART_SOURCE,
+                )
+                executed += 1
+                results.append(
+                    fetch_result(
+                        target,
+                        "fetched_public_fallback",
+                        target.destination,
+                        generated_at,
+                        row_count=len(rows),
+                        anomaly_count=len(anomalies),
+                        skipped_reason=f"{provider_circuit_reason[:180]}; public_yahoo_chart_used=true",
+                    )
+                )
+            except Exception as public_exc:
+                results.append(
+                    fetch_result(
+                        target,
+                        "deferred",
+                        existing,
+                        generated_at,
+                        skipped_reason=f"{provider_circuit_reason}; yahoo_chart_error={str(public_exc)[:160]}",
+                    )
+                )
             continue
         if executed >= budget:
             results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason="fetch_budget_exhausted"))
@@ -391,15 +432,45 @@ def run_fetch_plan(
             results.append(fetch_result(target, "fetched", target.destination, generated_at, row_count=len(rows), anomaly_count=len(anomalies)))
         except Exception as exc:  # pragma: no cover - runtime provider path
             skipped_reason = str(exc)
-            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=skipped_reason))
-            if is_provider_level_fetch_failure(skipped_reason):
+            provider_failure = is_provider_level_fetch_failure(skipped_reason)
+            if provider_failure:
                 consecutive_provider_failures += 1
                 if consecutive_provider_failures >= MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES:
                     provider_circuit_reason = (
                         "fetch_provider_circuit_open_after_"
                         f"{MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES}_failures: {skipped_reason}"
                     )
-            else:
+                try:
+                    rows = fetch_public_fallback_rows(config, target, existing)
+                    rows, anomalies = sanitize_vendor_rows(rows)
+                    if not rows:
+                        raise RuntimeError("public provider returned no usable rows")
+                    write_cache_csv(target.destination, rows)
+                    write_cache_metadata(
+                        target.destination,
+                        target,
+                        rows,
+                        anomalies,
+                        generated_at,
+                        source=PUBLIC_YAHOO_CHART_SOURCE,
+                    )
+                    executed += 1
+                    results.append(
+                        fetch_result(
+                            target,
+                            "fetched_public_fallback",
+                            target.destination,
+                            generated_at,
+                            row_count=len(rows),
+                            anomaly_count=len(anomalies),
+                            skipped_reason=f"longbridge_error={skipped_reason[:180]}; public_yahoo_chart_used=true",
+                        )
+                    )
+                    continue
+                except Exception as public_exc:
+                    skipped_reason = f"{skipped_reason}; yahoo_chart_error={str(public_exc)[:160]}"
+            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=skipped_reason))
+            if not provider_failure:
                 consecutive_provider_failures = 0
     return results
 
@@ -477,6 +548,129 @@ def fetch_target_rows(config: M1212Config, target: FetchTarget) -> list[dict[str
     raise ValueError(f"Unsupported fetch target: {target.timeframe}")
 
 
+def fetch_public_fallback_rows(config: M1212Config, target: FetchTarget, existing: Path | None) -> list[dict[str, str]]:
+    if config.market != "US":
+        raise RuntimeError("public yahoo chart fallback only supports US market")
+    if target.timeframe == "1d":
+        return fetch_public_daily_rows(config, target, existing)
+    if target.timeframe == "5m" and target.target_start == target.target_end:
+        return fetch_public_intraday_rows(config, target)
+    raise RuntimeError(f"public yahoo chart fallback unsupported target: {target.timeframe} {target.fetch_mode}")
+
+
+def fetch_public_daily_rows(config: M1212Config, target: FetchTarget, existing: Path | None) -> list[dict[str, str]]:
+    existing_rows: list[dict[str, str]] = []
+    existing_end: date | None = None
+    if existing is not None and existing.exists():
+        stats = csv_stats(existing)
+        if stats["end_date"]:
+            existing_end = date.fromisoformat(stats["end_date"])
+            if date.fromisoformat(stats["end_date"]) < target.target_end:
+                with existing.open(newline="", encoding="utf-8") as handle:
+                    existing_rows = list(csv.DictReader(handle))
+        else:
+            raise RuntimeError("existing daily cache has no usable end date")
+    chart_rows = fetch_yahoo_chart_rows(target.symbol, "1mo", "1d")
+    target_rows = []
+    for row in chart_rows:
+        row_date = date.fromisoformat(row["timestamp"][:10])
+        if existing_end is not None and row_date <= existing_end:
+            continue
+        if row_date <= target.target_end:
+            target_rows.append(row)
+    if not target_rows:
+        raise RuntimeError(f"public yahoo chart has no new daily rows for {target.symbol} through {target.target_end.isoformat()}")
+    rows = [
+        row for row in existing_rows
+        if date.fromisoformat(row.get("timestamp", "")[:10]) <= target.target_end
+    ]
+    for row in target_rows:
+        row_date = date.fromisoformat(row["timestamp"][:10])
+        normalized = dict(row)
+        normalized["timestamp"] = datetime.combine(row_date, time(16, 0)).isoformat()
+        rows.append(normalized)
+    return rows
+
+
+def fetch_public_intraday_rows(config: M1212Config, target: FetchTarget) -> list[dict[str, str]]:
+    rows = [
+        row for row in fetch_yahoo_chart_rows(target.symbol, "1d", "5m")
+        if row["timestamp"].startswith(target.target_end.isoformat())
+    ]
+    if not rows:
+        raise RuntimeError(f"public yahoo chart has no 5m row for {target.symbol} {target.target_end.isoformat()}")
+    return rows
+
+
+@lru_cache(maxsize=256)
+def fetch_yahoo_chart_rows(symbol: str, range_value: str, interval: str) -> tuple[dict[str, str], ...]:
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{urllib.parse.quote(symbol)}?range={urllib.parse.quote(range_value)}"
+        f"&interval={urllib.parse.quote(interval)}&includePrePost=false"
+    )
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=PUBLIC_YAHOO_CHART_TIMEOUT_SECONDS) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    result = ((payload.get("chart") or {}).get("result") or [])
+    if not result:
+        raise RuntimeError("empty yahoo chart result")
+    chart = result[0]
+    timestamps = chart.get("timestamp") or []
+    quote = ((chart.get("indicators") or {}).get("quote") or [{}])[0]
+    opens = quote.get("open") or []
+    highs = quote.get("high") or []
+    lows = quote.get("low") or []
+    closes = quote.get("close") or []
+    volumes = quote.get("volume") or []
+    rows: list[dict[str, str]] = []
+    zone = "America/New_York"
+    for idx, raw_ts in enumerate(timestamps):
+        values = [
+            value_at(opens, idx),
+            value_at(highs, idx),
+            value_at(lows, idx),
+            value_at(closes, idx),
+        ]
+        if any(value in (None, "") for value in values):
+            continue
+        ny_local = datetime.fromtimestamp(int(raw_ts), tz=UTC).astimezone(ZoneInfo(zone))
+        timeframe = "1d" if interval == "1d" else interval
+        timestamp = (
+            datetime.combine(ny_local.date(), time(16, 0)).isoformat()
+            if interval == "1d"
+            else ny_local.replace(tzinfo=None).isoformat(timespec="seconds")
+        )
+        rows.append(
+            {
+                "symbol": symbol,
+                "market": "US",
+                "timeframe": timeframe,
+                "timestamp": timestamp,
+                "timezone": zone,
+                "open": public_decimal_text(values[0]),
+                "high": public_decimal_text(values[1]),
+                "low": public_decimal_text(values[2]),
+                "close": public_decimal_text(values[3]),
+                "volume": str(value_at(volumes, idx) or ""),
+            }
+        )
+    return tuple(rows)
+
+
+def value_at(values: list[Any], index: int) -> Any:
+    return values[index] if index < len(values) else None
+
+
+def public_decimal_text(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        return str(Decimal(str(value)).quantize(Decimal("0.0001")))
+    except (InvalidOperation, ValueError):
+        return str(value)
+
+
 def fetch_result(
     target: FetchTarget,
     status: str,
@@ -504,7 +698,15 @@ def fetch_result(
     }
 
 
-def write_cache_metadata(path: Path, target: FetchTarget, rows: list[dict[str, str]], anomalies: list[dict[str, Any]], generated_at: str) -> None:
+def write_cache_metadata(
+    path: Path,
+    target: FetchTarget,
+    rows: list[dict[str, str]],
+    anomalies: list[dict[str, Any]],
+    generated_at: str,
+    *,
+    source: str = "longbridge_readonly_kline",
+) -> None:
     anomaly_path = path.with_suffix(".vendor_anomalies.json")
     if anomalies:
         anomaly_path.write_text(json.dumps(anomalies, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -513,7 +715,7 @@ def write_cache_metadata(path: Path, target: FetchTarget, rows: list[dict[str, s
     metadata = {
         "schema_version": "m12.12.local-cache-metadata.v1",
         "generated_at": generated_at,
-        "source": "longbridge_readonly_kline",
+        "source": source,
         "symbol": target.symbol,
         "timeframe": target.timeframe,
         "fetch_mode": target.fetch_mode,

@@ -246,6 +246,72 @@ def process_alive(pid: int | None) -> bool:
     return True
 
 
+def find_processes_containing(*needles: str) -> list[int]:
+    try:
+        completed = subprocess.run(
+            ["ps", "-eo", "pid=,args="],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except Exception:
+        return []
+    if completed.returncode != 0:
+        return []
+    current_pid = os.getpid()
+    matches: list[int] = []
+    for line in completed.stdout.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        pid_text, _, args = stripped.partition(" ")
+        try:
+            pid = int(pid_text)
+        except ValueError:
+            continue
+        if pid == current_pid:
+            continue
+        if all(needle in args for needle in needles):
+            matches.append(pid)
+    return matches
+
+
+def discover_supervisor_pids() -> list[int]:
+    return find_processes_containing("run_m12_47_session_supervisor.py", "--foreground")
+
+
+def discover_child_session_pids(config: SupervisorConfig) -> list[int]:
+    return find_processes_containing(
+        "run_m12_37_intraday_auto_loop.py",
+        "--session",
+        str(config.source_m12_37_config_path),
+    )
+
+
+def terminate_pids(pids: list[int]) -> bool:
+    unique_pids = sorted({pid for pid in pids if pid > 0 and process_alive(pid)})
+    if not unique_pids:
+        return False
+    for pid in unique_pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if not any(process_alive(pid) for pid in unique_pids):
+            return True
+        time.sleep(0.2)
+    for pid in unique_pids:
+        if process_alive(pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+    return True
+
+
 def spawn_m1237_session(config: SupervisorConfig) -> subprocess.Popen[str]:
     child_log_path(config).parent.mkdir(parents=True, exist_ok=True)
     log_handle = child_log_path(config).open("a", encoding="utf-8")
@@ -689,11 +755,17 @@ def read_existing_pid(config: SupervisorConfig) -> int | None:
 
 def stop_existing_supervisor(config: SupervisorConfig) -> bool:
     pid = read_existing_pid(config)
-    if not process_alive(pid):
+    pids = []
+    if process_alive(pid):
+        pids.append(int(pid))
+    pids.extend(discover_child_session_pids(config))
+    pids.extend(discover_supervisor_pids())
+    if not pids:
         remove_pid_file(config)
         return False
-    os.kill(pid, signal.SIGTERM)
-    return True
+    stopped = terminate_pids(pids)
+    remove_pid_file(config)
+    return stopped
 
 
 def run_foreground(config: SupervisorConfig) -> int:
@@ -821,6 +893,10 @@ def start_daemon(config: SupervisorConfig, config_path: str | Path) -> int:
     existing = read_existing_pid(config)
     if process_alive(existing):
         print(f"supervisor_already_running pid={existing}")
+        return 0
+    discovered = [pid for pid in discover_supervisor_pids() if process_alive(pid)]
+    if discovered:
+        print(f"supervisor_already_running pid={discovered[0]}")
         return 0
     remove_pid_file(config)
     log_path(config).parent.mkdir(parents=True, exist_ok=True)

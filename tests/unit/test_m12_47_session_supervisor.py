@@ -16,6 +16,7 @@ from scripts.run_m12_47_session_supervisor import (
     should_trip_failure_breaker,
     stale_dashboard_restart_reason,
     status_path,
+    stop_existing_supervisor,
 )
 
 
@@ -47,6 +48,20 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(phase["market_status"], "等待下一交易日")
         self.assertEqual(phase["session_should_run"], "false")
         self.assertEqual(phase["next_session_start_new_york"], "2026-05-26 09:25:00 EDT")
+
+    def test_stop_existing_supervisor_terminates_pidfile_and_discovered_sessions(self):
+        config = load_config()
+        with patch("scripts.run_m12_47_session_supervisor.read_existing_pid", return_value=101):
+            with patch("scripts.run_m12_47_session_supervisor.process_alive", return_value=True):
+                with patch("scripts.run_m12_47_session_supervisor.discover_child_session_pids", return_value=[202]):
+                    with patch("scripts.run_m12_47_session_supervisor.discover_supervisor_pids", return_value=[303]):
+                        with patch("scripts.run_m12_47_session_supervisor.terminate_pids", return_value=True) as terminate:
+                            with patch("scripts.run_m12_47_session_supervisor.remove_pid_file") as remove_pid:
+                                stopped = stop_existing_supervisor(config)
+
+        self.assertTrue(stopped)
+        terminate.assert_called_once_with([101, 202, 303])
+        remove_pid.assert_called_once_with(config)
 
     def test_dashboard_status_overlay_marks_holiday_snapshot_audit_only(self):
         dashboard = {

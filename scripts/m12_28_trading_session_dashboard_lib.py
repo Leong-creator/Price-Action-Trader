@@ -7,7 +7,10 @@ import json
 import shutil
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
@@ -34,6 +37,9 @@ HUNDRED = Decimal("100")
 DEFAULT_ACCOUNT_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
 LONGRIDGE_QUOTE_TIMEOUT_SECONDS = 6
+YAHOO_CHART_TIMEOUT_SECONDS = 6
+YAHOO_CHART_MAX_WORKERS = 8
+YAHOO_CHART_QUOTE_SOURCE = "yahoo_chart_readonly_after_longbridge_error"
 FORBIDDEN_OUTPUT_TEXT = (
     "PA-SC-",
     "SF-",
@@ -237,8 +243,20 @@ def build_quotes(
             quotes = fetch_longbridge_quotes(symbols, config.market, generated_at)
             return quotes, quote_manifest(config, generated_at, "longbridge_quote_readonly", quotes, "")
         except Exception as exc:  # pragma: no cover - runtime provider path
+            longbridge_error = str(exc)[:300]
+            try:
+                quotes = fetch_yahoo_chart_quotes(symbols, generated_at)
+                return quotes, quote_manifest(
+                    config,
+                    generated_at,
+                    YAHOO_CHART_QUOTE_SOURCE,
+                    quotes,
+                    f"longbridge_quote_error={longbridge_error}; public_yahoo_chart_used=true",
+                )
+            except Exception as public_exc:
+                fallback_error = f"{longbridge_error}; yahoo_chart_error={str(public_exc)[:160]}"
             fallback = fallback_quotes(config, generated_at)
-            return fallback, quote_manifest(config, generated_at, "fallback_after_quote_error", fallback, str(exc)[:300])
+            return fallback, quote_manifest(config, generated_at, "fallback_after_quote_error", fallback, fallback_error)
     fallback = fallback_quotes(config, generated_at)
     return fallback, quote_manifest(config, generated_at, "fallback_quotes_only", fallback, "quote_refresh_disabled")
 
@@ -290,6 +308,70 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
         apply_extended_session_quote(quote_row, row, "overnight", "overnight_quote")
         quotes[symbol] = quote_row
     return quotes
+
+
+def fetch_yahoo_chart_quotes(symbols: list[str], generated_at: str) -> dict[str, dict[str, str]]:
+    quotes: dict[str, dict[str, str]] = {}
+    if not symbols:
+        return quotes
+    with ThreadPoolExecutor(max_workers=min(YAHOO_CHART_MAX_WORKERS, max(1, len(symbols)))) as executor:
+        future_to_symbol = {
+            executor.submit(fetch_yahoo_chart_quote, symbol, generated_at): symbol
+            for symbol in symbols
+        }
+        errors: list[str] = []
+        for future in as_completed(future_to_symbol):
+            symbol = future_to_symbol[future]
+            try:
+                quote = future.result()
+            except Exception as exc:
+                errors.append(f"{symbol}:{str(exc)[:80]}")
+                continue
+            if quote:
+                quotes[symbol] = quote
+    if not quotes:
+        detail = "; ".join(errors[:5])
+        raise RuntimeError(f"yahoo chart returned no usable quotes: {detail}")
+    return quotes
+
+
+def fetch_yahoo_chart_quote(symbol: str, generated_at: str) -> dict[str, str]:
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{urllib.parse.quote(symbol)}?range=1d&interval=1m&includePrePost=false"
+    )
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=YAHOO_CHART_TIMEOUT_SECONDS) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    result = ((payload.get("chart") or {}).get("result") or [])
+    if not result:
+        raise RuntimeError("empty chart result")
+    chart = result[0]
+    meta = chart.get("meta") or {}
+    indicators = ((chart.get("indicators") or {}).get("quote") or [{}])[0]
+    open_values = indicators.get("open") or []
+    first_open = next((value for value in open_values if value is not None), "")
+    return {
+        "symbol": symbol,
+        "latest_price": yahoo_decimal_text(meta.get("regularMarketPrice")),
+        "previous_close": yahoo_decimal_text(meta.get("previousClose") or meta.get("chartPreviousClose")),
+        "open": yahoo_decimal_text(first_open),
+        "high": yahoo_decimal_text(meta.get("regularMarketDayHigh")),
+        "low": yahoo_decimal_text(meta.get("regularMarketDayLow")),
+        "volume": str(meta.get("regularMarketVolume", "")),
+        "quote_status": "regularMarket",
+        "quote_timestamp": generated_at,
+        "quote_source": YAHOO_CHART_QUOTE_SOURCE,
+    }
+
+
+def yahoo_decimal_text(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        return str(Decimal(str(value)).quantize(MONEY))
+    except (InvalidOperation, ValueError):
+        return str(value)
 
 
 def fallback_quotes(config: M1228Config, generated_at: str) -> dict[str, dict[str, str]]:
