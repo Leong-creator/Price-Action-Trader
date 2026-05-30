@@ -79,6 +79,8 @@ class LongbridgeHistoryLibTests(unittest.TestCase):
         self.assertEqual(first_command[first_command.index("--session") + 1], "intraday")
         self.assertEqual(first_command[first_command.index("--start") + 1], "2026-01-05")
         self.assertEqual(second_command[second_command.index("--start") + 1], "2026-01-06")
+        self.assertEqual(run_mock.call_args_list[0].kwargs["env"]["LONGBRIDGE_REGION"], "cn")
+        self.assertEqual(run_mock.call_args_list[0].kwargs["env"]["LONGBRIDGE_HTTP_URL"], "https://openapi.longbridge.cn")
 
     def test_fetch_daily_rows_builds_repo_schema(self) -> None:
         with (

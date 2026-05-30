@@ -92,9 +92,11 @@ class M1228TradingSessionDashboardTests(unittest.TestCase):
             with patch(
                 "scripts.m12_28_trading_session_dashboard_lib.subprocess.run",
                 side_effect=TimeoutExpired(cmd=["longbridge", "quote"], timeout=MODULE.LONGRIDGE_QUOTE_TIMEOUT_SECONDS),
-            ):
+            ) as run_mock:
                 with self.assertRaisesRegex(RuntimeError, "longbridge quote timed out after 6s"):
                     MODULE.fetch_longbridge_quotes(["INTC"], "US", "2026-05-28T16:00:00Z")
+        self.assertEqual(run_mock.call_args.kwargs["env"]["LONGBRIDGE_REGION"], "cn")
+        self.assertEqual(run_mock.call_args.kwargs["env"]["LONGBRIDGE_HTTP_URL"], "https://openapi.longbridge.cn")
 
     def test_build_quotes_uses_yahoo_chart_after_longbridge_error(self) -> None:
         config = MODULE.load_config()

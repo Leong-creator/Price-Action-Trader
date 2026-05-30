@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.m12_liquid_universe_scanner_lib import load_bars  # noqa: E402
 from scripts.m12_readonly_auth_preflight_lib import _assert_readonly_command, clean_cli_text  # noqa: E402
+from scripts.longbridge_cli_env import build_longbridge_cli_env  # noqa: E402
 
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
@@ -275,6 +276,7 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
             text=True,
             check=False,
             timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
+            env=build_longbridge_cli_env(),
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"longbridge quote timed out after {LONGRIDGE_QUOTE_TIMEOUT_SECONDS}s") from exc

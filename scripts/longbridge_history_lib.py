@@ -10,6 +10,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from scripts.longbridge_cli_env import build_longbridge_cli_env
+
 
 LONGBRIDGE_INSTALL_HINT = (
     "longbridge CLI is not installed. Install it first with the official installer, "
@@ -218,6 +220,7 @@ def _run_longbridge_command(
                 text=True,
                 check=False,
                 timeout=LONGBRIDGE_HISTORY_TIMEOUT_SECONDS,
+                env=build_longbridge_cli_env(),
             )
         except subprocess.TimeoutExpired:
             last_detail = f"timeout after {LONGBRIDGE_HISTORY_TIMEOUT_SECONDS}s"
