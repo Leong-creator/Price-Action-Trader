@@ -26,6 +26,7 @@ python scripts/set_conversation_goal.py "目标描述"
 - 当前交易运行单元动作状态只允许 `advance_internal_sim`、`risk_limited_advance`、`repair_now`、`pause_runtime`、`paper_candidate`；辅助条目使用 `auxiliary_module`，明确写成“辅助模块：启用为某某用途，不作为独立交易策略”。不得再输出泛化 `continue_testing`、`waiting_for_review` 或“继续观察”作为下一步。
 - 盈利但高回撤、低胜率或风险偏高的 runtime 默认走 `risk_limited_advance` 并降低仓位，不得仅因这些风险自动否掉进入内部模拟。
 - 明显亏损、零信号或执行链断裂的 runtime 必须给出具体 `repair_now` / `pause_runtime` 原因，不能用观察替代修复。
+- M15 修复队列不能只停在报告层；已经批准修复的 runtime 必须进入 M12 账户化运行规则，至少明确仓位倍率、收益风险比、止损距离、假突破确认、图形上下文或连续亏损暂停中的适用规则。周一 fresh refresh 后，用 M13/M14 账本验收这些规则是否真的减少亏损或错误入场。
 - `historical_net_profit`、历史净利润、历史收益和历史盈利因子属于旧版错误产物，不得出现在当前 M12/M13/M14/M15 dashboard、CSV、JSON、HTML、Markdown 输出，也不得作为规划或 gate 输入。以后如需历史表现，必须用 M13 account operation ledger 重新按每日价格 mark-to-market，并换新字段名。
 - Longbridge paper 只能走 paper-token-only preflight。凭证注入、broker 连接和首次 paper 下单必须等用户单独批准；live token、真实资金和真实订单仍禁用。第一笔模拟订单白名单只允许 `M10-PA-004-long-1d`，且必须是限价单、美股常规交易时段、一键停止开启、单日订单数和风险上限生效。
 - 周一前只能准备 M15 预演、白名单、仓位、熔断和验收清单；周一交易时段必须等 M12.47 自动拉起 M12.37 fresh refresh，行情来源为 `longbridge_quote_readonly` 后才能重算 M13/M14 和继续长桥模拟账户预演。

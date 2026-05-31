@@ -179,6 +179,135 @@ ACCOUNT_SPECS = (
     {"account_id": "M12-FTD-001-m14-modify-20260522-1d", "strategy_id": "M12-FTD-001-m14-modify-20260522", "timeframe": "1d", "lane": "rescue", "display_name": "M12-FTD-001 救援日线账户", "variant_id": "m14_modify_20260522"},
     {"account_id": "M10-PA-011-ORB-R1-5m", "strategy_id": PA011_ORB_REBUILD_VARIANT_ID, "timeframe": "5m", "lane": "rescue", "display_name": "M10-PA-011 ORB-R1 五分钟救援账户", "variant_id": "orb_rebuild_r1"},
 )
+RUNTIME_POSITION_SIZE_MULTIPLIERS = {
+    "M10-PA-001-1d": Decimal("0.10"),
+    "M10-PA-001-5m": Decimal("0.10"),
+    "M10-PA-002-1d": Decimal("0.25"),
+    "M10-PA-002-5m": Decimal("0.10"),
+    "M10-PA-004-long-1d": Decimal("1.00"),
+    "M10-PA-004-MBF-1d": Decimal("0.50"),
+    "M10-PA-004-MBF-QC-1d": Decimal("0.10"),
+    "M10-PA-005-1d": Decimal("0.25"),
+    "M10-PA-005-5m": Decimal("0.25"),
+    "M10-PA-007-1d": Decimal("0.10"),
+    "M10-PA-008-1d": Decimal("0.25"),
+    "M10-PA-009-1d": Decimal("0.10"),
+    "M10-PA-011-5m": Decimal("0.10"),
+    "M10-PA-011-ORB-R1-5m": Decimal("0.10"),
+    "M10-PA-012-5m": Decimal("0.50"),
+    "M10-PA-013-1d": Decimal("0.50"),
+    "M10-PA-013-5m": Decimal("0.50"),
+}
+RUNTIME_REPAIR_POLICIES: dict[str, dict[str, Any]] = {
+    "M10-PA-001-1d": {
+        "policy_id": "entry_quality_stop_distance_loss_cooldown",
+        "summary": "修复入场质量、止损距离和连续亏损；只保留至少 1.2R、止损不超过 6% 的信号。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+        "block_high_risk_label": True,
+        "cooldown_after_losses": 3,
+    },
+    "M10-PA-001-5m": {
+        "policy_id": "entry_quality_stop_distance_loss_cooldown",
+        "summary": "修复五分钟入场质量和连续亏损；只保留至少 1.2R、止损不超过 2.5% 的信号。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("2.50"),
+        "block_high_risk_label": True,
+        "cooldown_after_losses": 3,
+    },
+    "M10-PA-002-5m": {
+        "policy_id": "false_breakout_confirmation_cooldown",
+        "summary": "修复五分钟假突破；入场后必须仍站在入场价有利一侧，至少 1.3R，止损不超过 2.5%。",
+        "min_reward_r": Decimal("1.30"),
+        "max_risk_percent": Decimal("2.50"),
+        "require_latest_confirms_entry": True,
+        "cooldown_after_losses": 2,
+    },
+    "M10-PA-004-MBF-QC-1d": {
+        "policy_id": "confirmation_quality_risk_compression",
+        "summary": "修复质量确认变体；只保留至少 1.5R、止损不超过 4% 的强确认信号。",
+        "min_reward_r": Decimal("1.50"),
+        "max_risk_percent": Decimal("4.00"),
+        "block_high_risk_label": True,
+    },
+    "M10-PA-005-1d": {
+        "policy_id": "failed_breakout_quality_size_limit",
+        "summary": "日线失败突破只做小仓位推进；要求至少 1.2R，止损不超过 6%，不和 5 分钟混合判断。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+    },
+    "M10-PA-005-5m": {
+        "policy_id": "failed_breakout_quality_cooldown",
+        "summary": "五分钟失败突破只做小仓位推进；要求至少 1.2R，止损不超过 2.5%，连续亏损后暂停。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("2.50"),
+        "cooldown_after_losses": 2,
+    },
+    "M10-PA-007-1d": {
+        "policy_id": "second_leg_visual_evidence_required",
+        "summary": "修复第二腿陷阱识别；必须带第二腿图形证据，至少 1.2R，止损不超过 6%。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+        "required_context_tokens": ("second_leg", "第二腿"),
+    },
+    "M10-PA-008-1d": {
+        "policy_id": "major_trend_reversal_risk_cap",
+        "summary": "主要趋势反转保留小仓位推进；至少 1.2R，止损不超过 6%，单笔风险由影子账户继续压到 100 以内。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+    },
+    "M10-PA-009-1d": {
+        "policy_id": "weak_wedge_signal_filter",
+        "summary": "修复弱楔形信号；必须带 Wave B/楔形上下文，至少 1.2R，止损不超过 6%。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+        "required_context_tokens": ("wave_b", "wedge", "楔形"),
+        "block_high_risk_label": True,
+    },
+    "M10-PA-011-5m": {
+        "policy_id": "orb_failed_breakout_retest_only",
+        "summary": "修复开盘区间反转；只接受 ORB-R1 失败突破回测确认信号，至少 1.5R，止损不超过 2.5%。",
+        "min_reward_r": Decimal("1.50"),
+        "max_risk_percent": Decimal("2.50"),
+        "required_context_tokens": (PA011_ORB_REBUILD_ADAPTER_ID, "orb_rebuild_r1"),
+        "cooldown_after_losses": 2,
+    },
+    "M10-PA-011-ORB-R1-5m": {
+        "policy_id": "orb_failed_breakout_retest_only",
+        "summary": "ORB-R1 救援版只接受失败突破回测确认信号，至少 1.5R，止损不超过 2.5%。",
+        "min_reward_r": Decimal("1.50"),
+        "max_risk_percent": Decimal("2.50"),
+        "required_context_tokens": (PA011_ORB_REBUILD_ADAPTER_ID, "orb_rebuild_r1"),
+        "cooldown_after_losses": 2,
+    },
+    "M10-PA-012-5m": {
+        "policy_id": "orb_target_stop_geometry",
+        "summary": "开盘区间突破保留 0.5 倍推进；至少 1.0R，止损不超过 2.5%，目标/止损影子账户继续对照。",
+        "min_reward_r": Decimal("1.00"),
+        "max_risk_percent": Decimal("2.50"),
+    },
+    "M10-PA-013-5m": {
+        "policy_id": "support_resistance_failure_quality_filter",
+        "summary": "支撑阻力失败测试保留 0.5 倍推进；至少 1.2R，止损不超过 2.5%，过滤弱失败信号。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("2.50"),
+    },
+    "M12-FTD-001-baseline-1d": {
+        "policy_id": "trend_filter_reference_only",
+        "summary": "FTD001 原版先作为对照基准；新增趋势和价格几何过滤，不进入第一笔模拟账户试单。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+        "require_latest_confirms_entry": True,
+    },
+    "M12-FTD-001-loss-streak-guard-1d": {
+        "policy_id": "trend_filter_loss_streak_guard",
+        "summary": "FTD001 连亏保护版保留连续亏损暂停，并新增趋势和价格几何过滤。",
+        "min_reward_r": Decimal("1.20"),
+        "max_risk_percent": Decimal("6.00"),
+        "require_latest_confirms_entry": True,
+        "cooldown_after_losses": 3,
+    },
+}
 SUPPORTING_RULE_SPECS = (
     {"supporting_rule_id": "M10-PA-006", "display_name": "BLSHS 限价过滤", "mode": "base_trigger + M10-PA-006"},
     {"supporting_rule_id": "M10-PA-014", "display_name": "目标/止盈模块", "mode": "base_trigger + M10-PA-014"},
@@ -873,6 +1002,8 @@ def experimental_rows_for_spec(
         return pa005_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id == "M10-PA-007":
         return pa007_adapter_rows(spec, symbol, bars, cache_path, checksum, quotes, generated_at, scan_date)
+    if strategy_id == "M10-PA-011":
+        return pa011_orb_rebuild_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id == PA004_MOMENTUM_VARIANT_ID:
         return pa004_momentum_breakout_rows(spec, symbol, bars, cache_path, checksum, quotes, scan_date)
     if strategy_id == PA004_MOMENTUM_QUALITY_VARIANT_ID:
@@ -1037,13 +1168,18 @@ def pa011_orb_rebuild_rows(
     signal = pa011_orb_rebuild_signal(symbol=symbol, bars=bars, scan_date=scan_date)
     if signal is None:
         return []
+    rescue_lane = spec["lane"] == "rescue"
     entry = signal["entry"]
     stop = signal["stop"]
     target = signal["target"]
     latest = quote_latest_or_entry(quotes, symbol, entry)
     row = experimental_adapter_trade_row(
         strategy_id=spec["strategy_id"],
-        strategy_title="M10-PA-011 ORB-R1 失败开盘突破反转（救援账户）",
+        strategy_title=(
+            "M10-PA-011 ORB-R1 失败开盘突破反转（救援账户）"
+            if rescue_lane
+            else "M10-PA-011 失败开盘突破反转（修复版实验账户）"
+        ),
         symbol=symbol,
         timeframe=spec["timeframe"],
         direction=str(signal["direction"]),
@@ -1060,15 +1196,19 @@ def pa011_orb_rebuild_rows(
         source_refs="reports/strategy_lab/m10_price_action_strategy_refresh/source_ledgers/M10-PA-011.json;reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_rescue/m14_strategy_rescue_plan.json",
         context=PA011_ORB_REBUILD_ADAPTER_ID,
         review_status=(
-            "ORB-R1 重建版只在 5m 开盘 30 分钟区间后工作：要求先假突破开盘区间、"
+            "M10-PA-011 修复版只在 5m 开盘 30 分钟区间后工作：要求先假突破开盘区间、"
             "随后回到区间中轴另一侧确认，单次风险不超过 2.5%，目标固定 1.5R；"
-            "M10-PA-011 baseline 保持独立不覆盖。"
+            + (
+                "M10-PA-011 baseline 保持独立不覆盖。"
+                if rescue_lane
+                else "原泛化开盘反转信号不再直接入账。"
+            )
         ),
         risk_level="中",
         variant_id="orb_rebuild_r1",
     )
-    row["bucket"] = "M14 救援变体输入"
-    row["candidate_status"] = "m14_rescue_adapter_entry"
+    row["bucket"] = "M14 救援变体输入" if rescue_lane else "M13 实验账户输入"
+    row["candidate_status"] = "m14_rescue_adapter_entry" if rescue_lane else "experimental_detector_entry"
     row["data_lineage"] = PA011_ORB_REBUILD_ADAPTER_ID
     row["signal_source_type"] = PA011_ORB_REBUILD_ADAPTER_ID
     return [row]
@@ -1586,20 +1726,23 @@ def runtime_signal_rows(
     pa004_formal_rows: list[dict[str, str]],
 ) -> list[dict[str, str]]:
     if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
-        return [
+        return apply_runtime_repair_rules(spec, [
             row for row in trade_rows
             if row.get("strategy_id") == spec["strategy_id"]
             and row.get("timeframe") == spec["timeframe"]
-        ]
+        ])
     source_strategy_id = runtime_source_strategy_id(spec)
     if source_strategy_id == "M10-PA-004":
-        return filter_rescue_signal_rows(spec, [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]])
+        return apply_runtime_repair_rules(
+            spec,
+            filter_rescue_signal_rows(spec, [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]]),
+        )
     rows = [
         row for row in trade_rows
         if row.get("strategy_id") == source_strategy_id
         and row.get("timeframe") == spec["timeframe"]
     ]
-    return filter_rescue_signal_rows(spec, rows)
+    return apply_runtime_repair_rules(spec, filter_rescue_signal_rows(spec, rows))
 
 
 def build_runtime_readiness(
@@ -1752,6 +1895,109 @@ def max_risk_amount_for_spec(spec: dict[str, str]) -> Decimal | None:
     return None
 
 
+def runtime_position_size_multiplier(spec: dict[str, str]) -> Decimal:
+    return RUNTIME_POSITION_SIZE_MULTIPLIERS.get(spec["account_id"], Decimal("1.00"))
+
+
+def runtime_repair_policy(spec: dict[str, str]) -> dict[str, Any]:
+    return RUNTIME_REPAIR_POLICIES.get(spec["account_id"], {})
+
+
+def runtime_loss_cooldown_threshold(spec: dict[str, str]) -> int:
+    policy = runtime_repair_policy(spec)
+    if "cooldown_after_losses" in policy:
+        return int(policy["cooldown_after_losses"])
+    if spec["variant_id"] == "loss_streak_guard":
+        return 3
+    return 0
+
+
+def runtime_repair_summary(spec: dict[str, str]) -> str:
+    policy = runtime_repair_policy(spec)
+    return str(policy.get("summary", ""))
+
+
+def apply_runtime_repair_rules(spec: dict[str, str], rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    policy = runtime_repair_policy(spec)
+    if not policy:
+        return rows
+    accepted: list[dict[str, str]] = []
+    for row in rows:
+        if not repair_policy_accepts_row(policy, row):
+            continue
+        clone = dict(row)
+        clone["runtime_repair_policy"] = str(policy["policy_id"])
+        clone["runtime_repair_status"] = "accepted_after_repair_filter"
+        clone["position_size_multiplier"] = str(runtime_position_size_multiplier(spec))
+        clone["repair_rule_summary"] = str(policy["summary"])
+        accepted.append(clone)
+    return accepted
+
+
+def repair_policy_accepts_row(policy: dict[str, Any], row: dict[str, str]) -> bool:
+    entry = decimal_or_none(row.get("hypothetical_entry_price", ""))
+    stop = decimal_or_none(row.get("hypothetical_stop_price", ""))
+    target = decimal_or_none(row.get("hypothetical_target_price", ""))
+    if entry is None or stop is None or target is None or entry <= ZERO or stop <= ZERO or target <= ZERO:
+        return False
+    direction = direction_zh(str(row.get("direction", "")))
+    risk, reward = directional_risk_reward(direction, entry, stop, target)
+    if risk <= ZERO or reward <= ZERO:
+        return False
+    min_reward_r = policy.get("min_reward_r")
+    if isinstance(min_reward_r, Decimal) and reward < risk * min_reward_r:
+        return False
+    max_risk_percent = policy.get("max_risk_percent")
+    if isinstance(max_risk_percent, Decimal) and risk / entry * HUNDRED > max_risk_percent:
+        return False
+    if policy.get("block_high_risk_label") and row_has_high_risk_or_weak_quality_label(row):
+        return False
+    if policy.get("require_latest_confirms_entry") and not latest_confirms_entry(direction, row, entry):
+        return False
+    tokens = tuple(str(token) for token in policy.get("required_context_tokens", ()))
+    if tokens and not row_context_contains_any(row, tokens):
+        return False
+    return True
+
+
+def directional_risk_reward(direction: str, entry: Decimal, stop: Decimal, target: Decimal) -> tuple[Decimal, Decimal]:
+    if direction in {"long", "看涨"}:
+        return entry - stop, target - entry
+    if direction in {"short", "看跌"}:
+        return stop - entry, entry - target
+    return abs(entry - stop), abs(target - entry)
+
+
+def latest_confirms_entry(direction: str, row: dict[str, str], entry: Decimal) -> bool:
+    latest = decimal_or_none(row.get("latest_price", ""))
+    if latest is None or latest <= ZERO:
+        return False
+    if direction in {"long", "看涨"}:
+        return latest >= entry
+    if direction in {"short", "看跌"}:
+        return latest <= entry
+    return False
+
+
+def row_has_high_risk_or_weak_quality_label(row: dict[str, str]) -> bool:
+    risk_level = str(row.get("risk_level", "")).strip().lower()
+    if risk_level in {"高", "high", "risk_blocked"}:
+        return True
+    text = " ".join(
+        str(row.get(key, ""))
+        for key in ("review_status", "candidate_status", "notes")
+    ).lower()
+    return any(token in text for token in ("weak", "低质量", "unconfirmed", "risk_blocked"))
+
+
+def row_context_contains_any(row: dict[str, str], tokens: tuple[str, ...]) -> bool:
+    text = " ".join(
+        str(row.get(key, ""))
+        for key in ("simulated_context", "signal_source_type", "data_lineage", "variant_id", "review_status")
+    ).lower()
+    return any(token.lower() in text for token in tokens)
+
+
 def open_new_positions(
     account: dict[str, Any],
     spec: dict[str, str],
@@ -1761,15 +2007,32 @@ def open_new_positions(
 ) -> tuple[list[dict[str, Any]], int]:
     new_ledger: list[dict[str, Any]] = []
     opened = 0
+    size_multiplier = runtime_position_size_multiplier(spec)
+    repair_policy = runtime_repair_policy(spec)
+    cooldown_threshold = runtime_loss_cooldown_threshold(spec)
     for row in rows:
         if row.get("signal_date") != scan_date.isoformat():
             continue
         signal_id = account_signal_id(spec, row)
         if signal_id in account["processed_signal_ids"]:
             continue
-        if spec["variant_id"] == "loss_streak_guard" and account.get("pause_remaining_signals", 0) > 0:
+        if cooldown_threshold and account.get("pause_remaining_signals", 0) > 0:
             account["pause_remaining_signals"] -= 1
             account["processed_signal_ids"].append(signal_id)
+            new_ledger.append(
+                {
+                    "event_type": "skip",
+                    "runtime_id": spec["account_id"],
+                    "strategy_id": spec["strategy_id"],
+                    "timeframe": spec["timeframe"],
+                    "symbol": row.get("symbol", ""),
+                    "trading_date": scan_date.isoformat(),
+                    "signal_time": row.get("signal_time", ""),
+                    "event_time": generated_at,
+                    "skip_reason": "连续亏损后暂停一条新信号",
+                    "runtime_repair_policy": str(repair_policy.get("policy_id", "loss_streak_guard")),
+                }
+            )
             continue
         entry = money_to_decimal(row.get("hypothetical_entry_price", ""))
         stop = money_to_decimal(row.get("hypothetical_stop_price", ""))
@@ -1783,7 +2046,7 @@ def open_new_positions(
         current_equity = money_to_decimal(account["equity"])
         available_cash = money_to_decimal(account["cash"])
         uncapped_risk_budget = (current_equity * DEFAULT_ACCOUNT_RISK_RATE).quantize(MONEY)
-        risk_budget = uncapped_risk_budget
+        risk_budget = (uncapped_risk_budget * size_multiplier).quantize(MONEY)
         max_risk_amount = max_risk_amount_for_spec(spec)
         if max_risk_amount is not None and max_risk_amount > ZERO:
             risk_budget = min(risk_budget, max_risk_amount)
@@ -1821,8 +2084,14 @@ def open_new_positions(
             "risk_level": row.get("risk_level", ""),
             "source_refs": row.get("source_refs", ""),
             "spec_ref": row.get("spec_ref", ""),
+            "position_size_multiplier": str(size_multiplier),
+            "runtime_repair_policy": str(repair_policy.get("policy_id", "")),
+            "runtime_repair_summary": str(repair_policy.get("summary", "")),
         }
-        ledger_extra: dict[str, str] = {}
+        ledger_extra: dict[str, str] = {
+            "position_size_multiplier": str(size_multiplier),
+            "runtime_repair_policy": str(repair_policy.get("policy_id", "")),
+        }
         if max_risk_amount is not None:
             broker_risk_cap_applied = risk_budget < uncapped_risk_budget
             cap_fields = {
@@ -1928,11 +2197,14 @@ def mark_position_to_market(
         "opened_at": position["opened_at"],
         "exit_reason": exit_reason,
         "realized_pnl": money(pnl),
+        "position_size_multiplier": position.get("position_size_multiplier", ""),
+        "runtime_repair_policy": position.get("runtime_repair_policy", ""),
     }
     account["closed_trades"].append(trade)
     if pnl < ZERO:
         account["consecutive_losses"] = int(account.get("consecutive_losses", 0)) + 1
-        if spec["variant_id"] == "loss_streak_guard" and account["consecutive_losses"] >= 3:
+        cooldown_threshold = runtime_loss_cooldown_threshold(spec)
+        if cooldown_threshold and account["consecutive_losses"] >= cooldown_threshold:
             account["pause_remaining_signals"] = 1
             account["consecutive_losses"] = 0
     else:
@@ -2114,29 +2386,12 @@ def build_account_input_audit_rows(
     rows: list[dict[str, str]] = []
     for spec in ACCOUNT_SPECS:
         scanner_connected = scanner_connected_for_spec(spec)
+        repair_policy = runtime_repair_policy(spec)
         source_strategy_id = runtime_source_strategy_id(spec)
-        if spec["strategy_id"] == PA011_ORB_REBUILD_VARIANT_ID:
-            source_rows = [
-                row
-                for row in trade_rows
-                if row.get("strategy_id") == spec["strategy_id"] and row.get("timeframe") == spec["timeframe"]
-            ]
-            source_type = source_rows[0].get("signal_source_type", input_source_type_for_spec(spec)) if source_rows else input_source_type_for_spec(spec)
-        elif source_strategy_id == "M10-PA-004":
-            source_rows = filter_rescue_signal_rows(
-                spec,
-                [row for row in pa004_formal_rows if row.get("timeframe") == spec["timeframe"]],
-            )
+        source_rows = runtime_signal_rows(spec, trade_rows, pa004_formal_rows)
+        if source_strategy_id == "M10-PA-004" and spec["strategy_id"] == "M10-PA-004":
             source_type = "formal_detector_entry"
         else:
-            source_rows = filter_rescue_signal_rows(
-                spec,
-                [
-                    row
-                    for row in trade_rows
-                    if row.get("strategy_id") == source_strategy_id and row.get("timeframe") == spec["timeframe"]
-                ],
-            )
             source_type = source_rows[0].get("signal_source_type", input_source_type_for_spec(spec)) if source_rows else input_source_type_for_spec(spec)
         today_formal_count = sum(1 for row in source_rows if row.get("signal_date") == scan_date.isoformat())
         if not scanner_connected:
@@ -2160,6 +2415,9 @@ def build_account_input_audit_rows(
                 "input_status": input_status,
                 "today_formal_signal_count": str(today_formal_count),
                 "source_row_count": str(len(source_rows)),
+                "position_size_multiplier": str(runtime_position_size_multiplier(spec)),
+                "runtime_repair_policy": str(repair_policy.get("policy_id", "")),
+                "runtime_repair_summary": str(repair_policy.get("summary", "")),
                 "watchlist_only": "false",
                 "plain_language_result": plain_language_result,
             }
@@ -2170,6 +2428,8 @@ def build_account_input_audit_rows(
 def input_source_type_for_spec(spec: dict[str, str]) -> str:
     if spec["strategy_id"] in RESCUE_CONNECTED_STRATEGIES:
         return rescue_input_source_type_for_spec(spec)
+    if spec["strategy_id"] == "M10-PA-011":
+        return PA011_ORB_REBUILD_ADAPTER_ID
     if spec["strategy_id"] in EXPERIMENTAL_ADAPTER_STRATEGIES:
         return "experimental_detector_entry"
     return "formal_scan"
@@ -2178,6 +2438,8 @@ def input_source_type_for_spec(spec: dict[str, str]) -> str:
 def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict[str, str]:
     open_positions = account["open_positions"]
     symbols = sorted({position["symbol"] for position in open_positions + account["closed_trades"]})
+    spec = next((item for item in ACCOUNT_SPECS if item["account_id"] == account["runtime_id"]), {})
+    repair_policy = runtime_repair_policy(spec) if spec else {}
     return {
         "runtime_id": account["runtime_id"],
         "strategy_id": account["strategy_id"],
@@ -2205,6 +2467,9 @@ def build_account_view(account: dict[str, Any], history: dict[str, str]) -> dict
         "cumulative_return_percent": account["cumulative_return_percent"],
         "symbols": ", ".join(symbols[:10]),
         "variant_label": history.get("variant_label", ""),
+        "position_size_multiplier": str(runtime_position_size_multiplier(spec)) if spec else "1.00",
+        "runtime_repair_policy": str(repair_policy.get("policy_id", "")),
+        "runtime_repair_summary": str(repair_policy.get("summary", "")),
         "paper_trial_candidate_now": "false",
     }
 
@@ -2445,6 +2710,8 @@ def build_trade_ledger_rows(account_rows: list[dict[str, str]], state: dict[str,
                     "quantity": position["quantity"],
                     "pnl": position["current_pnl"],
                     "state": position["current_state"],
+                    "position_size_multiplier": position.get("position_size_multiplier", ""),
+                    "runtime_repair_policy": position.get("runtime_repair_policy", ""),
                 }
             )
         for trade in account["closed_trades"][-10:]:
@@ -2467,6 +2734,8 @@ def build_trade_ledger_rows(account_rows: list[dict[str, str]], state: dict[str,
                     "quantity": trade["quantity"],
                     "pnl": trade["realized_pnl"],
                     "state": trade["exit_reason"],
+                    "position_size_multiplier": trade.get("position_size_multiplier", ""),
+                    "runtime_repair_policy": trade.get("runtime_repair_policy", ""),
                 }
             )
     rows.sort(key=lambda row: (row["signal_time"], row["record_type"], row["runtime_id"]), reverse=True)
@@ -2703,6 +2972,9 @@ def build_terminal_account_rows(runtime: dict[str, Any], m14_context: dict[str, 
                 "today_closed_count": row["today_closed_count"],
                 "win_rate_percent": row["win_rate_percent"],
                 "max_drawdown_percent": row["max_drawdown_percent"],
+                "position_size_multiplier": row.get("position_size_multiplier", "1.00"),
+                "runtime_repair_policy": row.get("runtime_repair_policy", ""),
+                "runtime_repair_summary": row.get("runtime_repair_summary", ""),
                 "m14_decision": str(decision.get("action_state") or decision.get("decision", "not_available")),
                 "m14_decision_reason": str(decision.get("decision_reason", "")),
                 "paper_trial_gate": str(gate.get("paper_trial_gate", "not_approved_or_pending")),

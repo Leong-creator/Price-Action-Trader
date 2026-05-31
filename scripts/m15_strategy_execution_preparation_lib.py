@@ -29,6 +29,29 @@ FORBIDDEN_BOUNDARIES = (
     "manual_m12_37_once",
     "legacy_bug_profit_metric_planning_input",
 )
+IMPLEMENTED_M12_RUNTIME_RULES = frozenset(
+    {
+        "M10-PA-001-1d",
+        "M10-PA-001-5m",
+        "M10-PA-002-1d",
+        "M10-PA-002-5m",
+        "M10-PA-004-long-1d",
+        "M10-PA-004-MBF-1d",
+        "M10-PA-004-MBF-QC-1d",
+        "M10-PA-005-1d",
+        "M10-PA-005-5m",
+        "M10-PA-007-1d",
+        "M10-PA-008-1d",
+        "M10-PA-009-1d",
+        "M10-PA-011-5m",
+        "M10-PA-011-ORB-R1-5m",
+        "M10-PA-012-5m",
+        "M10-PA-013-1d",
+        "M10-PA-013-5m",
+        "M12-FTD-001-baseline-1d",
+        "M12-FTD-001-loss-streak-guard-1d",
+    }
+)
 
 
 FIRST_BATCH_ROWS = (
@@ -357,7 +380,15 @@ def run_m15_strategy_execution_preparation(
 
 
 def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str) -> dict[str, Any]:
-    first_batch = [dict(row) for row in FIRST_BATCH_ROWS]
+    first_batch = [
+        {
+            **dict(row),
+            "m12_runtime_rule_status": (
+                "implemented_in_m12_account_runtime" if row["runtime_id"] in IMPLEMENTED_M12_RUNTIME_RULES else "pending"
+            ),
+        }
+        for row in FIRST_BATCH_ROWS
+    ]
     second_batch = [
         {
             "runtime_id": runtime_id,
@@ -367,6 +398,9 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
             "position_size_multiplier": size,
             "plain_status": status,
             "longbridge_paper_scope": "not_first_order_candidate",
+            "m12_runtime_rule_status": (
+                "implemented_in_m12_account_runtime" if runtime_id in IMPLEMENTED_M12_RUNTIME_RULES else "pending"
+            ),
         }
         for runtime_id, strategy_id, timeframe, action_state, size, status in SECOND_BATCH_ROWS
     ]
@@ -377,9 +411,19 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
             "longbridge_paper_scope": "blocked_until_repaired",
             "broker_paper_start_allowed": False,
             "standalone_repair_trial": True,
+            "m12_runtime_rule_status": (
+                "implemented_in_m12_account_runtime"
+                if row["runtime_id"] in IMPLEMENTED_M12_RUNTIME_RULES
+                else "pending"
+            ),
         }
         for row in REPAIR_ROWS
     ]
+    implemented_rule_count = sum(
+        1
+        for row in [*first_batch, *second_batch, *repairs]
+        if row["m12_runtime_rule_status"] == "implemented_in_m12_account_runtime"
+    )
     repair_priority_counts = {
         priority: sum(1 for row in repairs if row["repair_priority"] == priority)
         for priority in sorted({row["repair_priority"] for row in repairs})
@@ -401,6 +445,8 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
         "repair_now_count": len(repairs),
         "repair_priority_counts": repair_priority_counts,
         "repair_queue_ready_before_monday": True,
+        "m12_runtime_rule_implemented_count": implemented_rule_count,
+        "m12_runtime_rule_scope": "仓位倍率、收益风险比、止损距离、假突破确认、图形上下文、连续亏损暂停已接入 M12 账户化运行链路",
         "auxiliary_module_count": len(auxiliary),
         "first_paper_order_strategy_id": "M10-PA-004",
         "first_paper_order_runtime_id": "M10-PA-004-long-1d",
@@ -425,7 +471,8 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
         **default_boundaries(),
         "plain_language_result": [
             "周一前先把预演、白名单、仓位、熔断、验收清单和辅助模块定位准备好。",
-            "第一批只推进 M10-PA-004、M10-PA-005、M10-PA-008 到下一轮内部模拟。",
+        "M12 账户化运行链路已接入仓位倍率、质量过滤、止损距离、假突破确认和连续亏损暂停规则。",
+        "第一批只推进 M10-PA-004、M10-PA-005、M10-PA-008 到下一轮内部模拟。",
             "第一笔长桥模拟账户试单只允许 M10-PA-004，且必须等用户单独批准令牌和首笔订单。",
             "辅助模块不是废弃策略，而是正式服务主策略的筛选、风控、目标价、仓位、加仓和图形证据模块。",
         ],
@@ -478,21 +525,22 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"- 生成时间: `{payload['generated_at']}`",
         f"- 第一批 / 第二批 / 立即修复 / 辅助模块: `{summary['first_batch_internal_sim_count']}/{summary['second_batch_candidate_count']}/{summary['repair_now_count']}/{summary['auxiliary_module_count']}`",
         f"- 修复优先级: `{summary['repair_priority_counts']}`",
+        f"- 已接入 M12 账户化运行规则: `{summary['m12_runtime_rule_implemented_count']}` 条",
         f"- 第一笔长桥模拟候选: `{summary['first_paper_order_runtime_id']}`",
         "- 边界: 不读凭证、不连接账户、不提交订单、不启用实盘。",
         "",
         "## 第一批内部模拟",
         "",
-        "| 运行单元 | 动作 | 仓位 | 状态 | 长桥模拟范围 |",
-        "|---|---|---:|---|---|",
+        "| 运行单元 | 动作 | 仓位 | 规则状态 | 状态 | 长桥模拟范围 |",
+        "|---|---|---:|---|---|---|",
     ]
     for row in payload["first_batch_internal_sim"]:
         lines.append(
-            f"| {row['runtime_id']} | {row['action_state']} | {row['position_size_multiplier']} | {row['plain_status']} | {row['longbridge_paper_scope']} |"
+            f"| {row['runtime_id']} | {row['action_state']} | {row['position_size_multiplier']} | {row['m12_runtime_rule_status']} | {row['plain_status']} | {row['longbridge_paper_scope']} |"
         )
-    lines.extend(["", "## 第二批内部模拟候选", "", "| 运行单元 | 动作 | 仓位 | 状态 |", "|---|---|---:|---|"])
+    lines.extend(["", "## 第二批内部模拟候选", "", "| 运行单元 | 动作 | 仓位 | 规则状态 | 状态 |", "|---|---|---:|---|---|"])
     for row in payload["second_batch_internal_sim_candidates"]:
-        lines.append(f"| {row['runtime_id']} | {row['action_state']} | {row['position_size_multiplier']} | {row['plain_status']} |")
+        lines.append(f"| {row['runtime_id']} | {row['action_state']} | {row['position_size_multiplier']} | {row['m12_runtime_rule_status']} | {row['plain_status']} |")
     lines.extend(["", "## 立即修复队列", ""])
     for row in payload["repair_before_advance"]:
         lines.extend(
@@ -502,6 +550,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
                 f"- 优先级: `{row['repair_priority']}`",
                 f"- 周期: `{row['timeframe']}`",
                 f"- 仓位: `{row['position_size_multiplier']}`",
+                f"- M12 规则状态: `{row['m12_runtime_rule_status']}`",
                 f"- 修复窗口: {row['repair_window']}",
                 f"- 修复目标: {row['repair_plan']}",
                 "- 修复动作:",

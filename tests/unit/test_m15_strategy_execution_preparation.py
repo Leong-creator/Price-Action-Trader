@@ -24,8 +24,10 @@ class M15StrategyExecutionPreparationTest(unittest.TestCase):
 
             self.assertEqual(payload["summary"]["first_batch_internal_sim_count"], 4)
             self.assertEqual(payload["summary"]["first_paper_order_strategy_id"], "M10-PA-004")
+            self.assertGreaterEqual(payload["summary"]["m12_runtime_rule_implemented_count"], 18)
             first_batch = {row["runtime_id"]: row for row in payload["first_batch_internal_sim"]}
             self.assertEqual(first_batch["M10-PA-004-long-1d"]["longbridge_paper_scope"], "first_order_candidate_after_user_approval")
+            self.assertEqual(first_batch["M10-PA-004-long-1d"]["m12_runtime_rule_status"], "implemented_in_m12_account_runtime")
             self.assertEqual(first_batch["M10-PA-005-5m"]["position_size_multiplier"], "0.25")
             self.assertEqual(first_batch["M10-PA-008-1d"]["position_size_multiplier"], "0.25")
             self.assertFalse(payload["broker_connection"])
@@ -72,6 +74,9 @@ class M15StrategyExecutionPreparationTest(unittest.TestCase):
             repairs = {row["runtime_id"]: row for row in payload["repair_execution_queue"]}
             self.assertEqual(payload["summary"]["repair_priority_counts"], {"P0": 4, "P1": 5})
             self.assertTrue(payload["summary"]["repair_queue_ready_before_monday"])
+            self.assertTrue(
+                all(row["m12_runtime_rule_status"] == "implemented_in_m12_account_runtime" for row in repairs.values())
+            )
 
             pa001 = repairs["M10-PA-001-1d"]
             self.assertEqual(pa001["action_state"], "repair_now")

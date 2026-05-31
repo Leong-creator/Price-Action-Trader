@@ -67,6 +67,7 @@
         "准备第一笔长桥模拟账户限价单预览，但不连接账户、不下单"
       ],
       "longbridge_paper_scope": "first_order_candidate_after_user_approval",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "monday_refresh_checks": [
         "刷新后复核 M13 当天账本",
         "刷新后复核 M14 gate 仍为推进内部模拟",
@@ -85,6 +86,7 @@
         "仓位固定为 0.25 倍，先不进入第一笔长桥模拟账户"
       ],
       "longbridge_paper_scope": "excluded_from_first_order",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "monday_refresh_checks": [
         "刷新后确认日线账本独立更新",
         "若仍盈利但风险高，继续降仓位推进而不是否掉"
@@ -103,6 +105,7 @@
         "准备低质量信号过滤"
       ],
       "longbridge_paper_scope": "excluded_until_broker_blockers_clear",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "monday_refresh_checks": [
         "刷新后看总敞口阻断是否解除",
         "刷新后看连续亏损暂停是否仍触发"
@@ -120,6 +123,7 @@
         "准备 M10-PA-008-broker-risk-cap-shadow 首个影子账本检查"
       ],
       "longbridge_paper_scope": "excluded_until_broker_blockers_clear",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "monday_refresh_checks": [
         "刷新后确认风险上限影子账本是否生成",
         "若风险上限仍超标，继续压数量而不是进入长桥模拟账户"
@@ -131,7 +135,7 @@
       "timeframe": "1d"
     }
   ],
-  "generated_at": "2026-05-31T09:33:19Z",
+  "generated_at": "2026-05-31T09:51:48Z",
   "hard_boundaries": {
     "broker_connection": false,
     "credential_injection_allowed_now": false,
@@ -193,6 +197,7 @@
   "paper_trading_approval": false,
   "plain_language_result": [
     "周一前先把预演、白名单、仓位、熔断、验收清单和辅助模块定位准备好。",
+    "M12 账户化运行链路已接入仓位倍率、质量过滤、止损距离、假突破确认和连续亏损暂停规则。",
     "第一批只推进 M10-PA-004、M10-PA-005、M10-PA-008 到下一轮内部模拟。",
     "第一笔长桥模拟账户试单只允许 M10-PA-004，且必须等用户单独批准令牌和首笔订单。",
     "辅助模块不是废弃策略，而是正式服务主策略的筛选、风控、目标价、仓位、加仓和图形证据模块。"
@@ -214,6 +219,7 @@
         "增加连续亏损冷却：同一运行单元连续亏损后暂停新信号，等下一次高质量信号再恢复"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验",
       "repair_priority": "P0",
@@ -238,6 +244,7 @@
         "连续亏损后增加冷却，避免同一段弱行情反复试错"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修入场质量、止损距离、连续亏损控制；5 分钟单独验收，不和日线混合",
       "repair_priority": "P0",
@@ -262,6 +269,7 @@
         "同一标的同一方向失败后延迟下一次入场，避免连续追错"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
       "repair_priority": "P0",
@@ -286,6 +294,7 @@
         "保持为 PA004 并行质量确认变体，不覆盖 PA004 主线"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修确认条件和入场质量；只作为 PA004 质量确认变体",
       "repair_priority": "P1",
@@ -310,6 +319,7 @@
         "保留样例证据，方便周一刷新后复核误判来源"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修第二腿图形识别器；没有稳定图形证据前不交易",
       "repair_priority": "P1",
@@ -334,6 +344,7 @@
         "账本转正前只允许低仓位修复试验"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修弱信号过滤和图形证据；账本转正前低仓位修复",
       "repair_priority": "P1",
@@ -358,6 +369,7 @@
         "失败后当日同方向冷却，避免开盘噪音反复入场"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修开盘区间反转高回撤；只允许小仓位试验",
       "repair_priority": "P0",
@@ -382,6 +394,7 @@
         "和 loss-streak-guard 并排比较，不互相覆盖"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.00",
       "repair_plan": "修趋势过滤和连续亏损保护；先作为对照基准",
       "repair_priority": "P1",
@@ -406,6 +419,7 @@
         "若保护降低回撤，再考虑第二批内部模拟候选"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.00",
       "repair_plan": "修连续亏损保护；不进第一批长桥模拟账户",
       "repair_priority": "P1",
@@ -432,6 +446,7 @@
         "增加连续亏损冷却：同一运行单元连续亏损后暂停新信号，等下一次高质量信号再恢复"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验",
       "repair_priority": "P0",
@@ -456,6 +471,7 @@
         "连续亏损后增加冷却，避免同一段弱行情反复试错"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修入场质量、止损距离、连续亏损控制；5 分钟单独验收，不和日线混合",
       "repair_priority": "P0",
@@ -480,6 +496,7 @@
         "同一标的同一方向失败后延迟下一次入场，避免连续追错"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
       "repair_priority": "P0",
@@ -504,6 +521,7 @@
         "保持为 PA004 并行质量确认变体，不覆盖 PA004 主线"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修确认条件和入场质量；只作为 PA004 质量确认变体",
       "repair_priority": "P1",
@@ -528,6 +546,7 @@
         "保留样例证据，方便周一刷新后复核误判来源"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修第二腿图形识别器；没有稳定图形证据前不交易",
       "repair_priority": "P1",
@@ -552,6 +571,7 @@
         "账本转正前只允许低仓位修复试验"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修弱信号过滤和图形证据；账本转正前低仓位修复",
       "repair_priority": "P1",
@@ -576,6 +596,7 @@
         "失败后当日同方向冷却，避免开盘噪音反复入场"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.10",
       "repair_plan": "修开盘区间反转高回撤；只允许小仓位试验",
       "repair_priority": "P0",
@@ -600,6 +621,7 @@
         "和 loss-streak-guard 并排比较，不互相覆盖"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.00",
       "repair_plan": "修趋势过滤和连续亏损保护；先作为对照基准",
       "repair_priority": "P1",
@@ -624,6 +646,7 @@
         "若保护降低回撤，再考虑第二批内部模拟候选"
       ],
       "longbridge_paper_scope": "blocked_until_repaired",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "position_size_multiplier": "0.00",
       "repair_plan": "修连续亏损保护；不进第一批长桥模拟账户",
       "repair_priority": "P1",
@@ -639,6 +662,7 @@
     {
       "action_state": "risk_limited_advance",
       "longbridge_paper_scope": "not_first_order_candidate",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "plain_status": "表现较好，先补新行情账本，不进第一笔长桥模拟账户",
       "position_size_multiplier": "0.50",
       "runtime_id": "M10-PA-013-1d",
@@ -648,6 +672,7 @@
     {
       "action_state": "risk_limited_advance",
       "longbridge_paper_scope": "not_first_order_candidate",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "plain_status": "过滤弱支撑/阻力失败信号后继续内部模拟",
       "position_size_multiplier": "0.50",
       "runtime_id": "M10-PA-013-5m",
@@ -657,6 +682,7 @@
     {
       "action_state": "risk_limited_advance",
       "longbridge_paper_scope": "not_first_order_candidate",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "plain_status": "修目标价和止损几何，先跑 1 倍风险目标价影子账本",
       "position_size_multiplier": "0.50",
       "runtime_id": "M10-PA-012-5m",
@@ -666,6 +692,7 @@
     {
       "action_state": "risk_limited_advance",
       "longbridge_paper_scope": "not_first_order_candidate",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "plain_status": "加强突破质量和回撤控制后继续内部模拟",
       "position_size_multiplier": "0.25",
       "runtime_id": "M10-PA-002-1d",
@@ -675,6 +702,7 @@
     {
       "action_state": "risk_limited_advance",
       "longbridge_paper_scope": "not_first_order_candidate",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
       "plain_status": "作为 PA004 并行变体对照，不覆盖主线 PA004",
       "position_size_multiplier": "0.50",
       "runtime_id": "M10-PA-004-MBF-1d",
@@ -691,6 +719,8 @@
     "first_paper_order_strategy_id": "M10-PA-004",
     "live_execution": false,
     "longbridge_paper_earliest_status": "等待周一正常刷新、下单预演通过、用户单独批准模拟令牌和首笔模拟订单",
+    "m12_runtime_rule_implemented_count": 18,
+    "m12_runtime_rule_scope": "仓位倍率、收益风险比、止损距离、假突破确认、图形上下文、连续亏损暂停已接入 M12 账户化运行链路",
     "order_submitted": false,
     "repair_now_count": 9,
     "repair_priority_counts": {

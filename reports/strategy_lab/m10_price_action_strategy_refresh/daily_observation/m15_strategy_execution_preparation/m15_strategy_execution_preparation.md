@@ -1,29 +1,30 @@
 # M15 策略推进准备
 
-- 生成时间: `2026-05-31T09:33:19Z`
+- 生成时间: `2026-05-31T09:51:48Z`
 - 第一批 / 第二批 / 立即修复 / 辅助模块: `4/5/9/7`
 - 修复优先级: `{'P0': 4, 'P1': 5}`
+- 已接入 M12 账户化运行规则: `18` 条
 - 第一笔长桥模拟候选: `M10-PA-004-long-1d`
 - 边界: 不读凭证、不连接账户、不提交订单、不启用实盘。
 
 ## 第一批内部模拟
 
-| 运行单元 | 动作 | 仓位 | 状态 | 长桥模拟范围 |
-|---|---|---:|---|---|
-| M10-PA-004-long-1d | advance_internal_sim | 1.0 | 主推进策略，正常仓位进入下一轮内部模拟 | first_order_candidate_after_user_approval |
-| M10-PA-005-1d | risk_limited_advance | 0.25 | 风险受限推进，日线单独判断，不和 5 分钟混合 | excluded_from_first_order |
-| M10-PA-005-5m | risk_limited_advance | 0.25 | 风险受限推进，5 分钟单独判断 | excluded_until_broker_blockers_clear |
-| M10-PA-008-1d | risk_limited_advance | 0.25 | 风险受限推进，单笔风险上限先固定 | excluded_until_broker_blockers_clear |
+| 运行单元 | 动作 | 仓位 | 规则状态 | 状态 | 长桥模拟范围 |
+|---|---|---:|---|---|---|
+| M10-PA-004-long-1d | advance_internal_sim | 1.0 | implemented_in_m12_account_runtime | 主推进策略，正常仓位进入下一轮内部模拟 | first_order_candidate_after_user_approval |
+| M10-PA-005-1d | risk_limited_advance | 0.25 | implemented_in_m12_account_runtime | 风险受限推进，日线单独判断，不和 5 分钟混合 | excluded_from_first_order |
+| M10-PA-005-5m | risk_limited_advance | 0.25 | implemented_in_m12_account_runtime | 风险受限推进，5 分钟单独判断 | excluded_until_broker_blockers_clear |
+| M10-PA-008-1d | risk_limited_advance | 0.25 | implemented_in_m12_account_runtime | 风险受限推进，单笔风险上限先固定 | excluded_until_broker_blockers_clear |
 
 ## 第二批内部模拟候选
 
-| 运行单元 | 动作 | 仓位 | 状态 |
-|---|---|---:|---|
-| M10-PA-013-1d | risk_limited_advance | 0.50 | 表现较好，先补新行情账本，不进第一笔长桥模拟账户 |
-| M10-PA-013-5m | risk_limited_advance | 0.50 | 过滤弱支撑/阻力失败信号后继续内部模拟 |
-| M10-PA-012-5m | risk_limited_advance | 0.50 | 修目标价和止损几何，先跑 1 倍风险目标价影子账本 |
-| M10-PA-002-1d | risk_limited_advance | 0.25 | 加强突破质量和回撤控制后继续内部模拟 |
-| M10-PA-004-MBF-1d | risk_limited_advance | 0.50 | 作为 PA004 并行变体对照，不覆盖主线 PA004 |
+| 运行单元 | 动作 | 仓位 | 规则状态 | 状态 |
+|---|---|---:|---|---|
+| M10-PA-013-1d | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 表现较好，先补新行情账本，不进第一笔长桥模拟账户 |
+| M10-PA-013-5m | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 过滤弱支撑/阻力失败信号后继续内部模拟 |
+| M10-PA-012-5m | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 修目标价和止损几何，先跑 1 倍风险目标价影子账本 |
+| M10-PA-002-1d | risk_limited_advance | 0.25 | implemented_in_m12_account_runtime | 加强突破质量和回撤控制后继续内部模拟 |
+| M10-PA-004-MBF-1d | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 作为 PA004 并行变体对照，不覆盖主线 PA004 |
 
 ## 立即修复队列
 
@@ -32,6 +33,7 @@
 - 优先级: `P0`
 - 周期: `1d`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前完成规则准备，周一新行情刷新后验收
 - 修复目标: 修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验
 - 修复动作:
@@ -50,6 +52,7 @@
 - 优先级: `P0`
 - 周期: `5m`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前完成规则准备，周一新行情刷新后验收
 - 修复目标: 修入场质量、止损距离、连续亏损控制；5 分钟单独验收，不和日线混合
 - 修复动作:
@@ -68,6 +71,7 @@
 - 优先级: `P0`
 - 周期: `5m`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前完成假突破过滤和失败后冷却规则
 - 修复目标: 修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户
 - 修复动作:
@@ -86,6 +90,7 @@
 - 优先级: `P1`
 - 周期: `1d`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前固定质量确认条件
 - 修复目标: 修确认条件和入场质量；只作为 PA004 质量确认变体
 - 修复动作:
@@ -104,6 +109,7 @@
 - 优先级: `P1`
 - 周期: `1d`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前固定第二腿图形证据规则
 - 修复目标: 修第二腿图形识别器；没有稳定图形证据前不交易
 - 修复动作:
@@ -122,6 +128,7 @@
 - 优先级: `P1`
 - 周期: `1d`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前固定弱信号过滤和图形证据规则
 - 修复目标: 修弱信号过滤和图形证据；账本转正前低仓位修复
 - 修复动作:
@@ -140,6 +147,7 @@
 - 优先级: `P0`
 - 周期: `5m`
 - 仓位: `0.10`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前固定开盘区间失败突破修复规则
 - 修复目标: 修开盘区间反转高回撤；只允许小仓位试验
 - 修复动作:
@@ -158,6 +166,7 @@
 - 优先级: `P1`
 - 周期: `1d`
 - 仓位: `0.00`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前固定对照基准和趋势过滤对比
 - 修复目标: 修趋势过滤和连续亏损保护；先作为对照基准
 - 修复动作:
@@ -176,6 +185,7 @@
 - 优先级: `P1`
 - 周期: `1d`
 - 仓位: `0.00`
+- M12 规则状态: `implemented_in_m12_account_runtime`
 - 修复窗口: 周一交易日前固定连续亏损保护对照
 - 修复目标: 修连续亏损保护；不进第一批长桥模拟账户
 - 修复动作:

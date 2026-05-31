@@ -65,6 +65,7 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
                         "signal_time": "2026-04-29T14:00:00Z",
                         "signal_date": "2026-04-29",
                         "latest_price": "101.00",
+                        "latest_price_source": "longbridge_quote_readonly",
                         "hypothetical_entry_price": "100.00",
                         "hypothetical_stop_price": "99.00",
                         "hypothetical_target_price": "103.00",
@@ -81,6 +82,7 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
                         "signal_time": "2026-04-29T14:00:00Z",
                         "signal_date": "2026-04-29",
                         "latest_price": "101.00",
+                        "latest_price_source": "longbridge_quote_readonly",
                         "hypothetical_entry_price": "100.00",
                         "hypothetical_stop_price": "99.00",
                         "hypothetical_target_price": "103.00",
@@ -97,6 +99,7 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
                         "signal_time": "2026-04-29T14:00:00Z",
                         "signal_date": "2026-04-29",
                         "latest_price": "101.00",
+                        "latest_price_source": "longbridge_quote_readonly",
                         "hypothetical_entry_price": "100.00",
                         "hypothetical_stop_price": "98.00",
                         "hypothetical_target_price": "106.00",
@@ -124,8 +127,8 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
             accounts["M12-FTD-001-baseline-1d"]["processed_signal_ids"][0],
             accounts["M12-FTD-001-loss-streak-guard-1d"]["processed_signal_ids"][0],
         )
-        self.assertEqual(runtime["state"]["accounts"]["M10-PA-001-5m"]["cash"], "10000.00")
-        self.assertEqual(runtime["state"]["accounts"]["M10-PA-005-5m"]["cash"], "10000.00")
+        self.assertEqual(runtime["state"]["accounts"]["M10-PA-001-5m"]["cash"], "19000.00")
+        self.assertEqual(runtime["state"]["accounts"]["M10-PA-005-5m"]["cash"], "17500.00")
         self.assertEqual(runtime["state"]["accounts"]["M12-FTD-001-baseline-1d"]["cash"], "15000.00")
         self.assertEqual(runtime["state"]["accounts"]["M12-FTD-001-loss-streak-guard-1d"]["cash"], "15000.00")
 
@@ -147,8 +150,9 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
                         "signal_time": "2026-04-29T14:00:00Z",
                         "signal_date": "2026-04-29",
                         "latest_price": "101.00",
+                        "latest_price_source": "longbridge_quote_readonly",
                         "hypothetical_entry_price": "100.00",
-                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_stop_price": "99.75",
                         "hypothetical_target_price": "100.50",
                         "review_status": "ready",
                         "risk_level": "medium",
@@ -166,6 +170,158 @@ class M1246RuntimeAccountsTest(unittest.TestCase):
         self.assertEqual(account["today_opened_count"], "1")
         self.assertEqual(account["today_closed_count"], "1")
         self.assertEqual(account["open_position_count"], "0")
+
+    def test_repair_runtime_filters_low_quality_and_sizes_down(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_46"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T14:00:00Z",
+                scan_date=date.fromisoformat("2026-04-29"),
+                trade_rows=[
+                    {
+                        "strategy_id": "M10-PA-001",
+                        "timeframe": "5m",
+                        "symbol": "BAD",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:00:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "100.20",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "100.50",
+                        "review_status": "低质量入场",
+                        "risk_level": "高",
+                    },
+                    {
+                        "strategy_id": "M10-PA-001",
+                        "timeframe": "5m",
+                        "symbol": "GOOD",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:05:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "101.00",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "103.00",
+                        "review_status": "ready",
+                        "risk_level": "medium",
+                    },
+                ],
+                pa004_formal_rows=[],
+                closure_rows=[],
+                current_day_runtime_ready=True,
+            )
+        account = runtime["state"]["accounts"]["M10-PA-001-5m"]
+        self.assertEqual([position["symbol"] for position in account["open_positions"]], ["GOOD"])
+        self.assertEqual(account["open_positions"][0]["quantity"], "10.0000")
+        audit = {row["runtime_id"]: row for row in runtime["account_input_audit_rows"]}
+        self.assertEqual(audit["M10-PA-001-5m"]["source_row_count"], "1")
+        self.assertEqual(audit["M10-PA-001-5m"]["position_size_multiplier"], "0.10")
+        self.assertEqual(
+            audit["M10-PA-001-5m"]["runtime_repair_policy"],
+            "entry_quality_stop_distance_loss_cooldown",
+        )
+
+    def test_pa002_5m_false_breakout_confirmation_blocks_failed_probe(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_46"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T14:00:00Z",
+                scan_date=date.fromisoformat("2026-04-29"),
+                trade_rows=[
+                    {
+                        "strategy_id": "M10-PA-002",
+                        "timeframe": "5m",
+                        "symbol": "FAIL",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:00:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "99.50",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "103.00",
+                        "review_status": "ready",
+                        "risk_level": "medium",
+                    },
+                    {
+                        "strategy_id": "M10-PA-002",
+                        "timeframe": "5m",
+                        "symbol": "PASS",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:05:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "101.00",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "103.00",
+                        "review_status": "ready",
+                        "risk_level": "medium",
+                    },
+                ],
+                pa004_formal_rows=[],
+                closure_rows=[],
+                current_day_runtime_ready=True,
+            )
+        account = runtime["state"]["accounts"]["M10-PA-002-5m"]
+        self.assertEqual([position["symbol"] for position in account["open_positions"]], ["PASS"])
+        self.assertEqual(account["open_positions"][0]["quantity"], "10.0000")
+
+    def test_pa011_5m_requires_orb_repair_context(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_46"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            runtime = advance_account_runtime(
+                config,
+                generated_at="2026-04-29T14:00:00Z",
+                scan_date=date.fromisoformat("2026-04-29"),
+                trade_rows=[
+                    {
+                        "strategy_id": "M10-PA-011",
+                        "timeframe": "5m",
+                        "symbol": "GENERIC",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:00:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "101.00",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "103.00",
+                        "simulated_context": "m13_m10_pa_011_wave_b_adapter",
+                        "review_status": "generic opening reversal",
+                        "risk_level": "medium",
+                    },
+                    {
+                        "strategy_id": "M10-PA-011",
+                        "timeframe": "5m",
+                        "symbol": "ORB",
+                        "direction": "long",
+                        "signal_time": "2026-04-29T14:05:00Z",
+                        "signal_date": "2026-04-29",
+                        "latest_price": "101.00",
+                        "hypothetical_entry_price": "100.00",
+                        "hypothetical_stop_price": "99.00",
+                        "hypothetical_target_price": "101.50",
+                        "simulated_context": "m14_rescue_pa011_failed_orb_retest_adapter",
+                        "signal_source_type": "m14_rescue_pa011_failed_orb_retest_adapter",
+                        "variant_id": "orb_rebuild_r1",
+                        "review_status": "failed ORB retest confirmed",
+                        "risk_level": "medium",
+                    },
+                ],
+                pa004_formal_rows=[],
+                closure_rows=[],
+                current_day_runtime_ready=True,
+            )
+        account = runtime["state"]["accounts"]["M10-PA-011-5m"]
+        self.assertEqual([position["symbol"] for position in account["open_positions"]], ["ORB"])
+        self.assertEqual(account["open_positions"][0]["quantity"], "10.0000")
 
 
 if __name__ == "__main__":
