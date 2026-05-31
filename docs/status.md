@@ -9,7 +9,7 @@
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：M14/M15 加速推进整改、runtime 级内部模拟准入与 Longbridge paper preflight
-- 当前子阶段：M14/M15 已进入“周一交易日前准备”状态。有效 challenge 仍为 `10/10`，当前 canonical gate 共 `25` 个 runtime row，其中 `9` 个 runtime 可进入内部模拟推进，`7` 个为 `risk_limited_advance` 降仓推进，`7` 个非交易条目已固定为 `auxiliary_module` 辅助模块；`paper_candidate_runtime_ids` 现在因 `m12_quote_source=fallback_quotes_only` 为 `0`，不能进入 Longbridge paper。旧版利润错误产物继续排除在当前活跃 M12/M13/M14/M15 dashboard/report 输出和策略判断之外；后续如需历史表现，只能用 M13 account operation ledger 重算新的 mark-to-market 字段。M15 Longbridge paper preflight 已改为 paper-token-only、limit-only、US regular-hours-only、白名单、kill switch 和风险上限预演；当前本地 CLI 为 `longbridge 0.22.1`，仍不读凭证、不连接 broker、不提交订单。M12.37 仍只能由 M12.47 守护器在交易窗口拉起，本轮未手动运行 once-mode。
+- 当前子阶段：M14/M15 已进入“周一交易日前准备”状态。有效 challenge 仍为 `10/10`，当前 canonical gate 共 `25` 个 runtime row，其中 `9` 个 runtime 可进入内部模拟推进，`7` 个为 `risk_limited_advance` 降仓推进，`7` 个非交易条目已固定为 `auxiliary_module` 辅助模块；`paper_candidate_runtime_ids` 现在因 `m12_quote_source=fallback_quotes_only` 为 `0`，不能进入 Longbridge paper。M15 修复队列已固化为 `9` 个立即修复运行单元，其中 `P0=4`、`P1=5`，每条都有修复动作、验收条件、修好后推进路径和长桥模拟账户阻断状态。旧版利润错误产物继续排除在当前活跃 M12/M13/M14/M15 dashboard/report 输出和策略判断之外；后续如需历史表现，只能用 M13 account operation ledger 重算新的 mark-to-market 字段。M15 Longbridge paper preflight 已改为 paper-token-only、limit-only、US regular-hours-only、白名单、kill switch 和风险上限预演；当前本地 CLI 为 `longbridge 0.22.1`，仍不读凭证、不连接 broker、不提交订单。M12.37 仍只能由 M12.47 守护器在交易窗口拉起，本轮未手动运行 once-mode。
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
@@ -23,7 +23,7 @@
 - 已固化辅助模块定位：`M10-PA-003/006/010/014/015/016` 和 `AI-TRADER-EXTERNAL` 现在在 M14 gate、M14 next-step matrix 和 M15 strategy execution preparation 中显示为“辅助模块：启用为某某用途，不作为独立交易策略”，不再作为独立交易 runtime 进入模拟账户。
 - 已移除旧历史净利润显示链路：M12 JSON/CSV/HTML/Markdown writer 会递归剔除 `historical_*`、历史净利润、历史收益和历史盈利因子字段，当前活跃看板 artifact 已清理；M14 decision ledger 现在写当前规则快照，避免继续露出旧 `continue_testing / modify / reject / promote` 噪音。
 - 已增强 Longbridge paper preflight：`scripts/run_m15_longbridge_paper_preflight.py` 只做 paper-only 前置检查，拒绝 live token、非限价单、非美股常规时段、非白名单策略/runtime/标的和关闭 kill switch 的配置；当前因为 M12/M14 数据仍是 fallback/no-fetch 状态而阻断，未尝试凭证注入、broker 连接或订单提交。第一笔 paper order 候选只允许 `M10-PA-004-long-1d`，且仍需用户单独批准。
-- 已新增 M15 strategy execution preparation：`scripts/run_m15_strategy_execution_preparation.py` 生成周一前准备计划，第一批内部模拟固定为 `M10-PA-004 / M10-PA-005 / M10-PA-008`，第二批候选、修复队列、辅助模块和 Longbridge paper 进入条件均已写成可审计 JSON/Markdown。
+- 已增强 M15 strategy execution preparation：`scripts/run_m15_strategy_execution_preparation.py` 生成周一前准备计划，第一批内部模拟固定为 `M10-PA-004 / M10-PA-005 / M10-PA-008`，第二批候选、修复队列、辅助模块和 Longbridge paper 进入条件均已写成可审计 JSON/Markdown。修复队列现在逐条写明 `M10-PA-001-1d/5m`、`M10-PA-002-5m`、`M10-PA-004-MBF-QC-1d`、`M10-PA-007-1d`、`M10-PA-009-1d`、`M10-PA-011-5m`、`M12-FTD-001 baseline/loss-streak-guard` 的修复动作、验收条件、仓位倍率和长桥模拟账户阻断状态，避免继续停留在模糊观察口径。
 - 已新增 M15 Monday refresh acceptance：`scripts/run_m15_monday_refresh_acceptance.py` 只读 M12.47/M12.37/M13/M14/M15 产物，输出周一交易窗口验收清单；当前状态为 `pretrade_preparation_ready_waiting_for_monday`，等待 M12.47 在美股常规交易时段自动拉起 fresh refresh。
 - 已修复 M12.37/M12.47 面板假日误判：`M12.29` 和 `M12.37` 现在共用配置化美股休市日历，`2026-05-25` Memorial Day 不再显示为常规交易时段，也不会在休市日误跑 M13 ledger；M12.47 `--status` 会把现有静态看板 overlay 成“非交易日等待 / audit-only 快照”。
 - 已修复 M14 gate 与券商式主面板同步滞后：M12.47 `--status` 现在会刷新主面板里的 M14 进度、内部模拟准入数量和每条策略账户的 gate/decision；M14 `goal_status` 也直接写入 `challenge_progress_label`、`paper_trial_gate_approved_count` 和 approved ids，避免心跳汇报继续读到旧的 `approved 0`。
@@ -606,7 +606,7 @@
 
 - 下一步：让 M12.47 守护器每个工作日自动拉起 `python scripts/run_m12_37_intraday_auto_loop.py --session --config config/examples/m12_37_intraday_auto_loop.json`；该入口已自动触发 M13，并在盘后自动触发 M14，只有故障补跑时才需要手工运行 M13/M14。
 - 同步连续运行 M12.47/M12.37/M13/M14 每日只读循环，在 `10/10` challenge 之后继续收集 approved internal-sim 刷新、rescue 首账本、rescue 10 日 A/B、shadow-review 和 broker dry-run blocker watch 证据；若 M12 数据仍是 fallback/no-fetch，当天只能记为数据质量 blocker，不能算作 fresh refresh 通过。
-- 每日 challenge 结束后按收益、回撤、胜率、期望、交易频率、滑点敏感性输出 `promote / modify / reject / continue_testing`；只有 gate 为 `approved_internal_sim_only` 才能进入内部模拟账户，且在用户另行批准前仍不得进入 broker paper、真实账户、真实下单或 live。
+- 每日 challenge 结束后按收益、回撤、胜率、期望、交易频率、滑点敏感性输出可执行动作：`advance_internal_sim`、`risk_limited_advance`、`repair_now`、`pause_runtime`、`auxiliary_module` 或 `paper_candidate`。高回撤、低胜率的盈利策略先降仓推进并加风控提醒，不再用旧的泛化“继续观察/不批准”口径挡住下一步；只有通过内部模拟和长桥预演的运行单元，且用户单独批准后，才允许进入长桥模拟账户，真实账户、真实下单和 live 仍冻结。
 - 新增下一步：设计 M14.2 / M15 `broker readiness scaffold`，先做模拟账户与未来券商接入的工程准备，包括 `BrokerExecutionRequest`、`BrokerExecutionPlan`、`credential_policy`、`approval_token`、`paper_dry_run_only`、`live_disabled_by_default`、只读账户探针接口、订单预演日志、熔断/kill switch、回放校验和审计报表；默认不开真实连接，所有真实 broker/paper broker/live 调用都必须等待用户单独审批。
 - M14.2 验收下一步：在不引入真实 broker SDK / HTTP / WebSocket 的前提下，把 dry-run preview 与 M14 gate artifact 连接成只读审计报告；之后才讨论 broker paper 凭证注入和人工审批流程。
 - 不手动运行 `scripts/run_m12_37_intraday_auto_loop.py --once`；下一次 fresh refresh 只能由 M12.47 守护器在交易窗口拉起 `--session`，所有输出仍是只读模拟，不接账户、不下单。

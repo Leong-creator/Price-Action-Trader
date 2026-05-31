@@ -184,12 +184,12 @@ def run_m14_strategy_next_step_readiness_matrix(
         "summary": summary,
         "matrix_rows": matrix_rows,
         "readiness_policy": {
-            "purpose": "Give one per-strategy next-step route without changing strategy state.",
-            "approved_strategy_rule": "Approved strategies may only continue through the next M12.47-supervised internal simulated-account refresh.",
-            "rescue_rule": "Weak or variant strategies stay in rescue A/B, first-ledger watch, or shadow-parameter review until evidence is complete.",
-            "source_review_rule": "Auxiliary modules serve screening, targets, stops, sizing, add-ons, visual evidence, or external comparison; they are not standalone trading strategies.",
-            "legacy_history_metric_rule": "Legacy account-dashboard history metrics are display-only and are excluded from strategy planning.",
-            "mutation_rule": "No parameter, registry, account-spec, broker-readiness, broker/live, or manual M12.37 once-mode mutation is allowed.",
+            "purpose": "给每条策略一个明确下一步，不在这里改策略定义。",
+            "approved_strategy_rule": "已通过内部模拟门槛的策略，只能等下一次 M12.47 自动刷新后继续内部模拟。",
+            "rescue_rule": "弱策略或变体进入修复账本、首个账本检查或影子参数复核，不用模糊观察口径。",
+            "source_review_rule": "辅助模块只服务筛选、目标价、止损、仓位、加仓、图形证据或外部对照，不作为独立交易策略。",
+            "legacy_history_metric_rule": "旧账户看板历史利润字段只当错误旧产物处理，不参与策略规划。",
+            "mutation_rule": "不改参数、不改登记表、不改账户规格、不改券商准备状态、不接账户、不手动跑 M12.37 once-mode。",
         },
         "legacy_history_metric_exclusion": legacy_history_metric_exclusion(objective_blocker),
         "hard_boundaries": hard_boundaries(),
@@ -248,7 +248,11 @@ def build_matrix_row(
         "auxiliary_module_purpose": auxiliary_module_purpose(strategy_id) if is_auxiliary else "",
         "standalone_trading_allowed": not is_auxiliary,
         "display_action": display_action_for(strategy_id) if is_auxiliary else next_action_for(next_step_type),
-        "decision": first_non_empty(decision_row.get("decision"), gap_row.get("decision")),
+        "decision": normalized_decision_for_output(
+            is_auxiliary=is_auxiliary,
+            next_step_type=next_step_type,
+            can_continue_internal_sim_now=can_continue_internal_sim_now,
+        ),
         "ladder_state": first_non_empty(decision_row.get("ladder_state"), gap_row.get("ladder_state")),
         "gap_state": gap_state,
         "burn_down_lane": burn_down_lane,
@@ -510,16 +514,31 @@ def required_evidence_for(
 
 def next_action_for(next_step_type: str) -> str:
     actions = {
-        "continue_next_internal_sim_refresh": "Wait for the next M12.47-supervised internal simulated-account refresh, then recompute M13/M14 evidence.",
-        "collect_first_rescue_ledger": "Keep the rescue runtime under observation until the first matching M13 ledger evidence appears.",
-        "continue_rescue_ab_collection": "Continue rescue A/B evidence collection until the 10-trading-day rescue window is complete.",
-        "complete_shadow_parameter_review": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
-        "rebuild_detector_then_ab": "Review detector/timeframe mapping, then continue A/B evidence collection if the detector is still valid.",
-        "source_visual_or_plugin_research": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
+        "continue_next_internal_sim_refresh": "下一次由 M12.47 自动刷新后重算 M13/M14，符合条件的运行单元继续内部模拟。",
+        "collect_first_rescue_ledger": "下一次由 M12.47 自动刷新后核对第一条 M13 修复账本；若仍没有账本，直接修账本路径或输入接线。",
+        "continue_rescue_ab_collection": "按 10 个交易日修复 A/B 账本推进，每天记录信号、开平仓、风控阻断、收益和回撤，不进入长桥模拟账户。",
+        "complete_shadow_parameter_review": "先完成影子参数规格复核；只有新行情刷新和人工复核都通过后，才允许单独实现参数变体。",
+        "rebuild_detector_then_ab": "先修检测器和周期映射；修好后进入修复 A/B 账本，不把当前结果当作交易准入。",
+        "source_visual_or_plugin_research": "辅助模块只服务筛选、目标价、止损、仓位或图形证据，不作为独立交易策略。",
         "auxiliary_module_support": "辅助模块继续服务主策略的筛选、目标价、止损、仓位或图形证据，不作为独立交易策略。",
-        "manual_m14_review": "Hold for manual M14 review; do not promote, discard, mutate parameters, or start broker paper.",
+        "manual_m14_review": "进入 M14 人工复核；只能给出推进、风险受限推进、立即修复或暂停运行单元，不启动长桥模拟账户。",
     }
     return actions.get(next_step_type, actions["manual_m14_review"])
+
+
+def normalized_decision_for_output(
+    *,
+    is_auxiliary: bool,
+    next_step_type: str,
+    can_continue_internal_sim_now: bool,
+) -> str:
+    if is_auxiliary:
+        return "auxiliary_module"
+    if next_step_type == "continue_next_internal_sim_refresh" and can_continue_internal_sim_now:
+        return "advance_internal_sim"
+    if next_step_type == "manual_m14_review":
+        return "manual_m14_review"
+    return "repair_now"
 
 
 def auxiliary_module_purpose(strategy_id: str) -> str:
@@ -621,25 +640,25 @@ def build_plain_language_result(payload: dict[str, Any]) -> list[str]:
     summary = payload["summary"]
     return [
         (
-            f"Built {summary['strategy_next_step_row_count']} per-strategy next-step rows; "
-            f"{summary['approved_internal_sim_continue_count']} may continue only through internal simulated refresh."
+            f"已生成 {summary['strategy_next_step_row_count']} 条策略下一步；"
+            f"{summary['approved_internal_sim_continue_count']} 条只能通过内部模拟继续推进。"
         ),
         (
-            f"Promotion/discard/parameter activation/broker paper counts are "
+            f"直接升级、最终淘汰、参数启用、长桥模拟账户数量分别为 "
             f"{summary['promotion_allowed_count']}/"
             f"{summary['final_discard_allowed_count']}/"
             f"{summary['parameter_activation_allowed_count']}/"
-            f"{summary['broker_paper_start_allowed_count']}."
+            f"{summary['broker_paper_start_allowed_count']}。"
         ),
         (
-            "Legacy historical profit metrics are display-only: "
-            f"planning input count is {summary['legacy_historical_profit_planning_input_count']}."
+            "旧历史利润字段已从规划口径排除："
+            f"当前参与判断的旧字段数量为 {summary['legacy_historical_profit_planning_input_count']}。"
         ),
         (
-            "Future source-reextract spec prep remains conditional: "
-            f"{summary['future_source_reextract_spec_prep_row_count']} rows, "
-            f"{summary['future_source_reextract_spec_unblocked_count']} unblocked, "
-            f"{summary['future_source_reextract_spec_pending_confirmation_count']} pending confirmations."
+            "来源重提炼规格仍是条件项："
+            f"{summary['future_source_reextract_spec_prep_row_count']} 条，"
+            f"{summary['future_source_reextract_spec_unblocked_count']} 条已解除阻断，"
+            f"{summary['future_source_reextract_spec_pending_confirmation_count']} 条确认待处理。"
         ),
         f"辅助模块行数为 {summary['auxiliary_module_support_count']}，这些模块只服务主策略，不作为独立交易策略。",
     ]
@@ -649,37 +668,37 @@ def build_matrix_md(payload: dict[str, Any]) -> str:
     summary = payload["summary"]
     rows = payload["matrix_rows"]
     lines = [
-        "# M14 Strategy Next-Step Readiness Matrix",
+        "# M14 下一步推进矩阵",
         "",
-        f"- Generated at: `{payload['generated_at']}`",
-        f"- Current stage: `{summary['current_project_stage']}`",
-        f"- Challenge progress: `{summary['challenge_progress_label']}`",
-        f"- Strategy rows: `{summary['strategy_next_step_row_count']}`",
-        f"- Continue internal sim / promote / discard / activate parameters / broker paper: "
+        f"- 生成时间: `{payload['generated_at']}`",
+        f"- 当前阶段: `{summary['current_project_stage']}`",
+        f"- 挑战进度: `{summary['challenge_progress_label']}`",
+        f"- 策略行数: `{summary['strategy_next_step_row_count']}`",
+        f"- 内部模拟 / 直接升级 / 最终淘汰 / 参数启用 / 长桥模拟账户: "
         f"`{summary['approved_internal_sim_continue_count']}/"
         f"{summary['promotion_allowed_count']}/"
         f"{summary['final_discard_allowed_count']}/"
         f"{summary['parameter_activation_allowed_count']}/"
         f"{summary['broker_paper_start_allowed_count']}`",
-        f"- Auxiliary module rows: `{summary['auxiliary_module_support_count']}`",
-        f"- Legacy history metric planning inputs: `{summary['legacy_historical_profit_planning_input_count']}`",
-        f"- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `{summary['future_source_reextract_spec_prep_row_count']}/{summary['future_source_reextract_spec_conditional_draft_count']}/{summary['future_source_reextract_spec_unblocked_count']}/{summary['future_source_reextract_spec_blocked_visual_count']}/{summary['future_source_reextract_spec_pending_confirmation_count']}`",
-        f"- M12.37 manual once allowed: `{summary['manual_m12_37_once_allowed']}`",
-        f"- Broker/live enabled: `{summary['broker_or_live_enabled']}`",
+        f"- 辅助模块行数: `{summary['auxiliary_module_support_count']}`",
+        f"- 旧历史利润参与规划数量: `{summary['legacy_historical_profit_planning_input_count']}`",
+        f"- 来源重提炼规格 行数/草案/已解除/阻断/待确认: `{summary['future_source_reextract_spec_prep_row_count']}/{summary['future_source_reextract_spec_conditional_draft_count']}/{summary['future_source_reextract_spec_unblocked_count']}/{summary['future_source_reextract_spec_blocked_visual_count']}/{summary['future_source_reextract_spec_pending_confirmation_count']}`",
+        f"- 是否允许手动跑 M12.37 once-mode: `{summary['manual_m12_37_once_allowed']}`",
+        f"- 是否启用券商/实盘: `{summary['broker_or_live_enabled']}`",
         "",
-        "## Legacy History Metric Policy",
+        "## 旧历史利润口径",
         "",
-        "Legacy account-dashboard history metrics are display-only and cannot affect strategy promotion, rescue priority, parameter activation, broker readiness, or objective completion.",
+        "旧账户看板历史利润字段按错误旧产物处理，不能影响策略推进、修复优先级、参数启用、券商准备或目标完成判断。",
         "",
-        "## Rows",
+        "## 明细",
         "",
-        "| Strategy | Bucket | Next step | Role | Continue sim | Promote | Discard | Legacy history input | Evidence needed |",
+        "| 策略 | 当前分组 | 下一步 | 角色 | 能否继续内部模拟 | 直接升级 | 最终淘汰 | 旧历史字段参与 | 需要的证据 |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         evidence = ", ".join(row["required_next_evidence"][:5])
         if len(row["required_next_evidence"]) > 5:
-            evidence += f", +{len(row['required_next_evidence']) - 5} more"
+            evidence += f", 另有 {len(row['required_next_evidence']) - 5} 项"
         lines.append(
             "| "
             + " | ".join(

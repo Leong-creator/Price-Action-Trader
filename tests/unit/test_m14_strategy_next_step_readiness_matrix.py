@@ -46,14 +46,18 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
 
             rows = {row["strategy_id"]: row for row in result["matrix_rows"]}
             self.assertEqual(rows["M10-PA-004"]["current_bucket"], "approved_internal_sim_continue")
+            self.assertEqual(rows["M10-PA-004"]["decision"], "advance_internal_sim")
             self.assertEqual(rows["M10-PA-004"]["next_step_type"], "continue_next_internal_sim_refresh")
             self.assertTrue(rows["M10-PA-004"]["can_continue_internal_sim_now"])
             self.assertIn("m12_47_fresh_refresh", rows["M10-PA-004"]["required_next_evidence"])
+            self.assertEqual(rows["M10-PA-011"]["decision"], "repair_now")
             self.assertEqual(rows["M10-PA-011"]["next_step_type"], "collect_first_rescue_ledger")
             self.assertIn("first_m13_rescue_ledger", rows["M10-PA-011"]["required_next_evidence"])
+            self.assertEqual(rows["M10-PA-001"]["decision"], "repair_now")
             self.assertEqual(rows["M10-PA-001"]["next_step_type"], "complete_shadow_parameter_review")
             self.assertTrue(rows["M10-PA-001"]["parameter_shadow_spec_present"])
             self.assertTrue(rows["M10-PA-001"]["parameter_activation_waiting_for_fresh_refresh"])
+            self.assertEqual(rows["M10-PA-003"]["decision"], "auxiliary_module")
             self.assertEqual(rows["M10-PA-003"]["current_bucket"], "auxiliary_module_support")
             self.assertEqual(rows["M10-PA-003"]["next_step_type"], "auxiliary_module_support")
             self.assertEqual(rows["M10-PA-003"]["runtime_role"], "auxiliary_module")
@@ -81,11 +85,13 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             persisted = json.loads((root / "matrix.json").read_text(encoding="utf-8"))
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "matrix.md").read_text(encoding="utf-8")
-            self.assertIn("M14 Strategy Next-Step Readiness Matrix", md)
-            self.assertIn("Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `1/1/0/1/8`", md)
-            self.assertIn("Legacy history metric planning inputs: `0`", md)
-            self.assertIn("Auxiliary module rows: `1`", md)
+            self.assertIn("M14 下一步推进矩阵", md)
+            self.assertIn("来源重提炼规格 行数/草案/已解除/阻断/待确认: `1/1/0/1/8`", md)
+            self.assertIn("旧历史利润参与规划数量: `0`", md)
+            self.assertIn("辅助模块行数: `1`", md)
             self.assertIn("M10-PA-004", md)
+            self.assertNotIn("continue_testing", json.dumps(result, ensure_ascii=False))
+            self.assertNotIn("waiting_for_review", json.dumps(result, ensure_ascii=False))
 
     def test_rejects_legacy_history_metric_planning_input_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

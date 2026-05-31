@@ -113,15 +113,186 @@ SECOND_BATCH_ROWS = (
 )
 
 REPAIR_ROWS = (
-    ("M10-PA-001-1d", "M10-PA-001", "1d", "0.10", "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验"),
-    ("M10-PA-001-5m", "M10-PA-001", "5m", "0.10", "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验"),
-    ("M10-PA-002-5m", "M10-PA-002", "5m", "0.10", "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户"),
-    ("M10-PA-004-MBF-QC-1d", "M10-PA-004-MBF-QC", "1d", "0.10", "修确认条件和入场质量；只作为 PA004 质量确认变体"),
-    ("M10-PA-007-1d", "M10-PA-007", "1d", "0.10", "修第二腿图形识别器；没有稳定图形证据前不交易"),
-    ("M10-PA-009-1d", "M10-PA-009", "1d", "0.10", "修弱信号过滤和图形证据；账本转正前低仓位修复"),
-    ("M10-PA-011-5m", "M10-PA-011", "5m", "0.10", "修开盘区间反转高回撤；只允许小仓位试验"),
-    ("M12-FTD-001-baseline-1d", "M12-FTD-001", "1d", "0.00", "修趋势过滤和连续亏损保护；先作为对照基准"),
-    ("M12-FTD-001-loss-streak-guard-1d", "M12-FTD-001", "1d", "0.00", "修连续亏损保护；不进第一批长桥模拟账户"),
+    {
+        "runtime_id": "M10-PA-001-1d",
+        "strategy_id": "M10-PA-001",
+        "timeframe": "1d",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P0",
+        "repair_window": "周一交易日前完成规则准备，周一新行情刷新后验收",
+        "repair_plan": "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验",
+        "fix_steps": [
+            "提高入场质量门槛：只保留趋势方向明确、回撤后重新转强的信号",
+            "限制止损距离：止损过宽时压缩数量或放弃该信号",
+            "增加连续亏损冷却：同一运行单元连续亏损后暂停新信号，等下一次高质量信号再恢复",
+        ],
+        "acceptance_checks": [
+            "周一刷新后 M13 账本必须有本运行单元状态",
+            "若有信号，账户操作必须写明开仓、平仓或风控阻断原因",
+            "风险受限试验阶段仓位保持 0.10 倍",
+        ],
+        "advance_after_fix": "账本由亏损转为稳定或风控阻断明显下降后，升为风险受限推进",
+    },
+    {
+        "runtime_id": "M10-PA-001-5m",
+        "strategy_id": "M10-PA-001",
+        "timeframe": "5m",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P0",
+        "repair_window": "周一交易日前完成规则准备，周一新行情刷新后验收",
+        "repair_plan": "修入场质量、止损距离、连续亏损控制；5 分钟单独验收，不和日线混合",
+        "fix_steps": [
+            "5 分钟只用本周期信号独立判断，不继承日线结论",
+            "过滤窄幅震荡里的追价入场",
+            "连续亏损后增加冷却，避免同一段弱行情反复试错",
+        ],
+        "acceptance_checks": [
+            "周一刷新后 5 分钟账本必须独立生成",
+            "风控阻断必须写明是止损距离、连续亏损还是敞口原因",
+            "修复试验阶段仓位保持 0.10 倍",
+        ],
+        "advance_after_fix": "5 分钟账本转正或风险阻断下降后，单独升为风险受限推进",
+    },
+    {
+        "runtime_id": "M10-PA-002-5m",
+        "strategy_id": "M10-PA-002",
+        "timeframe": "5m",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P0",
+        "repair_window": "周一交易日前完成假突破过滤和失败后冷却规则",
+        "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
+        "fix_steps": [
+            "突破必须有收盘确认，不能只用盘中刺破当作有效突破",
+            "突破后若快速回到区间内，标记为假突破并进入冷却",
+            "同一标的同一方向失败后延迟下一次入场，避免连续追错",
+        ],
+        "acceptance_checks": [
+            "周一刷新后必须能区分有效突破、假突破和冷却跳过",
+            "有信号无账户操作时必须写明 no-op 原因",
+            "修复前不进入长桥模拟账户候选",
+        ],
+        "advance_after_fix": "假突破过滤通过且冷却生效后，先进入 0.10 倍修复试验",
+    },
+    {
+        "runtime_id": "M10-PA-004-MBF-QC-1d",
+        "strategy_id": "M10-PA-004-MBF-QC",
+        "timeframe": "1d",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P1",
+        "repair_window": "周一交易日前固定质量确认条件",
+        "repair_plan": "修确认条件和入场质量；只作为 PA004 质量确认变体",
+        "fix_steps": [
+            "只保留强突破后继续站稳的信号",
+            "过滤过宽风险距离和低收盘质量信号",
+            "保持为 PA004 并行质量确认变体，不覆盖 PA004 主线",
+        ],
+        "acceptance_checks": [
+            "周一刷新后必须和 PA004 主线分开出账本",
+            "没有质量确认时输出零信号或具体过滤原因",
+            "不得替代 PA004 第一笔长桥模拟账户候选",
+        ],
+        "advance_after_fix": "连续生成高质量账本后，作为第二批内部模拟对照",
+    },
+    {
+        "runtime_id": "M10-PA-007-1d",
+        "strategy_id": "M10-PA-007",
+        "timeframe": "1d",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P1",
+        "repair_window": "周一交易日前固定第二腿图形证据规则",
+        "repair_plan": "修第二腿图形识别器；没有稳定图形证据前不交易",
+        "fix_steps": [
+            "第二腿必须有明确第一腿、回调和第二次失败突破结构",
+            "图形证据不足时只输出辅助证据，不生成交易运行单元信号",
+            "保留样例证据，方便周一刷新后复核误判来源",
+        ],
+        "acceptance_checks": [
+            "周一刷新后信号必须带第二腿结构证据",
+            "没有稳定图形证据时保持零信号或暂停运行单元",
+            "不进入第一批长桥模拟账户",
+        ],
+        "advance_after_fix": "图形证据稳定后，先进入 0.10 倍修复试验",
+    },
+    {
+        "runtime_id": "M10-PA-009-1d",
+        "strategy_id": "M10-PA-009",
+        "timeframe": "1d",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P1",
+        "repair_window": "周一交易日前固定弱信号过滤和图形证据规则",
+        "repair_plan": "修弱信号过滤和图形证据；账本转正前低仓位修复",
+        "fix_steps": [
+            "过滤弱楔形、弱反转和没有后续确认的信号",
+            "必须输出图形证据来源，不能只凭单根 K 线入场",
+            "账本转正前只允许低仓位修复试验",
+        ],
+        "acceptance_checks": [
+            "周一刷新后信号必须说明图形证据或过滤原因",
+            "弱信号不能进入账户操作",
+            "修复阶段仓位保持 0.10 倍",
+        ],
+        "advance_after_fix": "弱信号过滤后账本改善，再升为风险受限推进",
+    },
+    {
+        "runtime_id": "M10-PA-011-5m",
+        "strategy_id": "M10-PA-011",
+        "timeframe": "5m",
+        "position_size_multiplier": "0.10",
+        "repair_priority": "P0",
+        "repair_window": "周一交易日前固定开盘区间失败突破修复规则",
+        "repair_plan": "修开盘区间反转高回撤；只允许小仓位试验",
+        "fix_steps": [
+            "只交易开盘区间失败突破后的回测确认，不追第一下反转",
+            "加入最大回撤提醒和小仓位限制",
+            "失败后当日同方向冷却，避免开盘噪音反复入场",
+        ],
+        "acceptance_checks": [
+            "周一刷新后必须区分原始开盘反转和 ORB-R1 修复变体",
+            "高回撤只触发提醒和仓位折扣，不再直接否掉策略",
+            "修复阶段仓位保持 0.10 倍",
+        ],
+        "advance_after_fix": "回撤下降且账户操作可解释后，继续 5 分钟内部模拟",
+    },
+    {
+        "runtime_id": "M12-FTD-001-baseline-1d",
+        "strategy_id": "M12-FTD-001",
+        "timeframe": "1d",
+        "position_size_multiplier": "0.00",
+        "repair_priority": "P1",
+        "repair_window": "周一交易日前固定对照基准和趋势过滤对比",
+        "repair_plan": "修趋势过滤和连续亏损保护；先作为对照基准",
+        "fix_steps": [
+            "baseline 只作为对照基准，不进入第一批长桥模拟账户",
+            "补趋势过滤对照：弱趋势或横盘阶段不扩大仓位",
+            "和 loss-streak-guard 并排比较，不互相覆盖",
+        ],
+        "acceptance_checks": [
+            "周一刷新后 baseline 与 loss-streak-guard 必须分开出账本",
+            "报告必须写明趋势过滤是否减少亏损段",
+            "第一批长桥模拟账户不允许 FTD001 下单",
+        ],
+        "advance_after_fix": "趋势过滤和亏损保护有效后，仅作为第二批候选",
+    },
+    {
+        "runtime_id": "M12-FTD-001-loss-streak-guard-1d",
+        "strategy_id": "M12-FTD-001",
+        "timeframe": "1d",
+        "position_size_multiplier": "0.00",
+        "repair_priority": "P1",
+        "repair_window": "周一交易日前固定连续亏损保护对照",
+        "repair_plan": "修连续亏损保护；不进第一批长桥模拟账户",
+        "fix_steps": [
+            "连续亏损保护必须写明暂停条件和恢复条件",
+            "只和 FTD001 baseline 做对照，不覆盖基准账本",
+            "若保护降低回撤，再考虑第二批内部模拟候选",
+        ],
+        "acceptance_checks": [
+            "周一刷新后必须能看到连续亏损保护是否触发",
+            "触发后必须说明暂停原因和恢复条件",
+            "不进入第一批长桥模拟账户",
+        ],
+        "advance_after_fix": "连续亏损保护有效后，作为第二批风险受限候选",
+    },
 )
 
 AUXILIARY_ROWS = (
@@ -201,16 +372,18 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
     ]
     repairs = [
         {
-            "runtime_id": runtime_id,
-            "strategy_id": strategy_id,
-            "timeframe": timeframe,
+            **dict(row),
             "action_state": "repair_now",
-            "position_size_multiplier": size,
-            "repair_plan": repair_plan,
             "longbridge_paper_scope": "blocked_until_repaired",
+            "broker_paper_start_allowed": False,
+            "standalone_repair_trial": True,
         }
-        for runtime_id, strategy_id, timeframe, size, repair_plan in REPAIR_ROWS
+        for row in REPAIR_ROWS
     ]
+    repair_priority_counts = {
+        priority: sum(1 for row in repairs if row["repair_priority"] == priority)
+        for priority in sorted({row["repair_priority"] for row in repairs})
+    }
     auxiliary = [
         {
             "strategy_id": strategy_id,
@@ -226,6 +399,8 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
         "first_batch_internal_sim_count": len(first_batch),
         "second_batch_candidate_count": len(second_batch),
         "repair_now_count": len(repairs),
+        "repair_priority_counts": repair_priority_counts,
+        "repair_queue_ready_before_monday": True,
         "auxiliary_module_count": len(auxiliary),
         "first_paper_order_strategy_id": "M10-PA-004",
         "first_paper_order_runtime_id": "M10-PA-004-long-1d",
@@ -242,6 +417,7 @@ def build_payload(config: StrategyExecutionPreparationConfig, generated_at: str)
         "first_batch_internal_sim": first_batch,
         "second_batch_internal_sim_candidates": second_batch,
         "repair_before_advance": repairs,
+        "repair_execution_queue": repairs,
         "auxiliary_modules": auxiliary,
         "monday_acceptance": monday_acceptance(),
         "longbridge_paper_entry_conditions": longbridge_entry_conditions(),
@@ -297,35 +473,59 @@ def default_boundaries() -> dict[str, bool]:
 def render_markdown(payload: dict[str, Any]) -> str:
     summary = payload["summary"]
     lines = [
-        "# M15 Strategy Execution Preparation",
+        "# M15 策略推进准备",
         "",
-        f"- Generated at: `{payload['generated_at']}`",
-        f"- First batch / second batch / repair / auxiliary: `{summary['first_batch_internal_sim_count']}/{summary['second_batch_candidate_count']}/{summary['repair_now_count']}/{summary['auxiliary_module_count']}`",
-        f"- First paper order candidate: `{summary['first_paper_order_runtime_id']}`",
-        "- Boundary: no credentials, no broker connection, no order submission, no live execution.",
+        f"- 生成时间: `{payload['generated_at']}`",
+        f"- 第一批 / 第二批 / 立即修复 / 辅助模块: `{summary['first_batch_internal_sim_count']}/{summary['second_batch_candidate_count']}/{summary['repair_now_count']}/{summary['auxiliary_module_count']}`",
+        f"- 修复优先级: `{summary['repair_priority_counts']}`",
+        f"- 第一笔长桥模拟候选: `{summary['first_paper_order_runtime_id']}`",
+        "- 边界: 不读凭证、不连接账户、不提交订单、不启用实盘。",
         "",
-        "## First Batch",
+        "## 第一批内部模拟",
         "",
-        "| Runtime | Action | Size | Status | Paper scope |",
+        "| 运行单元 | 动作 | 仓位 | 状态 | 长桥模拟范围 |",
         "|---|---|---:|---|---|",
     ]
     for row in payload["first_batch_internal_sim"]:
         lines.append(
             f"| {row['runtime_id']} | {row['action_state']} | {row['position_size_multiplier']} | {row['plain_status']} | {row['longbridge_paper_scope']} |"
         )
-    lines.extend(["", "## Second Batch", "", "| Runtime | Action | Size | Status |", "|---|---|---:|---|"])
+    lines.extend(["", "## 第二批内部模拟候选", "", "| 运行单元 | 动作 | 仓位 | 状态 |", "|---|---|---:|---|"])
     for row in payload["second_batch_internal_sim_candidates"]:
         lines.append(f"| {row['runtime_id']} | {row['action_state']} | {row['position_size_multiplier']} | {row['plain_status']} |")
-    lines.extend(["", "## Repair Queue", "", "| Runtime | Size | Repair plan |", "|---|---:|---|"])
+    lines.extend(["", "## 立即修复队列", ""])
     for row in payload["repair_before_advance"]:
-        lines.append(f"| {row['runtime_id']} | {row['position_size_multiplier']} | {row['repair_plan']} |")
-    lines.extend(["", "## Auxiliary Modules", "", "| Strategy | Purpose | Standalone trading |", "|---|---|---|"])
+        lines.extend(
+            [
+                f"### {row['runtime_id']}",
+                "",
+                f"- 优先级: `{row['repair_priority']}`",
+                f"- 周期: `{row['timeframe']}`",
+                f"- 仓位: `{row['position_size_multiplier']}`",
+                f"- 修复窗口: {row['repair_window']}",
+                f"- 修复目标: {row['repair_plan']}",
+                "- 修复动作:",
+            ]
+        )
+        for item in row["fix_steps"]:
+            lines.append(f"  - {item}")
+        lines.append("- 验收条件:")
+        for item in row["acceptance_checks"]:
+            lines.append(f"  - {item}")
+        lines.extend(
+            [
+                f"- 修好后推进: {row['advance_after_fix']}",
+                f"- 长桥模拟账户: `{row['longbridge_paper_scope']}`",
+                "",
+            ]
+        )
+    lines.extend(["", "## 辅助模块", "", "| 策略 | 用途 | 是否允许独立交易 |", "|---|---|---|"])
     for row in payload["auxiliary_modules"]:
         lines.append(f"| {row['strategy_id']} | {row['module_purpose']} | {row['standalone_trading_allowed']} |")
-    lines.extend(["", "## Monday Acceptance", ""])
+    lines.extend(["", "## 周一刷新验收", ""])
     for row in payload["monday_acceptance"]:
         lines.append(f"- `{row['check']}`: {row['required_result']}")
-    lines.extend(["", "## Longbridge Paper Entry Conditions", ""])
+    lines.extend(["", "## 长桥模拟账户进入条件", ""])
     for item in payload["longbridge_paper_entry_conditions"]:
         lines.append(f"- {item}")
     return "\n".join(lines) + "\n"
