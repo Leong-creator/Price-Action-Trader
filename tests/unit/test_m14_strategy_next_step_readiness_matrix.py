@@ -26,6 +26,7 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             self.assertEqual(result["summary"]["strategy_next_step_row_count"], 4)
             self.assertEqual(result["summary"]["approved_internal_sim_continue_count"], 1)
             self.assertEqual(result["summary"]["can_continue_internal_sim_now_count"], 1)
+            self.assertEqual(result["summary"]["auxiliary_module_support_count"], 1)
             self.assertEqual(result["summary"]["promotion_allowed_count"], 0)
             self.assertEqual(result["summary"]["final_discard_allowed_count"], 0)
             self.assertEqual(result["summary"]["parameter_activation_allowed_count"], 0)
@@ -53,7 +54,11 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             self.assertEqual(rows["M10-PA-001"]["next_step_type"], "complete_shadow_parameter_review")
             self.assertTrue(rows["M10-PA-001"]["parameter_shadow_spec_present"])
             self.assertTrue(rows["M10-PA-001"]["parameter_activation_waiting_for_fresh_refresh"])
-            self.assertEqual(rows["M10-PA-003"]["current_bucket"], "source_review_or_plugin_research")
+            self.assertEqual(rows["M10-PA-003"]["current_bucket"], "auxiliary_module_support")
+            self.assertEqual(rows["M10-PA-003"]["next_step_type"], "auxiliary_module_support")
+            self.assertEqual(rows["M10-PA-003"]["runtime_role"], "auxiliary_module")
+            self.assertFalse(rows["M10-PA-003"]["standalone_trading_allowed"])
+            self.assertIn("辅助模块", rows["M10-PA-003"]["display_action"])
             self.assertEqual(rows["M10-PA-003"]["visual_question_pending_count"], 3)
             self.assertEqual(rows["M10-PA-003"]["visual_case_pending_count"], 5)
             self.assertEqual(rows["M10-PA-003"]["future_source_reextract_spec_prep_count"], 1)
@@ -71,13 +76,15 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
 
             policy = result["legacy_history_metric_exclusion"]
             self.assertFalse(policy["planning_input_allowed"])
-            self.assertIn("historical_net_profit", policy["excluded_metrics"])
+            self.assertTrue(policy["legacy_bug_metric_excluded"])
+            self.assertIn("old_account_dashboard_profit_fields", policy["excluded_metric_categories"])
             persisted = json.loads((root / "matrix.json").read_text(encoding="utf-8"))
             self.assertEqual(persisted["summary"], result["summary"])
             md = (root / "matrix.md").read_text(encoding="utf-8")
             self.assertIn("M14 Strategy Next-Step Readiness Matrix", md)
             self.assertIn("Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `1/1/0/1/8`", md)
             self.assertIn("Legacy history metric planning inputs: `0`", md)
+            self.assertIn("Auxiliary module rows: `1`", md)
             self.assertIn("M10-PA-004", md)
 
     def test_rejects_legacy_history_metric_planning_input_boundary(self) -> None:

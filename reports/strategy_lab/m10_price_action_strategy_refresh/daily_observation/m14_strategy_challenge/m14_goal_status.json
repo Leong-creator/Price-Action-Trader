@@ -19,11 +19,29 @@
     "M10-PA-012",
     "M10-PA-013"
   ],
+  "auxiliary_module_runtime_ids": [
+    "AI-TRADER-EXTERNAL",
+    "M10-PA-003",
+    "M10-PA-006",
+    "M10-PA-010",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
+  "auxiliary_module_strategy_ids": [
+    "AI-TRADER-EXTERNAL",
+    "M10-PA-003",
+    "M10-PA-006",
+    "M10-PA-010",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
   "challenge_progress_label": "10/10",
   "continue_without_stopping": false,
   "data_quality_state": "history_recompute_from_existing_challenge",
   "effective_challenge_trading_days": 10,
-  "generated_at": "2026-05-27T10:50:00Z",
+  "generated_at": "2026-05-31T02:36:00Z",
   "goal_complete": true,
   "goal_name": "Build a reliable strategy challenge and internal paper-trading gate",
   "next_action": "Review completed/circuit decisions, keep broker paper and real-money execution disabled.",

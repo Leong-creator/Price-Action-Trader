@@ -192,7 +192,7 @@ def build_prep_row(review_row: dict[str, Any], response_row: dict[str, Any]) -> 
         ),
         "planning_input_policy": {
             "legacy_historical_profit_planning_input": False,
-            "historical_net_profit_display_only": True,
+            "legacy_bug_profit_metric_display_only": True,
             "decision_basis": "source_atoms_visual_confirmation_internal_sim_evidence_only",
         },
         "conditional_spec_draft": {

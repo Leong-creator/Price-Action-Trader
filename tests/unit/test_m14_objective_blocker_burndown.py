@@ -45,8 +45,8 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
                 "active_guardrail",
             )
             self.assertIn(
-                "historical_net_profit",
-                rows["legacy_historical_profit_contamination_guardrail"]["excluded_metrics"],
+                "old_account_dashboard_profit_fields",
+                rows["legacy_historical_profit_contamination_guardrail"]["excluded_metric_categories"],
             )
             self.assertEqual(
                 rows["fresh_refresh_required_before_parameter_activation"]["state"],
@@ -71,7 +71,8 @@ class M14ObjectiveBlockerBurndownTest(unittest.TestCase):
             self.assertIn("M14 Objective Blocker Burndown", md)
             self.assertIn("Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `2/2/0/2/16`", md)
             self.assertIn("Legacy history metric planning inputs: `0`", md)
-            self.assertIn("historical_net_profit", md)
+            self.assertNotIn("historical_net_profit", md)
+            self.assertIn("old_account_dashboard_profit_fields", md)
 
     def test_rejects_legacy_history_metric_planning_input(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1,6 +1,6 @@
 # M14 Objective Blocker Burndown
 
-- Generated at: `2026-05-26T20:09:02Z`
+- Generated at: `2026-05-31T02:41:00Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Objective complete: `False`
 - Challenge: `10/10`
@@ -14,13 +14,13 @@
 
 ## Plain Result
 
-Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still not complete: 10-day challenge is 10/10, 3 strategies may continue internal simulation, but 2 rescue runtimes need first ledger evidence, 10 rescue A/B gaps remain, and 6 question plus 10 case visual confirmations are pending. Future source-reextract prep has 2 rows, 0 unblocked, and 0 legacy-history planning inputs. Legacy historical net-profit/history-return dashboard fields are explicitly ignored for planning. Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled.
+Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still not complete: 10-day challenge is 10/10, 3 strategies may continue internal simulation, but 2 rescue runtimes need first ledger evidence, 10 rescue A/B gaps remain, and 6 question plus 10 case visual confirmations are pending. Future source-reextract prep has 2 rows, 0 unblocked, and 0 old-dashboard-profit planning inputs. Old dashboard profit fields are explicitly ignored for planning. Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled.
 
 ## Legacy Metric Exclusion
 
-- Excluded metrics: `historical_net_profit, historical_profit_factor, historical_return_percent, 历史净利润, 历史收益`
+- Excluded metric categories: `old_account_dashboard_profit_fields, old_return_drawdown_fields, old_profit_factor_fields`
 - Excluded from: `strategy_promotion, rescue_priority, parameter_activation, broker_readiness, objective_completion`
-- Reason: The account drilldown historical net-profit/history-return fields can contain old-version contaminated values and must not steer M14 strategy planning.
+- Reason: Old account-drilldown profit fields can contain old-version contaminated values and must not steer M14 strategy planning.
 
 ## Blocker Rows
 
@@ -28,7 +28,7 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 
 - Category: `metric_exclusion_guardrail`
 - State: `active_guardrail`
-- Evidence: Legacy account dashboard historical_net_profit/history return fields are treated as old-version display artifacts and are excluded from every M14 planning decision.
+- Evidence: Old account-dashboard profit fields are treated as old-version display artifacts and are excluded from every M14 planning decision.
 - Next action: Keep planning tied to M13/M14 ledger, gate, evidence-gap, and M12.47 fresh-refresh artifacts only.
 - Waiting on: `none`
 - Allowed now: `artifact_review`
@@ -68,7 +68,7 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 - Category: `rescue_evidence`
 - State: `rescue_ab_window_incomplete`
 - Evidence: 10 rescue 10-day A/B gaps remain; promotion allowed count is 0.
-- Next action: Continue collecting rescue A/B evidence under M12.47/M13/M14; do not promote or abandon weak strategies from old history metrics.
+- Next action: Continue collecting rescue A/B evidence under M12.47/M13/M14; do not promote or abandon weak strategies from old dashboard profit metrics.
 - Waiting on: `rescue_10_day_ab_window, manual_m14_review`
 - Allowed now: `artifact_review, ab_contract_review`
 - Strategy promotion / discard allowed: `False/False`

@@ -22,6 +22,25 @@
     "M10-PA-012",
     "M10-PA-013"
   ],
+  "auxiliary_module_count": 7,
+  "auxiliary_module_runtime_ids": [
+    "AI-TRADER-EXTERNAL",
+    "M10-PA-003",
+    "M10-PA-006",
+    "M10-PA-010",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
+  "auxiliary_module_strategy_ids": [
+    "AI-TRADER-EXTERNAL",
+    "M10-PA-003",
+    "M10-PA-006",
+    "M10-PA-010",
+    "M10-PA-014",
+    "M10-PA-015",
+    "M10-PA-016"
+  ],
   "broker_paper_connection": false,
   "challenge_correction_ledger_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_challenge_day_correction_ledger.jsonl",
   "challenge_day_ledger_row_count": 270,
@@ -34,7 +53,7 @@
   "effective_challenge_trading_days": 10,
   "first50_current_5m_ready_symbols": 50,
   "first50_daily_ready_symbols": 50,
-  "generated_at": "2026-05-27T10:50:00Z",
+  "generated_at": "2026-05-31T02:36:00Z",
   "internal_paper_execution_ledger_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_internal_paper_execution_ledger.jsonl",
   "internal_simulated_account": true,
   "live_execution": false,

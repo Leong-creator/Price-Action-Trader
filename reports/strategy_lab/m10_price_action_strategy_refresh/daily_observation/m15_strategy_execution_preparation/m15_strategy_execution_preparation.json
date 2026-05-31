@@ -1,0 +1,345 @@
+{
+  "auxiliary_modules": [
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为质量评分和排序模块，给主策略打分，不作为独立交易策略",
+      "module_purpose": "质量评分和排序模块，给主策略打分",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "M10-PA-003"
+    },
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为限价入场过滤模块，过滤差入场，不作为独立交易策略",
+      "module_purpose": "限价入场过滤模块，过滤差入场",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "M10-PA-006"
+    },
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为图形识别资料模块，帮助视觉策略补证据，不作为独立交易策略",
+      "module_purpose": "图形识别资料模块，帮助视觉策略补证据",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "M10-PA-010"
+    },
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为目标价计算模块，服务止盈目标，不作为独立交易策略",
+      "module_purpose": "目标价计算模块，服务止盈目标",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "M10-PA-014"
+    },
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为止损和仓位模块，服务风控和数量计算，不作为独立交易策略",
+      "module_purpose": "止损和仓位模块，服务风控和数量计算",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "M10-PA-015"
+    },
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为区间加仓辅助模块，服务已有主策略，不作为独立交易策略",
+      "module_purpose": "区间加仓辅助模块，服务已有主策略",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "M10-PA-016"
+    },
+    {
+      "broker_paper_start_allowed": false,
+      "display_action": "辅助模块：启用为外部参考信号，只做对照，不复制交易，不覆盖本项目判断，不作为独立交易策略",
+      "module_purpose": "外部参考信号，只做对照，不复制交易，不覆盖本项目判断",
+      "runtime_role": "auxiliary_module",
+      "standalone_trading_allowed": false,
+      "strategy_id": "AI-TRADER-EXTERNAL"
+    }
+  ],
+  "broker_connection": false,
+  "credential_injection_allowed_now": false,
+  "first_batch_internal_sim": [
+    {
+      "action_state": "advance_internal_sim",
+      "before_monday_tasks": [
+        "确认开仓、平仓、止损、止盈链路在内部模拟里都有审计记录",
+        "准备第一笔长桥模拟账户限价单预览，但不连接账户、不下单"
+      ],
+      "longbridge_paper_scope": "first_order_candidate_after_user_approval",
+      "monday_refresh_checks": [
+        "刷新后复核 M13 当天账本",
+        "刷新后复核 M14 gate 仍为推进内部模拟",
+        "首笔模拟订单预演只允许从本运行单元开始"
+      ],
+      "plain_status": "主推进策略，正常仓位进入下一轮内部模拟",
+      "position_size_multiplier": "1.0",
+      "runtime_id": "M10-PA-004-long-1d",
+      "strategy_id": "M10-PA-004",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "before_monday_tasks": [
+        "保持日线独立 runtime 账本",
+        "仓位固定为 0.25 倍，先不进入第一笔长桥模拟账户"
+      ],
+      "longbridge_paper_scope": "excluded_from_first_order",
+      "monday_refresh_checks": [
+        "刷新后确认日线账本独立更新",
+        "若仍盈利但风险高，继续降仓位推进而不是否掉"
+      ],
+      "plain_status": "风险受限推进，日线单独判断，不和 5 分钟混合",
+      "position_size_multiplier": "0.25",
+      "runtime_id": "M10-PA-005-1d",
+      "strategy_id": "M10-PA-005",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "before_monday_tasks": [
+        "准备敞口排序",
+        "准备连续亏损暂停",
+        "准备低质量信号过滤"
+      ],
+      "longbridge_paper_scope": "excluded_until_broker_blockers_clear",
+      "monday_refresh_checks": [
+        "刷新后看总敞口阻断是否解除",
+        "刷新后看连续亏损暂停是否仍触发"
+      ],
+      "plain_status": "风险受限推进，5 分钟单独判断",
+      "position_size_multiplier": "0.25",
+      "runtime_id": "M10-PA-005-5m",
+      "strategy_id": "M10-PA-005",
+      "timeframe": "5m"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "before_monday_tasks": [
+        "固定单笔风险不超过 100 的数量限制",
+        "准备 M10-PA-008-broker-risk-cap-shadow 首个影子账本检查"
+      ],
+      "longbridge_paper_scope": "excluded_until_broker_blockers_clear",
+      "monday_refresh_checks": [
+        "刷新后确认风险上限影子账本是否生成",
+        "若风险上限仍超标，继续压数量而不是进入长桥模拟账户"
+      ],
+      "plain_status": "风险受限推进，单笔风险上限先固定",
+      "position_size_multiplier": "0.25",
+      "runtime_id": "M10-PA-008-1d",
+      "strategy_id": "M10-PA-008",
+      "timeframe": "1d"
+    }
+  ],
+  "generated_at": "2026-05-31T02:39:00Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "credential_injection_allowed_now": false,
+    "internal_simulated_account": true,
+    "legacy_bug_profit_metric_planning_input": false,
+    "live_execution": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "paper_trading_approval": false,
+    "real_order": false
+  },
+  "internal_simulated_account": true,
+  "legacy_bug_profit_metric_planning_input": false,
+  "live_execution": false,
+  "longbridge_paper_entry_conditions": [
+    "至少 1 次周一正常交易窗口完整刷新通过",
+    "M10-PA-004 的限价单预演通过",
+    "M10-PA-005 和 M10-PA-008 的风控阻断已修复，或明确排除在第一笔模拟订单之外",
+    "用户单独批准模拟账户令牌注入",
+    "用户单独批准首次模拟订单",
+    "未经批准不连接账户、不下单"
+  ],
+  "manual_m12_37_once": false,
+  "monday_acceptance": [
+    {
+      "check": "m12_47_alive",
+      "required_result": "M12.47 守护器存活"
+    },
+    {
+      "check": "regular_us_session",
+      "required_result": "当前市场窗口为美股常规交易时段"
+    },
+    {
+      "check": "m12_37_owned_by_supervisor",
+      "required_result": "M12.37 只能由 M12.47 自动拉起"
+    },
+    {
+      "check": "quote_source",
+      "required_result": "行情来源必须为 longbridge_quote_readonly"
+    },
+    {
+      "check": "daily_and_5m_complete",
+      "required_result": "第一批 50 只日线和当日 5 分钟数据完整"
+    },
+    {
+      "check": "m13_current_day_ledger",
+      "required_result": "M13 生成当天策略账本"
+    },
+    {
+      "check": "m14_recompute",
+      "required_result": "M14 重算内部模拟、修复队列、影子参数和长桥预演"
+    },
+    {
+      "check": "no_fallback_or_old_snapshot",
+      "required_result": "备用行情或旧快照当天不允许进入长桥模拟账户"
+    }
+  ],
+  "paper_simulated_only": true,
+  "paper_trading_approval": false,
+  "plain_language_result": [
+    "周一前先把预演、白名单、仓位、熔断、验收清单和辅助模块定位准备好。",
+    "第一批只推进 M10-PA-004、M10-PA-005、M10-PA-008 到下一轮内部模拟。",
+    "第一笔长桥模拟账户试单只允许 M10-PA-004，且必须等用户单独批准令牌和首笔订单。",
+    "辅助模块不是废弃策略，而是正式服务主策略的筛选、风控、目标价、仓位、加仓和图形证据模块。"
+  ],
+  "real_order": false,
+  "repair_before_advance": [
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验",
+      "runtime_id": "M10-PA-001-1d",
+      "strategy_id": "M10-PA-001",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修入场质量、止损距离、连续亏损控制；账本转正前只做 0.1 倍修复试验",
+      "runtime_id": "M10-PA-001-5m",
+      "strategy_id": "M10-PA-001",
+      "timeframe": "5m"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
+      "runtime_id": "M10-PA-002-5m",
+      "strategy_id": "M10-PA-002",
+      "timeframe": "5m"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修确认条件和入场质量；只作为 PA004 质量确认变体",
+      "runtime_id": "M10-PA-004-MBF-QC-1d",
+      "strategy_id": "M10-PA-004-MBF-QC",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修第二腿图形识别器；没有稳定图形证据前不交易",
+      "runtime_id": "M10-PA-007-1d",
+      "strategy_id": "M10-PA-007",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修弱信号过滤和图形证据；账本转正前低仓位修复",
+      "runtime_id": "M10-PA-009-1d",
+      "strategy_id": "M10-PA-009",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.10",
+      "repair_plan": "修开盘区间反转高回撤；只允许小仓位试验",
+      "runtime_id": "M10-PA-011-5m",
+      "strategy_id": "M10-PA-011",
+      "timeframe": "5m"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.00",
+      "repair_plan": "修趋势过滤和连续亏损保护；先作为对照基准",
+      "runtime_id": "M12-FTD-001-baseline-1d",
+      "strategy_id": "M12-FTD-001",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "repair_now",
+      "longbridge_paper_scope": "blocked_until_repaired",
+      "position_size_multiplier": "0.00",
+      "repair_plan": "修连续亏损保护；不进第一批长桥模拟账户",
+      "runtime_id": "M12-FTD-001-loss-streak-guard-1d",
+      "strategy_id": "M12-FTD-001",
+      "timeframe": "1d"
+    }
+  ],
+  "schema_version": "m15.strategy-execution-preparation.v1",
+  "second_batch_internal_sim_candidates": [
+    {
+      "action_state": "risk_limited_advance",
+      "longbridge_paper_scope": "not_first_order_candidate",
+      "plain_status": "表现较好，先补新行情账本，不进第一笔长桥模拟账户",
+      "position_size_multiplier": "0.50",
+      "runtime_id": "M10-PA-013-1d",
+      "strategy_id": "M10-PA-013",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "longbridge_paper_scope": "not_first_order_candidate",
+      "plain_status": "过滤弱支撑/阻力失败信号后继续内部模拟",
+      "position_size_multiplier": "0.50",
+      "runtime_id": "M10-PA-013-5m",
+      "strategy_id": "M10-PA-013",
+      "timeframe": "5m"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "longbridge_paper_scope": "not_first_order_candidate",
+      "plain_status": "修目标价和止损几何，先跑 1 倍风险目标价影子账本",
+      "position_size_multiplier": "0.50",
+      "runtime_id": "M10-PA-012-5m",
+      "strategy_id": "M10-PA-012",
+      "timeframe": "5m"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "longbridge_paper_scope": "not_first_order_candidate",
+      "plain_status": "加强突破质量和回撤控制后继续内部模拟",
+      "position_size_multiplier": "0.25",
+      "runtime_id": "M10-PA-002-1d",
+      "strategy_id": "M10-PA-002",
+      "timeframe": "1d"
+    },
+    {
+      "action_state": "risk_limited_advance",
+      "longbridge_paper_scope": "not_first_order_candidate",
+      "plain_status": "作为 PA004 并行变体对照，不覆盖主线 PA004",
+      "position_size_multiplier": "0.50",
+      "runtime_id": "M10-PA-004-MBF-1d",
+      "strategy_id": "M10-PA-004-MBF",
+      "timeframe": "1d"
+    }
+  ],
+  "stage": "M15.strategy_execution_preparation",
+  "summary": {
+    "auxiliary_module_count": 7,
+    "broker_connection": false,
+    "first_batch_internal_sim_count": 4,
+    "first_paper_order_runtime_id": "M10-PA-004-long-1d",
+    "first_paper_order_strategy_id": "M10-PA-004",
+    "live_execution": false,
+    "longbridge_paper_earliest_status": "等待周一正常刷新、下单预演通过、用户单独批准模拟令牌和首笔模拟订单",
+    "order_submitted": false,
+    "repair_now_count": 9,
+    "second_batch_candidate_count": 5
+  }
+}

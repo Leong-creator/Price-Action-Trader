@@ -316,8 +316,8 @@ def build_blocker_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             state="active_guardrail",
             sequence_rank=5,
             evidence=(
-                "Legacy account dashboard historical_net_profit/history return fields are treated as old-version "
-                "display artifacts and are excluded from every M14 planning decision."
+                "Old account-dashboard profit fields are treated as old-version display artifacts "
+                "and are excluded from every M14 planning decision."
             ),
             next_action="Keep planning tied to M13/M14 ledger, gate, evidence-gap, and M12.47 fresh-refresh artifacts only.",
             waiting_on=[],
@@ -365,7 +365,7 @@ def build_blocker_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{summary['strategy_evidence_rescue_10_day_ab_gap_count']} rescue 10-day A/B gaps remain; "
                 f"promotion allowed count is {summary['rescue_promotion_allowed_count']}."
             ),
-            next_action="Continue collecting rescue A/B evidence under M12.47/M13/M14; do not promote or abandon weak strategies from old history metrics.",
+            next_action="Continue collecting rescue A/B evidence under M12.47/M13/M14; do not promote or abandon weak strategies from old dashboard profit metrics.",
             waiting_on=["rescue_10_day_ab_window", "manual_m14_review"],
             allowed_now=["artifact_review", "ab_contract_review"],
         ),
@@ -449,7 +449,7 @@ def blocker_row(
         "next_action": next_action,
         "waiting_on": waiting_on,
         "allowed_now": allowed_now,
-        "excluded_metrics": list(legacy_history_metric_exclusion()["excluded_metric_names"])
+        "excluded_metric_categories": list(legacy_history_metric_exclusion()["excluded_metric_categories"])
         if blocker_id == "legacy_historical_profit_contamination_guardrail"
         else [],
         "can_close_objective_now": False,
@@ -503,8 +503,8 @@ def build_plain_language_result(payload: dict[str, Any]) -> str:
         f"{summary['source_visual_case_pending_count']} case visual confirmations are pending. "
         f"Future source-reextract prep has {summary['future_source_reextract_spec_prep_row_count']} rows, "
         f"{summary['future_source_reextract_spec_prep_unblocked_count']} unblocked, and "
-        f"{summary['future_source_reextract_spec_prep_legacy_historical_profit_planning_input_count']} legacy-history planning inputs. "
-        "Legacy historical net-profit/history-return dashboard fields are explicitly ignored for planning. "
+        f"{summary['future_source_reextract_spec_prep_legacy_historical_profit_planning_input_count']} old-dashboard-profit planning inputs. "
+        "Old dashboard profit fields are explicitly ignored for planning. "
         "Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled."
     )
 
@@ -533,7 +533,7 @@ def build_burndown_md(payload: dict[str, Any]) -> str:
         "",
         "## Legacy Metric Exclusion",
         "",
-        f"- Excluded metrics: `{', '.join(metric_policy['excluded_metric_names'])}`",
+        f"- Excluded metric categories: `{', '.join(metric_policy['excluded_metric_categories'])}`",
         f"- Excluded from: `{', '.join(metric_policy['excluded_from_decisions'])}`",
         f"- Reason: {metric_policy['reason']}",
         "",
@@ -564,12 +564,10 @@ def build_burndown_md(payload: dict[str, Any]) -> str:
 def legacy_history_metric_exclusion() -> dict[str, Any]:
     return {
         "legacy_historical_profit_ignored": True,
-        "excluded_metric_names": [
-            "historical_net_profit",
-            "historical_profit_factor",
-            "historical_return_percent",
-            "历史净利润",
-            "历史收益",
+        "excluded_metric_categories": [
+            "old_account_dashboard_profit_fields",
+            "old_return_drawdown_fields",
+            "old_profit_factor_fields",
         ],
         "excluded_from_decisions": [
             "strategy_promotion",
@@ -586,7 +584,7 @@ def legacy_history_metric_exclusion() -> dict[str, Any]:
             "m14_project_stage_assessment",
             "m12_47_supervised_fresh_refresh_status",
         ],
-        "reason": "The account drilldown historical net-profit/history-return fields can contain old-version contaminated values and must not steer M14 strategy planning.",
+        "reason": "Old account-drilldown profit fields can contain old-version contaminated values and must not steer M14 strategy planning.",
     }
 
 

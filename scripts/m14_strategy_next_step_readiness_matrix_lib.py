@@ -23,6 +23,15 @@ FORBIDDEN_OPERATIONS = (
     "parameter_mutation",
     "legacy_historical_profit_planning_input",
 )
+AUXILIARY_MODULE_PURPOSES = {
+    "M10-PA-003": "质量评分和排序模块，给主策略打分",
+    "M10-PA-006": "限价入场过滤模块，过滤差入场",
+    "M10-PA-010": "图形识别资料模块，帮助视觉策略补证据",
+    "M10-PA-014": "目标价计算模块，服务止盈目标",
+    "M10-PA-015": "止损和仓位模块，服务风控和数量计算",
+    "M10-PA-016": "区间加仓辅助模块，服务已有主策略",
+    "AI-TRADER-EXTERNAL": "外部参考信号，只做对照，不复制交易，不覆盖本项目判断",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,7 +187,7 @@ def run_m14_strategy_next_step_readiness_matrix(
             "purpose": "Give one per-strategy next-step route without changing strategy state.",
             "approved_strategy_rule": "Approved strategies may only continue through the next M12.47-supervised internal simulated-account refresh.",
             "rescue_rule": "Weak or variant strategies stay in rescue A/B, first-ledger watch, or shadow-parameter review until evidence is complete.",
-            "source_review_rule": "Source-visual, future source-reextract spec prep, and plugin research rows remain review-only until manual confirmation is complete.",
+            "source_review_rule": "Auxiliary modules serve screening, targets, stops, sizing, add-ons, visual evidence, or external comparison; they are not standalone trading strategies.",
             "legacy_history_metric_rule": "Legacy account-dashboard history metrics are display-only and are excluded from strategy planning.",
             "mutation_rule": "No parameter, registry, account-spec, broker-readiness, broker/live, or manual M12.37 once-mode mutation is allowed.",
         },
@@ -207,9 +216,15 @@ def build_matrix_row(
     route_category = first_non_empty(decision_row.get("route_category"), gap_row.get("route_category"), burndown_row.get("route_category"))
     burn_down_lane = str(burndown_row.get("burn_down_lane", ""))
     gap_state = str(gap_row.get("gap_state") or burndown_row.get("gap_state", ""))
+    is_auxiliary = strategy_id in AUXILIARY_MODULE_PURPOSES or route_category == "shadow_or_plugin_hold" or burn_down_lane == "shadow_plugin_research"
     next_step_type = next_step_type_for(route_category, burn_down_lane, gap_state, gap_row, burndown_row)
+    if is_auxiliary:
+        next_step_type = "auxiliary_module_support"
     current_bucket = current_bucket_for(route_category, burn_down_lane, next_step_type)
-    required_next_evidence = required_evidence_for(gap_row, burndown_row, visual_rows, future_spec_rows)
+    required_next_evidence = [
+        clean_auxiliary_text(item)
+        for item in required_evidence_for(gap_row, burndown_row, visual_rows, future_spec_rows)
+    ]
     future_spec_legacy_input = any(
         bool(row.get("legacy_historical_profit_planning_input")) for row in future_spec_rows
     )
@@ -223,12 +238,16 @@ def build_matrix_row(
     )
     return {
         "strategy_id": strategy_id,
-        "display_name": first_non_empty(decision_row.get("display_name"), gap_row.get("display_name"), burndown_row.get("display_name")),
+        "display_name": clean_auxiliary_text(first_non_empty(decision_row.get("display_name"), gap_row.get("display_name"), burndown_row.get("display_name"))),
         "route_rank": int_or_zero(first_non_empty(decision_row.get("route_rank"), gap_row.get("route_rank")), 999),
         "sequence_rank": int_or_zero(burndown_row.get("sequence_rank"), 999),
         "route_category": route_category,
         "current_bucket": current_bucket,
         "next_step_type": next_step_type,
+        "runtime_role": "auxiliary_module" if is_auxiliary else "trading_runtime",
+        "auxiliary_module_purpose": auxiliary_module_purpose(strategy_id) if is_auxiliary else "",
+        "standalone_trading_allowed": not is_auxiliary,
+        "display_action": display_action_for(strategy_id) if is_auxiliary else next_action_for(next_step_type),
         "decision": first_non_empty(decision_row.get("decision"), gap_row.get("decision")),
         "ladder_state": first_non_empty(decision_row.get("ladder_state"), gap_row.get("ladder_state")),
         "gap_state": gap_state,
@@ -248,8 +267,8 @@ def build_matrix_row(
         "broker_or_live_enabled": False,
         "legacy_historical_profit_planning_input": future_spec_legacy_input,
         "required_next_evidence": required_next_evidence,
-        "blocked_by": sorted(set(listify(burndown_row.get("blocked_by")) + listify(gap_row.get("missing_evidence_categories")))),
-        "allowed_operations": safe_allowed_operations(burndown_row),
+        "blocked_by": sorted({clean_auxiliary_text(item) for item in listify(burndown_row.get("blocked_by")) + listify(gap_row.get("missing_evidence_categories"))}),
+        "allowed_operations": ["auxiliary_module_support"] if is_auxiliary else safe_allowed_operations(burndown_row),
         "forbidden_operations": list(FORBIDDEN_OPERATIONS),
         "rescue_runtime_strategy_ids": clean_strings(
             listify(first_non_empty(gap_row.get("rescue_runtime_strategy_ids"), decision_row.get("rescue_runtime_strategy_ids")))
@@ -282,7 +301,7 @@ def build_matrix_row(
         "future_source_reextract_spec_legacy_historical_profit_planning_input_count": sum(
             bool(row.get("legacy_historical_profit_planning_input")) for row in future_spec_rows
         ),
-        "next_action": next_action_for(next_step_type),
+        "next_action": display_action_for(strategy_id) if is_auxiliary else next_action_for(next_step_type),
         "paper_simulated_only": True,
         "internal_simulated_account": True,
         "broker_connection": False,
@@ -345,6 +364,7 @@ def build_summary(
         "can_continue_internal_sim_now_count": sum(1 for row in matrix_rows if row["can_continue_internal_sim_now"]),
         "rescue_or_shadow_review_count": bucket_counts.get("rescue_or_shadow_review", 0),
         "source_review_or_plugin_research_count": bucket_counts.get("source_review_or_plugin_research", 0),
+        "auxiliary_module_support_count": bucket_counts.get("auxiliary_module_support", 0),
         "open_evidence_gap_row_count": int_or_zero(
             first_non_empty(gap_summary.get("open_evidence_gap_row_count"), burndown_summary.get("open_evidence_gap_row_count"))
         ),
@@ -427,6 +447,8 @@ def build_summary(
 
 
 def current_bucket_for(route_category: str, burn_down_lane: str, next_step_type: str) -> str:
+    if next_step_type == "auxiliary_module_support":
+        return "auxiliary_module_support"
     if route_category == "approved_internal_sim_continue" or burn_down_lane == "approved_internal_sim_refresh":
         return "approved_internal_sim_continue"
     if next_step_type in {
@@ -494,9 +516,33 @@ def next_action_for(next_step_type: str) -> str:
         "complete_shadow_parameter_review": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
         "rebuild_detector_then_ab": "Review detector/timeframe mapping, then continue A/B evidence collection if the detector is still valid.",
         "source_visual_or_plugin_research": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
+        "auxiliary_module_support": "辅助模块继续服务主策略的筛选、目标价、止损、仓位或图形证据，不作为独立交易策略。",
         "manual_m14_review": "Hold for manual M14 review; do not promote, discard, mutate parameters, or start broker paper.",
     }
     return actions.get(next_step_type, actions["manual_m14_review"])
+
+
+def auxiliary_module_purpose(strategy_id: str) -> str:
+    return AUXILIARY_MODULE_PURPOSES.get(strategy_id, "筛选、风控、目标价、仓位或图形证据服务主策略")
+
+
+def display_action_for(strategy_id: str) -> str:
+    return f"辅助模块：启用为{auxiliary_module_purpose(strategy_id)}，不作为独立交易策略"
+
+
+def clean_auxiliary_text(value: Any) -> str:
+    text = str(value)
+    replacements = {
+        "research-only": "auxiliary-module",
+        "Research-only": "Auxiliary-module",
+        "plugin or auxiliary-module": "auxiliary-module",
+        "plugin/research": "auxiliary-module",
+        "shadow/plugin/research": "auxiliary-module",
+        "source/plugin research": "auxiliary-module support",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
 
 
 def safe_allowed_operations(burndown_row: dict[str, Any]) -> list[str]:
@@ -520,28 +566,38 @@ def index_rows_by_strategy(rows: list[dict[str, Any]]) -> dict[str, list[dict[st
 
 
 def legacy_history_metric_exclusion(objective_blocker: dict[str, Any]) -> dict[str, Any]:
-    policy = dict(objective_blocker.get("legacy_history_metric_exclusion", {}))
-    if not policy:
-        policy = {
-            "excluded_metrics": [
-                "historical_net_profit",
-                "historical_profit_factor",
-                "historical_return_percent",
-                "history_return_drawdown",
-                "history_return_win_rate",
-            ],
-            "excluded_from_decisions": [
-                "strategy_promotion",
-                "strategy_rescue_priority",
-                "parameter_activation",
-                "broker_readiness",
-                "objective_completion",
-            ],
-        }
-    if "excluded_metrics" not in policy and "excluded_metric_names" in policy:
-        policy["excluded_metrics"] = listify(policy["excluded_metric_names"])
-    policy["planning_input_allowed"] = False
-    return policy
+    source_policy = dict(objective_blocker.get("legacy_history_metric_exclusion", {}))
+    return {
+        "legacy_bug_metric_excluded": True,
+        "planning_input_allowed": False,
+        "excluded_metric_categories": [
+            "old_account_dashboard_profit_fields",
+            "old_return_drawdown_fields",
+            "old_profit_factor_fields",
+        ],
+        "excluded_from_decisions": listify(
+            source_policy.get(
+                "excluded_from_decisions",
+                [
+                    "strategy_promotion",
+                    "strategy_rescue_priority",
+                    "parameter_activation",
+                    "broker_readiness",
+                    "objective_completion",
+                ],
+            )
+        ),
+        "replacement_evidence_sources": listify(
+            source_policy.get(
+                "replacement_evidence_sources",
+                [
+                    "m13_signal_ledger",
+                    "m13_account_operation_ledger",
+                    "m12_47_supervised_fresh_refresh_status",
+                ],
+            )
+        ),
+    }
 
 
 def hard_boundaries() -> dict[str, bool]:
@@ -585,6 +641,7 @@ def build_plain_language_result(payload: dict[str, Any]) -> list[str]:
             f"{summary['future_source_reextract_spec_unblocked_count']} unblocked, "
             f"{summary['future_source_reextract_spec_pending_confirmation_count']} pending confirmations."
         ),
+        f"辅助模块行数为 {summary['auxiliary_module_support_count']}，这些模块只服务主策略，不作为独立交易策略。",
     ]
 
 
@@ -604,6 +661,7 @@ def build_matrix_md(payload: dict[str, Any]) -> str:
         f"{summary['final_discard_allowed_count']}/"
         f"{summary['parameter_activation_allowed_count']}/"
         f"{summary['broker_paper_start_allowed_count']}`",
+        f"- Auxiliary module rows: `{summary['auxiliary_module_support_count']}`",
         f"- Legacy history metric planning inputs: `{summary['legacy_historical_profit_planning_input_count']}`",
         f"- Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `{summary['future_source_reextract_spec_prep_row_count']}/{summary['future_source_reextract_spec_conditional_draft_count']}/{summary['future_source_reextract_spec_unblocked_count']}/{summary['future_source_reextract_spec_blocked_visual_count']}/{summary['future_source_reextract_spec_pending_confirmation_count']}`",
         f"- M12.37 manual once allowed: `{summary['manual_m12_37_once_allowed']}`",
@@ -615,8 +673,8 @@ def build_matrix_md(payload: dict[str, Any]) -> str:
         "",
         "## Rows",
         "",
-        "| Strategy | Bucket | Next step | Continue sim | Promote | Discard | Legacy history input | Evidence needed |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Strategy | Bucket | Next step | Role | Continue sim | Promote | Discard | Legacy history input | Evidence needed |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         evidence = ", ".join(row["required_next_evidence"][:5])
@@ -629,6 +687,7 @@ def build_matrix_md(payload: dict[str, Any]) -> str:
                     markdown_cell(row["strategy_id"]),
                     markdown_cell(row["current_bucket"]),
                     markdown_cell(row["next_step_type"]),
+                    markdown_cell(row["runtime_role"]),
                     str(row["can_continue_internal_sim_now"]),
                     str(row["promotion_allowed"]),
                     str(row["final_discard_allowed"]),

@@ -1,0 +1,16 @@
+{
+  "schema_version": "m15.strategy-execution-preparation.config.v1",
+  "stage": "M15.strategy_execution_preparation",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_strategy_execution_preparation",
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "internal_simulated_account": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false,
+    "credential_injection_allowed_now": false,
+    "manual_m12_37_once": false,
+    "legacy_bug_profit_metric_planning_input": false
+  }
+}

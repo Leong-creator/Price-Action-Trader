@@ -41,6 +41,7 @@ ACTION_STATES = {
     "repair_now",
     "pause_runtime",
     "paper_candidate",
+    "auxiliary_module",
 }
 DECISIONS = ACTION_STATES
 INTERNAL_SIM_ACTION_STATES = {"advance_internal_sim", "risk_limited_advance", "paper_candidate"}
@@ -105,6 +106,15 @@ RUNTIME_DEFAULT_ACTIONS = {
         "repair_focus": "repair opening-range breakout reversal drawdown before normal sizing",
         "trial_mode": "tiny_size_trial",
     },
+}
+AUXILIARY_MODULE_PURPOSES = {
+    "M10-PA-003": "质量评分和排序模块，给主策略打分",
+    "M10-PA-006": "限价入场过滤模块，过滤差入场",
+    "M10-PA-010": "图形识别资料模块，帮助视觉策略补证据",
+    "M10-PA-014": "目标价计算模块，服务止盈目标",
+    "M10-PA-015": "止损和仓位模块，服务风控和数量计算",
+    "M10-PA-016": "区间加仓辅助模块，服务已有主策略",
+    "AI-TRADER-EXTERNAL": "外部参考信号，只做对照，不复制交易，不覆盖本项目判断",
 }
 ZERO = Decimal("0")
 ONE_HUNDRED = Decimal("100")
@@ -627,8 +637,16 @@ def build_strategy_decision_rows(
                 "runtime_id": str(aggregate.get("runtime_id") or aggregate.get("strategy_id") or ""),
                 "strategy_id": str(aggregate.get("strategy_id") or aggregate.get("runtime_id") or ""),
                 "timeframe": str(aggregate.get("timeframe", "")),
-                "display_name": aggregate["display_name"],
+                "display_name": clean_auxiliary_text(aggregate["display_name"]),
                 "module_role": aggregate["module_role"],
+                "runtime_role": runtime_role_for(decision, str(aggregate.get("strategy_id") or "")),
+                "auxiliary_module_purpose": auxiliary_module_purpose(str(aggregate.get("strategy_id") or ""), str(aggregate.get("module_role") or "")),
+                "standalone_trading_allowed": decision != "auxiliary_module",
+                "display_action": display_action_for(
+                    decision,
+                    str(aggregate.get("strategy_id") or ""),
+                    str(aggregate.get("module_role") or ""),
+                ),
                 "required_for_goal": aggregate["required_for_goal"],
                 "decision": decision,
                 "action_state": decision,
@@ -636,7 +654,7 @@ def build_strategy_decision_rows(
                 "repair_focus": repair_focus,
                 "trial_mode": trial_mode,
                 "position_size_multiplier": fmt_decimal(position_size),
-                "paper_candidate": decision in {"advance_internal_sim", "risk_limited_advance", "paper_candidate"},
+                "paper_candidate": decision in INTERNAL_SIM_ACTION_STATES,
                 "circuit_breaker_triggered": circuit,
                 "frozen": frozen,
                 "modify_candidate": modify_candidate,
@@ -688,6 +706,7 @@ def decide_strategy(
     close_count = int(aggregate["close_count"])
     runtime_id = str(aggregate.get("runtime_id") or aggregate.get("strategy_id") or "")
     strategy_id = str(aggregate.get("strategy_id") or runtime_id)
+    auxiliary_purpose = auxiliary_module_purpose(strategy_id, role)
 
     def result(
         action_state: str,
@@ -712,12 +731,22 @@ def decide_strategy(
             trial_mode or action_state,
         )
 
+    if auxiliary_purpose:
+        return result(
+            "auxiliary_module",
+            "auxiliary_module_not_standalone_trading",
+            False,
+            False,
+            False,
+            repair_focus=f"辅助模块：{auxiliary_purpose}，不作为独立交易策略",
+            trial_mode="auxiliary_module_support",
+        )
     if role == "external_research":
-        return result("pause_runtime", "external_shadow_research_only", False, True, False, repair_focus="keep as reference only; no runtime promotion")
+        return result("auxiliary_module", "auxiliary_module_not_standalone_trading", False, False, False, repair_focus="辅助模块：外部参考信号，只做对照，不复制交易，不覆盖本项目判断", trial_mode="auxiliary_module_support")
     if role == "research_only":
-        return result("pause_runtime", "research_only_blocker", False, True, False, repair_focus="define executable signal or keep paused")
+        return result("auxiliary_module", "auxiliary_module_not_standalone_trading", False, False, False, repair_focus="辅助模块：资料和图形证据服务主策略，不作为独立交易策略", trial_mode="auxiliary_module_support")
     if role == "plugin_filter":
-        return result("pause_runtime", "plugin_filter_ab_coverage", False, False, False, repair_focus="plugin/filter modules must remain sidecar evidence")
+        return result("auxiliary_module", "auxiliary_module_not_standalone_trading", False, False, False, repair_focus="辅助模块：筛选、风控或目标价服务主策略，不作为独立交易策略", trial_mode="auxiliary_module_support")
     if data_mismatch_days >= config.circuit_breaker.data_mismatch_days_threshold or (
         observed_data_mismatch_days > 0 and completed_days == 0
     ):
@@ -782,6 +811,51 @@ def decide_strategy(
     return result("repair_now", "incomplete_window_no_profit_repair_now", False, False, True, f"{strategy_id}-m14-repair-{trading_date.strftime('%Y%m%d')}", Decimal("0.10"), "repair signal quality or execution mapping before next run", "tiny_size_trial")
 
 
+def auxiliary_module_purpose(strategy_id: str, module_role: str = "") -> str:
+    if strategy_id in AUXILIARY_MODULE_PURPOSES:
+        return AUXILIARY_MODULE_PURPOSES[strategy_id]
+    if module_role == "external_research":
+        return AUXILIARY_MODULE_PURPOSES["AI-TRADER-EXTERNAL"]
+    if module_role == "research_only":
+        return "资料和图形证据服务主策略"
+    if module_role == "plugin_filter":
+        return "筛选、风控、目标价或仓位服务主策略"
+    return ""
+
+
+def runtime_role_for(action_state: str, strategy_id: str) -> str:
+    if action_state == "auxiliary_module" or strategy_id in AUXILIARY_MODULE_PURPOSES:
+        return "auxiliary_module"
+    return "trading_runtime"
+
+
+def display_action_for(action_state: str, strategy_id: str, module_role: str = "") -> str:
+    purpose = auxiliary_module_purpose(strategy_id, module_role)
+    if action_state == "auxiliary_module" or purpose:
+        return f"辅助模块：启用为{purpose}，不作为独立交易策略"
+    labels = {
+        "advance_internal_sim": "推进内部模拟",
+        "risk_limited_advance": "风险受限推进",
+        "repair_now": "立即修复",
+        "pause_runtime": "暂停运行单元直到数据或执行链修复",
+        "paper_candidate": "长桥模拟账户候选",
+    }
+    return labels.get(action_state, action_state)
+
+
+def clean_auxiliary_text(value: Any) -> str:
+    text = str(value)
+    replacements = {
+        "research-only": "auxiliary-module",
+        "Research-only": "Auxiliary-module",
+        "shadow/plugin/research": "auxiliary-module",
+        "plugin/filter": "auxiliary",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
 def build_paper_trial_gate(
     config: M14Config,
     generated_at: str,
@@ -815,6 +889,9 @@ def build_paper_trial_gate(
         elif action_state == "repair_now":
             gate_status = "repair_now"
             reason = f"Runtime needs concrete repair: {decision.get('repair_focus', '') or decision.get('decision_reason', '')}."
+        elif action_state == "auxiliary_module":
+            gate_status = "auxiliary_module"
+            reason = str(decision.get("display_action") or decision.get("repair_focus") or "辅助模块：不作为独立交易策略")
         elif action_state == "pause_runtime":
             gate_status = "pause_runtime"
             reason = f"Runtime is paused until blocker is fixed: {decision.get('repair_focus', '') or decision.get('decision_reason', '')}."
@@ -838,7 +915,12 @@ def build_paper_trial_gate(
                 "runtime_id": aggregate["runtime_id"],
                 "strategy_id": aggregate["strategy_id"],
                 "timeframe": aggregate["timeframe"],
-                "display_name": aggregate["display_name"],
+                "display_name": clean_auxiliary_text(aggregate["display_name"]),
+                "module_role": aggregate.get("module_role", ""),
+                "runtime_role": decision.get("runtime_role", runtime_role_for(action_state, str(aggregate.get("strategy_id", "")))),
+                "auxiliary_module_purpose": decision.get("auxiliary_module_purpose", ""),
+                "standalone_trading_allowed": bool(decision.get("standalone_trading_allowed", action_state != "auxiliary_module")),
+                "display_action": decision.get("display_action", display_action_for(action_state, str(aggregate.get("strategy_id", "")), str(aggregate.get("module_role", "")))),
                 "paper_trial_gate": gate_status,
                 "gate_reason": reason,
                 "decision": decision["decision"],
@@ -867,6 +949,8 @@ def build_paper_trial_gate(
         "approved_internal_sim_strategy_ids": sorted({row["strategy_id"] for row in rows if row["action_state"] in INTERNAL_SIM_ACTION_STATES}),
         "approved_internal_sim_runtime_ids": [row["runtime_id"] for row in rows if row["action_state"] in INTERNAL_SIM_ACTION_STATES],
         "risk_limited_runtime_ids": [row["runtime_id"] for row in rows if row["action_state"] == "risk_limited_advance"],
+        "auxiliary_module_runtime_ids": [row["runtime_id"] for row in rows if row["action_state"] == "auxiliary_module"],
+        "auxiliary_module_strategy_ids": sorted({row["strategy_id"] for row in rows if row["action_state"] == "auxiliary_module"}),
         "paper_candidate_runtime_ids": [row["runtime_id"] for row in rows if row["paper_candidate"]],
         "paper_simulated_only": True,
         "internal_simulated_account": True,
@@ -1171,7 +1255,7 @@ def build_summary(
         for key, aggregate in strategy_aggregates.items()
         if (
             int(aggregate["completed_trading_days"]) >= config.challenge_trading_days
-            or decisions[key]["action_state"] in {"advance_internal_sim", "risk_limited_advance", "repair_now", "pause_runtime", "paper_candidate"}
+            or decisions[key]["action_state"] in ACTION_STATES
             or decisions[key]["circuit_breaker_triggered"]
         )
     ]
@@ -1221,8 +1305,11 @@ def build_summary(
         "approved_internal_sim_strategy_ids": approved,
         "approved_internal_sim_runtime_ids": approved_runtimes,
         "risk_limited_runtime_ids": paper_gate.get("risk_limited_runtime_ids", []),
+        "auxiliary_module_runtime_ids": paper_gate.get("auxiliary_module_runtime_ids", []),
+        "auxiliary_module_strategy_ids": paper_gate.get("auxiliary_module_strategy_ids", []),
         "paper_candidate_runtime_ids": paper_gate.get("paper_candidate_runtime_ids", []),
         "paper_trial_gate_approved_count": len(approved),
+        "auxiliary_module_count": len(paper_gate.get("auxiliary_module_runtime_ids", [])),
         "paper_simulated_only": True,
         "internal_simulated_account": True,
         "broker_paper_connection": False,
@@ -1258,6 +1345,8 @@ def build_goal_status(summary: dict[str, Any]) -> dict[str, Any]:
         "approved_internal_sim_strategy_ids": summary["approved_internal_sim_strategy_ids"],
         "approved_internal_sim_runtime_ids": summary.get("approved_internal_sim_runtime_ids", []),
         "risk_limited_runtime_ids": summary.get("risk_limited_runtime_ids", []),
+        "auxiliary_module_runtime_ids": summary.get("auxiliary_module_runtime_ids", []),
+        "auxiliary_module_strategy_ids": summary.get("auxiliary_module_strategy_ids", []),
         "paper_candidate_runtime_ids": summary.get("paper_candidate_runtime_ids", []),
         "paper_trial_gate_approved_count": summary["paper_trial_gate_approved_count"],
         "plain_language_result": summary["plain_language_result"],
@@ -1343,6 +1432,8 @@ def strategy_dashboard_row(aggregate: dict[str, Any], decision: dict[str, Any], 
     pnl = decimal_or_zero(aggregate["realized_pnl"])
     cls = "good" if pnl > ZERO else "bad" if pnl < ZERO else "muted"
     blocker = "; ".join(aggregate["blocker_reasons"][:3]) or "无"
+    decision_label = str(decision.get("display_action") or display_action_for(str(decision["action_state"]), str(aggregate.get("strategy_id", "")), str(aggregate.get("module_role", ""))))
+    gate_reason = str(gate.get("gate_reason", ""))
     return (
         "<tr>"
         f"<td>{html.escape(aggregate['runtime_id'])}<br><small>{html.escape(aggregate['strategy_id'])} / {html.escape(aggregate.get('timeframe', ''))}</small></td>"
@@ -1352,8 +1443,8 @@ def strategy_dashboard_row(aggregate: dict[str, Any], decision: dict[str, Any], 
         f"<td>{html.escape(str(aggregate['total_signal_count']))} / {html.escape(str(aggregate['open_count']))} / {html.escape(str(aggregate['close_count']))}</td>"
         f"<td>{html.escape(str(aggregate['zero_signal_days']))}</td>"
         f"<td>{html.escape(blocker)}</td>"
-        f"<td>{html.escape(decision['action_state'])}<br><small>{html.escape(decision['decision_reason'])}</small></td>"
-        f"<td>{html.escape(gate['paper_trial_gate'])}<br><small>size {html.escape(str(gate.get('position_size_multiplier', '1')))} ｜ {html.escape(gate['gate_reason'])}</small></td>"
+        f"<td>{html.escape(decision_label)}<br><small>{html.escape(decision['decision_reason'])}</small></td>"
+        f"<td>{html.escape(gate['paper_trial_gate'])}<br><small>size {html.escape(str(gate.get('position_size_multiplier', '1')))} ｜ {html.escape(gate_reason)}</small></td>"
         "</tr>"
     )
 

@@ -1,26 +1,55 @@
 {
+  "approved_strategy_whitelist": [
+    "M10-PA-004",
+    "M10-PA-005",
+    "M10-PA-008"
+  ],
+  "blocked_candidate_count": 0,
+  "blocked_candidates": [],
   "broker_connection_attempted": false,
   "candidate_count": 0,
   "candidates": [],
   "credential_injection_allowed_now": false,
   "fallback_or_no_fetch_data": true,
+  "first_paper_order_candidate_count": 0,
   "first_paper_order_requires_user_approval": true,
-  "generated_at": "2026-05-27T10:51:00Z",
+  "first_paper_order_strategy_whitelist": [
+    "M10-PA-004"
+  ],
+  "generated_at": "2026-05-31T02:38:00Z",
+  "kill_switch_enabled": true,
+  "limit_orders_only": true,
   "live_execution": false,
   "live_token_allowed": false,
   "longbridge_cli": {
     "available": "true",
     "error": "",
     "path": "/home/hgl/.local/bin/longbridge",
-    "version": "longbridge 0.17.1"
+    "version": "longbridge 0.22.1"
   },
+  "max_orders_per_day": 1,
+  "max_risk_per_order": "100",
+  "max_total_exposure": "25000",
   "order_submitted": false,
   "paper_gate_ref": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
   "paper_preflight_status": "blocked_fallback_or_no_fetch_data",
+  "paper_token_only": true,
   "paper_token_required": true,
-  "plain_language_result": "Longbridge paper preflight is blocked because current M14/M12 data is fallback/no-fetch; paper candidates require fully refreshed data.",
+  "plain_language_result": "长桥模拟账户预演被阻断：当前 M14/M12 数据仍是备用行情或 no-fetch，必须等 M12.47 在交易窗口拉起 fresh refresh。",
+  "policy_blockers": [],
   "real_money_actions": false,
+  "regular_hours_only": true,
+  "runtime_whitelist": [
+    "M10-PA-004-long-1d",
+    "M10-PA-005-1d",
+    "M10-PA-005-5m",
+    "M10-PA-008-1d",
+    "M10-PA-008-broker-risk-cap-shadow-1d"
+  ],
   "schema_version": "m15.longbridge-paper-preflight.v1",
   "stage": "M15.longbridge_paper_preflight",
-  "title": "M15 Longbridge paper preflight"
+  "symbol_whitelist": [],
+  "title": "M15 Longbridge paper preflight",
+  "token_mode": "paper",
+  "us_paper_prepost_supported": false
 }

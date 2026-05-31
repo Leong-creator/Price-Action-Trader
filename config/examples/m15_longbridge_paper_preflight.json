@@ -6,5 +6,31 @@
   "cli_name": "longbridge",
   "market": "US",
   "default_order_type": "limit",
-  "regular_hours_only": true
+  "regular_hours_only": true,
+  "safety_controls": {
+    "token_mode": "paper",
+    "live_token_allowed": false,
+    "kill_switch_enabled": true,
+    "max_orders_per_day": 1,
+    "max_risk_per_order": "100",
+    "max_total_exposure": "25000"
+  },
+  "whitelists": {
+    "approved_strategy_whitelist": [
+      "M10-PA-004",
+      "M10-PA-005",
+      "M10-PA-008"
+    ],
+    "first_paper_order_strategy_whitelist": [
+      "M10-PA-004"
+    ],
+    "runtime_whitelist": [
+      "M10-PA-004-long-1d",
+      "M10-PA-005-1d",
+      "M10-PA-005-5m",
+      "M10-PA-008-1d",
+      "M10-PA-008-broker-risk-cap-shadow-1d"
+    ],
+    "symbol_whitelist": []
+  }
 }

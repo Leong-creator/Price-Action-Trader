@@ -206,6 +206,12 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.assertEqual(gate["M10-PA-001-1d"]["paper_trial_gate"], "pause_runtime")
             self.assertEqual(gate["M10-PA-001-1d"]["action_state"], "pause_runtime")
             self.assertFalse(gate["M10-PA-001-1d"]["paper_candidate"])
+            self.assertEqual(gate["M10-PA-003"]["paper_trial_gate"], "auxiliary_module")
+            self.assertEqual(gate["M10-PA-003"]["action_state"], "auxiliary_module")
+            self.assertEqual(gate["M10-PA-003"]["runtime_role"], "auxiliary_module")
+            self.assertFalse(gate["M10-PA-003"]["standalone_trading_allowed"])
+            self.assertIn("辅助模块", gate["M10-PA-003"]["display_action"])
+            self.assertNotIn("research-only", gate["M10-PA-003"]["gate_reason"])
             self.assertIn("fallback quotes / no-fetch", second["summary"]["data_freshness_warning"])
 
     def test_degraded_days_are_audit_only_and_do_not_poison_valid_challenge_progress(self):

@@ -1,7 +1,7 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T20:09:06Z",
+  "generated_at": "2026-05-31T02:42:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -36,23 +36,13 @@
       "broker_readiness",
       "objective_completion"
     ],
-    "excluded_metric_names": [
-      "historical_net_profit",
-      "historical_profit_factor",
-      "historical_return_percent",
-      "历史净利润",
-      "历史收益"
+    "excluded_metric_categories": [
+      "old_account_dashboard_profit_fields",
+      "old_return_drawdown_fields",
+      "old_profit_factor_fields"
     ],
-    "excluded_metrics": [
-      "historical_net_profit",
-      "historical_profit_factor",
-      "historical_return_percent",
-      "历史净利润",
-      "历史收益"
-    ],
-    "legacy_historical_profit_ignored": true,
+    "legacy_bug_metric_excluded": true,
     "planning_input_allowed": false,
-    "reason": "The account drilldown historical net-profit/history-return fields can contain old-version contaminated values and must not steer M14 strategy planning.",
     "replacement_evidence_sources": [
       "m13_signal_ledger",
       "m13_account_operation_ledger",
@@ -72,6 +62,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -90,6 +81,7 @@
       "continue_rescue": false,
       "current_bucket": "approved_internal_sim_continue",
       "decision": "promote",
+      "display_action": "Wait for the next M12.47-supervised internal simulated-account refresh, then recompute M13/M14 evidence.",
       "display_name": "Broad channel boundary reversal long-only runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -146,9 +138,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "approved_internal_sim_continue",
       "route_rank": 0,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 10,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-004",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -159,6 +153,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "broker_dry_run_watch_recheck",
         "m12_47_fresh_refresh",
@@ -180,6 +175,7 @@
       "continue_rescue": false,
       "current_bucket": "approved_internal_sim_continue",
       "decision": "promote",
+      "display_action": "Wait for the next M12.47-supervised internal simulated-account refresh, then recompute M13/M14 evidence.",
       "display_name": "Range geometry experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -240,11 +236,13 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "approved_internal_sim_continue",
       "route_rank": 0,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 10,
       "shadow_spec_count": 2,
       "shadow_spec_states": [
         "shadow_spec_prepared_wait_fresh_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-005",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -255,6 +253,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "broker_dry_run_watch_recheck",
         "first_m13_rescue_ledger",
@@ -278,6 +277,7 @@
       "continue_rescue": false,
       "current_bucket": "approved_internal_sim_continue",
       "decision": "promote",
+      "display_action": "Wait for the next M12.47-supervised internal simulated-account refresh, then recompute M13/M14 evidence.",
       "display_name": "Visual strategy 008 experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -340,12 +340,14 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "approved_internal_sim_continue",
       "route_rank": 0,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 10,
       "shadow_spec_count": 2,
       "shadow_spec_states": [
         "shadow_spec_prepared_wait_fresh_refresh",
         "wait_first_ledger_before_parameter_decision"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-008",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -356,6 +358,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "first_m13_rescue_ledger",
         "first_rescue_specific_ledger_missing",
@@ -379,6 +382,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Keep the rescue runtime under observation until the first matching M13 ledger evidence appears.",
       "display_name": "Opening range breakout runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -442,12 +446,14 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 21,
       "shadow_spec_count": 2,
       "shadow_spec_states": [
         "shadow_spec_prepared_wait_fresh_refresh",
         "wait_first_ledger_before_parameter_decision"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-012",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -458,6 +464,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -479,6 +486,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "Trend pullback runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -539,11 +547,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "fresh_recheck_spec_ready_wait_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-001",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -554,6 +564,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -575,6 +586,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "Breakout runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -635,11 +647,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "fresh_recheck_spec_ready_wait_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-002",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -650,6 +664,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -671,6 +686,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "PA004 momentum breakout quality-confirmed experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -731,11 +747,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "fresh_recheck_spec_ready_wait_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-004-MBF-QC",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -746,6 +764,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -767,6 +786,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "Second leg visual detector runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -827,11 +847,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "fresh_recheck_spec_ready_wait_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-007",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -842,6 +864,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -863,6 +886,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "Visual strategy 009 experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -923,11 +947,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "fresh_recheck_spec_ready_wait_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-009",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -938,6 +964,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -959,6 +986,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "Visual strategy 013 experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1019,11 +1047,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "wait_parent_detector_evidence_before_spec"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-013",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1034,6 +1064,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -1055,6 +1086,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "modify",
+      "display_action": "Review shadow parameter specs and keep them inactive until fresh-refresh and review gates pass.",
       "display_name": "Formal daily trend runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1115,11 +1147,13 @@
       ],
       "route_category": "rescue_ab_collect",
       "route_rank": 1,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 31,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "fresh_recheck_spec_ready_wait_refresh"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M12-FTD-001",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1130,6 +1164,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "manual_m14_review",
         "manual_m14_review_pending",
@@ -1147,6 +1182,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "continue_testing",
+      "display_action": "Continue rescue A/B evidence collection until the 10-trading-day rescue window is complete.",
       "display_name": "PA004 momentum breakout follow-through experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1203,9 +1239,11 @@
       ],
       "route_category": "parallel_ab_collect",
       "route_rank": 2,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 142,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-004-MBF",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1216,6 +1254,7 @@
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
+      "auxiliary_module_purpose": "",
       "blocked_by": [
         "m12_47_fresh_refresh",
         "m12_47_fresh_refresh_not_observed",
@@ -1237,6 +1276,7 @@
       "continue_rescue": true,
       "current_bucket": "rescue_or_shadow_review",
       "decision": "reject",
+      "display_action": "Review detector/timeframe mapping, then continue A/B evidence collection if the detector is still valid.",
       "display_name": "Session microstructure experimental runtime",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1297,11 +1337,13 @@
       ],
       "route_category": "rebuild_detector_then_ab",
       "route_rank": 3,
+      "runtime_role": "trading_runtime",
       "sequence_rank": 53,
       "shadow_spec_count": 1,
       "shadow_spec_states": [
         "continue_ab_collection_no_new_parameter_spec"
       ],
+      "standalone_trading_allowed": true,
       "strategy_id": "M10-PA-011",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1309,9 +1351,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "外部参考信号，只做对照，不复制交易，不覆盖本项目判断",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1326,8 +1368,9 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
+      "display_action": "辅助模块：启用为外部参考信号，只做对照，不复制交易，不覆盖本项目判断，不作为独立交易策略",
       "display_name": "AI-Trader external signal research",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1358,8 +1401,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为外部参考信号，只做对照，不复制交易，不覆盖本项目判断，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1369,8 +1412,8 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review"
@@ -1382,9 +1425,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "AI-TRADER-EXTERNAL",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1392,9 +1437,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "质量评分和排序模块，给主策略打分",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1409,8 +1454,9 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
+      "display_action": "辅助模块：启用为质量评分和排序模块，给主策略打分，不作为独立交易策略",
       "display_name": "Filter and ranking module",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1443,8 +1489,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为质量评分和排序模块，给主策略打分，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1454,10 +1500,10 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
         "future_source_reextract_spec_manual_visual_confirmation",
         "future_source_reextract_spec_prep_review_only",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review",
@@ -1471,9 +1517,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "M10-PA-003",
       "visual_case_pending_count": 5,
       "visual_question_pending_count": 3,
@@ -1481,9 +1529,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "限价入场过滤模块，过滤差入场",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1498,8 +1546,9 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
+      "display_action": "辅助模块：启用为限价入场过滤模块，过滤差入场，不作为独立交易策略",
       "display_name": "BLSHS limit filter",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1530,8 +1579,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为限价入场过滤模块，过滤差入场，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1541,8 +1590,8 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review"
@@ -1554,9 +1603,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "M10-PA-006",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1564,9 +1615,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "图形识别资料模块，帮助视觉策略补证据",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1581,9 +1632,10 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
-      "display_name": "Visual research-only module",
+      "display_action": "辅助模块：启用为图形识别资料模块，帮助视觉策略补证据，不作为独立交易策略",
+      "display_name": "Visual auxiliary-module module",
       "final_discard_allowed": false,
       "forbidden_operations": [
         "broker_connection",
@@ -1615,8 +1667,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为图形识别资料模块，帮助视觉策略补证据，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1626,10 +1678,10 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
         "future_source_reextract_spec_manual_visual_confirmation",
         "future_source_reextract_spec_prep_review_only",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review",
@@ -1643,9 +1695,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "M10-PA-010",
       "visual_case_pending_count": 5,
       "visual_question_pending_count": 3,
@@ -1653,9 +1707,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "目标价计算模块，服务止盈目标",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1670,8 +1724,9 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
+      "display_action": "辅助模块：启用为目标价计算模块，服务止盈目标，不作为独立交易策略",
       "display_name": "Target module",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1702,8 +1757,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为目标价计算模块，服务止盈目标，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1713,8 +1768,8 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review"
@@ -1726,9 +1781,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "M10-PA-014",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1736,9 +1793,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "止损和仓位模块，服务风控和数量计算",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1753,8 +1810,9 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
+      "display_action": "辅助模块：启用为止损和仓位模块，服务风控和数量计算，不作为独立交易策略",
       "display_name": "Stop and sizing module",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1785,8 +1843,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为止损和仓位模块，服务风控和数量计算，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1796,8 +1854,8 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review"
@@ -1809,9 +1867,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "M10-PA-015",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1819,9 +1879,9 @@
     },
     {
       "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
+        "auxiliary_module_support"
       ],
+      "auxiliary_module_purpose": "区间加仓辅助模块，服务已有主策略",
       "blocked_by": [
         "independent_strategy_evidence_missing",
         "manual_m14_review",
@@ -1836,8 +1896,9 @@
       "can_promote_now": false,
       "completed_trading_days": 10,
       "continue_rescue": false,
-      "current_bucket": "source_review_or_plugin_research",
+      "current_bucket": "auxiliary_module_support",
       "decision": "continue_testing",
+      "display_action": "辅助模块：启用为区间加仓辅助模块，服务已有主策略，不作为独立交易策略",
       "display_name": "Range add-on module",
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1868,8 +1929,8 @@
       "manual_m12_37_once": false,
       "manual_m12_37_once_allowed": false,
       "manual_review_ready": false,
-      "next_action": "Keep source-visual or plugin research in review-only mode until manual confirmation is complete.",
-      "next_step_type": "source_visual_or_plugin_research",
+      "next_action": "辅助模块：启用为区间加仓辅助模块，服务已有主策略，不作为独立交易策略",
+      "next_step_type": "auxiliary_module_support",
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_activation_allowed_now": false,
@@ -1879,8 +1940,8 @@
       "promotion_allowed": false,
       "real_order": false,
       "required_next_evidence": [
-        "Independent strategy evidence beyond plugin or research-only coverage.",
-        "independent strategy evidence beyond shadow/plugin/research coverage",
+        "Independent strategy evidence beyond auxiliary-module coverage.",
+        "independent strategy evidence beyond shadow/auxiliary-module coverage",
         "independent_strategy_evidence_missing",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review"
@@ -1892,9 +1953,11 @@
       "rescue_runtime_strategy_ids": [],
       "route_category": "shadow_or_plugin_hold",
       "route_rank": 4,
+      "runtime_role": "auxiliary_module",
       "sequence_rank": 274,
       "shadow_spec_count": 0,
       "shadow_spec_states": [],
+      "standalone_trading_allowed": false,
       "strategy_id": "M10-PA-016",
       "visual_case_pending_count": 0,
       "visual_question_pending_count": 0,
@@ -1908,7 +1971,8 @@
     "Built 20 per-strategy next-step rows; 3 may continue only through internal simulated refresh.",
     "Promotion/discard/parameter activation/broker paper counts are 0/0/0/0.",
     "Legacy historical profit metrics are display-only: planning input count is 0.",
-    "Future source-reextract spec prep remains conditional: 2 rows, 0 unblocked, 16 pending confirmations."
+    "Future source-reextract spec prep remains conditional: 2 rows, 0 unblocked, 16 pending confirmations.",
+    "辅助模块行数为 7，这些模块只服务主策略，不作为独立交易策略。"
   ],
   "readiness_policy": {
     "approved_strategy_rule": "Approved strategies may only continue through the next M12.47-supervised internal simulated-account refresh.",
@@ -1916,13 +1980,14 @@
     "mutation_rule": "No parameter, registry, account-spec, broker-readiness, broker/live, or manual M12.37 once-mode mutation is allowed.",
     "purpose": "Give one per-strategy next-step route without changing strategy state.",
     "rescue_rule": "Weak or variant strategies stay in rescue A/B, first-ledger watch, or shadow-parameter review until evidence is complete.",
-    "source_review_rule": "Source-visual, future source-reextract spec prep, and plugin research rows remain review-only until manual confirmation is complete."
+    "source_review_rule": "Auxiliary modules serve screening, targets, stops, sizing, add-ons, visual evidence, or external comparison; they are not standalone trading strategies."
   },
   "real_order": false,
   "schema_version": "m14.strategy-next-step-readiness-matrix.v1",
   "stage": "M14.strategy_next_step_readiness_matrix",
   "summary": {
     "approved_internal_sim_continue_count": 3,
+    "auxiliary_module_support_count": 7,
     "broker_or_live_enabled": false,
     "broker_paper_start_allowed_count": 0,
     "can_continue_internal_sim_now_count": 3,
@@ -1932,8 +1997,8 @@
     "copy_trading_allowed": false,
     "current_bucket_counts": {
       "approved_internal_sim_continue": 3,
-      "rescue_or_shadow_review": 10,
-      "source_review_or_plugin_research": 7
+      "auxiliary_module_support": 7,
+      "rescue_or_shadow_review": 10
     },
     "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
     "external_override_allowed": false,
@@ -1950,12 +2015,12 @@
     "manual_m12_37_once_allowed": false,
     "manual_m12_37_once_allowed_count": 0,
     "next_step_type_counts": {
+      "auxiliary_module_support": 7,
       "collect_first_rescue_ledger": 1,
       "complete_shadow_parameter_review": 7,
       "continue_next_internal_sim_refresh": 3,
       "continue_rescue_ab_collection": 1,
-      "rebuild_detector_then_ab": 1,
-      "source_visual_or_plugin_research": 7
+      "rebuild_detector_then_ab": 1
     },
     "objective_complete": false,
     "open_evidence_gap_row_count": 20,
@@ -1980,7 +2045,7 @@
       "rescue_ab_collect": 8,
       "shadow_or_plugin_hold": 7
     },
-    "source_review_or_plugin_research_count": 7,
+    "source_review_or_plugin_research_count": 0,
     "source_visual_case_pending_count": 10,
     "source_visual_future_spec_unblocked_count": 0,
     "source_visual_question_pending_count": 6,
