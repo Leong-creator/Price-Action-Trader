@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     build_dashboard_html,
+    build_longbridge_paper_dashboard_view,
     load_m14_terminal_context,
     load_config as load_m12_29_dashboard_config,
     load_json,
@@ -580,6 +581,13 @@ def apply_dashboard_m14_overlay(terminal: dict[str, Any], m14_context: dict[str,
     )
 
 
+def apply_dashboard_longbridge_overlay(dashboard: dict[str, Any], longbridge_context: dict[str, Any]) -> None:
+    dashboard["longbridge_paper_account"] = longbridge_context
+    top_metrics = dashboard.setdefault("top_metrics", {})
+    top_metrics["长桥模拟账户"] = str(longbridge_context.get("top_metric", "未生成长桥模拟账户状态"))
+    top_metrics["长桥可提交订单"] = str(longbridge_context.get("submit_ready_count", "0"))
+
+
 def apply_m14_rows_overlay(
     rows: Any,
     paper_gate_by_strategy: dict[str, Any],
@@ -612,6 +620,7 @@ def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, A
     m14_context = load_m14_terminal_context(dashboard_config)
     if not apply_dashboard_status_overlay(dashboard, payload, m14_context=m14_context):
         return False
+    apply_dashboard_longbridge_overlay(dashboard, build_longbridge_paper_dashboard_view(dashboard_config))
     write_json(dashboard_path, dashboard)
     try:
         (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(

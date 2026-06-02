@@ -30,8 +30,10 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     bootstrap_account_state,
     build_accountized_run_status,
     build_dashboard_data_freshness_warning,
+    build_dashboard_html,
     build_dashboard_update_status,
     build_extended_session_monitor,
+    build_longbridge_paper_dashboard_view,
     build_quote_lookup,
     current_us_scan_date,
     filter_rescue_signal_rows,
@@ -179,6 +181,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("运行状态", html)
         self.assertIn("自动会话", html)
         self.assertIn("盘前 / 盘后异动", html)
+        self.assertIn("长桥模拟账户", html)
         self.assertIn("看板新鲜度", html)
         self.assertNotIn("1h 小时线测试", html)
         self.assertNotIn("15m 十五分钟测试", html)
@@ -194,6 +197,178 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("CST", dashboard["update_status"]["beijing_time"])
         self.assertIn("session_liveness", dashboard["update_status"])
         self.assertIn("freshness_state", dashboard["update_status"])
+        self.assertIn("longbridge_paper_account", dashboard)
+        self.assertEqual(dashboard["longbridge_paper_account"]["data_available"], False)
+
+    def test_dashboard_includes_longbridge_paper_account_panel_from_m15_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output_dir = root / "m12_29"
+            submitter_dir = root / "m15_longbridge_paper_order_submitter"
+            queue_dir = root / "m15_longbridge_fast_signal_queue"
+            connection_dir = root / "m15_longbridge_paper_connection_check"
+            submitter_dir.mkdir(parents=True)
+            queue_dir.mkdir(parents=True)
+            connection_dir.mkdir(parents=True)
+            (submitter_dir / "m15_longbridge_paper_account_state.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.longbridge-paper-account-state.v1",
+                        "account_channel": "lb_papertrading",
+                        "account_type": "M",
+                        "paper_account_detected": True,
+                        "auth_ok": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "buying_power": "102524.64",
+                        "position_row_count": 1,
+                        "open_order_count": 2,
+                        "held_symbols": ["NVDA"],
+                        "local_sim_position_migration": False,
+                        "real_money_actions": False,
+                        "live_execution": False,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (submitter_dir / "m15_longbridge_paper_order_submitter.json").write_text(
+                json.dumps(
+                    {
+                        "submission_status": "no_eligible_orders",
+                        "eligible_order_count": 0,
+                        "attempted_order_count": 0,
+                        "submitted_order_count": 0,
+                        "paper_account_equity_model": "6000.00",
+                        "global_blockers": [],
+                        "plain_language_result": "当前没有符合提交条件的模拟订单。",
+                        "market_window": {
+                            "market_status": "regular_session",
+                            "new_york_time": "2026-06-02 10:02:06 EDT",
+                        },
+                        "latency_ms": {"total": 1027},
+                        "next_interval_seconds": 15,
+                        "longbridge_account": {
+                            "account_channel": "lb_papertrading",
+                            "account_type": "M",
+                            "paper_account_detected": True,
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (queue_dir / "m15_longbridge_fast_signal_queue.json").write_text(
+                json.dumps(
+                    {
+                        "scan_date": "2026-06-02",
+                        "current_market_date": "2026-06-02",
+                        "fast_queue_status": "no_submit_ready_fast_signals",
+                        "snapshot_freshness_status": "current_market_date",
+                        "plain_language_result": "快速通道发现 17 条当天新开仓信号，其中 0 条通过快速队列风控。",
+                        "summary": {
+                            "new_open_signal_count": 17,
+                            "blocked_signal_count": 17,
+                            "ready_after_user_approval_count": 0,
+                            "ready_after_user_approval_notional": "0.00",
+                            "repair_signal_count": 10,
+                            "stale_snapshot_blocked_count": 0,
+                            "confluence_primary_count": 0,
+                            "confluence_support_count": 0,
+                            "status_counts": {"local_order_preview_created_short_disabled": 6},
+                        },
+                        "confluence_summary": {"max_confluence_multiplier": "1"},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (connection_dir / "m15_longbridge_paper_connection_check.json").write_text(
+                json.dumps(
+                    {
+                        "paper_account_verified": True,
+                        "paper_account_equity_model": "6000",
+                        "real_money_actions": False,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            config = replace(load_config(), output_dir=output_dir)
+            panel = build_longbridge_paper_dashboard_view(config)
+            panel_json = json.dumps(panel, ensure_ascii=False)
+            html = build_dashboard_html(config, self._minimal_dashboard_for_html(panel))
+        self.assertTrue(panel["data_available"])
+        self.assertTrue(panel["paper_account_detected"])
+        self.assertEqual(panel["account_channel"], "lb_papertrading")
+        self.assertEqual(panel["position_row_count"], "1")
+        self.assertEqual(panel["open_order_count"], "2")
+        self.assertEqual(panel["submit_ready_count"], "0")
+        self.assertIn("项目仍按 6000 USD 控制仓位", panel_json)
+        self.assertIn("长桥模拟账户已连接", panel["plain_language_result"])
+        self.assertIn("当前无合格订单", html)
+        self.assertIn("快速信号队列", html)
+        self.assertNotIn("order_id", panel_json)
+
+    def _minimal_dashboard_for_html(self, longbridge_panel: dict) -> dict:
+        empty_overview = {
+            "starting_capital": "0.00",
+            "current_equity": "0.00",
+            "day_pnl": "0.00",
+            "cumulative_return_percent": "0.00",
+            "today_opened_count": "0",
+            "today_closed_count": "0",
+            "win_rate_percent": "0.00",
+            "max_drawdown_percent": "0.00",
+        }
+        empty_timeframe = {
+            "display_name": "fixture",
+            "account_count": "0",
+            "today_total_pnl": "0.00",
+            "win_rate_percent": "0.00",
+            "plain_language_note": "fixture",
+            "strategy_rows": [],
+        }
+        return {
+            "top_metrics": {},
+            "summary": {"audit_only_snapshot": True, "audit_only_snapshot_note": "fixture", "data_freshness_warning": ""},
+            "mainline_account_view": empty_overview,
+            "experimental_account_view": empty_overview,
+            "timeframe_views": {"views": {"1d": empty_timeframe, "5m": empty_timeframe}},
+            "ftd001_monitor": {"plain_language_summary": "fixture", "accounts": [], "current_plain_status": "fixture", "risk_flags": []},
+            "update_status": {
+                "beijing_time": "2026-06-02 22:02:06 CST",
+                "wall_clock_beijing_time": "2026-06-02 22:02:06 CST",
+                "freshness_state": "fresh",
+                "dashboard_age_seconds": "0",
+                "new_york_time": "2026-06-02 10:02:06 EDT",
+                "market_status": "美股常规交易时段",
+                "runtime_status": "fixture",
+                "session_liveness": "alive",
+                "supervisor_process_alive": "true",
+                "last_heartbeat_beijing_time": "2026-06-02 22:02:06 CST",
+                "heartbeat_age_seconds": "0",
+            },
+            "strategy_scorecard_rows": [],
+            "strategy_detail_views": {},
+            "trade_rows": [],
+            "signal_watchlist": [],
+            "reference_watchlist": [],
+            "broker_terminal_view": {"top_status": {}, "strategy_accounts": [], "pa004_comparison": {"rows": []}, "watchlists": {"groups": []}, "news_panel": {}},
+            "extended_session_monitor": {
+                "plain_language_summary": "fixture",
+                "threshold_percent": "2.00",
+                "premarket_rows": [],
+                "postmarket_rows": [],
+                "focus_hits": [],
+            },
+            "longbridge_paper_account": longbridge_panel,
+            "strategy_status_rows": [],
+            "supporting_rule_ab_results": {"rows": []},
+            "account_input_audit": {"rows": []},
+        }
 
     def test_broker_terminal_view_has_accounts_watchlists_news_and_pa004_split(self):
         _, result, output_dir = self.run_stage()

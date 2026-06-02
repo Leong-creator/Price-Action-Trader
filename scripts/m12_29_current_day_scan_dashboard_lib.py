@@ -52,6 +52,9 @@ DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_29_current_day_scan_da
 MARKET_CALENDAR_CONFIG_PATH = ROOT / "config" / "examples" / "m12_47_session_supervisor.json"
 MARKET_WATCHLIST_CONFIG_PATH = ROOT / "config" / "examples" / "m14_market_watchlist.json"
 OUTPUT_DIR = M10_DIR / "daily_observation" / "m12_29_current_day_scan_dashboard"
+M15_PAPER_ORDER_SUBMITTER_DIR = "m15_longbridge_paper_order_submitter"
+M15_FAST_SIGNAL_QUEUE_DIR = "m15_longbridge_fast_signal_queue"
+M15_PAPER_CONNECTION_CHECK_DIR = "m15_longbridge_paper_connection_check"
 MONEY = Decimal("0.01")
 PERCENT = Decimal("0.01")
 ZERO = Decimal("0")
@@ -3368,6 +3371,7 @@ def build_accountized_dashboard_payload(
         trade_ledger_rows,
         update_status,
     )
+    longbridge_paper_account = build_longbridge_paper_dashboard_view(config)
     experimental_lane_note = experimental_lane_plain_reason(runtime["account_input_audit_rows"])
     return {
         "schema_version": "m12.46.accountized-readonly-dashboard.v1",
@@ -3386,6 +3390,8 @@ def build_accountized_dashboard_payload(
             "今日已平仓": mainline_overview["today_closed_count"],
             "FTD001 对照": ftd001_monitor["current_plain_status"],
             "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
+            "长桥模拟账户": longbridge_paper_account["top_metric"],
+            "长桥可提交订单": longbridge_paper_account["submit_ready_count"],
             "北京时间更新": update_status["beijing_time"],
             "运行状态": update_status["runtime_status"],
         },
@@ -3395,6 +3401,7 @@ def build_accountized_dashboard_payload(
             "timeframe_views": "按 1d / 5m 分组测试",
             "ftd001_focus": "FTD001 双版本对照",
             "extended_session_monitor": "盘前 / 盘后异动",
+            "longbridge_paper_account": "长桥模拟账户",
             "trade_ledger": "模拟交易明细",
             "signal_watchlist": "信号观察清单",
             "audit_reports": "审计与报告",
@@ -3431,6 +3438,7 @@ def build_accountized_dashboard_payload(
         "timeframe_views": timeframe_views,
         "ftd001_monitor": ftd001_monitor,
         "extended_session_monitor": extended_session_monitor,
+        "longbridge_paper_account": longbridge_paper_account,
         "codex_observer": codex_observer,
         "summary": summary,
         "trade_rows": trade_ledger_rows,
@@ -3601,6 +3609,194 @@ def build_dashboard_update_status(config: M1229Config, summary: dict[str, Any], 
         "heartbeat_age_seconds": heartbeat_age_seconds,
         "stale_after_seconds": stale_after_seconds,
     }
+
+
+def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]:
+    daily_dir = config.output_dir.parent
+    account_state_path = daily_dir / M15_PAPER_ORDER_SUBMITTER_DIR / "m15_longbridge_paper_account_state.json"
+    submitter_path = daily_dir / M15_PAPER_ORDER_SUBMITTER_DIR / "m15_longbridge_paper_order_submitter.json"
+    fast_queue_path = daily_dir / M15_FAST_SIGNAL_QUEUE_DIR / "m15_longbridge_fast_signal_queue.json"
+    connection_path = daily_dir / M15_PAPER_CONNECTION_CHECK_DIR / "m15_longbridge_paper_connection_check.json"
+    account_state = load_optional_json(account_state_path)
+    submitter = load_optional_json(submitter_path)
+    fast_queue = load_optional_json(fast_queue_path)
+    connection = load_optional_json(connection_path)
+    submitter_account = submitter.get("longbridge_account", {}) if isinstance(submitter.get("longbridge_account"), dict) else {}
+    queue_summary = fast_queue.get("summary", {}) if isinstance(fast_queue.get("summary"), dict) else {}
+    confluence_summary = fast_queue.get("confluence_summary", {}) if isinstance(fast_queue.get("confluence_summary"), dict) else {}
+    account_channel = str(account_state.get("account_channel") or submitter_account.get("account_channel") or "")
+    account_type = str(account_state.get("account_type") or submitter_account.get("account_type") or "")
+    paper_detected = bool(account_state.get("paper_account_detected") or submitter_account.get("paper_account_detected"))
+    auth_ok = bool(account_state.get("auth_ok") or submitter_account.get("auth_ok") or connection.get("paper_account_verified"))
+    assets_ok = bool(account_state.get("assets_ok") or submitter_account.get("assets_ok"))
+    positions_ok = bool(account_state.get("positions_ok") or submitter_account.get("positions_ok"))
+    orders_ok = bool(account_state.get("orders_ok"))
+    buying_power = str(account_state.get("buying_power") or submitter_account.get("buying_power") or "暂无")
+    position_count = str(account_state.get("position_row_count", submitter_account.get("held_symbol_count", "0")))
+    open_order_count = str(account_state.get("open_order_count", "0"))
+    held_symbols = account_state.get("held_symbols", [])
+    held_symbol_text = ", ".join(str(item) for item in held_symbols[:12]) if isinstance(held_symbols, list) and held_symbols else "暂无"
+    submit_status = str(submitter.get("submission_status") or "")
+    market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
+    market_status = str(market_window.get("market_status") or "")
+    eligible_count = int_like(submitter.get("eligible_order_count", queue_summary.get("ready_after_user_approval_count", 0)))
+    submitted_count = int_like(submitter.get("submitted_order_count", 0))
+    attempted_count = int_like(submitter.get("attempted_order_count", 0))
+    queue_status = str(fast_queue.get("fast_queue_status") or fast_queue.get("preview_status") or "")
+    new_signal_count = int_like(queue_summary.get("new_open_signal_count", 0))
+    blocked_signal_count = int_like(queue_summary.get("blocked_signal_count", 0))
+    repair_signal_count = int_like(queue_summary.get("repair_signal_count", 0))
+    stale_blocked_count = int_like(queue_summary.get("stale_snapshot_blocked_count", 0))
+    confluence_primary_count = int_like(queue_summary.get("confluence_primary_count", 0))
+    confluence_support_count = int_like(queue_summary.get("confluence_support_count", 0))
+    ready_notional = str(queue_summary.get("ready_after_user_approval_notional", "0.00"))
+    status_counts = queue_summary.get("status_counts", {}) if isinstance(queue_summary.get("status_counts"), dict) else {}
+    global_blockers = submitter.get("global_blockers", []) if isinstance(submitter.get("global_blockers"), list) else []
+    queue_blockers = fast_queue.get("current_day_blockers", []) if isinstance(fast_queue.get("current_day_blockers"), list) else []
+    data_available = bool(account_state or submitter or fast_queue or connection)
+    account_label = "模拟账户已连接" if paper_detected else "等待模拟账户确认" if auth_ok else "等待授权或状态文件"
+    top_metric = (
+        f"{account_label} / {position_count}持仓 / {open_order_count}挂单"
+        if data_available else
+        "未生成长桥模拟账户状态"
+    )
+    if not data_available:
+        plain_language = "长桥模拟账户状态还没有写入看板；等 M15 提交器生成状态文件后会自动显示。"
+    elif not paper_detected:
+        plain_language = "长桥账户尚未被确认成模拟账户，所以看板只显示状态，不允许提交。"
+    elif submitted_count > 0:
+        plain_language = f"长桥模拟账户已连接，本轮已提交 {submitted_count} 笔模拟订单；仍是模拟账户，不触碰真实资金。"
+    elif eligible_count > 0:
+        plain_language = f"长桥模拟账户已连接，当前有 {eligible_count} 笔订单通过快速风控，等待提交器按规则处理。"
+    else:
+        plain_language = "长桥模拟账户已连接，但当前没有合格订单；信号要么是修复策略、做空、数量不足，或被快速风控挡住。"
+    if global_blockers:
+        plain_language += f" 当前全局阻断：{', '.join(str(item) for item in global_blockers)}。"
+    if queue_blockers:
+        plain_language += f" 队列阻断：{', '.join(str(item) for item in queue_blockers)}。"
+    status_rows = [
+        {"label": "账户状态", "value": account_label, "note": f"通道 {account_channel or '暂无'}，类型 {account_type or '暂无'}"},
+        {"label": "模拟资金模型", "value": str(submitter.get("paper_account_equity_model") or connection.get("paper_account_equity_model") or "6000"), "note": "项目仍按 6000 USD 控制仓位，不用长桥余额放大风险。"},
+        {"label": "可用购买力", "value": buying_power, "note": "来自长桥模拟账户资产读取，仅用于确认连接状态。"},
+        {"label": "持仓 / 挂单", "value": f"{position_count} / {open_order_count}", "note": f"当前持仓标的：{held_symbol_text}"},
+        {"label": "提交器状态", "value": submit_status_label(submit_status), "note": str(submitter.get("plain_language_result") or "暂无提交器摘要")},
+        {"label": "市场窗口", "value": market_status_label(market_status), "note": str(market_window.get("new_york_time") or "暂无")},
+        {"label": "接口读取", "value": health_label(auth_ok, assets_ok, positions_ok, orders_ok), "note": "认证、资产、持仓、挂单状态只读检查。"},
+        {"label": "延迟", "value": latency_label(submitter.get("latency_ms", {})), "note": f"下一轮检查间隔 {submitter.get('next_interval_seconds', '暂无')} 秒"},
+    ]
+    queue_rows = [
+        {"label": "队列日期", "value": str(fast_queue.get("scan_date") or "暂无"), "note": f"当前美股交易日 {fast_queue.get('current_market_date', '暂无')}"},
+        {"label": "队列状态", "value": fast_queue_status_label(queue_status), "note": str(fast_queue.get("plain_language_result") or "暂无")},
+        {"label": "新开仓信号", "value": str(new_signal_count), "note": f"通过快速风控 {eligible_count}，名义金额 {ready_notional}"},
+        {"label": "被阻断信号", "value": str(blocked_signal_count), "note": status_counts_label(status_counts)},
+        {"label": "修复策略信号", "value": str(repair_signal_count), "note": "修复策略只生成本地草稿，不提交长桥模拟账户。"},
+        {"label": "旧快照阻断", "value": str(stale_blocked_count), "note": str(fast_queue.get("snapshot_freshness_status") or "暂无")},
+        {"label": "多策略共振", "value": f"{confluence_primary_count}主 / {confluence_support_count}辅", "note": f"最高倍率 {confluence_summary.get('max_confluence_multiplier', '1')}"},
+        {"label": "已提交 / 已尝试", "value": f"{submitted_count} / {attempted_count}", "note": "这里只统计长桥模拟账户提交器，不包含本地模拟账本。"},
+    ]
+    return {
+        "schema_version": "m15.longbridge-paper-dashboard-panel.v1",
+        "stage": "M15.longbridge_paper_dashboard_panel",
+        "title": "长桥模拟账户",
+        "generated_from": "m15 account state + fast queue + submitter summary",
+        "data_available": data_available,
+        "top_metric": top_metric,
+        "submit_ready_count": str(eligible_count),
+        "paper_account_detected": paper_detected,
+        "account_channel": account_channel,
+        "account_type": account_type,
+        "buying_power": buying_power,
+        "position_row_count": position_count,
+        "open_order_count": open_order_count,
+        "submission_status": submit_status,
+        "fast_queue_status": queue_status,
+        "new_open_signal_count": str(new_signal_count),
+        "blocked_signal_count": str(blocked_signal_count),
+        "submitted_order_count": str(submitted_count),
+        "plain_language_result": plain_language,
+        "status_rows": status_rows,
+        "queue_rows": queue_rows,
+        "refs": {
+            "paper_account_state": project_path(account_state_path) if account_state_path.exists() else "",
+            "paper_order_submitter": project_path(submitter_path) if submitter_path.exists() else "",
+            "fast_signal_queue": project_path(fast_queue_path) if fast_queue_path.exists() else "",
+            "connection_check": project_path(connection_path) if connection_path.exists() else "",
+        },
+        "paper_simulated_only": True,
+        "local_sim_position_migration": False,
+        "real_money_actions": False,
+        "live_execution": False,
+    }
+
+
+def load_optional_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def int_like(value: Any) -> int:
+    try:
+        return int(Decimal(str(value)))
+    except (InvalidOperation, ValueError):
+        return 0
+
+
+def submit_status_label(status: str) -> str:
+    labels = {
+        "paper_orders_submitted": "已提交模拟订单",
+        "blocked_global_gate": "全局门禁阻断",
+        "waiting_for_regular_session": "等待常规交易时段",
+        "no_eligible_orders": "当前无合格订单",
+        "ready_but_not_submitted": "已合格但未提交",
+    }
+    return labels.get(status, status or "暂无")
+
+
+def fast_queue_status_label(status: str) -> str:
+    labels = {
+        "ready_after_user_approval": "有信号通过快速风控",
+        "no_submit_ready_fast_signals": "无可提交新信号",
+        "stale_snapshot_waiting_for_current_refresh": "旧快照等待刷新",
+        "blocked_fallback_or_no_fetch_data": "行情数据降级阻断",
+    }
+    return labels.get(status, status or "暂无")
+
+
+def market_status_label(status: str) -> str:
+    labels = {
+        "regular_session": "美股常规交易时段",
+        "before_regular_session": "开盘前",
+        "after_regular_session": "收盘后",
+        "non_trading_day": "非交易日",
+    }
+    return labels.get(status, status or "暂无")
+
+
+def health_label(auth_ok: bool, assets_ok: bool, positions_ok: bool, orders_ok: bool) -> str:
+    flags = [
+        "认证OK" if auth_ok else "认证异常",
+        "资产OK" if assets_ok else "资产异常",
+        "持仓OK" if positions_ok else "持仓异常",
+        "挂单OK" if orders_ok else "挂单异常",
+    ]
+    return " / ".join(flags)
+
+
+def latency_label(latency: Any) -> str:
+    if not isinstance(latency, dict) or not latency:
+        return "暂无"
+    total = latency.get("total")
+    return f"{total} ms" if total not in (None, "") else "暂无"
+
+
+def status_counts_label(counts: dict[str, Any]) -> str:
+    if not counts:
+        return "暂无阻断明细"
+    return "；".join(f"{key}:{value}" for key, value in sorted(counts.items()))
 
 
 def supervisor_pid_alive(supervisor: dict[str, Any]) -> bool:
@@ -4331,6 +4527,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
     summary = dashboard.get("summary", {})
     terminal = dashboard.get("broker_terminal_view", {})
+    longbridge = dashboard.get("longbridge_paper_account", {})
     mainline = dashboard["mainline_account_view"]
     experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
@@ -4397,6 +4594,8 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     terminal_watchlist_sections = "\n".join(watchlist_group_html(group) for group in terminal.get("watchlists", {}).get("groups", []))
     terminal_news_sections = news_panel_html(terminal.get("news_panel", {}))
     pa004_terminal_rows = "\n".join(terminal_account_row_html(row) for row in terminal.get("pa004_comparison", {}).get("rows", [])) or "<tr><td colspan=\"17\">暂无 PA004 对照行</td></tr>"
+    longbridge_status_rows = "\n".join(longbridge_panel_row_html(row) for row in longbridge.get("status_rows", [])) or "<tr><td colspan=\"3\">暂无长桥模拟账户状态</td></tr>"
+    longbridge_queue_rows = "\n".join(longbridge_panel_row_html(row) for row in longbridge.get("queue_rows", [])) or "<tr><td colspan=\"3\">暂无长桥快速队列状态</td></tr>"
     timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in PRIMARY_TIMEFRAME_ORDER)
     ftd_rows = "".join(ftd_account_row_html(row) for row in ftd["accounts"])
     extended_monitor = dashboard["extended_session_monitor"]
@@ -4475,6 +4674,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     </section>
     <div class="grid">{cards}</div>
     {data_freshness_section}
+    <section class="panel"><h2>长桥模拟账户</h2><div class="note">{html.escape(str(longbridge.get('plain_language_result', '长桥模拟账户状态暂未生成。')))}</div><div class="two-col"><div class="mini-card"><h2>账户与提交器</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_status_rows}</tbody></table></div><div class="mini-card"><h2>快速信号队列</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_queue_rows}</tbody></table></div></div></section>
     <section class="terminal">
       <div class="terminal-panel"><h2>策略账户</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{terminal_account_rows}</tbody></table></div></div>
       <div class="terminal-panel"><h2>持仓 / 信号 / PA004 对照</h2><div class="note">{html.escape(terminal.get('pa004_comparison', {}).get('plain_language_result', ''))}</div><div class="wrap"><table class="terminal-table"><thead>{table_head()}</thead><tbody>{terminal_position_rows}</tbody></table></div><h2>今日正式信号</h2><div class="wrap"><table class="terminal-table"><thead>{watchlist_head()}</thead><tbody>{terminal_signal_rows}</tbody></table></div><h2>PA004 baseline / MBF / QC 对照</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{pa004_terminal_rows}</tbody></table></div></div>
@@ -4505,6 +4705,20 @@ def table_head() -> str:
 
 def terminal_account_head() -> str:
     return "<tr><th>账户</th><th>状态</th><th>今日盈亏</th><th>总盈亏</th><th>权益</th><th>持仓</th><th>信号</th><th>开/平</th><th>M14 决策</th><th>准入</th></tr>"
+
+
+def longbridge_panel_head() -> str:
+    return "<tr><th>项目</th><th>当前值</th><th>说明</th></tr>"
+
+
+def longbridge_panel_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('label', '')))}</td>"
+        f"<td>{html.escape(str(row.get('value', '')))}</td>"
+        f"<td>{html.escape(str(row.get('note', '')))}</td>"
+        "</tr>"
+    )
 
 
 def terminal_account_row_html(row: dict[str, str]) -> str:

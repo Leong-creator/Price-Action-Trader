@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.run_m12_47_session_supervisor import (
+    apply_dashboard_longbridge_overlay,
     apply_dashboard_status_overlay,
     build_failure_payload,
     build_status_payload,
@@ -157,6 +158,24 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
         self.assertFalse(dashboard["summary"]["audit_only_snapshot"])
         self.assertEqual(dashboard["top_metrics"]["数据快照状态"], "交易窗口刷新中")
+
+    def test_dashboard_longbridge_overlay_updates_top_metrics_and_panel(self):
+        dashboard = {"top_metrics": {"运行状态": "旧状态"}}
+        apply_dashboard_longbridge_overlay(
+            dashboard,
+            {
+                "schema_version": "m15.longbridge-paper-dashboard-panel.v1",
+                "top_metric": "模拟账户已连接 / 1持仓 / 2挂单",
+                "submit_ready_count": "3",
+                "real_money_actions": False,
+                "live_execution": False,
+            },
+        )
+
+        self.assertEqual(dashboard["top_metrics"]["长桥模拟账户"], "模拟账户已连接 / 1持仓 / 2挂单")
+        self.assertEqual(dashboard["top_metrics"]["长桥可提交订单"], "3")
+        self.assertFalse(dashboard["longbridge_paper_account"]["real_money_actions"])
+        self.assertFalse(dashboard["longbridge_paper_account"]["live_execution"])
 
     def test_dashboard_status_overlay_refreshes_m14_gate_context(self):
         dashboard = {
