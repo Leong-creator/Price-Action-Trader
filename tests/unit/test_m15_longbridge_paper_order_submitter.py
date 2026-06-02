@@ -50,6 +50,53 @@ class M15LongbridgePaperOrderSubmitterTest(unittest.TestCase):
             self.assertFalse(rows[0]["real_money_actions"])
             self.assertFalse(rows[0]["live_execution"])
 
+    def test_refreshes_account_state_after_successful_submission(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(Path(tmp), scan_date="2026-06-02", source_event_time="2026-06-02T14:00:01Z")
+            submitted = False
+
+            def runner(args: list[str]) -> CommandResult:
+                nonlocal submitted
+                if args[1:4] == ["auth", "status", "--format"]:
+                    return CommandResult(
+                        0,
+                        json.dumps({"account": {"account_channel": "lb_papertrading", "account_type": "M"}, "token": {"status": "valid"}}),
+                        "",
+                    )
+                if args[1:3] == ["assets", "--format"]:
+                    buy_power = "102335.94" if submitted else "102524.64"
+                    return CommandResult(0, json.dumps([{"buy_power": buy_power, "total_cash": "102524.64"}]), "")
+                if args[1:3] == ["positions", "--format"]:
+                    return CommandResult(0, json.dumps([]), "")
+                if args[1:3] == ["order", "--format"]:
+                    orders = [
+                        {
+                            "order_id": "paper-order-1",
+                            "symbol": "NVDA.US",
+                            "status": "New",
+                            "executed_quantity": "0",
+                        }
+                    ] if submitted else []
+                    return CommandResult(0, json.dumps(orders), "")
+                if args[1:3] == ["order", "buy"]:
+                    submitted = True
+                    return CommandResult(0, json.dumps({"order_id": "paper-order-1"}), "")
+                return CommandResult(1, "", "unexpected command")
+
+            payload = run_paper_submitter(
+                config,
+                generated_at="2026-06-02T14:00:00Z",
+                command_runner=runner,
+            )
+            account_state = json.loads((config.output_dir / "m15_longbridge_paper_account_state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["submission_status"], "paper_orders_submitted")
+        self.assertTrue(payload["post_submit_account_refresh_performed"])
+        self.assertEqual(account_state["buying_power"], "102335.94")
+        self.assertEqual(account_state["position_row_count"], 0)
+        self.assertEqual(account_state["open_order_count"], 1)
+        self.assertEqual(account_state["submitted_signal_fingerprints"], ["preview-1"])
+
     def test_non_paper_account_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self._write_config(Path(tmp), scan_date="2026-06-02", source_event_time="2026-06-02T14:00:01Z")

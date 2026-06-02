@@ -332,10 +332,23 @@ def build_and_maybe_submit(
             )
     if not eligible:
         ledger_rows.append(empty_submission_row(generated_at, "no_eligible_orders", global_blockers))
+    post_submit_account_refresh_performed = False
+    if submitted_count > 0 and execute_orders:
+        assets = probe_json(command_runner, [cli_path, "assets", "--format", "json"])
+        positions = probe_json(command_runner, [cli_path, "positions", "--format", "json"])
+        existing_orders = probe_json(command_runner, [cli_path, "order", "--format", "json"])
+        post_submit_account_refresh_performed = True
+    current_submitted_ids = {
+        str(row.get("signal_fingerprint") or row.get("preview_id") or "")
+        for row in ledger_rows
+        if row.get("submission_status") == "submitted"
+    }
+    current_submitted_ids.discard("")
+    account_state_submitted_ids = submitted_ids | current_submitted_ids
     status = submission_status(global_blockers, eligible, submitted_count, market)
     backoff_reasons = backoff_reasons_for(auth, assets, positions, existing_orders)
     next_interval_seconds = config.backoff_interval_seconds if backoff_reasons else config.watch_interval_seconds
-    account_state = build_account_state(config, generated_at, auth, assets, positions, existing_orders, submitted_ids)
+    account_state = build_account_state(config, generated_at, auth, assets, positions, existing_orders, account_state_submitted_ids)
     summary = {
         "schema_version": "m15.longbridge-paper-order-submitter.v1",
         "stage": config.stage,
@@ -368,6 +381,7 @@ def build_and_maybe_submit(
         "eligible_order_count": len(eligible),
         "attempted_order_count": sum(1 for row in ledger_rows if row.get("submission_status") in {"submitted", "submit_failed"}),
         "submitted_order_count": submitted_count,
+        "post_submit_account_refresh_performed": post_submit_account_refresh_performed,
         "max_orders_per_run": config.max_orders_per_run,
         "paper_account_equity_model": fmt_money(config.paper_account_equity),
         "max_total_exposure": fmt_money(config.max_total_exposure),
