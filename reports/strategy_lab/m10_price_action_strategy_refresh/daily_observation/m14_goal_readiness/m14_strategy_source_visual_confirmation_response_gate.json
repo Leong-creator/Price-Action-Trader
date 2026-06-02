@@ -1,7 +1,7 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T17:42:48Z",
+  "generated_at": "2026-06-01T17:29:01Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,

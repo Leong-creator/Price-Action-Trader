@@ -1,0 +1,18 @@
+{
+  "stage": "M15.profit_quality_audit",
+  "inputs": {
+    "m12_32_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+    "m12_46_account_runtime_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_runtime_state.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_profit_quality_audit"
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false,
+    "manual_m12_37_once": false
+  }
+}

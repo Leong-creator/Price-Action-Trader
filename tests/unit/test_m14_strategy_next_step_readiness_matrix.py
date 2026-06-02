@@ -104,6 +104,101 @@ class M14StrategyNextStepReadinessMatrixTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "legacy_historical_profit_planning_input"):
                 load_config(config_path)
 
+    def test_risk_limited_runtime_keeps_risk_limited_next_step_with_shadow_gap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = self._write_fixture(root)
+            config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+            decision_path = Path(config_payload["inputs"]["m14_strategy_decision_ladder"])
+            gap_path = Path(config_payload["inputs"]["m14_strategy_evidence_gap_matrix"])
+            burndown_path = Path(config_payload["inputs"]["m14_strategy_evidence_gap_burndown"])
+            shadow_path = Path(config_payload["inputs"]["m14_rescue_parameter_shadow_spec"])
+
+            decision = json.loads(decision_path.read_text(encoding="utf-8"))
+            decision["ladder_rows"].append(
+                {
+                    "strategy_id": "M10-PA-005",
+                    "display_name": "PA005 risk limited fixture",
+                    "route_rank": 2,
+                    "route_category": "manual_review_required",
+                    "decision": "risk_limited_advance",
+                    "action_state": "risk_limited_advance",
+                    "paper_trial_gate": "risk_limited_internal_sim",
+                    "position_size_multiplier": "0.25",
+                    "ladder_state": "continue_rescue_with_shadow_specs",
+                    "completed_trading_days": 10,
+                    "can_advance_next_step": False,
+                    "can_promote_now": False,
+                    "continue_rescue": False,
+                    "final_discard_allowed": False,
+                }
+            )
+            decision_path.write_text(json.dumps(decision), encoding="utf-8")
+
+            gap = json.loads(gap_path.read_text(encoding="utf-8"))
+            gap["gap_rows"].append(
+                {
+                    "strategy_id": "M10-PA-005",
+                    "display_name": "PA005 risk limited fixture",
+                    "route_rank": 2,
+                    "route_category": "manual_review_required",
+                    "gap_state": "wait_shadow_parameter_review",
+                    "decision": "risk_limited_advance",
+                    "paper_trial_gate": "risk_limited_internal_sim",
+                    "position_size_multiplier": "0.25",
+                    "missing_evidence_categories": ["shadow_parameter_review"],
+                    "required_artifacts": ["pa005-shadow.json"],
+                    "can_continue_internal_sim_now": False,
+                    "can_promote_now": False,
+                    "continue_rescue": False,
+                    "final_discard_allowed": False,
+                }
+            )
+            gap_path.write_text(json.dumps(gap), encoding="utf-8")
+
+            burndown = json.loads(burndown_path.read_text(encoding="utf-8"))
+            burndown["burndown_rows"].append(
+                {
+                    "strategy_id": "M10-PA-005",
+                    "display_name": "PA005 risk limited fixture",
+                    "sequence_rank": 5,
+                    "route_category": "manual_review_required",
+                    "burn_down_lane": "rescue_shadow_parameter_review",
+                    "next_evidence_to_collect": ["shadow_parameter_review"],
+                    "blocked_by": ["shadow_parameter_review"],
+                    "allowed_operations": ["m12_47_supervised_refresh_review"],
+                    "can_continue_internal_sim_now": False,
+                    "can_promote_now": False,
+                    "continue_rescue": False,
+                    "final_discard_allowed": False,
+                    "activation_gate_row_count": 1,
+                }
+            )
+            burndown_path.write_text(json.dumps(burndown), encoding="utf-8")
+
+            shadow = json.loads(shadow_path.read_text(encoding="utf-8"))
+            shadow["spec_rows"].append(
+                {
+                    "strategy_id": "M10-PA-005",
+                    "spec_state": "ready_for_manual_shadow_review_no_mutation",
+                    "activation_gate_state": "ready_for_manual_shadow_review_no_mutation",
+                    "variant_count": 1,
+                }
+            )
+            shadow_path.write_text(json.dumps(shadow), encoding="utf-8")
+
+            result = run_m14_strategy_next_step_readiness_matrix(
+                load_config(config_path),
+                generated_at="2026-05-27T06:00:00Z",
+            )
+            rows = {row["strategy_id"]: row for row in result["matrix_rows"]}
+            self.assertEqual(rows["M10-PA-005"]["decision"], "risk_limited_advance")
+            self.assertEqual(rows["M10-PA-005"]["next_step_type"], "continue_risk_limited_internal_sim_refresh")
+            self.assertEqual(rows["M10-PA-005"]["current_bucket"], "approved_internal_sim_continue")
+            self.assertEqual(rows["M10-PA-005"]["position_size_multiplier"], "0.25")
+            self.assertTrue(rows["M10-PA-005"]["can_continue_internal_sim_now"])
+            self.assertFalse(rows["M10-PA-005"]["broker_paper_start_allowed"])
+
     def _write_fixture(self, root: Path) -> Path:
         decision_path = root / "decision.json"
         gap_path = root / "gap.json"

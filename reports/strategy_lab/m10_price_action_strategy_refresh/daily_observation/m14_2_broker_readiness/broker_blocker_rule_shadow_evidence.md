@@ -1,6 +1,6 @@
 # M14.2 Broker Blocker Rule Shadow Evidence
 
-- Generated at: `2026-05-26T22:05:00Z`
+- Generated at: `2026-06-01T17:29:00Z`
 - Source A/B prep rows: `3`
 - Rule shadow evidence rows: `2`
 - Exposure-ranker rules: `1`

@@ -1,0 +1,82 @@
+{
+  "schema_version": "m15.longbridge-paper-order-submitter.config.v1",
+  "stage": "M15.longbridge_paper_order_submitter",
+  "title": "长桥模拟账户订单提交器",
+  "inputs": {
+    "connection_check": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_paper_connection_check/m15_longbridge_paper_connection_check.json",
+    "fast_signal_queue_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_fast_signal_queue/m15_longbridge_fast_signal_queue.json",
+    "fast_signal_queue_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_fast_signal_queue/m15_longbridge_fast_signal_queue_ledger.jsonl"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_paper_order_submitter"
+  },
+  "longbridge": {
+    "cli_name": "longbridge",
+    "required_account_channel": "lb_papertrading",
+    "paper_account_start_at": "2026-06-02T07:18:05Z",
+    "submit_only_new_open_orders_after_start": true,
+    "ignore_local_sim_positions_before_start": true,
+    "submit_orders": true,
+    "paper_trading_approval": true,
+    "user_approval_note": "用户于 2026-06-02 确认今晚可以开始长桥模拟账户交易；仅限模拟账户。",
+    "outside_rth": "RTH_ONLY",
+    "time_in_force": "day",
+    "regular_hours_only": true,
+    "max_orders_per_run": 5,
+    "allowed_order_types": [
+      "limit",
+      "trigger_limit"
+    ],
+    "allowed_soft_preview_blockers": [
+      "broker_connection_disabled",
+      "order_submission_disabled",
+      "paper_trading_approval_false"
+    ]
+  },
+  "paper_account_model": {
+    "equity": "6000",
+    "max_total_exposure": "3600",
+    "max_symbol_exposure": "600",
+    "max_risk_per_order": "12",
+    "min_cash_reserve": "2400",
+    "allow_fractional_shares": false,
+    "allow_short_selling": false,
+    "allow_options": false
+  },
+  "market_session": {
+    "timezone": "America/New_York",
+    "regular_open": "09:30",
+    "regular_close": "16:00",
+    "market_holidays": [
+      "2026-01-01",
+      "2026-01-19",
+      "2026-02-16",
+      "2026-04-03",
+      "2026-05-25",
+      "2026-06-19",
+      "2026-07-03",
+      "2026-09-07",
+      "2026-11-26",
+      "2026-12-25"
+    ]
+  },
+  "watch": {
+    "interval_seconds": 15,
+    "backoff_interval_seconds": 60,
+    "run_queue_before_submit": true,
+    "queue_command": [
+      "python",
+      "scripts/run_m15_longbridge_fast_signal_queue.py",
+      "--config",
+      "config/examples/m15_longbridge_fast_signal_queue.json"
+    ],
+    "run_preview_before_submit": false,
+    "preview_command": []
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "manual_m12_37_once": false
+  }
+}

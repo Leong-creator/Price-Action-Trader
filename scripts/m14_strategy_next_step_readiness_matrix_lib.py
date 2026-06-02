@@ -32,6 +32,8 @@ AUXILIARY_MODULE_PURPOSES = {
     "M10-PA-016": "区间加仓辅助模块，服务已有主策略",
     "AI-TRADER-EXTERNAL": "外部参考信号，只做对照，不复制交易，不覆盖本项目判断",
 }
+INTERNAL_SIM_DECISIONS = {"advance_internal_sim", "risk_limited_advance", "paper_candidate"}
+INTERNAL_SIM_GATES = {"approved_internal_sim_only", "advance_internal_sim", "risk_limited_internal_sim"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,11 +218,15 @@ def build_matrix_row(
     route_category = first_non_empty(decision_row.get("route_category"), gap_row.get("route_category"), burndown_row.get("route_category"))
     burn_down_lane = str(burndown_row.get("burn_down_lane", ""))
     gap_state = str(gap_row.get("gap_state") or burndown_row.get("gap_state", ""))
+    source_action_state = first_non_empty(decision_row.get("action_state"), decision_row.get("decision"), gap_row.get("decision"))
+    source_gate = first_non_empty(decision_row.get("paper_trial_gate"), gap_row.get("paper_trial_gate"), burndown_row.get("paper_trial_gate"))
+    position_size_multiplier = first_non_empty(
+        decision_row.get("position_size_multiplier"),
+        gap_row.get("position_size_multiplier"),
+        burndown_row.get("position_size_multiplier"),
+    )
     is_auxiliary = strategy_id in AUXILIARY_MODULE_PURPOSES or route_category == "shadow_or_plugin_hold" or burn_down_lane == "shadow_plugin_research"
     next_step_type = next_step_type_for(route_category, burn_down_lane, gap_state, gap_row, burndown_row)
-    if is_auxiliary:
-        next_step_type = "auxiliary_module_support"
-    current_bucket = current_bucket_for(route_category, burn_down_lane, next_step_type)
     required_next_evidence = [
         clean_auxiliary_text(item)
         for item in required_evidence_for(gap_row, burndown_row, visual_rows, future_spec_rows)
@@ -228,7 +234,20 @@ def build_matrix_row(
     future_spec_legacy_input = any(
         bool(row.get("legacy_historical_profit_planning_input")) for row in future_spec_rows
     )
-    can_continue_internal_sim_now = bool(first_bool(gap_row.get("can_continue_internal_sim_now"), burndown_row.get("can_continue_internal_sim_now"), decision_row.get("can_advance_next_step")))
+    source_internal_sim_allowed = source_action_state in INTERNAL_SIM_DECISIONS and (
+        not source_gate or source_gate in INTERNAL_SIM_GATES
+    )
+    if is_auxiliary:
+        next_step_type = "auxiliary_module_support"
+    elif source_internal_sim_allowed and source_action_state == "risk_limited_advance":
+        next_step_type = "continue_risk_limited_internal_sim_refresh"
+    elif source_internal_sim_allowed:
+        next_step_type = "continue_next_internal_sim_refresh"
+    can_continue_internal_sim_now = bool(
+        source_internal_sim_allowed
+        or first_bool(gap_row.get("can_continue_internal_sim_now"), burndown_row.get("can_continue_internal_sim_now"), decision_row.get("can_advance_next_step"))
+    )
+    current_bucket = current_bucket_for(route_category, burn_down_lane, next_step_type)
     can_promote_now = bool(first_bool(gap_row.get("can_promote_now"), burndown_row.get("can_promote_now"), decision_row.get("can_promote_now")))
     final_discard_allowed = bool(first_bool(gap_row.get("final_discard_allowed"), burndown_row.get("final_discard_allowed"), decision_row.get("final_discard_allowed")))
     parameter_shadow_spec_present = bool(shadow_rows or int_or_zero(burndown_row.get("activation_gate_row_count")) or int_or_zero(burndown_row.get("parameter_experiment_row_count")))
@@ -245,6 +264,9 @@ def build_matrix_row(
         "current_bucket": current_bucket,
         "next_step_type": next_step_type,
         "runtime_role": "auxiliary_module" if is_auxiliary else "trading_runtime",
+        "source_action_state": source_action_state,
+        "paper_trial_gate": source_gate,
+        "position_size_multiplier": str(position_size_multiplier),
         "auxiliary_module_purpose": auxiliary_module_purpose(strategy_id) if is_auxiliary else "",
         "standalone_trading_allowed": not is_auxiliary,
         "display_action": display_action_for(strategy_id) if is_auxiliary else next_action_for(next_step_type),
@@ -252,6 +274,7 @@ def build_matrix_row(
             is_auxiliary=is_auxiliary,
             next_step_type=next_step_type,
             can_continue_internal_sim_now=can_continue_internal_sim_now,
+            source_action_state=source_action_state,
         ),
         "ladder_state": first_non_empty(decision_row.get("ladder_state"), gap_row.get("ladder_state")),
         "gap_state": gap_state,
@@ -453,7 +476,11 @@ def build_summary(
 def current_bucket_for(route_category: str, burn_down_lane: str, next_step_type: str) -> str:
     if next_step_type == "auxiliary_module_support":
         return "auxiliary_module_support"
-    if route_category == "approved_internal_sim_continue" or burn_down_lane == "approved_internal_sim_refresh":
+    if (
+        route_category == "approved_internal_sim_continue"
+        or burn_down_lane == "approved_internal_sim_refresh"
+        or next_step_type in {"continue_next_internal_sim_refresh", "continue_risk_limited_internal_sim_refresh"}
+    ):
         return "approved_internal_sim_continue"
     if next_step_type in {
         "collect_first_rescue_ledger",
@@ -515,6 +542,7 @@ def required_evidence_for(
 def next_action_for(next_step_type: str) -> str:
     actions = {
         "continue_next_internal_sim_refresh": "下一次由 M12.47 自动刷新后重算 M13/M14，符合条件的运行单元继续内部模拟。",
+        "continue_risk_limited_internal_sim_refresh": "风险受限推进：按降仓位继续内部模拟，同时修风控或参数证据，不进入首笔长桥模拟账户。",
         "collect_first_rescue_ledger": "下一次由 M12.47 自动刷新后核对第一条 M13 修复账本；若仍没有账本，直接修账本路径或输入接线。",
         "continue_rescue_ab_collection": "按 10 个交易日修复 A/B 账本推进，每天记录信号、开平仓、风控阻断、收益和回撤，不进入长桥模拟账户。",
         "complete_shadow_parameter_review": "先完成影子参数规格复核；只有新行情刷新和人工复核都通过后，才允许单独实现参数变体。",
@@ -531,9 +559,14 @@ def normalized_decision_for_output(
     is_auxiliary: bool,
     next_step_type: str,
     can_continue_internal_sim_now: bool,
+    source_action_state: str,
 ) -> str:
     if is_auxiliary:
         return "auxiliary_module"
+    if source_action_state == "risk_limited_advance" and next_step_type == "continue_risk_limited_internal_sim_refresh":
+        return "risk_limited_advance"
+    if source_action_state in {"advance_internal_sim", "paper_candidate"} and next_step_type == "continue_next_internal_sim_refresh":
+        return "advance_internal_sim"
     if next_step_type == "continue_next_internal_sim_refresh" and can_continue_internal_sim_now:
         return "advance_internal_sim"
     if next_step_type == "manual_m14_review":

@@ -1,0 +1,14 @@
+{
+  "title": "M15 Longbridge paper connection check",
+  "stage": "M15.longbridge_paper_connection_check",
+  "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_paper_connection_check",
+  "cli_name": "longbridge",
+  "authentication_method": "oauth",
+  "require_paper_account": true,
+  "require_paper_account_marker": false,
+  "user_confirmed_paper_account": true,
+  "paper_account_assertion_source": "user_confirmed_oauth_authorization",
+  "live_token_allowed": false,
+  "allow_asset_read_after_paper_verified": false,
+  "paper_account_equity": "6000"
+}

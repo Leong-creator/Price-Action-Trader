@@ -1,6 +1,6 @@
 # M14.2 Broker Blocker Diagnostics
 
-- Generated at: `2026-05-26T20:05:00Z`
+- Generated at: `2026-06-01T17:29:00Z`
 - Blocked dry-run rows: `3`
 - Blocked strategies: `2`
 - Reason counts: `{'consecutive_losses_limit': 1, 'max_risk_per_order_exceeded': 1, 'max_total_exposure_exceeded': 1}`

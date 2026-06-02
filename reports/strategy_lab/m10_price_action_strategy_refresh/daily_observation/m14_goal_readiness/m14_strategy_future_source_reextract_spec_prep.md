@@ -1,6 +1,6 @@
 # M14 Strategy Future Source Reextract Spec Prep
 
-- Generated at: `2026-05-31T09:00:36Z`
+- Generated at: `2026-06-01T17:29:01Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
 - Prep rows / candidates: `2/2`

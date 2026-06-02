@@ -4,10 +4,10 @@
     "daily_ready_symbols": 50,
     "first_batch_symbols": 50
   },
-  "generated_at": "2026-05-21T23:58:16Z",
+  "generated_at": "2026-06-01T23:58:50Z",
   "items": [
     {
-      "candidate_count_today": "15",
+      "candidate_count_today": "21",
       "paper_gate_evidence_now": "false",
       "plain_reason": "50只日线可测；日内用当前5m观察",
       "status": "已进入每日测试",
@@ -15,7 +15,7 @@
       "title": "趋势回调二次入场"
     },
     {
-      "candidate_count_today": "7",
+      "candidate_count_today": "10",
       "paper_gate_evidence_now": "false",
       "plain_reason": "50只日线可测；日内用当前5m观察",
       "status": "已进入每日测试",
@@ -95,7 +95,7 @@
       "title": "开盘反转"
     },
     {
-      "candidate_count_today": "95",
+      "candidate_count_today": "94",
       "paper_gate_evidence_now": "false",
       "plain_reason": "当前5m可做日内只读观察",
       "status": "已进入每日测试",

@@ -1,28 +1,28 @@
 {
   "broker_connection": false,
   "broker_readiness_status_mutation": false,
-  "generated_at": "2026-05-26T20:09:21Z",
+  "generated_at": "2026-06-01T17:29:01Z",
   "global_acceptance_gates": [
     {
-      "evidence": "3/3 approved strategies launch-ready; 4/4 approved runtime inputs connected.",
+      "evidence": "1/7 approved strategies launch-ready; 7/7 approved runtime inputs connected.",
       "fail_action": "Hold affected strategy until gate/runtime/input mapping is repaired.",
       "gate_id": "internal_sim_trial_start_gate",
       "pass_action": "Wait for M12.47 to own the next trading-window refresh.",
-      "state": "pass"
+      "state": "blocked"
     },
     {
-      "evidence": "fresh_refresh_observed=False; source_quote=fallback_quotes_only",
+      "evidence": "fresh_refresh_observed=True; source_quote=longbridge_quote_readonly",
       "fail_action": "Keep current plan as waiting; do not manually run M12.37 once-mode.",
       "gate_id": "m12_47_fresh_refresh_gate",
       "pass_action": "Evaluate post-refresh trial rows and rescue watches.",
-      "state": "waiting"
+      "state": "pass"
     },
     {
       "evidence": "checklist steps=29; acceptance gates=9; two_pass_required=True.",
       "fail_action": "Do not declare objective complete until recompute artifacts are refreshed.",
       "gate_id": "post_fresh_recompute_gate",
       "pass_action": "Rerun M14 read-only recompute sequence and then refresh project stage assessment.",
-      "state": "waiting"
+      "state": "ready"
     },
     {
       "evidence": "legacy inputs blocker/next-step=0/0",
@@ -72,13 +72,13 @@
   "paper_trading_approval": false,
   "parameter_mutation": false,
   "plain_language_result": [
-    "Internal simulated-account trial start gate is ready for 3/3 approved strategies.",
-    "Fresh refresh still required for 3 trial rows; post-refresh observed=False source_quote=fallback_quotes_only.",
+    "Internal simulated-account trial start gate is ready for 1/7 approved strategies.",
+    "Fresh refresh still required for 6 trial rows; post-refresh observed=True source_quote=longbridge_quote_readonly.",
     "Broker paper/live/manual M12.37/parameter mutation remain disabled; legacy historical profit planning inputs=0."
   ],
   "post_trial_recompute_protocol": [
     {
-      "acceptance_hint": "waiting rows should fall from current 13 after fresh evidence exists.",
+      "acceptance_hint": "waiting rows should fall from current 0 after fresh evidence exists.",
       "broker_connection": false,
       "command": "python scripts/run_m14_rescue_post_refresh_outcome_review.py",
       "live_execution": false,
@@ -131,13 +131,17 @@
   "schema_version": "m14.internal-sim-trial-acceptance-gate.v1",
   "stage": "M14.internal_sim_trial_acceptance_gate",
   "summary": {
-    "approved_runtime_input_connected_count": 4,
-    "approved_runtime_input_count": 4,
-    "approved_trial_strategy_count": 3,
+    "approved_runtime_input_connected_count": 7,
+    "approved_runtime_input_count": 7,
+    "approved_trial_strategy_count": 7,
     "approved_trial_strategy_ids": [
       "M10-PA-004",
+      "M10-PA-002",
+      "M10-PA-004-MBF",
       "M10-PA-005",
-      "M10-PA-008"
+      "M10-PA-008",
+      "M10-PA-012",
+      "M10-PA-013"
     ],
     "broker_or_live_enabled": false,
     "broker_readiness_status_mutation_count": 0,
@@ -147,14 +151,15 @@
       "M10-PA-008"
     ],
     "can_start_broker_paper": false,
-    "can_start_internal_sim_trial_now": true,
+    "can_start_internal_sim_trial_now": false,
     "challenge_progress_label": "10/10",
     "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
-    "fresh_refresh_required_count": 3,
+    "fresh_refresh_required_count": 6,
     "global_gate_count": 5,
     "global_gate_state_counts": {
+      "blocked": 1,
       "pass": 3,
-      "waiting": 2
+      "ready": 1
     },
     "legacy_historical_profit_planning_input_count": 0,
     "m12_account_specs_mutation_count": 0,
@@ -166,14 +171,12 @@
     "parameter_mutation_allowed_count": 0,
     "post_fresh_recompute_acceptance_gate_count": 9,
     "post_fresh_recompute_step_count": 29,
-    "post_refresh_fresh_refresh_observed": false,
-    "post_refresh_source_quote": "fallback_quotes_only",
-    "post_refresh_waiting_count": 13,
-    "trial_start_ready_count": 3,
+    "post_refresh_fresh_refresh_observed": true,
+    "post_refresh_source_quote": "longbridge_quote_readonly",
+    "post_refresh_waiting_count": 0,
+    "trial_start_ready_count": 1,
     "trial_start_ready_strategy_ids": [
-      "M10-PA-004",
-      "M10-PA-005",
-      "M10-PA-008"
+      "M10-PA-004"
     ]
   },
   "trial_acceptance_rows": [
@@ -211,7 +214,7 @@
       "m12_account_input_connected_runtime_count": 1,
       "m12_account_input_runtime_count": 1,
       "m12_account_specs_mutation": false,
-      "m13_close_count": 0,
+      "m13_close_count": 1,
       "m13_open_count": 0,
       "m13_registry_mutation": false,
       "m13_signal_count": 0,
@@ -228,9 +231,9 @@
         "legacy_history_metric_planning_input_false",
         "broker_live_real_order_boundaries_false"
       ],
-      "post_refresh_acceptance_status": "waiting_for_m12_47_fresh_refresh",
-      "post_refresh_fresh_refresh_observed": false,
-      "post_refresh_source_quote": "fallback_quotes_only",
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
       "real_order": false,
       "required_trial_evidence": [
         "M12.47-supervised M12/M13 refreshed artifacts",
@@ -253,6 +256,161 @@
       "strategy_id": "M10-PA-004",
       "trial_mode": "m12_47_supervised_internal_simulated_account",
       "trial_start_status": "ready_internal_sim_trial"
+    },
+    {
+      "allowed_operations": [
+        "m12_47_supervised_refresh_review",
+        "artifact_review"
+      ],
+      "broker_blocker_reason_counts": {},
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 0,
+      "broker_dry_run_ready_count": 0,
+      "broker_readiness_status_mutation": false,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "current_bucket": "rescue_or_shadow_review",
+      "display_name": "Breakout runtime",
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation",
+        "legacy_historical_profit_planning_input"
+      ],
+      "fresh_refresh_required": true,
+      "legacy_historical_profit_planning_input": false,
+      "linked_next_refresh_family_counts": {
+        "parent_detector_evidence_wait": 1
+      },
+      "linked_next_refresh_watch_count": 1,
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
+      "m12_account_specs_mutation": false,
+      "m13_close_count": 8,
+      "m13_open_count": 10,
+      "m13_registry_mutation": false,
+      "m13_signal_count": 0,
+      "manual_m12_37_once": false,
+      "next_step_type": "complete_shadow_parameter_review",
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "post_refresh_acceptance_checks": [
+        "fresh_longbridge_quote_readonly_observed",
+        "m12_47_owned_m12_m13_refresh",
+        "m13_signal_and_account_ledgers_updated",
+        "m14_post_fresh_recompute_checklist_rerun",
+        "strategy_remains_approved_internal_sim_only",
+        "legacy_history_metric_planning_input_false",
+        "broker_live_real_order_boundaries_false",
+        "shadow_parameter_review_waits_for_fresh_evidence"
+      ],
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
+      "real_order": false,
+      "required_trial_evidence": [
+        "10 trading-day rescue A/B evidence",
+        "M12.47-supervised M12/M13 refreshed artifacts",
+        "M14 parameter shadow spec and activation gate",
+        "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+        "m12_47_fresh_refresh",
+        "manual M14 review after machine evidence is complete",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review",
+        "m12_47_supervised_fresh_refresh",
+        "post_run_m13_signal_and_account_ledgers",
+        "post_refresh_m14_recompute_checklist",
+        "legacy_history_metrics_display_only_not_planning_input"
+      ],
+      "runtime_ids": [
+        "M10-PA-002-5m"
+      ],
+      "session_action": "hold_until_launch_readiness_repaired",
+      "start_gate_passed": false,
+      "strategy_id": "M10-PA-002",
+      "trial_mode": "m12_47_supervised_internal_simulated_account",
+      "trial_start_status": "hold_internal_sim_trial"
+    },
+    {
+      "allowed_operations": [
+        "m12_47_supervised_refresh_review",
+        "artifact_review"
+      ],
+      "broker_blocker_reason_counts": {},
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 0,
+      "broker_dry_run_ready_count": 0,
+      "broker_readiness_status_mutation": false,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "current_bucket": "approved_internal_sim_continue",
+      "display_name": "PA004 momentum breakout follow-through experimental runtime",
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation",
+        "legacy_historical_profit_planning_input"
+      ],
+      "fresh_refresh_required": false,
+      "legacy_historical_profit_planning_input": false,
+      "linked_next_refresh_family_counts": {},
+      "linked_next_refresh_watch_count": 0,
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
+      "m12_account_specs_mutation": false,
+      "m13_close_count": 7,
+      "m13_open_count": 5,
+      "m13_registry_mutation": false,
+      "m13_signal_count": 5,
+      "manual_m12_37_once": false,
+      "next_step_type": "continue_risk_limited_internal_sim_refresh",
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "post_refresh_acceptance_checks": [
+        "fresh_longbridge_quote_readonly_observed",
+        "m12_47_owned_m12_m13_refresh",
+        "m13_signal_and_account_ledgers_updated",
+        "m14_post_fresh_recompute_checklist_rerun",
+        "strategy_remains_approved_internal_sim_only",
+        "legacy_history_metric_planning_input_false",
+        "broker_live_real_order_boundaries_false"
+      ],
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
+      "real_order": false,
+      "required_trial_evidence": [
+        "Manual M14 review after machine evidence is complete.",
+        "manual M14 review after machine evidence is complete",
+        "manual_m14_review",
+        "m12_47_supervised_fresh_refresh",
+        "post_run_m13_signal_and_account_ledgers",
+        "post_refresh_m14_recompute_checklist",
+        "legacy_history_metrics_display_only_not_planning_input"
+      ],
+      "runtime_ids": [
+        "M10-PA-004-MBF-1d"
+      ],
+      "session_action": "hold_until_launch_readiness_repaired",
+      "start_gate_passed": false,
+      "strategy_id": "M10-PA-004-MBF",
+      "trial_mode": "m12_47_supervised_internal_simulated_account",
+      "trial_start_status": "hold_internal_sim_trial"
     },
     {
       "allowed_operations": [
@@ -291,15 +449,15 @@
       },
       "linked_next_refresh_watch_count": 2,
       "live_execution": false,
-      "m12_account_input_connected_runtime_count": 2,
-      "m12_account_input_runtime_count": 2,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
       "m12_account_specs_mutation": false,
-      "m13_close_count": 8,
-      "m13_open_count": 8,
+      "m13_close_count": 12,
+      "m13_open_count": 15,
       "m13_registry_mutation": false,
-      "m13_signal_count": 329,
+      "m13_signal_count": 79,
       "manual_m12_37_once": false,
-      "next_step_type": "continue_next_internal_sim_refresh",
+      "next_step_type": "continue_risk_limited_internal_sim_refresh",
       "paper_trading_approval": false,
       "parameter_mutation": false,
       "post_refresh_acceptance_checks": [
@@ -313,21 +471,19 @@
         "broker_dry_run_blockers_remain_watch_only",
         "shadow_parameter_review_waits_for_fresh_evidence"
       ],
-      "post_refresh_acceptance_status": "waiting_for_m12_47_fresh_refresh",
-      "post_refresh_fresh_refresh_observed": false,
-      "post_refresh_source_quote": "fallback_quotes_only",
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
       "real_order": false,
       "required_trial_evidence": [
+        "10 trading-day rescue A/B evidence",
         "M12.47-supervised M12/M13 refreshed artifacts",
         "M14 parameter shadow spec and activation gate",
-        "M14.2 broker dry-run blocker recheck",
         "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-        "broker_dry_run_watch_recheck",
         "m12_47_fresh_refresh",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review",
-        "post-refresh M13/M14 recompute artifacts",
-        "post_refresh_m13_m14_recompute",
+        "rescue_10_day_ab_window",
         "shadow_parameter_review",
         "m12_47_supervised_fresh_refresh",
         "post_run_m13_signal_and_account_ledgers",
@@ -336,14 +492,13 @@
         "broker_dry_run_blockers_remain_watch_only"
       ],
       "runtime_ids": [
-        "M10-PA-005-1d",
         "M10-PA-005-5m"
       ],
-      "session_action": "continue_internal_sim_and_watch_broker_dry_run_blockers",
-      "start_gate_passed": true,
+      "session_action": "hold_until_launch_readiness_repaired",
+      "start_gate_passed": false,
       "strategy_id": "M10-PA-005",
       "trial_mode": "m12_47_supervised_internal_simulated_account",
-      "trial_start_status": "ready_internal_sim_trial_with_broker_watch_only"
+      "trial_start_status": "hold_internal_sim_trial"
     },
     {
       "allowed_operations": [
@@ -377,19 +532,19 @@
       "fresh_refresh_required": true,
       "legacy_historical_profit_planning_input": false,
       "linked_next_refresh_family_counts": {
-        "first_rescue_ledger_watch": 1
+        "parent_detector_evidence_wait": 1
       },
       "linked_next_refresh_watch_count": 1,
       "live_execution": false,
       "m12_account_input_connected_runtime_count": 1,
       "m12_account_input_runtime_count": 1,
       "m12_account_specs_mutation": false,
-      "m13_close_count": 0,
-      "m13_open_count": 1,
+      "m13_close_count": 1,
+      "m13_open_count": 0,
       "m13_registry_mutation": false,
-      "m13_signal_count": 1,
+      "m13_signal_count": 0,
       "manual_m12_37_once": false,
-      "next_step_type": "continue_next_internal_sim_refresh",
+      "next_step_type": "continue_risk_limited_internal_sim_refresh",
       "paper_trading_approval": false,
       "parameter_mutation": false,
       "post_refresh_acceptance_checks": [
@@ -401,26 +556,21 @@
         "legacy_history_metric_planning_input_false",
         "broker_live_real_order_boundaries_false",
         "broker_dry_run_blockers_remain_watch_only",
-        "first_rescue_specific_m13_ledger_watch",
         "shadow_parameter_review_waits_for_fresh_evidence"
       ],
-      "post_refresh_acceptance_status": "waiting_for_m12_47_fresh_refresh",
-      "post_refresh_fresh_refresh_observed": false,
-      "post_refresh_source_quote": "fallback_quotes_only",
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
       "real_order": false,
       "required_trial_evidence": [
+        "10 trading-day rescue A/B evidence",
         "M12.47-supervised M12/M13 refreshed artifacts",
         "M14 parameter shadow spec and activation gate",
-        "M14.2 broker dry-run blocker recheck",
         "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-        "broker_dry_run_watch_recheck",
-        "first_m13_rescue_ledger",
         "m12_47_fresh_refresh",
         "manual M14 review after machine evidence is complete",
         "manual_m14_review",
-        "post-refresh M13/M14 recompute artifacts",
-        "post_refresh_m13_m14_recompute",
-        "rescue-specific M13 signal/account ledger row",
+        "rescue_10_day_ab_window",
         "shadow_parameter_review",
         "m12_47_supervised_fresh_refresh",
         "post_run_m13_signal_and_account_ledgers",
@@ -431,11 +581,173 @@
       "runtime_ids": [
         "M10-PA-008-1d"
       ],
-      "session_action": "continue_internal_sim_and_watch_broker_dry_run_blockers",
-      "start_gate_passed": true,
+      "session_action": "hold_until_launch_readiness_repaired",
+      "start_gate_passed": false,
       "strategy_id": "M10-PA-008",
       "trial_mode": "m12_47_supervised_internal_simulated_account",
-      "trial_start_status": "ready_internal_sim_trial_with_broker_watch_only"
+      "trial_start_status": "hold_internal_sim_trial"
+    },
+    {
+      "allowed_operations": [
+        "m12_47_supervised_refresh_review",
+        "artifact_review"
+      ],
+      "broker_blocker_reason_counts": {},
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 0,
+      "broker_dry_run_ready_count": 0,
+      "broker_readiness_status_mutation": false,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "current_bucket": "approved_internal_sim_continue",
+      "display_name": "Opening range breakout runtime",
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation",
+        "legacy_historical_profit_planning_input"
+      ],
+      "fresh_refresh_required": true,
+      "legacy_historical_profit_planning_input": false,
+      "linked_next_refresh_family_counts": {
+        "target_stop_shadow_compare": 1
+      },
+      "linked_next_refresh_watch_count": 1,
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
+      "m12_account_specs_mutation": false,
+      "m13_close_count": 0,
+      "m13_open_count": 0,
+      "m13_registry_mutation": false,
+      "m13_signal_count": 0,
+      "manual_m12_37_once": false,
+      "next_step_type": "continue_risk_limited_internal_sim_refresh",
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "post_refresh_acceptance_checks": [
+        "fresh_longbridge_quote_readonly_observed",
+        "m12_47_owned_m12_m13_refresh",
+        "m13_signal_and_account_ledgers_updated",
+        "m14_post_fresh_recompute_checklist_rerun",
+        "strategy_remains_approved_internal_sim_only",
+        "legacy_history_metric_planning_input_false",
+        "broker_live_real_order_boundaries_false",
+        "shadow_parameter_review_waits_for_fresh_evidence"
+      ],
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
+      "real_order": false,
+      "required_trial_evidence": [
+        "10 trading-day rescue A/B evidence",
+        "M12.47-supervised M12/M13 refreshed artifacts",
+        "M14 parameter shadow spec and activation gate",
+        "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+        "m12_47_fresh_refresh",
+        "manual M14 review after machine evidence is complete",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review",
+        "m12_47_supervised_fresh_refresh",
+        "post_run_m13_signal_and_account_ledgers",
+        "post_refresh_m14_recompute_checklist",
+        "legacy_history_metrics_display_only_not_planning_input"
+      ],
+      "runtime_ids": [
+        "M10-PA-012-5m"
+      ],
+      "session_action": "hold_until_launch_readiness_repaired",
+      "start_gate_passed": false,
+      "strategy_id": "M10-PA-012",
+      "trial_mode": "m12_47_supervised_internal_simulated_account",
+      "trial_start_status": "hold_internal_sim_trial"
+    },
+    {
+      "allowed_operations": [
+        "m12_47_supervised_refresh_review",
+        "artifact_review"
+      ],
+      "broker_blocker_reason_counts": {},
+      "broker_connection": false,
+      "broker_dry_run_blocked_count": 0,
+      "broker_dry_run_ready_count": 0,
+      "broker_readiness_status_mutation": false,
+      "can_start_broker_paper": false,
+      "completed_trading_days": 10,
+      "current_bucket": "approved_internal_sim_continue",
+      "display_name": "Visual strategy 013 experimental runtime",
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation",
+        "legacy_historical_profit_planning_input"
+      ],
+      "fresh_refresh_required": true,
+      "legacy_historical_profit_planning_input": false,
+      "linked_next_refresh_family_counts": {},
+      "linked_next_refresh_watch_count": 0,
+      "live_execution": false,
+      "m12_account_input_connected_runtime_count": 1,
+      "m12_account_input_runtime_count": 1,
+      "m12_account_specs_mutation": false,
+      "m13_close_count": 5,
+      "m13_open_count": 8,
+      "m13_registry_mutation": false,
+      "m13_signal_count": 22,
+      "manual_m12_37_once": false,
+      "next_step_type": "continue_risk_limited_internal_sim_refresh",
+      "paper_trading_approval": false,
+      "parameter_mutation": false,
+      "post_refresh_acceptance_checks": [
+        "fresh_longbridge_quote_readonly_observed",
+        "m12_47_owned_m12_m13_refresh",
+        "m13_signal_and_account_ledgers_updated",
+        "m14_post_fresh_recompute_checklist_rerun",
+        "strategy_remains_approved_internal_sim_only",
+        "legacy_history_metric_planning_input_false",
+        "broker_live_real_order_boundaries_false",
+        "shadow_parameter_review_waits_for_fresh_evidence"
+      ],
+      "post_refresh_acceptance_status": "ready_for_post_refresh_review",
+      "post_refresh_fresh_refresh_observed": true,
+      "post_refresh_source_quote": "longbridge_quote_readonly",
+      "real_order": false,
+      "required_trial_evidence": [
+        "10 trading-day rescue A/B evidence",
+        "M12.47-supervised M12/M13 refreshed artifacts",
+        "M14 parameter shadow spec and activation gate",
+        "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+        "m12_47_fresh_refresh",
+        "manual M14 review after machine evidence is complete",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review",
+        "m12_47_supervised_fresh_refresh",
+        "post_run_m13_signal_and_account_ledgers",
+        "post_refresh_m14_recompute_checklist",
+        "legacy_history_metrics_display_only_not_planning_input"
+      ],
+      "runtime_ids": [
+        "M10-PA-013-5m"
+      ],
+      "session_action": "hold_until_launch_readiness_repaired",
+      "start_gate_passed": false,
+      "strategy_id": "M10-PA-013",
+      "trial_mode": "m12_47_supervised_internal_simulated_account",
+      "trial_start_status": "hold_internal_sim_trial"
     }
   ]
 }

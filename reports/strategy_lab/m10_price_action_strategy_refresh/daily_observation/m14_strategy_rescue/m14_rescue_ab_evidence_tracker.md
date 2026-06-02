@@ -1,9 +1,9 @@
 # M14 Rescue A/B Evidence Tracker
 
-- Generated at: `2026-05-26T22:10:00Z`
-- Rescue strategies with M13 ledger evidence: `9/11`
+- Generated at: `2026-06-01T17:29:00Z`
+- Rescue strategies with M13 ledger evidence: `11/11`
 - Ready for manual review after min days: `0`
-- No M13 rescue ledger evidence yet: `2`
+- No M13 rescue ledger evidence yet: `0`
 - Promotion allowed count: `0`
 - Boundary: internal simulated only; no broker connection, no real orders, no live execution.
 - Policy: parent strategy evidence does not count for the rescue variant; every rescue variant needs its own 10 trading-day ledger.
@@ -16,7 +16,7 @@
 - Runtime ids: `M10-PA-001-m14-modify-20260522-1d`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
+- Signal / open / close / risk-blocked: `1 / 0 / 0 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-002-m14-modify-20260522
@@ -34,7 +34,7 @@
 - Runtime ids: `M10-PA-004-MBF-QC-m14-modify-20260522-1d`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
+- Signal / open / close / risk-blocked: `2 / 2 / 2 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-007-m14-modify-20260522
@@ -43,17 +43,17 @@
 - Runtime ids: `M10-PA-007-m14-modify-20260522-1d`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
+- Signal / open / close / risk-blocked: `1 / 1 / 0 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-008-broker-risk-cap-shadow
 
 - Parent: `M10-PA-008`
 - Runtime ids: `M10-PA-008-broker-risk-cap-shadow-1d`
-- Evidence status: `no_m13_rescue_ledger_evidence_yet`
-- Observed trading days: `0/10`
+- Evidence status: `collecting_ab_evidence`
+- Observed trading days: `1/10`
 - Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
-- Promotion blocked reason: `no_m13_rescue_ledger_rows_yet`
+- Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-009-m14-modify-20260522
 
@@ -70,7 +70,7 @@
 - Runtime ids: `M10-PA-011-ORB-R1-5m`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `18 / 2 / 0 / 0`
+- Signal / open / close / risk-blocked: `3 / 4 / 2 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-012-m14-modify-20260522
@@ -86,10 +86,10 @@
 
 - Parent: `M10-PA-012`
 - Runtime ids: `M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m`
-- Evidence status: `no_m13_rescue_ledger_evidence_yet`
-- Observed trading days: `0/10`
-- Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
-- Promotion blocked reason: `no_m13_rescue_ledger_rows_yet`
+- Evidence status: `collecting_ab_evidence`
+- Observed trading days: `1/10`
+- Signal / open / close / risk-blocked: `15 / 2 / 2 / 0`
+- Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M10-PA-013-m14-modify-20260522
 
@@ -97,7 +97,7 @@
 - Runtime ids: `M10-PA-013-m14-modify-20260522-1d, M10-PA-013-m14-modify-20260522-5m`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
+- Signal / open / close / risk-blocked: `3 / 3 / 3 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ### M12-FTD-001-m14-modify-20260522
@@ -106,9 +106,9 @@
 - Runtime ids: `M12-FTD-001-m14-modify-20260522-1d`
 - Evidence status: `collecting_ab_evidence`
 - Observed trading days: `1/10`
-- Signal / open / close / risk-blocked: `0 / 0 / 0 / 0`
+- Signal / open / close / risk-blocked: `2 / 0 / 0 / 0`
 - Promotion blocked reason: `needs_10_trading_days_ab_evidence`
 
 ## Summary
 
-Rescue A/B evidence is observed for 9/11 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 2 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.
+Rescue A/B evidence is observed for 11/11 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 0 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.

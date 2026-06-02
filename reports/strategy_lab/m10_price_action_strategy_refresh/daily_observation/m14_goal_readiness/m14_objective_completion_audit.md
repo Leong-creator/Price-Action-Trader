@@ -1,15 +1,15 @@
 # M14 Objective Completion Audit
 
-- Generated at: `2026-05-26T20:09:49Z`
+- Generated at: `2026-06-01T17:29:01Z`
 - Objective complete: `False`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Challenge: `10/10`
-- Approved internal sim strategies: `M10-PA-004, M10-PA-005, M10-PA-008`
-- Rescue evidence observed: `9/11`
+- Approved internal sim strategies: `M10-PA-002, M10-PA-004, M10-PA-004-MBF, M10-PA-005, M10-PA-008, M10-PA-012, M10-PA-013`
+- Rescue evidence observed: `11/11`
 - Rescue promotions allowed: `0`
 - Parameter shadow specs/variants: `14/14`
-- Strategy ladder rescue/final discard: `10/0`
-- Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `20/12/2/10/11`
+- Strategy ladder rescue/final discard: `0/0`
+- Strategy evidence gaps open/fresh/first-ledger/10-day/shadow: `25/17/0/15/16`
 - Source recheck rows/future-reextract: `7/2`
 - Source reextract plan rows/future/tasks/questions: `7/2/16/16`
 - Source reextract review packets/atoms/answers/draftable/visual-required: `2/10/6/2/2`
@@ -22,15 +22,15 @@
 - Source visual confirmation response create/mutation/invalid allowed: `0/0/0`
 - Future source-reextract spec prep rows/drafts/unblocked/visual-blocked/pending-confirmations: `2/2/0/2/16`
 - Future source-reextract spec prep create/close/promote/discard/mutation/legacy-history inputs: `0/0/0/0/0/0`
-- Fresh refresh observed: `False`
-- Post-refresh waiting rows: `13`
-- Parameter activation candidates: `0`
+- Fresh refresh observed: `True`
+- Post-refresh waiting rows: `0`
+- Parameter activation candidates: `4`
 - Requirement states: `{'blocked': 3, 'guardrail': 3, 'in_progress': 3, 'proven': 4}`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
 
 ## Plain Result
 
-Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-004, M10-PA-005, M10-PA-008. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 10 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates; the source reextract plan now carries 7 rows, 2 future candidates, and 16 source-review tasks; the source reextract review now carries 2 packets, 10 source-backed atoms, and 2 draftable future specs after visual alignment; the visual alignment gate has 2 rows, 10 visual cases, and 2 rows ready for manual visual alignment, but 2 still require manual visual confirmation; the visual confirmation packet now has 2 rows, 6 confirmation questions, 10 case rows, and 0 confirmations recorded; the response gate has 2 rows, 6 pending question responses, 10 pending case responses, and 0 future specs unblocked; its manual review pack is ready=True with 10/10 local case assets present; future source-reextract spec prep has 2 rows, 2 conditional drafts, 0 unblocked, 2 visual-blocked, and legacy-history planning inputs=0. Evidence gap matrix still has 20 open rows, including 12 fresh-refresh waits, 2 first-ledger gaps, and 10 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is False with 13 waiting rows, and parameter activation has 0 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.
+Objective audit is not complete yet. Proven: project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold, the 10-day challenge is 10/10, and approved internal simulated-account strategies can continue: M10-PA-002, M10-PA-004, M10-PA-004-MBF, M10-PA-005, M10-PA-008, M10-PA-012, M10-PA-013. In progress: 11 rescue runtimes, 14 parameter experiment rows, 14 parameter shadow variants, and 0 rescue-continuation ladder rows. Source recheck triage tracks 7 artifact-only rows, including 2 future source-reextract candidates; the source reextract plan now carries 7 rows, 2 future candidates, and 16 source-review tasks; the source reextract review now carries 2 packets, 10 source-backed atoms, and 2 draftable future specs after visual alignment; the visual alignment gate has 2 rows, 10 visual cases, and 2 rows ready for manual visual alignment, but 2 still require manual visual confirmation; the visual confirmation packet now has 2 rows, 6 confirmation questions, 10 case rows, and 0 confirmations recorded; the response gate has 2 rows, 6 pending question responses, 10 pending case responses, and 0 future specs unblocked; its manual review pack is ready=True with 10/10 local case assets present; future source-reextract spec prep has 2 rows, 2 conditional drafts, 0 unblocked, 2 visual-blocked, and legacy-history planning inputs=0. Evidence gap matrix still has 25 open rows, including 17 fresh-refresh waits, 0 first-ledger gaps, and 15 rescue 10-day A/B gaps. Blocked: rescue promotion remains 0, fresh refresh observed is True with 0 waiting rows, and parameter activation has 4 shadow-review candidates. Final-discard allowed is 0. Broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, and manual M12.37 once-mode remain disabled.
 
 ## Requirements
 
@@ -50,9 +50,9 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 
 ### approved_strategies_can_continue_internal_sim
 
-- State: `proven`
-- Evidence: 3 approved strategies (M10-PA-004, M10-PA-005, M10-PA-008) and 4/4 approved runtimes connected.
-- Blocker: None
+- State: `blocked`
+- Evidence: 7 approved strategies (M10-PA-002, M10-PA-004, M10-PA-004-MBF, M10-PA-005, M10-PA-008, M10-PA-012, M10-PA-013) and 7/7 approved runtimes connected.
+- Blocker: Next internal sim session is not ready.
 - Next action: Run only through the M12.47-supervised internal simulated-account flow.
 
 ### real_simulated_account_test_not_broker_live
@@ -65,21 +65,21 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 ### weak_strategies_rescue_not_discarded
 
 - State: `in_progress`
-- Evidence: 11 rescue runtimes exist; 9 have M13 ledger evidence; decision ladder keeps 10 strategies in rescue/continuation and final-discard allowed remains 0; evidence gap matrix has 20 open rows, 10 rescue 10-day A/B gaps, and 2 first-ledger gaps.
+- Evidence: 11 rescue runtimes exist; 11 have M13 ledger evidence; decision ladder keeps 0 strategies in rescue/continuation and final-discard allowed remains 0; evidence gap matrix has 25 open rows, 15 rescue 10-day A/B gaps, and 0 first-ledger gaps.
 - Blocker: None
 - Next action: Continue rescue A/B collection, zero-signal diagnostics, and detector rebuild work before discarding.
 
 ### rescue_evidence_sufficient_for_promotion
 
 - State: `blocked`
-- Evidence: Promotion allowed: 0; manual-review ready: 0; no-ledger rows: 2.
+- Evidence: Promotion allowed: 0; manual-review ready: 0; no-ledger rows: 0.
 - Blocker: Rescue runtimes still need their own 10 trading-day A/B evidence.
 - Next action: Wait for rescue-specific M13 ledgers and complete the 10-day rescue A/B window.
 
 ### parameter_optimization_path_ready
 
 - State: `in_progress`
-- Evidence: Parameter queue has 14 rows; shadow specs cover 14 rows and 14 candidate variants; allowed-now changes 0; activation shadow-review candidates 0; evidence gap matrix shows 11 shadow-review gaps; parameter mutations allowed 0.
+- Evidence: Parameter queue has 14 rows; shadow specs cover 14 rows and 14 candidate variants; allowed-now changes 0; activation shadow-review candidates 4; evidence gap matrix shows 16 shadow-review gaps; parameter mutations allowed 0.
 - Blocker: None
 - Next action: Use queued shadow review families only after fresh evidence appears.
 
@@ -92,8 +92,8 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 
 ### fresh_refresh_required_before_parameter_activation
 
-- State: `blocked`
-- Evidence: fresh_refresh_observed=False; waiting rows=13; quote_source=fallback_quotes_only.
+- State: `proven`
+- Evidence: fresh_refresh_observed=True; waiting rows=0; quote_source=longbridge_quote_readonly.
 - Blocker: Current evidence still waits for a fresh supervisor-owned refresh.
 - Next action: Wait for the next M12.47-owned trading-window refresh; do not run M12.37 once-mode manually.
 
@@ -121,6 +121,6 @@ Objective audit is not complete yet. Proven: project is at M14 stable strategy t
 ### objective_complete
 
 - State: `blocked`
-- Evidence: Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, and parameter activation are not complete; strategy ladder still allows 0 final discards and 0 promotion candidates; evidence gap matrix still has 20 open rows.
+- Evidence: Stage and approved internal simulation are ready, but rescue promotion, fresh-refresh review, and parameter activation are not complete; strategy ladder still allows 0 final discards and 0 promotion candidates; evidence gap matrix still has 25 open rows.
 - Blocker: Objective is not complete while rescue promotion is 0, fresh refresh is absent, parameter activation candidates are 0, and evidence gaps remain open.
 - Next action: Continue internal simulation and rescue evidence collection under read-only/simulated guardrails.

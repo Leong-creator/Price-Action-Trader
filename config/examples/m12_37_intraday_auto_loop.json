@@ -21,7 +21,7 @@
     "enabled": true,
     "m13_config_path": "config/examples/m13_daily_strategy_test_runner.json",
     "m14_config_path": "config/examples/m14_strategy_challenge_gate.json",
-    "m14_finalize_policy": "postmarket_only"
+    "m14_finalize_policy": "postmarket_or_runtime_ready"
   },
   "boundary": {
     "paper_simulated_only": true,

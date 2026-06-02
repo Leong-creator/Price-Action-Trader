@@ -1,0 +1,72 @@
+{
+  "schema_version": "m15.all-strategy-order-preview.config.v1",
+  "stage": "M15.all_strategy_order_preview",
+  "title": "全策略长桥模拟账户订单预演",
+  "inputs": {
+    "m12_32_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+    "m12_46_account_runtime_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_runtime_state.json",
+    "m12_46_account_trade_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_trade_ledger.jsonl",
+    "m13_account_operation_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m13_real_daily_strategy_testing/m13_account_operation_ledger.jsonl",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_all_strategy_order_preview"
+  },
+  "longbridge_paper_preview": {
+    "token_mode": "paper",
+    "live_token_allowed": false,
+    "broker_connection_enabled": false,
+    "submit_orders": false,
+    "paper_trading_approval": false,
+    "default_order_type": "limit",
+    "allowed_order_types": [
+      "limit",
+      "trigger_limit"
+    ],
+    "breakout_order_type": "trigger_limit",
+    "regular_hours_only": true,
+    "max_orders_per_day": 5,
+    "max_risk_per_order": "12",
+    "quantity_policy": "integer_floor_no_fractional",
+    "paper_account_model": {
+      "equity": "6000",
+      "max_total_exposure": "3600",
+      "min_cash_reserve": "2400",
+      "max_symbol_exposure": "600",
+      "allow_fractional_shares": false,
+      "allow_short_selling": false,
+      "allow_options": false
+    },
+    "risk_tiers": {
+      "primary": {
+        "max_strategy_exposure": "900",
+        "max_risk_per_order": "12"
+      },
+      "standard": {
+        "max_strategy_exposure": "600",
+        "max_risk_per_order": "8"
+      },
+      "risk_limited": {
+        "max_strategy_exposure": "450",
+        "max_risk_per_order": "6"
+      },
+      "repair": {
+        "max_strategy_exposure": "0",
+        "max_risk_per_order": "0"
+      }
+    },
+    "primary_runtime_ids": [
+      "M10-PA-004-long-1d"
+    ]
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "local_record_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "paper_trading_approval": false,
+    "credential_read": false,
+    "manual_m12_37_once": false
+  }
+}

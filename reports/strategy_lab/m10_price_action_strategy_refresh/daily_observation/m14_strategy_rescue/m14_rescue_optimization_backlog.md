@@ -1,10 +1,10 @@
 # M14 Rescue Optimization Backlog
 
-- Generated at: `2026-05-26T22:10:00Z`
+- Generated at: `2026-06-01T17:29:00Z`
 - Rescue rows: `11`
-- Actionable before 10-day A/B completion: `10`
-- Zero-signal connected variants: `8`
-- Signal without account operation variants: `0`
+- Actionable before 10-day A/B completion: `6`
+- Zero-signal connected variants: `4`
+- Signal without account operation variants: `2`
 - Broker dry-run blockers: `3`
 - Boundary: internal simulated only; no broker connection, no real orders, no live execution.
 
@@ -13,34 +13,14 @@
 ### M10-PA-001-m14-modify-20260522
 
 - Priority: `P0`
-- Issue: `zero_signal_after_connection`
+- Issue: `signal_generated_no_account_operation`
 - Work state: `actionable_before_10d`
 - Evidence days: `1/10`
-- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `detector_threshold_source_mapping_timeframe`
-- Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
+- Signal/source/open/close/risk-blocked: `1 / 1 / 0 / 0 / 0`
+- Optimization family: `ledger_bridge_trading_date_noop_reason`
+- Action: Audit signal-to-account bridge, trading-date normalization, and no-op reason attribution; do not treat signals as execution evidence until account operations are explicit.
 
 ### M10-PA-002-m14-modify-20260522
-
-- Priority: `P0`
-- Issue: `zero_signal_after_connection`
-- Work state: `actionable_before_10d`
-- Evidence days: `1/10`
-- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `detector_threshold_source_mapping_timeframe`
-- Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
-
-### M10-PA-004-MBF-QC-m14-modify-20260522
-
-- Priority: `P0`
-- Issue: `zero_signal_after_connection`
-- Work state: `actionable_before_10d`
-- Evidence days: `1/10`
-- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `detector_threshold_source_mapping_timeframe`
-- Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
-
-### M10-PA-007-m14-modify-20260522
 
 - Priority: `P0`
 - Issue: `zero_signal_after_connection`
@@ -53,12 +33,12 @@
 ### M10-PA-008-broker-risk-cap-shadow
 
 - Priority: `P0`
-- Issue: `missing_rescue_ledger`
+- Issue: `zero_signal_after_connection`
 - Work state: `actionable_before_10d`
-- Evidence days: `0/10`
+- Evidence days: `1/10`
 - Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `ab_evidence_collection`
-- Action: Let the next M12.47-owned refresh generate the first M13 rescue ledger row; if it is still absent after that run, audit the ledger path.
+- Optimization family: `detector_threshold_source_mapping_timeframe`
+- Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
 
 ### M10-PA-009-m14-modify-20260522
 
@@ -80,35 +60,35 @@
 - Optimization family: `detector_threshold_source_mapping_timeframe`
 - Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
 
-### M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow
-
-- Priority: `P0`
-- Issue: `missing_rescue_ledger`
-- Work state: `actionable_before_10d`
-- Evidence days: `0/10`
-- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `volatility_filter_risk_sizing_trailing_exit`
-- Action: Let the next M12.47-owned refresh generate the first M13 rescue ledger row; if it is still absent after that run, audit the ledger path.
-
-### M10-PA-013-m14-modify-20260522
-
-- Priority: `P0`
-- Issue: `zero_signal_after_connection`
-- Work state: `actionable_before_10d`
-- Evidence days: `1/10`
-- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `detector_threshold_source_mapping_timeframe`
-- Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
-
 ### M12-FTD-001-m14-modify-20260522
 
 - Priority: `P0`
-- Issue: `zero_signal_after_connection`
+- Issue: `signal_generated_no_account_operation`
 - Work state: `actionable_before_10d`
 - Evidence days: `1/10`
-- Signal/source/open/close/risk-blocked: `0 / 0 / 0 / 0 / 0`
-- Optimization family: `detector_threshold_source_mapping_timeframe`
-- Action: Audit detector thresholds, source-row mapping, universe coverage, and timeframe routing; test one relax/quality parameter family in shadow before changing risk.
+- Signal/source/open/close/risk-blocked: `2 / 2 / 0 / 0 / 0`
+- Optimization family: `ledger_bridge_trading_date_noop_reason`
+- Action: Audit signal-to-account bridge, trading-date normalization, and no-op reason attribution; do not treat signals as execution evidence until account operations are explicit.
+
+### M10-PA-004-MBF-QC-m14-modify-20260522
+
+- Priority: `P2`
+- Issue: `collect_more_ab_evidence`
+- Work state: `wait_for_more_ab_evidence`
+- Evidence days: `1/10`
+- Signal/source/open/close/risk-blocked: `2 / 2 / 2 / 2 / 0`
+- Optimization family: `trend_context_news_veto_entry_confirmation`
+- Action: Continue collecting rescue A/B ledger days without changing the frozen variant.
+
+### M10-PA-007-m14-modify-20260522
+
+- Priority: `P2`
+- Issue: `collect_more_ab_evidence`
+- Work state: `wait_for_more_ab_evidence`
+- Evidence days: `1/10`
+- Signal/source/open/close/risk-blocked: `1 / 1 / 1 / 0 / 0`
+- Optimization family: `trend_context_news_veto_entry_confirmation`
+- Action: Continue collecting rescue A/B ledger days without changing the frozen variant.
 
 ### M10-PA-011-ORB-R1
 
@@ -116,8 +96,28 @@
 - Issue: `collect_more_ab_evidence`
 - Work state: `wait_for_more_ab_evidence`
 - Evidence days: `1/10`
-- Signal/source/open/close/risk-blocked: `18 / 18 / 2 / 0 / 0`
+- Signal/source/open/close/risk-blocked: `3 / 3 / 4 / 2 / 0`
 - Optimization family: `detector_contract_rebuild`
+- Action: Continue collecting rescue A/B ledger days without changing the frozen variant.
+
+### M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow
+
+- Priority: `P2`
+- Issue: `collect_more_ab_evidence`
+- Work state: `wait_for_more_ab_evidence`
+- Evidence days: `1/10`
+- Signal/source/open/close/risk-blocked: `15 / 15 / 2 / 2 / 0`
+- Optimization family: `volatility_filter_risk_sizing_trailing_exit`
+- Action: Continue collecting rescue A/B ledger days without changing the frozen variant.
+
+### M10-PA-013-m14-modify-20260522
+
+- Priority: `P2`
+- Issue: `collect_more_ab_evidence`
+- Work state: `wait_for_more_ab_evidence`
+- Evidence days: `1/10`
+- Signal/source/open/close/risk-blocked: `3 / 3 / 3 / 3 / 0`
+- Optimization family: `volatility_filter_risk_sizing_trailing_exit`
 - Action: Continue collecting rescue A/B ledger days without changing the frozen variant.
 
 ## Broker Dry-run Blockers
@@ -127,4 +127,4 @@
 
 ## Summary
 
-Rescue optimization backlog has 11 rescue rows; 10 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.
+Rescue optimization backlog has 11 rescue rows; 6 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 4; signal-without-account-operation variants: 2. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.

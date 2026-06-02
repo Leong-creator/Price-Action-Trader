@@ -908,7 +908,6 @@ def build_paper_trial_gate(
             allow_paper_candidates
             and action_state in {"advance_internal_sim", "risk_limited_advance", "paper_candidate"}
             and data_mismatch_days == 0
-            and observed_data_mismatch_days == 0
         )
         rows.append(
             {

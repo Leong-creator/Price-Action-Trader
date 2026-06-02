@@ -1,0 +1,70 @@
+{
+  "build_elapsed_ms": 32,
+  "confluence_summary": {
+    "confluence_group_count": 3,
+    "confluence_support_row_count": 3,
+    "max_confluence_multiplier": "1.5"
+  },
+  "current_day_blockers": [],
+  "current_day_strategy_confirmation_status": "confirmed",
+  "current_market_date": "2026-06-02",
+  "fallback_or_no_fetch_data": false,
+  "fast_path_no_m13_wait": true,
+  "fast_queue_status": "stale_snapshot_waiting_for_current_refresh",
+  "generated_at": "2026-06-02T10:06:42Z",
+  "hard_boundaries": {
+    "broker_connection": false,
+    "live_execution": false,
+    "local_sim_position_migration": false,
+    "m13_wait_before_submit": false,
+    "manual_m12_37_once": false,
+    "paper_simulated_only": true,
+    "real_order": false
+  },
+  "input_refs": {
+    "m12_32_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+    "m12_46_account_trade_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_trade_ledger.jsonl",
+    "m12_48_extended_session_monitor": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_48_extended_session_monitor.json",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json"
+  },
+  "m14_trading_date": "2026-06-01",
+  "output_refs": {
+    "fast_signal_queue_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_fast_signal_queue/m15_longbridge_fast_signal_queue_ledger.jsonl",
+    "markdown_report": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_fast_signal_queue/m15_longbridge_fast_signal_queue.md",
+    "summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_fast_signal_queue/m15_longbridge_fast_signal_queue.json"
+  },
+  "plain_language_result": "快速通道发现 152 条当天新开仓信号，其中 0 条通过快速队列风控。 但这是旧快照，等待今日刷新：stale_snapshot_submit_blocked。",
+  "preview_status": "stale_snapshot_waiting_for_current_refresh",
+  "quote_source": "longbridge_quote_readonly",
+  "quote_source_blockers": [],
+  "scan_date": "2026-06-01",
+  "schema_version": "m15.longbridge-fast-signal-queue.v1",
+  "snapshot_freshness_status": "stale_snapshot",
+  "source_mode": "fast_signal_queue",
+  "stage": "M15.longbridge_fast_signal_queue",
+  "stale_snapshot_blockers": [
+    "stale_snapshot_submit_blocked"
+  ],
+  "summary": {
+    "action_state_counts": {
+      "advance_internal_sim": 2,
+      "repair_now": 96,
+      "risk_limited_advance": 54
+    },
+    "auxiliary_module_count": 7,
+    "blocked_signal_count": 152,
+    "confluence_primary_count": 3,
+    "confluence_support_count": 3,
+    "new_open_signal_count": 152,
+    "premarket_blocked_count": 0,
+    "premarket_wait_confirmation_count": 0,
+    "ready_after_user_approval_count": 0,
+    "ready_after_user_approval_notional": "0.00",
+    "repair_signal_count": 96,
+    "stale_snapshot_blocked_count": 152,
+    "status_counts": {
+      "stale_snapshot_submit_blocked": 152
+    }
+  },
+  "title": "长桥模拟账户快速新信号队列"
+}

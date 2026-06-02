@@ -6,31 +6,34 @@
   "cli_name": "longbridge",
   "market": "US",
   "default_order_type": "limit",
+  "allowed_order_types": [
+    "limit",
+    "trigger_limit"
+  ],
+  "breakout_order_type": "trigger_limit",
   "regular_hours_only": true,
   "safety_controls": {
     "token_mode": "paper",
     "live_token_allowed": false,
     "kill_switch_enabled": true,
-    "max_orders_per_day": 1,
-    "max_risk_per_order": "100",
-    "max_total_exposure": "25000"
+    "max_orders_per_day": 5,
+    "max_risk_per_order": "12",
+    "max_total_exposure": "3600",
+    "paper_account_equity": "6000",
+    "min_cash_reserve": "2400",
+    "max_symbol_exposure": "600",
+    "allow_fractional_shares": false,
+    "allow_short_selling": false,
+    "allow_options": false
+  },
+  "candidate_policy": {
+    "include_all_non_repair_paper_candidates": true,
+    "first_order_single_strategy_only": false
   },
   "whitelists": {
-    "approved_strategy_whitelist": [
-      "M10-PA-004",
-      "M10-PA-005",
-      "M10-PA-008"
-    ],
-    "first_paper_order_strategy_whitelist": [
-      "M10-PA-004"
-    ],
-    "runtime_whitelist": [
-      "M10-PA-004-long-1d",
-      "M10-PA-005-1d",
-      "M10-PA-005-5m",
-      "M10-PA-008-1d",
-      "M10-PA-008-broker-risk-cap-shadow-1d"
-    ],
+    "approved_strategy_whitelist": [],
+    "first_paper_order_strategy_whitelist": [],
+    "runtime_whitelist": [],
     "symbol_whitelist": []
   }
 }

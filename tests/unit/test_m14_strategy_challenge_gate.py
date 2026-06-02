@@ -371,6 +371,60 @@ class M14StrategyChallengeGateTest(unittest.TestCase):
             self.assertEqual(decision["position_size_multiplier"], "0.25")
             self.assertTrue(decision["paper_candidate"])
 
+    def test_audit_only_degraded_days_do_not_block_current_paper_candidate(self):
+        temp, config, _, _, _ = self.build_dirs()
+        with temp:
+            rows = []
+            for idx, day in enumerate(
+                [
+                    "2026-05-04",
+                    "2026-05-05",
+                    "2026-05-06",
+                    "2026-05-07",
+                    "2026-05-08",
+                    "2026-05-11",
+                    "2026-05-12",
+                    "2026-05-13",
+                    "2026-05-14",
+                    "2026-05-15",
+                ]
+            ):
+                row = self.base_challenge_row(day, realized_pnl="20.00")
+                row["strategy_id"] = "M10-PA-004"
+                row["runtime_id"] = "M10-PA-004-long-1d"
+                row["timeframe"] = "1d"
+                row["realized_pnl"] = "20.00" if idx < 10 else "0.00"
+                rows.append(row)
+            degraded = self.base_challenge_row("2026-05-18", realized_pnl="0.00")
+            degraded["strategy_id"] = "M10-PA-004"
+            degraded["runtime_id"] = "M10-PA-004-long-1d"
+            degraded["timeframe"] = "1d"
+            degraded["data_quality_state"] = "fallback_quotes_only"
+            degraded["data_freshness_warning"] = "audit-only degraded quote day"
+            rows.append(degraded)
+
+            aggregates = build_strategy_aggregates(config, rows)
+            decisions = build_strategy_decision_rows(
+                config=config,
+                generated_at="2026-05-19T17:00:00Z",
+                trading_date=date.fromisoformat("2026-05-19"),
+                aggregates=aggregates,
+            )
+            decision = decisions[0]
+            self.assertEqual(decision["completed_trading_days"], 10)
+            self.assertEqual(decision["data_mismatch_days"], 0)
+            self.assertEqual(decision["observed_data_mismatch_days"], 1)
+            paper_gate = build_paper_trial_gate(
+                config,
+                "2026-05-19T17:00:00Z",
+                {decision["runtime_id"]: decision},
+                aggregates,
+            )
+            gate = paper_gate["rows"][0]
+            self.assertEqual(gate["runtime_id"], "M10-PA-004-long-1d")
+            self.assertEqual(gate["action_state"], "advance_internal_sim")
+            self.assertTrue(gate["paper_candidate"])
+
     def test_same_parent_1d_and_5m_are_independent_runtime_gate_rows(self):
         temp, config, _, _, _ = self.build_dirs()
         with temp:

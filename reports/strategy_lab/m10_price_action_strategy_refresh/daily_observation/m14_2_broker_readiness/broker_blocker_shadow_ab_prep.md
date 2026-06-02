@@ -1,6 +1,6 @@
 # M14.2 Broker Blocker Shadow A/B Prep
 
-- Generated at: `2026-05-26T21:35:00Z`
+- Generated at: `2026-06-01T17:29:00Z`
 - Source shadow repair rows: `3`
 - Runtime-registration candidates: `1`
 - Rule-only shadow candidates: `2`

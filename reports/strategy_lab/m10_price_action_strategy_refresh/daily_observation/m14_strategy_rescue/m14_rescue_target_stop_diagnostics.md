@@ -1,6 +1,6 @@
 # M14 Rescue Target/Stop Diagnostics
 
-- Generated at: `2026-05-26T22:10:00Z`
+- Generated at: `2026-06-01T17:29:00Z`
 - Diagnosed rescue runtimes: `1`
 - Target/stop issue runtimes: `1`
 - Shadow-candidate runtimes: `0`
@@ -17,13 +17,13 @@ Target/stop diagnostics reviewed 1 rescue runtimes that were reward/R candidates
 
 - Parent/timeframe: `M10-PA-012 / 5m`
 - Dominant target/stop issue: `target_reward_below_1r_after_quality_gates`
-- Source rows: `47`
-- Valid geometry: `47`
-- Bullish rows: `16`
-- Non-leveraged bullish valid rows: `15`
-- Risk gate pass: `12`
+- Source rows: `45`
+- Valid geometry: `45`
+- Bullish rows: `27`
+- Non-leveraged bullish valid rows: `26`
+- Risk gate pass: `18`
 - Reward pass counts: `1.0R=0, 1.1R=0, 1.2R=0`
-- Reward/R min/median/max: `0.7159 / 0.9568 / 0.9819`
+- Reward/R min/median/max: `0.7727 / 0.9302 / 0.9969`
 - Action: Inspect and shadow-test the ORB target/stop generator before lowering min-R; try measured-move/opening-range-height or normalized 1.0R targets only in simulated diagnostics.
 
 ## Summary

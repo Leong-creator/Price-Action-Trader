@@ -44,5 +44,5 @@ summary:
   first50_daily_ready: 50
   first50_current_5m_ready: 50
   first50_full_5m_target_ready: 0
-  daily_candidate_count: 126
+  daily_candidate_count: 134
   paper_gate_approval: False

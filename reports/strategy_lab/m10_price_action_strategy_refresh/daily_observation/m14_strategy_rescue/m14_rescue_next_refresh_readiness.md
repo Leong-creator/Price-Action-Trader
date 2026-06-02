@@ -1,12 +1,12 @@
 # M14 Rescue Next Refresh Readiness
 
-- Generated at: `2026-05-26T22:30:00Z`
-- Watch rows: `13`
-- Fresh-quote rechecks: `7`
-- First-ledger watches: `2`
+- Generated at: `2026-06-01T17:29:00Z`
+- Watch rows: `6`
+- Fresh-quote rechecks: `0`
+- First-ledger watches: `0`
 - Broker-rule shadow rechecks: `2`
 - Target/stop shadow comparisons: `1`
-- Parent-detector waits: `1`
+- Parent-detector waits: `3`
 - Parameter changes allowed now: `0`
 - Boundary: next-refresh readiness only; no runtime registration, registry mutation, account spec mutation, or broker readiness mutation.
 
@@ -34,105 +34,6 @@
 - Fail action: Keep original broker readiness blocked and refine only the rule contract.
 - Parameter change allowed now: `False`
 
-### M10-PA-008-broker-risk-cap-shadow / M10-PA-008-broker-risk-cap-shadow-1d
-
-- Priority: `P0`
-- Family: `first_rescue_ledger_watch`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47/M13 refresh writes the first rescue signal/account ledger row.
-- Expected evidence: M13 signal/account ledger row count becomes greater than zero for this rescue runtime.
-- Pass action: Start counting its own 10 rescue A/B trading days from the fresh ledger evidence.
-- Fail action: Audit M13 registry, M12 account specs input mapping, and ledger write path.
-- Parameter change allowed now: `False`
-
-### M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow / M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m
-
-- Priority: `P0`
-- Family: `first_rescue_ledger_watch`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47/M13 refresh writes the first rescue signal/account ledger row.
-- Expected evidence: M13 signal/account ledger row count becomes greater than zero for this rescue runtime.
-- Pass action: Start counting its own 10 rescue A/B trading days from the fresh ledger evidence.
-- Fail action: Audit M13 registry, M12 account specs input mapping, and ledger write path.
-- Parameter change allowed now: `False`
-
-### M10-PA-001-m14-modify-20260522 / M10-PA-001-m14-modify-20260522-1d
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 12 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
-### M10-PA-002-m14-modify-20260522 / M10-PA-002-m14-modify-20260522-1d
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 2 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
-### M10-PA-004-MBF-QC-m14-modify-20260522 / M10-PA-004-MBF-QC-m14-modify-20260522-1d
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 1 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
-### M10-PA-007-m14-modify-20260522 / M10-PA-007-m14-modify-20260522-1d
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 5 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
-### M10-PA-009-m14-modify-20260522 / M10-PA-009-m14-modify-20260522-1d
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 1 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
-### M10-PA-013-m14-modify-20260522 / M10-PA-013-m14-modify-20260522-5m
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 39 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
-### M12-FTD-001-m14-modify-20260522 / M12-FTD-001-m14-modify-20260522-1d
-
-- Priority: `P0`
-- Family: `fresh_quote_recheck`
-- State: `ready_for_next_m12_47_refresh`
-- Trigger: Next M12.47-owned fresh Longbridge quote refresh produces current source rows.
-- Expected evidence: 3 eligible candidates if the stale quote gate clears.
-- Pass action: Continue 10-day rescue A/B evidence collection without changing parameters.
-- Fail action: Audit quote-refresh path before changing detector thresholds or risk settings.
-- Parameter change allowed now: `False`
-
 ### M10-PA-012-m14-modify-20260522 / M10-PA-012-m14-modify-20260522-5m
 
 - Priority: `P0`
@@ -144,7 +45,29 @@
 - Fail action: Inspect target/stop generation again; do not lower the frozen reward threshold directly.
 - Parameter change allowed now: `False`
 
-### M10-PA-013-m14-modify-20260522 / M10-PA-013-m14-modify-20260522-1d
+### M10-PA-002-m14-modify-20260522 / M10-PA-002-m14-modify-20260522-1d
+
+- Priority: `P1`
+- Family: `parent_detector_evidence_wait`
+- State: `wait_same_timeframe_parent_evidence`
+- Trigger: Parent detector produces same-timeframe source rows in a fresh run.
+- Expected evidence: Parent detector must show valid same-timeframe source rows before rescue remapping.
+- Pass action: Only then evaluate a same-timeframe rescue variant; do not remap across timeframes.
+- Fail action: Keep waiting for parent evidence or start a separate detector redesign review.
+- Parameter change allowed now: `False`
+
+### M10-PA-008-broker-risk-cap-shadow / M10-PA-008-broker-risk-cap-shadow-1d
+
+- Priority: `P1`
+- Family: `parent_detector_evidence_wait`
+- State: `wait_same_timeframe_parent_evidence`
+- Trigger: Parent detector produces same-timeframe source rows in a fresh run.
+- Expected evidence: Parent detector must show valid same-timeframe source rows before rescue remapping.
+- Pass action: Only then evaluate a same-timeframe rescue variant; do not remap across timeframes.
+- Fail action: Keep waiting for parent evidence or start a separate detector redesign review.
+- Parameter change allowed now: `False`
+
+### M10-PA-009-m14-modify-20260522 / M10-PA-009-m14-modify-20260522-1d
 
 - Priority: `P1`
 - Family: `parent_detector_evidence_wait`
@@ -157,4 +80,4 @@
 
 ## Summary
 
-Next-refresh rescue readiness tracks 13 rows: 7 fresh-quote rechecks, 2 first-ledger watches, 2 PA005 broker-rule shadow rechecks, 1 target/stop shadow comparisons, and 1 parent-detector waits. Parameter changes allowed now: 0. No registry, account-spec, broker readiness, broker connection, real order, live execution, or paper approval is changed.
+Next-refresh rescue readiness tracks 6 rows: 0 fresh-quote rechecks, 0 first-ledger watches, 2 PA005 broker-rule shadow rechecks, 1 target/stop shadow comparisons, and 3 parent-detector waits. Parameter changes allowed now: 0. No registry, account-spec, broker readiness, broker connection, real order, live execution, or paper approval is changed.

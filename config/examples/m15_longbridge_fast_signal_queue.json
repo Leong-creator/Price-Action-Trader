@@ -1,0 +1,84 @@
+{
+  "schema_version": "m15.longbridge-fast-signal-queue.config.v1",
+  "stage": "M15.longbridge_fast_signal_queue",
+  "title": "长桥模拟账户快速新信号队列",
+  "inputs": {
+    "m12_32_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
+    "m12_46_account_trade_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_trade_ledger.jsonl",
+    "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m12_48_extended_session_monitor": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_48_extended_session_monitor.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_fast_signal_queue"
+  },
+  "longbridge_paper_fast_queue": {
+    "token_mode": "paper",
+    "live_token_allowed": false,
+    "default_order_type": "limit",
+    "allowed_order_types": [
+      "limit",
+      "trigger_limit"
+    ],
+    "breakout_order_type": "trigger_limit",
+    "regular_hours_only": true,
+    "market_timezone": "America/New_York",
+    "market_holidays": [
+      "2026-01-01",
+      "2026-01-19",
+      "2026-02-16",
+      "2026-04-03",
+      "2026-05-25",
+      "2026-06-19",
+      "2026-07-03",
+      "2026-09-07",
+      "2026-11-26",
+      "2026-12-25"
+    ],
+    "max_orders_per_day": 5,
+    "max_risk_per_order": "12",
+    "quantity_policy": "integer_floor_no_fractional",
+    "independent_family_bonus": "0.50",
+    "same_family_variant_bonus": "0.25",
+    "max_same_family_variants": 2,
+    "max_confluence_multiplier": "1.75",
+    "premarket_against_signal_block_percent": "-3",
+    "premarket_overheat_wait_percent": "8",
+    "paper_account_model": {
+      "equity": "6000",
+      "max_total_exposure": "3600",
+      "min_cash_reserve": "2400",
+      "max_symbol_exposure": "600",
+      "allow_fractional_shares": false,
+      "allow_short_selling": false,
+      "allow_options": false
+    },
+    "risk_tiers": {
+      "primary": {
+        "max_strategy_exposure": "900",
+        "max_risk_per_order": "12"
+      },
+      "standard": {
+        "max_strategy_exposure": "600",
+        "max_risk_per_order": "8"
+      },
+      "risk_limited": {
+        "max_strategy_exposure": "450",
+        "max_risk_per_order": "6"
+      },
+      "repair": {
+        "max_strategy_exposure": "0",
+        "max_risk_per_order": "0"
+      }
+    },
+    "primary_runtime_ids": [
+      "M10-PA-004-long-1d"
+    ]
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "broker_connection": false,
+    "real_order": false,
+    "live_execution": false,
+    "manual_m12_37_once": false
+  }
+}

@@ -1,6 +1,6 @@
 # M14.2 Broker Blocker Shadow Repair Plan
 
-- Generated at: `2026-05-26T21:05:00Z`
+- Generated at: `2026-06-01T17:29:00Z`
 - Source blocked rows: `3`
 - Shadow actions: `{'apply_quantity_cap': 1, 'defer_until_exposure_frees': 1, 'keep_loss_streak_halt': 1}`
 - Shadow statuses: `{'defer_not_repair': 2, 'shadow_repair_candidate': 1}`

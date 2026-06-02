@@ -599,7 +599,7 @@ def apply_m14_rows_overlay(
             row["m14_decision"] = str(decision.get("decision", row.get("m14_decision", "not_available")))
             row["m14_decision_reason"] = str(decision.get("decision_reason", row.get("m14_decision_reason", "")))
         if gate:
-            row["paper_trial_gate"] = str(gate.get("paper_trial_gate", row.get("paper_trial_gate", "not_approved_or_pending")))
+            row["paper_trial_gate"] = str(gate.get("paper_trial_gate", row.get("paper_trial_gate", "gate_pending_or_auxiliary")))
             row["gate_reason"] = str(gate.get("gate_reason", row.get("gate_reason", "")))
 
 

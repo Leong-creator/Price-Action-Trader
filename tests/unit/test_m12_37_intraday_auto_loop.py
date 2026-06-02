@@ -252,6 +252,10 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             (True, ""),
         )
 
+    def test_example_config_allows_m14_when_runtime_ready(self):
+        config = load_auto_config(Path("config/examples/m12_37_intraday_auto_loop.json"))
+        self.assertEqual(config.post_run_m14_finalize_policy, "postmarket_or_runtime_ready")
+
     def test_post_run_strategy_ledgers_runs_m13_and_postmarket_m14(self):
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "m12_37"

@@ -1,43 +1,43 @@
 # M14 Objective Execution Plan
 
-- Generated at: `2026-05-26T23:59:00Z`
+- Generated at: `2026-06-01T17:29:01Z`
 - Objective complete: `False`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Execution actions: `7`
 - P0 actions: `5`
-- Actions requiring M12.47 fresh refresh: `5`
-- Rescue evidence observed: `9/11`
-- Rescue no-ledger waits: `2`
-- Parameter shadow-review candidates: `0`
-- Strategy evidence open/fresh/first-ledger/10-day/shadow gaps: `20/12/2/10/11`
+- Actions requiring M12.47 fresh refresh: `3`
+- Rescue evidence observed: `11/11`
+- Rescue no-ledger waits: `0`
+- Parameter shadow-review candidates: `3`
+- Strategy evidence open/fresh/first-ledger/10-day/shadow gaps: `25/17/0/15/16`
 - Manual execution allowed count: `0`
 - Boundary: internal simulated accounts only; no broker connection, no real orders, no live execution.
 
 ## Plain Result
 
-Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still require an M12.47-owned fresh refresh. Approved internal sim is ready for 3 strategies; rescue evidence remains 9/11 observed with 2 first-ledger waits. Parameter activation has 0 shadow-review candidates and 13 rows waiting for fresh evidence. Strategy evidence gaps remain open in 20 rows, with 12 waiting for fresh refresh. Manual M12.37 once-mode, broker/live, real orders, paper approval, registry/account-spec mutation, broker readiness mutation, and parameter mutation remain disabled.
+Objective execution plan has 7 actions, including 5 P0 actions. 3 actions still require an M12.47-owned fresh refresh. Approved internal sim is ready for 7 strategies; rescue evidence remains 11/11 observed with 0 first-ledger waits. Parameter activation has 3 shadow-review candidates and 0 rows waiting for fresh evidence. Strategy evidence gaps remain open in 25 rows, with 17 waiting for fresh refresh. Manual M12.37 once-mode, broker/live, real orders, paper approval, registry/account-spec mutation, broker readiness mutation, and parameter mutation remain disabled.
 
 ## Execution Actions
 
 ### approved_internal_sim_next_refresh
 
 - Priority: `P0`
-- State: `ready_for_m12_47_supervisor_window`
+- State: `blocked`
 - Gate: `m12_47_supervised_refresh_required`
 - Requires M12.47 fresh refresh: `True`
-- Evidence: 3 approved strategies and 4/4 approved runtime inputs are connected.
-- Blocked by: `none`
+- Evidence: 7 approved strategies and 7/7 approved runtime inputs are connected.
+- Blocked by: `internal_sim_next_session_not_ready`
 - Next action: Wait for the M12.47 supervisor trading window and review refreshed M13 ledgers afterward.
 - Success condition: Approved strategies stay connected and refresh their internal simulated-account ledgers.
 
 ### rescue_first_ledger_watch
 
 - Priority: `P0`
-- State: `waiting_for_m12_47_fresh_refresh`
+- State: `complete`
 - Gate: `m12_47_supervised_refresh_required`
-- Requires M12.47 fresh refresh: `True`
-- Evidence: 2 rescue runtimes still have no M13 rescue ledger.
-- Blocked by: `m12_47_fresh_refresh_not_observed`
+- Requires M12.47 fresh refresh: `False`
+- Evidence: 0 rescue runtimes still have no M13 rescue ledger.
+- Blocked by: `none`
 - Next action: After the next supervisor-owned refresh, verify first M13 ledger rows for no-ledger rescue runtimes.
 - Success condition: Each no-ledger rescue runtime has at least one rescue-specific M13 ledger row.
 
@@ -47,7 +47,7 @@ Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still 
 - State: `collecting_rescue_ab_evidence`
 - Gate: `m12_47_supervised_refresh_required`
 - Requires M12.47 fresh refresh: `True`
-- Evidence: 9/11 rescue strategies have ledger evidence; promotion allowed remains 0.
+- Evidence: 11/11 rescue strategies have ledger evidence; promotion allowed remains 0.
 - Blocked by: `needs_10_rescue_ab_trading_days`
 - Next action: Keep rescue variants collecting their own 10-trading-day A/B evidence before promote/modify/reject.
 - Success condition: Rescue variants reach the required rescue-specific A/B evidence window and manual review gate.
@@ -55,11 +55,11 @@ Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still 
 ### parameter_shadow_review_after_fresh_evidence
 
 - Priority: `P0`
-- State: `waiting_for_m12_47_fresh_refresh_no_candidates`
+- State: `ready_for_manual_shadow_review`
 - Gate: `m12_47_supervised_refresh_required`
-- Requires M12.47 fresh refresh: `True`
-- Evidence: 14 parameter gate rows; 13 waiting for fresh refresh; 0 shadow-review candidates.
-- Blocked by: `m12_47_fresh_refresh_not_observed`
+- Requires M12.47 fresh refresh: `False`
+- Evidence: 14 parameter gate rows; 0 waiting for fresh refresh; 3 shadow-review candidates.
+- Blocked by: `none`
 - Next action: Re-run the activation gate after a fresh M12.47-owned refresh; only passed rows may enter manual shadow review.
 - Success condition: Fresh evidence opens shadow-review candidates while implementation and parameter mutation stay disabled.
 
@@ -91,8 +91,8 @@ Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still 
 - State: `blocked_or_in_progress`
 - Gate: `audit_recheck_after_evidence_updates`
 - Requires M12.47 fresh refresh: `True`
-- Evidence: Objective complete=False; blockers=['weak_strategies_rescue_not_discarded', 'rescue_evidence_sufficient_for_promotion', 'parameter_optimization_path_ready', 'fresh_refresh_required_before_parameter_activation', 'objective_complete']; open evidence gaps=20.
-- Blocked by: `weak_strategies_rescue_not_discarded, rescue_evidence_sufficient_for_promotion, parameter_optimization_path_ready, fresh_refresh_required_before_parameter_activation, objective_complete`
+- Evidence: Objective complete=False; blockers=['approved_strategies_can_continue_internal_sim', 'weak_strategies_rescue_not_discarded', 'rescue_evidence_sufficient_for_promotion', 'parameter_optimization_path_ready', 'source_reextract_path_ready', 'objective_complete']; open evidence gaps=25.
+- Blocked by: `approved_strategies_can_continue_internal_sim, weak_strategies_rescue_not_discarded, rescue_evidence_sufficient_for_promotion, parameter_optimization_path_ready, source_reextract_path_ready, objective_complete`
 - Next action: Regenerate objective audit after fresh-refresh, rescue evidence, and parameter activation artifacts update.
 - Success condition: Objective audit has no blocked or in-progress requirements and all guardrails remain intact.
 
@@ -102,27 +102,27 @@ Objective execution plan has 7 actions, including 5 P0 actions. 5 actions still 
 - `M10-PA-002-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M10-PA-004-MBF-QC-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M10-PA-007-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
-- `M10-PA-008-broker-risk-cap-shadow`: `wait_first_m13_rescue_ledger`, observed `0/10`, remaining `10`
+- `M10-PA-008-broker-risk-cap-shadow`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M10-PA-009-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M10-PA-011-ORB-R1`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M10-PA-012-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
-- `M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow`: `wait_first_m13_rescue_ledger`, observed `0/10`, remaining `10`
+- `M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M10-PA-013-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 - `M12-FTD-001-m14-modify-20260522`: `collect_rescue_ab_evidence`, observed `1/10`, remaining `9`
 
 ## Parameter Gate Digest
 
-- `M10-PA-001-m14-modify-20260522` `fresh_quote_gate_recheck`: `wait_fresh_refresh`
-- `M10-PA-002-m14-modify-20260522` `fresh_quote_gate_recheck`: `wait_fresh_refresh`
-- `M10-PA-004-MBF-QC-m14-modify-20260522` `fresh_quote_gate_recheck`: `wait_fresh_refresh`
-- `M10-PA-005` `cooldown_quality_veto_shadow`: `wait_fresh_refresh`
-- `M10-PA-005` `exposure_ranker_shadow`: `wait_fresh_refresh`
-- `M10-PA-007-m14-modify-20260522` `fresh_quote_gate_recheck`: `wait_fresh_refresh`
-- `M10-PA-008` `quantity_cap_shadow`: `wait_fresh_refresh`
-- `M10-PA-008-broker-risk-cap-shadow` `ledger_path_mapping_audit`: `wait_fresh_refresh`
-- `M10-PA-009-m14-modify-20260522` `fresh_quote_gate_recheck`: `wait_fresh_refresh`
-- `M10-PA-012-m14-modify-20260522` `target_stop_reward_geometry_shadow`: `wait_fresh_refresh`
-- `M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow` `ledger_path_mapping_audit`: `wait_fresh_refresh`
-- `M10-PA-013-m14-modify-20260522` `parent_detector_timeframe_mapping_review`: `wait_fresh_refresh`
-- `M12-FTD-001-m14-modify-20260522` `fresh_quote_gate_recheck`: `wait_fresh_refresh`
+- `M10-PA-001-m14-modify-20260522` `signal_to_account_bridge_audit`: `hold_for_manual_review`
+- `M10-PA-002-m14-modify-20260522` `parent_detector_timeframe_mapping_review`: `hold_for_manual_review`
+- `M10-PA-005` `cooldown_quality_veto_shadow`: `ready_for_manual_shadow_review`
+- `M10-PA-005` `exposure_ranker_shadow`: `ready_for_manual_shadow_review`
+- `M10-PA-008` `quantity_cap_shadow`: `hold_for_manual_review`
+- `M10-PA-008-broker-risk-cap-shadow` `parent_detector_timeframe_mapping_review`: `hold_for_manual_review`
+- `M10-PA-009-m14-modify-20260522` `parent_detector_timeframe_mapping_review`: `hold_for_manual_review`
+- `M10-PA-012-m14-modify-20260522` `target_stop_reward_geometry_shadow`: `ready_for_manual_shadow_review`
+- `M12-FTD-001-m14-modify-20260522` `signal_to_account_bridge_audit`: `hold_for_manual_review`
+- `M10-PA-004-MBF-QC-m14-modify-20260522` `continue_ab_evidence_collection`: `continue_ab_collection_only`
+- `M10-PA-007-m14-modify-20260522` `continue_ab_evidence_collection`: `continue_ab_collection_only`
 - `M10-PA-011-ORB-R1` `continue_ab_evidence_collection`: `continue_ab_collection_only`
+- `M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow` `continue_ab_evidence_collection`: `continue_ab_collection_only`
+- `M10-PA-013-m14-modify-20260522` `continue_ab_evidence_collection`: `continue_ab_collection_only`

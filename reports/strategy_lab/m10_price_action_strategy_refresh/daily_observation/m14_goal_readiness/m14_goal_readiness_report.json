@@ -93,7 +93,7 @@
     "challenge_progress_label": "10/10",
     "data_quality_state": "history_recompute_from_existing_challenge",
     "effective_challenge_trading_days": 10,
-    "m12_current_day_runtime_ready": false,
+    "m12_current_day_runtime_ready": true,
     "recompute_only": true,
     "required_challenge_trading_days": 10,
     "ten_day_challenge_complete": true
@@ -124,7 +124,7 @@
       }
     ]
   },
-  "generated_at": "2026-05-26T05:58:22Z",
+  "generated_at": "2026-06-01T17:29:00Z",
   "goal_completion_assessment": {
     "goal_complete": false,
     "reason": "The 10-day challenge is complete and approved strategies can continue internal simulation, but rescue variants still need their own 10 trading-day A/B evidence before final promote/modify/reject."
@@ -147,7 +147,7 @@
     "m14_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_challenge_summary.json"
   },
   "internal_sim_launch_readiness": {
-    "approved_internal_sim_strategy_count": 3,
+    "approved_internal_sim_strategy_count": 7,
     "broker_dry_run_blocked_count": 3,
     "broker_dry_run_ready_count": 5,
     "broker_watch_strategy_count": 2,
@@ -155,42 +155,43 @@
       "M10-PA-005",
       "M10-PA-008"
     ],
-    "can_continue_internal_simulated_account": true,
+    "can_continue_internal_simulated_account": false,
     "can_start_broker_paper": false,
     "hard_boundary_violation_count": 0,
-    "launch_ready_strategy_count": 3,
+    "launch_ready_strategy_count": 1,
     "launch_ready_strategy_ids": [
-      "M10-PA-004",
-      "M10-PA-005",
-      "M10-PA-008"
+      "M10-PA-004"
     ],
     "launch_status_counts": {
-      "ready_internal_sim_continue": 1,
-      "ready_internal_sim_continue_with_broker_dry_run_watch": 2
+      "blocked_internal_sim_launch_check": 6,
+      "ready_internal_sim_continue": 1
     },
-    "m12_account_input_connected_runtime_count": 4,
-    "m12_account_input_runtime_count": 4,
-    "m13_registry_connected_strategy_count": 3,
-    "m13_scorecard_present_strategy_count": 3,
+    "m12_account_input_connected_runtime_count": 7,
+    "m12_account_input_runtime_count": 7,
+    "m13_registry_connected_strategy_count": 7,
+    "m13_scorecard_present_strategy_count": 7,
     "manual_approval_required_before_broker_paper": true,
-    "plain_language_result": "Internal simulated-account launch readiness: 3/3 approved strategies can continue internal simulation. Runtime inputs are connected for 4/4 approved runtimes. Broker dry-run remains preview-only: 5 ready rows, 3 blocked rows; broker paper/live stays disabled and still needs manual approval.",
+    "plain_language_result": "Internal simulated-account launch readiness: 1/7 approved strategies can continue internal simulation. Runtime inputs are connected for 7/7 approved runtimes. Broker dry-run remains preview-only: 5 ready rows, 3 blocked rows; broker paper/live stays disabled and still needs manual approval.",
     "source_risk_check_count": 8,
     "ten_day_challenge_complete": true
   },
   "internal_simulation_gate": {
-    "approved_internal_sim_strategy_count": 3,
+    "approved_internal_sim_strategy_count": 7,
     "approved_internal_sim_strategy_ids": [
+      "M10-PA-002",
       "M10-PA-004",
+      "M10-PA-004-MBF",
       "M10-PA-005",
-      "M10-PA-008"
+      "M10-PA-008",
+      "M10-PA-012",
+      "M10-PA-013"
     ],
     "can_enter_internal_simulation_for_approved_strategies": true,
     "gate_counts": {
-      "approved_internal_sim_only": 3,
-      "not_approved_challenge_incomplete": 7,
-      "not_approved_modify_candidate": 8,
-      "not_approved_parallel_modify_testing": 1,
-      "not_approved_rejected": 1
+      "approved_internal_sim_only": 2,
+      "auxiliary_module": 7,
+      "repair_now": 9,
+      "risk_limited_internal_sim": 7
     },
     "gate_scope": "internal_simulated_account_only"
   },
@@ -200,31 +201,31 @@
     {
       "action": "Run approved strategies in internal simulated-account testing only",
       "boundary": "No broker connection, no real order, no live execution.",
-      "evidence": "M10-PA-004, M10-PA-005, M10-PA-008",
+      "evidence": "M10-PA-002, M10-PA-004, M10-PA-004-MBF, M10-PA-005, M10-PA-008, M10-PA-012, M10-PA-013",
       "priority": "P0"
     },
     {
       "action": "Use internal simulated-account launch readiness before the next approved-strategy refresh",
       "boundary": "This is an internal simulated-account checklist only; broker paper/live remains disabled.",
-      "evidence": "3/3 approved strategies launch-ready; 4/4 approved runtimes have account inputs; 2 strategies need broker dry-run blocker watch",
+      "evidence": "1/7 approved strategies launch-ready; 7/7 approved runtimes have account inputs; 2 strategies need broker dry-run blocker watch",
       "priority": "P0"
     },
     {
       "action": "Work the rescue optimization backlog before the 10-day A/B window completes",
       "boundary": "Optimization backlog cannot change broker/live approval or count as promotion evidence.",
-      "evidence": "10 actionable; 8 zero-signal connected variants; 0 signal-to-account no-op variants",
+      "evidence": "6 actionable; 4 zero-signal connected variants; 2 signal-to-account no-op variants",
       "priority": "P0"
     },
     {
       "action": "Use zero-signal diagnostics before changing rescue parameters",
       "boundary": "Fresh-data rerun and shadow parameter tests only; no broker/live approval.",
-      "evidence": "7 quote-refresh candidates; 1 quality/filter candidates; 0 source-mapping candidates; 1 parent-detector zero-signal candidates",
+      "evidence": "0 quote-refresh candidates; 2 quality/filter candidates; 0 source-mapping candidates; 3 parent-detector zero-signal candidates",
       "priority": "P0"
     },
     {
       "action": "Use the rescue next-refresh readiness matrix after the next M12.47 fresh run",
       "boundary": "This matrix only defines post-refresh evidence checks; it cannot mutate runtimes or approve broker/live paths.",
-      "evidence": "13 watch rows; 7 fresh-quote rechecks; 2 first-ledger watches; 2 PA005 broker-rule rechecks; 0 parameter changes allowed now",
+      "evidence": "6 watch rows; 0 fresh-quote rechecks; 0 first-ledger watches; 2 PA005 broker-rule rechecks; 0 parameter changes allowed now",
       "priority": "P0"
     },
     {
@@ -236,7 +237,7 @@
     {
       "action": "Collect first fresh M13 ledger row for the PA012 target/stop normalized shadow runtime",
       "boundary": "Connected shadow runtime is still simulated-only and requires 10 rescue A/B trading days before review.",
-      "evidence": "12/12 eligible rows pass the best shadow variant; best variants {'risk_normalized_1_0r': 1}",
+      "evidence": "18/18 eligible rows pass the best shadow variant; best variants {'risk_normalized_1_0r': 1}",
       "priority": "P0"
     },
     {
@@ -260,7 +261,7 @@
     {
       "action": "Collect 10 trading-day A/B evidence for connected rescue runtimes",
       "boundary": "Connected rescue runtime is not a promotion or approval.",
-      "evidence": "9/11 rescue strategies have M13 ledger evidence; 0 ready for manual review",
+      "evidence": "11/11 rescue strategies have M13 ledger evidence; 0 ready for manual review",
       "priority": "P0"
     },
     {
@@ -268,27 +269,18 @@
       "boundary": "Manual user approval is still required before any broker paper/live path.",
       "evidence": "5 dry-run ready, 3 blocked",
       "priority": "P1"
-    },
-    {
-      "action": "Treat the current artifact set as a recompute/audit snapshot until the next trading session refresh",
-      "boundary": "Do not manually run M12.37 once-mode; M12.47 owns session launch.",
-      "evidence": "history_recompute_from_existing_challenge",
-      "priority": "P1"
     }
   ],
-  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 3 strategies can continue internal simulated-account testing only: M10-PA-004, M10-PA-005, M10-PA-008. Internal launch readiness is 3/3 approved strategies, with 4/4 approved runtimes connected and 2 strategies needing broker dry-run blocker watch. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 9/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 10 actionable items: 8 zero-signal and 0 signal-to-account no-op. Next-refresh readiness tracks 13 rescue watch rows, including 7 fresh-quote rechecks, 2 first-ledger watches, 2 PA005 broker-rule rechecks, and 0 parameter changes allowed now. Zero-signal diagnosis: 7 should be rechecked after fresh quote refresh, 1 need filter/parameter work, 0 need source mapping, 1 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 12/12 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker blocker rule shadow evidence has 2 PA005 rule-only rows (1 exposure ranker, 1 cooldown/quality) and 0 runtime registrations. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
+  "plain_language_result": "Project is at M14 stable strategy testing + M14.2 broker readiness dry-run scaffold. 10-day challenge complete: 10/10. 7 strategies can continue internal simulated-account testing only: M10-PA-002, M10-PA-004, M10-PA-004-MBF, M10-PA-005, M10-PA-008, M10-PA-012, M10-PA-013. Internal launch readiness is 1/7 approved strategies, with 7/7 approved runtimes connected and 2 strategies needing broker dry-run blocker watch. Rescue coverage is 11/11 strategies and 10/10 planned actions. Rescue A/B evidence is now 11/11 strategies observed, 0 ready for manual review, promotion allowed 0. Pre-10-day optimization backlog has 6 actionable items: 4 zero-signal and 2 signal-to-account no-op. Next-refresh readiness tracks 6 rescue watch rows, including 0 fresh-quote rechecks, 0 first-ledger watches, 2 PA005 broker-rule rechecks, and 0 parameter changes allowed now. Zero-signal diagnosis: 0 should be rechecked after fresh quote refresh, 2 need filter/parameter work, 0 need source mapping, 3 should keep same-timeframe mapping and wait for parent detector evidence. Target/stop diagnosis reviewed 1 reward/R runtimes, with 1 still needing target/stop geometry work before threshold changes. Target/stop shadow normalization has 1 candidate runtimes and 18/18 eligible rows passing the best shadow variant. Broker blocker shadow repair has 1 quantity-cap candidate, 1 exposure deferrals, and 1 cooldown halts. Broker blocker shadow A/B prep has 1 runtime-registration candidate and 2 rule-only shadow candidates, with 3 original blocked rows preserved. Broker blocker rule shadow evidence has 2 PA005 rule-only rows (1 exposure ranker, 1 cooldown/quality) and 0 runtime registrations. Broker readiness remains paper_dry_run_only: 5 dry-run ready, 3 blocked; no broker/live/real order approval.",
   "project_stage_label": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
   "rescue_ab_evidence": {
-    "collecting_evidence_count": 9,
+    "collecting_evidence_count": 11,
     "evidence_ready_for_manual_review_count": 0,
     "evidence_ready_for_manual_review_strategy_ids": [],
-    "m13_ledger_observed_strategy_count": 9,
+    "m13_ledger_observed_strategy_count": 11,
     "min_ab_trading_days": 10,
-    "no_m13_ledger_evidence_count": 2,
-    "no_m13_ledger_evidence_strategy_ids": [
-      "M10-PA-008-broker-risk-cap-shadow",
-      "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow"
-    ],
+    "no_m13_ledger_evidence_count": 0,
+    "no_m13_ledger_evidence_strategy_ids": [],
     "pending_evidence_strategy_ids": [
       "M10-PA-001-m14-modify-20260522",
       "M10-PA-002-m14-modify-20260522",
@@ -302,7 +294,7 @@
       "M10-PA-013-m14-modify-20260522",
       "M12-FTD-001-m14-modify-20260522"
     ],
-    "plain_language_result": "Rescue A/B evidence is observed for 9/11 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 2 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.",
+    "plain_language_result": "Rescue A/B evidence is observed for 11/11 rescue strategies. 0 have at least 10 trading days of rescue-ledger evidence; 0 have no M13 rescue ledger rows yet. No rescue strategy is auto-promoted; broker connection, real orders, live execution, and paper-trading approval remain disabled.",
     "promotion_allowed_count": 0,
     "rescue_runtime_strategy_count": 11
   },
@@ -311,36 +303,34 @@
     "broker_readiness_status_mutation": false,
     "broker_readiness_status_mutation_count": 0,
     "broker_rule_shadow_watch_count": 2,
-    "first_ledger_watch_count": 2,
-    "fresh_quote_recheck_count": 7,
+    "first_ledger_watch_count": 0,
+    "fresh_quote_recheck_count": 0,
     "m12_account_specs_mutation": false,
     "m12_account_specs_mutation_count": 0,
     "m13_registry_mutation": false,
     "m13_registry_mutation_count": 0,
-    "next_refresh_dependent_count": 13,
+    "next_refresh_dependent_count": 6,
     "parameter_change_allowed_now_count": 0,
-    "parent_detector_wait_count": 1,
-    "plain_language_result": "Next-refresh rescue readiness tracks 13 rows: 7 fresh-quote rechecks, 2 first-ledger watches, 2 PA005 broker-rule shadow rechecks, 1 target/stop shadow comparisons, and 1 parent-detector waits. Parameter changes allowed now: 0. No registry, account-spec, broker readiness, broker connection, real order, live execution, or paper approval is changed.",
+    "parent_detector_wait_count": 3,
+    "plain_language_result": "Next-refresh rescue readiness tracks 6 rows: 0 fresh-quote rechecks, 0 first-ledger watches, 2 PA005 broker-rule shadow rechecks, 1 target/stop shadow comparisons, and 3 parent-detector waits. Parameter changes allowed now: 0. No registry, account-spec, broker readiness, broker connection, real order, live execution, or paper approval is changed.",
     "readiness_family_counts": {
       "broker_rule_shadow_recheck": 2,
-      "first_rescue_ledger_watch": 2,
-      "fresh_quote_recheck": 7,
-      "parent_detector_evidence_wait": 1,
+      "parent_detector_evidence_wait": 3,
       "target_stop_shadow_compare": 1
     },
     "readiness_state_counts": {
       "covered_by_shadow_runtime_wait_refresh": 1,
-      "ready_for_next_m12_47_refresh": 11,
-      "wait_same_timeframe_parent_evidence": 1
+      "ready_for_next_m12_47_refresh": 2,
+      "wait_same_timeframe_parent_evidence": 3
     },
     "readiness_status_mutation": false,
-    "ready_for_next_m12_47_refresh_count": 11,
+    "ready_for_next_m12_47_refresh_count": 2,
     "source_rescue_backlog_rows": 11,
     "target_stop_shadow_compare_count": 1,
-    "watch_rows": 13
+    "watch_rows": 6
   },
   "rescue_optimization_backlog": {
-    "actionable_before_10d_count": 10,
+    "actionable_before_10d_count": 6,
     "broker_blocker_reason_counts": {
       "consecutive_losses_limit": 1,
       "max_risk_per_order_exceeded": 1,
@@ -351,20 +341,16 @@
     "high_priority_strategy_ids": [
       "M10-PA-001-m14-modify-20260522",
       "M10-PA-002-m14-modify-20260522",
-      "M10-PA-004-MBF-QC-m14-modify-20260522",
-      "M10-PA-007-m14-modify-20260522",
       "M10-PA-008-broker-risk-cap-shadow",
       "M10-PA-009-m14-modify-20260522",
       "M10-PA-012-m14-modify-20260522",
-      "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow",
-      "M10-PA-013-m14-modify-20260522",
       "M12-FTD-001-m14-modify-20260522"
     ],
-    "plain_language_result": "Rescue optimization backlog has 11 rescue rows; 10 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 8; signal-without-account-operation variants: 0. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+    "plain_language_result": "Rescue optimization backlog has 11 rescue rows; 6 can be worked before the 10-day A/B window completes. Zero-signal connected variants: 4; signal-without-account-operation variants: 2. Broker dry-run blockers remain 3 events across 2 strategies. No broker connection, real order, live execution, or paper-trading approval is enabled.",
     "rescue_strategy_count": 11,
-    "signal_generated_no_account_operation_count": 0,
-    "wait_for_more_ab_evidence_count": 1,
-    "zero_signal_after_connection_count": 8
+    "signal_generated_no_account_operation_count": 2,
+    "wait_for_more_ab_evidence_count": 5,
+    "zero_signal_after_connection_count": 4
   },
   "rescue_status": {
     "all_planned_rescue_actions_have_runtime_coverage": true,
@@ -401,7 +387,7 @@
     "target_stop_issue_runtime_count": 1
   },
   "rescue_target_stop_shadow_normalization": {
-    "best_variant_candidate_row_count": 12,
+    "best_variant_candidate_row_count": 18,
     "best_variant_id_counts": {
       "risk_normalized_1_0r": 1
     },
@@ -410,45 +396,43 @@
     "parent_strategy_ids": [
       "M10-PA-012"
     ],
-    "plain_language_result": "Target/stop shadow normalization reviewed 1 reward/R-blocked runtimes. 1 have a shadow-only candidate; best candidate rows: 12/12. Best variant counts: {'risk_normalized_1_0r': 1}. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+    "plain_language_result": "Target/stop shadow normalization reviewed 1 reward/R-blocked runtimes. 1 have a shadow-only candidate; best candidate rows: 18/18. Best variant counts: {'risk_normalized_1_0r': 1}. No broker connection, real order, live execution, or paper-trading approval is enabled.",
     "runtime_ids": [
       "M10-PA-012-m14-modify-20260522-5m"
     ],
     "runtime_with_shadow_candidate_count": 1,
     "runtime_without_shadow_candidate_count": 0,
-    "source_candidate_row_count": 12,
+    "source_candidate_row_count": 18,
     "strategy_ids": [
       "M10-PA-012-m14-modify-20260522"
     ]
   },
   "rescue_zero_signal_diagnostics": {
     "dominant_issue_counts": {
-      "parent_detector_zero_signal_for_timeframe": 1,
+      "parent_detector_zero_signal_for_timeframe": 3,
       "reward_filter_blocks_all": 1,
-      "stale_quote_source_blocks_candidate": 7
+      "strict_quality_filter_blocks_all": 1
     },
-    "parent_detector_zero_signal_runtime_count": 1,
+    "parent_detector_zero_signal_runtime_count": 3,
     "parent_source_absent_runtime_count": 0,
-    "parent_source_available_runtime_count": 8,
-    "plain_language_result": "Zero-signal rescue diagnostics reviewed 9 rescue runtimes. 7 are blocked mainly by stale/non-fresh quote source and should be rechecked on the next M12.47 fresh refresh; 1 need parameter/filter work; 0 have no parent source rows for the configured timeframe; 1 have parent detectors that were also zero-signal on the same timeframe. Potential entries if fresh quote gate clears: 63. No broker connection, real order, live execution, or paper-trading approval is enabled.",
-    "potential_signal_if_fresh_quote_count": 63,
-    "quality_filter_blocked_runtime_count": 1,
-    "quote_refresh_candidate_runtime_count": 7,
+    "parent_source_available_runtime_count": 2,
+    "plain_language_result": "Zero-signal rescue diagnostics reviewed 5 rescue runtimes. 0 are blocked mainly by stale/non-fresh quote source and should be rechecked on the next M12.47 fresh refresh; 2 need parameter/filter work; 0 have no parent source rows for the configured timeframe; 3 have parent detectors that were also zero-signal on the same timeframe. Potential entries if fresh quote gate clears: 0. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+    "potential_signal_if_fresh_quote_count": 0,
+    "quality_filter_blocked_runtime_count": 2,
+    "quote_refresh_candidate_runtime_count": 0,
     "rejection_reason_counts": {
-      "direction_not_long": 71,
-      "invalid_risk_reward": 1,
-      "leveraged_etf_excluded": 6,
-      "reward_r_below_min": 47,
-      "risk_percent_above_limit": 17,
-      "stale_quote_source": 164
+      "direction_not_long": 20,
+      "leveraged_etf_excluded": 2,
+      "reward_r_below_min": 45,
+      "risk_percent_above_limit": 10
     },
     "shadow_reward_min_r_pass_counts": {
-      "1.0R": 63,
-      "1.1R": 63,
-      "1.2R": 63
+      "1.0R": 0,
+      "1.1R": 0,
+      "1.2R": 0
     },
-    "zero_signal_runtime_count": 9,
-    "zero_signal_strategy_count": 8
+    "zero_signal_runtime_count": 5,
+    "zero_signal_strategy_count": 5
   },
   "schema_version": "m14.goal-readiness-report.v1",
   "stage": "M14.goal_readiness_report",
@@ -457,13 +441,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "external_shadow_research_only",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
       "display_name": "AI-Trader external signal research",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -475,21 +459,42 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "modify",
+      "decision": "repair_now",
       "decision_reason": "net_pnl_below_minus_2r",
       "display_name": "Trend pullback runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "repair_now",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-001-m14-modify-20260522"
       ],
       "runtime_ids": [
-        "M10-PA-001-1d",
+        "M10-PA-001-1d"
+      ],
+      "strategy_id": "M10-PA-001"
+    },
+    {
+      "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 10,
+      "decision": "repair_now",
+      "decision_reason": "ten_day_losing_repair_candidate",
+      "display_name": "Trend pullback runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "repair_now",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "covered_by_rescue_runtime",
+      "rescue_runtime_strategy_ids": [
+        "M10-PA-001-m14-modify-20260522"
+      ],
+      "runtime_ids": [
         "M10-PA-001-5m"
       ],
       "strategy_id": "M10-PA-001"
@@ -498,21 +503,42 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "modify",
-      "decision_reason": "net_pnl_below_minus_2r",
+      "decision": "risk_limited_advance",
+      "decision_reason": "max_drawdown_warning_size_limited",
       "display_name": "Breakout runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "risk_limited_internal_sim",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-002-m14-modify-20260522"
       ],
       "runtime_ids": [
-        "M10-PA-002-1d",
+        "M10-PA-002-1d"
+      ],
+      "strategy_id": "M10-PA-002"
+    },
+    {
+      "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 10,
+      "decision": "repair_now",
+      "decision_reason": "net_pnl_below_minus_2r",
+      "display_name": "Breakout runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "repair_now",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "covered_by_rescue_runtime",
+      "rescue_runtime_strategy_ids": [
+        "M10-PA-002-m14-modify-20260522"
+      ],
+      "runtime_ids": [
         "M10-PA-002-5m"
       ],
       "strategy_id": "M10-PA-002"
@@ -521,13 +547,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "plugin_filter_ab_coverage",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
       "display_name": "Filter and ranking module",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -537,10 +563,54 @@
     },
     {
       "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 10,
+      "decision": "risk_limited_advance",
+      "decision_reason": "parallel_repair_variant_started_size_limited_original",
+      "display_name": "PA004 momentum breakout follow-through experimental runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "risk_limited_internal_sim",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "covered_by_existing_runtime",
+      "rescue_runtime_strategy_ids": [
+        "M10-PA-004-MBF-QC"
+      ],
+      "runtime_ids": [
+        "M10-PA-004-MBF-1d"
+      ],
+      "strategy_id": "M10-PA-004-MBF"
+    },
+    {
+      "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 7,
+      "decision": "repair_now",
+      "decision_reason": "net_pnl_below_minus_2r",
+      "display_name": "PA004 momentum breakout quality-confirmed experimental runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "repair_now",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "covered_by_rescue_runtime",
+      "rescue_runtime_strategy_ids": [
+        "M10-PA-004-MBF-QC-m14-modify-20260522"
+      ],
+      "runtime_ids": [
+        "M10-PA-004-MBF-QC-1d"
+      ],
+      "strategy_id": "M10-PA-004-MBF-QC"
+    },
+    {
+      "broker_connection": false,
       "can_enter_internal_simulation": true,
       "completed_trading_days": 10,
-      "decision": "promote",
-      "decision_reason": "ten_day_positive_expectancy_internal_sim_candidate",
+      "decision": "advance_internal_sim",
+      "decision_reason": "pa004_long_runtime_positive_primary_advance",
       "display_name": "Broad channel boundary reversal long-only runtime",
       "live_execution": false,
       "next_action_category": "continue_internal_simulation",
@@ -559,63 +629,38 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "parallel_modify_variant_started_continue_original_to_10d",
-      "display_name": "PA004 momentum breakout follow-through experimental runtime",
-      "live_execution": false,
-      "next_action_category": "continue_parallel_ab_evidence",
-      "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_parallel_modify_testing",
-      "real_order": false,
-      "requires_10_day_ab_evidence": true,
-      "rescue_coverage_status": "covered_by_existing_runtime",
-      "rescue_runtime_strategy_ids": [
-        "M10-PA-004-MBF-QC"
-      ],
-      "runtime_ids": [
-        "M10-PA-004-MBF-1d"
-      ],
-      "strategy_id": "M10-PA-004-MBF"
-    },
-    {
-      "broker_connection": false,
-      "can_enter_internal_simulation": false,
-      "completed_trading_days": 7,
-      "decision": "modify",
-      "decision_reason": "net_pnl_below_minus_2r",
-      "display_name": "PA004 momentum breakout quality-confirmed experimental runtime",
-      "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
-      "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
-      "real_order": false,
-      "requires_10_day_ab_evidence": true,
-      "rescue_coverage_status": "covered_by_rescue_runtime",
-      "rescue_runtime_strategy_ids": [
-        "M10-PA-004-MBF-QC-m14-modify-20260522"
-      ],
-      "runtime_ids": [
-        "M10-PA-004-MBF-QC-1d"
-      ],
-      "strategy_id": "M10-PA-004-MBF-QC"
-    },
-    {
-      "broker_connection": false,
-      "can_enter_internal_simulation": true,
-      "completed_trading_days": 10,
-      "decision": "promote",
-      "decision_reason": "ten_day_positive_expectancy_internal_sim_candidate",
+      "decision": "risk_limited_advance",
+      "decision_reason": "pa005_1d_positive_small_sample_size_limited",
       "display_name": "Range geometry experimental runtime",
       "live_execution": false,
-      "next_action_category": "continue_internal_simulation",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "approved_internal_sim_only",
+      "paper_trial_gate": "risk_limited_internal_sim",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
       "rescue_runtime_strategy_ids": [],
       "runtime_ids": [
-        "M10-PA-005-1d",
+        "M10-PA-005-1d"
+      ],
+      "strategy_id": "M10-PA-005"
+    },
+    {
+      "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 10,
+      "decision": "risk_limited_advance",
+      "decision_reason": "pa005_5m_positive_but_high_drawdown_size_limited",
+      "display_name": "Range geometry experimental runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "risk_limited_internal_sim",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "",
+      "rescue_runtime_strategy_ids": [],
+      "runtime_ids": [
         "M10-PA-005-5m"
       ],
       "strategy_id": "M10-PA-005"
@@ -624,13 +669,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "plugin_filter_ab_coverage",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
       "display_name": "BLSHS limit filter",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -642,15 +687,15 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "modify",
+      "decision": "repair_now",
       "decision_reason": "net_pnl_below_minus_2r",
       "display_name": "Second leg visual detector runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "repair_now",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-007-m14-modify-20260522"
@@ -662,15 +707,15 @@
     },
     {
       "broker_connection": false,
-      "can_enter_internal_simulation": true,
+      "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "promote",
-      "decision_reason": "ten_day_positive_expectancy_internal_sim_candidate",
+      "decision": "risk_limited_advance",
+      "decision_reason": "pa008_1d_positive_with_risk_cap_repair",
       "display_name": "Visual strategy 008 experimental runtime",
       "live_execution": false,
-      "next_action_category": "continue_internal_simulation",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "approved_internal_sim_only",
+      "paper_trial_gate": "risk_limited_internal_sim",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -684,15 +729,15 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "modify",
-      "decision_reason": "ten_day_losing_modify_candidate",
+      "decision": "repair_now",
+      "decision_reason": "ten_day_losing_repair_candidate",
       "display_name": "Visual strategy 009 experimental runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "repair_now",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-009-m14-modify-20260522"
@@ -706,13 +751,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "research_only_blocker",
-      "display_name": "Visual research-only module",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
+      "display_name": "Visual auxiliary-module module",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -724,15 +769,15 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "reject",
-      "decision_reason": "ten_days_no_viable_signal",
+      "decision": "repair_now",
+      "decision_reason": "pa011_orb_r1_high_drawdown_tiny_size_repair",
       "display_name": "Session microstructure experimental runtime",
       "live_execution": false,
-      "next_action_category": "rebuild_detector_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_rejected",
+      "paper_trial_gate": "repair_now",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-011-ORB-R1"
@@ -746,15 +791,15 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "modify",
-      "decision_reason": "max_drawdown_above_3_percent",
+      "decision": "risk_limited_advance",
+      "decision_reason": "pa012_5m_positive_with_target_stop_repair",
       "display_name": "Opening range breakout runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "risk_limited_internal_sim",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-012-m14-modify-20260522",
@@ -767,23 +812,44 @@
     },
     {
       "broker_connection": false,
-      "can_enter_internal_simulation": false,
+      "can_enter_internal_simulation": true,
       "completed_trading_days": 10,
-      "decision": "modify",
-      "decision_reason": "max_drawdown_above_3_percent",
+      "decision": "advance_internal_sim",
+      "decision_reason": "ten_day_positive_expectancy_internal_sim_candidate",
       "display_name": "Visual strategy 013 experimental runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "continue_internal_simulation",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "approved_internal_sim_only",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M10-PA-013-m14-modify-20260522"
       ],
       "runtime_ids": [
-        "M10-PA-013-1d",
+        "M10-PA-013-1d"
+      ],
+      "strategy_id": "M10-PA-013"
+    },
+    {
+      "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 10,
+      "decision": "risk_limited_advance",
+      "decision_reason": "pa013_5m_positive_low_win_rate_size_limited",
+      "display_name": "Visual strategy 013 experimental runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "risk_limited_internal_sim",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "covered_by_rescue_runtime",
+      "rescue_runtime_strategy_ids": [
+        "M10-PA-013-m14-modify-20260522"
+      ],
+      "runtime_ids": [
         "M10-PA-013-5m"
       ],
       "strategy_id": "M10-PA-013"
@@ -792,13 +858,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "plugin_filter_ab_coverage",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
       "display_name": "Target module",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -810,13 +876,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "plugin_filter_ab_coverage",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
       "display_name": "Stop and sizing module",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -828,13 +894,13 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "continue_testing",
-      "decision_reason": "plugin_filter_ab_coverage",
+      "decision": "auxiliary_module",
+      "decision_reason": "auxiliary_module_not_standalone_trading",
       "display_name": "Range add-on module",
       "live_execution": false,
-      "next_action_category": "continue_shadow_or_plugin_review",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_challenge_incomplete",
+      "paper_trial_gate": "auxiliary_module",
       "real_order": false,
       "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "",
@@ -846,21 +912,42 @@
       "broker_connection": false,
       "can_enter_internal_simulation": false,
       "completed_trading_days": 10,
-      "decision": "modify",
+      "decision": "repair_now",
       "decision_reason": "net_pnl_below_minus_2r",
       "display_name": "Formal daily trend runtime",
       "live_execution": false,
-      "next_action_category": "collect_rescue_ab_evidence",
+      "next_action_category": "hold_until_gate_evidence",
       "paper_trading_approval": false,
-      "paper_trial_gate": "not_approved_modify_candidate",
+      "paper_trial_gate": "repair_now",
       "real_order": false,
-      "requires_10_day_ab_evidence": true,
+      "requires_10_day_ab_evidence": false,
       "rescue_coverage_status": "covered_by_rescue_runtime",
       "rescue_runtime_strategy_ids": [
         "M12-FTD-001-m14-modify-20260522"
       ],
       "runtime_ids": [
-        "M12-FTD-001-baseline-1d",
+        "M12-FTD-001-baseline-1d"
+      ],
+      "strategy_id": "M12-FTD-001"
+    },
+    {
+      "broker_connection": false,
+      "can_enter_internal_simulation": false,
+      "completed_trading_days": 10,
+      "decision": "repair_now",
+      "decision_reason": "net_pnl_below_minus_2r",
+      "display_name": "Formal daily trend runtime",
+      "live_execution": false,
+      "next_action_category": "hold_until_gate_evidence",
+      "paper_trading_approval": false,
+      "paper_trial_gate": "repair_now",
+      "real_order": false,
+      "requires_10_day_ab_evidence": false,
+      "rescue_coverage_status": "covered_by_rescue_runtime",
+      "rescue_runtime_strategy_ids": [
+        "M12-FTD-001-m14-modify-20260522"
+      ],
+      "runtime_ids": [
         "M12-FTD-001-loss-streak-guard-1d"
       ],
       "strategy_id": "M12-FTD-001"

@@ -1,12 +1,12 @@
 # M14 Objective Blocker Burndown
 
-- Generated at: `2026-05-31T02:41:00Z`
+- Generated at: `2026-06-01T17:29:01Z`
 - Current stage: `M14 stable strategy testing + M14.2 broker readiness dry-run scaffold`
 - Objective complete: `False`
 - Challenge: `10/10`
 - Blocker rows P0/P1/P2: `4/3/0`
-- Approved internal-sim strategies: `3` (`M10-PA-004, M10-PA-005, M10-PA-008`)
-- Rescue first-ledger / 10-day A/B / shadow-review gaps: `2/10/11`
+- Approved internal-sim strategies: `7` (`M10-PA-002, M10-PA-004, M10-PA-004-MBF, M10-PA-005, M10-PA-008, M10-PA-012, M10-PA-013`)
+- Rescue first-ledger / 10-day A/B / shadow-review gaps: `0/15/16`
 - Visual confirmation pending questions / cases: `6/10`
 - Future source-reextract spec prep rows/drafts/unblocked/blocked/pending: `2/2/0/2/16`
 - Legacy history metric planning inputs: `0`
@@ -14,7 +14,7 @@
 
 ## Plain Result
 
-Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still not complete: 10-day challenge is 10/10, 3 strategies may continue internal simulation, but 2 rescue runtimes need first ledger evidence, 10 rescue A/B gaps remain, and 6 question plus 10 case visual confirmations are pending. Future source-reextract prep has 2 rows, 0 unblocked, and 0 old-dashboard-profit planning inputs. Old dashboard profit fields are explicitly ignored for planning. Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled.
+Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still not complete: 10-day challenge is 10/10, 7 strategies may continue internal simulation, but 0 rescue runtimes need first ledger evidence, 15 rescue A/B gaps remain, and 6 question plus 10 case visual confirmations are pending. Future source-reextract prep has 2 rows, 0 unblocked, and 0 old-dashboard-profit planning inputs. Old dashboard profit fields are explicitly ignored for planning. Broker/live, real orders, paper approval, parameter mutation, and manual M12.37 once-mode remain disabled.
 
 ## Legacy Metric Exclusion
 
@@ -40,8 +40,8 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 ### P0 fresh_refresh_required_before_parameter_activation
 
 - Category: `fresh_refresh`
-- State: `waiting_for_m12_47_fresh_refresh`
-- Evidence: 13 post-refresh watch rows are still waiting; source quote state is fallback_quotes_only.
+- State: `fresh_refresh_observed_recompute_required`
+- Evidence: 0 post-refresh watch rows are still waiting; source quote state is longbridge_quote_readonly.
 - Next action: Wait for the M12.47 supervisor to own the next fresh refresh, then run the read-only post-refresh recompute checklist.
 - Waiting on: `m12_47_supervised_fresh_refresh`
 - Allowed now: `artifact_review, post_refresh_checklist_review`
@@ -54,7 +54,7 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 
 - Category: `rescue_evidence`
 - State: `waiting_for_first_m13_ledger`
-- Evidence: 2 rescue runtimes still need first M13 ledger evidence; 9/11 have ledger evidence.
+- Evidence: 0 rescue runtimes still need first M13 ledger evidence; 11/11 have ledger evidence.
 - Next action: After the next M12.47-owned refresh, verify first strategy/account ledger rows before any promotion or discard decision.
 - Waiting on: `m12_47_supervised_fresh_refresh, m13_rescue_ledger_rows`
 - Allowed now: `runtime_registry_readonly_review, ledger_mapping_review`
@@ -67,7 +67,7 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 
 - Category: `rescue_evidence`
 - State: `rescue_ab_window_incomplete`
-- Evidence: 10 rescue 10-day A/B gaps remain; promotion allowed count is 0.
+- Evidence: 15 rescue 10-day A/B gaps remain; promotion allowed count is 0.
 - Next action: Continue collecting rescue A/B evidence under M12.47/M13/M14; do not promote or abandon weak strategies from old dashboard profit metrics.
 - Waiting on: `rescue_10_day_ab_window, manual_m14_review`
 - Allowed now: `artifact_review, ab_contract_review`
@@ -80,7 +80,7 @@ Objective blocker burndown has 7 rows with P0/P1/P2=4/3/0. The project is still 
 
 - Category: `parameter_optimization`
 - State: `waiting_for_fresh_evidence_no_mutation`
-- Evidence: 14 parameter experiment rows exist; 13 activation rows are waiting for fresh refresh; mutation allowed count is 0.
+- Evidence: 14 parameter experiment rows exist; 0 activation rows are waiting for fresh refresh; mutation allowed count is 0.
 - Next action: Keep parameter variants in shadow review until fresh M13/M14 evidence clears activation gates.
 - Waiting on: `fresh_m13_m14_evidence, activation_gate_review`
 - Allowed now: `shadow_spec_review, activation_gate_readonly_review`

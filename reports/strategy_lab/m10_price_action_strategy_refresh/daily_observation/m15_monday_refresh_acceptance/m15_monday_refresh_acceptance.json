@@ -9,7 +9,7 @@
       "status": "pass"
     },
     {
-      "actual": "非交易日等待",
+      "actual": "等待下一交易日",
       "check": "regular_us_market_window",
       "required_result": "当前市场窗口为美股常规交易时段",
       "status": "waiting_for_monday_refresh"
@@ -21,10 +21,10 @@
       "status": "waiting_for_monday_refresh"
     },
     {
-      "actual": "fallback_quotes_only",
+      "actual": "longbridge_quote_readonly",
       "check": "quote_source_longbridge",
       "required_result": "行情来源为 longbridge_quote_readonly",
-      "status": "waiting_for_monday_refresh"
+      "status": "pass"
     },
     {
       "actual": "daily=50/50, 5m=50/50",
@@ -33,25 +33,25 @@
       "status": "pass"
     },
     {
-      "actual": "scan_date=2026-05-22, m13=2026-05-22",
+      "actual": "scan_date=2026-06-01, m13=2026-06-01",
       "check": "m13_current_day_ledger",
       "required_result": "M13 生成当天策略账本",
       "status": "pass"
     },
     {
-      "actual": "scan_date=2026-05-22, m14=2026-05-22",
+      "actual": "scan_date=2026-06-01, m14=2026-06-01",
       "check": "m14_recomputed_for_current_day",
       "required_result": "M14 重算内部模拟、修复队列和长桥预演",
       "status": "pass"
     },
     {
-      "actual": "fallback_or_no_fetch",
+      "actual": "fresh_or_clean",
       "check": "no_fallback_or_old_snapshot",
       "required_result": "备用行情或旧快照当天不允许进入长桥模拟账户",
-      "status": "waiting_for_monday_refresh"
+      "status": "pass"
     },
     {
-      "actual": "blocked_fallback_or_no_fetch_data",
+      "actual": "ready_for_user_paper_credential_approval",
       "check": "longbridge_paper_preflight_preview_only",
       "required_result": "长桥模拟账户只生成预演，不连接账户、不下单",
       "status": "pass"
@@ -67,8 +67,8 @@
   "fail_count": 0,
   "failure_reason": "",
   "failure_state": "",
-  "fallback_or_no_fetch_data": true,
-  "generated_at": "2026-05-31T02:40:00Z",
+  "fallback_or_no_fetch_data": false,
+  "generated_at": "2026-06-02T06:07:23Z",
   "input_refs": {
     "m12_32_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
     "m12_37_auto_runner_manifest": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_37_auto_runner_manifest.json",
@@ -78,18 +78,18 @@
     "m15_longbridge_preflight": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_paper_preflight/m15_longbridge_paper_preflight.json"
   },
   "live_execution": false,
-  "m13_trading_date": "2026-05-22",
-  "m14_trading_date": "2026-05-22",
+  "m13_trading_date": "2026-06-01",
+  "m14_trading_date": "2026-06-01",
   "manual_m12_37_once": false,
   "paper_trading_approval": false,
-  "pass_count": 6,
+  "pass_count": 8,
   "plain_language_result": "当前不是交易窗口，周一前准备项已固化；等待下一次美股常规交易时段由 M12.47 自动拉起刷新。",
-  "quote_source": "fallback_quotes_only",
+  "quote_source": "longbridge_quote_readonly",
   "real_order": false,
-  "scan_date": "2026-05-22",
+  "scan_date": "2026-06-01",
   "schema_version": "m15.monday-refresh-acceptance.v1",
   "session_should_run": false,
   "stage": "M15.monday_refresh_acceptance",
   "supervisor_process_alive": true,
-  "waiting_count": 4
+  "waiting_count": 2
 }

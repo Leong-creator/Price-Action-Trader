@@ -1,6 +1,6 @@
 {
   "broker_connection": false,
-  "generated_at": "2026-05-26T22:10:00Z",
+  "generated_at": "2026-06-01T17:29:00Z",
   "hard_boundaries": {
     "broker_connection": false,
     "live_execution": false,
@@ -15,7 +15,7 @@
   "live_execution": false,
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_result": "Zero-signal rescue diagnostics reviewed 9 rescue runtimes. 7 are blocked mainly by stale/non-fresh quote source and should be rechecked on the next M12.47 fresh refresh; 1 need parameter/filter work; 0 have no parent source rows for the configured timeframe; 1 have parent detectors that were also zero-signal on the same timeframe. Potential entries if fresh quote gate clears: 63. No broker connection, real order, live execution, or paper-trading approval is enabled.",
+  "plain_language_result": "Zero-signal rescue diagnostics reviewed 5 rescue runtimes. 0 are blocked mainly by stale/non-fresh quote source and should be rechecked on the next M12.47 fresh refresh; 2 need parameter/filter work; 0 have no parent source rows for the configured timeframe; 3 have parent detectors that were also zero-signal on the same timeframe. Potential entries if fresh quote gate clears: 0. No broker connection, real order, live execution, or paper-trading approval is enabled.",
   "real_order": false,
   "rows": [
     {
@@ -30,11 +30,11 @@
       "parent_audit_input_status": "connected_zero_signal_today",
       "parent_audit_source_row_count": 0,
       "parent_source_row_count": 0,
-      "parent_strategy_id": "M10-PA-013",
+      "parent_strategy_id": "M10-PA-002",
       "real_order": false,
       "recommended_action": "Keep same-timeframe mapping and wait for the parent detector to produce a valid same-timeframe signal; do not remap across timeframes.",
       "rejection_reason_counts": {},
-      "runtime_id": "M10-PA-013-m14-modify-20260522-1d",
+      "runtime_id": "M10-PA-002-m14-modify-20260522-1d",
       "sample_symbols": [],
       "shadow_reward_min_r_pass_counts": {
         "1.0R": 0,
@@ -43,7 +43,63 @@
       },
       "source_direction_counts": {},
       "source_quote_source_counts": {},
-      "strategy_id": "M10-PA-013-m14-modify-20260522",
+      "strategy_id": "M10-PA-002-m14-modify-20260522",
+      "timeframe": "1d"
+    },
+    {
+      "broker_connection": false,
+      "dominant_issue": "parent_detector_zero_signal_for_timeframe",
+      "eligible_if_fresh_quote_count": 0,
+      "filter_pass_count": 0,
+      "input_source_type": "m14_broker_blocker_pa008_quantity_cap_adapter",
+      "live_execution": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parent_audit_input_status": "connected_zero_signal_today",
+      "parent_audit_source_row_count": 0,
+      "parent_source_row_count": 0,
+      "parent_strategy_id": "M10-PA-008",
+      "real_order": false,
+      "recommended_action": "Keep same-timeframe mapping and wait for the parent detector to produce a valid same-timeframe signal; do not remap across timeframes.",
+      "rejection_reason_counts": {},
+      "runtime_id": "M10-PA-008-broker-risk-cap-shadow-1d",
+      "sample_symbols": [],
+      "shadow_reward_min_r_pass_counts": {
+        "1.0R": 0,
+        "1.1R": 0,
+        "1.2R": 0
+      },
+      "source_direction_counts": {},
+      "source_quote_source_counts": {},
+      "strategy_id": "M10-PA-008-broker-risk-cap-shadow",
+      "timeframe": "1d"
+    },
+    {
+      "broker_connection": false,
+      "dominant_issue": "parent_detector_zero_signal_for_timeframe",
+      "eligible_if_fresh_quote_count": 0,
+      "filter_pass_count": 0,
+      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
+      "live_execution": false,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parent_audit_input_status": "connected_zero_signal_today",
+      "parent_audit_source_row_count": 0,
+      "parent_source_row_count": 0,
+      "parent_strategy_id": "M10-PA-009",
+      "real_order": false,
+      "recommended_action": "Keep same-timeframe mapping and wait for the parent detector to produce a valid same-timeframe signal; do not remap across timeframes.",
+      "rejection_reason_counts": {},
+      "runtime_id": "M10-PA-009-m14-modify-20260522-1d",
+      "sample_symbols": [],
+      "shadow_reward_min_r_pass_counts": {
+        "1.0R": 0,
+        "1.1R": 0,
+        "1.2R": 0
+      },
+      "source_direction_counts": {},
+      "source_quote_source_counts": {},
+      "strategy_id": "M10-PA-009-m14-modify-20260522",
       "timeframe": "1d"
     },
     {
@@ -51,22 +107,21 @@
       "dominant_issue": "reward_filter_blocks_all",
       "eligible_if_fresh_quote_count": 0,
       "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
+      "input_source_type": "m14_rescue_orb_quality_filter_adapter",
       "live_execution": false,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 47,
-      "parent_source_row_count": 47,
+      "parent_audit_input_status": "connected_zero_signal_today",
+      "parent_audit_source_row_count": 0,
+      "parent_source_row_count": 45,
       "parent_strategy_id": "M10-PA-012",
       "real_order": false,
       "recommended_action": "Reward failure remains even at shadow-only 1.0R after other quality gates; inspect target/stop generation before lowering the frozen rescue threshold.",
       "rejection_reason_counts": {
-        "direction_not_long": 31,
+        "direction_not_long": 18,
         "leveraged_etf_excluded": 2,
-        "reward_r_below_min": 47,
-        "risk_percent_above_limit": 5,
-        "stale_quote_source": 47
+        "reward_r_below_min": 45,
+        "risk_percent_above_limit": 10
       },
       "runtime_id": "M10-PA-012-m14-modify-20260522-5m",
       "sample_symbols": [
@@ -85,69 +140,19 @@
         "1.2R": 0
       },
       "source_direction_counts": {
-        "看涨": 16,
-        "看跌": 31
+        "看涨": 27,
+        "看跌": 18
       },
       "source_quote_source_counts": {
-        "candidate_reference_fallback": 5,
-        "m12_12_cached_reference_fallback": 38,
-        "m12_27_readonly_kline_fallback": 4
+        "longbridge_quote_readonly": 45
       },
       "strategy_id": "M10-PA-012-m14-modify-20260522",
       "timeframe": "5m"
     },
     {
       "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 12,
-      "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
-      "live_execution": false,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 22,
-      "parent_source_row_count": 22,
-      "parent_strategy_id": "M10-PA-001",
-      "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
-      "rejection_reason_counts": {
-        "direction_not_long": 1,
-        "risk_percent_above_limit": 9,
-        "stale_quote_source": 22
-      },
-      "runtime_id": "M10-PA-001-m14-modify-20260522-1d",
-      "sample_symbols": [
-        "ADBE",
-        "AMD",
-        "AMZN",
-        "ARKK",
-        "DIA",
-        "EEM",
-        "HYG",
-        "INTC"
-      ],
-      "shadow_reward_min_r_pass_counts": {
-        "1.0R": 12,
-        "1.1R": 12,
-        "1.2R": 12
-      },
-      "source_direction_counts": {
-        "看涨": 21,
-        "看跌": 1
-      },
-      "source_quote_source_counts": {
-        "candidate_reference_fallback": 4,
-        "m12_12_cached_reference_fallback": 17,
-        "m12_27_readonly_kline_fallback": 1
-      },
-      "strategy_id": "M10-PA-001-m14-modify-20260522",
-      "timeframe": "1d"
-    },
-    {
-      "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 2,
+      "dominant_issue": "strict_quality_filter_blocks_all",
+      "eligible_if_fresh_quote_count": 0,
       "filter_pass_count": 0,
       "input_source_type": "m14_rescue_parent_quality_filter_adapter",
       "live_execution": false,
@@ -156,244 +161,29 @@
       "parent_audit_input_status": "connected_with_signal_today",
       "parent_audit_source_row_count": 2,
       "parent_source_row_count": 2,
-      "parent_strategy_id": "M10-PA-002",
-      "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
-      "rejection_reason_counts": {
-        "stale_quote_source": 2
-      },
-      "runtime_id": "M10-PA-002-m14-modify-20260522-1d",
-      "sample_symbols": [
-        "PANW",
-        "XLV"
-      ],
-      "shadow_reward_min_r_pass_counts": {
-        "1.0R": 2,
-        "1.1R": 2,
-        "1.2R": 2
-      },
-      "source_direction_counts": {
-        "看涨": 2
-      },
-      "source_quote_source_counts": {
-        "m12_12_cached_reference_fallback": 2
-      },
-      "strategy_id": "M10-PA-002-m14-modify-20260522",
-      "timeframe": "1d"
-    },
-    {
-      "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 1,
-      "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_pa004_mbf_qc_risk_compression_adapter",
-      "live_execution": false,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 1,
-      "parent_source_row_count": 1,
-      "parent_strategy_id": "M10-PA-004-MBF-QC",
-      "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
-      "rejection_reason_counts": {
-        "stale_quote_source": 1
-      },
-      "runtime_id": "M10-PA-004-MBF-QC-m14-modify-20260522-1d",
-      "sample_symbols": [
-        "SNOW"
-      ],
-      "shadow_reward_min_r_pass_counts": {
-        "1.0R": 1,
-        "1.1R": 1,
-        "1.2R": 1
-      },
-      "source_direction_counts": {
-        "看涨": 1
-      },
-      "source_quote_source_counts": {
-        "m12_12_cached_reference_fallback": 1
-      },
-      "strategy_id": "M10-PA-004-MBF-QC-m14-modify-20260522",
-      "timeframe": "1d"
-    },
-    {
-      "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 5,
-      "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
-      "live_execution": false,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 6,
-      "parent_source_row_count": 6,
-      "parent_strategy_id": "M10-PA-007",
-      "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
-      "rejection_reason_counts": {
-        "direction_not_long": 1,
-        "risk_percent_above_limit": 1,
-        "stale_quote_source": 6
-      },
-      "runtime_id": "M10-PA-007-m14-modify-20260522-1d",
-      "sample_symbols": [
-        "IWM",
-        "LQD",
-        "NVDA",
-        "SLV",
-        "XLB",
-        "XLF"
-      ],
-      "shadow_reward_min_r_pass_counts": {
-        "1.0R": 5,
-        "1.1R": 5,
-        "1.2R": 5
-      },
-      "source_direction_counts": {
-        "看涨": 5,
-        "看跌": 1
-      },
-      "source_quote_source_counts": {
-        "candidate_reference_fallback": 2,
-        "m12_12_cached_reference_fallback": 3,
-        "m12_27_readonly_kline_fallback": 1
-      },
-      "strategy_id": "M10-PA-007-m14-modify-20260522",
-      "timeframe": "1d"
-    },
-    {
-      "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 1,
-      "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
-      "live_execution": false,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 2,
-      "parent_source_row_count": 2,
-      "parent_strategy_id": "M10-PA-009",
-      "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
-      "rejection_reason_counts": {
-        "risk_percent_above_limit": 1,
-        "stale_quote_source": 2
-      },
-      "runtime_id": "M10-PA-009-m14-modify-20260522-1d",
-      "sample_symbols": [
-        "HYG",
-        "PLTR"
-      ],
-      "shadow_reward_min_r_pass_counts": {
-        "1.0R": 1,
-        "1.1R": 1,
-        "1.2R": 1
-      },
-      "source_direction_counts": {
-        "看涨": 2
-      },
-      "source_quote_source_counts": {
-        "m12_12_cached_reference_fallback": 2
-      },
-      "strategy_id": "M10-PA-009-m14-modify-20260522",
-      "timeframe": "1d"
-    },
-    {
-      "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 39,
-      "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
-      "live_execution": false,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 77,
-      "parent_source_row_count": 77,
       "parent_strategy_id": "M10-PA-013",
       "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
+      "recommended_action": "Inspect direction, risk-percent, leveraged ETF, and price-validity gates; change only one parameter family at a time in shadow.",
       "rejection_reason_counts": {
-        "direction_not_long": 35,
-        "invalid_risk_reward": 1,
-        "leveraged_etf_excluded": 4,
-        "stale_quote_source": 77
+        "direction_not_long": 2
       },
-      "runtime_id": "M10-PA-013-m14-modify-20260522-5m",
+      "runtime_id": "M10-PA-013-m14-modify-20260522-1d",
       "sample_symbols": [
-        "AAPL",
-        "ADBE",
-        "AMD",
-        "AMZN",
-        "ARKK",
-        "AVGO",
-        "CRM",
-        "DIA"
+        "EFA",
+        "LQD"
       ],
       "shadow_reward_min_r_pass_counts": {
-        "1.0R": 39,
-        "1.1R": 39,
-        "1.2R": 39
+        "1.0R": 0,
+        "1.1R": 0,
+        "1.2R": 0
       },
       "source_direction_counts": {
-        "看涨": 42,
-        "看跌": 35
+        "看跌": 2
       },
       "source_quote_source_counts": {
-        "candidate_reference_fallback": 8,
-        "m12_12_cached_reference_fallback": 63,
-        "m12_27_readonly_kline_fallback": 6
+        "longbridge_quote_readonly": 2
       },
       "strategy_id": "M10-PA-013-m14-modify-20260522",
-      "timeframe": "5m"
-    },
-    {
-      "broker_connection": false,
-      "dominant_issue": "stale_quote_source_blocks_candidate",
-      "eligible_if_fresh_quote_count": 3,
-      "filter_pass_count": 0,
-      "input_source_type": "m14_rescue_parent_quality_filter_adapter",
-      "live_execution": false,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parent_audit_input_status": "connected_with_signal_today",
-      "parent_audit_source_row_count": 7,
-      "parent_source_row_count": 7,
-      "parent_strategy_id": "M12-FTD-001",
-      "real_order": false,
-      "recommended_action": "Wait for the next M12.47-owned fresh Longbridge quote refresh before changing rescue parameters.",
-      "rejection_reason_counts": {
-        "direction_not_long": 3,
-        "risk_percent_above_limit": 1,
-        "stale_quote_source": 7
-      },
-      "runtime_id": "M12-FTD-001-m14-modify-20260522-1d",
-      "sample_symbols": [
-        "GOOG",
-        "GOOGL",
-        "NVDA",
-        "PANW",
-        "QCOM",
-        "XLU",
-        "XLV"
-      ],
-      "shadow_reward_min_r_pass_counts": {
-        "1.0R": 3,
-        "1.1R": 3,
-        "1.2R": 3
-      },
-      "source_direction_counts": {
-        "看涨": 4,
-        "看跌": 3
-      },
-      "source_quote_source_counts": {
-        "m12_12_cached_reference_fallback": 6,
-        "m12_27_readonly_kline_fallback": 1
-      },
-      "strategy_id": "M12-FTD-001-m14-modify-20260522",
       "timeframe": "1d"
     }
   ],
@@ -401,31 +191,29 @@
   "stage": "M14.rescue_zero_signal_diagnostics",
   "summary": {
     "dominant_issue_counts": {
-      "parent_detector_zero_signal_for_timeframe": 1,
+      "parent_detector_zero_signal_for_timeframe": 3,
       "reward_filter_blocks_all": 1,
-      "stale_quote_source_blocks_candidate": 7
+      "strict_quality_filter_blocks_all": 1
     },
     "filter_pass_count": 0,
-    "parent_detector_zero_signal_runtime_count": 1,
+    "parent_detector_zero_signal_runtime_count": 3,
     "parent_source_absent_runtime_count": 0,
-    "parent_source_available_runtime_count": 8,
-    "potential_signal_if_fresh_quote_count": 63,
-    "quality_filter_blocked_runtime_count": 1,
-    "quote_refresh_candidate_runtime_count": 7,
+    "parent_source_available_runtime_count": 2,
+    "potential_signal_if_fresh_quote_count": 0,
+    "quality_filter_blocked_runtime_count": 2,
+    "quote_refresh_candidate_runtime_count": 0,
     "rejection_reason_counts": {
-      "direction_not_long": 71,
-      "invalid_risk_reward": 1,
-      "leveraged_etf_excluded": 6,
-      "reward_r_below_min": 47,
-      "risk_percent_above_limit": 17,
-      "stale_quote_source": 164
+      "direction_not_long": 20,
+      "leveraged_etf_excluded": 2,
+      "reward_r_below_min": 45,
+      "risk_percent_above_limit": 10
     },
     "shadow_reward_min_r_pass_counts": {
-      "1.0R": 63,
-      "1.1R": 63,
-      "1.2R": 63
+      "1.0R": 0,
+      "1.1R": 0,
+      "1.2R": 0
     },
-    "zero_signal_runtime_count": 9,
-    "zero_signal_strategy_count": 8
+    "zero_signal_runtime_count": 5,
+    "zero_signal_strategy_count": 5
   }
 }

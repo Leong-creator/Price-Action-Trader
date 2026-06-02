@@ -77,8 +77,8 @@
       "strategy_id": "M10-PA-004"
     },
     {
-      "activation_gate_row_count": 2,
-      "activation_waiting_for_fresh_refresh_count": 2,
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
@@ -86,171 +86,19 @@
       "blocked_by": [
         "m12_47_fresh_refresh_not_observed",
         "manual_m14_review_pending",
-        "shadow_parameter_review_not_open"
-      ],
-      "broker_connection": false,
-      "broker_readiness_status_mutation": false,
-      "broker_watch": true,
-      "burn_down_lane": "approved_internal_sim_refresh",
-      "can_continue_internal_sim_now": true,
-      "can_promote_now": false,
-      "candidate_variant_count": 2,
-      "continue_rescue": false,
-      "display_name": "Range geometry experimental runtime",
-      "execution_action_ids": [
-        "approved_internal_sim_next_refresh",
-        "parameter_shadow_review_after_fresh_evidence",
-        "broker_dry_run_watch_only"
-      ],
-      "final_discard_allowed": false,
-      "forbidden_operations": [
-        "broker_connection",
-        "real_order",
-        "live_execution",
-        "paper_trading_approval",
-        "manual_m12_37_once",
-        "m13_registry_mutation",
-        "m12_account_specs_mutation",
-        "broker_readiness_status_mutation",
-        "parameter_mutation"
-      ],
-      "gap_state": "approved_wait_next_refresh",
-      "internal_simulated_account": true,
-      "live_execution": false,
-      "m12_account_specs_mutation": false,
-      "m13_registry_mutation": false,
-      "manual_m12_37_once": false,
-      "manual_review_ready": false,
-      "missing_evidence_categories": [
-        "broker_dry_run_watch_recheck",
-        "m12_47_fresh_refresh",
-        "manual_m14_review",
-        "post_refresh_m13_m14_recompute",
-        "shadow_parameter_review"
-      ],
-      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-      "open_evidence_gap_count": 5,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parameter_experiment_row_count": 2,
-      "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
-        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
-        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
-      ],
-      "pre_refresh_review_available": true,
-      "priority": "P0",
-      "real_order": false,
-      "requires_m12_47_fresh_refresh": true,
-      "rescue_ab_observed_days_max": 0,
-      "rescue_ab_remaining_days_min": 0,
-      "route_category": "approved_internal_sim_continue",
-      "sequence_rank": 10,
-      "shadow_review_candidate_count": 0,
-      "strategy_id": "M10-PA-005"
-    },
-    {
-      "activation_gate_row_count": 2,
-      "activation_waiting_for_fresh_refresh_count": 2,
-      "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
-      ],
-      "blocked_by": [
-        "first_rescue_specific_ledger_missing",
-        "m12_47_fresh_refresh_not_observed",
-        "manual_m14_review_pending",
-        "shadow_parameter_review_not_open"
-      ],
-      "broker_connection": false,
-      "broker_readiness_status_mutation": false,
-      "broker_watch": true,
-      "burn_down_lane": "approved_internal_sim_refresh",
-      "can_continue_internal_sim_now": true,
-      "can_promote_now": false,
-      "candidate_variant_count": 2,
-      "continue_rescue": false,
-      "display_name": "Visual strategy 008 experimental runtime",
-      "execution_action_ids": [
-        "approved_internal_sim_next_refresh",
-        "parameter_shadow_review_after_fresh_evidence",
-        "broker_dry_run_watch_only"
-      ],
-      "final_discard_allowed": false,
-      "forbidden_operations": [
-        "broker_connection",
-        "real_order",
-        "live_execution",
-        "paper_trading_approval",
-        "manual_m12_37_once",
-        "m13_registry_mutation",
-        "m12_account_specs_mutation",
-        "broker_readiness_status_mutation",
-        "parameter_mutation"
-      ],
-      "gap_state": "approved_wait_next_refresh",
-      "internal_simulated_account": true,
-      "live_execution": false,
-      "m12_account_specs_mutation": false,
-      "m13_registry_mutation": false,
-      "manual_m12_37_once": false,
-      "manual_review_ready": false,
-      "missing_evidence_categories": [
-        "broker_dry_run_watch_recheck",
-        "first_m13_rescue_ledger",
-        "m12_47_fresh_refresh",
-        "manual_m14_review",
-        "post_refresh_m13_m14_recompute",
-        "shadow_parameter_review"
-      ],
-      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-      "open_evidence_gap_count": 6,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parameter_experiment_row_count": 2,
-      "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
-        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
-        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
-      ],
-      "pre_refresh_review_available": true,
-      "priority": "P0",
-      "real_order": false,
-      "requires_m12_47_fresh_refresh": true,
-      "rescue_ab_observed_days_max": 0,
-      "rescue_ab_remaining_days_min": 10,
-      "route_category": "approved_internal_sim_continue",
-      "sequence_rank": 10,
-      "shadow_review_candidate_count": 0,
-      "strategy_id": "M10-PA-008"
-    },
-    {
-      "activation_gate_row_count": 2,
-      "activation_waiting_for_fresh_refresh_count": 2,
-      "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
-      ],
-      "blocked_by": [
-        "first_rescue_specific_ledger_missing",
-        "m12_47_fresh_refresh_not_observed",
-        "manual_m14_review_pending",
-        "rescue_10_day_ab_window_incomplete",
         "shadow_parameter_review_not_open"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "first_rescue_ledger",
-      "can_continue_internal_sim_now": false,
+      "burn_down_lane": "approved_internal_sim_refresh",
+      "can_continue_internal_sim_now": true,
       "can_promote_now": false,
-      "candidate_variant_count": 2,
-      "continue_rescue": true,
-      "display_name": "Opening range breakout runtime",
+      "candidate_variant_count": 1,
+      "continue_rescue": false,
+      "display_name": "Visual strategy 013 experimental runtime",
       "execution_action_ids": [
-        "rescue_first_ledger_watch",
+        "approved_internal_sim_next_refresh",
         "rescue_ab_evidence_window",
         "parameter_shadow_review_after_fresh_evidence"
       ],
@@ -266,7 +114,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "wait_first_rescue_ledger",
+      "gap_state": "approved_wait_next_refresh",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -274,22 +122,20 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "first_m13_rescue_ledger",
         "m12_47_fresh_refresh",
         "manual_m14_review",
-        "rescue_10_day_ab_window",
+        "post_refresh_m13_m14_recompute",
         "shadow_parameter_review"
       ],
       "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-      "open_evidence_gap_count": 5,
+      "open_evidence_gap_count": 4,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
-      "parameter_experiment_row_count": 2,
+      "parameter_experiment_row_count": 1,
       "parameter_mutation": false,
       "pre_refresh_review_actions": [
         "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
-        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
-        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
       ],
       "pre_refresh_review_available": true,
       "priority": "P0",
@@ -297,14 +143,14 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 21,
+      "route_category": "approved_internal_sim_continue",
+      "sequence_rank": 10,
       "shadow_review_candidate_count": 0,
-      "strategy_id": "M10-PA-012"
+      "strategy_id": "M10-PA-013"
     },
     {
       "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
@@ -322,7 +168,7 @@
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 1,
-      "continue_rescue": true,
+      "continue_rescue": false,
       "display_name": "Trend pullback runtime",
       "execution_action_ids": [
         "rescue_ab_evidence_window",
@@ -369,14 +215,14 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-001"
     },
     {
       "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
@@ -394,8 +240,8 @@
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 1,
-      "continue_rescue": true,
-      "display_name": "Breakout runtime",
+      "continue_rescue": false,
+      "display_name": "Trend pullback runtime",
       "execution_action_ids": [
         "rescue_ab_evidence_window",
         "parameter_shadow_review_after_fresh_evidence"
@@ -441,14 +287,14 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
-      "strategy_id": "M10-PA-002"
+      "strategy_id": "M10-PA-001"
     },
     {
       "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
@@ -466,7 +312,153 @@
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 1,
-      "continue_rescue": true,
+      "continue_rescue": false,
+      "display_name": "Breakout runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "rescue_ab_evidence_window",
+        "parameter_shadow_review_after_fresh_evidence"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 1,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 0,
+      "strategy_id": "M10-PA-002"
+    },
+    {
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": false,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 1,
+      "continue_rescue": false,
+      "display_name": "Breakout runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "rescue_ab_evidence_window",
+        "parameter_shadow_review_after_fresh_evidence"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 1,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 0,
+      "strategy_id": "M10-PA-002"
+    },
+    {
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": false,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 1,
+      "continue_rescue": false,
       "display_name": "PA004 momentum breakout quality-confirmed experimental runtime",
       "execution_action_ids": [
         "rescue_ab_evidence_window",
@@ -513,14 +505,162 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-004-MBF-QC"
     },
     {
+      "activation_gate_row_count": 2,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": true,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 2,
+      "continue_rescue": false,
+      "display_name": "Range geometry experimental runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "parameter_shadow_review_after_fresh_evidence",
+        "broker_dry_run_watch_only"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 2,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
+        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 0,
+      "rescue_ab_remaining_days_min": 0,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 2,
+      "strategy_id": "M10-PA-005"
+    },
+    {
+      "activation_gate_row_count": 2,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": true,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 2,
+      "continue_rescue": false,
+      "display_name": "Range geometry experimental runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "parameter_shadow_review_after_fresh_evidence",
+        "broker_dry_run_watch_only"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 2,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
+        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 0,
+      "rescue_ab_remaining_days_min": 0,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 2,
+      "strategy_id": "M10-PA-005"
+    },
+    {
       "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
@@ -538,7 +678,7 @@
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 1,
-      "continue_rescue": true,
+      "continue_rescue": false,
       "display_name": "Second leg visual detector runtime",
       "execution_action_ids": [
         "rescue_ab_evidence_window",
@@ -585,14 +725,88 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-007"
     },
     {
+      "activation_gate_row_count": 2,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": true,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 2,
+      "continue_rescue": false,
+      "display_name": "Visual strategy 008 experimental runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "parameter_shadow_review_after_fresh_evidence",
+        "broker_dry_run_watch_only"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 2,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
+        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 0,
+      "strategy_id": "M10-PA-008"
+    },
+    {
       "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
@@ -610,7 +824,7 @@
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 1,
-      "continue_rescue": true,
+      "continue_rescue": false,
       "display_name": "Visual strategy 009 experimental runtime",
       "execution_action_ids": [
         "rescue_ab_evidence_window",
@@ -657,154 +871,10 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-009"
-    },
-    {
-      "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
-      "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
-      ],
-      "blocked_by": [
-        "m12_47_fresh_refresh_not_observed",
-        "manual_m14_review_pending",
-        "rescue_10_day_ab_window_incomplete",
-        "shadow_parameter_review_not_open"
-      ],
-      "broker_connection": false,
-      "broker_readiness_status_mutation": false,
-      "broker_watch": false,
-      "burn_down_lane": "rescue_shadow_parameter_review",
-      "can_continue_internal_sim_now": false,
-      "can_promote_now": false,
-      "candidate_variant_count": 1,
-      "continue_rescue": true,
-      "display_name": "Visual strategy 013 experimental runtime",
-      "execution_action_ids": [
-        "rescue_ab_evidence_window",
-        "parameter_shadow_review_after_fresh_evidence"
-      ],
-      "final_discard_allowed": false,
-      "forbidden_operations": [
-        "broker_connection",
-        "real_order",
-        "live_execution",
-        "paper_trading_approval",
-        "manual_m12_37_once",
-        "m13_registry_mutation",
-        "m12_account_specs_mutation",
-        "broker_readiness_status_mutation",
-        "parameter_mutation"
-      ],
-      "gap_state": "wait_shadow_parameter_review",
-      "internal_simulated_account": true,
-      "live_execution": false,
-      "m12_account_specs_mutation": false,
-      "m13_registry_mutation": false,
-      "manual_m12_37_once": false,
-      "manual_review_ready": false,
-      "missing_evidence_categories": [
-        "m12_47_fresh_refresh",
-        "manual_m14_review",
-        "rescue_10_day_ab_window",
-        "shadow_parameter_review"
-      ],
-      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-      "open_evidence_gap_count": 4,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parameter_experiment_row_count": 1,
-      "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
-        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
-      ],
-      "pre_refresh_review_available": true,
-      "priority": "P0",
-      "real_order": false,
-      "requires_m12_47_fresh_refresh": true,
-      "rescue_ab_observed_days_max": 1,
-      "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
-      "shadow_review_candidate_count": 0,
-      "strategy_id": "M10-PA-013"
-    },
-    {
-      "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
-      "allowed_operations": [
-        "artifact_review",
-        "m12_47_supervised_refresh_review"
-      ],
-      "blocked_by": [
-        "m12_47_fresh_refresh_not_observed",
-        "manual_m14_review_pending",
-        "rescue_10_day_ab_window_incomplete",
-        "shadow_parameter_review_not_open"
-      ],
-      "broker_connection": false,
-      "broker_readiness_status_mutation": false,
-      "broker_watch": false,
-      "burn_down_lane": "rescue_shadow_parameter_review",
-      "can_continue_internal_sim_now": false,
-      "can_promote_now": false,
-      "candidate_variant_count": 1,
-      "continue_rescue": true,
-      "display_name": "Formal daily trend runtime",
-      "execution_action_ids": [
-        "rescue_ab_evidence_window",
-        "parameter_shadow_review_after_fresh_evidence"
-      ],
-      "final_discard_allowed": false,
-      "forbidden_operations": [
-        "broker_connection",
-        "real_order",
-        "live_execution",
-        "paper_trading_approval",
-        "manual_m12_37_once",
-        "m13_registry_mutation",
-        "m12_account_specs_mutation",
-        "broker_readiness_status_mutation",
-        "parameter_mutation"
-      ],
-      "gap_state": "wait_shadow_parameter_review",
-      "internal_simulated_account": true,
-      "live_execution": false,
-      "m12_account_specs_mutation": false,
-      "m13_registry_mutation": false,
-      "manual_m12_37_once": false,
-      "manual_review_ready": false,
-      "missing_evidence_categories": [
-        "m12_47_fresh_refresh",
-        "manual_m14_review",
-        "rescue_10_day_ab_window",
-        "shadow_parameter_review"
-      ],
-      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
-      "open_evidence_gap_count": 4,
-      "paper_simulated_only": true,
-      "paper_trading_approval": false,
-      "parameter_experiment_row_count": 1,
-      "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
-        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
-      ],
-      "pre_refresh_review_available": true,
-      "priority": "P0",
-      "real_order": false,
-      "requires_m12_47_fresh_refresh": true,
-      "rescue_ab_observed_days_max": 1,
-      "rescue_ab_remaining_days_min": 9,
-      "route_category": "rescue_ab_collect",
-      "sequence_rank": 31,
-      "shadow_review_candidate_count": 0,
-      "strategy_id": "M12-FTD-001"
     },
     {
       "activation_gate_row_count": 1,
@@ -822,11 +892,11 @@
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "detector_rebuild_ab",
+      "burn_down_lane": "rescue_shadow_parameter_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 1,
-      "continue_rescue": true,
+      "continue_rescue": false,
       "display_name": "Session microstructure experimental runtime",
       "execution_action_ids": [
         "rescue_ab_evidence_window",
@@ -873,32 +943,38 @@
       "requires_m12_47_fresh_refresh": true,
       "rescue_ab_observed_days_max": 1,
       "rescue_ab_remaining_days_min": 9,
-      "route_category": "rebuild_detector_then_ab",
-      "sequence_rank": 53,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-011"
     },
     {
-      "activation_gate_row_count": 1,
-      "activation_waiting_for_fresh_refresh_count": 1,
+      "activation_gate_row_count": 2,
+      "activation_waiting_for_fresh_refresh_count": 0,
       "allowed_operations": [
         "artifact_review",
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
         "manual_m14_review_pending",
-        "rescue_10_day_ab_window_incomplete"
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "rescue_ab_collection",
+      "burn_down_lane": "rescue_shadow_parameter_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
-      "candidate_variant_count": 0,
-      "continue_rescue": true,
-      "display_name": "PA004 momentum breakout follow-through experimental runtime",
-      "execution_action_ids": [],
+      "candidate_variant_count": 2,
+      "continue_rescue": false,
+      "display_name": "Opening range breakout runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "rescue_ab_evidence_window",
+        "parameter_shadow_review_after_fresh_evidence"
+      ],
       "final_discard_allowed": false,
       "forbidden_operations": [
         "broker_connection",
@@ -911,7 +987,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "collect_rescue_ab_evidence",
+      "gap_state": "wait_shadow_parameter_review",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -919,26 +995,249 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
         "manual_m14_review",
-        "rescue_10_day_ab_window"
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
       ],
-      "next_evidence_to_collect": "10 trading-day rescue A/B evidence window.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 2,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters.",
+        "Review broker-blocker or target/stop shadow variants as internal-sim evidence contracts only."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 1,
+      "strategy_id": "M10-PA-012"
+    },
+    {
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": false,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 1,
+      "continue_rescue": false,
+      "display_name": "Visual strategy 013 experimental runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh",
+        "rescue_ab_evidence_window",
+        "parameter_shadow_review_after_fresh_evidence"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 1,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [],
-      "pre_refresh_review_available": false,
-      "priority": "P1",
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
       "real_order": false,
-      "requires_m12_47_fresh_refresh": false,
-      "rescue_ab_observed_days_max": 0,
-      "rescue_ab_remaining_days_min": 0,
-      "route_category": "parallel_ab_collect",
-      "sequence_rank": 142,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
       "shadow_review_candidate_count": 0,
-      "strategy_id": "M10-PA-004-MBF"
+      "strategy_id": "M10-PA-013"
+    },
+    {
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": false,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 1,
+      "continue_rescue": false,
+      "display_name": "Formal daily trend runtime",
+      "execution_action_ids": [
+        "rescue_ab_evidence_window",
+        "parameter_shadow_review_after_fresh_evidence"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 1,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 0,
+      "strategy_id": "M12-FTD-001"
+    },
+    {
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "m12_47_fresh_refresh_not_observed",
+        "manual_m14_review_pending",
+        "rescue_10_day_ab_window_incomplete",
+        "shadow_parameter_review_not_open"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": false,
+      "burn_down_lane": "rescue_shadow_parameter_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 1,
+      "continue_rescue": false,
+      "display_name": "Formal daily trend runtime",
+      "execution_action_ids": [
+        "rescue_ab_evidence_window",
+        "parameter_shadow_review_after_fresh_evidence"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "wait_shadow_parameter_review",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "m12_47_fresh_refresh",
+        "manual_m14_review",
+        "rescue_10_day_ab_window",
+        "shadow_parameter_review"
+      ],
+      "next_evidence_to_collect": "Next M12.47-supervised fresh refresh and post-run M13 ledger update.",
+      "open_evidence_gap_count": 4,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 1,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [
+        "Review existing artifacts only; wait for M12.47 to own any evidence-changing refresh.",
+        "Check shadow parameter families and activation gates for review readiness; do not mutate parameters."
+      ],
+      "pre_refresh_review_available": true,
+      "priority": "P0",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": true,
+      "rescue_ab_observed_days_max": 1,
+      "rescue_ab_remaining_days_min": 9,
+      "route_category": "manual_review_required",
+      "sequence_rank": 39,
+      "shadow_review_candidate_count": 0,
+      "strategy_id": "M12-FTD-001"
     },
     {
       "activation_gate_row_count": 0,
@@ -948,13 +1247,12 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
@@ -973,7 +1271,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -981,26 +1279,23 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "AI-TRADER-EXTERNAL"
     },
@@ -1012,13 +1307,12 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
@@ -1037,7 +1331,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -1045,28 +1339,87 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-003"
+    },
+    {
+      "activation_gate_row_count": 1,
+      "activation_waiting_for_fresh_refresh_count": 0,
+      "allowed_operations": [
+        "artifact_review",
+        "m12_47_supervised_refresh_review"
+      ],
+      "blocked_by": [
+        "manual_m14_review_pending"
+      ],
+      "broker_connection": false,
+      "broker_readiness_status_mutation": false,
+      "broker_watch": false,
+      "burn_down_lane": "manual_review",
+      "can_continue_internal_sim_now": false,
+      "can_promote_now": false,
+      "candidate_variant_count": 0,
+      "continue_rescue": false,
+      "display_name": "PA004 momentum breakout follow-through experimental runtime",
+      "execution_action_ids": [
+        "approved_internal_sim_next_refresh"
+      ],
+      "final_discard_allowed": false,
+      "forbidden_operations": [
+        "broker_connection",
+        "real_order",
+        "live_execution",
+        "paper_trading_approval",
+        "manual_m12_37_once",
+        "m13_registry_mutation",
+        "m12_account_specs_mutation",
+        "broker_readiness_status_mutation",
+        "parameter_mutation"
+      ],
+      "gap_state": "manual_review_required",
+      "internal_simulated_account": true,
+      "live_execution": false,
+      "m12_account_specs_mutation": false,
+      "m13_registry_mutation": false,
+      "manual_m12_37_once": false,
+      "manual_review_ready": false,
+      "missing_evidence_categories": [
+        "manual_m14_review"
+      ],
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
+      "paper_simulated_only": true,
+      "paper_trading_approval": false,
+      "parameter_experiment_row_count": 1,
+      "parameter_mutation": false,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
+      "priority": "P2",
+      "real_order": false,
+      "requires_m12_47_fresh_refresh": false,
+      "rescue_ab_observed_days_max": 0,
+      "rescue_ab_remaining_days_min": 0,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
+      "shadow_review_candidate_count": 0,
+      "strategy_id": "M10-PA-004-MBF"
     },
     {
       "activation_gate_row_count": 0,
@@ -1076,13 +1429,12 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
@@ -1101,7 +1453,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -1109,26 +1461,23 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-006"
     },
@@ -1140,18 +1489,17 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
       "continue_rescue": false,
-      "display_name": "Visual research-only module",
+      "display_name": "Visual auxiliary-module module",
       "execution_action_ids": [],
       "final_discard_allowed": false,
       "forbidden_operations": [
@@ -1165,7 +1513,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -1173,26 +1521,23 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-010"
     },
@@ -1204,13 +1549,12 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
@@ -1229,7 +1573,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -1237,26 +1581,23 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-014"
     },
@@ -1268,13 +1609,12 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
@@ -1293,7 +1633,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -1301,26 +1641,23 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-015"
     },
@@ -1332,13 +1669,12 @@
         "m12_47_supervised_refresh_review"
       ],
       "blocked_by": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review_pending"
       ],
       "broker_connection": false,
       "broker_readiness_status_mutation": false,
       "broker_watch": false,
-      "burn_down_lane": "shadow_plugin_research",
+      "burn_down_lane": "manual_review",
       "can_continue_internal_sim_now": false,
       "can_promote_now": false,
       "candidate_variant_count": 0,
@@ -1357,7 +1693,7 @@
         "broker_readiness_status_mutation",
         "parameter_mutation"
       ],
-      "gap_state": "shadow_or_plugin_hold",
+      "gap_state": "manual_review_required",
       "internal_simulated_account": true,
       "live_execution": false,
       "m12_account_specs_mutation": false,
@@ -1365,31 +1701,28 @@
       "manual_m12_37_once": false,
       "manual_review_ready": false,
       "missing_evidence_categories": [
-        "independent_strategy_evidence_missing",
         "manual_m14_review"
       ],
-      "next_evidence_to_collect": "Independent strategy evidence beyond plugin or research-only coverage.",
-      "open_evidence_gap_count": 2,
+      "next_evidence_to_collect": "Manual M14 review after machine evidence is complete.",
+      "open_evidence_gap_count": 1,
       "paper_simulated_only": true,
       "paper_trading_approval": false,
       "parameter_experiment_row_count": 0,
       "parameter_mutation": false,
-      "pre_refresh_review_actions": [
-        "Recheck source evidence and keep the item in shadow/plugin/research coverage unless an independent account is justified."
-      ],
-      "pre_refresh_review_available": true,
+      "pre_refresh_review_actions": [],
+      "pre_refresh_review_available": false,
       "priority": "P2",
       "real_order": false,
       "requires_m12_47_fresh_refresh": false,
       "rescue_ab_observed_days_max": 0,
       "rescue_ab_remaining_days_min": 0,
-      "route_category": "shadow_or_plugin_hold",
-      "sequence_rank": 274,
+      "route_category": "manual_review_required",
+      "sequence_rank": 299,
       "shadow_review_candidate_count": 0,
       "strategy_id": "M10-PA-016"
     }
   ],
-  "generated_at": "2026-05-26T23:59:54Z",
+  "generated_at": "2026-06-01T17:29:01Z",
   "hard_boundaries": {
     "broker_connection": false,
     "broker_readiness_status_mutation": false,
@@ -1418,55 +1751,51 @@
   "paper_simulated_only": true,
   "paper_trading_approval": false,
   "parameter_mutation": false,
-  "plain_language_result": "Strategy evidence burndown has 20 rows: 12 P0, 1 P1, and 7 P2. 3 approved strategies are waiting for the next M12.47-supervised internal-sim refresh; 2 rows need first rescue ledgers; 10 need rescue 10-day A/B evidence; 11 need shadow-review evidence. Pre-refresh artifact review is available for 19 rows, but broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, broker-readiness mutation, and manual M12.37 once-mode remain disabled.",
+  "plain_language_result": "Strategy evidence burndown has 25 rows: 17 P0, 0 P1, and 8 P2. 2 approved strategies are waiting for the next M12.47-supervised internal-sim refresh; 0 rows need first rescue ledgers; 15 need rescue 10-day A/B evidence; 16 need shadow-review evidence. Pre-refresh artifact review is available for 17 rows, but broker/live, real orders, paper approval, parameter mutation, registry/account-spec mutation, broker-readiness mutation, and manual M12.37 once-mode remain disabled.",
   "real_order": false,
   "schema_version": "m14.strategy-evidence-gap-burndown.v1",
   "stage": "M14.strategy_evidence_gap_burndown",
   "summary": {
     "broker_or_live_enabled": false,
     "burn_down_lane_counts": {
-      "approved_internal_sim_refresh": 3,
-      "detector_rebuild_ab": 1,
-      "first_rescue_ledger": 1,
-      "rescue_ab_collection": 1,
-      "rescue_shadow_parameter_review": 7,
-      "shadow_plugin_research": 7
+      "approved_internal_sim_refresh": 2,
+      "manual_review": 8,
+      "rescue_shadow_parameter_review": 15
     },
-    "burndown_row_count": 20,
+    "burndown_row_count": 25,
     "challenge_progress_label": "10/10",
     "current_project_stage": "M14 stable strategy testing + M14.2 broker readiness dry-run scaffold",
     "external_reference_broker_blocker_row_count": 2,
     "external_reference_mapped_rescue_row_count": 11,
     "external_reference_project_count": 2,
     "final_discard_allowed_count": 0,
-    "first_ledger_watch_row_count": 2,
+    "first_ledger_watch_row_count": 0,
     "m14_trading_date": "2026-05-22",
     "manual_execution_allowed_count": 0,
     "manual_m12_37_once_allowed": false,
     "objective_execution_action_count": 7,
     "objective_execution_p0_action_count": 5,
-    "objective_execution_waiting_for_fresh_refresh_action_count": 5,
-    "open_evidence_gap_row_count": 20,
-    "p0_row_count": 12,
-    "p1_row_count": 1,
-    "p2_row_count": 7,
+    "objective_execution_waiting_for_fresh_refresh_action_count": 3,
+    "open_evidence_gap_row_count": 25,
+    "p0_row_count": 17,
+    "p1_row_count": 0,
+    "p2_row_count": 8,
     "parameter_activation_gate_row_count": 14,
-    "parameter_activation_shadow_review_candidate_count": 0,
-    "parameter_activation_waiting_for_fresh_refresh_count": 13,
+    "parameter_activation_shadow_review_candidate_count": 3,
+    "parameter_activation_waiting_for_fresh_refresh_count": 0,
     "parameter_experiment_allowed_now_count": 0,
     "parameter_experiment_row_count": 14,
     "parameter_mutation_allowed_count": 0,
-    "pre_refresh_review_available_count": 19,
+    "pre_refresh_review_available_count": 17,
     "priority_counts": {
-      "P0": 12,
-      "P1": 1,
-      "P2": 7
+      "P0": 17,
+      "P2": 8
     },
     "promotion_candidate_count": 0,
-    "ready_for_internal_sim_refresh_count": 3,
-    "requires_m12_47_fresh_refresh_count": 12,
-    "rescue_ab_collection_row_count": 10,
-    "shadow_plugin_hold_row_count": 7,
-    "shadow_review_wait_row_count": 11
+    "ready_for_internal_sim_refresh_count": 2,
+    "requires_m12_47_fresh_refresh_count": 17,
+    "rescue_ab_collection_row_count": 15,
+    "shadow_plugin_hold_row_count": 0,
+    "shadow_review_wait_row_count": 16
   }
 }

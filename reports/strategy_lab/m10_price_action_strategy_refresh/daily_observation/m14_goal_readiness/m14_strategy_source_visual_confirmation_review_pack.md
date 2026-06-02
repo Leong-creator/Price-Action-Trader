@@ -1,6 +1,6 @@
 # M14 Strategy Source Visual Confirmation Review Pack
 
-- Generated at: `2026-05-26T17:42:48Z`
+- Generated at: `2026-06-01T17:29:01Z`
 - Response file: `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_goal_readiness/m14_strategy_source_visual_confirmation_response.json`
 - Gate rows / strategies: `2/2`
 - Review questions / case assets: `6/10`
