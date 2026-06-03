@@ -355,6 +355,22 @@ class M1247SessionSupervisorTest(unittest.TestCase):
 
         self.assertEqual(reason, "")
 
+    def test_stale_dashboard_restart_reason_respects_active_cache_writes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T14:00:00Z"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            phase = build_window_state(config, "2026-05-05T14:20:30Z")
+
+            with patch("scripts.run_m12_47_session_supervisor.child_has_recent_artifact_activity", return_value=True):
+                reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:00:00Z")
+
+        self.assertEqual(reason, "")
+
     def test_print_status_persists_dead_supervisor_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "m12_47"

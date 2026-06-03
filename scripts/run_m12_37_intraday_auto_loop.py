@@ -36,7 +36,7 @@ from scripts.m14_strategy_challenge_gate_lib import (  # noqa: E402
 
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_37_intraday_auto_loop.json"
 PREOPEN_NATIVE_FETCH_BUDGET = 100
-REGULAR_NATIVE_FETCH_BUDGET = 100
+REGULAR_NATIVE_FETCH_BUDGET = 294
 
 
 @dataclass(frozen=True, slots=True)

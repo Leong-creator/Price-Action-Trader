@@ -92,6 +92,224 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertEqual(rows[0]["status"], "deferred")
         self.assertIn("longbridge kline history failed", rows[0]["skipped_reason"])
 
+    def test_intraday_fast_refresh_skips_stale_daily_cache_and_fetches_5m_first(self) -> None:
+        config = MODULE.load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            history_dir = root / "longbridge_history"
+            history_dir.mkdir(parents=True)
+            existing_daily = history_dir / "us_SPY_1d_2010-06-29_2026-06-02_longbridge.csv"
+            MODULE.write_cache_csv(
+                existing_daily,
+                [
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2010-06-29T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "100.00",
+                        "high": "101.00",
+                        "low": "99.00",
+                        "close": "100.50",
+                        "volume": "1000",
+                    },
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-06-02T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "520.00",
+                        "high": "525.00",
+                        "low": "519.00",
+                        "close": "524.00",
+                        "volume": "2000",
+                    },
+                ],
+            )
+            test_config = replace(
+                config,
+                local_data_roots=(root,),
+                daily_end=date(2026, 6, 3),
+                intraday_current_start=date(2026, 6, 3),
+                intraday_end=date(2026, 6, 3),
+            )
+
+            def fake_fetch(_config, target):
+                self.assertEqual(target.timeframe, "5m")
+                return [
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "5m",
+                        "timestamp": "2026-06-03T09:30:00",
+                        "timezone": "America/New_York",
+                        "open": "525.00",
+                        "high": "526.00",
+                        "low": "524.00",
+                        "close": "525.50",
+                        "volume": "1000",
+                    }
+                ]
+
+            with patch("scripts.m12_12_daily_observation_loop_lib.fetch_target_rows", side_effect=fake_fetch):
+                rows = MODULE.run_fetch_plan(
+                    test_config,
+                    ["SPY"],
+                    generated_at="2026-06-03T13:31:00Z",
+                    execute_fetch=True,
+                    max_native_fetches=1,
+                    force_refresh_current_intraday=True,
+                )
+            inventory, cache = MODULE.build_cache_inventory(test_config, ["SPY"], "2026-06-03T13:31:00Z", rows)
+
+        self.assertEqual(rows[0]["timeframe"], "5m")
+        self.assertEqual(rows[0]["status"], "fetched")
+        self.assertEqual(rows[1]["timeframe"], "1d")
+        self.assertEqual(rows[1]["status"], "deferred")
+        self.assertEqual(rows[1]["skipped_reason"], "daily_cache_deferred_during_intraday_fast_refresh")
+        daily_inventory = [row for row in inventory if row["timeframe"] == "1d"][0]
+        self.assertEqual(daily_inventory["coverage_status"], "prior_daily_cache_accepted_for_intraday_fast_refresh")
+        self.assertTrue(daily_inventory["ready_for_daily_test"])
+        self.assertEqual(cache["daily_ready_symbols"], 1)
+        self.assertEqual(cache["current_5m_ready_symbols"], 1)
+
+    def test_intraday_fast_refresh_fetches_missing_daily_only_through_previous_session(self) -> None:
+        config = MODULE.load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            test_config = replace(
+                config,
+                local_data_roots=(root,),
+                daily_end=date(2026, 6, 3),
+                intraday_current_start=date(2026, 6, 3),
+                intraday_end=date(2026, 6, 3),
+            )
+
+            def fake_fetch(_config, target):
+                if target.timeframe == "5m":
+                    return [
+                        {
+                            "symbol": "SPY",
+                            "market": "US",
+                            "timeframe": "5m",
+                            "timestamp": "2026-06-03T09:30:00",
+                            "timezone": "America/New_York",
+                            "open": "525.00",
+                            "high": "526.00",
+                            "low": "524.00",
+                            "close": "525.50",
+                            "volume": "1000",
+                        }
+                    ]
+                self.assertEqual(target.timeframe, "1d")
+                self.assertEqual(target.target_end, date(2026, 6, 2))
+                return [
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2010-06-29T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "100.00",
+                        "high": "101.00",
+                        "low": "99.00",
+                        "close": "100.50",
+                        "volume": "1000",
+                    },
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-06-02T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "520.00",
+                        "high": "525.00",
+                        "low": "519.00",
+                        "close": "524.00",
+                        "volume": "2000",
+                    },
+                ]
+
+            with patch("scripts.m12_12_daily_observation_loop_lib.fetch_target_rows", side_effect=fake_fetch):
+                rows = MODULE.run_fetch_plan(
+                    test_config,
+                    ["SPY"],
+                    generated_at="2026-06-03T13:31:00Z",
+                    execute_fetch=True,
+                    max_native_fetches=2,
+                    force_refresh_current_intraday=True,
+                )
+            inventory, cache = MODULE.build_cache_inventory(
+                test_config,
+                ["SPY"],
+                "2026-06-03T13:31:00Z",
+                rows,
+                accept_prior_daily_for_intraday_fast_refresh=True,
+            )
+
+        self.assertEqual(rows[0]["timeframe"], "5m")
+        self.assertEqual(rows[0]["status"], "fetched")
+        self.assertEqual(rows[1]["timeframe"], "1d")
+        self.assertEqual(rows[1]["target_end"], "2026-06-02")
+        self.assertEqual(rows[1]["status"], "fetched")
+        daily_inventory = [row for row in inventory if row["timeframe"] == "1d"][0]
+        self.assertEqual(daily_inventory["coverage_status"], "prior_daily_cache_accepted_for_intraday_fast_refresh")
+        self.assertTrue(daily_inventory["ready_for_daily_test"])
+        self.assertEqual(cache["daily_ready_symbols"], 1)
+        self.assertEqual(cache["current_5m_ready_symbols"], 1)
+
+    def test_intraday_prior_daily_accepts_later_ipo_start(self) -> None:
+        config = MODULE.load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            history_dir = root / "longbridge_history"
+            history_dir.mkdir(parents=True)
+            existing_daily = history_dir / "us_ABNB_1d_2010-06-29_2026-06-02_longbridge.csv"
+            MODULE.write_cache_csv(
+                existing_daily,
+                [
+                    {
+                        "symbol": "ABNB",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2020-12-10T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "146.00",
+                        "high": "165.00",
+                        "low": "141.00",
+                        "close": "144.71",
+                        "volume": "1000",
+                    },
+                    {
+                        "symbol": "ABNB",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-06-02T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "130.00",
+                        "high": "132.00",
+                        "low": "128.00",
+                        "close": "131.00",
+                        "volume": "2000",
+                    },
+                ],
+            )
+            test_config = replace(config, local_data_roots=(root,), daily_end=date(2026, 6, 3))
+            inventory, cache = MODULE.build_cache_inventory(
+                test_config,
+                ["ABNB"],
+                "2026-06-03T13:31:00Z",
+                [],
+                accept_prior_daily_for_intraday_fast_refresh=True,
+            )
+
+        daily_inventory = [row for row in inventory if row["timeframe"] == "1d"][0]
+        self.assertEqual(daily_inventory["coverage_status"], "prior_daily_cache_accepted_for_intraday_fast_refresh")
+        self.assertTrue(daily_inventory["ready_for_daily_test"])
+        self.assertEqual(cache["daily_ready_symbols"], 1)
+
     def test_public_daily_fallback_appends_current_day_to_existing_cache(self) -> None:
         config = MODULE.load_config()
         with tempfile.TemporaryDirectory() as tmp:

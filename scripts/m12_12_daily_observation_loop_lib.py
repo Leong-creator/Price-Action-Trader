@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import lru_cache
 from pathlib import Path
@@ -35,6 +35,7 @@ from scripts.public_backtest_demo_lib import CSV_HEADER, sanitize_vendor_rows, w
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_12_daily_observation_loop.json"
+MARKET_CALENDAR_CONFIG_PATH = ROOT / "config" / "examples" / "m12_47_session_supervisor.json"
 OUTPUT_DIR = M10_DIR / "daily_observation" / "m12_12_loop"
 SPEC_DIR = M10_DIR / "backtest_specs"
 VISUAL_LEDGER_PATH = M10_DIR / "visual_review" / "m12_9_closure" / "m12_9_case_review_ledger.json"
@@ -248,7 +249,13 @@ def run_m12_12_daily_observation_loop(
         max_native_fetches=max_native_fetches,
         force_refresh_current_intraday=force_refresh_current_intraday,
     )
-    cache_inventory, cache_summary = build_cache_inventory(config, symbols, generated_at, fetch_results)
+    cache_inventory, cache_summary = build_cache_inventory(
+        config,
+        symbols,
+        generated_at,
+        fetch_results,
+        accept_prior_daily_for_intraday_fast_refresh=force_refresh_current_intraday,
+    )
     specs = load_specs()
     scanner_candidates, observation_rows, scanner_deferred = scan_daily_loop(config, symbols, specs, generated_at)
     formal_summary, formal_trades = run_formal_daily_strategy(config, symbols, generated_at)
@@ -366,32 +373,60 @@ def run_fetch_plan(
     fetch_enabled = execute_fetch and config.fetch_policy.allow_readonly_fetch
     results: list[dict[str, Any]] = []
     targets = build_fetch_targets(config, symbols)
+    if force_refresh_current_intraday:
+        targets.sort(key=intraday_fast_refresh_target_rank)
     executed = 0
     consecutive_provider_failures = 0
     provider_circuit_reason = ""
     for target in targets:
         existing = best_cache_file(config.local_data_roots, target.symbol, target.timeframe, target.target_start, target.target_end)
+        if (
+            force_refresh_current_intraday
+            and target.fetch_mode == "full_daily"
+            and existing is not None
+            and prior_daily_cache_is_usable_for_intraday(existing, target.target_start, target.target_end)
+        ):
+            results.append(
+                fetch_result(
+                    target,
+                    "deferred",
+                    existing,
+                    generated_at,
+                    skipped_reason="daily_cache_deferred_during_intraday_fast_refresh",
+                )
+            )
+            continue
+        fetch_target = intraday_fast_refresh_daily_fetch_target(config, target) if (
+            force_refresh_current_intraday and target.fetch_mode == "full_daily"
+        ) else target
+        existing = best_cache_file(
+            config.local_data_roots,
+            fetch_target.symbol,
+            fetch_target.timeframe,
+            fetch_target.target_start,
+            fetch_target.target_end,
+        )
         force_current_intraday = (
             force_refresh_current_intraday
-            and target.timeframe == "5m"
-            and target.fetch_mode == "current_regular_session_5m"
+            and fetch_target.timeframe == "5m"
+            and fetch_target.fetch_mode == "current_regular_session_5m"
         )
-        if existing and is_target_ready(existing, target.target_start, target.target_end) and not force_current_intraday:
-            results.append(fetch_result(target, "already_ready", existing, generated_at, skipped_reason="cache_already_covers_target"))
+        if existing and is_target_ready(existing, fetch_target.target_start, fetch_target.target_end) and not force_current_intraday:
+            results.append(fetch_result(fetch_target, "already_ready", existing, generated_at, skipped_reason="cache_already_covers_target"))
             continue
         if not fetch_enabled:
-            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason="fetch_disabled"))
+            results.append(fetch_result(fetch_target, "deferred", existing, generated_at, skipped_reason="fetch_disabled"))
             continue
         if provider_circuit_reason:
             try:
-                rows = fetch_public_fallback_rows(config, target, existing)
+                rows = fetch_public_fallback_rows(config, fetch_target, existing)
                 rows, anomalies = sanitize_vendor_rows(rows)
                 if not rows:
                     raise RuntimeError("public provider returned no usable rows")
-                write_cache_csv(target.destination, rows)
+                write_cache_csv(fetch_target.destination, rows)
                 write_cache_metadata(
-                    target.destination,
-                    target,
+                    fetch_target.destination,
+                    fetch_target,
                     rows,
                     anomalies,
                     generated_at,
@@ -400,9 +435,9 @@ def run_fetch_plan(
                 executed += 1
                 results.append(
                     fetch_result(
-                        target,
+                        fetch_target,
                         "fetched_public_fallback",
-                        target.destination,
+                        fetch_target.destination,
                         generated_at,
                         row_count=len(rows),
                         anomaly_count=len(anomalies),
@@ -412,27 +447,27 @@ def run_fetch_plan(
             except Exception as public_exc:
                 results.append(
                     fetch_result(
-                        target,
+                        fetch_target,
                         "deferred",
                         existing,
                         generated_at,
                         skipped_reason=f"{provider_circuit_reason}; yahoo_chart_error={str(public_exc)[:160]}",
                     )
-                )
+            )
             continue
         if executed >= budget:
-            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason="fetch_budget_exhausted"))
+            results.append(fetch_result(fetch_target, "deferred", existing, generated_at, skipped_reason="fetch_budget_exhausted"))
             continue
         try:
-            rows = fetch_target_rows(config, target)
+            rows = fetch_target_rows(config, fetch_target)
             rows, anomalies = sanitize_vendor_rows(rows)
             if not rows:
                 raise RuntimeError("provider returned no usable rows")
-            write_cache_csv(target.destination, rows)
-            write_cache_metadata(target.destination, target, rows, anomalies, generated_at)
+            write_cache_csv(fetch_target.destination, rows)
+            write_cache_metadata(fetch_target.destination, fetch_target, rows, anomalies, generated_at)
             executed += 1
             consecutive_provider_failures = 0
-            results.append(fetch_result(target, "fetched", target.destination, generated_at, row_count=len(rows), anomaly_count=len(anomalies)))
+            results.append(fetch_result(fetch_target, "fetched", fetch_target.destination, generated_at, row_count=len(rows), anomaly_count=len(anomalies)))
         except Exception as exc:  # pragma: no cover - runtime provider path
             skipped_reason = str(exc)
             provider_failure = is_provider_level_fetch_failure(skipped_reason)
@@ -444,14 +479,14 @@ def run_fetch_plan(
                         f"{MAX_CONSECUTIVE_PROVIDER_FETCH_FAILURES}_failures: {skipped_reason}"
                     )
                 try:
-                    rows = fetch_public_fallback_rows(config, target, existing)
+                    rows = fetch_public_fallback_rows(config, fetch_target, existing)
                     rows, anomalies = sanitize_vendor_rows(rows)
                     if not rows:
                         raise RuntimeError("public provider returned no usable rows")
-                    write_cache_csv(target.destination, rows)
+                    write_cache_csv(fetch_target.destination, rows)
                     write_cache_metadata(
-                        target.destination,
-                        target,
+                        fetch_target.destination,
+                        fetch_target,
                         rows,
                         anomalies,
                         generated_at,
@@ -460,9 +495,9 @@ def run_fetch_plan(
                     executed += 1
                     results.append(
                         fetch_result(
-                            target,
+                            fetch_target,
                             "fetched_public_fallback",
-                            target.destination,
+                            fetch_target.destination,
                             generated_at,
                             row_count=len(rows),
                             anomaly_count=len(anomalies),
@@ -472,10 +507,64 @@ def run_fetch_plan(
                     continue
                 except Exception as public_exc:
                     skipped_reason = f"{skipped_reason}; yahoo_chart_error={str(public_exc)[:160]}"
-            results.append(fetch_result(target, "deferred", existing, generated_at, skipped_reason=skipped_reason))
+            results.append(fetch_result(fetch_target, "deferred", existing, generated_at, skipped_reason=skipped_reason))
             if not provider_failure:
                 consecutive_provider_failures = 0
     return results
+
+
+def intraday_fast_refresh_target_rank(target: FetchTarget) -> tuple[int, str]:
+    if target.fetch_mode == "current_regular_session_5m":
+        return (0, target.symbol)
+    if target.fetch_mode == "full_daily":
+        return (1, target.symbol)
+    return (2, target.symbol)
+
+
+def prior_daily_cache_is_usable_for_intraday(path: Path, target_start: date, target_end: date) -> bool:
+    stats = csv_stats(path)
+    if not stats["row_count"] or not stats["start_date"] or not stats["end_date"]:
+        return False
+    cache_start = date.fromisoformat(stats["start_date"])
+    cache_end = date.fromisoformat(stats["end_date"])
+    request_start = stats.get("request_start_date", "")
+    starts_at_target_or_first_available = cache_start <= target_start or (
+        bool(request_start) and date.fromisoformat(request_start) <= target_start
+    )
+    if not starts_at_target_or_first_available or cache_end >= target_end:
+        return False
+    return (target_end - cache_end).days <= 5
+
+
+def intraday_fast_refresh_daily_fetch_target(config: M1212Config, target: FetchTarget) -> FetchTarget:
+    target_end = previous_complete_daily_session(target.target_end)
+    return FetchTarget(
+        symbol=target.symbol,
+        timeframe=target.timeframe,
+        target_start=target.target_start,
+        target_end=target_end,
+        fetch_mode=target.fetch_mode,
+        destination=cache_write_root(config)
+        / "longbridge_history"
+        / f"{config.market.lower()}_{target.symbol}_1d_{target.target_start.isoformat()}_{target_end.isoformat()}_longbridge.csv",
+    )
+
+
+def previous_complete_daily_session(target_end: date) -> date:
+    holidays = market_holiday_dates()
+    candidate = target_end - timedelta(days=1)
+    while candidate.weekday() >= 5 or candidate in holidays:
+        candidate -= timedelta(days=1)
+    return candidate
+
+
+@lru_cache(maxsize=1)
+def market_holiday_dates() -> frozenset[date]:
+    try:
+        payload = json.loads(MARKET_CALENDAR_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return frozenset()
+    return frozenset(date.fromisoformat(item) for item in payload.get("market_holidays", []))
 
 
 def is_provider_level_fetch_failure(reason: str) -> bool:
@@ -494,6 +583,7 @@ def is_provider_level_fetch_failure(reason: str) -> bool:
 
 def build_fetch_targets(config: M1212Config, symbols: list[str]) -> list[FetchTarget]:
     targets: list[FetchTarget] = []
+    write_root = cache_write_root(config)
     for symbol in symbols:
         if "1d" in config.fetch_policy.fetch_timeframes:
             targets.append(
@@ -503,8 +593,7 @@ def build_fetch_targets(config: M1212Config, symbols: list[str]) -> list[FetchTa
                     target_start=config.daily_start,
                     target_end=config.daily_end,
                     fetch_mode="full_daily",
-                    destination=ROOT
-                    / "local_data"
+                    destination=write_root
                     / "longbridge_history"
                     / f"{config.market.lower()}_{symbol}_1d_{config.daily_start.isoformat()}_{config.daily_end.isoformat()}_longbridge.csv",
                 )
@@ -517,13 +606,16 @@ def build_fetch_targets(config: M1212Config, symbols: list[str]) -> list[FetchTa
                     target_start=config.intraday_current_start,
                     target_end=config.intraday_end,
                     fetch_mode="current_regular_session_5m",
-                    destination=ROOT
-                    / "local_data"
+                    destination=write_root
                     / "longbridge_intraday"
                     / f"{config.market.lower()}_{symbol}_5m_{config.intraday_current_start.isoformat()}_{config.intraday_end.isoformat()}_longbridge.csv",
                 )
             )
     return targets
+
+
+def cache_write_root(config: M1212Config) -> Path:
+    return config.local_data_roots[0] if config.local_data_roots else ROOT / "local_data"
 
 
 def fetch_target_rows(config: M1212Config, target: FetchTarget) -> list[dict[str, str]]:
@@ -738,6 +830,8 @@ def build_cache_inventory(
     symbols: list[str],
     generated_at: str,
     fetch_results: list[dict[str, Any]],
+    *,
+    accept_prior_daily_for_intraday_fast_refresh: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     fetch_by_symbol_tf = {(item["symbol"], item["timeframe"], item["fetch_mode"]): item for item in fetch_results}
@@ -745,7 +839,27 @@ def build_cache_inventory(
         daily_path = best_cache_file(config.local_data_roots, symbol, "1d", config.daily_start, config.daily_end)
         five_current_path = best_cache_file(config.local_data_roots, symbol, "5m", config.intraday_current_start, config.intraday_end)
         five_full_path = best_cache_file(config.local_data_roots, symbol, "5m", config.intraday_full_start, config.intraday_end)
-        rows.append(inventory_row(config, symbol, "1d", "native_daily_cache", daily_path, config.daily_start, config.daily_end))
+        daily_row = inventory_row(config, symbol, "1d", "native_daily_cache", daily_path, config.daily_start, config.daily_end)
+        daily_result = fetch_by_symbol_tf.get((symbol, "1d", "full_daily"))
+        if daily_path is not None and (
+            (
+                daily_result
+                and daily_result.get("skipped_reason") == "daily_cache_deferred_during_intraday_fast_refresh"
+            )
+            or (
+                accept_prior_daily_for_intraday_fast_refresh
+                and prior_daily_cache_is_usable_for_intraday(daily_path, config.daily_start, config.daily_end)
+            )
+        ):
+            daily_row.update(
+                {
+                    "coverage_status": "prior_daily_cache_accepted_for_intraday_fast_refresh",
+                    "coverage_reason": "常规交易时段先使用上一交易日完整日线缓存，避免未收盘日线阻塞当日5分钟信号；盘后再补完整日线。",
+                    "ready_for_daily_test": True,
+                    "intraday_fast_refresh_daily_cache": True,
+                }
+            )
+        rows.append(daily_row)
         rows.append(inventory_row(config, symbol, "5m_current", "native_current_session_5m_cache", five_current_path, config.intraday_current_start, config.intraday_end))
         rows.append(inventory_row(config, symbol, "5m_full_target", "native_full_5m_cache", five_full_path, config.intraday_full_start, config.intraday_end))
         rows.append(inventory_row(config, symbol, "15m_current", "derived_from_5m_current", five_current_path, config.intraday_current_start, config.intraday_end))

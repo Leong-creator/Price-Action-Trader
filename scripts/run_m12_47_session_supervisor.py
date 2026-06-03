@@ -697,6 +697,8 @@ def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, st
     child_age_seconds = int((now_dt - child_started_dt).total_seconds())
     if child_age_seconds < child_grace_seconds:
         return ""
+    if child_has_recent_artifact_activity(config, now_dt, max(refresh_seconds * 10, 600)):
+        return ""
     dashboard = read_json_if_exists(dashboard_json_path(config))
     dashboard_generated_at = str(dashboard.get("generated_at") or dashboard.get("summary", {}).get("generated_at") or "")
     dashboard_dt = parse_utc_timestamp(dashboard_generated_at)
@@ -707,6 +709,47 @@ def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, st
     if dashboard_age_seconds > stale_after_seconds:
         return f"dashboard_stale_{dashboard_age_seconds}s_over_{stale_after_seconds}s"
     return ""
+
+
+def child_has_recent_artifact_activity(config: SupervisorConfig, now_dt: datetime, within_seconds: int) -> bool:
+    newest_mtime: datetime | None = None
+    roots: tuple[Path, ...] = (
+        child_log_path(config),
+        config.output_dir / "m12_12_current_day_source",
+    )
+    try:
+        config.output_dir.resolve().relative_to(ROOT)
+        roots = (
+            *roots,
+            ROOT / "local_data" / "longbridge_history",
+            ROOT / "local_data" / "longbridge_intraday",
+        )
+    except ValueError:
+        pass
+    for root in roots:
+        newest_mtime = newest_file_mtime(root, newest_mtime)
+    if newest_mtime is None:
+        return False
+    return int((now_dt - newest_mtime).total_seconds()) <= within_seconds
+
+
+def newest_file_mtime(path: Path, current: datetime | None = None) -> datetime | None:
+    if not path.exists():
+        return current
+    if path.is_file():
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, UTC)
+        return mtime if current is None or mtime > current else current
+    newest = current
+    for child in path.rglob("*"):
+        if not child.is_file():
+            continue
+        try:
+            mtime = datetime.fromtimestamp(child.stat().st_mtime, UTC)
+        except OSError:
+            continue
+        if newest is None or mtime > newest:
+            newest = mtime
+    return newest
 
 
 def write_failure_dossier(config: SupervisorConfig, payload: dict[str, Any]) -> None:
