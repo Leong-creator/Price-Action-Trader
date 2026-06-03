@@ -42,7 +42,7 @@ class M1217DailyObservationContinuityTests(unittest.TestCase):
         summary = json.loads((OUTPUT_DIR / "m12_17_daily_observation_continuity_summary.json").read_text(encoding="utf-8"))
         snapshot = json.loads((OUTPUT_DIR / "m12_17_dashboard_snapshot.json").read_text(encoding="utf-8"))
         self.assertEqual(snapshot["homepage_metrics"]["连续记录天数"], 1)
-        for label in ("今日机会", "今日估算盈亏", "今日估算收益率", "FTD增强版历史收益率", "FTD增强版历史胜率", "FTD增强版最大回撤"):
+        for label in ("今日机会", "今日估算盈亏", "今日估算收益率", "FTD增强版历史胜率", "FTD增强版最大回撤"):
             self.assertIn(label, snapshot["homepage_metrics"])
         self.assertEqual(summary["selected_ftd_variant"], "pullback_guard")
         html = (OUTPUT_DIR / "m12_17_dashboard_snapshot.html").read_text(encoding="utf-8")

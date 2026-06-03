@@ -10,5 +10,5 @@
   "paper_account_assertion_source": "user_confirmed_oauth_authorization",
   "live_token_allowed": false,
   "allow_asset_read_after_paper_verified": false,
-  "paper_account_equity": "6000"
+  "paper_account_equity": "10000"
 }

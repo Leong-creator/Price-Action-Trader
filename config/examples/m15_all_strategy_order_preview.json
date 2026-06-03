@@ -25,30 +25,30 @@
     ],
     "breakout_order_type": "trigger_limit",
     "regular_hours_only": true,
-    "max_orders_per_day": 5,
-    "max_risk_per_order": "12",
+    "max_orders_per_day": 6,
+    "max_risk_per_order": "20",
     "quantity_policy": "integer_floor_no_fractional",
     "paper_account_model": {
-      "equity": "6000",
-      "max_total_exposure": "3600",
-      "min_cash_reserve": "2400",
-      "max_symbol_exposure": "600",
+      "equity": "10000",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "max_symbol_exposure": "1500",
       "allow_fractional_shares": false,
       "allow_short_selling": false,
       "allow_options": false
     },
     "risk_tiers": {
       "primary": {
-        "max_strategy_exposure": "900",
-        "max_risk_per_order": "12"
+        "max_strategy_exposure": "1500",
+        "max_risk_per_order": "20"
       },
       "standard": {
-        "max_strategy_exposure": "600",
-        "max_risk_per_order": "8"
+        "max_strategy_exposure": "1000",
+        "max_risk_per_order": "13"
       },
       "risk_limited": {
-        "max_strategy_exposure": "450",
-        "max_risk_per_order": "6"
+        "max_strategy_exposure": "750",
+        "max_risk_per_order": "10"
       },
       "repair": {
         "max_strategy_exposure": "0",

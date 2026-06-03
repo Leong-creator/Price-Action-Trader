@@ -43,7 +43,7 @@ from scripts.m10_wave_b_capital_backtest_lib import (  # noqa: E402
     candidate_from_event as wave_b_candidate_from_event,
     detect_wave_b_events,
 )
-from scripts.m12_liquid_universe_scanner_lib import load_bars  # noqa: E402
+from scripts.m12_liquid_universe_scanner_lib import US_LIQUID_SEED_V1, load_bars  # noqa: E402
 from src.data import OhlcvRow  # noqa: E402
 
 
@@ -412,8 +412,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M1229Config:
 def validate_config(config: M1229Config) -> None:
     if config.stage != "M12.29.current_day_scan_dashboard":
         raise ValueError("M12.29 stage drift")
-    if config.first_batch_size != 50:
-        raise ValueError("M12.29 first batch must stay 50 symbols")
+    if config.first_batch_size <= 0 or config.first_batch_size > len(US_LIQUID_SEED_V1):
+        raise ValueError("M12.29 first batch size must stay within the M12.5 seed universe")
     if not config.boundary.paper_simulated_only:
         raise ValueError("M12.29 must stay paper/simulated only")
     if (
@@ -1768,16 +1768,16 @@ def build_runtime_readiness(
     effective_daily_ready = min(config.first_batch_size, daily_ready + len(deferred_daily_symbols))
     runtime_ready = current_5m_ready == config.first_batch_size and effective_daily_ready >= config.first_batch_size
     if strict_complete:
-        plain_reason = "第一批 50 只股票当日数据已齐。"
+        plain_reason = f"当前 {config.first_batch_size} 只种子池当日数据已齐。"
     elif runtime_ready:
         symbol_text = "、".join(deferred_daily_symbols[:5]) or "少量日线"
         plain_reason = (
             f"当前有 {len(deferred_daily_symbols)} 只日线因本轮禁抓取而沿用上一份 cache：{symbol_text}；"
-            "这不影响当前只读账户刷新，但会让严格“50/50 当日全齐”口径显示未完成。"
+            f"这不影响当前只读账户刷新，但会让严格“{config.first_batch_size}/{config.first_batch_size} 当日全齐”口径显示未完成。"
         )
     else:
         plain_reason = (
-            f"第一批 50 只股票仍有缺口：日线 {daily_ready}/{config.first_batch_size}，"
+            f"当前 {config.first_batch_size} 只种子池仍有缺口：日线 {daily_ready}/{config.first_batch_size}，"
             f"当日 5m {current_5m_ready}/{config.first_batch_size}。"
         )
     return {
@@ -1785,6 +1785,9 @@ def build_runtime_readiness(
         "runtime_ready": runtime_ready,
         "daily_ready_symbols": daily_ready,
         "current_5m_ready_symbols": current_5m_ready,
+        "active_universe_symbol_count": config.first_batch_size,
+        "active_universe_daily_ready_symbols": daily_ready,
+        "active_universe_current_5m_ready_symbols": current_5m_ready,
         "effective_daily_ready_symbols": effective_daily_ready,
         "deferred_daily_symbols": deferred_daily_symbols,
         "plain_reason": plain_reason,
@@ -2769,6 +2772,7 @@ def build_accountized_summary(
         current_day_scan_complete=bool(runtime_readiness["strict_complete"]),
         daily_ready_symbols=runtime_readiness["daily_ready_symbols"],
         current_5m_ready_symbols=runtime_readiness["current_5m_ready_symbols"],
+        active_universe_symbol_count=runtime_readiness["active_universe_symbol_count"],
         runtime_readiness_note=str(runtime_readiness["plain_reason"]),
     )
     return {
@@ -2800,6 +2804,9 @@ def build_accountized_summary(
         "current_day_scan_complete": runtime_readiness["strict_complete"],
         "current_day_runtime_ready": runtime_readiness["runtime_ready"],
         "candidate_date_warning": "" if not old_rows else f"仍有 {len(old_rows)} 条旧日期候选留在观察信号里，不能当作今日新开仓。",
+        "active_universe_symbol_count": runtime_readiness["active_universe_symbol_count"],
+        "active_universe_daily_ready_symbols": runtime_readiness["active_universe_daily_ready_symbols"],
+        "active_universe_current_5m_ready_symbols": runtime_readiness["active_universe_current_5m_ready_symbols"],
         "first50_daily_ready_symbols": runtime_readiness["daily_ready_symbols"],
         "first50_current_5m_ready_symbols": runtime_readiness["current_5m_ready_symbols"],
         "runtime_readiness_note": runtime_readiness["plain_reason"],
@@ -2826,6 +2833,7 @@ def build_dashboard_data_freshness_warning(
     current_day_scan_complete: bool,
     daily_ready_symbols: Any,
     current_5m_ready_symbols: Any,
+    active_universe_symbol_count: Any,
     runtime_readiness_note: str,
 ) -> str:
     fallback_or_no_fetch = any(
@@ -2839,7 +2847,8 @@ def build_dashboard_data_freshness_warning(
         f"quote_source={quote_source or 'unknown'}，"
         f"current_day_runtime_ready={str(current_day_runtime_ready).lower()}，"
         f"current_day_scan_complete={str(current_day_scan_complete).lower()}，"
-        f"第一批 50 只日线 {daily_ready_symbols}/50，当日 5m {current_5m_ready_symbols}/50。"
+        f"当前 {active_universe_symbol_count} 只种子池日线 {daily_ready_symbols}/{active_universe_symbol_count}，"
+        f"当日 5m {current_5m_ready_symbols}/{active_universe_symbol_count}。"
         f"{runtime_readiness_note}"
     )
 
@@ -3487,7 +3496,7 @@ def build_accountized_codex_observer(
     if summary["candidate_date_warning"]:
         alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
     if not summary["current_day_runtime_ready"]:
-        alerts.append({"level": "数据", "message": "第一批 50 只股票当前运行数据仍有真实缺口。"})
+        alerts.append({"level": "数据", "message": f"{summary.get('active_universe_symbol_count', 50)} 只种子池当前运行数据仍有真实缺口。"})
     elif not summary["current_day_scan_complete"]:
         alerts.append({"level": "数据", "message": summary["runtime_readiness_note"]})
     experimental_connected = [
@@ -3647,6 +3656,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     blocked_signal_count = int_like(queue_summary.get("blocked_signal_count", 0))
     repair_signal_count = int_like(queue_summary.get("repair_signal_count", 0))
     stale_blocked_count = int_like(queue_summary.get("stale_snapshot_blocked_count", 0))
+    fee_profit_blocked_count = int_like(queue_summary.get("fee_profit_blocked_count", 0))
+    net_profitable_ready_count = int_like(queue_summary.get("net_profitable_ready_count", eligible_count))
     confluence_primary_count = int_like(queue_summary.get("confluence_primary_count", 0))
     confluence_support_count = int_like(queue_summary.get("confluence_support_count", 0))
     ready_notional = str(queue_summary.get("ready_after_user_approval_notional", "0.00"))
@@ -3676,7 +3687,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language += f" 队列阻断：{', '.join(str(item) for item in queue_blockers)}。"
     status_rows = [
         {"label": "账户状态", "value": account_label, "note": f"通道 {account_channel or '暂无'}，类型 {account_type or '暂无'}"},
-        {"label": "模拟资金模型", "value": str(submitter.get("paper_account_equity_model") or connection.get("paper_account_equity_model") or "6000"), "note": "项目仍按 6000 USD 控制仓位，不用长桥余额放大风险。"},
+        {"label": "模拟资金模型", "value": str(submitter.get("paper_account_equity_model") or connection.get("paper_account_equity_model") or "10000"), "note": "项目按 10000 USD 模型控制仓位，不用长桥余额放大风险。"},
         {"label": "可用购买力", "value": buying_power, "note": "来自长桥模拟账户资产读取，仅用于确认连接状态。"},
         {"label": "持仓 / 挂单", "value": f"{position_count} / {open_order_count}", "note": f"当前持仓标的：{held_symbol_text}"},
         {"label": "提交器状态", "value": submit_status_label(submit_status), "note": str(submitter.get("plain_language_result") or "暂无提交器摘要")},
@@ -3689,6 +3700,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         {"label": "队列状态", "value": fast_queue_status_label(queue_status), "note": str(fast_queue.get("plain_language_result") or "暂无")},
         {"label": "新开仓信号", "value": str(new_signal_count), "note": f"通过快速风控 {eligible_count}，名义金额 {ready_notional}"},
         {"label": "被阻断信号", "value": str(blocked_signal_count), "note": status_counts_label(status_counts)},
+        {"label": "扣费后合格", "value": str(net_profitable_ready_count), "note": f"扣费后不赚钱阻断 {fee_profit_blocked_count}"},
         {"label": "修复策略信号", "value": str(repair_signal_count), "note": "修复策略只生成本地草稿，不提交长桥模拟账户。"},
         {"label": "旧快照阻断", "value": str(stale_blocked_count), "note": str(fast_queue.get("snapshot_freshness_status") or "暂无")},
         {"label": "多策略共振", "value": f"{confluence_primary_count}主 / {confluence_support_count}辅", "note": f"最高倍率 {confluence_summary.get('max_confluence_multiplier', '1')}"},
@@ -3859,7 +3871,8 @@ def build_accountized_gate_recheck(config: M1229Config, summary: dict[str, Any],
     if not summary["current_day_runtime_ready"]:
         blockers.append("当前只读账户运行数据仍有真实缺口")
     if not summary["current_day_scan_complete"]:
-        blockers.append("严格 50/50 当日全齐口径尚未满足，但这不等于当前账户运行中断")
+        total = summary.get("active_universe_symbol_count", 50)
+        blockers.append(f"严格 {total}/{total} 当日全齐口径尚未满足，但这不等于当前账户运行中断")
     return {
         "schema_version": "m11.8.paper-trial-gate.v1",
         "stage": "M11.8.paper_trial_gate_recheck",
@@ -3944,11 +3957,14 @@ def build_summary(
         "generated_at": generated_at,
         "market_session": market,
         "scan_date": scan_date.isoformat(),
-        "plain_language_result": "已把 50 只股票滚动到当前美股交易日扫描，并生成分钟级只读模拟看板输入。",
+        "plain_language_result": f"已把 {config.first_batch_size} 只种子池滚动到当前美股交易日扫描，并生成分钟级只读模拟看板输入。",
         "source_m12_12_summary_ref": project_path(config.output_dir / "m12_12_current_day_source" / "m12_12_loop_summary.json"),
         "source_m12_12_candidate_count": source_summary["daily_loop"]["candidate_count"],
         "quote_source": quote_manifest["quote_source"],
         "quote_count": quote_manifest["quote_count"],
+        "active_universe_symbol_count": config.first_batch_size,
+        "active_universe_daily_ready_symbols": cache_summary["daily_ready_symbols"],
+        "active_universe_current_5m_ready_symbols": cache_summary["current_5m_ready_symbols"],
         "first50_daily_ready_symbols": cache_summary["daily_ready_symbols"],
         "first50_current_5m_ready_symbols": cache_summary["current_5m_ready_symbols"],
         "current_day_scan_complete": current_day_complete,
@@ -4358,7 +4374,7 @@ def observer_alerts(summary: dict[str, Any], shared_account: dict[str, Any], ftd
     if summary["candidate_date_warning"]:
         alerts.append({"level": "数据", "message": summary["candidate_date_warning"]})
     if not summary["current_day_scan_complete"]:
-        alerts.append({"level": "数据", "message": "第一批 50 只股票当日数据未全部可用。"})
+        alerts.append({"level": "数据", "message": f"{summary.get('active_universe_symbol_count', 50)} 只种子池当日数据未全部可用。"})
     observed_with_events = [row["strategy_id"] for row in observation_test_lane["rows"] if row["today_opportunity_count"] != "0"]
     if observed_with_events:
         alerts.append({"level": "观察策略", "message": "观察策略今日已有触发：" + "，".join(observed_with_events)})
@@ -4450,7 +4466,7 @@ def build_report_md(summary: dict[str, Any]) -> str:
         f"- 实验账户今日盈亏：`{summary['experimental_today_pnl']}`，当前权益：`{summary['experimental_current_equity']}`。\n"
         f"- 今日新信号 `{summary['today_candidate_count']}` 条，信号观察清单总数 `{summary['signal_watchlist_count']}` 条。\n"
         f"- 盘前异动 `{summary['premarket_mover_count']}` 条，盘后异动 `{summary['postmarket_mover_count']}` 条，重点关注股命中 `{summary['focus_mover_count']}` 条。\n"
-        f"- 50 只股票日线可用 `{summary['first50_daily_ready_symbols']}` 只，当日 5m 可用 `{summary['first50_current_5m_ready_symbols']}` 只。{warning}\n"
+        f"- {summary.get('active_universe_symbol_count', 50)} 只种子池日线可用 `{summary.get('active_universe_daily_ready_symbols', summary['first50_daily_ready_symbols'])}` 只，当日 5m 可用 `{summary.get('active_universe_current_5m_ready_symbols', summary['first50_current_5m_ready_symbols'])}` 只。{warning}\n"
         "- 这不是实盘，也不是自动买卖；只是只读行情和模拟盈亏。\n"
     )
 
@@ -4548,8 +4564,9 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
             quote_source=str(summary.get("quote_source", "")),
             current_day_runtime_ready=bool(summary.get("current_day_runtime_ready", False)),
             current_day_scan_complete=bool(summary.get("current_day_scan_complete", False)),
-            daily_ready_symbols=summary.get("first50_daily_ready_symbols", "unknown"),
-            current_5m_ready_symbols=summary.get("first50_current_5m_ready_symbols", "unknown"),
+            daily_ready_symbols=summary.get("active_universe_daily_ready_symbols", summary.get("first50_daily_ready_symbols", "unknown")),
+            current_5m_ready_symbols=summary.get("active_universe_current_5m_ready_symbols", summary.get("first50_current_5m_ready_symbols", "unknown")),
+            active_universe_symbol_count=summary.get("active_universe_symbol_count", 50),
             runtime_readiness_note=str(summary.get("runtime_readiness_note", "")),
         )
         data_freshness_section = (

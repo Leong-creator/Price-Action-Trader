@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.m12_liquid_universe_scanner_lib import load_bars  # noqa: E402
+from scripts.m12_liquid_universe_scanner_lib import US_LIQUID_SEED_V1, load_bars  # noqa: E402
 from scripts.m12_readonly_auth_preflight_lib import _assert_readonly_command, clean_cli_text  # noqa: E402
 from scripts.longbridge_cli_env import build_longbridge_cli_env  # noqa: E402
 
@@ -38,6 +38,7 @@ HUNDRED = Decimal("100")
 DEFAULT_ACCOUNT_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
 LONGRIDGE_QUOTE_TIMEOUT_SECONDS = 6
+LONGBRIDGE_QUOTE_BATCH_SIZE = 50
 YAHOO_CHART_TIMEOUT_SECONDS = 6
 YAHOO_CHART_MAX_WORKERS = 8
 YAHOO_CHART_QUOTE_SOURCE = "yahoo_chart_readonly_after_longbridge_error"
@@ -158,8 +159,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M1228Config:
 def validate_config(config: M1228Config) -> None:
     if config.stage != "M12.28.trading_session_dashboard":
         raise ValueError("M12.28 stage drift")
-    if config.quote_refresh.max_symbols > 50:
-        raise ValueError("M12.28 quote refresh must stay within first 50 symbols")
+    if config.quote_refresh.max_symbols <= 0 or config.quote_refresh.max_symbols > len(US_LIQUID_SEED_V1):
+        raise ValueError("M12.28 quote refresh must stay within the M12.5 seed universe")
     if not config.boundary.paper_simulated_only:
         raise ValueError("M12.28 must stay paper/simulated only")
     if (
@@ -266,50 +267,55 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
     cli_path = shutil.which("longbridge")
     if cli_path is None:
         raise RuntimeError("longbridge_cli_missing")
-    lb_symbols = [build_longbridge_symbol(symbol, market) for symbol in symbols]
-    command = ["quote", *lb_symbols, "--format", "json"]
-    _assert_readonly_command(command)
-    try:
-        completed = subprocess.run(
-            [cli_path, *command],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
-            env=build_longbridge_cli_env(),
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(f"longbridge quote timed out after {LONGRIDGE_QUOTE_TIMEOUT_SECONDS}s") from exc
-    if completed.returncode != 0:
-        detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
-        raise RuntimeError(detail or f"longbridge quote failed with {completed.returncode}")
-    payload = json.loads(completed.stdout.strip() or "[]")
-    if not isinstance(payload, list):
-        raise RuntimeError("longbridge quote returned non-list payload")
     quotes: dict[str, dict[str, str]] = {}
-    for row in payload:
-        if not isinstance(row, dict):
-            continue
-        symbol = str(row.get("symbol", "")).split(".")[0]
-        if not symbol:
-            continue
-        quote_row = {
-            "symbol": symbol,
-            "latest_price": str(row.get("last", "")),
-            "previous_close": str(row.get("prev_close", "")),
-            "open": str(row.get("open", "")),
-            "high": str(row.get("high", "")),
-            "low": str(row.get("low", "")),
-            "volume": str(row.get("volume", "")),
-            "quote_status": str(row.get("status", "")),
-            "quote_timestamp": generated_at,
-            "quote_source": "longbridge_quote_readonly",
-        }
-        apply_extended_session_quote(quote_row, row, "pre_market", "pre_market_quote")
-        apply_extended_session_quote(quote_row, row, "post_market", "post_market_quote")
-        apply_extended_session_quote(quote_row, row, "overnight", "overnight_quote")
-        quotes[symbol] = quote_row
+    for batch in symbol_batches(symbols, LONGBRIDGE_QUOTE_BATCH_SIZE):
+        lb_symbols = [build_longbridge_symbol(symbol, market) for symbol in batch]
+        command = ["quote", *lb_symbols, "--format", "json"]
+        _assert_readonly_command(command)
+        try:
+            completed = subprocess.run(
+                [cli_path, *command],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
+                env=build_longbridge_cli_env(),
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"longbridge quote timed out after {LONGRIDGE_QUOTE_TIMEOUT_SECONDS}s") from exc
+        if completed.returncode != 0:
+            detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
+            raise RuntimeError(detail or f"longbridge quote failed with {completed.returncode}")
+        payload = json.loads(completed.stdout.strip() or "[]")
+        if not isinstance(payload, list):
+            raise RuntimeError("longbridge quote returned non-list payload")
+        for row in payload:
+            if not isinstance(row, dict):
+                continue
+            symbol = str(row.get("symbol", "")).split(".")[0]
+            if not symbol:
+                continue
+            quote_row = {
+                "symbol": symbol,
+                "latest_price": str(row.get("last", "")),
+                "previous_close": str(row.get("prev_close", "")),
+                "open": str(row.get("open", "")),
+                "high": str(row.get("high", "")),
+                "low": str(row.get("low", "")),
+                "volume": str(row.get("volume", "")),
+                "quote_status": str(row.get("status", "")),
+                "quote_timestamp": generated_at,
+                "quote_source": "longbridge_quote_readonly",
+            }
+            apply_extended_session_quote(quote_row, row, "pre_market", "pre_market_quote")
+            apply_extended_session_quote(quote_row, row, "post_market", "post_market_quote")
+            apply_extended_session_quote(quote_row, row, "overnight", "overnight_quote")
+            quotes[symbol] = quote_row
     return quotes
+
+
+def symbol_batches(symbols: list[str], batch_size: int) -> list[list[str]]:
+    return [symbols[index : index + batch_size] for index in range(0, len(symbols), batch_size)]
 
 
 def fetch_yahoo_chart_quotes(symbols: list[str], generated_at: str) -> dict[str, dict[str, str]]:
@@ -596,7 +602,7 @@ def build_summary(
     alignment = "current_day_scan_with_live_quotes" if mainline_is_today else "live_quote_overlay_on_prior_candidate_set"
     warning = (
         "当前价格已按 Longbridge 只读行情刷新，但主线候选仍来自上一轮 M12.12 扫描；"
-        "这不是今日重新全量扫描结果，下一步需要把 50 只股票滚动到当前交易日重新扫描。"
+        f"这不是今日重新全量扫描结果，下一步需要把 {len(first50)} 只种子池滚动到当前交易日重新扫描。"
     )
     return {
         "plain_language_result": "盘中只读模拟看板已可刷新；PA004 只做多版已进入观察区，但不是成交、不是实盘。",
@@ -627,7 +633,7 @@ def build_summary(
             "trade_count": pa004_long["trade_count"],
             "decision": pa004_long["decision"],
         },
-        "next_action": "用同一个脚本按 60 秒或 5 分钟刷新；下一阶段可把 M12.12 日期滚动后接入 50 只盘中扫描。",
+        "next_action": f"用同一个脚本按 60 秒或 5 分钟刷新；下一阶段可把 M12.12 日期滚动后接入 {len(first50)} 只盘中扫描。",
     }
 
 
@@ -781,7 +787,7 @@ def build_report_md(dashboard: dict[str, Any]) -> str:
         "- 这不是实盘，也不是自动买卖；只是盘中按只读行情刷新模拟表现。\n\n"
         "## 下一步\n\n"
         "- 盘中可以重复运行本阶段脚本刷新看板。\n"
-        "- 下一步把 M12.12 的日期滚动接入 50 只股票的盘中扫描，让今日候选不再依赖上一轮缓存日期。\n"
+        f"- 下一步把 M12.12 的日期滚动接入 {s['first50_symbol_count']} 只种子池的盘中扫描，让今日候选不再依赖上一轮缓存日期。\n"
         "- 长历史 5m 继续补，用于以后做完整日内回测，不阻塞当前看板。\n"
     )
 

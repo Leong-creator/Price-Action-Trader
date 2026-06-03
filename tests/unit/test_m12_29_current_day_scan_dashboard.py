@@ -116,6 +116,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             current_day_scan_complete=False,
             daily_ready_symbols=0,
             current_5m_ready_symbols=0,
+            active_universe_symbol_count=147,
             runtime_readiness_note="fixture",
         )
         self.assertIn("看板已生成但数据源降级", warning)
@@ -125,12 +126,64 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 quote_source="longbridge_quote_readonly",
                 current_day_runtime_ready=True,
                 current_day_scan_complete=True,
-                daily_ready_symbols=50,
-                current_5m_ready_symbols=50,
+                daily_ready_symbols=147,
+                current_5m_ready_symbols=147,
+                active_universe_symbol_count=147,
                 runtime_readiness_note="ready",
             ),
             "",
         )
+
+    def test_longbridge_paper_panel_uses_10000_model_and_fee_gate_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "daily" / "m12_29"
+            daily_dir = output_dir.parent
+            submitter_dir = daily_dir / "m15_longbridge_paper_order_submitter"
+            queue_dir = daily_dir / "m15_longbridge_fast_signal_queue"
+            connection_dir = daily_dir / "m15_longbridge_paper_connection_check"
+            submitter_dir.mkdir(parents=True)
+            queue_dir.mkdir(parents=True)
+            connection_dir.mkdir(parents=True)
+            (submitter_dir / "m15_longbridge_paper_order_submitter.json").write_text(
+                json.dumps(
+                    {
+                        "paper_account_equity_model": "10000.00",
+                        "eligible_order_count": 2,
+                        "submitted_order_count": 0,
+                        "attempted_order_count": 0,
+                        "longbridge_account": {"paper_account_detected": True, "account_channel": "lb_papertrading"},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (queue_dir / "m15_longbridge_fast_signal_queue.json").write_text(
+                json.dumps(
+                    {
+                        "fast_queue_status": "fast_signal_queue_ready",
+                        "summary": {
+                            "ready_after_user_approval_count": 2,
+                            "blocked_signal_count": 3,
+                            "fee_profit_blocked_count": 1,
+                            "net_profitable_ready_count": 2,
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (connection_dir / "m15_longbridge_paper_connection_check.json").write_text(
+                json.dumps({"paper_account_verified": True}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            panel = build_longbridge_paper_dashboard_view(replace(load_config(), output_dir=output_dir))
+
+        status_by_label = {row["label"]: row for row in panel["status_rows"]}
+        queue_by_label = {row["label"]: row for row in panel["queue_rows"]}
+        self.assertEqual(status_by_label["模拟资金模型"]["value"], "10000.00")
+        self.assertIn("10000 USD", status_by_label["模拟资金模型"]["note"])
+        self.assertEqual(queue_by_label["扣费后合格"]["value"], "2")
+        self.assertIn("扣费后不赚钱阻断 1", queue_by_label["扣费后合格"]["note"])
 
     def test_dashboard_freshness_allows_full_first50_refresh_runtime(self):
         generated_at = (datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=500)).isoformat().replace("+00:00", "Z")
@@ -306,7 +359,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(panel["position_row_count"], "1")
         self.assertEqual(panel["open_order_count"], "2")
         self.assertEqual(panel["submit_ready_count"], "0")
-        self.assertIn("项目仍按 6000 USD 控制仓位", panel_json)
+        self.assertIn("项目按 10000 USD 模型控制仓位", panel_json)
         self.assertIn("长桥模拟账户已连接", panel["plain_language_result"])
         self.assertIn("当前无合格订单", html)
         self.assertIn("快速信号队列", html)

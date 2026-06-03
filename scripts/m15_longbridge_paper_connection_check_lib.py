@@ -78,7 +78,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M15PaperConnectionCon
         paper_account_assertion_source=str(payload.get("paper_account_assertion_source", "")),
         live_token_allowed=bool(payload.get("live_token_allowed", False)),
         allow_asset_read_after_paper_verified=bool(payload.get("allow_asset_read_after_paper_verified", False)),
-        paper_account_equity=str(payload.get("paper_account_equity", "6000")),
+        paper_account_equity=str(payload.get("paper_account_equity", "10000")),
     )
 
 

@@ -70,6 +70,68 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
         self.assertEqual(rows[0]["order_type"], "trigger_limit")
         self.assertEqual(rows[0]["trigger_price"], "101.5")
 
+    def test_blocks_order_when_target_profit_does_not_cover_fees(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "symbol": "VTI",
+                    "entry_price": "373.99",
+                    "stop_price": "368.99",
+                    "target_price": "374.18",
+                    "quantity": "1",
+                },
+            )
+            payload = run_fast_signal_queue(config, generated_at="2026-06-02T14:00:00Z")
+            rows = self._rows(config)
+
+        self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 0)
+        self.assertEqual(payload["summary"]["fee_profit_blocked_count"], 1)
+        self.assertEqual(rows[0]["longbridge_paper_order_preview_status"], "local_order_preview_created_fee_profit_blocked")
+        self.assertIn("net_profit_after_fees_not_positive", rows[0]["blockers"])
+
+    def test_high_price_symbol_can_rank_first_when_net_profit_is_better(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "symbol": "NOW",
+                    "entry_price": "700.00",
+                    "stop_price": "695.00",
+                    "target_price": "750.00",
+                    "quantity": "2",
+                },
+                extra_rows=[
+                    self._source_row(
+                        runtime_id="M10-PA-013-1d",
+                        strategy_id="M10-PA-013",
+                        symbol="INTC",
+                        entry_price="100.00",
+                        stop_price="95.00",
+                        target_price="112.00",
+                        quantity="10",
+                    )
+                ],
+                extra_gate_rows=[
+                    {
+                        "runtime_id": "M10-PA-013-1d",
+                        "strategy_id": "M10-PA-013",
+                        "action_state": "paper_candidate",
+                        "paper_trial_gate": "paper_candidate",
+                    }
+                ],
+            )
+            payload = run_fast_signal_queue(config, generated_at="2026-06-02T14:00:00Z")
+            rows = self._rows(config)
+
+        ready = [row for row in rows if row["longbridge_paper_order_preview_status"] == "local_order_preview_created_ready_after_user_approval"]
+        self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 2)
+        self.assertEqual(ready[0]["symbol"], "NOW")
+        self.assertEqual(ready[0]["submission_priority_rank"], "1")
+        self.assertGreater(float(ready[0]["net_profit_after_fees_at_target"]), float(ready[1]["net_profit_after_fees_at_target"]))
+
     def test_same_symbol_same_direction_merges_and_sizes_same_family_confluence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self._write_config(
@@ -114,8 +176,8 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
         self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 1)
         self.assertEqual(primary["runtime_id"], "M10-PA-004-MBF-1d")
         self.assertEqual(primary["confluence_multiplier"], "1.25")
-        self.assertEqual(primary["quantity"], "2")
-        self.assertEqual(primary["estimated_open_risk"], "6.70")
+        self.assertEqual(primary["quantity"], "3")
+        self.assertEqual(primary["estimated_open_risk"], "10.05")
         self.assertEqual(support["longbridge_paper_order_preview_status"], "merged_into_confluence_primary")
         self.assertEqual(support["merged_primary_signal_fingerprint"], primary["signal_fingerprint"])
 
@@ -174,9 +236,9 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
 
         primary = [row for row in rows if row.get("confluence_role") == "primary"][0]
         self.assertEqual(primary["confluence_multiplier"], "1.75")
-        self.assertEqual(primary["quantity"], "3")
-        self.assertLessEqual(float(primary["notional"]), 600.0)
-        self.assertLessEqual(float(primary["estimated_open_risk"]), 12.0)
+        self.assertEqual(primary["quantity"], "5")
+        self.assertLessEqual(float(primary["notional"]), 1500.0)
+        self.assertLessEqual(float(primary["estimated_open_risk"]), 20.0)
 
     def test_stale_snapshot_blocks_all_ready_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -187,6 +249,7 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
         self.assertEqual(payload["fast_queue_status"], "stale_snapshot_waiting_for_current_refresh")
         self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 0)
         self.assertEqual(rows[0]["longbridge_paper_order_preview_status"], "stale_snapshot_submit_blocked")
+        self.assertEqual(rows[0]["submission_priority_rank"], "")
         self.assertIn("stale_snapshot_submit_blocked", rows[0]["blockers"])
 
     def test_premarket_against_signal_blocks_bullish_order(self) -> None:
@@ -255,6 +318,7 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
         ledger = root / "ledger.jsonl"
         paper_gate = root / "m14_paper_trial_gate.json"
         summary = root / "m14_strategy_challenge_summary.json"
+        decision = root / "m14_strategy_decision_ledger.jsonl"
         extended = root / "extended.json"
         out = root / "out"
         dashboard.write_text(
@@ -277,6 +341,24 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
             encoding="utf-8",
         )
         summary.write_text(json.dumps({"trading_date": m14_date}), encoding="utf-8")
+        decision.write_text(
+            json.dumps(
+                {
+                    "runtime_id": default_gate_row["runtime_id"],
+                    "strategy_id": default_gate_row["strategy_id"],
+                    "trading_date": m14_date,
+                    "generated_at": "2026-06-02T13:59:00Z",
+                    "net_pnl_r": "1.0",
+                    "realized_pnl": "25.00",
+                    "max_drawdown_percent": "5",
+                    "risk_block_ratio": "0",
+                    "total_signal_count": "5",
+                },
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         extended.write_text(json.dumps(extended_session_monitor or {"premarket_rows": []}), encoding="utf-8")
         rows = [self._source_row(trading_date=scan_date, **(source_overrides or {}))]
         rows.extend(extra_rows or [])
@@ -286,6 +368,7 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
             dashboard_path=dashboard,
             account_trade_ledger_path=ledger,
             paper_gate_path=paper_gate,
+            strategy_decision_ledger_path=decision,
             extended_session_monitor_path=extended,
             output_dir=out,
         )

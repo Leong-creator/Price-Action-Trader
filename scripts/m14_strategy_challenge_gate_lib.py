@@ -1284,6 +1284,9 @@ def build_summary(
         "m12_current_day_runtime_ready": bool(m12_summary.get("current_day_runtime_ready", False)),
         "m12_current_day_scan_complete": bool(m12_summary.get("current_day_scan_complete", False)),
         "m12_quote_source": m12_summary.get("quote_source", ""),
+        "active_universe_symbol_count": m12_summary.get("active_universe_symbol_count", ""),
+        "active_universe_daily_ready_symbols": m12_summary.get("active_universe_daily_ready_symbols", m12_summary.get("first50_daily_ready_symbols", "")),
+        "active_universe_current_5m_ready_symbols": m12_summary.get("active_universe_current_5m_ready_symbols", m12_summary.get("first50_current_5m_ready_symbols", "")),
         "first50_daily_ready_symbols": m12_summary.get("first50_daily_ready_symbols", ""),
         "first50_current_5m_ready_symbols": m12_summary.get("first50_current_5m_ready_symbols", ""),
         "challenge_trading_days": config.challenge_trading_days,
@@ -1502,12 +1505,13 @@ def build_data_quality_state(summary: dict[str, Any]) -> dict[str, str]:
     if runtime_ready and not fallback_or_no_fetch:
         return {"state": "fully_ready" if scan_complete else "runtime_ready_partial_scan", "warning": ""}
     note = str(summary.get("runtime_readiness_note", "") or "当前看板不是完整当日刷新。")
+    active_count = summary.get("active_universe_symbol_count", 50)
     warning = (
         f"看板数据未刷新 / fallback quotes / no-fetch: quote_source={quote_source or 'unknown'}, "
         f"current_day_runtime_ready={str(runtime_ready).lower()}, "
         f"current_day_scan_complete={str(scan_complete).lower()}, "
-        f"first50_daily_ready={summary.get('first50_daily_ready_symbols', 'unknown')}/50, "
-        f"first50_5m_ready={summary.get('first50_current_5m_ready_symbols', 'unknown')}/50. {note}"
+        f"active_universe_daily_ready={summary.get('active_universe_daily_ready_symbols', summary.get('first50_daily_ready_symbols', 'unknown'))}/{active_count}, "
+        f"active_universe_5m_ready={summary.get('active_universe_current_5m_ready_symbols', summary.get('first50_current_5m_ready_symbols', 'unknown'))}/{active_count}. {note}"
     )
     return {"state": "degraded_no_fetch_or_fallback_quotes", "warning": warning}
 

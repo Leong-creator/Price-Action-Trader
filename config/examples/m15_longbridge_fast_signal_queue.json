@@ -6,6 +6,7 @@
     "m12_32_dashboard": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
     "m12_46_account_trade_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_46_account_trade_ledger.jsonl",
     "m14_paper_trial_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_paper_trial_gate.json",
+    "m14_strategy_decision_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_decision_ledger.jsonl",
     "m12_48_extended_session_monitor": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_48_extended_session_monitor.json"
   },
   "outputs": {
@@ -34,8 +35,8 @@
       "2026-11-26",
       "2026-12-25"
     ],
-    "max_orders_per_day": 5,
-    "max_risk_per_order": "12",
+    "max_orders_per_day": 6,
+    "max_risk_per_order": "20",
     "quantity_policy": "integer_floor_no_fractional",
     "independent_family_bonus": "0.50",
     "same_family_variant_bonus": "0.25",
@@ -43,27 +44,39 @@
     "max_confluence_multiplier": "1.75",
     "premarket_against_signal_block_percent": "-3",
     "premarket_overheat_wait_percent": "8",
+    "fee_model": {
+      "commission_per_share": "0.0049",
+      "commission_min": "0.99",
+      "platform_fee_per_share": "0.005",
+      "platform_fee_min": "1.00",
+      "settlement_fee_per_share": "0.003",
+      "sec_fee_rate": "0.0000229",
+      "sec_fee_min": "0.01",
+      "taf_per_share": "0.00013",
+      "taf_min": "0.01",
+      "taf_max": "6.49"
+    },
     "paper_account_model": {
-      "equity": "6000",
-      "max_total_exposure": "3600",
-      "min_cash_reserve": "2400",
-      "max_symbol_exposure": "600",
+      "equity": "10000",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "max_symbol_exposure": "1500",
       "allow_fractional_shares": false,
       "allow_short_selling": false,
       "allow_options": false
     },
     "risk_tiers": {
       "primary": {
-        "max_strategy_exposure": "900",
-        "max_risk_per_order": "12"
+        "max_strategy_exposure": "1500",
+        "max_risk_per_order": "20"
       },
       "standard": {
-        "max_strategy_exposure": "600",
-        "max_risk_per_order": "8"
+        "max_strategy_exposure": "1000",
+        "max_risk_per_order": "13"
       },
       "risk_limited": {
-        "max_strategy_exposure": "450",
-        "max_risk_per_order": "6"
+        "max_strategy_exposure": "750",
+        "max_risk_per_order": "10"
       },
       "repair": {
         "max_strategy_exposure": "0",

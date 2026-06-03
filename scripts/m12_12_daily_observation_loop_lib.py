@@ -207,8 +207,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M1212Config:
 def validate_config(config: M1212Config) -> None:
     if config.stage != "M12.12.daily_observation_loop":
         raise ValueError("M12.12 stage drift")
-    if config.first_batch_size != 50:
-        raise ValueError("M12.12 first batch must stay 50 symbols")
+    if config.first_batch_size <= 0 or config.first_batch_size > len(US_LIQUID_SEED_V1):
+        raise ValueError("M12.12 first batch must stay within the M12.5 seed universe")
     if config.formal_daily_strategy.strategy_id != FORMAL_DAILY_ID:
         raise ValueError(f"Formal daily strategy must be {FORMAL_DAILY_ID}")
     if set(config.daily_observation_strategies) != set(DAILY_LOOP_STRATEGIES):
@@ -282,17 +282,20 @@ def run_m12_12_daily_observation_loop(
     )
 
     write_json(config.output_dir / "m12_12_first50_universe.json", {
-        "schema_version": "m12.12.first50-universe.v1",
+        "schema_version": "m12.12.active-universe.v1",
         "stage": config.stage,
         "generated_at": generated_at,
-        "selection_rule": "M12.5 static seed order first 50; not a live liquidity ranking.",
+        "selection_rule": f"M12.5 static seed order first {config.first_batch_size}; not a live liquidity ranking.",
+        "legacy_filename": "m12_12_first50_universe.json",
+        "active_universe_symbol_count": len(symbols),
         "symbol_count": len(symbols),
         "symbols": symbols,
     })
     write_json(config.output_dir / "m12_12_first50_cache_inventory.json", {
-        "schema_version": "m12.12.first50-cache-inventory.v1",
+        "schema_version": "m12.12.active-universe-cache-inventory.v1",
         "stage": config.stage,
         "generated_at": generated_at,
+        "legacy_filename": "m12_12_first50_cache_inventory.json",
         "items": cache_inventory,
     })
     write_json(config.output_dir / "m12_12_first50_cache_summary.json", cache_summary)
@@ -346,7 +349,7 @@ def select_first_batch_symbols(config: M1212Config) -> list[str]:
     symbols = payload.get("symbols", [])
     expected = list(US_LIQUID_SEED_V1[: config.first_batch_size])
     if symbols[: config.first_batch_size] != expected:
-        raise ValueError("M12.12 first-50 universe must match M12.5 seed order")
+        raise ValueError("M12.12 active universe must match M12.5 seed order")
     return expected
 
 
@@ -757,9 +760,12 @@ def build_cache_inventory(
     current_5m_ready = sorted(row["symbol"] for row in rows if row["timeframe"] == "5m_current" and row["ready_for_daily_test"])
     full_5m_ready = sorted(row["symbol"] for row in rows if row["timeframe"] == "5m_full_target" and row["ready_for_daily_test"])
     summary = {
-        "schema_version": "m12.12.first50-cache-summary.v1",
+        "schema_version": "m12.12.active-universe-cache-summary.v1",
         "stage": config.stage,
         "generated_at": generated_at,
+        "legacy_filename": "m12_12_first50_cache_summary.json",
+        "active_universe_symbol_count": len(symbols),
+        "active_universe_label": f"first{len(symbols)}_seed_symbols",
         "symbol_count": len(symbols),
         "daily_ready_symbols": len(daily_ready),
         "current_5m_ready_symbols": len(current_5m_ready),
@@ -1548,13 +1554,11 @@ def build_dashboard(
             "今日机会估算盈亏（未成交）": trade_summary["simulated_unrealized_pnl"],
             "今日机会估算收益率（未成交）": trade_summary["simulated_unrealized_return_percent"],
             "今日浮盈机会占比": trade_summary["floating_positive_percent"],
-            "早期日线历史模拟盈利": overall["net_profit"],
-            "早期日线历史收益率": overall["return_percent"],
             "早期日线历史胜率": overall["win_rate"],
             "早期日线最大回撤": overall["max_drawdown_percent"],
             "第一批可测股票": cache_summary["daily_ready_symbols"],
             "当前5分钟可观察股票": cache_summary["current_5m_ready_symbols"],
-            "长历史5分钟完整度": f"{cache_summary['full_5m_target_ready_symbols']}/50",
+            "长历史5分钟完整度": f"{cache_summary['full_5m_target_ready_symbols']}/{cache_summary['symbol_count']}",
             "日线策略定位": formal_summary["decision"],
         },
         "trade_view_summary": trade_summary,
@@ -1982,6 +1986,7 @@ def build_equity_svg(points: list[dict[str, str]]) -> str:
 def build_daily_report_md(summary: dict[str, Any], dashboard: dict[str, Any]) -> str:
     metrics = dashboard["top_metrics"]
     trade_summary = dashboard["trade_view_summary"]
+    symbol_count = summary.get("first50_cache", {}).get("symbol_count", metrics["第一批可测股票"])
     lines = [
         "# M12.12 每日只读测试报告",
         "",
@@ -1991,12 +1996,10 @@ def build_daily_report_md(summary: dict[str, Any], dashboard: dict[str, Any]) ->
         f"- 今日机会估算盈亏（未成交）：`{metrics['今日机会估算盈亏（未成交）']}`",
         f"- 今日机会估算收益率（未成交）：`{metrics['今日机会估算收益率（未成交）']}%`",
         f"- 今日浮盈机会占比：`{metrics['今日浮盈机会占比']}%`",
-        f"- 早期日线历史模拟盈利：`{metrics['早期日线历史模拟盈利']}`",
-        f"- 早期日线历史收益率：`{metrics['早期日线历史收益率']}%`",
         f"- 早期日线历史胜率：`{metrics['早期日线历史胜率']}%`",
         f"- 早期日线最大回撤：`{metrics['早期日线最大回撤']}%`",
-        f"- 第一批可测股票：`{metrics['第一批可测股票']}/50`",
-        f"- 当前5分钟可观察股票：`{metrics['当前5分钟可观察股票']}/50`",
+        f"- 当前种子池日线可测：`{metrics['第一批可测股票']}/{symbol_count}`",
+        f"- 当前种子池5分钟可观察：`{metrics['当前5分钟可观察股票']}/{symbol_count}`",
         "",
         "## 候选是什么意思",
         "",

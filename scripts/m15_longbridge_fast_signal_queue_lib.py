@@ -61,6 +61,7 @@ class FastSignalQueueConfig:
     dashboard_path: Path
     account_trade_ledger_path: Path
     paper_gate_path: Path
+    strategy_decision_ledger_path: Path
     extended_session_monitor_path: Path
     output_dir: Path
     token_mode: str
@@ -87,6 +88,16 @@ class FastSignalQueueConfig:
     same_family_variant_bonus: Decimal
     max_same_family_variants: int
     max_confluence_multiplier: Decimal
+    commission_per_share: Decimal
+    commission_min: Decimal
+    platform_fee_per_share: Decimal
+    platform_fee_min: Decimal
+    settlement_fee_per_share: Decimal
+    sec_fee_rate: Decimal
+    sec_fee_min: Decimal
+    taf_per_share: Decimal
+    taf_min: Decimal
+    taf_max: Decimal
     premarket_against_signal_block_percent: Decimal
     premarket_overheat_wait_percent: Decimal
     hard_boundaries: dict[str, bool]
@@ -114,6 +125,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> FastSignalQueueConfig
     outputs = payload.get("outputs", {})
     queue = payload.get("longbridge_paper_fast_queue", {})
     account_model = queue.get("paper_account_model", {})
+    fee_model = queue.get("fee_model", {})
     risk_tiers = {
         str(name): {
             str(key): decimal(value)
@@ -130,6 +142,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> FastSignalQueueConfig
             inputs.get("m12_46_account_trade_ledger", DEFAULT_M12_DIR / "m12_46_account_trade_ledger.jsonl")
         ),
         paper_gate_path=resolve_repo_path(inputs.get("m14_paper_trial_gate", DEFAULT_M14_DIR / "m14_paper_trial_gate.json")),
+        strategy_decision_ledger_path=resolve_repo_path(
+            inputs.get("m14_strategy_decision_ledger", DEFAULT_M14_DIR / "m14_strategy_decision_ledger.jsonl")
+        ),
         extended_session_monitor_path=resolve_repo_path(
             inputs.get("m12_48_extended_session_monitor", DEFAULT_M12_DIR / "m12_48_extended_session_monitor.json")
         ),
@@ -140,13 +155,13 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> FastSignalQueueConfig
         allowed_order_types=tuple(str(item) for item in queue.get("allowed_order_types", ["limit", "trigger_limit"])),
         breakout_order_type=str(queue.get("breakout_order_type", "trigger_limit")),
         regular_hours_only=bool(queue.get("regular_hours_only", True)),
-        max_orders_per_day=int(queue.get("max_orders_per_day", 5)),
-        max_risk_per_order=decimal(queue.get("max_risk_per_order", "12")),
+        max_orders_per_day=int(queue.get("max_orders_per_day", 6)),
+        max_risk_per_order=decimal(queue.get("max_risk_per_order", "20")),
         quantity_policy=str(queue.get("quantity_policy", "integer_floor_no_fractional")),
-        paper_account_equity=decimal(account_model.get("equity", "6000")),
-        max_total_exposure=decimal(account_model.get("max_total_exposure", "3600")),
-        min_cash_reserve=decimal(account_model.get("min_cash_reserve", "2400")),
-        max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "600")),
+        paper_account_equity=decimal(account_model.get("equity", "10000")),
+        max_total_exposure=decimal(account_model.get("max_total_exposure", "6000")),
+        min_cash_reserve=decimal(account_model.get("min_cash_reserve", "4000")),
+        max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "1500")),
         allow_fractional_shares=bool(account_model.get("allow_fractional_shares", False)),
         allow_short_selling=bool(account_model.get("allow_short_selling", False)),
         allow_options=bool(account_model.get("allow_options", False)),
@@ -158,6 +173,16 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> FastSignalQueueConfig
         same_family_variant_bonus=decimal(queue.get("same_family_variant_bonus", "0.25")),
         max_same_family_variants=int(queue.get("max_same_family_variants", 2)),
         max_confluence_multiplier=decimal(queue.get("max_confluence_multiplier", "1.75")),
+        commission_per_share=decimal(fee_model.get("commission_per_share", "0.0049")),
+        commission_min=decimal(fee_model.get("commission_min", "0.99")),
+        platform_fee_per_share=decimal(fee_model.get("platform_fee_per_share", "0.005")),
+        platform_fee_min=decimal(fee_model.get("platform_fee_min", "1.00")),
+        settlement_fee_per_share=decimal(fee_model.get("settlement_fee_per_share", "0.003")),
+        sec_fee_rate=decimal(fee_model.get("sec_fee_rate", "0.0000229")),
+        sec_fee_min=decimal(fee_model.get("sec_fee_min", "0.01")),
+        taf_per_share=decimal(fee_model.get("taf_per_share", "0.00013")),
+        taf_min=decimal(fee_model.get("taf_min", "0.01")),
+        taf_max=decimal(fee_model.get("taf_max", "6.49")),
         premarket_against_signal_block_percent=decimal(queue.get("premarket_against_signal_block_percent", "-3")),
         premarket_overheat_wait_percent=decimal(queue.get("premarket_overheat_wait_percent", "8")),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -197,6 +222,20 @@ def validate_config(config: FastSignalQueueConfig) -> None:
         raise ValueError("M15 fast signal queue same family variant cap must be non-negative")
     if config.max_confluence_multiplier < Decimal("1.0"):
         raise ValueError("M15 fast signal queue confluence multiplier must be >= 1")
+    fee_values = (
+        config.commission_per_share,
+        config.commission_min,
+        config.platform_fee_per_share,
+        config.platform_fee_min,
+        config.settlement_fee_per_share,
+        config.sec_fee_rate,
+        config.sec_fee_min,
+        config.taf_per_share,
+        config.taf_min,
+        config.taf_max,
+    )
+    if any(value < ZERO for value in fee_values):
+        raise ValueError("M15 fast signal queue fee model values must be non-negative")
     if config.premarket_against_signal_block_percent >= ZERO:
         raise ValueError("M15 fast signal queue premarket against threshold must be negative")
     if config.premarket_overheat_wait_percent <= ZERO:
@@ -241,12 +280,24 @@ def build_fast_signal_queue(config: FastSignalQueueConfig, generated_at: str) ->
     stale_snapshot_blockers = stale_snapshot_blockers_for(scan_date, current_market_date)
     gate_rows = list(paper_gate.get("rows", []))
     gate_by_runtime = {str(row.get("runtime_id", "")): row for row in gate_rows if row.get("runtime_id")}
+    decision_by_runtime = latest_strategy_decisions_by_runtime(read_jsonl(config.strategy_decision_ledger_path), m14_trading_date)
     source_rows = current_day_open_rows(read_jsonl(config.account_trade_ledger_path), scan_date)
-    ledger_rows = [build_fast_signal_row(config, generated_at, row, gate_by_runtime.get(str(row.get("runtime_id", "")), {})) for row in source_rows]
+    ledger_rows = [
+        build_fast_signal_row(
+            config,
+            generated_at,
+            row,
+            gate_by_runtime.get(str(row.get("runtime_id", "")), {}),
+            decision_by_runtime.get(str(row.get("runtime_id", "")), {}),
+        )
+        for row in source_rows
+    ]
     apply_premarket_adjustments(ledger_rows, extended_session_monitor)
     confluence_summary = apply_confluence_merge(config, ledger_rows)
+    sort_rows_for_profit_priority(ledger_rows)
     apply_shared_account_caps(ledger_rows, config)
     apply_stale_snapshot_blockers(ledger_rows, stale_snapshot_blockers)
+    apply_submission_priority_ranks(ledger_rows)
     counts = build_summary_counts(ledger_rows, gate_rows)
     status = fast_queue_status_for(counts, quote_source_blockers, current_day_blockers, stale_snapshot_blockers)
     payload = {
@@ -260,6 +311,7 @@ def build_fast_signal_queue(config: FastSignalQueueConfig, generated_at: str) ->
             "m12_32_dashboard": project_path(config.dashboard_path),
             "m12_46_account_trade_ledger": project_path(config.account_trade_ledger_path),
             "m14_paper_trial_gate": project_path(config.paper_gate_path),
+            "m14_strategy_decision_ledger": project_path(config.strategy_decision_ledger_path),
             "m12_48_extended_session_monitor": project_path(config.extended_session_monitor_path),
         },
         "output_refs": {
@@ -282,6 +334,36 @@ def build_fast_signal_queue(config: FastSignalQueueConfig, generated_at: str) ->
         "preview_status": status,
         "confluence_summary": confluence_summary,
         "summary": counts,
+        "paper_account_model": {
+            "equity": fmt_money(config.paper_account_equity),
+            "max_total_exposure": fmt_money(config.max_total_exposure),
+            "min_cash_reserve": fmt_money(config.min_cash_reserve),
+            "max_symbol_exposure": fmt_money(config.max_symbol_exposure),
+            "max_risk_per_order": fmt_money(config.max_risk_per_order),
+            "max_orders_per_day": config.max_orders_per_day,
+        },
+        "profit_priority_policy": {
+            "fee_profit_gate": "target_gross_profit_minus_buy_fees_minus_sell_fees_must_be_positive",
+            "sort_order": [
+                "net_profit_after_fees_at_target_desc",
+                "strategy_quality_score_desc",
+                "reward_r_desc",
+                "confluence_multiplier_desc",
+            ],
+            "symbol_price_priority": "not_used_for_priority_only_affordability_and_risk",
+        },
+        "fee_model": {
+            "commission_per_share": fmt_decimal(config.commission_per_share),
+            "commission_min": fmt_money(config.commission_min),
+            "platform_fee_per_share": fmt_decimal(config.platform_fee_per_share),
+            "platform_fee_min": fmt_money(config.platform_fee_min),
+            "settlement_fee_per_share": fmt_decimal(config.settlement_fee_per_share),
+            "sec_fee_rate": fmt_decimal(config.sec_fee_rate),
+            "sec_fee_min": fmt_money(config.sec_fee_min),
+            "taf_per_share": fmt_decimal(config.taf_per_share),
+            "taf_min": fmt_money(config.taf_min),
+            "taf_max": fmt_money(config.taf_max),
+        },
         "hard_boundaries": {
             "paper_simulated_only": True,
             "broker_connection": False,
@@ -303,6 +385,141 @@ def current_day_open_rows(rows: list[dict[str, Any]], scan_date: str) -> list[di
         for row in rows
         if str(row.get("trading_date", "")) == scan_date and str(row.get("event_type", "")) == "open"
     ]
+
+
+def latest_strategy_decisions_by_runtime(rows: list[dict[str, Any]], trading_date: str) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        runtime_id = str(row.get("runtime_id", ""))
+        if not runtime_id:
+            continue
+        row_date = str(row.get("trading_date", ""))
+        if trading_date and row_date and row_date != trading_date:
+            continue
+        current = result.get(runtime_id)
+        if current is None or str(row.get("generated_at", "")) >= str(current.get("generated_at", "")):
+            result[runtime_id] = row
+    return result
+
+
+def estimate_fee_profit_fields(
+    config: FastSignalQueueConfig,
+    entry_price: Decimal,
+    target_price: Decimal,
+    quantity: Decimal,
+) -> dict[str, Any]:
+    gross_profit = (target_price - entry_price) * quantity
+    entry_fees = estimate_us_stock_fee(config, "buy", entry_price, quantity)
+    exit_fee_breakdown = estimate_us_stock_fee_breakdown(config, "sell", target_price, quantity)
+    exit_fees = sum(exit_fee_breakdown.values(), ZERO)
+    regulatory = exit_fee_breakdown.get("sec_fee", ZERO) + exit_fee_breakdown.get("taf_fee", ZERO)
+    net_profit = gross_profit - entry_fees - exit_fees
+    blockers: list[str] = []
+    if quantity > ZERO and entry_price > ZERO and target_price > ZERO and net_profit <= ZERO:
+        blockers.append("net_profit_after_fees_not_positive")
+    return {
+        "gross_profit_at_target": fmt_money(gross_profit),
+        "estimated_entry_fees": fmt_money(entry_fees),
+        "estimated_exit_fees_at_target": fmt_money(exit_fees),
+        "estimated_regulatory_fees_at_target": fmt_money(regulatory),
+        "net_profit_after_fees_at_target": fmt_money(net_profit),
+        "fee_profit_gate_status": "passed" if not blockers else "blocked",
+        "fee_profit_gate_blockers": blockers,
+    }
+
+
+def estimate_us_stock_fee(config: FastSignalQueueConfig, side: str, price: Decimal, quantity: Decimal) -> Decimal:
+    return sum(estimate_us_stock_fee_breakdown(config, side, price, quantity).values(), ZERO)
+
+
+def estimate_us_stock_fee_breakdown(
+    config: FastSignalQueueConfig,
+    side: str,
+    price: Decimal,
+    quantity: Decimal,
+) -> dict[str, Decimal]:
+    if price <= ZERO or quantity <= ZERO:
+        return {"commission": ZERO, "platform_fee": ZERO, "settlement_fee": ZERO, "sec_fee": ZERO, "taf_fee": ZERO}
+    commission = max(config.commission_per_share * quantity, config.commission_min)
+    platform_fee = max(config.platform_fee_per_share * quantity, config.platform_fee_min)
+    settlement_fee = config.settlement_fee_per_share * quantity
+    sec_fee = ZERO
+    taf_fee = ZERO
+    if side == "sell":
+        sec_fee = max(config.sec_fee_rate * price * quantity, config.sec_fee_min)
+        taf_fee = min(max(config.taf_per_share * quantity, config.taf_min), config.taf_max)
+    return {
+        "commission": commission,
+        "platform_fee": platform_fee,
+        "settlement_fee": settlement_fee,
+        "sec_fee": sec_fee,
+        "taf_fee": taf_fee,
+    }
+
+
+def strategy_win_rate(decision_row: dict[str, Any]) -> str:
+    for key in ("win_rate", "win_rate_percent", "current_win_rate", "current_win_rate_percent"):
+        if str(decision_row.get(key, "")) != "":
+            return str(decision_row.get(key, ""))
+    return ""
+
+
+def strategy_quality_score(decision_row: dict[str, Any], gate_row: dict[str, Any]) -> Decimal:
+    score = action_quality_score(str(gate_row.get("action_state", "")))
+    net_pnl_r = decimal(decision_row.get("net_pnl_r", "0"))
+    realized_pnl = decimal(decision_row.get("realized_pnl", "0"))
+    drawdown = decimal(decision_row.get("max_drawdown_percent", "0"))
+    risk_block_ratio = decimal(decision_row.get("risk_block_ratio", "0"))
+    signal_count = decimal(decision_row.get("total_signal_count") or decision_row.get("signal_count") or "0")
+    if net_pnl_r > ZERO:
+        score += min(net_pnl_r * Decimal("10"), Decimal("30"))
+    if realized_pnl > ZERO:
+        score += min(realized_pnl / Decimal("10"), Decimal("20"))
+    if drawdown > ZERO:
+        score += max(Decimal("0"), Decimal("20") - drawdown)
+    if risk_block_ratio > ZERO:
+        score -= min(risk_block_ratio * Decimal("20"), Decimal("20"))
+    score += min(signal_count, Decimal("10"))
+    return max(score, ZERO)
+
+
+def action_quality_score(action_state: str) -> Decimal:
+    scores = {
+        "paper_candidate": Decimal("30"),
+        "advance_internal_sim": Decimal("25"),
+        "risk_limited_advance": Decimal("15"),
+        "repair_now": Decimal("0"),
+        "pause_runtime": Decimal("0"),
+        "auxiliary_module": Decimal("0"),
+    }
+    return scores.get(action_state, ZERO)
+
+
+def sort_rows_for_profit_priority(rows: list[dict[str, Any]]) -> None:
+    rows.sort(key=profit_priority_key)
+
+
+def profit_priority_key(row: dict[str, Any]) -> tuple[int, Decimal, Decimal, Decimal, Decimal, str, str]:
+    ready_penalty = 0 if row.get("longbridge_paper_order_preview_status") == READY_STATUS else 1
+    return (
+        ready_penalty,
+        -decimal(row.get("net_profit_after_fees_at_target", "0")),
+        -decimal(row.get("strategy_quality_score", "0")),
+        -decimal(row.get("reward_r", "0")),
+        -decimal(row.get("confluence_multiplier", "1")),
+        str(row.get("symbol", "")),
+        str(row.get("runtime_id", "")),
+    )
+
+
+def apply_submission_priority_ranks(rows: list[dict[str, Any]]) -> None:
+    rank = 0
+    for row in rows:
+        if row.get("longbridge_paper_order_preview_status") != READY_STATUS:
+            row["submission_priority_rank"] = ""
+            continue
+        rank += 1
+        row["submission_priority_rank"] = str(rank)
 
 
 def market_date_for(config: FastSignalQueueConfig, generated_at: str) -> str:
@@ -487,6 +704,7 @@ def update_primary_for_confluence(
     price = decimal(primary.get("limit_price", "0"))
     stop = decimal(primary.get("stop_price", "0"))
     risk_amount = estimated_open_risk("open", price, stop, quantity)
+    fee_profit = estimate_fee_profit_fields(config, price, decimal(primary.get("target_price", "0")), quantity)
     new_fingerprint = preview_id(
         str(primary.get("runtime_id", "")),
         str(primary.get("symbol", "")),
@@ -521,6 +739,14 @@ def update_primary_for_confluence(
             "quantity": fmt_decimal(quantity),
             "notional": fmt_money(price * quantity),
             "estimated_open_risk": fmt_money(risk_amount),
+            "gross_profit_at_target": fee_profit["gross_profit_at_target"],
+            "estimated_entry_fees": fee_profit["estimated_entry_fees"],
+            "estimated_exit_fees_at_target": fee_profit["estimated_exit_fees_at_target"],
+            "estimated_regulatory_fees_at_target": fee_profit["estimated_regulatory_fees_at_target"],
+            "net_profit_after_fees_at_target": fee_profit["net_profit_after_fees_at_target"],
+            "fee_profit_gate_status": fee_profit["fee_profit_gate_status"],
+            "fee_profit_gate_blockers": fee_profit["fee_profit_gate_blockers"],
+            "reward_r": fmt_decimal(reward_r({"limit_price": price, "stop_price": stop, "target_price": primary.get("target_price", "0")})),
         }
     )
 
@@ -577,6 +803,7 @@ def build_fast_signal_row(
     generated_at: str,
     source_row: dict[str, Any],
     gate_row: dict[str, Any],
+    decision_row: dict[str, Any],
 ) -> dict[str, Any]:
     direction = normalize_direction(str(source_row.get("direction", "")))
     price = order_price(source_row)
@@ -597,7 +824,12 @@ def build_fast_signal_row(
     risk_amount = estimated_open_risk("open", price, stop_price, quantity)
     order_type = infer_order_type(source_row, config)
     blockers = order_blockers(config, source_row, gate_row, price, source_quantity, quantity, risk_amount, tier_policy)
+    fee_profit = estimate_fee_profit_fields(config, price, target_price, quantity)
+    if fee_profit["fee_profit_gate_status"] == "blocked":
+        blockers = append_unique(blockers, ["net_profit_after_fees_not_positive"])
     preview_status = order_preview_status(gate_row, blockers)
+    if "net_profit_after_fees_not_positive" in blockers and preview_status == READY_STATUS:
+        preview_status = "local_order_preview_created_fee_profit_blocked"
     runtime_id = str(source_row.get("runtime_id", ""))
     strategy_id = str(source_row.get("strategy_id", ""))
     symbol = str(source_row.get("symbol", ""))
@@ -646,6 +878,18 @@ def build_fast_signal_row(
         "stop_price": fmt_decimal(stop_price),
         "target_price": fmt_decimal(target_price),
         "estimated_open_risk": fmt_money(risk_amount),
+        "gross_profit_at_target": fee_profit["gross_profit_at_target"],
+        "estimated_entry_fees": fee_profit["estimated_entry_fees"],
+        "estimated_exit_fees_at_target": fee_profit["estimated_exit_fees_at_target"],
+        "estimated_regulatory_fees_at_target": fee_profit["estimated_regulatory_fees_at_target"],
+        "net_profit_after_fees_at_target": fee_profit["net_profit_after_fees_at_target"],
+        "fee_profit_gate_status": fee_profit["fee_profit_gate_status"],
+        "fee_profit_gate_blockers": fee_profit["fee_profit_gate_blockers"],
+        "strategy_win_rate": strategy_win_rate(decision_row),
+        "strategy_quality_score": fmt_decimal(strategy_quality_score(decision_row, gate_row)),
+        "strategy_quality_source": "m14_strategy_decision_ledger",
+        "reward_r": fmt_decimal(reward_r({"limit_price": price, "stop_price": stop_price, "target_price": target_price})),
+        "submission_priority_rank": "",
         "paper_account_equity": fmt_money(config.paper_account_equity),
         "max_total_exposure": fmt_money(config.max_total_exposure),
         "max_symbol_exposure": fmt_money(config.max_symbol_exposure),
@@ -685,6 +929,8 @@ def build_summary_counts(rows: list[dict[str, Any]], gate_rows: list[dict[str, A
         "stale_snapshot_blocked_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "stale_snapshot_submit_blocked"),
         "premarket_blocked_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "premarket_against_signal_blocked"),
         "premarket_wait_confirmation_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "wait_first_5m_confirmation"),
+        "fee_profit_blocked_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "local_order_preview_created_fee_profit_blocked"),
+        "net_profitable_ready_count": sum(1 for row in ready if decimal(row.get("net_profit_after_fees_at_target", "0")) > ZERO),
         "repair_signal_count": sum(1 for row in rows if row.get("runtime_action_state") == "repair_now"),
         "auxiliary_module_count": sum(1 for row in gate_rows if str(row.get("runtime_role", "")) == "auxiliary_module"),
     }
@@ -770,6 +1016,8 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         f"- 队列生成耗时毫秒：`{summary['build_elapsed_ms']}`",
         "- 完整 M13/M14 对账等待：否",
         "- 旧本地模拟仓位迁移：否",
+        f"- 账户口径：`{summary['paper_account_model']['equity']}` 美元模型；总敞口 `{summary['paper_account_model']['max_total_exposure']}`，单标的 `{summary['paper_account_model']['max_symbol_exposure']}`，现金保留 `{summary['paper_account_model']['min_cash_reserve']}`",
+        "- 排序口径：扣费后预计净利润优先，价格不参与优先级",
         f"- 旧快照阻断：`{', '.join(summary.get('stale_snapshot_blockers', [])) or 'none'}`",
         "",
         "## 汇总",
@@ -779,19 +1027,21 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         f"- 被阻断信号：`{counts['blocked_signal_count']}`",
         f"- 共振主订单：`{counts.get('confluence_primary_count', 0)}`",
         f"- 共振支持行：`{counts.get('confluence_support_count', 0)}`",
+        f"- 扣费后不赚钱阻断：`{counts.get('fee_profit_blocked_count', 0)}`",
         f"- 盘前阻断/等待确认：`{counts.get('premarket_blocked_count', 0)}` / `{counts.get('premarket_wait_confirmation_count', 0)}`",
         "",
         "## 队列样本",
         "",
-        "| 状态 | 共振角色 | 运行单元 | 标的 | 类型 | 数量 | 限价 | 触发价 | 阻断 |",
-        "| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- |",
+        "| 优先级 | 状态 | 共振角色 | 运行单元 | 标的 | 类型 | 数量 | 限价 | 触发价 | 扣费后净利 | 收益风险比 | 阻断 |",
+        "| ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for row in rows[:50]:
         lines.append(
-            f"| {row.get('longbridge_paper_order_preview_status', '')} | {row.get('confluence_role', '')} | "
+            f"| {row.get('submission_priority_rank', '')} | {row.get('longbridge_paper_order_preview_status', '')} | {row.get('confluence_role', '')} | "
             f"{row.get('runtime_id', '')} | "
             f"{row.get('symbol', '')} | {row.get('order_type', '')} | {row.get('quantity', '')} | "
             f"{row.get('limit_price', '')} | {row.get('trigger_price', '')} | "
+            f"{row.get('net_profit_after_fees_at_target', '')} | {row.get('reward_r', '')} | "
             f"{', '.join(row.get('blockers', [])) or 'none'} |"
         )
     return "\n".join(lines) + "\n"

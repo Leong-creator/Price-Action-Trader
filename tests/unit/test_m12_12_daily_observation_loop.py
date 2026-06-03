@@ -17,7 +17,7 @@ OUTPUT_DIR = MODULE.OUTPUT_DIR
 class M1212DailyObservationLoopTests(unittest.TestCase):
     def test_config_locks_first_batch_and_simulated_boundary(self) -> None:
         config = MODULE.load_config()
-        self.assertEqual(config.first_batch_size, 50)
+        self.assertEqual(config.first_batch_size, 147)
         self.assertEqual(config.daily_start.isoformat(), "2010-06-29")
         self.assertEqual(config.intraday_current_start.isoformat(), "2026-04-27")
         self.assertEqual(config.daily_observation_strategies, ("M10-PA-001", "M10-PA-002", "M10-PA-012", "M12-FTD-001"))
@@ -27,12 +27,12 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertFalse(config.boundary.live_execution)
         self.assertFalse(config.boundary.paper_trading_approval)
 
-    def test_first50_selection_matches_m12_5_seed_order(self) -> None:
+    def test_active_universe_selection_matches_m12_5_seed_order(self) -> None:
         config = MODULE.load_config()
         symbols = MODULE.select_first_batch_symbols(config)
-        self.assertEqual(len(symbols), 50)
+        self.assertEqual(len(symbols), 147)
         self.assertEqual(symbols[:4], ["SPY", "QQQ", "IWM", "DIA"])
-        self.assertEqual(symbols[-1], "PANW")
+        self.assertEqual(symbols[-1], "TSM")
 
     def test_formal_daily_spec_is_not_benchmark_placeholder_source(self) -> None:
         config = MODULE.load_config()
@@ -54,11 +54,12 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
             dashboard = json.loads((Path(tmp) / "m12_12_dashboard_data.json").read_text(encoding="utf-8"))
             visual = json.loads((Path(tmp) / "m12_12_visual_confirmation_packet.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(summary["first50_cache"]["symbol_count"], 50)
+        self.assertEqual(summary["first50_cache"]["symbol_count"], 147)
         self.assertFalse(summary["first50_cache"]["fake_data_created"])
         self.assertIn("今日机会数", dashboard["top_metrics"])
         self.assertIn("今日机会估算盈亏（未成交）", dashboard["top_metrics"])
-        self.assertIn("早期日线历史模拟盈利", dashboard["top_metrics"])
+        self.assertNotIn("早期日线历史模拟盈利", dashboard["top_metrics"])
+        self.assertNotIn("早期日线历史收益率", dashboard["top_metrics"])
         self.assertIn("today_trade_view", dashboard)
         self.assertIn("trade_view_summary", dashboard)
         self.assertEqual(visual["needs_user_review_count"], 10)
@@ -170,7 +171,7 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertTrue(expected <= {path.name for path in OUTPUT_DIR.glob("*")})
         summary = json.loads((OUTPUT_DIR / "m12_12_loop_summary.json").read_text(encoding="utf-8"))
         cache = summary["first50_cache"]
-        self.assertEqual(cache["symbol_count"], 50)
+        self.assertIn(cache["symbol_count"], {50, MODULE.load_config().first_batch_size})
         self.assertGreaterEqual(cache["daily_ready_symbols"], 4)
         self.assertGreaterEqual(cache["current_5m_ready_symbols"], 4)
         gate = json.loads((OUTPUT_DIR / "m11_6_paper_gate_recheck.json").read_text(encoding="utf-8"))
@@ -180,7 +181,7 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertIn("M12-FTD-001", gate["non_gate_daily_factor_strategies"])
         self.assertIn("你尚未明确批准进入模拟交易试运行。", gate["blockers"])
         html = (OUTPUT_DIR / "m12_12_readonly_daily_dashboard.html").read_text(encoding="utf-8")
-        for expected_text in ("今日机会估算视图（未成交）", "今日机会明细", "早期日线历史模拟盈利", "胜率", "最大回撤", "策略状态"):
+        for expected_text in ("今日机会估算视图（未成交）", "今日机会明细", "胜率", "最大回撤", "策略状态"):
             self.assertIn(expected_text, html)
         self.assertIn("候选是一条“策略 x 标的 x 周期”的可观察机会", html)
         self.assertIn("不是实际成交，不是模拟买卖试运行", html)

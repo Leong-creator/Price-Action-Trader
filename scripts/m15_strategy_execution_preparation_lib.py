@@ -485,7 +485,7 @@ def monday_acceptance() -> list[dict[str, str]]:
         {"check": "regular_us_session", "required_result": "当前市场窗口为美股常规交易时段"},
         {"check": "m12_37_owned_by_supervisor", "required_result": "M12.37 只能由 M12.47 自动拉起"},
         {"check": "quote_source", "required_result": "行情来源必须为 longbridge_quote_readonly"},
-        {"check": "daily_and_5m_complete", "required_result": "第一批 50 只日线和当日 5 分钟数据完整"},
+        {"check": "daily_and_5m_complete", "required_result": "当前种子池日线和当日 5 分钟数据完整"},
         {"check": "m13_current_day_ledger", "required_result": "M13 生成当天策略账本"},
         {"check": "m14_recompute", "required_result": "M14 重算内部模拟、修复队列、影子参数和长桥预演"},
         {"check": "no_fallback_or_old_snapshot", "required_result": "备用行情或旧快照当天不允许进入长桥模拟账户"},

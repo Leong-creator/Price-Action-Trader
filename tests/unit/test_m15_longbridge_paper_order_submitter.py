@@ -266,6 +266,56 @@ class M15LongbridgePaperOrderSubmitterTest(unittest.TestCase):
         self.assertEqual(rows[0]["signal_fingerprint"], "primary-now")
         self.assertEqual(rows[0]["quantity"], "2")
 
+    def test_submitter_consumes_profit_priority_order_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                scan_date="2026-06-02",
+                source_event_time="2026-06-02T14:00:01Z",
+                source_mode="fast_signal_queue",
+                m13_comparison_status="fast_queue_no_m13_wait",
+                current_day_strategy_confirmation_status="confirmed",
+                signal_fingerprint="lower-priority",
+                net_profit_after_fees_at_target="8.00",
+                submission_priority_rank="2",
+            )
+            higher = {
+                "preview_id": "preview-2",
+                "signal_fingerprint": "higher-priority",
+                "runtime_id": "M10-PA-013-1d",
+                "strategy_id": "M10-PA-013",
+                "symbol": "NOW",
+                "trading_date": "2026-06-02",
+                "broker_order_side": "buy",
+                "local_event_type": "open",
+                "longbridge_paper_order_preview_status": "local_order_preview_created_ready_after_user_approval",
+                "m13_comparison_status": "fast_queue_no_m13_wait",
+                "blockers": ["broker_connection_disabled", "order_submission_disabled", "paper_trading_approval_false"],
+                "order_type": "limit",
+                "quantity": "1",
+                "limit_price": "700.00",
+                "notional": "700.00",
+                "estimated_open_risk": "5.00",
+                "net_profit_after_fees_at_target": "40.00",
+                "submission_priority_rank": "1",
+                "source_event_time": "2026-06-02T14:00:01Z",
+            }
+            with config.order_preview_ledger_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(higher, ensure_ascii=False) + "\n")
+            run_paper_submitter(
+                config,
+                generated_at="2026-06-02T14:00:00Z",
+                command_runner=self._runner(),
+            )
+            rows = [
+                json.loads(line)
+                for line in (config.output_dir / "m15_longbridge_paper_order_submitter_ledger.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+
+        self.assertEqual(rows[0]["signal_fingerprint"], "higher-priority")
+        self.assertEqual(rows[0]["submission_priority_rank"], "1")
+
     def test_backoff_interval_when_longbridge_account_probe_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self._write_config(Path(tmp), scan_date="2026-06-02", source_event_time="2026-06-02T14:00:01Z")
@@ -318,6 +368,8 @@ class M15LongbridgePaperOrderSubmitterTest(unittest.TestCase):
         estimated_open_risk: str = "5.00",
         signal_fingerprint: str = "preview-1",
         confluence_role: str = "",
+        net_profit_after_fees_at_target: str = "10.00",
+        submission_priority_rank: str = "1",
         snapshot_freshness_status: str = "current_market_date",
         fast_queue_status: str = "fast_signal_queue_ready",
     ):
@@ -368,6 +420,8 @@ class M15LongbridgePaperOrderSubmitterTest(unittest.TestCase):
                     "limit_price": "100.00",
                     "notional": notional,
                     "estimated_open_risk": estimated_open_risk,
+                    "net_profit_after_fees_at_target": net_profit_after_fees_at_target,
+                    "submission_priority_rank": submission_priority_rank,
                     "confluence_role": confluence_role,
                     "source_event_time": source_event_time,
                 },

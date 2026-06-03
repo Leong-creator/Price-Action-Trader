@@ -3,19 +3,19 @@
 ## 当前阶段
 
 - 稳定基线：`main`
-- 当前支线：`codex/m14-2-broker-readiness-scaffold`
+- 当前支线：`codex/m15-paper-account-dashboard-panel`
 
 ## 当前 milestone
 
 - 稳定基线：`M8E.2 Longer-Window Daily Validation`（已完成）
 - 当前支线 milestone：M14/M15 加速推进整改、runtime 级内部模拟准入与 Longbridge paper preflight
-- 当前子阶段：M12.47 已在 2026-06-01 美股常规交易时段拉起 M12.37，M12/M13 当前看板使用 `longbridge_quote_readonly`，第一批 50 只日线与 5m 数据完整，M13 已生成 `2026-06-01` 账本。M14 已追加并重算到 `2026-06-01`，有效 challenge 进度为 `10/10`，当前 `11` 个非修复 runtime 可进入长桥模拟账户测试名单，`7` 个非交易条目固定为 `auxiliary_module`。M15 Longbridge paper preflight 状态为 `ready_for_user_paper_credential_approval`；预演规则已改为 `6000 USD` 共享模拟资金、整股、只做多、禁用碎股/融券做空/期权，订单类型允许普通限价单和突破触发限价单。M15 现在拆成两条链路：全策略订单预演继续做本地账本对比和后台审计；长桥模拟账户提交器默认消费 `m15_longbridge_fast_signal_queue`，只处理当天已确认策略名单下的新开仓信号，每笔订单只做快速风控，不再等待完整 M13/M14 重算。快速队列已新增同标的同方向合并、多策略共振加权、旧快照保护和盘前异动保护；当前 `2026-06-01` 队列在 `2026-06-02` 生成时被标成 `stale_snapshot_waiting_for_current_refresh`，`152` 条全部阻断、提交资格为 `0`，等待今晚 M12.47 fresh refresh 后重算。长桥模拟账户连接方式已切到 OAuth 授权；当前连接审计状态为 `connected_oauth_user_confirmed_paper_account`，表示 OAuth 已登录且按用户确认的模拟账户授权处理；资产、持仓、挂单只由 M15 提交器读取为模拟账户自身状态，旧 M12/M13 本地模拟仓位不得迁移。旧版利润错误产物继续排除在当前活跃 M12/M13/M14/M15 dashboard/report 输出和策略判断之外；后续如需历史表现，只能用 M13 account operation ledger 重算新的 mark-to-market 字段。M12.37 仍只能由 M12.47 守护器在交易窗口拉起，本轮未手动运行 once-mode。
+- 当前子阶段：M12.47 仍负责在美股交易窗口自动拉起 M12.37，M12.37 仍禁止手动 once-mode。本轮把长桥模拟账户资金模型从 `6000 USD` 提高到 `10000 USD`：总敞口 `6000 USD`、现金保留 `4000 USD`、单标的上限 `1500 USD`、全局单笔风险 `20 USD`、单日最多新开仓 `6` 笔。M12 当前交易日扫描范围从第一批 `50` 只扩到现有 `147` 只美股/ETF 种子池，报价刷新按批次拉取长桥只读 quote，避免一次 147 只导致接口超时。M15 快速队列继续只消费当天已确认策略名单下的新开仓信号，但新增扣费后预计净利润硬门槛：目标价毛利润减去买入费用、卖出费用和监管费用后必须大于 `0`；候选排序按扣费后预计净利润、策略质量、收益风险比、多策略共振依次排序，标的价格不参与优先级。长桥模拟账户连接方式继续走 OAuth 模拟账户；资产、持仓、挂单只由 M15 提交器读取为模拟账户自身状态，旧 M12/M13 本地模拟仓位不得迁移。旧版利润错误产物继续排除在当前活跃 M12/M13/M14/M15 dashboard/report 输出和策略判断之外。
 
 <!-- strategy_factory_provider_contract={"active_provider_config_path":"config/strategy_factory/active_provider_config.json","primary_provider_runtime_source":"source_order[0]"} -->
 
 ## 当前分支
 
-- `codex/m14-2-broker-readiness-scaffold`
+- `codex/m15-paper-account-dashboard-panel`
 
 ## 当前工具修复
 
@@ -25,15 +25,15 @@
 - 已增强 Longbridge paper preflight：`scripts/run_m15_longbridge_paper_preflight.py` 只做 paper-only 前置检查，拒绝 live token、碎股、融券做空、期权、非美股常规时段、关闭 kill switch、非 `longbridge_quote_readonly` 行情来源，以及 M14 未重算到当前看板交易日的旧门禁。当前 M14 已重算到 `2026-06-01`，预演状态为 `ready_for_user_paper_credential_approval`；`11` 个非修复 runtime 可进入长桥模拟账户测试名单，不再只限制 `M10-PA-004 / M10-PA-005 / M10-PA-008`。仍未尝试凭证注入、broker 连接或订单提交，模拟账户令牌和首次提交必须等用户单独批准。
 - 已新增 M15 长桥 OAuth 连接审计：`scripts/run_m15_longbridge_paper_connection_check.py` 现在按 OAuth 授权作为模拟账户入口，读取 `longbridge check` 和 `longbridge auth status` 的脱敏状态；当前 `connection_check_status=connected_oauth_user_confirmed_paper_account`，`paper_account_verified=true` 来自用户确认的 OAuth 模拟账户授权，`paper_account_marker_verified=false` 仅表示 CLI 未暴露账户类型字段。连接审计本身不读取资产、不读取持仓、不下单；模拟账户现金、持仓、挂单读取只在 M15 提交器账户状态里执行。
 - 已新增 M15 长桥模拟账户订单提交器：`scripts/run_m15_longbridge_paper_order_submitter.py` 支持以 daemon 运行。提交器只认长桥 `lb_papertrading` 模拟账户通道，只在美股常规交易时段工作，只提交 `2026-06-02T07:18:05Z` 新账户起点之后的新开仓信号；旧 M12/M13 本地模拟持仓、历史开仓、历史平仓和旧订单草稿不得迁移到长桥模拟账户。当前已把默认输入改为 `m15_longbridge_fast_signal_queue`，循环中只先构建当天新信号队列，不再每轮运行全策略预演；检查间隔为 `15` 秒，长桥账户、资产、持仓或挂单接口失败时退避为 `60` 秒。提交器会另写 `m15_longbridge_paper_account_state.json`，只记录长桥模拟账户自己的现金、持仓、挂单和已提交信号指纹；账户状态产物属于本地运行文件，不提交到远端。
-- 已新增 M15 长桥模拟账户快速新信号队列：`scripts/run_m15_longbridge_fast_signal_queue.py` 只读 M12 当前交易账本、M14 当天策略名单和 M12.48 盘前/盘后监控，生成 `m15_longbridge_fast_signal_queue.json/jsonl/md`。队列只包含当天新开仓信号，字段包括运行单元、标的、方向、订单类型、触发价、限价、数量、止损、目标价、风险金额、信号时间、交易日期和唯一信号指纹；修复运行单元、辅助模块、旧日期信号、旧账户起点前信号、做空、碎股、期权、超风险、超敞口都会被阻断或不进入提交资格。队列现在会合并同标的同方向重复信号，只保留一条共振主订单；支持行写 `merged_into_confluence_primary`，不提交到长桥。共振倍率只影响整股数量，最高 `1.75`，并继续受 `6000 USD` 共享资金、单标的 `600 USD`、总敞口 `3600 USD` 和单笔风险上限约束。非当前纽约交易日快照会写 `stale_snapshot_waiting_for_current_refresh`，当前旧队列已阻断 `152/152` 条。全策略订单预演仍保留为后台审计和本地模拟对账，不再阻塞每笔模拟账户订单。
-- 已把长桥模拟账户状态接入 M12.32 主看板：`m12_32_minute_readonly_dashboard_data.json/html` 现在新增“长桥模拟账户”面板，读取 M15 模拟账户状态、提交器摘要、快速信号队列和 OAuth 连接审计，展示模拟账户是否连接、可用购买力、持仓数、挂单数、可提交订单数、队列阻断原因和接口延迟。M12.47 状态覆盖重写 HTML 时也会同步刷新该面板，避免交易时段回写成旧看板结构。该面板只做状态展示，仍按 `6000 USD` 共享资金模型控仓，不迁移本地旧模拟持仓，不展示敏感凭证，不启用实盘或真实资金动作。
+- 已新增 M15 长桥模拟账户快速新信号队列：`scripts/run_m15_longbridge_fast_signal_queue.py` 只读 M12 当前交易账本、M14 当天策略名单、M14 决策账本和 M12.48 盘前/盘后监控，生成 `m15_longbridge_fast_signal_queue.json/jsonl/md`。队列只包含当天新开仓信号，字段包括运行单元、标的、方向、订单类型、触发价、限价、数量、止损、目标价、风险金额、信号时间、交易日期、唯一信号指纹和扣费后预计净利润；修复运行单元、辅助模块、旧日期信号、旧账户起点前信号、做空、碎股、期权、超风险、超敞口、扣费后不赚钱都会被阻断或不进入提交资格。队列会合并同标的同方向重复信号，只保留一条共振主订单；支持行写 `merged_into_confluence_primary`，不提交到长桥。共振倍率只影响整股数量，最高 `1.75`，并继续受 `10000 USD` 共享资金、单标的 `1500 USD`、总敞口 `6000 USD` 和单笔风险上限约束。非当前纽约交易日快照会写 `stale_snapshot_waiting_for_current_refresh`。全策略订单预演仍保留为后台审计和本地模拟对账，不再阻塞每笔模拟账户订单。
+- 已把长桥模拟账户状态接入 M12.32 主看板：`m12_32_minute_readonly_dashboard_data.json/html` 现在新增“长桥模拟账户”面板，读取 M15 模拟账户状态、提交器摘要、快速信号队列和 OAuth 连接审计，展示模拟账户是否连接、可用购买力、持仓数、挂单数、可提交订单数、队列阻断原因、资金模型和接口延迟。M12.47 状态覆盖重写 HTML 时也会同步刷新该面板，避免交易时段回写成旧看板结构。该面板只做状态展示，仍按 `10000 USD` 共享资金模型控仓，不迁移本地旧模拟持仓，不展示敏感凭证，不启用实盘或真实资金动作。
 - 已修复 M15 提交后账户状态滞后：提交器在成功向长桥模拟账户提交订单后，会立刻重新读取模拟账户资产、持仓和挂单，并把本轮已提交信号指纹写入 `m15_longbridge_paper_account_state.json`。这样看板会把未成交订单显示为挂单，而不会继续显示提交前的 `0` 持仓、`0` 挂单状态。
 - 已修复今晚模拟账户提交前的 M14 盘中复核卡点：`config/examples/m12_37_intraday_auto_loop.json` 的 `m14_finalize_policy` 已从 `postmarket_only` 改为 `postmarket_or_runtime_ready`。现在 M12.47 拉起 M12.37 后，只要当天行情和账户化运行数据准备好，M13/M14 可以在常规交易时段完成当天重算，M15 才能用当天新开仓信号进入长桥模拟账户提交链路；仍禁止手动 M12.37 once-mode，仍不迁移旧本地模拟订单。
 - 已增强 M15 strategy execution preparation：`scripts/run_m15_strategy_execution_preparation.py` 生成周一前准备计划，第一批内部模拟固定为 `M10-PA-004 / M10-PA-005 / M10-PA-008`，第二批候选、修复队列、辅助模块和 Longbridge paper 进入条件均已写成可审计 JSON/Markdown。修复队列现在逐条写明 `M10-PA-001-1d/5m`、`M10-PA-002-5m`、`M10-PA-004-MBF-QC-1d`、`M10-PA-007-1d`、`M10-PA-009-1d`、`M10-PA-011-5m`、`M12-FTD-001 baseline/loss-streak-guard` 的修复动作、验收条件、仓位倍率和长桥模拟账户阻断状态，避免继续停留在模糊观察口径。
 - 已把 M15 修复计划落到 M12 账户化实际运行链路：`scripts/m12_29_current_day_scan_dashboard_lib.py` 现在按 runtime 写入仓位倍率、收益风险比、止损距离、假突破确认、图形上下文和连续亏损暂停。`M10-PA-001-1d/5m`、`M10-PA-002-5m`、`M10-PA-004-MBF-QC-1d`、`M10-PA-005-1d/5m`、`M10-PA-007-1d`、`M10-PA-008-1d`、`M10-PA-009-1d`、`M10-PA-011-5m/ORB-R1-5m`、`M10-PA-012-5m`、`M10-PA-013-1d/5m`、`M12-FTD-001 baseline/loss-streak-guard` 已不再只是报告里的修复队列；下一次 M12.47 fresh refresh 时会直接用这些规则决定开仓、跳过或风控标记。周一前不能生成新 M13/M14 行情账本，验收仍等待 M12.47 在美股常规交易时段自动拉起 fresh refresh。
-- 已新增 M15 Monday refresh acceptance：`scripts/run_m15_monday_refresh_acceptance.py` 只读 M12.47/M12.37/M13/M14/M15 产物，输出周一交易窗口验收清单；当前 `10/10` 项通过，行情来源、子会话、50 只日线与 5m、M13 当天账本、M14 当天重算、无 fallback/no-fetch、长桥预演只读边界均通过。该验收只表示“本地只读预演链路可继续推进”，不等于已经连接长桥账户或允许下单。
+- 已新增 M15 Monday refresh acceptance：`scripts/run_m15_monday_refresh_acceptance.py` 只读 M12.47/M12.37/M13/M14/M15 产物，输出交易窗口验收清单；验收口径已从固定 50 只改为当前 active universe，默认要求 `147` 只种子池日线与当日 5m 完整。该验收只表示“本地只读预演链路可继续推进”，不等于允许实盘或真实资金动作。
 - 已新增 M15 今日利润质量审计：`scripts/run_m15_profit_quality_audit.py` 只读 M12.32 看板与 M12.46 账户运行状态，输出 `m15_profit_quality_audit.json/md`。最新审计显示 `2026-06-01` 合计内部模拟今日盈亏 `10023.48`，其中今日平仓 `8658.66`、当前未平仓浮盈浮亏 `1364.82`；利润来源是长桥只读行情估值下的内部模拟，不是账户现金利润、不是长桥模拟账户成交、不是实盘。大额收益主要来自旧持仓今天平仓，尤其 `SNOW / ORCL / INTC`，因此不能把今日高利润理解为今天新信号直接赚到；进入长桥模拟账户仍必须等 M14 当天正式重算和用户单独批准。
-- 已新增 M15 全策略长桥模拟账户订单预演：`scripts/run_m15_all_strategy_order_preview.py` 只读 M12 账户化开平仓、M13 当天账本和 M14 gate，把所有交易运行单元的本地模拟开仓/平仓转成长桥模拟账户格式的订单草稿，并输出 `m15_all_strategy_order_preview.json/md/jsonl`。最新结果为 `30` 个交易运行单元、`7` 个辅助模块、`275` 条订单草稿（开仓 `152`、平仓 `123`），M12 本地订单与 M13 当天账本 `275/275` 一致；辅助模块不生成订单，修复运行单元继续生成本地草稿但标记为不得提交。当前按 `6000 USD` 共享模拟资金、整股、只做多、普通限价/突破触发限价、单日最多 `5` 笔规则筛选，`5` 条做多开仓草稿可在用户批准后进入提交链路；做空开仓、无对应模拟账户持仓的平仓、数量不足 `1` 股、超仓位或超风险订单只保留本地草稿。该预演只用于本地记录和稳定性对比，不连接长桥账户、不读取凭证、不提交订单。
+- 已新增 M15 全策略长桥模拟账户订单预演：`scripts/run_m15_all_strategy_order_preview.py` 只读 M12 账户化开平仓、M13 当天账本和 M14 gate，把所有交易运行单元的本地模拟开仓/平仓转成长桥模拟账户格式的订单草稿，并输出 `m15_all_strategy_order_preview.json/md/jsonl`。辅助模块不生成订单，修复运行单元继续生成本地草稿但标记为不得提交。当前按 `10000 USD` 共享模拟资金、整股、只做多、普通限价/突破触发限价、单日最多 `6` 笔规则筛选；做空开仓、无对应模拟账户持仓的平仓、数量不足 `1` 股、超仓位或超风险订单只保留本地草稿。该预演只用于本地记录和稳定性对比，不连接长桥账户、不读取凭证、不提交订单。
 - 已修复 M14/M15 推进口径回归：`scripts/m14_strategy_next_step_readiness_matrix_lib.py` 现在会保留来自 M14 gate 的 `risk_limited_advance`，不会因为还存在影子参数/风控复核就把盈利但高风险 runtime 改写成 `repair_now`；`scripts/m14_strategy_challenge_gate_lib.py` 现在不会让旧的 audit-only degraded quote day 阻断当前已满足有效 10 日窗口的 paper preflight 候选。已补单元测试覆盖这两个口径。
 - 已修复 M12.37/M12.47 面板假日误判：`M12.29` 和 `M12.37` 现在共用配置化美股休市日历，`2026-05-25` Memorial Day 不再显示为常规交易时段，也不会在休市日误跑 M13 ledger；M12.47 `--status` 会把现有静态看板 overlay 成“非交易日等待 / audit-only 快照”。
 - 已修复 M14 gate 与券商式主面板同步滞后：M12.47 `--status` 现在会刷新主面板里的 M14 进度、内部模拟准入数量和每条策略账户的 gate/decision；M14 `goal_status` 也直接写入 `challenge_progress_label`、`paper_trial_gate_approved_count` 和 approved ids，避免心跳汇报继续读到旧的 `approved 0`。
@@ -603,12 +603,12 @@
 
 - 远端推送大文件阻塞已处理：M10.6 原始大 JSONL 已用 gzip archive manifest 保留可追溯，原始文件不再进入可推送历史；后续推送 `main` 不应再被该文件阻塞。
 - 当前 M14 已把“是否真的测试过”升级为 challenge/gate 口径；有效 `10` 个纽约真实交易日 challenge 已固化为 `10/10`，且 `2026-06-01` fresh refresh 已完成重算。当前 blocker 不再是 fallback/no-fetch 或旧 M14 日期，而是模拟账户凭证和首笔模拟订单尚未获得用户单独批准；修复队列、救援 A/B 和影子参数证据仍需继续滚动补账本。任何单日 open/close、zero_signal 或 M13 goal complete 都不能直接解释成可投入使用或可盈利。
-- M14 当前需要重点处理的策略 blocker：`M10-PA-001/002/007/009/011/M12-FTD-001` 等修复运行单元继续按 `repair_now` 修复并保留本地模拟/本地订单草稿；`M10-PA-012/013` 等盈利但高风险运行单元按 `risk_limited_advance` 降仓推进并补风控证据；辅助模块只服务筛选、目标价、止损、仓位、加仓和图形识别，不伪装成独立交易账户。所有非修复 runtime 已进入长桥模拟账户测试名单，但实际提交必须满足 `6000 USD` 共享资金、整股、只做多、单日订单数和风险/敞口上限；连接账户、读取凭证和提交订单仍需用户单独批准。
+- M14 当前需要重点处理的策略 blocker：`M10-PA-001/002/007/009/011/M12-FTD-001` 等修复运行单元继续按 `repair_now` 修复并保留本地模拟/本地订单草稿；`M10-PA-012/013` 等盈利但高风险运行单元按 `risk_limited_advance` 降仓推进并补风控证据；辅助模块只服务筛选、目标价、止损、仓位、加仓和图形识别，不伪装成独立交易账户。所有非修复 runtime 已进入长桥模拟账户测试名单，但实际提交必须满足 `10000 USD` 共享资金、整股、只做多、扣费后预计净利润为正、单日订单数和风险/敞口上限；连接账户、读取凭证和提交订单仍需用户单独批准。
 - M12.49 运行层 blocker 和 PA004 方向兼容 bug 已修复；M12.47 守护器可自动拉起 M12.37，盘前/盘中/盘后刷新看板；M12.37 已自动接入 M13 runner，M14 只在盘后固化 challenge/gate。
 - M11.7 旧模拟交易试运行口径已被 M14 challenge/gate 取代：当前已有 `10/10` challenge 和 `approved_internal_sim_only` 策略，但用户尚未批准 broker paper/live，且 rescue/调参证据仍未完成。
 - 新闻/财报当前仍是 sidecar 第一版：Google 案例已覆盖，但生产级新闻/财报历史事件集尚未建立，不能把当前 `2` 条事件样本解释成完整新闻感知回测。
-- 第一批 50 只的长历史 `5m` 全窗口尚未补齐；当前只保证当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
-- 147 只全量 universe 还没完成缓存扩展，当前不能宣称全量 scanner 可用。
+- 147 只种子池的长历史 `5m` 全窗口尚未补齐；当前只要求当日 `1d` 与当前交易日 `5m` 可用于每日只读观察，不把它解释成两年日内历史完整回测。
+- 147 只种子池已进入当前日扫描配置；若某交易日仍有标的缺当日长桥只读日线或 5m，则该标的不得进入长桥提交队列。
 - `M10-PA-004` 做多分支已进入主推进链路，混合变体继续对照；`M10-PA-007` 归入第二腿图形识别修复队列，未补足稳定图形证据前不进入模拟账户提交链路。
 - 真实 broker / live 交易仍冻结，直到用户另行批准；但可以提前准备不联网、不下单的 broker readiness scaffold、paper dry-run contract、审批 gate 与回退机制，避免策略通过后才临时补工程。
 
@@ -621,9 +621,9 @@
 - M14.2 验收下一步：在不引入真实 broker SDK / HTTP / WebSocket 的前提下，把 dry-run preview 与 M14 gate artifact 连接成只读审计报告；之后才讨论 broker paper 凭证注入和人工审批流程。
 - 不手动运行 `scripts/run_m12_37_intraday_auto_loop.py --once`；下一次 fresh refresh 只能由 M12.47 守护器在交易窗口拉起 `--session`，所有输出仍是只读模拟，不接账户、不下单。
 - `M10-PA-008/009` 不再等图例确认，继续严格定义观察；`M10-PA-004` 做多版现已进入正式主线账户，历史样例只留作参考不入账，PA004 做空版暂不进入主线；`M10-PA-007` 进入每日观察候选。
-- 继续分批补齐第一批 50 只的长历史 `5m` 全窗口，再决定是否扩展到 `147` 只完整 universe。
-- 满足 `50` 只数据稳定、`10` 个交易日看板连续输出、重点策略 A/B 重测可解释、以及用户业务审批后，M11.6 才能把第一批策略明确批准进入模拟交易试运行。
-- 继续扩展新闻/财报事件样本，优先覆盖第一批 `50` 只里发生财报、盘前/盘后大幅波动、宏观事件日的股票；把 M12.40-M12.45 的 sidecar 输出接入每日看板新闻区域，但不改主策略触发逻辑。
+- 继续分批补齐 `147` 只种子池的长历史 `5m` 全窗口；当前长桥模拟账户快速通道只要求当天新信号的当日日线、当前 5m、长桥只读 quote 和 M14 当天策略名单完整。
+- 满足 `147` 只当日数据稳定、`10` 个交易日看板连续输出、重点策略 A/B 重测可解释、扣费后预计净利润为正和用户业务审批后，非修复运行单元才能进入长桥模拟账户提交链路。
+- 继续扩展新闻/财报事件样本，优先覆盖 `147` 只种子池里发生财报、盘前/盘后大幅波动、宏观事件日的股票；把 M12.40-M12.45 的 sidecar 输出接入每日看板新闻区域，但不改主策略触发逻辑。
 - FTD001 下一步优先把 `loss_streak_guard` 作为增强观察候选加入日报比较：保留 baseline 与增强版并排展示，观察是否真能降低实时回撤。
 - M10.6 不得被解释为真实实时观察或盈利证明；M11 paper gate 报告只是准入草案，不是交易许可。
 - M10.4/M10.5/M10.6 仍只允许输出 `needs_definition_fix / needs_visual_review / continue_testing / reject_for_now / continue_observation`，不得输出 `retain/promote/live-ready`。

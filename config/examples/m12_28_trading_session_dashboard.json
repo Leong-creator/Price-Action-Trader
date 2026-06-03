@@ -12,7 +12,7 @@
   "fallback_live_snapshot_ledger_path": "reports/strategy_lab/m10_price_action_strategy_refresh/m12_read_only_pipeline/m12_27_live_snapshot/m12_1_bar_close_observation_ledger.jsonl",
   "quote_refresh": {
     "enabled": true,
-    "max_symbols": 50,
+    "max_symbols": 147,
     "fallback_behavior": "use_checked_in_snapshot_or_cached_reference"
   },
   "dashboard_refresh_seconds": 60,

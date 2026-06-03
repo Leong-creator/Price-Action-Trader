@@ -95,12 +95,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M15PaperPreflightConf
         token_mode=str(safety.get("token_mode", payload.get("token_mode", "paper"))),
         live_token_allowed=bool(safety.get("live_token_allowed", False)),
         kill_switch_enabled=bool(safety.get("kill_switch_enabled", True)),
-        max_orders_per_day=int(safety.get("max_orders_per_day", 1)),
-        max_risk_per_order=str(safety.get("max_risk_per_order", "12")),
-        max_total_exposure=str(safety.get("max_total_exposure", "3600")),
-        paper_account_equity=str(safety.get("paper_account_equity", "6000")),
-        min_cash_reserve=str(safety.get("min_cash_reserve", "2400")),
-        max_symbol_exposure=str(safety.get("max_symbol_exposure", "600")),
+        max_orders_per_day=int(safety.get("max_orders_per_day", 6)),
+        max_risk_per_order=str(safety.get("max_risk_per_order", "20")),
+        max_total_exposure=str(safety.get("max_total_exposure", "6000")),
+        paper_account_equity=str(safety.get("paper_account_equity", "10000")),
+        min_cash_reserve=str(safety.get("min_cash_reserve", "4000")),
+        max_symbol_exposure=str(safety.get("max_symbol_exposure", "1500")),
         allow_fractional_shares=bool(safety.get("allow_fractional_shares", False)),
         allow_short_selling=bool(safety.get("allow_short_selling", False)),
         allow_options=bool(safety.get("allow_options", False)),
@@ -433,7 +433,7 @@ def plain_result(
         return (
             "长桥模拟账户预演已准备好等待用户批准；"
             f"{len(candidates)} 个非修复运行单元可进入模拟账户测试名单，"
-            f"{first_count} 个可在用户批准后进入提交链路。当前按 6000 美元共享资金、整股、只做多、普通限价/突破触发限价规则预演。"
+            f"{first_count} 个可在用户批准后进入提交链路。当前按 10000 美元共享资金、整股、只做多、普通限价/突破触发限价规则预演。"
         )
     if status == "blocked_preflight_policy":
         return f"长桥模拟账户预演被安全策略阻断：{', '.join(policy_blockers or [])}。"

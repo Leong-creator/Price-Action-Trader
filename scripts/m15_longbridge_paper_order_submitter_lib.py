@@ -151,7 +151,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M15PaperSubmitterConf
         outside_rth=str(longbridge.get("outside_rth", "RTH_ONLY")),
         time_in_force=str(longbridge.get("time_in_force", "day")),
         regular_hours_only=bool(longbridge.get("regular_hours_only", True)),
-        max_orders_per_run=int(longbridge.get("max_orders_per_run", 5)),
+        max_orders_per_run=int(longbridge.get("max_orders_per_run", 6)),
         allowed_order_types=tuple(str(item) for item in longbridge.get("allowed_order_types", ["limit"])),
         allowed_soft_preview_blockers=tuple(
             str(item)
@@ -160,11 +160,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> M15PaperSubmitterConf
                 ["broker_connection_disabled", "order_submission_disabled", "paper_trading_approval_false"],
             )
         ),
-        paper_account_equity=decimal(account_model.get("equity", "6000")),
-        max_total_exposure=decimal(account_model.get("max_total_exposure", "3600")),
-        max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "600")),
-        max_risk_per_order=decimal(account_model.get("max_risk_per_order", "12")),
-        min_cash_reserve=decimal(account_model.get("min_cash_reserve", "2400")),
+        paper_account_equity=decimal(account_model.get("equity", "10000")),
+        max_total_exposure=decimal(account_model.get("max_total_exposure", "6000")),
+        max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "1500")),
+        max_risk_per_order=decimal(account_model.get("max_risk_per_order", "20")),
+        min_cash_reserve=decimal(account_model.get("min_cash_reserve", "4000")),
         allow_fractional_shares=bool(account_model.get("allow_fractional_shares", False)),
         allow_short_selling=bool(account_model.get("allow_short_selling", False)),
         allow_options=bool(account_model.get("allow_options", False)),
@@ -490,7 +490,7 @@ def eligible_preview_rows(
     selected_total = ZERO
     selected_by_symbol: dict[str, Decimal] = {}
     rows: list[dict[str, Any]] = []
-    for row in preview_rows:
+    for row in sorted(preview_rows, key=eligible_priority_key):
         signal_id = str(row.get("signal_fingerprint") or row.get("preview_id", ""))
         if signal_id in submitted_ids:
             continue
@@ -528,7 +528,28 @@ def eligible_preview_rows(
         selected_total += notional
         selected_by_symbol[symbol] = selected_by_symbol.get(symbol, ZERO) + notional
         rows.append(row)
+    rows.sort(key=eligible_priority_key)
     return rows
+
+
+def eligible_priority_key(row: dict[str, Any]) -> tuple[int, Decimal, Decimal, Decimal, Decimal, str, str]:
+    rank = int_or_large(row.get("submission_priority_rank", ""))
+    return (
+        rank,
+        -decimal(row.get("net_profit_after_fees_at_target", "0")),
+        -decimal(row.get("strategy_quality_score", "0")),
+        -decimal(row.get("reward_r", "0")),
+        -decimal(row.get("confluence_multiplier", "1")),
+        str(row.get("symbol", "")),
+        str(row.get("runtime_id", "")),
+    )
+
+
+def int_or_large(value: Any) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 10**9
 
 
 def order_command(config: M15PaperSubmitterConfig, cli_path: str, row: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -594,6 +615,8 @@ def build_submission_row(
         "limit_price": preview_row.get("limit_price", ""),
         "notional": preview_row.get("notional", ""),
         "estimated_open_risk": preview_row.get("estimated_open_risk", ""),
+        "net_profit_after_fees_at_target": preview_row.get("net_profit_after_fees_at_target", ""),
+        "submission_priority_rank": preview_row.get("submission_priority_rank", ""),
         "submission_status": status,
         "blockers": blockers,
         "longbridge_order_id": str(response.get("order_id", "")) if isinstance(response, dict) else "",

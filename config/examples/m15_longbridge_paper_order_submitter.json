@@ -22,7 +22,7 @@
     "outside_rth": "RTH_ONLY",
     "time_in_force": "day",
     "regular_hours_only": true,
-    "max_orders_per_run": 5,
+    "max_orders_per_run": 6,
     "allowed_order_types": [
       "limit",
       "trigger_limit"
@@ -34,11 +34,11 @@
     ]
   },
   "paper_account_model": {
-    "equity": "6000",
-    "max_total_exposure": "3600",
-    "max_symbol_exposure": "600",
-    "max_risk_per_order": "12",
-    "min_cash_reserve": "2400",
+    "equity": "10000",
+    "max_total_exposure": "6000",
+    "max_symbol_exposure": "1500",
+    "max_risk_per_order": "20",
+    "min_cash_reserve": "4000",
     "allow_fractional_shares": false,
     "allow_short_selling": false,
     "allow_options": false

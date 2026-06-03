@@ -119,13 +119,13 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> AllStrategyOrderPrevi
         allowed_order_types=tuple(str(item) for item in preview.get("allowed_order_types", ["limit"])),
         breakout_order_type=str(preview.get("breakout_order_type", "trigger_limit")),
         regular_hours_only=bool(preview.get("regular_hours_only", True)),
-        max_orders_per_day=int(preview.get("max_orders_per_day", 5)),
-        max_risk_per_order=decimal(preview.get("max_risk_per_order", "12")),
+        max_orders_per_day=int(preview.get("max_orders_per_day", 6)),
+        max_risk_per_order=decimal(preview.get("max_risk_per_order", "20")),
         quantity_policy=str(preview.get("quantity_policy", "preserve_local_sim_quantity")),
-        paper_account_equity=decimal(account_model.get("equity", "6000")),
-        max_total_exposure=decimal(account_model.get("max_total_exposure", "3600")),
-        min_cash_reserve=decimal(account_model.get("min_cash_reserve", "2400")),
-        max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "600")),
+        paper_account_equity=decimal(account_model.get("equity", "10000")),
+        max_total_exposure=decimal(account_model.get("max_total_exposure", "6000")),
+        min_cash_reserve=decimal(account_model.get("min_cash_reserve", "4000")),
+        max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "1500")),
         allow_fractional_shares=bool(account_model.get("allow_fractional_shares", False)),
         allow_short_selling=bool(account_model.get("allow_short_selling", False)),
         allow_options=bool(account_model.get("allow_options", False)),
@@ -449,7 +449,7 @@ def order_blockers(
         blockers.append("close_requires_existing_paper_position")
     if event_type == "open":
         if notional > config.max_symbol_exposure:
-            blockers.append("symbol_exposure_over_6000_account_cap")
+            blockers.append("symbol_exposure_over_account_cap")
         if notional > tier_policy["max_strategy_exposure"]:
             blockers.append("strategy_tier_exposure_over_cap")
     if str(source_row.get("event_type", "")) == "open":
@@ -481,12 +481,15 @@ def order_preview_status(gate_row: dict[str, Any], blockers: list[str]) -> str:
         return "local_order_preview_created_short_disabled"
     if (
         "strategy_tier_exposure_over_cap" in blockers
+        or "symbol_exposure_over_account_cap" in blockers
         or "symbol_exposure_over_6000_account_cap" in blockers
+        or "shared_account_total_exposure_over_account_cap" in blockers
         or "shared_account_total_exposure_over_6000_cap" in blockers
+        or "shared_symbol_exposure_over_account_cap" in blockers
         or "shared_symbol_exposure_over_6000_cap" in blockers
         or "shared_strategy_tier_exposure_over_cap" in blockers
     ):
-        return "local_order_preview_created_6000_account_size_blocked"
+        return "local_order_preview_created_account_size_blocked"
     if "risk_over_preview_cap" in blockers:
         return "local_order_preview_created_risk_cap_blocked"
     if action_state in {"advance_internal_sim", "risk_limited_advance", "paper_candidate"}:
@@ -623,16 +626,16 @@ def apply_shared_account_caps(preview_rows: list[dict[str, Any]], config: AllStr
         symbol = row["symbol"]
         blockers = list(row.get("blockers", []))
         if int(sum(1 for item in preview_rows if item["longbridge_paper_order_preview_status"] == "local_order_preview_created_ready_after_user_approval" and item.get("_accepted_daily_order"))) >= config.max_orders_per_day:
-            blockers.append("daily_order_count_over_6000_account_cap")
+            blockers.append("daily_order_count_over_account_cap")
         if total_open_notional + notional > config.max_total_exposure:
-            blockers.append("shared_account_total_exposure_over_6000_cap")
+            blockers.append("shared_account_total_exposure_over_account_cap")
         if symbol_open_notional[symbol] + notional > config.max_symbol_exposure:
-            blockers.append("shared_symbol_exposure_over_6000_cap")
+            blockers.append("shared_symbol_exposure_over_account_cap")
         if runtime_open_notional[runtime_id] + notional > decimal(row.get("max_strategy_exposure", "0")):
             blockers.append("shared_strategy_tier_exposure_over_cap")
         if blockers != row.get("blockers", []):
             row["blockers"] = blockers
-            row["longbridge_paper_order_preview_status"] = "local_order_preview_created_6000_account_size_blocked"
+            row["longbridge_paper_order_preview_status"] = "local_order_preview_created_account_size_blocked"
             continue
         row["_accepted_daily_order"] = True
         total_open_notional += notional
@@ -698,7 +701,7 @@ def plain_language_result(
         f"已为 {summary_counts['trading_runtime_count']} 个交易运行单元做长桥模拟账户格式的本地订单预演，"
         f"生成 {summary_counts['order_preview_count']} 条订单草稿，其中开仓 {summary_counts['open_order_preview_count']} 条、"
         f"平仓 {summary_counts['close_order_preview_count']} 条；{summary_counts['auxiliary_module_count']} 个辅助模块不单独生成订单。"
-        f" 按 6000 美元共享资金、整股、只做多规则筛选后，{summary_counts.get('ready_after_user_approval_count', 0)} 条草稿可在用户批准后进入模拟账户提交链路。"
+        f" 按 10000 美元共享资金、整股、只做多规则筛选后，{summary_counts.get('ready_after_user_approval_count', 0)} 条草稿可在用户批准后进入模拟账户提交链路。"
     )
     if status == "local_preview_created_for_all_strategy_orders":
         return base + " 当前只写本地账本，不连接账户、不下单。"
@@ -840,9 +843,9 @@ def runtime_risk_tier(
 
 def risk_tier_policy(tier: str, config: AllStrategyOrderPreviewConfig) -> dict[str, Decimal]:
     defaults = {
-        "primary": {"max_strategy_exposure": Decimal("900"), "max_risk_per_order": Decimal("12")},
-        "standard": {"max_strategy_exposure": Decimal("600"), "max_risk_per_order": Decimal("8")},
-        "risk_limited": {"max_strategy_exposure": Decimal("450"), "max_risk_per_order": Decimal("6")},
+        "primary": {"max_strategy_exposure": Decimal("1500"), "max_risk_per_order": Decimal("20")},
+        "standard": {"max_strategy_exposure": Decimal("1000"), "max_risk_per_order": Decimal("13")},
+        "risk_limited": {"max_strategy_exposure": Decimal("750"), "max_risk_per_order": Decimal("10")},
         "repair": {"max_strategy_exposure": ZERO, "max_risk_per_order": ZERO},
     }
     policy = dict(defaults.get(tier, defaults["repair"]))
@@ -906,7 +909,7 @@ def render_markdown(summary: dict[str, Any], ledger_rows: list[dict[str, Any]]) 
         "- 提交订单：否",
         "- 实盘执行：否",
         "- 手动运行 M12.37：否",
-        "- 账户口径：6000 美元共享模拟资金",
+        "- 账户口径：10000 美元共享模拟资金",
         "- 碎股：不做，数量向下取整，低于 1 股只保留草稿",
         "- 做空/期权：不做，看空开仓只记录不提交",
         "- 订单类型：允许普通限价单和突破触发限价单",

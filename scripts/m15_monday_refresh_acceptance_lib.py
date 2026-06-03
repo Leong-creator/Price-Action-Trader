@@ -98,8 +98,9 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     child_running = bool(supervisor.get("child_running", False))
     supervisor_alive = bool(supervisor.get("supervisor_process_alive", False))
     quote_source = str(dash_summary.get("quote_source", ""))
-    daily_ready = int_or_zero(dash_summary.get("first50_daily_ready_symbols"))
-    five_min_ready = int_or_zero(dash_summary.get("first50_current_5m_ready_symbols"))
+    active_universe_count = int_or_zero(dash_summary.get("active_universe_symbol_count")) or 50
+    daily_ready = int_or_zero(dash_summary.get("active_universe_daily_ready_symbols", dash_summary.get("first50_daily_ready_symbols")))
+    five_min_ready = int_or_zero(dash_summary.get("active_universe_current_5m_ready_symbols", dash_summary.get("first50_current_5m_ready_symbols")))
     scan_date = str(dash_summary.get("scan_date", ""))
     m13_trading_date = str(m13_goal.get("trading_date", ""))
     m14_trading_date = str(m14_goal.get("trading_date", ""))
@@ -116,10 +117,10 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             actual=quote_source or "missing",
         ),
         check_row(
-            "first50_daily_and_5m_complete",
-            "第一批 50 只日线和当日 5 分钟数据完整",
-            pass_wait_or_fail(daily_ready >= 50 and five_min_ready >= 50, session_should_run),
-            actual=f"daily={daily_ready}/50, 5m={five_min_ready}/50",
+            "active_universe_daily_and_5m_complete",
+            f"{active_universe_count} 只种子池日线和当日 5 分钟数据完整",
+            pass_wait_or_fail(daily_ready >= active_universe_count and five_min_ready >= active_universe_count, session_should_run),
+            actual=f"daily={daily_ready}/{active_universe_count}, 5m={five_min_ready}/{active_universe_count}",
         ),
         check_row(
             "m13_current_day_ledger",
