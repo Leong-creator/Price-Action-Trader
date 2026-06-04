@@ -220,6 +220,7 @@ def build_account_state(
         "order_row_count": len(order_rows),
         "open_order_count": len(open_order_rows),
         "positions": position_rows,
+        "orders": order_rows,
         "open_orders": open_order_rows,
         "position_notional_by_symbol": {key: fmt_money(value) for key, value in sorted(position_notional.items())},
         "open_order_notional_by_symbol": {key: fmt_money(value) for key, value in sorted(open_order_notional.items())},

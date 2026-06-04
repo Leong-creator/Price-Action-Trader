@@ -1,0 +1,26 @@
+{
+  "stage": "M15.longbridge_paper_session_report",
+  "title": "长桥模拟账户交易报告",
+  "inputs": {
+    "execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl",
+    "execution_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution.json",
+    "account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
+    "position_manager": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_position_manager.json",
+    "session_supervisor": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_session_supervisor.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
+  },
+  "report": {
+    "market_timezone": "America/New_York",
+    "regular_session_start_time": "09:30",
+    "first_window_minutes": 60
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "local_simulation_as_order_source": false,
+    "manual_m12_37_once": false
+  }
+}

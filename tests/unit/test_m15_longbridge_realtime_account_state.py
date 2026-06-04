@@ -38,6 +38,8 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
             self.assertEqual(account_state["held_symbols"], ["AAPL"])
             self.assertEqual(account_state["position_notional_by_symbol"], {"AAPL": "200.00"})
             self.assertEqual(account_state["open_order_count"], 1)
+            self.assertEqual(account_state["order_row_count"], 2)
+            self.assertEqual([row["order_id"] for row in account_state["orders"]], ["open-1", "filled-1"])
             self.assertEqual(account_state["open_order_notional_by_symbol"], {"MSFT": "300.00"})
             self.assertTrue(payload["local_simulation_isolated"])
             self.assertFalse(payload["order_submit_or_cancel_command_used"])

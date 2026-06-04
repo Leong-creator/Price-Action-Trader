@@ -610,6 +610,7 @@
 - M14.2 当前已从 M14 分支切出 `codex/m14-2-broker-readiness-scaffold` 做工程准备：新增 `BrokerReadinessConfig`、`BrokerOrderPreview`、`BrokerReadinessPlan` 与 `build_broker_readiness_plan`，只把已通过风控和 `approved_internal_sim_only` gate 的 `ExecutionRequest` 转成 dry-run 订单预演；默认 `broker_connection_enabled=false`、`real_order_enabled=false`、`live_execution_enabled=false`、`paper_trading_approval=false`。
 - M14.2 已新增 `scripts/run_m14_2_broker_readiness_scaffold.py` 与 `scripts/m14_2_broker_readiness_scaffold_lib.py`，把真实内部模拟执行账本里的 `risk_check` 事件批量生成 dry-run readiness plan/audit。当前 artifact 位于 `reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_2_broker_readiness/`，结果显示去重后 8 条内部模拟风控检查中 5 条可形成 dry-run preview，3 条被现有风控阻断；下一步应优先降低弱信号/超敞口触发，而不是放宽风控。
 - M12.47/M15 当前已修复网页看板“看起来不刷新”的主要误导：状态页刷新时会先做一次长桥模拟账户只读状态刷新，超过 60 秒或内容生成时间过期就重新读取纸账户认证、资产、持仓和挂单；M12.32 HTML 增加 no-cache 与带时间戳的自动刷新，避免浏览器继续展示旧静态页；长桥账户状态、提交器状态、快速队列状态现在分开判定，旧交易日快速队列只作审计，不再显示成今天可提交订单。北京时间 `2026-06-04 16:02:10` 自检显示守护器存活、当前等待开盘前预热、子会话未运行属正常；长桥模拟账户只读状态为 `2` 个持仓（`AAPL / XLU`）、`0` 个挂单，今天可提交订单 `0`。
+- M15 当前已新增长桥模拟账户盘中交易报告：`m15_longbridge_paper_session_report.*` 只读汇总今日累计提交、开盘首小时提交、当前持仓/挂单、最新风控阻断和订单对账；账户状态产物现在保留长桥今日订单列表，报告可用信号编号、标的、方向、数量和价格把提交流水对到长桥订单号。北京时间 `2026-06-04 23:15` 自检显示今日累计提交 `12` 笔、首小时 `9` 笔、当前 `9` 个持仓、`2` 个挂单，`12/12` 笔均已对上长桥订单号，未匹配订单为 `0`；旧本地模拟账本仍不作为长桥下单或对账来源。
 
 ## 当前阻塞
 
