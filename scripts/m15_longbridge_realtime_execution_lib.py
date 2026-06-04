@@ -288,7 +288,7 @@ def run_realtime_execution(
         for row in existing_ledger
         if row.get("signal_id") and row.get("submission_status") == "submitted"
     }
-    existing_submitted_exposure = submitted_ledger_open_exposure(existing_ledger, session_started_at)
+    existing_submitted_exposure = submitted_ledger_open_exposure(existing_ledger, session_started_at, account_state)
     broker_client = broker_client or (
         LongbridgeCliRealtimePaperClient(config) if config.execute_orders else NullRealtimePaperClient()
     )
@@ -479,6 +479,8 @@ def evaluate_signal_event(
             blockers.append("blocked_existing_open_order_same_symbol")
         if existing_submitted_exposure.get(symbol, ZERO) > ZERO:
             blockers.append("blocked_existing_submitted_order_same_symbol")
+        if selected_symbol_exposure.get(symbol, ZERO) > ZERO:
+            blockers.append("blocked_existing_selected_order_same_symbol")
     if OPTION_SYMBOL_RE.match(symbol):
         blockers.append("blocked_options_disabled")
     if order_type not in {"limit", "trigger_limit"}:
@@ -778,8 +780,14 @@ def count_by_reason(rows: list[dict[str, Any]]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def submitted_ledger_open_exposure(rows: list[dict[str, Any]], session_started_at: str) -> dict[str, Decimal]:
+def submitted_ledger_open_exposure(
+    rows: list[dict[str, Any]],
+    session_started_at: str,
+    account_state: dict[str, Any] | None = None,
+) -> dict[str, Decimal]:
     session_start = parse_utc_datetime(session_started_at)
+    account_state = account_state or {}
+    materialized_symbols = set(held_symbol_quantities(account_state)) | open_order_symbol_set(account_state)
     quantities: dict[str, Decimal] = {}
     notionals: dict[str, Decimal] = {}
     for row in rows:
@@ -790,6 +798,8 @@ def submitted_ledger_open_exposure(rows: list[dict[str, Any]], session_started_a
             continue
         symbol = base_symbol(str(row.get("symbol") or ""))
         if not symbol:
+            continue
+        if symbol in materialized_symbols:
             continue
         quantity = decimal(row.get("quantity", "0"))
         notional = decimal(row.get("notional", "0"))

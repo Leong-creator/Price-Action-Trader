@@ -95,9 +95,9 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.write_jsonl(
                 root / "signals.jsonl",
                 [
-                    self.signal(signal_id="target", created_at="2026-06-04T13:59:59.500Z"),
-                    self.signal(signal_id="acceptable", created_at="2026-06-04T13:59:57Z"),
-                    self.signal(signal_id="delayed", created_at="2026-06-04T13:59:53Z"),
+                    self.signal(signal_id="target", symbol="AAPL", created_at="2026-06-04T13:59:59.500Z"),
+                    self.signal(signal_id="acceptable", symbol="MSFT", created_at="2026-06-04T13:59:57Z"),
+                    self.signal(signal_id="delayed", symbol="NVDA", created_at="2026-06-04T13:59:53Z"),
                 ],
             )
 
@@ -120,8 +120,8 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.write_jsonl(
                 root / "signals.jsonl",
                 [
-                    self.signal(signal_id="limit-order", order_type="limit"),
-                    self.signal(signal_id="trigger-order", order_type="trigger_limit", trigger_price="101.00"),
+                    self.signal(signal_id="limit-order", symbol="AAPL", order_type="limit"),
+                    self.signal(signal_id="trigger-order", symbol="MSFT", order_type="trigger_limit", trigger_price="101.00"),
                 ],
             )
 
@@ -272,6 +272,68 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
 
             self.assertIn("blocked_existing_submitted_order_same_symbol", rows["new-aapl"]["blockers"])
             self.assertTrue(rows["new-aapl"]["longbridge_realtime_submitted_ledger_checked"])
+
+    def test_materialized_submitted_order_is_not_double_counted_after_account_refresh(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "held_symbols": ["AAPL"],
+                "positions": [{"symbol": "AAPL.US", "quantity": "1", "market_price": "100"}],
+                "position_notional_by_symbol": {"AAPL": "100"},
+                "open_order_notional_by_symbol": {},
+                "total_position_notional": "100",
+                "total_open_order_notional": "0",
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(root, account_state=account_state)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            self.write_jsonl(
+                config.output_dir / LEDGER_JSONL,
+                [
+                    {
+                        "signal_id": "already-materialized-aapl",
+                        "submission_status": "submitted",
+                        "submitted_at": "2026-06-04T13:31:00Z",
+                        "side": "buy",
+                        "symbol": "AAPL",
+                        "quantity": "1",
+                        "notional": "5900.00",
+                    }
+                ],
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [self.signal(signal_id="new-msft", symbol="MSFT", notional="500", quantity="5", limit_price="100")],
+            )
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(rows["new-msft"]["realtime_decision_status"], "latency_target_met_ready")
+            self.assertNotIn("blocked_total_exposure_over_cap", rows["new-msft"]["blockers"])
+
+    def test_same_cycle_same_symbol_second_buy_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(signal_id="first-bidu", symbol="BIDU", notional="200", quantity="2", limit_price="100"),
+                    self.signal(signal_id="second-bidu", symbol="BIDU", notional="100", quantity="1", limit_price="100"),
+                ],
+            )
+
+            payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(payload["ready_order_count"], 1)
+            self.assertEqual(rows["first-bidu"]["realtime_decision_status"], "latency_target_met_ready")
+            self.assertIn("blocked_existing_selected_order_same_symbol", rows["second-bidu"]["blockers"])
 
     def test_close_long_can_sell_existing_position_without_becoming_short(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
