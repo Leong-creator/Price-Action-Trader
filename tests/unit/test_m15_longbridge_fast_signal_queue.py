@@ -70,6 +70,108 @@ class M15LongbridgeFastSignalQueueTest(unittest.TestCase):
         self.assertEqual(rows[0]["order_type"], "trigger_limit")
         self.assertEqual(rows[0]["trigger_price"], "101.5")
 
+    def test_breakout_display_name_uses_trigger_limit_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "display_name": "Breakout runtime",
+                    "strategy_id": "M10-PA-002",
+                    "runtime_id": "M10-PA-002-1d",
+                    "trigger_price": "316.12",
+                },
+            )
+            run_fast_signal_queue(config, generated_at="2026-06-02T14:00:00Z")
+            rows = self._rows(config)
+
+        self.assertEqual(rows[0]["order_type"], "trigger_limit")
+        self.assertEqual(rows[0]["trigger_price"], "316.12")
+
+    def test_breakout_strategy_id_uses_trigger_limit_order_without_display_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "strategy_id": "M10-PA-002",
+                    "runtime_id": "M10-PA-002-1d",
+                    "trigger_price": "316.12",
+                },
+            )
+            run_fast_signal_queue(config, generated_at="2026-06-02T14:00:00Z")
+            rows = self._rows(config)
+
+        self.assertEqual(rows[0]["order_type"], "trigger_limit")
+        self.assertEqual(rows[0]["trigger_price"], "316.12")
+
+    def test_open_signal_with_later_close_is_not_submit_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "event_time": "2026-06-02T14:00:00Z",
+                    "signal_time": "2026-06-02T14:00:00Z",
+                    "symbol": "AAPL",
+                },
+                extra_rows=[
+                    self._source_row(
+                        event_type="close",
+                        event_time="2026-06-02T14:05:00Z",
+                        signal_time="2026-06-02T14:00:00Z",
+                        symbol="AAPL",
+                    )
+                ],
+            )
+            payload = run_fast_signal_queue(config, generated_at="2026-06-02T14:06:00Z")
+            rows = self._rows(config)
+
+        self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 0)
+        self.assertEqual(payload["summary"]["signal_superseded_by_close_count"], 1)
+        self.assertEqual(rows[0]["longbridge_paper_order_preview_status"], "signal_superseded_by_close_submit_blocked")
+        self.assertIn("signal_superseded_by_close", rows[0]["blockers"])
+        self.assertEqual(rows[0]["latest_close_event_time_after_open"], "2026-06-02T14:05:00Z")
+
+    def test_old_open_signal_expires_before_submit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "event_time": "2026-06-02T14:00:00Z",
+                    "signal_time": "2026-06-02T14:00:00Z",
+                    "timeframe": "5m",
+                },
+            )
+            payload = run_fast_signal_queue(config, generated_at="2026-06-02T14:16:00Z")
+            rows = self._rows(config)
+
+        self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 0)
+        self.assertEqual(payload["summary"]["signal_age_expired_count"], 1)
+        self.assertEqual(rows[0]["longbridge_paper_order_preview_status"], "signal_age_expired_submit_blocked")
+        self.assertEqual(rows[0]["signal_age_seconds"], "960")
+        self.assertIn("signal_age_expired", rows[0]["blockers"])
+
+    def test_daily_signal_does_not_expire_on_5m_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(
+                Path(tmp),
+                action_state="paper_candidate",
+                source_overrides={
+                    "event_time": "2026-06-02T14:00:00Z",
+                    "signal_time": "2026-06-02T14:00:00Z",
+                    "timeframe": "1d",
+                },
+            )
+            payload = run_fast_signal_queue(config, generated_at="2026-06-02T14:30:00Z")
+            rows = self._rows(config)
+
+        self.assertEqual(payload["summary"]["ready_after_user_approval_count"], 1)
+        self.assertEqual(payload["summary"]["signal_age_expired_count"], 0)
+        self.assertEqual(rows[0]["max_signal_age_seconds"], "23400")
+        self.assertNotIn("signal_age_expired", rows[0]["blockers"])
+
     def test_blocks_order_when_target_profit_does_not_cover_fees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self._write_config(

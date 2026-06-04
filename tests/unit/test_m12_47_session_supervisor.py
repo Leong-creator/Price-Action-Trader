@@ -4,15 +4,18 @@ import unittest
 from dataclasses import replace
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.run_m12_47_session_supervisor import (
     apply_dashboard_longbridge_overlay,
     apply_dashboard_status_overlay,
+    artifact_refresh_age_seconds,
     build_failure_payload,
     build_status_payload,
     build_window_state,
     load_config,
+    maybe_refresh_longbridge_account_state_for_dashboard,
     print_status,
     should_trip_failure_breaker,
     stale_dashboard_restart_reason,
@@ -176,6 +179,62 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(dashboard["top_metrics"]["长桥可提交订单"], "3")
         self.assertFalse(dashboard["longbridge_paper_account"]["real_money_actions"])
         self.assertFalse(dashboard["longbridge_paper_account"]["live_execution"])
+
+    def test_maybe_refreshes_longbridge_account_state_when_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = replace(load_config(), output_dir=Path(tmp) / "m12")
+            submitter_config = SimpleNamespace(output_dir=Path(tmp) / "m15")
+
+            with patch("scripts.run_m12_47_session_supervisor.load_m15_paper_submitter_config", return_value=submitter_config):
+                with patch("scripts.run_m12_47_session_supervisor.artifact_refresh_age_seconds", return_value=999):
+                    with patch("scripts.run_m12_47_session_supervisor.now_utc_iso", return_value="2026-06-04T15:00:01Z"):
+                        with patch("scripts.run_m12_47_session_supervisor.refresh_paper_account_state", return_value={}) as refresh:
+                            refreshed = maybe_refresh_longbridge_account_state_for_dashboard(
+                                config,
+                                {"supervisor_generated_at": "2026-06-04T15:00:00Z"},
+                            )
+
+        self.assertTrue(refreshed)
+        refresh.assert_called_once_with(submitter_config, generated_at="2026-06-04T15:00:01Z")
+
+    def test_refreshes_longbridge_account_state_when_generated_at_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            account_state_path = Path(tmp) / "account_state.json"
+            account_state_path.write_text(json.dumps({"generated_at": "2026-06-04T14:00:00Z"}), encoding="utf-8")
+
+            with patch("scripts.run_m12_47_session_supervisor.artifact_mtime_age_seconds", return_value=5):
+                with patch("scripts.run_m12_47_session_supervisor.datetime") as mocked_datetime:
+                    mocked_datetime.now.return_value.timestamp.return_value = 1_780_000_000
+                    mocked_datetime.fromisoformat.return_value.timestamp.return_value = 1_779_999_000
+                    age_seconds = artifact_refresh_age_seconds(account_state_path)
+
+        self.assertEqual(age_seconds, 1000)
+
+    def test_refresh_age_is_stale_when_generated_at_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            account_state_path = Path(tmp) / "account_state.json"
+            account_state_path.write_text(json.dumps({"schema_version": "test"}), encoding="utf-8")
+
+            with patch("scripts.run_m12_47_session_supervisor.artifact_mtime_age_seconds", return_value=5):
+                age_seconds = artifact_refresh_age_seconds(account_state_path)
+
+        self.assertEqual(age_seconds, 10**9)
+
+    def test_skips_longbridge_account_state_refresh_when_recent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = replace(load_config(), output_dir=Path(tmp) / "m12")
+            submitter_config = SimpleNamespace(output_dir=Path(tmp) / "m15")
+
+            with patch("scripts.run_m12_47_session_supervisor.load_m15_paper_submitter_config", return_value=submitter_config):
+                with patch("scripts.run_m12_47_session_supervisor.artifact_refresh_age_seconds", return_value=5):
+                    with patch("scripts.run_m12_47_session_supervisor.refresh_paper_account_state", return_value={}) as refresh:
+                        refreshed = maybe_refresh_longbridge_account_state_for_dashboard(
+                            config,
+                            {"supervisor_generated_at": "2026-06-04T15:00:00Z"},
+                        )
+
+        self.assertFalse(refreshed)
+        refresh.assert_not_called()
 
     def test_dashboard_status_overlay_refreshes_m14_gate_context(self):
         dashboard = {

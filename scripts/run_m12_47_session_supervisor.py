@@ -27,11 +27,17 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     load_json,
     write_json,
 )
+from scripts.m15_longbridge_paper_order_submitter_lib import (  # noqa: E402
+    ACCOUNT_STATE_JSON as M15_ACCOUNT_STATE_JSON,
+    load_config as load_m15_paper_submitter_config,
+    refresh_paper_account_state,
+)
 
 
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_47_session_supervisor.json"
 DEFAULT_M1237_CONFIG_PATH = ROOT / "config" / "examples" / "m12_37_intraday_auto_loop.json"
 DEFAULT_OUTPUT_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh" / "daily_observation" / "m12_29_current_day_scan_dashboard"
+M15_ACCOUNT_REFRESH_MIN_INTERVAL_SECONDS = 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -620,6 +626,7 @@ def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, A
     m14_context = load_m14_terminal_context(dashboard_config)
     if not apply_dashboard_status_overlay(dashboard, payload, m14_context=m14_context):
         return False
+    maybe_refresh_longbridge_account_state_for_dashboard(config, payload)
     apply_dashboard_longbridge_overlay(dashboard, build_longbridge_paper_dashboard_view(dashboard_config))
     write_json(dashboard_path, dashboard)
     try:
@@ -638,6 +645,50 @@ def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, A
             },
         )
     return True
+
+
+def maybe_refresh_longbridge_account_state_for_dashboard(config: SupervisorConfig, payload: dict[str, Any]) -> bool:
+    try:
+        submitter_config = load_m15_paper_submitter_config()
+        account_state_path = submitter_config.output_dir / M15_ACCOUNT_STATE_JSON
+        if artifact_refresh_age_seconds(account_state_path) <= M15_ACCOUNT_REFRESH_MIN_INTERVAL_SECONDS:
+            return False
+        refresh_paper_account_state(submitter_config, generated_at=now_utc_iso())
+        return True
+    except Exception as exc:  # pragma: no cover - keeps dashboard overlay resilient when Longbridge is unavailable
+        write_json(
+            config.output_dir / "m12_47_longbridge_account_refresh_error.json",
+            {
+                "schema_version": "m12.47.longbridge-account-refresh-error.v1",
+                "generated_at": now_utc_iso(),
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+                "paper_simulated_only": True,
+                "real_money_actions": False,
+                "live_execution": False,
+            },
+        )
+        return False
+
+
+def artifact_mtime_age_seconds(path: Path) -> int:
+    if not path.exists():
+        return 10**9
+    return max(0, int(time.time() - path.stat().st_mtime))
+
+
+def artifact_refresh_age_seconds(path: Path) -> int:
+    if not path.exists():
+        return 10**9
+    mtime_age = artifact_mtime_age_seconds(path)
+    payload = load_json(path)
+    generated_at = str(payload.get("generated_at", ""))
+    try:
+        generated_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError:
+        return 10**9
+    generated_age = max(0, int(datetime.now(UTC).timestamp() - generated_dt.timestamp()))
+    return max(mtime_age, generated_age)
 
 
 def sync_manifest_status_overlay(config: SupervisorConfig, payload: dict[str, Any]) -> bool:

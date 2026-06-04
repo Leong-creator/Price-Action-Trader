@@ -245,6 +245,26 @@ def run_paper_submitter(
     return summary
 
 
+def refresh_paper_account_state(
+    config: M15PaperSubmitterConfig | None = None,
+    *,
+    generated_at: str | None = None,
+    command_runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    config = config or load_config()
+    generated_at = generated_at or now_utc_iso()
+    runner = command_runner or run_command
+    cli_path = shutil.which(config.cli_name) or config.cli_name
+    auth = probe_json(runner, [cli_path, "auth", "status", "--format", "json"])
+    assets = probe_json(runner, [cli_path, "assets", "--format", "json"])
+    positions = probe_json(runner, [cli_path, "positions", "--format", "json"])
+    existing_orders = probe_json(runner, [cli_path, "order", "--format", "json"])
+    account_state = build_account_state(config, generated_at, auth, assets, positions, existing_orders, existing_submission_ids(config))
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    write_json(config.output_dir / ACCOUNT_STATE_JSON, account_state)
+    return account_state
+
+
 def watch_paper_submitter(
     config: M15PaperSubmitterConfig,
     *,
@@ -758,6 +778,7 @@ def build_account_state(
     account = auth_json.get("account", {}) if isinstance(auth_json.get("account"), dict) else {}
     position_rows = positions.get("json") if isinstance(positions.get("json"), list) else []
     order_rows = existing_orders.get("json") if isinstance(existing_orders.get("json"), list) else []
+    open_order_rows = [row for row in order_rows if is_open_order_row(row)]
     return {
         "schema_version": "m15.longbridge-paper-account-state.v1",
         "stage": "M15.longbridge_paper_order_submitter",
@@ -775,11 +796,31 @@ def build_account_state(
         "buying_power": fmt_money(available_buying_power(assets)),
         "held_symbols": sorted(held_symbol_set(positions)),
         "position_row_count": len(position_rows),
-        "open_order_count": len(order_rows),
+        "order_row_count": len(order_rows),
+        "open_order_count": len(open_order_rows),
         "submitted_signal_fingerprints": sorted(submitted_ids),
         "real_money_actions": False,
         "live_execution": False,
     }
+
+
+def is_open_order_row(row: Any) -> bool:
+    if not isinstance(row, dict):
+        return False
+    status = str(row.get("status") or "").strip().lower()
+    if not status:
+        return True
+    closed_statuses = {
+        "filled",
+        "canceled",
+        "cancelled",
+        "rejected",
+        "expired",
+        "withdrawn",
+        "deleted",
+        "failed",
+    }
+    return status not in closed_statuses
 
 
 def backoff_reasons_for(

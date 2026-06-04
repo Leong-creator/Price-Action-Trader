@@ -1,0 +1,40 @@
+{
+  "stage": "M15.longbridge_realtime_market_event_ingestor",
+  "title": "长桥实时行情事件采集器",
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
+    "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl"
+  },
+  "longbridge_market_data": {
+    "session_started_at": "auto",
+    "market": "US",
+    "symbols": [],
+    "hot_symbols": [
+      "SPY",
+      "QQQ",
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "TSLA"
+    ],
+    "use_seed_universe": true,
+    "symbol_limit": 147,
+    "max_symbols_per_cycle": 25,
+    "symbol_cursor_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_symbol_cursor.json",
+    "timeframes": [
+      "1d",
+      "5m"
+    ],
+    "kline_count": 2,
+    "watch_interval_seconds": 1,
+    "cli_timeout_seconds": 6
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "account_or_order_commands": false,
+    "local_simulation_as_market_source": false,
+    "manual_m12_37_once": false
+  }
+}

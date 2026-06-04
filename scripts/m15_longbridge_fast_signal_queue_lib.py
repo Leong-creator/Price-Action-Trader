@@ -69,6 +69,8 @@ class FastSignalQueueConfig:
     default_order_type: str
     allowed_order_types: tuple[str, ...]
     breakout_order_type: str
+    max_signal_age_seconds: int
+    max_signal_age_seconds_by_timeframe: dict[str, int]
     regular_hours_only: bool
     max_orders_per_day: int
     max_risk_per_order: Decimal
@@ -154,6 +156,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> FastSignalQueueConfig
         default_order_type=str(queue.get("default_order_type", "limit")),
         allowed_order_types=tuple(str(item) for item in queue.get("allowed_order_types", ["limit", "trigger_limit"])),
         breakout_order_type=str(queue.get("breakout_order_type", "trigger_limit")),
+        max_signal_age_seconds=int(queue.get("max_signal_age_seconds", 900)),
+        max_signal_age_seconds_by_timeframe={
+            str(name): int(value)
+            for name, value in dict(queue.get("max_signal_age_seconds_by_timeframe", {})).items()
+        },
         regular_hours_only=bool(queue.get("regular_hours_only", True)),
         max_orders_per_day=int(queue.get("max_orders_per_day", 6)),
         max_risk_per_order=decimal(queue.get("max_risk_per_order", "20")),
@@ -201,6 +208,10 @@ def validate_config(config: FastSignalQueueConfig) -> None:
         raise ValueError("M15 fast signal queue supports only limit and trigger_limit")
     if config.breakout_order_type not in set(config.allowed_order_types):
         raise ValueError("M15 fast signal queue breakout order type must be allowed")
+    if config.max_signal_age_seconds <= 0:
+        raise ValueError("M15 fast signal queue max signal age must be positive")
+    if any(value <= 0 for value in config.max_signal_age_seconds_by_timeframe.values()):
+        raise ValueError("M15 fast signal queue timeframe max signal ages must be positive")
     if config.allow_fractional_shares:
         raise ValueError("M15 fast signal queue forbids fractional shares")
     if config.allow_short_selling:
@@ -281,7 +292,9 @@ def build_fast_signal_queue(config: FastSignalQueueConfig, generated_at: str) ->
     gate_rows = list(paper_gate.get("rows", []))
     gate_by_runtime = {str(row.get("runtime_id", "")): row for row in gate_rows if row.get("runtime_id")}
     decision_by_runtime = latest_strategy_decisions_by_runtime(read_jsonl(config.strategy_decision_ledger_path), m14_trading_date)
-    source_rows = current_day_open_rows(read_jsonl(config.account_trade_ledger_path), scan_date)
+    source_ledger_rows = read_jsonl(config.account_trade_ledger_path)
+    source_rows = current_day_open_rows(source_ledger_rows, scan_date)
+    mark_open_rows_superseded_by_close(source_rows, source_ledger_rows, scan_date)
     ledger_rows = [
         build_fast_signal_row(
             config,
@@ -342,6 +355,11 @@ def build_fast_signal_queue(config: FastSignalQueueConfig, generated_at: str) ->
             "max_risk_per_order": fmt_money(config.max_risk_per_order),
             "max_orders_per_day": config.max_orders_per_day,
         },
+        "signal_freshness_policy": {
+            "max_signal_age_seconds": config.max_signal_age_seconds,
+            "max_signal_age_seconds_by_timeframe": dict(sorted(config.max_signal_age_seconds_by_timeframe.items())),
+            "close_after_open_blocks_submit": True,
+        },
         "profit_priority_policy": {
             "fee_profit_gate": "target_gross_profit_minus_buy_fees_minus_sell_fees_must_be_positive",
             "sort_order": [
@@ -385,6 +403,60 @@ def current_day_open_rows(rows: list[dict[str, Any]], scan_date: str) -> list[di
         for row in rows
         if str(row.get("trading_date", "")) == scan_date and str(row.get("event_type", "")) == "open"
     ]
+
+
+def mark_open_rows_superseded_by_close(open_rows: list[dict[str, Any]], all_rows: list[dict[str, Any]], scan_date: str) -> None:
+    closes_by_runtime_symbol: dict[tuple[str, str], list[datetime]] = defaultdict(list)
+    for row in all_rows:
+        if str(row.get("trading_date", "")) != scan_date or str(row.get("event_type", "")) != "close":
+            continue
+        close_dt = parse_optional_utc_datetime(str(row.get("event_time", "")))
+        if close_dt is None:
+            continue
+        key = (str(row.get("runtime_id", "")), str(row.get("symbol", "")))
+        closes_by_runtime_symbol[key].append(close_dt)
+    for row in open_rows:
+        open_dt = parse_optional_utc_datetime(str(row.get("event_time", "")))
+        if open_dt is None:
+            continue
+        key = (str(row.get("runtime_id", "")), str(row.get("symbol", "")))
+        later_closes = [close_dt for close_dt in closes_by_runtime_symbol.get(key, []) if close_dt > open_dt]
+        if later_closes:
+            row["_latest_close_event_time_after_open"] = max(later_closes).isoformat().replace("+00:00", "Z")
+
+
+def signal_freshness_blockers(config: FastSignalQueueConfig, generated_at: str, source_row: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    if str(source_row.get("_latest_close_event_time_after_open", "")):
+        blockers.append("signal_superseded_by_close")
+    generated_dt = parse_optional_utc_datetime(generated_at)
+    event_dt = parse_optional_utc_datetime(str(source_row.get("event_time", "")))
+    if generated_dt is not None and event_dt is not None:
+        age_seconds = int((generated_dt - event_dt).total_seconds())
+        max_age_seconds = signal_max_age_seconds(config, source_row)
+        source_row["_signal_age_seconds"] = str(age_seconds)
+        source_row["_signal_max_age_seconds"] = str(max_age_seconds)
+        if age_seconds > max_age_seconds:
+            blockers.append("signal_age_expired")
+    return blockers
+
+
+def signal_max_age_seconds(config: FastSignalQueueConfig, source_row: dict[str, Any]) -> int:
+    timeframe = str(source_row.get("timeframe", "")).strip().lower()
+    return config.max_signal_age_seconds_by_timeframe.get(timeframe, config.max_signal_age_seconds)
+
+
+def parse_optional_utc_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        text = value.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def latest_strategy_decisions_by_runtime(rows: list[dict[str, Any]], trading_date: str) -> dict[str, dict[str, Any]]:
@@ -824,10 +896,15 @@ def build_fast_signal_row(
     risk_amount = estimated_open_risk("open", price, stop_price, quantity)
     order_type = infer_order_type(source_row, config)
     blockers = order_blockers(config, source_row, gate_row, price, source_quantity, quantity, risk_amount, tier_policy)
+    blockers = append_unique(blockers, signal_freshness_blockers(config, generated_at, source_row))
     fee_profit = estimate_fee_profit_fields(config, price, target_price, quantity)
     if fee_profit["fee_profit_gate_status"] == "blocked":
         blockers = append_unique(blockers, ["net_profit_after_fees_not_positive"])
     preview_status = order_preview_status(gate_row, blockers)
+    if "signal_superseded_by_close" in blockers and preview_status == READY_STATUS:
+        preview_status = "signal_superseded_by_close_submit_blocked"
+    if "signal_age_expired" in blockers and preview_status == READY_STATUS:
+        preview_status = "signal_age_expired_submit_blocked"
     if "net_profit_after_fees_not_positive" in blockers and preview_status == READY_STATUS:
         preview_status = "local_order_preview_created_fee_profit_blocked"
     runtime_id = str(source_row.get("runtime_id", ""))
@@ -866,6 +943,7 @@ def build_fast_signal_row(
         "order_type": order_type,
         "allowed_order_types": list(config.allowed_order_types),
         "breakout_order_type": config.breakout_order_type,
+        "max_signal_age_seconds": str(source_row.get("_signal_max_age_seconds") or config.max_signal_age_seconds),
         "limit_price": fmt_decimal(price),
         "trigger_price": fmt_decimal(explicit_trigger_price if explicit_trigger_price > ZERO else price),
         "source_quantity": fmt_decimal(source_quantity),
@@ -885,6 +963,8 @@ def build_fast_signal_row(
         "net_profit_after_fees_at_target": fee_profit["net_profit_after_fees_at_target"],
         "fee_profit_gate_status": fee_profit["fee_profit_gate_status"],
         "fee_profit_gate_blockers": fee_profit["fee_profit_gate_blockers"],
+        "signal_age_seconds": str(source_row.get("_signal_age_seconds", "")),
+        "latest_close_event_time_after_open": str(source_row.get("_latest_close_event_time_after_open", "")),
         "strategy_win_rate": strategy_win_rate(decision_row),
         "strategy_quality_score": fmt_decimal(strategy_quality_score(decision_row, gate_row)),
         "strategy_quality_source": "m14_strategy_decision_ledger",
@@ -930,6 +1010,8 @@ def build_summary_counts(rows: list[dict[str, Any]], gate_rows: list[dict[str, A
         "premarket_blocked_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "premarket_against_signal_blocked"),
         "premarket_wait_confirmation_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "wait_first_5m_confirmation"),
         "fee_profit_blocked_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "local_order_preview_created_fee_profit_blocked"),
+        "signal_age_expired_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "signal_age_expired_submit_blocked"),
+        "signal_superseded_by_close_count": sum(1 for row in rows if row.get("longbridge_paper_order_preview_status") == "signal_superseded_by_close_submit_blocked"),
         "net_profitable_ready_count": sum(1 for row in ready if decimal(row.get("net_profit_after_fees_at_target", "0")) > ZERO),
         "repair_signal_count": sum(1 for row in rows if row.get("runtime_action_state") == "repair_now"),
         "auxiliary_module_count": sum(1 for row in gate_rows if str(row.get("runtime_role", "")) == "auxiliary_module"),

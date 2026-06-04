@@ -21,6 +21,13 @@
       "trigger_limit"
     ],
     "breakout_order_type": "trigger_limit",
+    "max_signal_age_seconds": 900,
+    "max_signal_age_seconds_by_timeframe": {
+      "5m": 900,
+      "15m": 2700,
+      "1h": 7200,
+      "1d": 23400
+    },
     "regular_hours_only": true,
     "market_timezone": "America/New_York",
     "market_holidays": [

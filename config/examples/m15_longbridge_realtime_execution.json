@@ -1,0 +1,96 @@
+{
+  "stage": "M15.longbridge_realtime_execution",
+  "title": "长桥模拟账户实时执行链路",
+  "inputs": {
+    "realtime_signal_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_signal_events.jsonl",
+    "paper_account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
+  },
+  "longbridge_realtime": {
+    "required_account_channel": "lb_papertrading",
+    "cli_name": "longbridge",
+    "cli_timeout_seconds": 6,
+    "time_in_force": "day",
+    "outside_rth": "RTH_ONLY",
+    "execute_orders": false,
+    "paper_trading_approval": false,
+    "session_started_at": "auto",
+    "allow_replay": false,
+    "watch_interval_seconds": 1,
+    "latency_target_ms": 1000,
+    "latency_acceptable_ms": 5000,
+    "allowed_runtime_ids": [
+      "M10-PA-004-long-1d",
+      "M10-PA-013-1d",
+      "M10-PA-001-1d",
+      "M10-PA-001-5m",
+      "M10-PA-002-1d",
+      "M10-PA-005-1d",
+      "M10-PA-005-5m",
+      "M10-PA-008-1d",
+      "M10-PA-012-5m",
+      "M10-PA-013-5m",
+      "M12-FTD-001-baseline-1d"
+    ]
+  },
+  "paper_account_model": {
+    "equity": "10000",
+    "max_total_exposure": "6000",
+    "max_symbol_exposure": "1500",
+    "max_risk_per_order": "20",
+    "min_cash_reserve": "4000",
+    "allow_fractional_shares": false,
+    "allow_short_selling": false,
+    "allow_options": false,
+    "minimum_net_profit_after_fees": "0"
+  },
+  "runtime_layering": {
+    "longbridge_realtime_candidates": [
+      "M10-PA-004-long-1d",
+      "M10-PA-013-1d",
+      "M10-PA-001-1d",
+      "M10-PA-001-5m",
+      "M10-PA-002-1d",
+      "M10-PA-005-1d",
+      "M10-PA-005-5m",
+      "M10-PA-008-1d",
+      "M10-PA-012-5m",
+      "M10-PA-013-5m",
+      "M12-FTD-001-baseline-1d"
+    ],
+    "local_repair_or_shadow_only": [
+      "M10-PA-002-5m",
+      "M10-PA-007-1d",
+      "M10-PA-009-1d",
+      "M10-PA-011-5m",
+      "M10-PA-011-ORB-R1-5m",
+      "M10-PA-004-MBF-1d",
+      "M10-PA-004-MBF-QC-1d",
+      "all m14-modify variants",
+      "all broker-risk-cap-shadow variants",
+      "all target-stop-shadow variants",
+      "all loss-streak-guard variants"
+    ],
+    "auxiliary_modules_local_only": [
+      "M10-PA-003",
+      "M10-PA-006",
+      "M10-PA-010",
+      "M10-PA-014",
+      "M10-PA-015",
+      "M10-PA-016",
+      "AI-TRADER-EXTERNAL"
+    ]
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "local_simulation_as_order_source": false,
+    "manual_m12_37_once": false,
+    "fractional_shares": false,
+    "short_selling": false,
+    "options": false
+  }
+}

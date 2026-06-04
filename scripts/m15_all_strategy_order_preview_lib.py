@@ -805,14 +805,21 @@ def infer_order_type(source_row: dict[str, Any], config: AllStrategyOrderPreview
     explicit = str(source_row.get("order_type") or source_row.get("entry_order_type") or "").strip()
     if explicit in set(config.allowed_order_types):
         return explicit
+    strategy_id = str(source_row.get("strategy_id", ""))
+    runtime_id = str(source_row.get("runtime_id", ""))
+    breakout_strategy_tokens = ("M10-PA-002", "M10-PA-004-MBF", "M10-PA-011-ORB", "M10-PA-012")
+    if any(token in strategy_id or token in runtime_id for token in breakout_strategy_tokens):
+        return config.breakout_order_type
     text = " ".join(
         str(source_row.get(key, ""))
         for key in (
             "entry_style",
             "entry_trigger",
+            "display_name",
             "setup",
             "pattern",
             "signal_label",
+            "order_intent",
             "runtime_repair_policy",
             "strategy_id",
             "runtime_id",

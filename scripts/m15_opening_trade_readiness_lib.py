@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config
+from scripts.m15_longbridge_realtime_session_supervisor_lib import (
+    DEFAULT_CONFIG_PATH as DEFAULT_REALTIME_SUPERVISOR_CONFIG_PATH,
+    build_window_state,
+    load_config as load_realtime_supervisor_config,
+    pid_path as realtime_pid_path,
+)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DAILY_DIR = (
+    ROOT
+    / "reports"
+    / "strategy_lab"
+    / "m10_price_action_strategy_refresh"
+    / "daily_observation"
+)
+DEFAULT_M12_DIR = DEFAULT_DAILY_DIR / "m12_29_current_day_scan_dashboard"
+DEFAULT_M15_REALTIME_DIR = DEFAULT_DAILY_DIR / "m15_longbridge_realtime_execution"
+DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_opening_trade_readiness"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_opening_trade_readiness.json"
+READINESS_JSON = "m15_opening_trade_readiness.json"
+READINESS_MD = "m15_opening_trade_readiness.md"
+
+
+@dataclass(frozen=True, slots=True)
+class OpeningTradeReadinessConfig:
+    stage: str
+    m12_47_status_path: Path
+    realtime_supervisor_config_path: Path
+    execution_config_path: Path
+    realtime_account_state_path: Path
+    realtime_supervisor_status_path: Path
+    output_dir: Path
+
+
+def resolve_repo_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
+def project_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path.resolve())
+
+
+def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadinessConfig:
+    config_path = resolve_repo_path(path)
+    payload = read_json(config_path) if config_path.exists() else {}
+    inputs = payload.get("inputs", {})
+    outputs = payload.get("outputs", {})
+    return OpeningTradeReadinessConfig(
+        stage=str(payload.get("stage", "M15.opening_trade_readiness")),
+        m12_47_status_path=resolve_repo_path(inputs.get("m12_47_status", DEFAULT_M12_DIR / "m12_47_session_supervisor_status.json")),
+        realtime_supervisor_config_path=resolve_repo_path(
+            inputs.get("realtime_supervisor_config", DEFAULT_REALTIME_SUPERVISOR_CONFIG_PATH)
+        ),
+        execution_config_path=resolve_repo_path(
+            inputs.get(
+                "execution_config",
+                ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_orders_enabled.json",
+            )
+        ),
+        realtime_account_state_path=resolve_repo_path(
+            inputs.get("realtime_account_state", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_realtime_account_state.json")
+        ),
+        realtime_supervisor_status_path=resolve_repo_path(
+            inputs.get("realtime_supervisor_status", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_realtime_session_supervisor.json")
+        ),
+        output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
+    )
+
+
+def run_m15_opening_trade_readiness(
+    config: OpeningTradeReadinessConfig | None = None,
+    *,
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    config = config or load_config()
+    generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    payload = build_readiness(config, generated_at)
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    write_json(config.output_dir / READINESS_JSON, payload)
+    (config.output_dir / READINESS_MD).write_text(render_markdown(payload), encoding="utf-8")
+    return payload
+
+
+def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> dict[str, Any]:
+    m12_status = read_json(config.m12_47_status_path)
+    realtime_config = load_realtime_supervisor_config(config.realtime_supervisor_config_path)
+    execution_config_error = ""
+    try:
+        execution_config = load_execution_config(config.execution_config_path)
+    except ValueError as exc:
+        execution_config = None
+        execution_config_error = str(exc)
+    execution_payload = read_json_payload(config.execution_config_path)
+    account_state = read_json(config.realtime_account_state_path)
+    realtime_status = read_json(config.realtime_supervisor_status_path)
+    window = build_window_state(realtime_config, generated_at=generated_at)
+    realtime_pid = read_pid(realtime_pid_path(realtime_config))
+    realtime_alive = bool(realtime_pid and process_alive(realtime_pid))
+    m12_alive = bool(m12_status.get("supervisor_process_alive", False))
+    execution_config_linked = config.execution_config_path.resolve() == realtime_config.execution_config_path.resolve()
+    paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
+    paper_account_ready = paper_account_verified(account_state)
+    checks = [
+        check_row("m12_47_daemon_alive", "M12.47 自动刷新守护器存活", "pass" if m12_alive else "fail", actual=str(m12_alive)),
+        check_row(
+            "m15_realtime_daemon_alive",
+            "M15 长桥实时链路守护器存活",
+            "pass" if realtime_alive else "fail",
+            actual=f"pid={realtime_pid or ''}",
+        ),
+        check_row(
+            "regular_session_window",
+            "只在美股常规交易时段提交模拟订单",
+            "pass" if window["market_phase"] == "regular_session" else "waiting",
+            actual=str(window.get("market_status", "")),
+        ),
+        check_row(
+            "paper_orders_enabled",
+            "已显式启用长桥模拟账户订单提交",
+            "pass" if paper_orders_enabled else "fail",
+            actual=execution_config_error
+            or f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}",
+        ),
+        check_row(
+            "paper_account_verified",
+            "账户必须是长桥模拟账户",
+            "pass" if paper_account_ready else "fail",
+            actual=f"channel={account_state.get('account_channel', '')}, verified={account_state.get('paper_account_verified', '')}",
+        ),
+        check_row(
+            "paper_enabled_config_linked",
+            "实时守护器使用模拟订单启用版执行配置",
+            "pass" if execution_config_linked else "fail",
+            actual=project_path(realtime_config.execution_config_path),
+        ),
+        check_row(
+            "order_safety_boundaries",
+            "整股、只做多、不开期权、常规交易时段、只限日内单",
+            "pass" if execution_config and order_safety_ok(execution_config) else "fail",
+            actual=execution_config_error or f"RTH={execution_config.outside_rth}, tif={execution_config.time_in_force}",
+        ),
+        check_row(
+            "paper_only_boundaries",
+            "禁止实盘和真实资金动作",
+            "pass" if paper_only_boundaries_ok(execution_payload, realtime_config.hard_boundaries) else "fail",
+            actual=str(execution_payload.get("hard_boundaries", {})),
+        ),
+        check_row(
+            "local_simulation_isolated",
+            "长桥实时链路不得读取本地模拟账本",
+            "pass" if local_simulation_isolated(realtime_status) else "fail",
+            actual=f"local_ref={realtime_status.get('local_ledger_input_ref', '')}",
+        ),
+        check_row(
+            "repair_auxiliary_isolated",
+            "修复策略、影子变体和辅助模块不进入长桥实时下单",
+            "pass" if repair_auxiliary_isolated(execution_payload) else "fail",
+            actual=f"whitelist={len(execution_config.allowed_runtime_ids) if execution_config else 0}",
+        ),
+    ]
+    fail_count = sum(1 for row in checks if row["status"] == "fail")
+    waiting_count = sum(1 for row in checks if row["status"] == "waiting")
+    pass_count = sum(1 for row in checks if row["status"] == "pass")
+    if fail_count:
+        readiness_status = "blocked_opening_trade_watch"
+    elif window["market_phase"] == "regular_session":
+        readiness_status = "ready_for_longbridge_paper_orders"
+    else:
+        readiness_status = "armed_waiting_regular_session"
+    return {
+        "schema_version": "m15.opening-trade-readiness.v1",
+        "stage": config.stage,
+        "generated_at": generated_at,
+        "readiness_status": readiness_status,
+        "market_window": window,
+        "paper_order_submission_enabled": paper_orders_enabled,
+        "m12_47_daemon_alive": m12_alive,
+        "m15_realtime_daemon_alive": realtime_alive,
+        "paper_account_verified": paper_account_ready,
+        "pass_count": pass_count,
+        "waiting_count": waiting_count,
+        "fail_count": fail_count,
+        "checks": checks,
+        "runtime_whitelist": list(execution_config.allowed_runtime_ids) if execution_config else [],
+        "boundaries": {
+            "paper_simulated_only": True,
+            "live_execution": False,
+            "real_money_actions": False,
+            "fractional_shares": False,
+            "short_selling": False,
+            "options": False,
+            "manual_m12_37_once": False,
+            "local_simulation_as_order_source": False,
+        },
+        "input_refs": {
+            "m12_47_status": project_path(config.m12_47_status_path),
+            "realtime_supervisor_config": project_path(config.realtime_supervisor_config_path),
+            "execution_config": project_path(config.execution_config_path),
+            "realtime_account_state": project_path(config.realtime_account_state_path),
+            "realtime_supervisor_status": project_path(config.realtime_supervisor_status_path),
+        },
+        "plain_language_result": plain_result(readiness_status, fail_count, waiting_count, window),
+    }
+
+
+def check_row(check: str, required_result: str, status: str, **extra: Any) -> dict[str, Any]:
+    row = {"check": check, "required_result": required_result, "status": status}
+    row.update(extra)
+    return row
+
+
+def paper_account_verified(account_state: dict[str, Any]) -> bool:
+    if not account_state:
+        return False
+    if str(account_state.get("account_channel") or account_state.get("channel") or "") != "lb_papertrading":
+        return False
+    if account_state.get("paper_account_verified") is False:
+        return False
+    if account_state.get("live_execution") is True or account_state.get("real_money_actions") is True:
+        return False
+    return True
+
+
+def order_safety_ok(execution_config: Any) -> bool:
+    return (
+        execution_config.outside_rth == "RTH_ONLY"
+        and execution_config.time_in_force.lower() == "day"
+        and not execution_config.allow_fractional_shares
+        and not execution_config.allow_short_selling
+        and not execution_config.allow_options
+    )
+
+
+def paper_only_boundaries_ok(execution_payload: dict[str, Any], supervisor_boundaries: dict[str, bool]) -> bool:
+    boundaries = execution_payload.get("hard_boundaries", {})
+    return (
+        boundaries.get("paper_simulated_only") is True
+        and boundaries.get("live_execution") is False
+        and boundaries.get("real_money_actions") is False
+        and supervisor_boundaries.get("paper_simulated_only") is True
+        and supervisor_boundaries.get("live_execution") is False
+        and supervisor_boundaries.get("real_money_actions") is False
+    )
+
+
+def local_simulation_isolated(realtime_status: dict[str, Any]) -> bool:
+    if not realtime_status:
+        return True
+    return (
+        realtime_status.get("local_simulation_isolated") is True
+        and str(realtime_status.get("local_ledger_input_ref") or "") == ""
+        and realtime_status.get("legacy_fast_queue_used") is False
+        and realtime_status.get("manual_m12_37_once_used") is False
+    )
+
+
+def repair_auxiliary_isolated(execution_payload: dict[str, Any]) -> bool:
+    layering = execution_payload.get("runtime_layering", {})
+    local_only = layering.get("local_repair_or_shadow_only", [])
+    auxiliary = layering.get("auxiliary_modules_local_only", [])
+    candidates = set(str(item) for item in layering.get("longbridge_realtime_candidates", []))
+    forbidden = set(str(item) for item in local_only + auxiliary if not str(item).startswith("all "))
+    return bool(local_only and auxiliary) and not (candidates & forbidden)
+
+
+def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[str, Any]) -> str:
+    if status == "ready_for_longbridge_paper_orders":
+        return "开盘值守已就绪：长桥模拟账户订单提交已启用，实时链路会在常规交易时段按风控提交模拟订单。"
+    if status == "armed_waiting_regular_session":
+        return f"开盘值守已武装：当前是{window.get('market_status')}，等待美股常规交易时段；到点后只走长桥模拟账户。"
+    return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"
+
+
+def render_markdown(payload: dict[str, Any]) -> str:
+    lines = [
+        "# M15 Opening Trade Readiness",
+        "",
+        f"- Status: `{payload['readiness_status']}`",
+        f"- Paper order submission enabled: `{payload['paper_order_submission_enabled']}`",
+        f"- M12.47 daemon alive: `{payload['m12_47_daemon_alive']}`",
+        f"- M15 realtime daemon alive: `{payload['m15_realtime_daemon_alive']}`",
+        f"- Paper account verified: `{payload['paper_account_verified']}`",
+        f"- Pass / waiting / fail: `{payload['pass_count']}/{payload['waiting_count']}/{payload['fail_count']}`",
+        f"- Result: {payload['plain_language_result']}",
+        "",
+        "| Check | Status | Actual |",
+        "|---|---|---|",
+    ]
+    for row in payload["checks"]:
+        lines.append(f"| {row['check']} | {row['status']} | {row.get('actual', '')} |")
+    lines.extend(
+        [
+            "",
+            "## Boundaries",
+            "",
+            "- 只允许长桥模拟账户，不允许实盘或真实资金动作。",
+            "- 不做碎股、不做空、不做期权。",
+            "- 修复策略、影子变体和辅助模块继续留在本地模拟。",
+            "- 长桥实时链路不读取本地模拟账本，也不使用旧快速队列作为下单来源。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_json_payload(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def read_pid(path: Path) -> int | None:
+    if not path.exists():
+        return None
+    try:
+        return int(path.read_text(encoding="utf-8").strip())
+    except ValueError:
+        return None
+
+
+def process_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True

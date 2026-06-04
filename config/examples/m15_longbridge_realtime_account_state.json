@@ -1,0 +1,20 @@
+{
+  "stage": "M15.longbridge_realtime_account_state",
+  "title": "长桥模拟账户实时账户状态",
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
+    "account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json"
+  },
+  "longbridge_account_state": {
+    "cli_name": "longbridge",
+    "required_account_channel": "lb_papertrading",
+    "cli_timeout_seconds": 6
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "local_simulation_as_account_source": false,
+    "order_submit_or_cancel_commands": false
+  }
+}

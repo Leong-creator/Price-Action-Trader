@@ -1,0 +1,50 @@
+{
+  "stage": "M15.longbridge_realtime_session_supervisor",
+  "title": "长桥实时链路守护器",
+  "inputs": {
+    "ingestor_config": "config/examples/m15_longbridge_realtime_market_event_ingestor.json",
+    "router_config": "config/examples/m15_longbridge_realtime_signal_router.json",
+    "account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
+    "position_manager_config": "config/examples/m15_longbridge_realtime_position_manager.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
+  },
+  "realtime_session_supervisor": {
+    "check_interval_seconds": 5,
+    "market_timezone": "America/New_York",
+    "regular_session_start_time": "09:30",
+    "regular_session_end_time": "16:00",
+    "active_market_phases": [
+      "regular_session"
+    ],
+    "market_holidays": [
+      "2026-01-01",
+      "2026-01-19",
+      "2026-02-16",
+      "2026-04-03",
+      "2026-05-25",
+      "2026-06-19",
+      "2026-07-03",
+      "2026-09-07",
+      "2026-11-26",
+      "2026-12-25"
+    ],
+    "max_consecutive_failures": 3,
+    "run_ingestor": true,
+    "run_router": true,
+    "run_account_state": true,
+    "run_position_manager": true,
+    "run_execution": true
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "local_simulation_as_signal_source": false,
+    "manual_m12_37_once": false,
+    "legacy_fast_queue_as_order_source": false,
+    "account_or_order_commands_in_ingestor": false
+  }
+}

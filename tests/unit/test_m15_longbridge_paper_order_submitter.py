@@ -9,6 +9,7 @@ from pathlib import Path
 from scripts.m15_longbridge_paper_order_submitter_lib import (
     CommandResult,
     load_config,
+    refresh_paper_account_state,
     run_paper_submitter,
     watch_paper_submitter,
 )
@@ -96,6 +97,76 @@ class M15LongbridgePaperOrderSubmitterTest(unittest.TestCase):
         self.assertEqual(account_state["position_row_count"], 0)
         self.assertEqual(account_state["open_order_count"], 1)
         self.assertEqual(account_state["submitted_signal_fingerprints"], ["preview-1"])
+
+    def test_account_state_counts_only_open_orders_not_filled_orders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(Path(tmp), scan_date="2026-06-02", source_event_time="2026-06-02T14:00:01Z")
+            submitted = False
+
+            def runner(args: list[str]) -> CommandResult:
+                nonlocal submitted
+                if args[1:4] == ["auth", "status", "--format"]:
+                    return CommandResult(
+                        0,
+                        json.dumps({"account": {"account_channel": "lb_papertrading", "account_type": "M"}, "token": {"status": "valid"}}),
+                        "",
+                    )
+                if args[1:3] == ["assets", "--format"]:
+                    return CommandResult(0, json.dumps([{"buy_power": "102042.38", "total_cash": "102524.64"}]), "")
+                if args[1:3] == ["positions", "--format"]:
+                    positions = [{"symbol": "AAPL.US", "quantity": "2", "available": "2"}] if submitted else []
+                    return CommandResult(0, json.dumps(positions), "")
+                if args[1:3] == ["order", "--format"]:
+                    orders = [
+                        {
+                            "order_id": "paper-order-filled",
+                            "symbol": "AAPL.US",
+                            "status": "Filled",
+                            "executed_quantity": "2",
+                        },
+                        {
+                            "order_id": "paper-order-new",
+                            "symbol": "XLU.US",
+                            "status": "New",
+                            "executed_quantity": "0",
+                        },
+                    ] if submitted else []
+                    return CommandResult(0, json.dumps(orders), "")
+                if args[1:3] == ["order", "buy"]:
+                    submitted = True
+                    return CommandResult(0, json.dumps({"order_id": "paper-order-new"}), "")
+                return CommandResult(1, "", "unexpected command")
+
+            run_paper_submitter(
+                config,
+                generated_at="2026-06-02T14:00:00Z",
+                command_runner=runner,
+            )
+            account_state = json.loads((config.output_dir / "m15_longbridge_paper_account_state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(account_state["position_row_count"], 1)
+        self.assertEqual(account_state["order_row_count"], 2)
+        self.assertEqual(account_state["open_order_count"], 1)
+
+    def test_refresh_account_state_only_does_not_submit_or_append_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self._write_config(Path(tmp), scan_date="2026-06-02", source_event_time="2026-06-02T14:00:01Z")
+            calls: list[list[str]] = []
+
+            def runner(args: list[str]) -> CommandResult:
+                calls.append(args)
+                return self._runner()(args)
+
+            state = refresh_paper_account_state(
+                config,
+                generated_at="2026-06-02T15:00:00Z",
+                command_runner=runner,
+            )
+
+        self.assertEqual(state["generated_at"], "2026-06-02T15:00:00Z")
+        self.assertEqual(state["position_row_count"], 0)
+        self.assertFalse(any(args[1:3] == ["order", "buy"] for args in calls))
+        self.assertFalse((config.output_dir / "m15_longbridge_paper_order_submitter_ledger.jsonl").exists())
 
     def test_non_paper_account_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

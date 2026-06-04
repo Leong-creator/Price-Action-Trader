@@ -296,7 +296,7 @@ def build_weekly_report(summary: dict[str, Any], dashboard_rows: list[dict[str, 
         "",
         "## 策略 Dashboard",
         "",
-        "| Strategy | 状态 | 历史收益 | 胜率 | 最大回撤 | 本周观察 | Scanner | 下周动作 |",
+        "| Strategy | 状态 | 账本表现 | 胜率 | 最大回撤 | 本周观察 | Scanner | 下周动作 |",
         "|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for row in dashboard_rows:
