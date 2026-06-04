@@ -8,6 +8,7 @@ from pathlib import Path
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     LEDGER_JSONL,
     SUMMARY_JSON,
+    apply_dashboard_longbridge_panel_overlay,
     load_config,
     run_realtime_session_once,
 )
@@ -129,6 +130,36 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "live execution"):
                 load_config(path)
+
+    def test_longbridge_overlay_updates_only_dashboard_panel_and_metrics(self) -> None:
+        dashboard = {
+            "top_metrics": {
+                "主线今日盈亏": "1.00",
+                "长桥模拟账户": "旧状态",
+                "长桥可提交订单": "9",
+            },
+            "longbridge_paper_account": {
+                "top_metric": "旧状态",
+                "submit_ready_count": "9",
+            },
+            "summary": {
+                "scan_date": "2026-06-04",
+            },
+        }
+        longbridge_context = {
+            "top_metric": "模拟账户已连接 / 9持仓 / 1挂单",
+            "submit_ready_count": "0",
+            "local_simulation_isolated": True,
+            "legacy_fast_queue_used": False,
+        }
+
+        apply_dashboard_longbridge_panel_overlay(dashboard, longbridge_context)
+
+        self.assertEqual(dashboard["longbridge_paper_account"], longbridge_context)
+        self.assertEqual(dashboard["top_metrics"]["长桥模拟账户"], "模拟账户已连接 / 9持仓 / 1挂单")
+        self.assertEqual(dashboard["top_metrics"]["长桥可提交订单"], "0")
+        self.assertEqual(dashboard["top_metrics"]["主线今日盈亏"], "1.00")
+        self.assertEqual(dashboard["summary"]["scan_date"], "2026-06-04")
 
     def make_config(self, root: Path, *, max_consecutive_failures: int = 3):
         path = root / "config.json"

@@ -298,6 +298,10 @@ def run_realtime_session_once(
     write_json(status_path(config), summary)
     append_jsonl(ledger_path(config), summary)
     report_path(config).write_text(render_report(summary), encoding="utf-8")
+    dashboard_synced = sync_m12_dashboard_longbridge_panel(config)
+    if dashboard_synced:
+        summary["m12_dashboard_longbridge_panel_synced"] = True
+        write_json(status_path(config), summary)
     return summary
 
 
@@ -461,6 +465,65 @@ def plain_language_result(status: str, window: dict[str, Any], step_rows: list[d
     if status == "cycle_completed":
         return "长桥实时链路本轮已完成：只读行情、实时信号、模拟账户执行链路已按顺序串联；没有读取本地模拟账本。"
     return "长桥实时链路守护器状态已更新。"
+
+
+def apply_dashboard_longbridge_panel_overlay(dashboard: dict[str, Any], longbridge_context: dict[str, Any]) -> None:
+    dashboard["longbridge_paper_account"] = longbridge_context
+    top_metrics = dashboard.setdefault("top_metrics", {})
+    top_metrics["长桥模拟账户"] = str(longbridge_context.get("top_metric", "未生成长桥模拟账户状态"))
+    top_metrics["长桥可提交订单"] = str(longbridge_context.get("submit_ready_count", "0"))
+
+
+def sync_m12_dashboard_longbridge_panel(config: RealtimeSessionSupervisorConfig) -> bool:
+    dashboard_dir = config.output_dir.parent / "m12_29_current_day_scan_dashboard"
+    dashboard_path = dashboard_dir / "m12_32_minute_readonly_dashboard_data.json"
+    if not dashboard_path.exists():
+        return False
+    try:
+        from scripts.m12_29_current_day_scan_dashboard_lib import (
+            build_dashboard_html,
+            build_longbridge_paper_dashboard_view,
+            load_config as load_m12_29_dashboard_config,
+        )
+
+        dashboard_config = replace(load_m12_29_dashboard_config(), output_dir=dashboard_dir)
+        dashboard = read_json(dashboard_path)
+        longbridge_context = build_longbridge_paper_dashboard_view(dashboard_config)
+        apply_dashboard_longbridge_panel_overlay(dashboard, longbridge_context)
+        write_json(dashboard_path, dashboard)
+        try:
+            (dashboard_dir / "m12_32_minute_readonly_dashboard.html").write_text(
+                build_dashboard_html(dashboard_config, dashboard),
+                encoding="utf-8",
+            )
+        except Exception as exc:  # pragma: no cover - display-only repair path
+            write_json(
+                config.output_dir / "m15_m12_dashboard_html_sync_error.json",
+                {
+                    "schema_version": "m15.m12-dashboard-html-sync-error.v1",
+                    "generated_at": to_iso(datetime.now(UTC)),
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                    "paper_simulated_only": True,
+                    "real_money_actions": False,
+                    "live_execution": False,
+                },
+            )
+        return True
+    except Exception as exc:  # pragma: no cover - display-only repair path
+        write_json(
+            config.output_dir / "m15_m12_dashboard_longbridge_sync_error.json",
+            {
+                "schema_version": "m15.m12-dashboard-longbridge-sync-error.v1",
+                "generated_at": to_iso(datetime.now(UTC)),
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+                "paper_simulated_only": True,
+                "real_money_actions": False,
+                "live_execution": False,
+            },
+        )
+        return False
 
 
 def render_report(summary: dict[str, Any]) -> str:

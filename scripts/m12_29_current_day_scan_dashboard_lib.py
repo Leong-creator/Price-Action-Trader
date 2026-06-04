@@ -3721,7 +3721,9 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     else:
         held_symbol_text = ", ".join(str(item) for item in held_symbols[:12]) if isinstance(held_symbols, list) and held_symbols else "暂无"
     submit_status = "submitter_state_stale_waiting_refresh" if submitter_stale else str(submitter.get("submission_status") or "")
-    market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
+    submitter_market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
+    realtime_market_window = realtime_supervisor.get("window", {}) if isinstance(realtime_supervisor.get("window"), dict) else {}
+    market_window = realtime_market_window if realtime_market_window else submitter_market_window
     market_status = str(market_window.get("market_status") or "")
     raw_queue_ready_count = int_like(queue_summary.get("ready_after_user_approval_count", 0))
     queue_ready_count = 0 if queue_stale_for_panel else raw_queue_ready_count
@@ -3740,11 +3742,21 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_managed_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("managed_position_count", 0))
     realtime_available = bool(realtime) and not realtime_stale
     eligible_count = realtime_ready_count if realtime_available else legacy_eligible_count
-    ledger_submission_counts = m15_submission_counts_for_date(submission_ledger, panel_market_date)
+    legacy_ledger_submission_counts = m15_submission_counts_for_date(submission_ledger, panel_market_date)
+    realtime_ledger_submission_counts = m15_submission_counts_for_date(realtime_ledger, panel_market_date)
     last_run_submitted_count = 0 if submitter_stale else int_like(submitter.get("submitted_order_count", 0))
     last_run_attempted_count = 0 if submitter_stale else int_like(submitter.get("attempted_order_count", 0))
-    submitted_count = max(ledger_submission_counts["submitted"], last_run_submitted_count, realtime_submitted_count)
-    attempted_count = max(ledger_submission_counts["attempted"], last_run_attempted_count)
+    submitted_count = max(
+        legacy_ledger_submission_counts["submitted"],
+        realtime_ledger_submission_counts["submitted"],
+        last_run_submitted_count,
+        realtime_submitted_count,
+    )
+    attempted_count = max(
+        legacy_ledger_submission_counts["attempted"],
+        realtime_ledger_submission_counts["attempted"],
+        last_run_attempted_count,
+    )
     queue_status = str(fast_queue.get("fast_queue_status") or fast_queue.get("preview_status") or "")
     new_signal_count = int_like(queue_summary.get("new_open_signal_count", 0))
     blocked_signal_count = int_like(queue_summary.get("blocked_signal_count", 0))
@@ -3788,11 +3800,11 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language = f"长桥模拟账户已连接，当前有 {eligible_count} 笔订单通过快速风控，等待提交器按规则处理。"
     else:
         plain_language = "长桥模拟账户已连接，但当前没有合格订单；信号要么是修复策略、做空、数量不足，或被快速风控挡住。"
-    if global_blockers:
+    if global_blockers and not realtime_available:
         plain_language += f" 当前全局阻断：{', '.join(str(item) for item in global_blockers)}。"
-    if queue_blockers:
+    if queue_blockers and not realtime_available:
         plain_language += f" 队列阻断：{', '.join(str(item) for item in queue_blockers)}。"
-    if submitter_stale:
+    if submitter_stale and not realtime_available:
         plain_language += " 提交器状态来自旧交易日，等待只读刷新。"
     if queue_stale_for_panel:
         plain_language += " 快速队列是旧交易日，只作审计，不作为今天可提交订单。"
@@ -3971,10 +3983,13 @@ def m15_submission_counts_for_date(rows: list[dict[str, Any]], market_date: str)
     submitted_fingerprints: set[str] = set()
     attempted_fingerprints: set[str] = set()
     for row in rows:
-        if str(row.get("trading_date") or "") != market_date:
+        row_market_date = str(row.get("trading_date") or row.get("market_date") or "")
+        if not row_market_date:
+            row_market_date = m15_row_market_date(row)
+        if row_market_date != market_date:
             continue
         status = str(row.get("submission_status") or "")
-        fingerprint = str(row.get("signal_fingerprint") or row.get("preview_id") or "")
+        fingerprint = str(row.get("signal_fingerprint") or row.get("preview_id") or row.get("signal_id") or "")
         if status == "submitted":
             submitted_fingerprints.add(fingerprint or f"submitted:{len(submitted_fingerprints)}")
             attempted_fingerprints.add(fingerprint or f"submitted:{len(attempted_fingerprints)}")
@@ -3983,6 +3998,21 @@ def m15_submission_counts_for_date(rows: list[dict[str, Any]], market_date: str)
     counts["submitted"] = len(submitted_fingerprints)
     counts["attempted"] = len(attempted_fingerprints)
     return counts
+
+
+def m15_row_market_date(row: dict[str, Any]) -> str:
+    for key in ("submitted_at", "processed_at", "created_at", "generated_at"):
+        raw_value = str(row.get(key) or "")
+        if not raw_value:
+            continue
+        try:
+            timestamp = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        return timestamp.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+    return ""
 
 
 def int_like(value: Any) -> int:

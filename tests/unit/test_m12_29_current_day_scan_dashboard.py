@@ -39,6 +39,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     filter_rescue_signal_rows,
     load_config,
     market_session_status,
+    m15_submission_counts_for_date,
     open_new_positions,
     pa011_orb_rebuild_signal,
     pa004_event_is_long,
@@ -528,6 +529,132 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(status_by_label["实时账户状态"]["value"], "paper_account_ready")
         self.assertTrue(panel["refs"]["realtime_account_state"])
         self.assertTrue(panel["refs"]["paper_account_state"])
+
+    def test_longbridge_panel_does_not_show_legacy_submitter_blocker_when_realtime_is_available(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fresh_generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+            output_dir = root / "m12_29"
+            submitter_dir = root / "m15_longbridge_paper_order_submitter"
+            realtime_dir = root / "m15_longbridge_realtime_execution"
+            connection_dir = root / "m15_longbridge_paper_connection_check"
+            submitter_dir.mkdir(parents=True)
+            realtime_dir.mkdir(parents=True)
+            connection_dir.mkdir(parents=True)
+            (submitter_dir / "m15_longbridge_paper_order_submitter.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-06-03T22:00:00Z",
+                        "submission_status": "blocked",
+                        "global_blockers": ["not_us_regular_session"],
+                        "market_window": {
+                            "market_status": "收盘后",
+                            "new_york_time": "2026-06-03 18:00:00 EDT",
+                        },
+                        "longbridge_account": {
+                            "account_channel": "lb_papertrading",
+                            "account_type": "M",
+                            "paper_account_detected": True,
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_account_state.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": fresh_generated_at,
+                        "account_channel": "lb_papertrading",
+                        "account_type": "M",
+                        "paper_account_detected": True,
+                        "paper_account_verified": True,
+                        "auth_ok": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "buying_power": "10000.00",
+                        "position_row_count": 9,
+                        "open_order_count": 1,
+                        "held_symbols": ["AAPL"],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_account_state_summary.json").write_text(
+                json.dumps({"generated_at": fresh_generated_at, "account_status": "paper_account_ready"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_session_supervisor.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": fresh_generated_at,
+                        "supervisor_status": "cycle_completed",
+                        "window": {
+                            "market_status": "美股常规交易时段",
+                            "new_york_time": "2026-06-04 09:53:26 EDT",
+                        },
+                        "plain_language_result": "实时链路本轮已完成。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_execution.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": fresh_generated_at,
+                        "ready_order_count": 0,
+                        "submitted_count": 0,
+                        "blocked_signal_count": 3,
+                        "signal_event_count": 3,
+                        "plain_language_result": "实时链路已隔离本地模拟。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (connection_dir / "m15_longbridge_paper_connection_check.json").write_text(
+                json.dumps({"paper_account_verified": True}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            panel = build_longbridge_paper_dashboard_view(replace(load_config(), output_dir=output_dir))
+
+        status_by_label = {row["label"]: row for row in panel["status_rows"]}
+        self.assertNotIn("not_us_regular_session", panel["plain_language_result"])
+        self.assertNotIn("提交器状态来自旧交易日", panel["plain_language_result"])
+        self.assertEqual(status_by_label["市场窗口"]["value"], "美股常规交易时段")
+
+    def test_m15_submission_counts_infers_market_date_from_realtime_timestamps(self):
+        rows = [
+            {
+                "submission_status": "submitted",
+                "signal_id": "signal-a",
+                "submitted_at": "2026-06-04T13:31:19Z",
+            },
+            {
+                "submission_status": "submitted",
+                "signal_id": "signal-a",
+                "submitted_at": "2026-06-04T13:31:20Z",
+            },
+            {
+                "submission_status": "submit_failed",
+                "signal_id": "signal-b",
+                "processed_at": "2026-06-04T13:32:00Z",
+            },
+            {
+                "submission_status": "submitted",
+                "signal_id": "prior-day",
+                "submitted_at": "2026-06-03T20:00:00Z",
+            },
+        ]
+
+        counts = m15_submission_counts_for_date(rows, "2026-06-04")
+
+        self.assertEqual(counts["submitted"], 1)
+        self.assertEqual(counts["attempted"], 2)
 
     def test_longbridge_panel_marks_stale_account_state_instead_of_showing_old_orders(self):
         with tempfile.TemporaryDirectory() as temp_dir:
