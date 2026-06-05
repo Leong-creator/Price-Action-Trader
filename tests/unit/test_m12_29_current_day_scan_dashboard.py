@@ -550,6 +550,115 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertTrue(panel["refs"]["realtime_account_state"])
         self.assertTrue(panel["refs"]["paper_account_state"])
 
+    def test_longbridge_panel_keeps_realtime_snapshot_while_waiting_next_session(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output_dir = root / "m12_29"
+            realtime_dir = root / "m15_longbridge_realtime_execution"
+            connection_dir = root / "m15_longbridge_paper_connection_check"
+            realtime_dir.mkdir(parents=True)
+            connection_dir.mkdir(parents=True)
+            old_generated_at = "2026-06-05T01:00:00Z"
+            (realtime_dir / "m15_longbridge_realtime_account_state.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.longbridge-realtime-account-state.v1",
+                        "generated_at": old_generated_at,
+                        "account_channel": "lb_papertrading",
+                        "account_type": "M",
+                        "paper_account_detected": True,
+                        "paper_account_verified": True,
+                        "auth_ok": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "buying_power": "100582.01",
+                        "position_row_count": 9,
+                        "open_order_count": 5,
+                        "held_symbols": ["AAPL", "XLU", "CRM"],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_account_state_summary.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": old_generated_at,
+                        "account_status": "paper_account_ready",
+                        "plain_language_result": "长桥模拟账户状态已读取：持仓 9 条，未完成挂单 5 条。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_session_supervisor.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-06-05T02:25:00Z",
+                        "supervisor_status": "waiting_market_window",
+                        "window": {
+                            "market_status": "等待下一交易日",
+                            "new_york_time": "2026-06-04 22:25:00 EDT",
+                        },
+                        "plain_language_result": "长桥实时链路守护器未运行交易循环：当前是等待下一交易日。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_execution.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": old_generated_at,
+                        "input_signal_event_count": 609,
+                        "signal_event_count": 0,
+                        "skipped_previously_processed_signal_count": 609,
+                        "ready_order_count": 0,
+                        "blocked_signal_count": 0,
+                        "submitted_count": 4,
+                        "plain_language_result": "长桥实时链路已就绪；当前没有新的实时信号事件。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_position_manager.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": old_generated_at,
+                        "managed_position_count": 7,
+                        "unmanaged_position_count": 2,
+                        "unmanaged_position_symbols": ["AAPL", "XLU"],
+                        "new_exit_signal_event_count": 0,
+                        "plain_language_result": "AAPL, XLU 是账户已有但非本轮 M15 开仓的持仓，只展示，不自动平仓。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (connection_dir / "m15_longbridge_paper_connection_check.json").write_text(
+                json.dumps({"paper_account_verified": True}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            config = replace(load_config(), output_dir=output_dir)
+            with patch("scripts.m12_29_current_day_scan_dashboard_lib.datetime") as mocked_datetime:
+                mocked_datetime.now.return_value = datetime.fromisoformat("2026-06-05T02:25:00+00:00")
+                mocked_datetime.fromisoformat = datetime.fromisoformat
+                panel = build_longbridge_paper_dashboard_view(config)
+
+        self.assertFalse(panel["account_state_stale"])
+        self.assertFalse(panel["realtime_execution_state_stale"])
+        self.assertEqual(panel["top_metric"], "模拟账户已连接 / 9持仓 / 5挂单")
+        self.assertEqual(panel["position_row_count"], "9")
+        self.assertEqual(panel["open_order_count"], "5")
+        self.assertEqual(panel["skipped_previously_processed_signal_count"], "609")
+        self.assertIn("上一轮长桥审计快照", panel["plain_language_result"])
+        self.assertIn("上一交易窗口累计提交 4 笔模拟订单", panel["plain_language_result"])
+        self.assertNotIn("实时链路本轮已提交", panel["plain_language_result"])
+        self.assertIn("7系统管理 / 2非系统管理", json.dumps(panel["status_rows"], ensure_ascii=False))
+
     def test_longbridge_panel_does_not_show_legacy_submitter_blocker_when_realtime_is_available(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -3659,10 +3659,16 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     queue_scan_date = str(fast_queue.get("scan_date") or "")
     panel_market_date = datetime.now(UTC).astimezone(ZoneInfo("America/New_York")).date().isoformat()
     queue_stale_for_panel = bool(queue_market_date and queue_market_date != panel_market_date)
+    submitter_market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
+    realtime_market_window = realtime_supervisor.get("window", {}) if isinstance(realtime_supervisor.get("window"), dict) else {}
+    market_window = realtime_market_window if realtime_market_window else submitter_market_window
+    market_status = str(market_window.get("market_status") or "")
+    realtime_waiting_window = m15_waiting_market_window(realtime_supervisor, market_status)
     account_state_stale = m15_artifact_stale_for_market(
         account_state,
         "",
         max_age_seconds=M15_ACCOUNT_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     submitter_stale = m15_artifact_stale_for_market(
         submitter,
@@ -3673,6 +3679,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         realtime,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_supervisor_stale = m15_artifact_stale_for_market(
         realtime_supervisor,
@@ -3683,21 +3690,25 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         realtime_router,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_ingestor_stale = m15_artifact_stale_for_market(
         realtime_ingestor,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_account_state_stale = m15_artifact_stale_for_market(
         realtime_account_state if realtime_account_state else {},
         "",
         max_age_seconds=M15_ACCOUNT_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_position_manager_stale = m15_artifact_stale_for_market(
         realtime_position_manager,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     if realtime_account_state:
         account_state_stale = realtime_account_state_stale
@@ -3721,10 +3732,6 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     else:
         held_symbol_text = ", ".join(str(item) for item in held_symbols[:12]) if isinstance(held_symbols, list) and held_symbols else "暂无"
     submit_status = "submitter_state_stale_waiting_refresh" if submitter_stale else str(submitter.get("submission_status") or "")
-    submitter_market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
-    realtime_market_window = realtime_supervisor.get("window", {}) if isinstance(realtime_supervisor.get("window"), dict) else {}
-    market_window = realtime_market_window if realtime_market_window else submitter_market_window
-    market_status = str(market_window.get("market_status") or "")
     raw_queue_ready_count = int_like(queue_summary.get("ready_after_user_approval_count", 0))
     queue_ready_count = 0 if queue_stale_for_panel else raw_queue_ready_count
     legacy_eligible_count = queue_ready_count if submitter_stale else int_like(submitter.get("eligible_order_count", queue_ready_count))
@@ -3796,12 +3803,21 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language = "长桥模拟账户连接过，但账户持仓/挂单状态来自旧交易日或已经过期；当前数字需要提交器只读刷新后再看。"
     elif not paper_detected:
         plain_language = "长桥账户尚未被确认成模拟账户，所以看板只显示状态，不允许提交。"
-    elif realtime_available and submitted_count > 0:
-        plain_language = f"长桥模拟账户已连接，实时链路本轮已提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
-    elif realtime_available and realtime_ready_count > 0:
-        plain_language = f"长桥模拟账户已连接，实时链路有 {realtime_ready_count} 条实时信号通过风控；旧快速队列只作审计。"
     elif realtime_available:
-        plain_language = "长桥模拟账户已连接，实时链路已和本地模拟隔离；当前没有合格实时信号。"
+        if realtime_waiting_window:
+            if submitted_count > 0:
+                plain_language = (
+                    f"长桥模拟账户已连接；当前不是美股常规交易时段，面板展示上一轮长桥审计快照。"
+                    f"上一交易窗口累计提交 {submitted_count} 笔模拟订单，本地模拟没有参与下单判断；等待下一交易日自动运行。"
+                )
+            else:
+                plain_language = "长桥模拟账户已连接；当前不是美股常规交易时段，面板展示上一轮长桥审计快照，等待下一交易日自动运行。"
+        elif submitted_count > 0:
+            plain_language = f"长桥模拟账户已连接，实时链路本轮已提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
+        elif realtime_ready_count > 0:
+            plain_language = f"长桥模拟账户已连接，实时链路有 {realtime_ready_count} 条实时信号通过风控；旧快速队列只作审计。"
+        else:
+            plain_language = "长桥模拟账户已连接，实时链路已和本地模拟隔离；当前没有合格实时信号。"
     elif submitter_stale:
         plain_language = "长桥模拟账户已连接，账户持仓/挂单是最新只读读取；实时链路状态尚未刷新，旧提交器和快速队列只作审计。"
     elif submitted_count > 0:
@@ -3954,6 +3970,7 @@ def m15_artifact_stale_for_market(
     market_date: str,
     *,
     max_age_seconds: int | None = None,
+    allow_audit_snapshot: bool = False,
 ) -> bool:
     if not payload:
         return False
@@ -3967,8 +3984,21 @@ def m15_artifact_stale_for_market(
             return True
     if max_age_seconds is None:
         return False
+    if allow_audit_snapshot:
+        return False
     age_seconds = m15_generated_age_seconds(payload)
     return bool(age_seconds is None or age_seconds > max_age_seconds)
+
+
+def m15_waiting_market_window(supervisor: dict[str, Any], market_status: str) -> bool:
+    supervisor_status = str(supervisor.get("supervisor_status") or "")
+    normalized = market_status.strip().lower()
+    return supervisor_status == "waiting_market_window" or normalized in {
+        "等待下一交易日",
+        "非交易日等待",
+        "waiting_market_window",
+        "non_trading_day",
+    }
 
 
 def m15_generated_market_date(payload: dict[str, Any]) -> str:

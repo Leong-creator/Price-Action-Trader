@@ -591,7 +591,8 @@ def apply_dashboard_longbridge_overlay(dashboard: dict[str, Any], longbridge_con
     dashboard["longbridge_paper_account"] = longbridge_context
     top_metrics = dashboard.setdefault("top_metrics", {})
     top_metrics["长桥模拟账户"] = str(longbridge_context.get("top_metric", "未生成长桥模拟账户状态"))
-    top_metrics["长桥可提交订单"] = str(longbridge_context.get("submit_ready_count", "0"))
+    top_metrics.pop("长桥可提交订单", None)
+    top_metrics["长桥本轮可新开仓"] = str(longbridge_context.get("submit_ready_count", "0"))
 
 
 def apply_m14_rows_overlay(

@@ -176,7 +176,8 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         )
 
         self.assertEqual(dashboard["top_metrics"]["长桥模拟账户"], "模拟账户已连接 / 1持仓 / 2挂单")
-        self.assertEqual(dashboard["top_metrics"]["长桥可提交订单"], "3")
+        self.assertNotIn("长桥可提交订单", dashboard["top_metrics"])
+        self.assertEqual(dashboard["top_metrics"]["长桥本轮可新开仓"], "3")
         self.assertFalse(dashboard["longbridge_paper_account"]["real_money_actions"])
         self.assertFalse(dashboard["longbridge_paper_account"]["live_execution"])
 
