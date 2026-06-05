@@ -21,6 +21,7 @@
     "watch_interval_seconds": 1,
     "latency_target_ms": 1000,
     "latency_acceptable_ms": 5000,
+    "max_delayed_signal_age_seconds": 60,
     "allowed_runtime_ids": [
       "M10-PA-004-long-1d",
       "M10-PA-013-1d",

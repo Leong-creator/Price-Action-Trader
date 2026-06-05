@@ -59,7 +59,12 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
 
             self.assertEqual(payload["new_exit_signal_event_count"], 0)
-            self.assertEqual(rows[0]["manager_status"], "no_submitted_open_metadata")
+            self.assertEqual(rows[0]["manager_status"], "legacy_unmanaged_longbridge_position")
+            self.assertEqual(rows[0]["position_management_scope"], "longbridge_account_unmanaged")
+            self.assertEqual(payload["managed_position_count"], 0)
+            self.assertEqual(payload["unmanaged_position_count"], 1)
+            self.assertEqual(payload["unmanaged_position_symbols"], ["AAPL"])
+            self.assertIn("只展示，不自动平仓", payload["plain_language_result"])
             self.assertEqual(payload["inputs"]["local_simulation_ledger"], "")
 
     def make_config(self, root: Path):

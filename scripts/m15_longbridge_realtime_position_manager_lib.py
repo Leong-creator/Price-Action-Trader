@@ -132,7 +132,13 @@ def run_realtime_position_manager(
         "local_simulation_isolated": True,
         "local_close_signal_used": False,
         "position_count": len(account_positions(account_state)),
-        "managed_position_count": sum(1 for row in ledger_rows if row.get("manager_status") != "no_submitted_open_metadata"),
+        "managed_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "m15_realtime_managed"),
+        "unmanaged_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_unmanaged"),
+        "unmanaged_position_symbols": [
+            str(row.get("symbol", ""))
+            for row in ledger_rows
+            if row.get("position_management_scope") == "longbridge_account_unmanaged"
+        ],
         "new_exit_signal_event_count": len(exit_events),
         "blocked_by_reason": count_statuses(ledger_rows),
         "paper_simulated_only": True,
@@ -171,9 +177,13 @@ def evaluate_position(
     target_price = decimal(metadata.get("target_price", "0"))
     runtime_id = str(metadata.get("runtime_id", ""))
     status = "hold_no_exit_trigger"
+    management_scope = "m15_realtime_managed"
+    management_note = "本轮 M15 实时链路管理的长桥模拟账户持仓。"
     exit_reason = ""
     if not metadata:
-        status = "no_submitted_open_metadata"
+        status = "legacy_unmanaged_longbridge_position"
+        management_scope = "longbridge_account_unmanaged"
+        management_note = "长桥模拟账户已有持仓，但没有本轮 M15 开仓元数据；只展示，不自动平仓。"
     elif latest_price <= ZERO:
         status = "missing_latest_price"
     elif stop_price <= ZERO or target_price <= ZERO:
@@ -222,6 +232,8 @@ def evaluate_position(
         "stop_price": fmt_money(stop_price) if stop_price > ZERO else "",
         "target_price": fmt_money(target_price) if target_price > ZERO else "",
         "manager_status": status,
+        "position_management_scope": management_scope,
+        "management_note": management_note,
         "exit_reason": exit_reason,
         "exit_signal_id": signal_id,
         "local_simulation_ignored": True,
@@ -287,6 +299,16 @@ def count_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
 def plain_language_result(exit_count: int, rows: list[dict[str, Any]]) -> str:
     if exit_count:
         return f"长桥持仓退出管理生成 {exit_count} 条平仓信号；这些信号来自长桥账户持仓和实时行情，不来自本地模拟。"
+    unmanaged_symbols = [
+        str(row.get("symbol", ""))
+        for row in rows
+        if row.get("position_management_scope") == "longbridge_account_unmanaged"
+    ]
+    if unmanaged_symbols:
+        return (
+            "长桥持仓退出管理已检查账户持仓；"
+            f"{', '.join(unmanaged_symbols)} 是账户已有但非本轮 M15 开仓的持仓，只展示，不自动平仓。"
+        )
     if rows:
         return "长桥持仓退出管理已检查账户持仓；当前没有触发止损或止盈。"
     return "长桥持仓退出管理已就绪；当前长桥账户没有可管理持仓。"
@@ -298,15 +320,16 @@ def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         "",
         f"- 生成时间: `{summary['generated_at']}`",
         f"- 持仓数: `{summary['position_count']}`",
+        f"- 系统管理持仓 / 非系统管理持仓: `{summary['managed_position_count']} / {summary['unmanaged_position_count']}`",
         f"- 新平仓信号: `{summary['new_exit_signal_event_count']}`",
         f"- 结论: {summary['plain_language_result']}",
         "",
-        "| 标的 | 运行单元 | 状态 | 当前价 | 止损 | 目标 |",
-        "|---|---|---|---:|---:|---:|",
+        "| 标的 | 运行单元 | 管理范围 | 状态 | 当前价 | 止损 | 目标 |",
+        "|---|---|---|---|---:|---:|---:|",
     ]
     for row in rows[:30]:
         lines.append(
-            f"| `{row.get('symbol', '')}` | `{row.get('runtime_id', '')}` | `{row.get('manager_status', '')}` | "
+            f"| `{row.get('symbol', '')}` | `{row.get('runtime_id', '')}` | `{row.get('position_management_scope', '')}` | `{row.get('manager_status', '')}` | "
             f"`{row.get('latest_price', '')}` | `{row.get('stop_price', '')}` | `{row.get('target_price', '')}` |"
         )
     lines.extend(

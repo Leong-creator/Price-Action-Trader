@@ -512,6 +512,22 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (realtime_dir / "m15_longbridge_realtime_position_manager.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.longbridge-realtime-position-manager.v1",
+                        "generated_at": fresh_generated_at,
+                        "position_count": 1,
+                        "managed_position_count": 0,
+                        "unmanaged_position_count": 1,
+                        "unmanaged_position_symbols": ["AAPL"],
+                        "new_exit_signal_event_count": 0,
+                        "plain_language_result": "AAPL 是账户已有但非本轮 M15 开仓的持仓，只展示，不自动平仓。",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
             (connection_dir / "m15_longbridge_paper_connection_check.json").write_text(
                 json.dumps({"paper_account_verified": True}, ensure_ascii=False),
                 encoding="utf-8",
@@ -527,6 +543,10 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("AAPL", status_by_label["持仓 / 挂单"]["note"])
         self.assertNotIn("OLD", status_by_label["持仓 / 挂单"]["note"])
         self.assertEqual(status_by_label["实时账户状态"]["value"], "paper_account_ready")
+        self.assertEqual(panel["managed_position_count"], "0")
+        self.assertEqual(panel["unmanaged_position_count"], "1")
+        self.assertEqual(panel["unmanaged_position_symbols"], ["AAPL"])
+        self.assertIn("非本轮 M15 开仓", status_by_label["实时持仓退出"]["note"])
         self.assertTrue(panel["refs"]["realtime_account_state"])
         self.assertTrue(panel["refs"]["paper_account_state"])
 

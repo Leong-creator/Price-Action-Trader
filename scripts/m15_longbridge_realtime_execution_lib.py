@@ -103,6 +103,7 @@ class RealtimeExecutionConfig:
     watch_interval_seconds: int
     latency_target_ms: int
     latency_acceptable_ms: int
+    max_delayed_signal_age_seconds: int
     allowed_runtime_ids: tuple[str, ...]
     paper_account_equity: Decimal
     max_total_exposure: Decimal
@@ -212,6 +213,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
         watch_interval_seconds=int(realtime.get("watch_interval_seconds", 1)),
         latency_target_ms=int(realtime.get("latency_target_ms", 1000)),
         latency_acceptable_ms=int(realtime.get("latency_acceptable_ms", 5000)),
+        max_delayed_signal_age_seconds=int(realtime.get("max_delayed_signal_age_seconds", 60)),
         allowed_runtime_ids=tuple(
             str(item)
             for item in realtime.get("allowed_runtime_ids", list(DEFAULT_REALTIME_RUNTIME_IDS))
@@ -252,6 +254,8 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
         raise ValueError("M15 realtime execution latency target must be positive")
     if config.latency_acceptable_ms < config.latency_target_ms:
         raise ValueError("M15 realtime execution acceptable latency must be >= target")
+    if config.max_delayed_signal_age_seconds <= 0:
+        raise ValueError("M15 realtime execution max delayed signal age must be positive")
     if not config.allowed_runtime_ids:
         raise ValueError("M15 realtime execution needs a runtime whitelist")
     if config.allow_fractional_shares:
@@ -367,6 +371,7 @@ def run_realtime_execution(
         "session_started_at": session_started_at,
         "latency_target_ms": config.latency_target_ms,
         "latency_acceptable_ms": config.latency_acceptable_ms,
+        "max_delayed_signal_age_seconds": config.max_delayed_signal_age_seconds,
         "latency_counts": {
             "target_met": target_met_count,
             "acceptable": acceptable_count,
@@ -376,6 +381,9 @@ def run_realtime_execution(
         "ready_order_count": ready_count,
         "blocked_signal_count": blocked_count,
         "submitted_count": submitted_count,
+        "delayed_signal_age_blocked_count": sum(
+            1 for row in ledger_rows if "blocked_delayed_signal_age_over_limit" in row.get("blockers", [])
+        ),
         "allowed_runtime_count": len(config.allowed_runtime_ids),
         "blocked_by_reason": count_by_reason(ledger_rows),
         "runtime_whitelist": list(config.allowed_runtime_ids),
@@ -441,6 +449,10 @@ def evaluate_signal_event(
     created_at = parse_signal_time(signal.get("created_at") or signal.get("generated_at") or signal.get("signal_time"))
     latency_ms = latency_millis(created_at, generated_at) if created_at else None
     latency_band = latency_band_for(config, latency_ms)
+    signal_expires_at = parse_signal_time(
+        signal.get("expires_at") or signal.get("valid_until") or signal.get("signal_expires_at")
+    )
+    age_limit_seconds, age_limit_source = signal_age_limit(config, signal, created_at, signal_expires_at)
     blockers: list[str] = []
 
     if not signal_id:
@@ -518,7 +530,11 @@ def evaluate_signal_event(
         blockers.append("blocked_cash_reserve")
     if side == "buy" and net_profit <= config.minimum_net_profit_after_fees:
         blockers.append("blocked_fee_profit_not_positive")
+    if signal_expires_at and generated_at > signal_expires_at:
+        blockers.append("blocked_realtime_signal_expired")
     if latency_ms is not None and latency_ms > config.latency_acceptable_ms:
+        if age_limit_seconds > 0 and latency_ms > age_limit_seconds * 1000:
+            blockers.append("blocked_delayed_signal_age_over_limit")
         if current_price <= ZERO or limit_price <= ZERO:
             blockers.append("blocked_delayed_signal_missing_revalidation_price")
 
@@ -558,6 +574,9 @@ def evaluate_signal_event(
         "processed_at": to_iso(generated_at),
         "latency_ms": latency_ms if latency_ms is not None else "",
         "latency_band": latency_band,
+        "signal_age_limit_seconds": age_limit_seconds,
+        "signal_age_limit_source": age_limit_source,
+        "signal_expires_at": to_iso(signal_expires_at) if signal_expires_at else "",
         "realtime_decision_status": status,
         "blockers": blockers,
         "order_payload": order_payload if not blockers else {},
@@ -829,6 +848,34 @@ def latency_millis(start: datetime, end: datetime) -> int:
     return max(0, int((end - start).total_seconds() * 1000))
 
 
+def signal_age_limit(
+    config: RealtimeExecutionConfig,
+    signal: dict[str, Any],
+    created_at: datetime | None,
+    signal_expires_at: datetime | None,
+) -> tuple[int, str]:
+    configured_limit = config.max_delayed_signal_age_seconds
+    raw_valid_for = signal.get("valid_for_seconds") or signal.get("ttl_seconds") or signal.get("signal_ttl_seconds")
+    valid_for_limit = int_decimal(raw_valid_for)
+    if valid_for_limit > 0:
+        configured_limit = min(configured_limit, valid_for_limit)
+    if created_at and signal_expires_at:
+        expires_limit = max(0, int((signal_expires_at - created_at).total_seconds()))
+        if expires_limit > 0:
+            configured_limit = min(configured_limit, expires_limit)
+            return configured_limit, "signal_expires_at"
+    if valid_for_limit > 0:
+        return configured_limit, "signal_valid_for_seconds"
+    return configured_limit, "config_max_delayed_signal_age_seconds"
+
+
+def int_decimal(value: Any) -> int:
+    try:
+        return int(Decimal(str(value)))
+    except (InvalidOperation, ValueError):
+        return 0
+
+
 def normalize_side(value: Any, *, position_action: str = "") -> str:
     text = str(value or "").strip().lower()
     if text in {"buy", "long", "open_long", "bullish", "看涨", "买入", "做多"}:
@@ -897,6 +944,7 @@ def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         f"- 旧快速队列: `{summary['legacy_fast_queue_status']}`",
         f"- 实时信号数 / 通过数 / 阻断数 / 已提交数: `{summary['signal_event_count']} / {summary['ready_order_count']} / {summary['blocked_signal_count']} / {summary['submitted_count']}`",
         f"- 延迟目标: `{summary['latency_target_ms']}ms`，第一版可接受: `{summary['latency_acceptable_ms']}ms`",
+        f"- 延迟信号最大年龄: `{summary['max_delayed_signal_age_seconds']}s`",
         f"- 结论: {summary['plain_language_result']}",
         "",
         "## 最近实时信号",

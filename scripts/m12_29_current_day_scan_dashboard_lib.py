@@ -3403,7 +3403,7 @@ def build_accountized_dashboard_payload(
             "FTD001 对照": ftd001_monitor["current_plain_status"],
             "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
             "长桥模拟账户": longbridge_paper_account["top_metric"],
-            "长桥可提交订单": longbridge_paper_account["submit_ready_count"],
+            "长桥本轮可新开仓": longbridge_paper_account["submit_ready_count"],
             "北京时间更新": update_status["beijing_time"],
             "运行状态": update_status["runtime_status"],
         },
@@ -3740,6 +3740,13 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_account_status = str(realtime_account_state_summary.get("account_status") or "")
     realtime_exit_signal_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("new_exit_signal_event_count", 0))
     realtime_managed_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("managed_position_count", 0))
+    realtime_unmanaged_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("unmanaged_position_count", 0))
+    realtime_unmanaged_symbols_raw = (
+        realtime_position_manager.get("unmanaged_position_symbols", [])
+        if isinstance(realtime_position_manager.get("unmanaged_position_symbols"), list)
+        else []
+    )
+    realtime_unmanaged_symbols = [str(item) for item in realtime_unmanaged_symbols_raw if str(item)]
     realtime_available = bool(realtime) and not realtime_stale
     eligible_count = realtime_ready_count if realtime_available else legacy_eligible_count
     legacy_ledger_submission_counts = m15_submission_counts_for_date(submission_ledger, panel_market_date)
@@ -3771,6 +3778,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     global_blockers = submitter.get("global_blockers", []) if isinstance(submitter.get("global_blockers"), list) else []
     queue_blockers = fast_queue.get("current_day_blockers", []) if isinstance(fast_queue.get("current_day_blockers"), list) else []
     realtime_latency_counts = realtime.get("latency_counts", {}) if isinstance(realtime.get("latency_counts"), dict) else {}
+    realtime_delayed_age_blocked_count = 0 if realtime_stale else int_like(realtime.get("delayed_signal_age_blocked_count", 0))
     data_available = bool(account_state or submitter or fast_queue or realtime_supervisor or realtime_ingestor or realtime_router or realtime_position_manager or realtime or connection)
     account_label = "模拟账户已连接" if paper_detected else "等待模拟账户确认" if auth_ok else "等待授权或状态文件"
     top_metric = (
@@ -3840,8 +3848,11 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         },
         {
             "label": "实时持仓退出",
-            "value": "过期" if realtime_position_manager_stale else f"{realtime_exit_signal_count}平仓信号",
-            "note": str(realtime_position_manager.get("plain_language_result") or f"管理持仓 {realtime_managed_position_count} 条；本地模拟平仓不触发长桥平仓。"),
+            "value": "过期" if realtime_position_manager_stale else f"{realtime_managed_position_count}系统管理 / {realtime_unmanaged_position_count}非系统管理",
+            "note": str(
+                realtime_position_manager.get("plain_language_result")
+                or f"新平仓信号 {realtime_exit_signal_count}；本地模拟平仓不触发长桥平仓。"
+            ),
         },
         {
             "label": "旧提交器状态",
@@ -3855,7 +3866,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     queue_rows = [
         {"label": "行情事件", "value": str(realtime_market_event_count), "note": f"采集器新增 {realtime_ingestor_new_event_count} / 累计 {realtime_ingestor_total_event_count} / 延期 {realtime_ingestor_deferred_count}"},
         {"label": "实时信号", "value": str(realtime_signal_count), "note": f"通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
-        {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": "1 秒内是目标，5 秒内第一版可接受。"},
+        {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": f"1 秒内是目标，5 秒内第一版可接受；超过最大年龄的旧信号不补交。本轮旧信号阻断 {realtime_delayed_age_blocked_count} 条。"},
         {"label": "旧队列日期", "value": str(fast_queue.get("scan_date") or "暂无"), "note": f"当前美股交易日 {fast_queue.get('current_market_date', '暂无')}"},
         {"label": "旧队列状态", "value": fast_queue_status_label(queue_status), "note": "本地审计/历史兼容，不作为长桥实时下单来源。"},
         {"label": "旧队列新信号", "value": str(new_signal_count), "note": f"旧队列快速风控 {legacy_eligible_count}，名义金额 {ready_notional}"},
@@ -3880,6 +3891,9 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "buying_power": buying_power,
         "position_row_count": position_count,
         "open_order_count": open_order_count,
+        "managed_position_count": str(realtime_managed_position_count),
+        "unmanaged_position_count": str(realtime_unmanaged_position_count),
+        "unmanaged_position_symbols": realtime_unmanaged_symbols,
         "account_state_stale": account_state_stale,
         "submitter_state_stale": submitter_stale,
         "realtime_session_supervisor_state_stale": realtime_supervisor_stale,
@@ -3895,6 +3909,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "new_open_signal_count": str(realtime_signal_count if realtime_available else new_signal_count),
         "blocked_signal_count": str(realtime_blocked_count if realtime_available else blocked_signal_count),
         "submitted_order_count": str(submitted_count),
+        "delayed_signal_age_blocked_count": str(realtime_delayed_age_blocked_count),
         "plain_language_result": plain_language,
         "status_rows": status_rows,
         "queue_rows": queue_rows,

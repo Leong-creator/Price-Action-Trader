@@ -111,6 +111,24 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(rows["acceptable"]["realtime_decision_status"], "latency_acceptable_ready")
             self.assertEqual(rows["delayed"]["realtime_decision_status"], "latency_delayed_revalidated_ready")
             self.assertNotIn("missed", rows["delayed"]["realtime_decision_status"])
+            self.assertEqual(rows["delayed"]["signal_age_limit_seconds"], 60)
+
+    def test_over_age_delayed_signal_is_blocked_instead_of_backfilled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [self.signal(signal_id="stale", created_at="2026-06-04T13:30:00Z")],
+            )
+
+            payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["ready_order_count"], 0)
+            self.assertEqual(payload["delayed_signal_age_blocked_count"], 1)
+            self.assertIn("blocked_delayed_signal_age_over_limit", rows[0]["blockers"])
+            self.assertEqual(rows[0]["submission_status"], "blocked_not_submitted")
 
     def test_limit_and_trigger_limit_orders_are_built_from_realtime_signal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -443,7 +461,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
 
             self.assertEqual(payload["session_started_at"], "2026-06-04T13:30:00Z")
-            self.assertEqual(rows["fresh"]["realtime_decision_status"], "latency_delayed_revalidated_ready")
+            self.assertIn("blocked_delayed_signal_age_over_limit", rows["fresh"]["blockers"])
             self.assertIn("blocked_replay_signal_before_session_start", rows["old"]["blockers"])
 
     def make_config(
@@ -484,6 +502,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 "watch_interval_seconds": 1,
                 "latency_target_ms": 1000,
                 "latency_acceptable_ms": 5000,
+                "max_delayed_signal_age_seconds": 60,
                 "allowed_runtime_ids": ["M10-PA-004-long-1d", "M10-PA-013-1d"],
             },
             "paper_account_model": {
