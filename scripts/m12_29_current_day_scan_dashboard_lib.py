@@ -3730,6 +3730,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     legacy_eligible_count = queue_ready_count if submitter_stale else int_like(submitter.get("eligible_order_count", queue_ready_count))
     realtime_ready_count = 0 if realtime_stale else int_like(realtime.get("ready_order_count", 0))
     realtime_signal_count = 0 if realtime_stale else int_like(realtime.get("signal_event_count", 0))
+    realtime_input_signal_count = 0 if realtime_stale else int_like(realtime.get("input_signal_event_count", realtime_signal_count))
+    realtime_skipped_processed_count = 0 if realtime_stale else int_like(realtime.get("skipped_previously_processed_signal_count", 0))
     realtime_blocked_count = 0 if realtime_stale else int_like(realtime.get("blocked_signal_count", 0))
     realtime_submitted_count = 0 if realtime_stale else int_like(realtime.get("submitted_count", 0))
     realtime_market_event_count = 0 if realtime_router_stale else int_like(realtime_router.get("market_event_count", 0))
@@ -3865,7 +3867,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     ]
     queue_rows = [
         {"label": "行情事件", "value": str(realtime_market_event_count), "note": f"采集器新增 {realtime_ingestor_new_event_count} / 累计 {realtime_ingestor_total_event_count} / 延期 {realtime_ingestor_deferred_count}"},
-        {"label": "实时信号", "value": str(realtime_signal_count), "note": f"通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
+        {"label": "实时信号", "value": str(realtime_signal_count), "note": f"输入 {realtime_input_signal_count}，跳过已处理 {realtime_skipped_processed_count}，通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
         {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": f"1 秒内是目标，5 秒内第一版可接受；超过最大年龄的旧信号不补交。本轮旧信号阻断 {realtime_delayed_age_blocked_count} 条。"},
         {"label": "旧队列日期", "value": str(fast_queue.get("scan_date") or "暂无"), "note": f"当前美股交易日 {fast_queue.get('current_market_date', '暂无')}"},
         {"label": "旧队列状态", "value": fast_queue_status_label(queue_status), "note": "本地审计/历史兼容，不作为长桥实时下单来源。"},
@@ -3907,6 +3909,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "realtime_execution_status": str(realtime.get("plain_language_result") or ""),
         "fast_queue_status": queue_status,
         "new_open_signal_count": str(realtime_signal_count if realtime_available else new_signal_count),
+        "input_signal_event_count": str(realtime_input_signal_count),
+        "skipped_previously_processed_signal_count": str(realtime_skipped_processed_count),
         "blocked_signal_count": str(realtime_blocked_count if realtime_available else blocked_signal_count),
         "submitted_order_count": str(submitted_count),
         "delayed_signal_age_blocked_count": str(realtime_delayed_age_blocked_count),

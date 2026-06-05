@@ -292,6 +292,12 @@ def run_realtime_execution(
         for row in existing_ledger
         if row.get("signal_id") and row.get("submission_status") == "submitted"
     }
+    existing_processed_ids = processed_signal_ids(existing_ledger)
+    signal_events_to_process = [
+        event
+        for event in signal_events
+        if str(event.get("signal_id") or "") not in existing_processed_ids
+    ]
     existing_submitted_exposure = submitted_ledger_open_exposure(existing_ledger, session_started_at, account_state)
     broker_client = broker_client or (
         LongbridgeCliRealtimePaperClient(config) if config.execute_orders else NullRealtimePaperClient()
@@ -308,7 +314,7 @@ def run_realtime_execution(
     acceptable_count = 0
     submitted_signal_ids = set(existing_submitted_ids)
 
-    for event in signal_events:
+    for event in signal_events_to_process:
         decision = evaluate_signal_event(
             config=config,
             signal=event,
@@ -377,7 +383,9 @@ def run_realtime_execution(
             "acceptable": acceptable_count,
             "delayed_revalidated": delayed_count,
         },
-        "signal_event_count": len(signal_events),
+        "input_signal_event_count": len(signal_events),
+        "signal_event_count": len(signal_events_to_process),
+        "skipped_previously_processed_signal_count": len(signal_events) - len(signal_events_to_process),
         "ready_order_count": ready_count,
         "blocked_signal_count": blocked_count,
         "submitted_count": submitted_count,
@@ -834,6 +842,17 @@ def submitted_ledger_open_exposure(
     return {symbol: notional for symbol, notional in notionals.items() if quantities.get(symbol, ZERO) > ZERO and notional > ZERO}
 
 
+def processed_signal_ids(rows: list[dict[str, Any]]) -> set[str]:
+    processed: set[str] = set()
+    for row in rows:
+        signal_id = str(row.get("signal_id") or "")
+        if not signal_id:
+            continue
+        if row.get("processed_at") or row.get("submitted_at") or row.get("submission_status"):
+            processed.add(signal_id)
+    return processed
+
+
 def latency_band_for(config: RealtimeExecutionConfig, latency_ms: int | None) -> str:
     if latency_ms is None:
         return "unknown"
@@ -942,7 +961,8 @@ def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         f"- 生成时间: `{summary['generated_at']}`",
         f"- 本地模拟隔离: `{summary['local_simulation_isolated']}`",
         f"- 旧快速队列: `{summary['legacy_fast_queue_status']}`",
-        f"- 实时信号数 / 通过数 / 阻断数 / 已提交数: `{summary['signal_event_count']} / {summary['ready_order_count']} / {summary['blocked_signal_count']} / {summary['submitted_count']}`",
+        f"- 本轮处理信号 / 跳过已处理信号: `{summary['signal_event_count']} / {summary['skipped_previously_processed_signal_count']}`",
+        f"- 通过数 / 阻断数 / 已提交数: `{summary['ready_order_count']} / {summary['blocked_signal_count']} / {summary['submitted_count']}`",
         f"- 延迟目标: `{summary['latency_target_ms']}ms`，第一版可接受: `{summary['latency_acceptable_ms']}ms`",
         f"- 延迟信号最大年龄: `{summary['max_delayed_signal_age_seconds']}s`",
         f"- 结论: {summary['plain_language_result']}",

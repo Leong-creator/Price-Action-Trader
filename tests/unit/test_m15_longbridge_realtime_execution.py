@@ -102,7 +102,11 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             )
 
             payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
-            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+            rows = {
+                row["signal_id"]: row
+                for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+                if row.get("processed_at") == "2026-06-04T14:00:00Z"
+            }
 
             self.assertEqual(payload["latency_counts"]["target_met"], 1)
             self.assertEqual(payload["latency_counts"]["acceptable"], 1)
@@ -129,6 +133,22 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(payload["delayed_signal_age_blocked_count"], 1)
             self.assertIn("blocked_delayed_signal_age_over_limit", rows[0]["blockers"])
             self.assertEqual(rows[0]["submission_status"], "blocked_not_submitted")
+
+    def test_previously_processed_signals_are_not_reprocessed_each_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="repeat", symbol="AAPL")])
+
+            first = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            second = run_realtime_execution(config, generated_at="2026-06-04T14:00:01Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(first["signal_event_count"], 1)
+            self.assertEqual(second["input_signal_event_count"], 1)
+            self.assertEqual(second["signal_event_count"], 0)
+            self.assertEqual(second["skipped_previously_processed_signal_count"], 1)
+            self.assertEqual(len(rows), 1)
 
     def test_limit_and_trigger_limit_orders_are_built_from_realtime_signal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -223,14 +243,18 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             )
 
             run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
-            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+            rows = {
+                row["signal_id"]: row
+                for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+                if row.get("processed_at") == "2026-06-04T14:00:00Z"
+            }
 
             self.assertIn("blocked_short_disabled", rows["short"]["blockers"])
             self.assertIn("blocked_fractional_disabled", rows["frac"]["blockers"])
             self.assertIn("blocked_options_disabled", rows["option"]["blockers"])
             self.assertIn("blocked_risk_over_cap", rows["risk"]["blockers"])
             self.assertIn("blocked_symbol_exposure_over_cap", rows["exposure"]["blockers"])
-            self.assertIn("duplicate_signal_already_submitted", rows["dup"]["blockers"])
+            self.assertNotIn("dup", rows)
 
     def test_existing_longbridge_position_or_open_order_blocks_new_buy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
