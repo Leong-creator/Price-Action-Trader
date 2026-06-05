@@ -3815,11 +3815,11 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         elif submitted_count > 0:
             plain_language = f"长桥模拟账户已连接，实时链路本轮已提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
         elif realtime_ready_count > 0:
-            plain_language = f"长桥模拟账户已连接，实时链路有 {realtime_ready_count} 条实时信号通过风控；旧快速队列只作审计。"
+            plain_language = f"长桥模拟账户已连接，实时链路有 {realtime_ready_count} 条实时信号通过风控。"
         else:
             plain_language = "长桥模拟账户已连接，实时链路已和本地模拟隔离；当前没有合格实时信号。"
     elif submitter_stale:
-        plain_language = "长桥模拟账户已连接，账户持仓/挂单是最新只读读取；实时链路状态尚未刷新，旧提交器和快速队列只作审计。"
+        plain_language = "长桥模拟账户已连接，账户持仓/挂单是最新只读读取；实时链路状态尚未刷新。"
     elif submitted_count > 0:
         plain_language = f"长桥模拟账户已连接，本轮已提交 {submitted_count} 笔模拟订单；仍是模拟账户，不触碰真实资金。"
     elif eligible_count > 0:
@@ -3832,8 +3832,6 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language += f" 队列阻断：{', '.join(str(item) for item in queue_blockers)}。"
     if submitter_stale and not realtime_available:
         plain_language += " 提交器状态来自旧交易日，等待只读刷新。"
-    if queue_stale_for_panel:
-        plain_language += " 快速队列是旧交易日，只作审计，不作为今天可提交订单。"
     status_rows = [
         {"label": "账户状态", "value": account_label, "note": f"通道 {account_channel or '暂无'}，类型 {account_type or '暂无'}"},
         {"label": "模拟资金模型", "value": str(submitter.get("paper_account_equity_model") or connection.get("paper_account_equity_model") or "10000"), "note": "项目按 10000 USD 模型控制仓位，不用长桥余额放大风险。"},
@@ -3847,7 +3845,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         {
             "label": "实时执行链路",
             "value": realtime_execution_status_label(realtime, realtime_stale),
-            "note": str(realtime.get("plain_language_result") or "实时链路尚未生成；旧快速队列只作审计。"),
+            "note": str(realtime.get("plain_language_result") or "实时链路尚未生成；等待长桥实时行情触发新信号。"),
         },
         {
             "label": "实时行情采集",
@@ -3872,11 +3870,6 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
                 or f"新平仓信号 {realtime_exit_signal_count}；本地模拟平仓不触发长桥平仓。"
             ),
         },
-        {
-            "label": "旧提交器状态",
-            "value": submit_status_label(submit_status),
-            "note": "旧提交器不再作为实时下单热路径。" if submitter_stale else str(submitter.get("plain_language_result") or "暂无提交器摘要"),
-        },
         {"label": "市场窗口", "value": market_status_label(market_status), "note": str(market_window.get("new_york_time") or "暂无")},
         {"label": "接口读取", "value": health_label(auth_ok, assets_ok, positions_ok, orders_ok), "note": "认证、资产、持仓、挂单状态只读检查。"},
         {"label": "延迟", "value": latency_label(submitter.get("latency_ms", {})), "note": f"下一轮检查间隔 {submitter.get('next_interval_seconds', '暂无')} 秒"},
@@ -3885,21 +3878,14 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         {"label": "行情事件", "value": str(realtime_market_event_count), "note": f"采集器新增 {realtime_ingestor_new_event_count} / 累计 {realtime_ingestor_total_event_count} / 延期 {realtime_ingestor_deferred_count}"},
         {"label": "实时信号", "value": str(realtime_signal_count), "note": f"输入 {realtime_input_signal_count}，跳过已处理 {realtime_skipped_processed_count}，通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
         {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": f"1 秒内是目标，5 秒内第一版可接受；超过最大年龄的旧信号不补交。本轮旧信号阻断 {realtime_delayed_age_blocked_count} 条。"},
-        {"label": "旧队列日期", "value": str(fast_queue.get("scan_date") or "暂无"), "note": f"当前美股交易日 {fast_queue.get('current_market_date', '暂无')}"},
-        {"label": "旧队列状态", "value": fast_queue_status_label(queue_status), "note": "本地审计/历史兼容，不作为长桥实时下单来源。"},
-        {"label": "旧队列新信号", "value": str(new_signal_count), "note": f"旧队列快速风控 {legacy_eligible_count}，名义金额 {ready_notional}"},
-        {"label": "被阻断信号", "value": str(blocked_signal_count), "note": status_counts_label(status_counts)},
-        {"label": "扣费后合格", "value": str(net_profitable_ready_count), "note": f"扣费后不赚钱阻断 {fee_profit_blocked_count}"},
-        {"label": "修复策略信号", "value": str(repair_signal_count), "note": "修复策略只生成本地草稿，不提交长桥模拟账户。"},
-        {"label": "旧快照阻断", "value": str(stale_blocked_count), "note": str(fast_queue.get("snapshot_freshness_status") or "暂无")},
-        {"label": "多策略共振", "value": f"{confluence_primary_count}主 / {confluence_support_count}辅", "note": f"最高倍率 {confluence_summary.get('max_confluence_multiplier', '1')}"},
         {"label": "已提交 / 已尝试", "value": f"{submitted_count} / {attempted_count}", "note": "按今天提交流水累计，不包含本地模拟账本。"},
+        {"label": "本地模拟隔离", "value": "已隔离", "note": "旧快速队列、旧本地账本和平仓记录不作为长桥实时下单来源。"},
     ]
     return {
         "schema_version": "m15.longbridge-paper-dashboard-panel.v2",
         "stage": "M15.longbridge_paper_dashboard_panel",
         "title": "长桥模拟账户",
-        "generated_from": "m15 realtime account state + realtime position manager + realtime execution + legacy fast queue audit",
+        "generated_from": "m15 realtime account state + realtime position manager + realtime execution",
         "data_available": data_available,
         "top_metric": top_metric,
         "submit_ready_count": str(eligible_count),
@@ -5076,7 +5062,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     </section>
     <div class="grid">{cards}</div>
     {data_freshness_section}
-    <section class="panel"><h2>长桥模拟账户</h2><div class="note">{html.escape(str(longbridge.get('plain_language_result', '长桥模拟账户状态暂未生成。')))}</div><div class="two-col"><div class="mini-card"><h2>账户与执行</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_status_rows}</tbody></table></div><div class="mini-card"><h2>实时链路与旧队列</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_queue_rows}</tbody></table></div></div></section>
+    <section class="panel"><h2>长桥模拟账户</h2><div class="note">{html.escape(str(longbridge.get('plain_language_result', '长桥模拟账户状态暂未生成。')))}</div><div class="two-col"><div class="mini-card"><h2>账户与执行</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_status_rows}</tbody></table></div><div class="mini-card"><h2>实时链路</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_queue_rows}</tbody></table></div></div></section>
     <section class="terminal">
       <div class="terminal-panel"><h2>策略账户</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{terminal_account_rows}</tbody></table></div></div>
       <div class="terminal-panel"><h2>持仓 / 信号 / PA004 对照</h2><div class="note">{html.escape(terminal.get('pa004_comparison', {}).get('plain_language_result', ''))}</div><div class="wrap"><table class="terminal-table"><thead>{table_head()}</thead><tbody>{terminal_position_rows}</tbody></table></div><h2>今日正式信号</h2><div class="wrap"><table class="terminal-table"><thead>{watchlist_head()}</thead><tbody>{terminal_signal_rows}</tbody></table></div><h2>PA004 baseline / MBF / QC 对照</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{pa004_terminal_rows}</tbody></table></div></div>

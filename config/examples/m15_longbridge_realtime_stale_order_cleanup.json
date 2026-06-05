@@ -1,0 +1,23 @@
+{
+  "stage": "M15.longbridge_realtime_stale_order_cleanup",
+  "title": "长桥模拟账户旧挂单清理",
+  "inputs": {
+    "account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json"
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
+  },
+  "stale_order_cleanup": {
+    "required_account_channel": "lb_papertrading",
+    "cli_name": "longbridge",
+    "cli_timeout_seconds": 6,
+    "cancel_stale_buy_orders": true,
+    "max_cancel_per_run": 20
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "cancel_sell_orders": false
+  }
+}

@@ -58,6 +58,12 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
                     "position_row_count": 1,
                     "open_order_count": 2,
                 },
+                stale_order_cleanup_runner=lambda _ts: calls.append("stale_order_cleanup") or {
+                    "cleanup_status": "stale_buy_open_orders_canceled",
+                    "stale_buy_open_order_count": 2,
+                    "canceled_count": 2,
+                    "failed_count": 0,
+                },
                 position_manager_runner=lambda _ts: calls.append("position_manager") or {
                     "position_count": 1,
                     "new_exit_signal_event_count": 1,
@@ -73,12 +79,16 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
 
             self.assertEqual(payload["supervisor_status"], "cycle_completed")
             self.assertTrue(payload["cycle_ran"])
-            self.assertEqual(calls, ["ingestor", "router", "account_state", "position_manager", "execution"])
+            self.assertEqual(
+                calls,
+                ["ingestor", "router", "account_state", "stale_order_cleanup", "account_state", "position_manager", "execution"],
+            )
             self.assertEqual(status["new_market_event_count"], 2)
             self.assertEqual(status["new_signal_event_count"], 1)
             self.assertTrue(status["paper_account_verified"])
             self.assertEqual(status["account_position_row_count"], 1)
             self.assertEqual(status["account_open_order_count"], 2)
+            self.assertEqual(status["stale_buy_open_order_canceled_count"], 2)
             self.assertEqual(status["new_exit_signal_event_count"], 1)
             self.assertEqual(status["ready_order_count"], 1)
             self.assertEqual(status["window"]["session_started_at"], "2026-06-04T13:30:00Z")
@@ -177,6 +187,7 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
                 "ingestor_config": str(root / "ingestor.json"),
                 "router_config": str(root / "router.json"),
                 "account_state_config": str(root / "account_state.json"),
+                "stale_order_cleanup_config": str(root / "stale_cleanup.json"),
                 "position_manager_config": str(root / "position_manager.json"),
                 "execution_config": str(root / "execution.json"),
             },
@@ -194,6 +205,7 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
                 "run_ingestor": True,
                 "run_router": True,
                 "run_account_state": True,
+                "run_stale_order_cleanup": True,
                 "run_position_manager": True,
                 "run_execution": True,
             },

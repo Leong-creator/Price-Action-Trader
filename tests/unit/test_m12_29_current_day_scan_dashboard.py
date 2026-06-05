@@ -433,7 +433,8 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("实时守护器", html)
         self.assertIn("实时行情采集", html)
         self.assertIn("实时信号生成", html)
-        self.assertIn("实时链路与旧队列", html)
+        self.assertIn("实时链路", html)
+        self.assertNotIn("实时链路与旧队列", html)
         self.assertIn('http-equiv="Cache-Control"', html)
         self.assertIn('content="no-store, no-cache, must-revalidate"', html)
         self.assertIn("dashboard_reload", html)
@@ -1076,7 +1077,8 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(panel["position_row_count"], "2")
         self.assertEqual(panel["open_order_count"], "0")
         self.assertEqual(panel["submit_ready_count"], "0")
-        self.assertIn("旧交易日，只作审计", panel["plain_language_result"])
+        self.assertIn("实时链路状态尚未刷新", panel["plain_language_result"])
+        self.assertIn("旧快速队列、旧本地账本和平仓记录不作为长桥实时下单来源", json.dumps(panel["queue_rows"], ensure_ascii=False))
         self.assertIn("AAPL, XLU", json.dumps(panel, ensure_ascii=False))
 
     def test_longbridge_panel_counts_today_submissions_from_ledger(self):

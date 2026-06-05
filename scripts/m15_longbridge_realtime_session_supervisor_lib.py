@@ -23,6 +23,8 @@ from scripts.m15_longbridge_realtime_position_manager_lib import load_config as 
 from scripts.m15_longbridge_realtime_position_manager_lib import run_realtime_position_manager
 from scripts.m15_longbridge_realtime_signal_router_lib import load_config as load_router_config
 from scripts.m15_longbridge_realtime_signal_router_lib import run_realtime_signal_router
+from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
+from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import run_stale_order_cleanup
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +33,7 @@ DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_se
 DEFAULT_INGESTOR_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_market_event_ingestor.json"
 DEFAULT_ROUTER_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_signal_router.json"
 DEFAULT_ACCOUNT_STATE_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_account_state.json"
+DEFAULT_STALE_ORDER_CLEANUP_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_stale_order_cleanup.json"
 DEFAULT_POSITION_MANAGER_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_position_manager.json"
 DEFAULT_EXECUTION_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.json"
 SUMMARY_JSON = "m15_longbridge_realtime_session_supervisor.json"
@@ -50,6 +53,7 @@ class RealtimeSessionSupervisorConfig:
     ingestor_config_path: Path
     router_config_path: Path
     account_state_config_path: Path
+    stale_order_cleanup_config_path: Path
     position_manager_config_path: Path
     execution_config_path: Path
     check_interval_seconds: int
@@ -62,6 +66,7 @@ class RealtimeSessionSupervisorConfig:
     run_ingestor: bool
     run_router: bool
     run_account_state: bool
+    run_stale_order_cleanup: bool
     run_position_manager: bool
     run_execution: bool
     hard_boundaries: dict[str, bool]
@@ -95,6 +100,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSessionSuperv
         ingestor_config_path=resolve_repo_path(inputs.get("ingestor_config", DEFAULT_INGESTOR_CONFIG_PATH)),
         router_config_path=resolve_repo_path(inputs.get("router_config", DEFAULT_ROUTER_CONFIG_PATH)),
         account_state_config_path=resolve_repo_path(inputs.get("account_state_config", DEFAULT_ACCOUNT_STATE_CONFIG_PATH)),
+        stale_order_cleanup_config_path=resolve_repo_path(
+            inputs.get("stale_order_cleanup_config", DEFAULT_STALE_ORDER_CLEANUP_CONFIG_PATH)
+        ),
         position_manager_config_path=resolve_repo_path(inputs.get("position_manager_config", DEFAULT_POSITION_MANAGER_CONFIG_PATH)),
         execution_config_path=resolve_repo_path(inputs.get("execution_config", DEFAULT_EXECUTION_CONFIG_PATH)),
         check_interval_seconds=int(session.get("check_interval_seconds", 5)),
@@ -107,6 +115,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSessionSuperv
         run_ingestor=bool(session.get("run_ingestor", True)),
         run_router=bool(session.get("run_router", True)),
         run_account_state=bool(session.get("run_account_state", True)),
+        run_stale_order_cleanup=bool(session.get("run_stale_order_cleanup", True)),
         run_position_manager=bool(session.get("run_position_manager", True)),
         run_execution=bool(session.get("run_execution", True)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
@@ -120,7 +129,14 @@ def validate_config(config: RealtimeSessionSupervisorConfig) -> None:
         raise ValueError("M15 realtime session supervisor check interval must be positive")
     if config.max_consecutive_failures <= 0:
         raise ValueError("M15 realtime session supervisor max_consecutive_failures must be positive")
-    if not (config.run_ingestor or config.run_router or config.run_account_state or config.run_position_manager or config.run_execution):
+    if not (
+        config.run_ingestor
+        or config.run_router
+        or config.run_account_state
+        or config.run_stale_order_cleanup
+        or config.run_position_manager
+        or config.run_execution
+    ):
         raise ValueError("M15 realtime session supervisor must run at least one step")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime session supervisor must stay paper/simulated only")
@@ -212,6 +228,7 @@ def run_realtime_session_once(
     ingestor_runner: StepRunner | None = None,
     router_runner: StepRunner | None = None,
     account_state_runner: StepRunner | None = None,
+    stale_order_cleanup_runner: StepRunner | None = None,
     position_manager_runner: StepRunner | None = None,
     execution_runner: StepRunner | None = None,
 ) -> dict[str, Any]:
@@ -243,6 +260,7 @@ def run_realtime_session_once(
             ingestor_runner,
             router_runner,
             account_state_runner,
+            stale_order_cleanup_runner,
             position_manager_runner,
             execution_runner,
             str(window["session_started_at"]),
@@ -310,6 +328,7 @@ def build_step_plan(
     ingestor_runner: StepRunner | None,
     router_runner: StepRunner | None,
     account_state_runner: StepRunner | None,
+    stale_order_cleanup_runner: StepRunner | None,
     position_manager_runner: StepRunner | None,
     execution_runner: StepRunner | None,
     session_started_at: str,
@@ -338,6 +357,26 @@ def build_step_plan(
                 return run_realtime_account_state(account_state_config, generated_at=generated_at)
 
         steps.append(("account_state", account_state_runner))
+    if config.run_stale_order_cleanup:
+        if stale_order_cleanup_runner is None:
+            def stale_order_cleanup_runner(generated_at: str | None) -> dict[str, Any]:
+                cleanup_config = load_stale_order_cleanup_config(config.stale_order_cleanup_config_path)
+                return run_stale_order_cleanup(
+                    cleanup_config,
+                    generated_at=generated_at,
+                    session_started_at=session_started_at,
+                )
+
+        steps.append(("stale_order_cleanup", stale_order_cleanup_runner))
+        if config.run_account_state:
+            if account_state_runner is None:
+                def account_state_after_cleanup_runner(generated_at: str | None) -> dict[str, Any]:
+                    account_state_config = load_account_state_config(config.account_state_config_path)
+                    return run_realtime_account_state(account_state_config, generated_at=generated_at)
+            else:
+                account_state_after_cleanup_runner = account_state_runner
+
+            steps.append(("account_state_after_cleanup", account_state_after_cleanup_runner))
     if config.run_position_manager:
         if position_manager_runner is None:
             def position_manager_runner(generated_at: str | None) -> dict[str, Any]:
@@ -372,6 +411,9 @@ def build_status_payload(
     ingestor = step_payloads.get("market_event_ingestor", {})
     router = step_payloads.get("signal_router", {})
     account_state = step_payloads.get("account_state", {})
+    stale_order_cleanup = step_payloads.get("stale_order_cleanup", {})
+    account_state_after_cleanup = step_payloads.get("account_state_after_cleanup", {})
+    effective_account_state = account_state_after_cleanup or account_state
     position_manager = step_payloads.get("position_manager", {})
     execution = step_payloads.get("paper_execution", {})
     return {
@@ -391,9 +433,13 @@ def build_status_payload(
         "market_event_count": int_like(router.get("market_event_count", ingestor.get("market_event_total_count", 0))),
         "new_market_event_count": int_like(ingestor.get("new_market_event_count", 0)),
         "new_signal_event_count": int_like(router.get("new_signal_event_count", 0)),
-        "paper_account_verified": bool(account_state.get("paper_account_verified", False)),
-        "account_position_row_count": int_like(account_state.get("position_row_count", 0)),
-        "account_open_order_count": int_like(account_state.get("open_order_count", 0)),
+        "paper_account_verified": bool(effective_account_state.get("paper_account_verified", False)),
+        "account_position_row_count": int_like(effective_account_state.get("position_row_count", 0)),
+        "account_open_order_count": int_like(effective_account_state.get("open_order_count", 0)),
+        "stale_order_cleanup_status": str(stale_order_cleanup.get("cleanup_status") or ""),
+        "stale_buy_open_order_count": int_like(stale_order_cleanup.get("stale_buy_open_order_count", 0)),
+        "stale_buy_open_order_canceled_count": int_like(stale_order_cleanup.get("canceled_count", 0)),
+        "stale_buy_open_order_cleanup_failed_count": int_like(stale_order_cleanup.get("failed_count", 0)),
         "new_exit_signal_event_count": int_like(position_manager.get("new_exit_signal_event_count", 0)),
         "ready_order_count": int_like(execution.get("ready_order_count", 0)),
         "submitted_count": int_like(execution.get("submitted_count", 0)),
@@ -408,6 +454,7 @@ def build_status_payload(
             "ingestor_config": project_path(config.ingestor_config_path),
             "router_config": project_path(config.router_config_path),
             "account_state_config": project_path(config.account_state_config_path),
+            "stale_order_cleanup_config": project_path(config.stale_order_cleanup_config_path),
             "position_manager_config": project_path(config.position_manager_config_path),
             "execution_config": project_path(config.execution_config_path),
             "local_simulation_ledger": "",
@@ -434,6 +481,20 @@ def payload_summary(step_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             "new_signal_event_count": int_like(payload.get("new_signal_event_count", 0)),
         }
     if step_id == "account_state":
+        return {
+            "account_status": str(payload.get("account_status", "")),
+            "paper_account_verified": bool(payload.get("paper_account_verified", False)),
+            "position_row_count": int_like(payload.get("position_row_count", 0)),
+            "open_order_count": int_like(payload.get("open_order_count", 0)),
+        }
+    if step_id == "stale_order_cleanup":
+        return {
+            "cleanup_status": str(payload.get("cleanup_status", "")),
+            "stale_buy_open_order_count": int_like(payload.get("stale_buy_open_order_count", 0)),
+            "canceled_count": int_like(payload.get("canceled_count", 0)),
+            "failed_count": int_like(payload.get("failed_count", 0)),
+        }
+    if step_id == "account_state_after_cleanup":
         return {
             "account_status": str(payload.get("account_status", "")),
             "paper_account_verified": bool(payload.get("paper_account_verified", False)),

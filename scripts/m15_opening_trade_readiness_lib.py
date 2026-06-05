@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Any
 
 from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config
+from scripts.m15_longbridge_realtime_execution_lib import parse_utc_datetime
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     DEFAULT_CONFIG_PATH as DEFAULT_REALTIME_SUPERVISOR_CONFIG_PATH,
     build_window_state,
     load_config as load_realtime_supervisor_config,
     pid_path as realtime_pid_path,
 )
+from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -116,6 +118,9 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     execution_config_linked = config.execution_config_path.resolve() == realtime_config.execution_config_path.resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     paper_account_ready = paper_account_verified(account_state)
+    stale_buy_orders = stale_buy_open_orders(account_state, parse_utc_datetime(str(window["session_started_at"])))
+    cleanup_enabled = bool(getattr(realtime_config, "run_stale_order_cleanup", False))
+    cleanup_failed = int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
     checks = [
         check_row("m12_47_daemon_alive", "M12.47 自动刷新守护器存活", "pass" if m12_alive else "fail", actual=str(m12_alive)),
         check_row(
@@ -172,6 +177,16 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "修复策略、影子变体和辅助模块不进入长桥实时下单",
             "pass" if repair_auxiliary_isolated(execution_payload) else "fail",
             actual=f"whitelist={len(execution_config.allowed_runtime_ids) if execution_config else 0}",
+        ),
+        check_row(
+            "stale_open_buy_order_cleanup",
+            "上一交易窗口遗留买入挂单必须在执行新信号前清理或阻断",
+            "fail" if stale_buy_orders and (not cleanup_enabled or cleanup_failed) else "pass",
+            actual=(
+                f"stale_buy_orders={len(stale_buy_orders)}, cleanup_enabled={cleanup_enabled}, "
+                f"last_cleanup_status={realtime_status.get('stale_order_cleanup_status', '')}, "
+                f"cleanup_failed={cleanup_failed}"
+            ),
         ),
     ]
     fail_count = sum(1 for row in checks if row["status"] == "fail")
