@@ -2783,6 +2783,18 @@ def m15_virtual_capital_bucket_definitions(payload: dict[str, Any]) -> list[dict
     return []
 
 
+def m15_configured_test_epoch(payload: dict[str, Any]) -> dict[str, str]:
+    epoch = payload.get("test_epoch") if isinstance(payload.get("test_epoch"), dict) else {}
+    epoch_id = str(epoch.get("test_epoch_id") or "")
+    if not epoch_id:
+        return {}
+    return {
+        "test_epoch_id": epoch_id,
+        "status": "waiting_runtime_refresh",
+        "configured": "true",
+    }
+
+
 def build_accountized_timeframe_views(account_rows: list[dict[str, str]]) -> dict[str, Any]:
     views: dict[str, Any] = {}
     for timeframe in PRIMARY_TIMEFRAME_ORDER:
@@ -4129,12 +4141,19 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     equity_curve_summary = m15_longbridge_equity_curve_summary(realtime_equity_curve)
     strategy_trade_pnl_rows = m15_longbridge_strategy_trade_pnl_rows(order_reconciliation, symbol_pnl_rows)
     strategy_quality_summary = m15_longbridge_strategy_quality_summary(account_state, realtime_ledger)
+    virtual_capital_bucket_definitions = (
+        m15_virtual_capital_bucket_definitions(paper_execution_config)
+        or m15_virtual_capital_bucket_definitions(realtime)
+    )
+    configured_realtime_epoch = m15_configured_test_epoch(paper_execution_config)
     virtual_bucket_rows = m15_longbridge_virtual_bucket_rows(
         realtime,
         realtime_ledger,
         realtime_epoch,
         active_pnl_reconciliation,
         order_reconciliation,
+        virtual_capital_bucket_definitions,
+        configured_realtime_epoch,
     )
     last_run_submitted_count = 0 if submitter_stale else int_like(submitter.get("submitted_order_count", 0))
     last_run_attempted_count = 0 if submitter_stale else int_like(submitter.get("attempted_order_count", 0))
@@ -4459,10 +4478,6 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         if isinstance(existing_dashboard.get("local_simulation_history_quality"), dict)
         else {}
     )
-    virtual_capital_bucket_definitions = (
-        m15_virtual_capital_bucket_definitions(paper_execution_config)
-        or m15_virtual_capital_bucket_definitions(realtime)
-    )
     runtime_whitelist = (
         paper_execution_config.get("longbridge_realtime", {}).get("allowed_runtime_ids", [])
         if isinstance(paper_execution_config.get("longbridge_realtime"), dict)
@@ -4557,7 +4572,16 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "virtual_capital_bucket_definitions": virtual_capital_bucket_definitions,
         "runtime_whitelist": runtime_whitelist,
         "dedicated_bucket_runtime_review_rows": dedicated_bucket_runtime_review_rows,
-        "test_epoch": realtime_epoch,
+        "test_epoch": (
+            {
+                **configured_realtime_epoch,
+                "runtime_state_test_epoch_id": str(realtime_epoch.get("test_epoch_id") or ""),
+                "runtime_state_status": str(realtime_epoch.get("status") or "未生成"),
+            }
+            if configured_realtime_epoch
+            and str(configured_realtime_epoch.get("test_epoch_id") or "") != str(realtime_epoch.get("test_epoch_id") or "")
+            else realtime_epoch
+        ),
         "position_market_value": account_pnl_summary["position_market_value"],
         "position_cost_value": account_pnl_summary["position_cost_value"],
         "open_order_notional": account_pnl_summary["open_order_notional"],
@@ -5605,15 +5629,24 @@ def m15_longbridge_virtual_bucket_rows(
     realtime_epoch: dict[str, Any],
     reconciliation: dict[str, Any] | None = None,
     order_reconciliation: dict[str, Any] | None = None,
+    configured_bucket_defs: list[dict[str, Any]] | None = None,
+    configured_epoch: dict[str, Any] | None = None,
     ) -> list[dict[str, str]]:
     realtime_epoch_from_summary = realtime.get("test_epoch", {}) if isinstance(realtime.get("test_epoch"), dict) else {}
-    epoch_id = str(realtime_epoch.get("test_epoch_id") or realtime_epoch_from_summary.get("test_epoch_id") or "")
-    epoch_status = str(realtime_epoch.get("status") or realtime_epoch_from_summary.get("status") or "未生成")
+    summary_epoch_id = str(realtime_epoch.get("test_epoch_id") or realtime_epoch_from_summary.get("test_epoch_id") or "")
+    configured_epoch_id = str((configured_epoch or {}).get("test_epoch_id") or "")
+    use_configured_epoch = bool(configured_epoch_id and configured_epoch_id != summary_epoch_id)
+    epoch_id = configured_epoch_id if use_configured_epoch else summary_epoch_id
+    epoch_status = (
+        str((configured_epoch or {}).get("status") or "waiting_runtime_refresh")
+        if use_configured_epoch
+        else str(realtime_epoch.get("status") or realtime_epoch_from_summary.get("status") or "未生成")
+    )
     active_rows = [
         row for row in realtime_ledger
         if not epoch_id or str(row.get("test_epoch_id") or "") == epoch_id
     ]
-    bucket_defs = realtime.get("virtual_capital_buckets", [])
+    bucket_defs = configured_bucket_defs if use_configured_epoch and configured_bucket_defs else realtime.get("virtual_capital_buckets", [])
     if not isinstance(bucket_defs, list) or not bucket_defs:
         bucket_defs = [
             {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
@@ -5688,9 +5721,13 @@ def m15_longbridge_virtual_bucket_rows(
                 "profit_loss_ratio": str(performance.get("profit_loss_ratio") or quality["profit_loss_ratio"]),
                 "max_drawdown_percent": "等待新基线成交" if not performance and not closed else "暂无",
                 "note": (
+                    "当前启用配置已切到新单策略仓，执行产物仍待下一轮 M15 刷新；旧基线交易不混入本表。"
+                    if use_configured_epoch
+                    else (
                     "清仓完成并激活新基线后才统计新测试表现。"
                     if epoch_status == "pending_flatten"
                     else "只按长桥实际成交和当前持仓做本地资金池归因；未成交请求不计入表现。"
+                    )
                 ),
             }
         )

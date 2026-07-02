@@ -1897,6 +1897,42 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(by_bucket["old_history"]["submitted_buy_count"], "1")
         self.assertEqual(by_bucket["local_repair"]["submitted_buy_count"], "0")
 
+    def test_longbridge_virtual_bucket_rows_prefer_configured_single_buckets_when_runtime_epoch_stale(self):
+        realtime = {
+            "test_epoch": {"test_epoch_id": "old-dual-bucket", "status": "active"},
+            "virtual_capital_buckets": [
+                {"capital_bucket": "main", "label": "主力仓", "runtime_ids": ["M10-PA-004-long-1d"]},
+                {"capital_bucket": "pa002_main", "label": "002专项主力仓", "runtime_ids": ["M10-PA-002-1d", "M10-PA-002-5m"]},
+            ],
+        }
+        configured_epoch = {
+            "test_epoch_id": "m15-single-strategy-buckets-20260702",
+            "status": "waiting_runtime_refresh",
+        }
+        configured_buckets = [
+            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "runtime_ids": ["M10-PA-004-long-1d"]},
+            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
+            {"capital_bucket": "experimental", "label": "统一实验仓", "runtime_ids": ["M10-PA-002-1d"]},
+        ]
+
+        rows = m15_longbridge_virtual_bucket_rows(
+            realtime,
+            [],
+            {"test_epoch_id": "old-dual-bucket", "status": "active"},
+            configured_bucket_defs=configured_buckets,
+            configured_epoch=configured_epoch,
+        )
+        by_bucket = {row["capital_bucket"]: row for row in rows}
+
+        self.assertIn("pa004_long", by_bucket)
+        self.assertIn("pa002_5m", by_bucket)
+        self.assertIn("experimental", by_bucket)
+        self.assertNotIn("main", by_bucket)
+        self.assertNotIn("pa002_main", by_bucket)
+        self.assertEqual(by_bucket["pa002_5m"]["test_epoch_id"], "m15-single-strategy-buckets-20260702")
+        self.assertEqual(by_bucket["pa002_5m"]["epoch_status"], "waiting_runtime_refresh")
+        self.assertIn("新单策略仓", by_bucket["pa002_5m"]["note"])
+
     def test_longbridge_virtual_bucket_rows_count_only_actual_fills_when_reconciled(self):
         realtime = {
             "virtual_capital_buckets": [
