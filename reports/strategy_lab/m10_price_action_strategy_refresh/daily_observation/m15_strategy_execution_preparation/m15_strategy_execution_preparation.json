@@ -135,7 +135,7 @@
       "timeframe": "1d"
     }
   ],
-  "generated_at": "2026-06-01T17:29:01Z",
+  "generated_at": "2026-06-30T03:16:58Z",
   "hard_boundaries": {
     "broker_connection": false,
     "credential_injection_allowed_now": false,
@@ -178,7 +178,7 @@
     },
     {
       "check": "daily_and_5m_complete",
-      "required_result": "第一批 50 只日线和当日 5 分钟数据完整"
+      "required_result": "当前种子池日线和当日 5 分钟数据完整"
     },
     {
       "check": "m13_current_day_ledger",
@@ -252,31 +252,6 @@
       "runtime_id": "M10-PA-001-5m",
       "standalone_repair_trial": true,
       "strategy_id": "M10-PA-001",
-      "timeframe": "5m"
-    },
-    {
-      "acceptance_checks": [
-        "周一刷新后必须能区分有效突破、假突破和冷却跳过",
-        "有信号无账户操作时必须写明 no-op 原因",
-        "修复前不进入长桥模拟账户候选"
-      ],
-      "action_state": "repair_now",
-      "advance_after_fix": "假突破过滤通过且冷却生效后，先进入 0.10 倍修复试验",
-      "broker_paper_start_allowed": false,
-      "fix_steps": [
-        "突破必须有收盘确认，不能只用盘中刺破当作有效突破",
-        "突破后若快速回到区间内，标记为假突破并进入冷却",
-        "同一标的同一方向失败后延迟下一次入场，避免连续追错"
-      ],
-      "longbridge_paper_scope": "blocked_until_repaired",
-      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
-      "position_size_multiplier": "0.10",
-      "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
-      "repair_priority": "P0",
-      "repair_window": "周一交易日前完成假突破过滤和失败后冷却规则",
-      "runtime_id": "M10-PA-002-5m",
-      "standalone_repair_trial": true,
-      "strategy_id": "M10-PA-002",
       "timeframe": "5m"
     },
     {
@@ -483,31 +458,6 @@
     },
     {
       "acceptance_checks": [
-        "周一刷新后必须能区分有效突破、假突破和冷却跳过",
-        "有信号无账户操作时必须写明 no-op 原因",
-        "修复前不进入长桥模拟账户候选"
-      ],
-      "action_state": "repair_now",
-      "advance_after_fix": "假突破过滤通过且冷却生效后，先进入 0.10 倍修复试验",
-      "broker_paper_start_allowed": false,
-      "fix_steps": [
-        "突破必须有收盘确认，不能只用盘中刺破当作有效突破",
-        "突破后若快速回到区间内，标记为假突破并进入冷却",
-        "同一标的同一方向失败后延迟下一次入场，避免连续追错"
-      ],
-      "longbridge_paper_scope": "blocked_until_repaired",
-      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
-      "position_size_multiplier": "0.10",
-      "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
-      "repair_priority": "P0",
-      "repair_window": "周一交易日前完成假突破过滤和失败后冷却规则",
-      "runtime_id": "M10-PA-002-5m",
-      "standalone_repair_trial": true,
-      "strategy_id": "M10-PA-002",
-      "timeframe": "5m"
-    },
-    {
-      "acceptance_checks": [
         "周一刷新后必须和 PA004 主线分开出账本",
         "没有质量确认时输出零信号或具体过滤原因",
         "不得替代 PA004 第一笔长桥模拟账户候选"
@@ -700,6 +650,16 @@
       "timeframe": "1d"
     },
     {
+      "action_state": "advance_dedicated_pa002_bucket",
+      "longbridge_paper_scope": "not_first_order_candidate",
+      "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
+      "plain_status": "已提升到 002 专项主力仓，按正常测试仓位验证五分钟突破确认",
+      "position_size_multiplier": "1.0",
+      "runtime_id": "M10-PA-002-5m",
+      "strategy_id": "M10-PA-002",
+      "timeframe": "5m"
+    },
+    {
       "action_state": "risk_limited_advance",
       "longbridge_paper_scope": "not_first_order_candidate",
       "m12_runtime_rule_status": "implemented_in_m12_account_runtime",
@@ -722,12 +682,12 @@
     "m12_runtime_rule_implemented_count": 18,
     "m12_runtime_rule_scope": "仓位倍率、收益风险比、止损距离、假突破确认、图形上下文、连续亏损暂停已接入 M12 账户化运行链路",
     "order_submitted": false,
-    "repair_now_count": 9,
+    "repair_now_count": 8,
     "repair_priority_counts": {
-      "P0": 4,
+      "P0": 3,
       "P1": 5
     },
     "repair_queue_ready_before_monday": true,
-    "second_batch_candidate_count": 5
+    "second_batch_candidate_count": 6
   }
 }

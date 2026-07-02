@@ -19,15 +19,19 @@
     ],
     "use_seed_universe": true,
     "symbol_limit": 147,
-    "max_symbols_per_cycle": 25,
+    "max_symbols_per_cycle": 8,
     "symbol_cursor_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_symbol_cursor.json",
     "timeframes": [
       "1d",
       "5m"
     ],
     "kline_count": 2,
+    "kline_retry_attempts": 1,
+    "kline_retry_sleep_seconds": 0.2,
     "watch_interval_seconds": 1,
-    "cli_timeout_seconds": 6
+    "cli_timeout_seconds": 2,
+    "max_market_event_file_bytes": 62914560,
+    "keep_market_event_lines": 20000
   },
   "hard_boundaries": {
     "paper_simulated_only": true,

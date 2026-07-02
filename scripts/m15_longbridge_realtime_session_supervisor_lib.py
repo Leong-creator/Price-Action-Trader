@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time as wall_time, timedelta
 from pathlib import Path
@@ -15,6 +16,9 @@ from scripts.m15_longbridge_realtime_execution_lib import (
 )
 from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config
 from scripts.m15_longbridge_realtime_execution_lib import run_realtime_execution
+from scripts.m15_longbridge_realtime_account_state_lib import PNL_RECONCILIATION_JSON as ACCOUNT_PNL_RECONCILIATION_JSON
+from scripts.m15_longbridge_realtime_account_state_lib import PNL_RECONCILIATION_MD as ACCOUNT_PNL_RECONCILIATION_MD
+from scripts.m15_longbridge_realtime_account_state_lib import SUMMARY_JSON as ACCOUNT_STATE_SUMMARY_JSON
 from scripts.m15_longbridge_realtime_account_state_lib import load_config as load_account_state_config
 from scripts.m15_longbridge_realtime_account_state_lib import run_realtime_account_state
 from scripts.m15_longbridge_realtime_market_event_ingestor_lib import load_config as load_ingestor_config
@@ -41,6 +45,9 @@ LEDGER_JSONL = "m15_longbridge_realtime_session_supervisor_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_session_supervisor.md"
 PID_FILE = "m15_longbridge_realtime_session_supervisor.pid"
 LOG_FILE = "m15_longbridge_realtime_session_supervisor.log"
+MAX_SUPERVISOR_LEDGER_BYTES = 20 * 1024 * 1024
+MAX_SUPERVISOR_LEDGER_LINES = 5000
+MAX_SUPERVISOR_LOG_BYTES = 20 * 1024 * 1024
 
 StepRunner = Callable[[str | None], dict[str, Any]]
 
@@ -57,6 +64,7 @@ class RealtimeSessionSupervisorConfig:
     position_manager_config_path: Path
     execution_config_path: Path
     check_interval_seconds: int
+    idle_check_interval_seconds: int
     market_timezone: str
     regular_session_start_time: str
     regular_session_end_time: str
@@ -106,6 +114,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSessionSuperv
         position_manager_config_path=resolve_repo_path(inputs.get("position_manager_config", DEFAULT_POSITION_MANAGER_CONFIG_PATH)),
         execution_config_path=resolve_repo_path(inputs.get("execution_config", DEFAULT_EXECUTION_CONFIG_PATH)),
         check_interval_seconds=int(session.get("check_interval_seconds", 5)),
+        idle_check_interval_seconds=int(session.get("idle_check_interval_seconds", 60)),
         market_timezone=str(session.get("market_timezone", "America/New_York")),
         regular_session_start_time=str(session.get("regular_session_start_time", "09:30")),
         regular_session_end_time=str(session.get("regular_session_end_time", "16:00")),
@@ -127,6 +136,8 @@ def validate_config(config: RealtimeSessionSupervisorConfig) -> None:
         raise ValueError("M15 realtime session supervisor stage drift")
     if config.check_interval_seconds <= 0:
         raise ValueError("M15 realtime session supervisor check interval must be positive")
+    if config.idle_check_interval_seconds <= 0:
+        raise ValueError("M15 realtime session supervisor idle check interval must be positive")
     if config.max_consecutive_failures <= 0:
         raise ValueError("M15 realtime session supervisor max_consecutive_failures must be positive")
     if not (
@@ -207,6 +218,7 @@ def build_window_state(
     next_session_market_dt = datetime.combine(next_session_date, regular_open, tzinfo=ZoneInfo(config.market_timezone))
     current_session_market_dt = datetime.combine(market_dt.date(), regular_open, tzinfo=ZoneInfo(config.market_timezone))
     effective_session_market_dt = current_session_market_dt if phase == "regular_session" else next_session_market_dt
+    seconds_until_next_session = max(0, int((next_session_market_dt.astimezone(UTC) - utc_dt).total_seconds()))
     return {
         "generated_at": to_iso(utc_dt),
         "market_phase": phase,
@@ -218,6 +230,7 @@ def build_window_state(
         "beijing_time": utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "next_session_start_new_york": next_session_market_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "next_session_start_beijing": next_session_market_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "seconds_until_next_session": seconds_until_next_session,
     }
 
 
@@ -248,6 +261,93 @@ def run_realtime_session_once(
 
     if not window["session_should_run"]:
         status = "waiting_market_window"
+        if config.run_account_state:
+            started = datetime.now(UTC)
+            cached_account_state: dict[str, Any] = {}
+            cached_account_summary: dict[str, Any] = {}
+            cached_pnl_reconciliation: dict[str, Any] = {}
+            cached_pnl_report = ""
+            account_state_config = None
+            try:
+                account_state_config = load_account_state_config(config.account_state_config_path)
+                cached_account_state = read_json(account_state_config.account_state_path)
+                cached_account_summary = read_json(account_state_config.output_dir / ACCOUNT_STATE_SUMMARY_JSON)
+                cached_pnl_reconciliation = read_json(account_state_config.output_dir / ACCOUNT_PNL_RECONCILIATION_JSON)
+                cached_pnl_report_path = account_state_config.output_dir / ACCOUNT_PNL_RECONCILIATION_MD
+                cached_pnl_report = cached_pnl_report_path.read_text(encoding="utf-8") if cached_pnl_report_path.exists() else ""
+            except ValueError:
+                cached_account_state = {}
+            try:
+                if account_state_runner is None:
+                    account_state_config = account_state_config or load_account_state_config(config.account_state_config_path)
+                    account_state_payload = run_realtime_account_state(account_state_config, generated_at=generated_at_iso)
+                else:
+                    account_state_payload = account_state_runner(generated_at_iso)
+                elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+                if not account_state_is_valid_paper(account_state_payload):
+                    if account_state_is_valid_paper(cached_account_state):
+                        failure_state = "account_state_refresh_failed"
+                        failure_reason = "account_state_refresh_returned_non_paper_or_empty_snapshot"
+                        step_payloads["account_state"] = cached_account_state
+                        if account_state_config is not None:
+                            restore_cached_account_artifacts(
+                                account_state_config,
+                                account_state=cached_account_state,
+                                account_summary=cached_account_summary,
+                                pnl_reconciliation=cached_pnl_reconciliation,
+                                pnl_report=cached_pnl_report,
+                            )
+                        step_rows.append(
+                            {
+                                "step_id": "account_state_refresh_only",
+                                "status": "failed_using_cached",
+                                "elapsed_ms": elapsed_ms,
+                                "error": failure_reason,
+                                "summary": payload_summary("account_state", cached_account_state),
+                            }
+                        )
+                        account_state_payload = None
+                    else:
+                        step_payloads["account_state"] = account_state_payload
+                else:
+                    step_payloads["account_state"] = account_state_payload
+                if account_state_payload is None:
+                    continue_waiting_status = True
+                else:
+                    continue_waiting_status = False
+                if continue_waiting_status:
+                    pass
+                else:
+                    step_rows.append(
+                        {
+                            "step_id": "account_state_refresh_only",
+                            "status": "ok",
+                            "elapsed_ms": elapsed_ms,
+                            "summary": payload_summary("account_state", account_state_payload),
+                        }
+                    )
+            except Exception as exc:
+                elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+                failure_state = "account_state_refresh_failed"
+                failure_reason = str(exc)[:500]
+                step_rows.append(
+                    {
+                        "step_id": "account_state_refresh_only",
+                        "status": "failed",
+                        "elapsed_ms": elapsed_ms,
+                        "error": failure_reason,
+                    }
+                )
+                if account_state_is_valid_paper(cached_account_state):
+                    step_payloads["account_state"] = cached_account_state
+                    if account_state_config is not None:
+                        restore_cached_account_artifacts(
+                            account_state_config,
+                            account_state=cached_account_state,
+                            account_summary=cached_account_summary,
+                            pnl_reconciliation=cached_pnl_reconciliation,
+                            pnl_report=cached_pnl_report,
+                        )
     elif breaker_already_tripped:
         status = "failure_breaker_tripped"
         failure_state = "failure_breaker_tripped"
@@ -315,7 +415,7 @@ def run_realtime_session_once(
     )
     write_json(status_path(config), summary)
     append_jsonl(ledger_path(config), summary)
-    report_path(config).write_text(render_report(summary), encoding="utf-8")
+    write_text_atomic(report_path(config), render_report(summary))
     dashboard_synced = sync_m12_dashboard_longbridge_panel(config)
     if dashboard_synced:
         summary["m12_dashboard_longbridge_panel_synced"] = True
@@ -515,8 +615,46 @@ def payload_summary(step_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def account_state_is_valid_paper(payload: dict[str, Any]) -> bool:
+    channel = payload.get("account_channel", "lb_papertrading")
+    return bool(payload.get("paper_account_verified")) and channel == "lb_papertrading"
+
+
+def restore_cached_account_artifacts(
+    account_state_config: Any,
+    *,
+    account_state: dict[str, Any],
+    account_summary: dict[str, Any],
+    pnl_reconciliation: dict[str, Any],
+    pnl_report: str,
+) -> None:
+    write_json(account_state_config.account_state_path, account_state)
+    if account_summary:
+        write_json(account_state_config.output_dir / ACCOUNT_STATE_SUMMARY_JSON, account_summary)
+    if pnl_reconciliation:
+        write_json(account_state_config.output_dir / ACCOUNT_PNL_RECONCILIATION_JSON, pnl_reconciliation)
+    if pnl_report:
+        write_text_atomic(account_state_config.output_dir / ACCOUNT_PNL_RECONCILIATION_MD, pnl_report)
+
+
 def plain_language_result(status: str, window: dict[str, Any], step_rows: list[dict[str, Any]], failure_reason: str) -> str:
     if status == "waiting_market_window":
+        account_refresh = next((row for row in step_rows if row.get("step_id") == "account_state_refresh_only"), {})
+        if account_refresh.get("status") == "ok":
+            return (
+                f"长桥实时链路守护器未运行交易循环：当前是{window.get('market_status')}，"
+                "已只读刷新长桥账户状态，等待下一次美股常规交易时段。"
+            )
+        if account_refresh.get("status") == "failed_using_cached":
+            return (
+                f"长桥实时链路守护器未运行交易循环：当前是{window.get('market_status')}，"
+                "长桥账户本轮只读刷新返回空快照，已保留上一份有效模拟账户状态，等待下一次美股常规交易时段。"
+            )
+        if account_refresh.get("status") == "failed":
+            return (
+                f"长桥实时链路守护器未运行交易循环：当前是{window.get('market_status')}，"
+                f"长桥账户只读刷新失败，继续等待下一次美股常规交易时段：{failure_reason}。"
+            )
         return f"长桥实时链路守护器未运行交易循环：当前是{window.get('market_status')}，等待下一次美股常规交易时段。"
     if status == "failure_breaker_tripped":
         return f"长桥实时链路守护器已触发连续失败熔断：{failure_reason or '等待人工检查'}。"
@@ -532,7 +670,28 @@ def apply_dashboard_longbridge_panel_overlay(dashboard: dict[str, Any], longbrid
     dashboard["longbridge_paper_account"] = longbridge_context
     top_metrics = dashboard.setdefault("top_metrics", {})
     top_metrics["长桥模拟账户"] = str(longbridge_context.get("top_metric", "未生成长桥模拟账户状态"))
-    top_metrics.pop("长桥可提交订单", None)
+    for legacy_key in (
+        "长桥可提交订单",
+        "长桥配对成交胜率",
+        "长桥已配对成交胜率",
+        "长桥今日盈亏",
+        "长桥总盈亏",
+        "长桥交易总盈亏",
+        "长桥当日总盈亏",
+        "长桥App当日盈亏",
+        "长桥账户总盈亏",
+    ):
+        top_metrics.pop(legacy_key, None)
+    top_metrics["长桥账户当日盈亏"] = str(longbridge_context.get("longbridge_account_intraday_pnl") or longbridge_context.get("app_display_today_pnl") or "暂无")
+    top_metrics["长桥接口持仓今日浮动"] = str(longbridge_context.get("today_total_pnl", "暂无"))
+    top_metrics["长桥当前持仓总盈亏"] = str(longbridge_context.get("total_pnl", "暂无"))
+    top_metrics["长桥账户总资产"] = str(longbridge_context.get("account_total_equity_estimate", "暂无"))
+    top_metrics["长桥交易累计盈亏"] = str(longbridge_context.get("longbridge_stock_total_pnl", "暂无"))
+    top_metrics["长桥逐标的胜率"] = str(longbridge_context.get("longbridge_symbol_win_rate_label", "暂无"))
+    top_metrics["长桥交易胜率"] = str(longbridge_context.get("longbridge_closed_trade_win_rate_label", "暂无"))
+    top_metrics["长桥修复后样本"] = str(longbridge_context.get("longbridge_post_fix_closed_trade_count", "0"))
+    top_metrics["长桥最大回撤"] = str(longbridge_context.get("longbridge_max_drawdown_label", "样本不足"))
+    top_metrics["长桥项目资金占用"] = str(longbridge_context.get("project_model_exposure_label", "暂无"))
     top_metrics["长桥本轮可新开仓"] = str(longbridge_context.get("submit_ready_count", "0"))
 
 
@@ -546,6 +705,7 @@ def sync_m12_dashboard_longbridge_panel(config: RealtimeSessionSupervisorConfig)
             build_dashboard_html,
             build_longbridge_paper_dashboard_view,
             load_config as load_m12_29_dashboard_config,
+            write_text_atomic as write_m12_text_atomic,
         )
 
         dashboard_config = replace(load_m12_29_dashboard_config(), output_dir=dashboard_dir)
@@ -554,9 +714,9 @@ def sync_m12_dashboard_longbridge_panel(config: RealtimeSessionSupervisorConfig)
         apply_dashboard_longbridge_panel_overlay(dashboard, longbridge_context)
         write_json(dashboard_path, dashboard)
         try:
-            (dashboard_dir / "m12_32_minute_readonly_dashboard.html").write_text(
+            write_m12_text_atomic(
+                dashboard_dir / "m12_32_minute_readonly_dashboard.html",
                 build_dashboard_html(dashboard_config, dashboard),
-                encoding="utf-8",
             )
         except Exception as exc:  # pragma: no cover - display-only repair path
             write_json(
@@ -652,12 +812,50 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    rotate_jsonl_if_needed(path, max_bytes=MAX_SUPERVISOR_LEDGER_BYTES, keep_lines=MAX_SUPERVISOR_LEDGER_LINES)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def rotate_jsonl_if_needed(path: Path, *, max_bytes: int, keep_lines: int) -> None:
+    if max_bytes <= 0 or keep_lines <= 0 or not path.exists() or path.stat().st_size <= max_bytes:
+        return
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    if len(lines) <= keep_lines:
+        return
+    archive_dir = path.parent / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    archive_path = archive_dir / f"{path.stem}.{timestamp}.archived.jsonl"
+    archived_lines = lines[:-keep_lines]
+    retained_lines = lines[-keep_lines:]
+    write_text_atomic(archive_path, "\n".join(archived_lines) + "\n")
+    write_text_atomic(path, "\n".join(retained_lines) + "\n")
+
+
+def rotate_text_log_if_needed(path: Path, *, max_bytes: int) -> Path | None:
+    if max_bytes <= 0 or not path.exists() or path.stat().st_size <= max_bytes:
+        return None
+    archive_dir = path.parent / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    archive_path = archive_dir / f"{path.stem}.{timestamp}.archived.log"
+    path.replace(archive_path)
+    return archive_path
 
 
 def int_like(value: Any) -> int:

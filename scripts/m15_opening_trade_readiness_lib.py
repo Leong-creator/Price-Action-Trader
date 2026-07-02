@@ -16,6 +16,7 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     load_config as load_realtime_supervisor_config,
     pid_path as realtime_pid_path,
 )
+from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
 
 
@@ -112,13 +113,21 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     account_state = read_json(config.realtime_account_state_path)
     realtime_status = read_json(config.realtime_supervisor_status_path)
     window = build_window_state(realtime_config, generated_at=generated_at)
+    cleanup_config = load_stale_order_cleanup_config(realtime_config.stale_order_cleanup_config_path)
     realtime_pid = read_pid(realtime_pid_path(realtime_config))
     realtime_alive = bool(realtime_pid and process_alive(realtime_pid))
+    realtime_status_generated_at = str(realtime_status.get("generated_at") or "")
+    realtime_status_age_seconds = artifact_age_seconds(realtime_status_generated_at, generated_at)
     m12_alive = bool(m12_status.get("supervisor_process_alive", False))
     execution_config_linked = config.execution_config_path.resolve() == realtime_config.execution_config_path.resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     paper_account_ready = paper_account_verified(account_state)
-    stale_buy_orders = stale_buy_open_orders(account_state, parse_utc_datetime(str(window["session_started_at"])))
+    stale_buy_orders = stale_buy_open_orders(
+        cleanup_config,
+        account_state,
+        parse_utc_datetime(str(window["session_started_at"])),
+        parse_utc_datetime(generated_at),
+    )
     cleanup_enabled = bool(getattr(realtime_config, "run_stale_order_cleanup", False))
     cleanup_failed = int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
     checks = [
@@ -127,7 +136,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "m15_realtime_daemon_alive",
             "M15 长桥实时链路守护器存活",
             "pass" if realtime_alive else "fail",
-            actual=f"pid={realtime_pid or ''}",
+            actual=pid_health_label(realtime_pid, realtime_alive, realtime_status_generated_at, realtime_status_age_seconds),
         ),
         check_row(
             "regular_session_window",
@@ -207,6 +216,9 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "paper_order_submission_enabled": paper_orders_enabled,
         "m12_47_daemon_alive": m12_alive,
         "m15_realtime_daemon_alive": realtime_alive,
+        "m15_realtime_daemon_pid": realtime_pid or "",
+        "m15_realtime_status_generated_at": realtime_status_generated_at,
+        "m15_realtime_status_age_seconds": realtime_status_age_seconds,
         "paper_account_verified": paper_account_ready,
         "pass_count": pass_count,
         "waiting_count": waiting_count,
@@ -238,6 +250,28 @@ def check_row(check: str, required_result: str, status: str, **extra: Any) -> di
     row = {"check": check, "required_result": required_result, "status": status}
     row.update(extra)
     return row
+
+
+def pid_health_label(pid: int | None, alive: bool, status_generated_at: str, status_age_seconds: int | None) -> str:
+    pid_text = f"pid={pid}" if pid else "pid=missing"
+    process_text = "alive" if alive else "dead"
+    if status_age_seconds is None:
+        return f"{pid_text}, process={process_text}, status_generated_at={status_generated_at or 'missing'}"
+    return (
+        f"{pid_text}, process={process_text}, "
+        f"status_generated_at={status_generated_at or 'missing'}, status_age_seconds={status_age_seconds}"
+    )
+
+
+def artifact_age_seconds(generated_at: str, now_iso: str) -> int | None:
+    if not generated_at:
+        return None
+    try:
+        generated_dt = parse_utc_datetime(generated_at)
+        now_dt = parse_utc_datetime(now_iso)
+    except ValueError:
+        return None
+    return max(0, int((now_dt - generated_dt).total_seconds()))
 
 
 def paper_account_verified(account_state: dict[str, Any]) -> bool:

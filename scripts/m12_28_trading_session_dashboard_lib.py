@@ -7,6 +7,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time as time_module
 import urllib.parse
 import urllib.request
 from collections import Counter
@@ -38,6 +39,8 @@ HUNDRED = Decimal("100")
 DEFAULT_ACCOUNT_EQUITY = Decimal("100000")
 DEFAULT_RISK_BUDGET = Decimal("500")
 LONGRIDGE_QUOTE_TIMEOUT_SECONDS = 6
+LONGRIDGE_QUOTE_RETRY_ATTEMPTS = 3
+LONGRIDGE_QUOTE_RETRY_SLEEP_SECONDS = 0.2
 LONGBRIDGE_QUOTE_BATCH_SIZE = 50
 YAHOO_CHART_TIMEOUT_SECONDS = 6
 YAHOO_CHART_MAX_WORKERS = 8
@@ -226,9 +229,9 @@ def run_m12_28_trading_session_dashboard(
     write_json(config.output_dir / "m12_28_session_quote_manifest.json", quote_manifest)
     write_csv(config.output_dir / "m12_28_session_trade_view.csv", session_rows)
     write_csv(config.output_dir / "m12_28_pa004_long_observation.csv", pa004_rows)
-    (config.output_dir / "m12_28_trading_session_dashboard.html").write_text(build_dashboard_html(config, dashboard), encoding="utf-8")
-    (config.output_dir / "m12_28_session_report.md").write_text(build_report_md(dashboard), encoding="utf-8")
-    (config.output_dir / "m12_28_handoff.md").write_text(build_handoff_md(config, summary), encoding="utf-8")
+    write_text_atomic(config.output_dir / "m12_28_trading_session_dashboard.html", build_dashboard_html(config, dashboard))
+    write_text_atomic(config.output_dir / "m12_28_session_report.md", build_report_md(dashboard))
+    write_text_atomic(config.output_dir / "m12_28_handoff.md", build_handoff_md(config, summary))
     assert_no_forbidden_output(config.output_dir)
     return dashboard
 
@@ -272,20 +275,7 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
         lb_symbols = [build_longbridge_symbol(symbol, market) for symbol in batch]
         command = ["quote", *lb_symbols, "--format", "json"]
         _assert_readonly_command(command)
-        try:
-            completed = subprocess.run(
-                [cli_path, *command],
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
-                env=build_longbridge_cli_env(),
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(f"longbridge quote timed out after {LONGRIDGE_QUOTE_TIMEOUT_SECONDS}s") from exc
-        if completed.returncode != 0:
-            detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
-            raise RuntimeError(detail or f"longbridge quote failed with {completed.returncode}")
+        completed = run_longbridge_quote_with_retries(cli_path, command)
         payload = json.loads(completed.stdout.strip() or "[]")
         if not isinstance(payload, list):
             raise RuntimeError("longbridge quote returned non-list payload")
@@ -312,6 +302,30 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
             apply_extended_session_quote(quote_row, row, "overnight", "overnight_quote")
             quotes[symbol] = quote_row
     return quotes
+
+
+def run_longbridge_quote_with_retries(cli_path: str, command: list[str]) -> subprocess.CompletedProcess[str]:
+    last_error = ""
+    for attempt in range(1, LONGRIDGE_QUOTE_RETRY_ATTEMPTS + 1):
+        try:
+            completed = subprocess.run(
+                [cli_path, *command],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=LONGRIDGE_QUOTE_TIMEOUT_SECONDS,
+                env=build_longbridge_cli_env(),
+            )
+        except subprocess.TimeoutExpired:
+            last_error = f"longbridge quote timed out after {LONGRIDGE_QUOTE_TIMEOUT_SECONDS}s"
+        else:
+            if completed.returncode == 0:
+                return completed
+            detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
+            last_error = detail or f"longbridge quote failed with {completed.returncode}"
+        if attempt < LONGRIDGE_QUOTE_RETRY_ATTEMPTS and LONGRIDGE_QUOTE_RETRY_SLEEP_SECONDS:
+            time_module.sleep(LONGRIDGE_QUOTE_RETRY_SLEEP_SECONDS)
+    raise RuntimeError(f"{last_error}; retry_attempts={LONGRIDGE_QUOTE_RETRY_ATTEMPTS}")
 
 
 def symbol_batches(symbols: list[str], batch_size: int) -> list[list[str]]:
@@ -857,7 +871,14 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_atomic(path, json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:

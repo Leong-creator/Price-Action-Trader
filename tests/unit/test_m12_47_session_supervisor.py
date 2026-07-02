@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,17 +11,22 @@ from unittest.mock import patch
 from scripts.run_m12_47_session_supervisor import (
     apply_dashboard_longbridge_overlay,
     apply_dashboard_status_overlay,
+    active_refresh_timeout_for_step,
     artifact_refresh_age_seconds,
     build_failure_payload,
     build_status_payload,
     build_window_state,
     load_config,
     maybe_refresh_longbridge_account_state_for_dashboard,
+    pid_path,
     print_status,
+    read_json_if_exists,
     should_trip_failure_breaker,
     stale_dashboard_restart_reason,
     status_path,
     stop_existing_supervisor,
+    sync_dashboard_status_overlay,
+    sync_manifest_status_overlay,
 )
 
 
@@ -143,24 +149,232 @@ class M1247SessionSupervisorTest(unittest.TestCase):
             "top_metrics": {"运行状态": "交易时段自动运行中"},
             "broker_terminal_view": {"top_status": {"fully_ready_for_trading_display": "true"}},
         }
-        changed = apply_dashboard_status_overlay(
-            dashboard,
-            {
-                "supervisor_generated_at": "2026-05-26T14:09:30Z",
-                "market_status": "美股常规交易时段",
-                "session_should_run": True,
-                "child_running": True,
-                "supervisor_process_alive": True,
-                "new_york_time": "2026-05-26 10:09:30 EDT",
-                "beijing_time": "2026-05-26 22:09:30 CST",
-            },
-        )
+        with patch("scripts.run_m12_47_session_supervisor.datetime") as mocked_datetime:
+            mocked_datetime.now.return_value = datetime.fromisoformat("2026-05-26T14:09:30+00:00")
+            mocked_datetime.fromisoformat = datetime.fromisoformat
+            mocked_datetime.combine = datetime.combine
+            changed = apply_dashboard_status_overlay(
+                dashboard,
+                {
+                    "supervisor_generated_at": "2026-05-26T14:09:30Z",
+                    "market_status": "美股常规交易时段",
+                    "session_should_run": True,
+                    "child_running": True,
+                    "supervisor_process_alive": True,
+                    "new_york_time": "2026-05-26 10:09:30 EDT",
+                    "beijing_time": "2026-05-26 22:09:30 CST",
+                },
+            )
         self.assertTrue(changed)
         self.assertTrue(dashboard["summary"]["current_day_runtime_ready"])
         self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["fully_ready_for_trading_display"], "true")
         self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
         self.assertFalse(dashboard["summary"]["audit_only_snapshot"])
         self.assertEqual(dashboard["top_metrics"]["数据快照状态"], "交易窗口刷新中")
+
+    def test_dashboard_status_overlay_labels_preheat_wait_separately_from_holiday(self):
+        dashboard = {
+            "generated_at": "2026-05-26T12:00:00Z",
+            "summary": {
+                "generated_at": "2026-05-26T12:00:00Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {"market_status": "美股常规交易时段", "freshness_state": "fresh"},
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {"top_status": {"fully_ready_for_trading_display": "true"}},
+        }
+
+        changed = apply_dashboard_status_overlay(
+            dashboard,
+            {
+                "supervisor_generated_at": "2026-05-26T12:00:00Z",
+                "market_status": "等待开盘前预热",
+                "session_should_run": False,
+                "child_running": False,
+                "supervisor_process_alive": True,
+                "new_york_time": "2026-05-26 08:00:00 EDT",
+                "beijing_time": "2026-05-26 20:00:00 CST",
+            },
+        )
+
+        self.assertTrue(changed)
+        self.assertTrue(dashboard["summary"]["audit_only_snapshot"])
+        self.assertEqual(
+            dashboard["top_metrics"]["数据快照状态"],
+            "等待开盘前预热：保留上一有效快照，未进入新交易日刷新窗口",
+        )
+
+    def test_dashboard_status_overlay_normalizes_longbridge_warning_backup(self):
+        dashboard = {
+            "generated_at": "2026-06-05T23:42:51Z",
+            "summary": {
+                "generated_at": "2026-06-05T23:42:51Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": False,
+                "data_freshness_warning": (
+                    "看板已生成但数据源降级 / fallback quotes / no-fetch："
+                    "quote_source=longbridge_quote_readonly，"
+                    "current_day_runtime_ready=true，current_day_scan_complete=false。"
+                ),
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {"market_status": "美股常规交易时段"},
+            "top_metrics": {},
+            "broker_terminal_view": {"top_status": {}},
+        }
+
+        changed = apply_dashboard_status_overlay(
+            dashboard,
+            {
+                "supervisor_generated_at": "2026-06-06T05:33:13Z",
+                "market_status": "非交易日等待",
+                "session_should_run": False,
+                "child_running": False,
+                "supervisor_process_alive": True,
+                "new_york_time": "2026-06-06 01:33:13 EDT",
+                "beijing_time": "2026-06-06 13:33:13 CST",
+            },
+        )
+
+        self.assertTrue(changed)
+        self.assertEqual(dashboard["summary"]["data_freshness_warning"], "")
+        self.assertIn("严格全量扫描口径未完成", dashboard["summary"]["data_freshness_warning_before_audit_overlay"])
+        self.assertIn("长桥只读行情没有降级", dashboard["summary"]["data_freshness_warning_before_audit_overlay"])
+        self.assertNotIn("数据源降级", dashboard["summary"]["data_freshness_warning_before_audit_overlay"])
+
+    def test_dashboard_status_overlay_marks_regular_session_stale_dashboard(self):
+        dashboard = {
+            "generated_at": "2026-05-26T14:00:00Z",
+            "summary": {
+                "generated_at": "2026-05-26T14:00:00Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {
+                "market_status": "美股常规交易时段",
+                "freshness_state": "fresh",
+                "stale_after_seconds": "600",
+            },
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {"top_status": {"fully_ready_for_trading_display": "true"}},
+        }
+        with patch("scripts.run_m12_47_session_supervisor.datetime") as mocked_datetime:
+            mocked_datetime.now.return_value = datetime.fromisoformat("2026-05-26T14:20:30+00:00")
+            mocked_datetime.fromisoformat = datetime.fromisoformat
+            mocked_datetime.combine = datetime.combine
+            changed = apply_dashboard_status_overlay(
+                dashboard,
+                {
+                    "supervisor_generated_at": "2026-05-26T14:20:30Z",
+                    "market_status": "美股常规交易时段",
+                    "session_should_run": True,
+                    "child_running": True,
+                    "supervisor_process_alive": True,
+                    "new_york_time": "2026-05-26 10:20:30 EDT",
+                    "beijing_time": "2026-05-26 22:20:30 CST",
+                },
+            )
+
+        self.assertTrue(changed)
+        self.assertEqual(dashboard["update_status"]["freshness_state"], "stale")
+        self.assertEqual(dashboard["update_status"]["dashboard_age_seconds"], "1230")
+        self.assertIn("交易窗口刷新滞后", dashboard["top_metrics"]["数据快照状态"])
+        self.assertTrue(dashboard["summary"]["current_day_runtime_ready"])
+
+    def test_dashboard_status_overlay_marks_in_progress_refresh_without_faking_core_time(self):
+        dashboard = {
+            "generated_at": "2026-05-26T14:00:00Z",
+            "summary": {
+                "generated_at": "2026-05-26T14:00:00Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {
+                "market_status": "美股常规交易时段",
+                "freshness_state": "fresh",
+                "stale_after_seconds": "600",
+            },
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {"top_status": {"fully_ready_for_trading_display": "true"}},
+        }
+        with patch("scripts.run_m12_47_session_supervisor.datetime") as mocked_datetime:
+            mocked_datetime.now.return_value = datetime.fromisoformat("2026-05-26T14:20:30+00:00")
+            mocked_datetime.fromisoformat = datetime.fromisoformat
+            mocked_datetime.combine = datetime.combine
+            changed = apply_dashboard_status_overlay(
+                dashboard,
+                {
+                    "supervisor_generated_at": "2026-05-26T14:20:30Z",
+                    "market_status": "美股常规交易时段",
+                    "session_should_run": True,
+                    "child_running": True,
+                    "supervisor_process_alive": True,
+                    "new_york_time": "2026-05-26 10:20:30 EDT",
+                    "beijing_time": "2026-05-26 22:20:30 CST",
+                    "m12_37_refresh_state": "refresh_in_progress",
+                    "m12_37_refresh_started_at": "2026-05-26T14:18:30Z",
+                    "m12_37_active_step": "m12_29_current_day_scan_dashboard",
+                },
+            )
+
+        self.assertTrue(changed)
+        self.assertEqual(dashboard["update_status"]["beijing_time"], "2026-05-26 22:00:00 CST")
+        self.assertEqual(dashboard["update_status"]["freshness_state"], "refreshing")
+        self.assertIn("正在刷新中", dashboard["top_metrics"]["数据快照状态"])
+        self.assertEqual(dashboard["broker_terminal_view"]["top_status"]["m12_37_refresh_state"], "refresh_in_progress")
+
+    def test_dashboard_status_overlay_marks_light_heartbeat(self):
+        dashboard = {
+            "generated_at": "2026-05-26T14:00:00Z",
+            "summary": {
+                "generated_at": "2026-05-26T14:00:00Z",
+                "current_day_runtime_ready": True,
+                "current_day_scan_complete": True,
+                "data_freshness_warning": "",
+                "market_session": {"status": "美股常规交易时段"},
+            },
+            "update_status": {
+                "market_status": "美股常规交易时段",
+                "freshness_state": "fresh",
+                "stale_after_seconds": "600",
+            },
+            "top_metrics": {"运行状态": "交易时段自动运行中"},
+            "broker_terminal_view": {"top_status": {"fully_ready_for_trading_display": "true"}},
+        }
+        with patch("scripts.run_m12_47_session_supervisor.datetime") as mocked_datetime:
+            mocked_datetime.now.return_value = datetime.fromisoformat("2026-05-26T14:03:30+00:00")
+            mocked_datetime.fromisoformat = datetime.fromisoformat
+            mocked_datetime.combine = datetime.combine
+            changed = apply_dashboard_status_overlay(
+                dashboard,
+                {
+                    "supervisor_generated_at": "2026-05-26T14:03:30Z",
+                    "market_status": "美股常规交易时段",
+                    "session_should_run": True,
+                    "child_running": True,
+                    "supervisor_process_alive": True,
+                    "new_york_time": "2026-05-26 10:03:30 EDT",
+                    "beijing_time": "2026-05-26 22:03:30 CST",
+                    "m12_37_refresh_state": "light_heartbeat_waiting_next_5m_bar",
+                    "m12_37_active_step": "light_heartbeat",
+                },
+            )
+
+        self.assertTrue(changed)
+        self.assertEqual(dashboard["update_status"]["freshness_state"], "light_heartbeat")
+        self.assertIn("轻量心跳", dashboard["top_metrics"]["数据快照状态"])
+        self.assertIn("等待下一根 5 分钟 K 线", dashboard["top_metrics"]["运行状态"])
+        self.assertEqual(
+            dashboard["broker_terminal_view"]["top_status"]["m12_37_refresh_state"],
+            "light_heartbeat_waiting_next_5m_bar",
+        )
 
     def test_dashboard_longbridge_overlay_updates_top_metrics_and_panel(self):
         dashboard = {"top_metrics": {"运行状态": "旧状态"}}
@@ -170,6 +384,18 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 "schema_version": "m15.longbridge-paper-dashboard-panel.v1",
                 "top_metric": "模拟账户已连接 / 1持仓 / 2挂单",
                 "submit_ready_count": "3",
+                "account_total_equity_estimate": "102375.57",
+                "account_total_pnl_estimate": "基准未确认",
+                "longbridge_account_total_pnl": "269.866",
+                "longbridge_account_intraday_pnl": "12.34",
+                "longbridge_account_today_total_pnl": "234.00",
+                "longbridge_app_display_today_pnl": "等待长桥字段对齐",
+                "longbridge_stock_total_pnl": "-154.18",
+                "longbridge_symbol_win_rate_label": "38.46%",
+                "longbridge_closed_trade_win_rate_label": "33.33%",
+                "longbridge_max_drawdown_label": "10.00%",
+                "longbridge_worst_symbol_loss_label": "-6.58%",
+                "project_model_exposure_label": "4638.96 / 10000.00 (46.39%)",
                 "real_money_actions": False,
                 "live_execution": False,
             },
@@ -177,6 +403,22 @@ class M1247SessionSupervisorTest(unittest.TestCase):
 
         self.assertEqual(dashboard["top_metrics"]["长桥模拟账户"], "模拟账户已连接 / 1持仓 / 2挂单")
         self.assertNotIn("长桥可提交订单", dashboard["top_metrics"])
+        self.assertEqual(dashboard["top_metrics"]["长桥账户总资产"], "102375.57")
+        self.assertEqual(dashboard["top_metrics"]["长桥当前持仓总盈亏"], "269.866")
+        self.assertEqual(dashboard["top_metrics"]["长桥账户当日盈亏"], "12.34")
+        self.assertEqual(dashboard["top_metrics"]["长桥接口持仓今日浮动"], "234.00")
+        self.assertEqual(dashboard["top_metrics"]["长桥交易累计盈亏"], "-154.18")
+        self.assertNotIn("长桥当日总盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥App当日盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥账户总盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥今日盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥总盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥交易总盈亏", dashboard["top_metrics"])
+        self.assertEqual(dashboard["top_metrics"]["长桥逐标的胜率"], "38.46%")
+        self.assertEqual(dashboard["top_metrics"]["长桥交易胜率"], "33.33%")
+        self.assertEqual(dashboard["top_metrics"]["长桥最大回撤"], "10.00%")
+        self.assertNotIn("长桥回撤代理", dashboard["top_metrics"])
+        self.assertEqual(dashboard["top_metrics"]["长桥项目资金占用"], "4638.96 / 10000.00 (46.39%)")
         self.assertEqual(dashboard["top_metrics"]["长桥本轮可新开仓"], "3")
         self.assertFalse(dashboard["longbridge_paper_account"]["real_money_actions"])
         self.assertFalse(dashboard["longbridge_paper_account"]["live_execution"])
@@ -220,6 +462,37 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 age_seconds = artifact_refresh_age_seconds(account_state_path)
 
         self.assertEqual(age_seconds, 10**9)
+
+    def test_partial_dashboard_json_does_not_crash_supervisor_reads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            dashboard_path = output_dir / "m12_32_minute_readonly_dashboard_data.json"
+            dashboard_path.write_text('{"generated_at": "2026-05-25T14:09:30Z", "summary": {"broken"', encoding="utf-8")
+
+            self.assertEqual(read_json_if_exists(dashboard_path), {})
+            self.assertEqual(artifact_refresh_age_seconds(dashboard_path), 10**9)
+            changed = sync_dashboard_status_overlay(
+                config,
+                {
+                    "supervisor_generated_at": "2026-05-25T16:02:29Z",
+                    "market_status": "美股常规交易时段",
+                    "session_should_run": True,
+                    "child_running": True,
+                    "supervisor_process_alive": True,
+                },
+            )
+
+        self.assertFalse(changed)
+
+    def test_read_json_if_exists_treats_loader_value_error_as_transient(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dashboard_path = Path(tmp) / "dashboard.json"
+            dashboard_path.write_text('{"generated_at": "2026-05-25T14:09:30Z"}', encoding="utf-8")
+
+            with patch("scripts.run_m12_47_session_supervisor.load_json", side_effect=ValueError("partial json")):
+                self.assertEqual(read_json_if_exists(dashboard_path), {})
 
     def test_skips_longbridge_account_state_refresh_when_recent(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -415,7 +688,7 @@ class M1247SessionSupervisorTest(unittest.TestCase):
 
         self.assertEqual(reason, "")
 
-    def test_stale_dashboard_restart_reason_respects_active_cache_writes(self):
+    def test_stale_dashboard_restart_reason_ignores_cache_writes_when_dashboard_is_stale(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "m12_47"
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -429,7 +702,66 @@ class M1247SessionSupervisorTest(unittest.TestCase):
             with patch("scripts.run_m12_47_session_supervisor.child_has_recent_artifact_activity", return_value=True):
                 reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:00:00Z")
 
+        self.assertIn("dashboard_stale", reason)
+
+    def test_stale_dashboard_restart_reason_allows_active_refresh_progress(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T14:00:00Z"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (output_dir / "m12_37_auto_runner_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "refresh_state": "refresh_in_progress",
+                        "refresh_started_at": "2026-05-05T14:18:00Z",
+                        "active_step": "m12_29_current_day_scan_dashboard",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            phase = build_window_state(config, "2026-05-05T14:25:30Z")
+
+            reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:17:30Z")
+
         self.assertEqual(reason, "")
+
+    def test_stale_dashboard_restart_reason_allows_long_m1229_refresh_activity(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T14:00:00Z"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (output_dir / "m12_37_auto_runner_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "refresh_state": "refresh_in_progress",
+                        "refresh_started_at": "2026-05-05T14:10:00Z",
+                        "active_step": "m12_29_current_day_scan_dashboard",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            phase = {
+                "session_should_run": "true",
+                "generated_at": "2026-05-05T15:05:00Z",
+            }
+
+            reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:00:00Z")
+
+        self.assertEqual(reason, "")
+
+    def test_active_refresh_timeout_for_m1229_allows_full_universe_scan(self):
+        self.assertGreaterEqual(active_refresh_timeout_for_step("m12_29_current_day_scan_dashboard", 60), 5400)
+        self.assertEqual(active_refresh_timeout_for_step("unknown", 60), 1800)
 
     def test_print_status_persists_dead_supervisor_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -457,6 +789,35 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertFalse(payload["supervisor_process_alive"])
         self.assertFalse(payload["child_running"])
         self.assertIn("自动调度器没有运行", payload["plain_language_result"])
+
+    def test_print_status_prefers_live_pidfile_over_stale_status_pid(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            status_path(config).write_text(
+                json.dumps(
+                    {
+                        "supervisor_pid": 111,
+                        "supervisor_process_alive": True,
+                        "child_pid": 0,
+                        "child_running": False,
+                        "child_started_at": "",
+                        "child_last_exit_code": "",
+                        "restart_count": 0,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            pid_path(config).write_text("222", encoding="utf-8")
+            with patch("scripts.run_m12_47_session_supervisor.process_alive", side_effect=lambda pid: pid == 222):
+                with patch("sys.stdout", new=StringIO()):
+                    print_status(config)
+            payload = json.loads(status_path(config).read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["supervisor_pid"], 222)
+        self.assertTrue(payload["supervisor_process_alive"])
 
     def test_print_status_reports_dashboard_timestamp_after_overlay(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -502,8 +863,82 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 with patch("sys.stdout", new=StringIO()):
                     print_status(config)
             payload = json.loads(status_path(config).read_text(encoding="utf-8"))
-        self.assertEqual(payload["latest_dashboard_beijing_time"], "2026-05-26 00:02:29 CST")
+        self.assertEqual(payload["latest_dashboard_beijing_time"], "2026-05-25 22:09:30 CST")
         self.assertEqual(payload["latest_dashboard_runtime_status"], "非交易日等待，M12.37 不会启动；当前面板保留上一有效审计快照。")
+
+    def test_non_trading_status_does_not_report_stale_refresh_in_progress(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-06-05T23:42:51Z", "update_status": {}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (output_dir / "m12_37_auto_runner_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "refresh_state": "refresh_in_progress",
+                        "refresh_started_at": "2026-06-05T23:57:52Z",
+                        "active_step": "m12_29_current_day_scan_dashboard",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            phase = build_window_state(config, "2026-06-06T05:17:22Z")
+
+            payload = build_status_payload(
+                config,
+                phase=phase,
+                supervisor_pid=123,
+                supervisor_process_alive=True,
+                child_pid=None,
+                child_running=False,
+                child_started_at="2026-06-05T23:57:52Z",
+                child_last_exit_code=-15,
+                restart_count=14,
+            )
+
+        self.assertFalse(payload["session_should_run"])
+        self.assertFalse(payload["child_running"])
+        self.assertEqual(payload["m12_37_refresh_state"], "idle_waiting_market_window")
+        self.assertEqual(payload["m12_37_refresh_started_at"], "")
+        self.assertEqual(payload["m12_37_active_step"], "idle")
+
+    def test_manifest_overlay_clears_stale_refresh_state_when_market_is_idle(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            manifest_path = output_dir / "m12_37_auto_runner_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "refresh_state": "refresh_in_progress",
+                        "refresh_started_at": "2026-06-05T23:57:52Z",
+                        "active_step": "m12_29_current_day_scan_dashboard",
+                        "market_session": {"status": "美股常规交易时段"},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            payload = {
+                "market_status": "非交易日等待",
+                "new_york_time": "2026-06-06 01:17:22 EDT",
+                "beijing_time": "2026-06-06 13:17:22 CST",
+                "session_should_run": False,
+                "child_running": False,
+            }
+
+            self.assertTrue(sync_manifest_status_overlay(config, payload))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["refresh_state"], "idle_waiting_market_window")
+        self.assertEqual(manifest["refresh_started_at"], "")
+        self.assertEqual(manifest["active_step"], "idle")
+        self.assertEqual(manifest["status_overlay"]["manifest_refresh_state"], "idle_waiting_market_window")
 
 
 if __name__ == "__main__":

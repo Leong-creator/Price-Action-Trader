@@ -121,14 +121,44 @@ def run_once(
 ) -> dict[str, Any]:
     generated_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     m12_29_config = load_m12_29_config(config.source_m12_29_config_path)
-    result = run_m12_29_current_day_scan_dashboard(
-        m12_29_config,
+    refresh_started_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    write_refresh_progress_manifest(
+        config,
+        m12_29_output_dir=m12_29_config.output_dir,
         generated_at=generated_at,
+        refresh_started_at=refresh_started_at,
+        refresh_state="refresh_in_progress",
+        active_step="m12_29_current_day_scan_dashboard",
         execute_fetch=execute_fetch,
         max_native_fetches=max_native_fetches,
         refresh_quotes=refresh_quotes,
         force_refresh_current_intraday=force_refresh_current_intraday,
     )
+    try:
+        result = run_m12_29_current_day_scan_dashboard(
+            m12_29_config,
+            generated_at=generated_at,
+            execute_fetch=execute_fetch,
+            max_native_fetches=max_native_fetches,
+            refresh_quotes=refresh_quotes,
+            force_refresh_current_intraday=force_refresh_current_intraday,
+        )
+    except Exception as exc:
+        write_refresh_progress_manifest(
+            config,
+            m12_29_output_dir=m12_29_config.output_dir,
+            generated_at=generated_at,
+            refresh_started_at=refresh_started_at,
+            refresh_state="refresh_failed",
+            active_step="m12_29_current_day_scan_dashboard",
+            execute_fetch=execute_fetch,
+            max_native_fetches=max_native_fetches,
+            refresh_quotes=refresh_quotes,
+            force_refresh_current_intraday=force_refresh_current_intraday,
+            error_type=exc.__class__.__name__,
+            error=str(exc),
+        )
+        raise
     market = market_session_status(generated_at)
     monitoring_active = market["status"] in {"盘前", "美股常规交易时段", "盘后"}
     if monitoring_active:
@@ -154,6 +184,10 @@ def run_once(
         "schema_version": "m12.37.auto-runner-manifest.v1",
         "stage": config.stage,
         "generated_at": generated_at,
+        "refresh_state": "refresh_complete",
+        "refresh_started_at": refresh_started_at,
+        "refresh_finished_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "active_step": "complete",
         "market_session": market,
         "refresh_seconds": config.refresh_seconds,
         "observer_interval_minutes": config.observer_interval_minutes,
@@ -185,6 +219,62 @@ def run_once(
         "result": result,
         "manifest": manifest,
     }
+
+
+def write_refresh_progress_manifest(
+    config: M1237AutoLoopConfig,
+    *,
+    m12_29_output_dir: Path,
+    generated_at: str,
+    refresh_started_at: str,
+    refresh_state: str,
+    active_step: str,
+    execute_fetch: bool,
+    max_native_fetches: int | None,
+    refresh_quotes: bool,
+    force_refresh_current_intraday: bool,
+    error_type: str = "",
+    error: str = "",
+) -> dict[str, Any]:
+    market = market_session_status(generated_at)
+    previous_dashboard = {}
+    dashboard_path = m12_29_output_dir / "m12_32_minute_readonly_dashboard_data.json"
+    if dashboard_path.exists():
+        try:
+            previous_dashboard = json.loads(dashboard_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous_dashboard = {}
+    manifest = {
+        "schema_version": "m12.37.auto-runner-manifest.v1",
+        "stage": config.stage,
+        "generated_at": generated_at,
+        "refresh_state": refresh_state,
+        "refresh_started_at": refresh_started_at,
+        "active_step": active_step,
+        "market_session": market,
+        "refresh_seconds": config.refresh_seconds,
+        "session_monitoring_active_now": market["status"] in {"盘前", "美股常规交易时段", "盘后"},
+        "regular_session_active_now": market["status"] == "美股常规交易时段",
+        "latest_dashboard_json": project_path(dashboard_path),
+        "latest_dashboard_html": project_path(m12_29_output_dir / "m12_32_minute_readonly_dashboard.html"),
+        "previous_dashboard_generated_at": str(previous_dashboard.get("generated_at") or previous_dashboard.get("summary", {}).get("generated_at") or ""),
+        "execute_fetch": execute_fetch,
+        "max_native_fetches": max_native_fetches if max_native_fetches is not None else "",
+        "refresh_quotes": refresh_quotes,
+        "force_refresh_current_intraday": force_refresh_current_intraday,
+        "error_type": error_type,
+        "error": error,
+        "plain_language_result": "M12.37 正在刷新核心看板；页面应显示上一份核心数据时间和当前刷新进度，不能把守护器心跳当成核心数据刷新。",
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+    if refresh_state == "refresh_failed":
+        manifest["plain_language_result"] = f"M12.37 本轮核心看板刷新失败：{error_type} {error}".strip()
+    write_json(m12_29_output_dir / "m12_37_auto_runner_manifest.json", manifest)
+    return manifest
 
 
 def build_skipped_post_run_strategy_ledgers(
@@ -243,6 +333,58 @@ def write_idle_manifest(
         "latest_observer_json": project_path(m12_29_config.output_dir / "m12_38_codex_observer_latest.json"),
         "observer_inbox": project_path(m12_29_config.output_dir / "m12_38_codex_observer_inbox.jsonl"),
         "plain_language_result": f"非交易窗口：M12.37 session 未刷新看板，原因 {reason}，等待下一交易窗口。",
+        "post_run_strategy_ledgers": build_skipped_post_run_strategy_ledgers(
+            config,
+            generated_at=generated_at,
+            trading_date=market.get("new_york_date", ""),
+            market_status=market["status"],
+            reason=reason,
+        ),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+    write_json(m12_29_config.output_dir / "m12_37_auto_runner_manifest.json", manifest)
+    return manifest
+
+
+def write_light_heartbeat_manifest(
+    config: M1237AutoLoopConfig,
+    *,
+    generated_at: str,
+    market: dict[str, str],
+    reason: str,
+    intraday_refresh_bucket: str,
+) -> dict[str, Any]:
+    m12_29_config = load_m12_29_config(config.source_m12_29_config_path)
+    manifest = {
+        "schema_version": "m12.37.auto-runner-manifest.v1",
+        "stage": config.stage,
+        "generated_at": generated_at,
+        "refresh_state": "light_heartbeat_waiting_next_5m_bar",
+        "active_step": "light_heartbeat",
+        "market_session": market,
+        "refresh_seconds": config.refresh_seconds,
+        "observer_interval_minutes": config.observer_interval_minutes,
+        "codex_observer_enabled": config.codex_observer_enabled,
+        "codex_observer_mode": config.codex_observer_mode,
+        "loop_can_continue_now": True,
+        "session_monitoring_active_now": True,
+        "regular_session_active_now": market["status"] == "美股常规交易时段",
+        "latest_dashboard_json": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard_data.json"),
+        "latest_dashboard_html": project_path(m12_29_config.output_dir / "m12_32_minute_readonly_dashboard.html"),
+        "latest_observer_json": project_path(m12_29_config.output_dir / "m12_38_codex_observer_latest.json"),
+        "observer_inbox": project_path(m12_29_config.output_dir / "m12_38_codex_observer_inbox.jsonl"),
+        "lightweight_heartbeat": True,
+        "heavy_dashboard_run_skipped": True,
+        "skip_reason": reason,
+        "intraday_refresh_bucket": intraday_refresh_bucket,
+        "plain_language_result": (
+            "M12.37 轻量心跳正常：当前 5 分钟 K 线桶已经完成重型刷新，"
+            "等待下一根 5 分钟 K 线后再重算本地完整看板；长桥实时链路不依赖本地完整重算。"
+        ),
         "post_run_strategy_ledgers": build_skipped_post_run_strategy_ledgers(
             config,
             generated_at=generated_at,
@@ -405,6 +547,7 @@ def session_refresh_policy(
     kline_refresh_due = market_status == "美股常规交易时段" and current_intraday_bucket != last_intraday_refresh_bucket
     if market_status == "美股常规交易时段":
         return {
+            "run_dashboard": kline_refresh_due,
             "execute_fetch": (not no_fetch) and kline_refresh_due,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": REGULAR_NATIVE_FETCH_BUDGET if (not no_fetch) and kline_refresh_due else 0,
@@ -415,6 +558,7 @@ def session_refresh_policy(
         }
     if preopen_window:
         return {
+            "run_dashboard": True,
             "execute_fetch": not no_fetch,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": PREOPEN_NATIVE_FETCH_BUDGET if not no_fetch else 0,
@@ -425,6 +569,7 @@ def session_refresh_policy(
         }
     if market_status == "盘前":
         return {
+            "run_dashboard": True,
             "execute_fetch": False,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": 0,
@@ -435,6 +580,7 @@ def session_refresh_policy(
         }
     if market_status == "盘后":
         return {
+            "run_dashboard": True,
             "execute_fetch": False,
             "refresh_quotes": not no_refresh_quotes,
             "max_native_fetches": 0,
@@ -444,6 +590,7 @@ def session_refresh_policy(
             "entered_regular_session": True,
         }
     return {
+        "run_dashboard": False,
         "execute_fetch": False,
         "refresh_quotes": False,
         "max_native_fetches": 0,
@@ -523,6 +670,32 @@ def main() -> int:
             refresh_quotes = policy["refresh_quotes"]
             max_native_fetches = policy["max_native_fetches"]
             force_refresh_current_intraday = policy["force_refresh_current_intraday"]
+            if not policy["run_dashboard"]:
+                manifest = write_light_heartbeat_manifest(
+                    config,
+                    generated_at=generated_at,
+                    market=market,
+                    reason="waiting_next_5m_bar_for_heavy_dashboard_refresh",
+                    intraday_refresh_bucket=policy["intraday_refresh_bucket"],
+                )
+                print(json.dumps({
+                    "stage": manifest["stage"],
+                    "market_status": manifest["market_session"]["status"],
+                    "loop_can_continue_now": manifest["loop_can_continue_now"],
+                    "post_run_strategy_ledgers": {
+                        "m13_ran": manifest["post_run_strategy_ledgers"]["m13_ran"],
+                        "m14_ran": manifest["post_run_strategy_ledgers"]["m14_ran"],
+                        "m14_skip_reason": manifest["post_run_strategy_ledgers"]["m14_skip_reason"],
+                        "m13_error_type": manifest["post_run_strategy_ledgers"]["m13_error_type"],
+                        "m14_error_type": manifest["post_run_strategy_ledgers"]["m14_error_type"],
+                    },
+                    "summary": manifest["plain_language_result"],
+                }, ensure_ascii=False, indent=2, sort_keys=True))
+                iteration += 1
+                if args.max_iterations and iteration >= args.max_iterations:
+                    break
+                time.sleep(config.refresh_seconds)
+                continue
         else:
             execute_fetch = not args.no_fetch
             refresh_quotes = not args.no_refresh_quotes

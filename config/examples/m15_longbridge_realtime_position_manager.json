@@ -11,7 +11,11 @@
     "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
   },
   "longbridge_position_manager": {
-    "max_exit_events_per_run": 10
+    "max_exit_events_per_run": 10,
+    "exit_attempt_cooldown_seconds": 900,
+    "manage_untracked_positions_for_exit": true,
+    "untracked_stop_loss_percent": "3",
+    "untracked_take_profit_percent": "3"
   },
   "hard_boundaries": {
     "paper_simulated_only": true,

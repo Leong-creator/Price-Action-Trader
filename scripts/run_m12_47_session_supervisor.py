@@ -26,6 +26,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     load_config as load_m12_29_dashboard_config,
     load_json,
     write_json,
+    write_text_atomic,
 )
 from scripts.m15_longbridge_paper_order_submitter_lib import (  # noqa: E402
     ACCOUNT_STATE_JSON as M15_ACCOUNT_STATE_JSON,
@@ -136,6 +137,13 @@ def now_utc_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def int_like(value: Any, *, default: int = 0) -> int:
+    try:
+        return int(float(str(value)))
+    except (TypeError, ValueError):
+        return default
+
+
 def current_times(config: SupervisorConfig, generated_at: str | None = None) -> tuple[datetime, datetime]:
     utc_dt = datetime.fromisoformat((generated_at or now_utc_iso()).replace("Z", "+00:00"))
     market_dt = utc_dt.astimezone(ZoneInfo(config.market_timezone))
@@ -221,6 +229,10 @@ def dashboard_json_path(config: SupervisorConfig) -> Path:
     return config.output_dir / "m12_32_minute_readonly_dashboard_data.json"
 
 
+def auto_runner_manifest_path(config: SupervisorConfig) -> Path:
+    return config.output_dir / "m12_37_auto_runner_manifest.json"
+
+
 def m1237_refresh_seconds(config: SupervisorConfig) -> int:
     try:
         payload = json.loads(config.source_m12_37_config_path.read_text(encoding="utf-8"))
@@ -238,7 +250,7 @@ def read_json_if_exists(path: Path) -> dict[str, Any]:
     for _ in range(3):
         try:
             return load_json(path)
-        except json.JSONDecodeError:
+        except (OSError, ValueError):
             time.sleep(0.2)
     return {}
 
@@ -355,8 +367,14 @@ def build_status_payload(
     last_restart_reason: str = "",
 ) -> dict[str, Any]:
     dashboard = read_json_if_exists(dashboard_json_path(config))
+    refresh_progress = normalize_refresh_progress_for_supervisor_status(
+        read_json_if_exists(auto_runner_manifest_path(config)),
+        phase=phase,
+        child_running=child_running,
+    )
     dashboard_generated_at = dashboard.get("generated_at", "")
     dashboard_update = dashboard.get("update_status", {})
+    latest_dashboard_beijing_time = dashboard_generated_at_beijing_time(str(dashboard_generated_at))
     return {
         "schema_version": "m12.47.session-supervisor-status.v1",
         "stage": config.stage,
@@ -380,8 +398,12 @@ def build_status_payload(
         "next_session_start_new_york": phase["next_session_start_new_york"],
         "next_session_start_beijing": phase["next_session_start_beijing"],
         "latest_dashboard_generated_at": dashboard_generated_at,
-        "latest_dashboard_beijing_time": dashboard_update.get("beijing_time", ""),
+        "latest_dashboard_beijing_time": latest_dashboard_beijing_time or dashboard_update.get("beijing_time", ""),
         "latest_dashboard_runtime_status": dashboard_update.get("runtime_status", ""),
+        "m12_37_refresh_state": refresh_progress.get("refresh_state", ""),
+        "m12_37_refresh_started_at": refresh_progress.get("refresh_started_at", ""),
+        "m12_37_active_step": refresh_progress.get("active_step", ""),
+        "m12_37_previous_dashboard_generated_at": refresh_progress.get("previous_dashboard_generated_at", ""),
         "plain_language_result": build_plain_language_status(
             phase,
             supervisor_process_alive,
@@ -390,6 +412,8 @@ def build_status_payload(
             dashboard_generated_at,
             failure_state,
             failure_reason,
+            refresh_state=str(refresh_progress.get("refresh_state", "")),
+            refresh_started_at=str(refresh_progress.get("refresh_started_at", "")),
         ),
         "paper_simulated_only": True,
         "trading_connection": False,
@@ -397,6 +421,36 @@ def build_status_payload(
         "live_execution": False,
         "paper_trading_approval": False,
     }
+
+
+def normalize_refresh_progress_for_supervisor_status(
+    refresh_progress: dict[str, Any],
+    *,
+    phase: dict[str, str],
+    child_running: bool,
+) -> dict[str, Any]:
+    progress = dict(refresh_progress or {})
+    if phase.get("session_should_run") == "true" or child_running:
+        return progress
+    if progress.get("refresh_state") != "refresh_in_progress":
+        return progress
+    progress.setdefault("refresh_state_before_idle_overlay", progress.get("refresh_state", ""))
+    progress.setdefault("refresh_started_at_before_idle_overlay", progress.get("refresh_started_at", ""))
+    progress.setdefault("active_step_before_idle_overlay", progress.get("active_step", ""))
+    progress["refresh_state"] = "idle_waiting_market_window"
+    progress["refresh_started_at"] = ""
+    progress["active_step"] = "idle"
+    return progress
+
+
+def dashboard_generated_at_beijing_time(generated_at: str) -> str:
+    if not generated_at:
+        return ""
+    try:
+        generated_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return generated_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 def build_plain_language_status(
@@ -407,6 +461,8 @@ def build_plain_language_status(
     dashboard_generated_at: str,
     failure_state: str = "",
     failure_reason: str = "",
+    refresh_state: str = "",
+    refresh_started_at: str = "",
 ) -> str:
     if failure_state == "failed":
         return (
@@ -419,6 +475,12 @@ def build_plain_language_status(
             f"最近面板刷新 {dashboard_generated_at or '暂无'}。"
         )
     if child_running:
+        if refresh_state == "refresh_in_progress":
+            return (
+                f"自动调度器正在运行；当前市场状态 {phase['market_status']}，子会话 PID {child_pid or 0}，"
+                f"M12.37 正在刷新核心看板，开始 {refresh_started_at or '未知'}；"
+                f"最近核心面板数据时间 {dashboard_generated_at or '暂无'}。"
+            )
         return (
             f"自动调度器正在运行；当前市场状态 {phase['market_status']}，"
             f"子会话 PID {child_pid or 0}，最近面板刷新 {dashboard_generated_at or '暂无'}。"
@@ -446,9 +508,31 @@ def dashboard_runtime_status_from_supervisor(payload: dict[str, Any]) -> str:
         return "开盘前预热窗口，M12.37 可由守护器启动，只读预热不生成实盘订单。"
     if market_status == "收盘后收尾窗口":
         return "收盘后收尾窗口，M12.37 可进行只读收尾与盘后固化。"
+    if payload.get("child_running") and payload.get("m12_37_refresh_state") == "refresh_in_progress":
+        started_at = str(payload.get("m12_37_refresh_started_at") or "")
+        active_step = str(payload.get("m12_37_active_step") or "unknown")
+        return f"{market_status or '未知市场状态'}，M12.37 正在刷新核心看板（步骤 {active_step}，开始 {started_at or '未知'}）。"
+    if payload.get("child_running") and payload.get("m12_37_refresh_state") == "light_heartbeat_waiting_next_5m_bar":
+        return (
+            f"{market_status or '未知市场状态'}，M12.37 轻量心跳正常；"
+            "本地完整看板等待下一根 5 分钟 K 线再重算，长桥实时链路不受影响。"
+        )
     if market_status == "美股常规交易时段":
         return "美股常规交易时段，M12.37 应由守护器保持只读刷新。"
     return f"{market_status or '未知市场状态'}；当前面板保留上一有效审计快照。"
+
+
+def normalize_longbridge_freshness_warning_text(warning: str) -> str:
+    if (
+        "quote_source=longbridge_quote_readonly" in warning
+        and "看板已生成但数据源降级 / fallback quotes / no-fetch：" in warning
+    ):
+        return warning.replace(
+            "看板已生成但数据源降级 / fallback quotes / no-fetch：",
+            "看板已生成但严格全量扫描口径未完成；长桥只读行情没有降级：",
+            1,
+        )
+    return warning
 
 
 def apply_dashboard_status_overlay(
@@ -466,11 +550,33 @@ def apply_dashboard_status_overlay(
     supervisor_generated_at = str(payload.get("supervisor_generated_at", ""))
     now_dt = datetime.now(UTC).replace(microsecond=0)
     dashboard_generated_at = str(dashboard.get("generated_at") or dashboard.get("summary", {}).get("generated_at") or "")
+    dashboard_beijing_time = dashboard_generated_at_beijing_time(dashboard_generated_at)
     dashboard_age_seconds = ""
+    dashboard_stale = False
+    prior_update_status = dashboard.get("update_status", {}) if isinstance(dashboard.get("update_status"), dict) else {}
+    stale_after_seconds = int_like(prior_update_status.get("stale_after_seconds", 600), default=600)
+    refresh_state = str(payload.get("m12_37_refresh_state") or "")
+    refresh_started_at = str(payload.get("m12_37_refresh_started_at") or "")
+    refresh_active_step = str(payload.get("m12_37_active_step") or "")
+    refresh_started_dt = parse_utc_timestamp(refresh_started_at)
+    refresh_age_seconds = ""
+    refresh_in_progress = bool(payload.get("child_running")) and refresh_state == "refresh_in_progress"
+    light_heartbeat = bool(payload.get("child_running")) and refresh_state == "light_heartbeat_waiting_next_5m_bar"
+    refresh_within_expected_time = False
+    if refresh_started_dt is not None:
+        refresh_age = max(int((now_dt - refresh_started_dt).total_seconds()), 0)
+        refresh_age_seconds = str(refresh_age)
+        if refresh_in_progress:
+            refresh_within_expected_time = refresh_age <= active_refresh_timeout_for_step(
+                refresh_active_step,
+                60,
+            )
     if dashboard_generated_at:
         try:
             generated_dt = datetime.fromisoformat(dashboard_generated_at.replace("Z", "+00:00"))
-            dashboard_age_seconds = str(max(int((now_dt - generated_dt).total_seconds()), 0))
+            age_seconds = max(int((now_dt - generated_dt).total_seconds()), 0)
+            dashboard_age_seconds = str(age_seconds)
+            dashboard_stale = age_seconds > max(stale_after_seconds, 600)
         except ValueError:
             dashboard_age_seconds = ""
     session_liveness = "alive" if payload.get("child_running") else ("idle" if not payload.get("session_should_run") else "stopped")
@@ -479,7 +585,8 @@ def apply_dashboard_status_overlay(
         {
             "market_status": market_status,
             "new_york_time": str(payload.get("new_york_time", update_status.get("new_york_time", ""))),
-            "beijing_time": str(payload.get("beijing_time", update_status.get("beijing_time", ""))),
+            "beijing_time": dashboard_beijing_time or str(update_status.get("beijing_time") or payload.get("beijing_time", "")),
+            "supervisor_beijing_time": str(payload.get("beijing_time", "")),
             "runtime_status": runtime_status,
             "session_liveness": session_liveness,
             "supervisor_process_alive": str(bool(payload.get("supervisor_process_alive"))).lower(),
@@ -488,10 +595,24 @@ def apply_dashboard_status_overlay(
             "wall_clock_beijing_time": now_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
             "dashboard_age_seconds": dashboard_age_seconds or str(update_status.get("dashboard_age_seconds", "")),
             "heartbeat_age_seconds": "0",
+            "m12_37_refresh_state": refresh_state,
+            "m12_37_refresh_started_at": refresh_started_at,
+            "m12_37_refresh_age_seconds": refresh_age_seconds,
+            "m12_37_active_step": refresh_active_step,
         }
     )
     if audit_only:
         update_status["freshness_state"] = "supervisor_idle"
+    elif light_heartbeat:
+        update_status["freshness_state"] = "light_heartbeat"
+    elif refresh_in_progress and dashboard_stale and not refresh_within_expected_time:
+        update_status["freshness_state"] = "refreshing_stale"
+    elif refresh_in_progress:
+        update_status["freshness_state"] = "refreshing"
+    elif dashboard_stale:
+        update_status["freshness_state"] = "stale"
+    elif dashboard_age_seconds:
+        update_status["freshness_state"] = "fresh"
     summary = dashboard.setdefault("summary", {})
     market_session = summary.setdefault("market_session", {})
     market_session.update(
@@ -510,7 +631,10 @@ def apply_dashboard_status_overlay(
         )
         existing_warning = str(summary.get("data_freshness_warning", ""))
         if existing_warning and not summary.get("data_freshness_warning_before_audit_overlay"):
-            summary["data_freshness_warning_before_audit_overlay"] = existing_warning
+            summary["data_freshness_warning_before_audit_overlay"] = normalize_longbridge_freshness_warning_text(existing_warning)
+        prior_warning = str(summary.get("data_freshness_warning_before_audit_overlay", ""))
+        if prior_warning:
+            summary["data_freshness_warning_before_audit_overlay"] = normalize_longbridge_freshness_warning_text(prior_warning)
         existing_plain_language = str(summary.get("plain_language_result", ""))
         if existing_plain_language and not summary.get("plain_language_result_before_audit_overlay"):
             summary["plain_language_result_before_audit_overlay"] = existing_plain_language
@@ -527,7 +651,26 @@ def apply_dashboard_status_overlay(
     top_metrics = dashboard.setdefault("top_metrics", {})
     top_metrics["运行状态"] = runtime_status
     top_metrics["守护器状态时间"] = str(payload.get("beijing_time", ""))
-    top_metrics["数据快照状态"] = "非交易日审计快照" if audit_only else "交易窗口刷新中"
+    if audit_only:
+        if market_status == "等待开盘前预热":
+            top_metrics["数据快照状态"] = "等待开盘前预热：保留上一有效快照，未进入新交易日刷新窗口"
+        elif market_status == "等待下一交易日":
+            top_metrics["数据快照状态"] = "等待下一交易日：保留上一有效审计快照"
+        else:
+            top_metrics["数据快照状态"] = "非交易日审计快照"
+    elif light_heartbeat:
+        top_metrics["数据快照状态"] = "M12.37 轻量心跳：等待下一根 5 分钟 K 线再重算本地完整看板"
+    elif refresh_in_progress and dashboard_stale and not refresh_within_expected_time:
+        top_metrics["数据快照状态"] = (
+            f"M12.37 正在刷新中：核心看板 {dashboard_age_seconds} 秒未更新，"
+            f"本轮刷新已运行 {refresh_age_seconds or '未知'} 秒"
+        )
+    elif refresh_in_progress:
+        top_metrics["数据快照状态"] = f"M12.37 正在刷新中：本轮刷新已运行 {refresh_age_seconds or '未知'} 秒"
+    elif dashboard_stale:
+        top_metrics["数据快照状态"] = f"交易窗口刷新滞后：核心看板 {dashboard_age_seconds} 秒未更新"
+    else:
+        top_metrics["数据快照状态"] = "交易窗口刷新中"
     terminal = dashboard.setdefault("broker_terminal_view", {})
     top_status = terminal.setdefault("top_status", {})
     top_status.update(
@@ -541,6 +684,10 @@ def apply_dashboard_status_overlay(
             "fully_ready_for_trading_display": "false" if audit_only else top_status.get("fully_ready_for_trading_display", "false"),
             "data_freshness_warning": summary.get("data_freshness_warning", ""),
             "audit_only_snapshot_note": summary.get("audit_only_snapshot_note", ""),
+            "m12_37_refresh_state": refresh_state,
+            "m12_37_refresh_started_at": refresh_started_at,
+            "m12_37_refresh_age_seconds": refresh_age_seconds,
+            "m12_37_active_step": refresh_active_step,
         }
     )
     if m14_context:
@@ -562,6 +709,9 @@ def apply_dashboard_status_overlay(
         "session_should_run": bool(payload.get("session_should_run")),
         "child_running": bool(payload.get("child_running")),
         "audit_only": audit_only,
+        "m12_37_refresh_state": refresh_state,
+        "m12_37_refresh_started_at": refresh_started_at,
+        "m12_37_refresh_age_seconds": refresh_age_seconds,
     }
     return True
 
@@ -592,6 +742,24 @@ def apply_dashboard_longbridge_overlay(dashboard: dict[str, Any], longbridge_con
     top_metrics = dashboard.setdefault("top_metrics", {})
     top_metrics["长桥模拟账户"] = str(longbridge_context.get("top_metric", "未生成长桥模拟账户状态"))
     top_metrics.pop("长桥可提交订单", None)
+    top_metrics.pop("长桥配对成交胜率", None)
+    top_metrics.pop("长桥已配对成交胜率", None)
+    top_metrics.pop("长桥今日盈亏", None)
+    top_metrics.pop("长桥总盈亏", None)
+    top_metrics.pop("长桥交易总盈亏", None)
+    top_metrics.pop("长桥当日总盈亏", None)
+    top_metrics.pop("长桥App当日盈亏", None)
+    top_metrics.pop("长桥账户总盈亏", None)
+    top_metrics["长桥账户当日盈亏"] = str(longbridge_context.get("longbridge_account_intraday_pnl", "等待长桥字段对齐"))
+    top_metrics["长桥接口持仓今日浮动"] = str(longbridge_context.get("longbridge_account_today_total_pnl", "暂无"))
+    top_metrics["长桥当前持仓总盈亏"] = str(longbridge_context.get("longbridge_account_total_pnl", "暂无"))
+    top_metrics["长桥账户总资产"] = str(longbridge_context.get("account_total_equity_estimate", "暂无"))
+    top_metrics["长桥交易累计盈亏"] = str(longbridge_context.get("longbridge_stock_total_pnl", "暂无"))
+    top_metrics["长桥逐标的胜率"] = str(longbridge_context.get("longbridge_symbol_win_rate_label", "暂无"))
+    top_metrics["长桥交易胜率"] = str(longbridge_context.get("longbridge_closed_trade_win_rate_label", "暂无"))
+    top_metrics["长桥修复后样本"] = str(longbridge_context.get("longbridge_post_fix_closed_trade_count", "0"))
+    top_metrics["长桥最大回撤"] = str(longbridge_context.get("longbridge_max_drawdown_label", "样本不足"))
+    top_metrics["长桥项目资金占用"] = str(longbridge_context.get("project_model_exposure_label", "暂无"))
     top_metrics["长桥本轮可新开仓"] = str(longbridge_context.get("submit_ready_count", "0"))
 
 
@@ -622,7 +790,9 @@ def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, A
     dashboard_path = dashboard_json_path(config)
     if not dashboard_path.exists():
         return False
-    dashboard = load_json(dashboard_path)
+    dashboard = read_json_if_exists(dashboard_path)
+    if not dashboard:
+        return False
     dashboard_config = replace(load_m12_29_dashboard_config(), output_dir=config.output_dir)
     m14_context = load_m14_terminal_context(dashboard_config)
     if not apply_dashboard_status_overlay(dashboard, payload, m14_context=m14_context):
@@ -630,14 +800,17 @@ def sync_dashboard_status_overlay(config: SupervisorConfig, payload: dict[str, A
     maybe_refresh_longbridge_account_state_for_dashboard(config, payload)
     apply_dashboard_longbridge_overlay(dashboard, build_longbridge_paper_dashboard_view(dashboard_config))
     write_json(dashboard_path, dashboard)
+    overlay_error_path = config.output_dir / "m12_47_dashboard_status_overlay_error.json"
     try:
-        (config.output_dir / "m12_32_minute_readonly_dashboard.html").write_text(
+        write_text_atomic(
+            config.output_dir / "m12_32_minute_readonly_dashboard.html",
             build_dashboard_html(dashboard_config, dashboard),
-            encoding="utf-8",
         )
+        if overlay_error_path.exists():
+            overlay_error_path.unlink()
     except Exception as exc:  # pragma: no cover - defensive artifact repair path
         write_json(
-            config.output_dir / "m12_47_dashboard_status_overlay_error.json",
+            overlay_error_path,
             {
                 "schema_version": "m12.47.dashboard-status-overlay-error.v1",
                 "generated_at": now_utc_iso(),
@@ -682,7 +855,9 @@ def artifact_refresh_age_seconds(path: Path) -> int:
     if not path.exists():
         return 10**9
     mtime_age = artifact_mtime_age_seconds(path)
-    payload = load_json(path)
+    payload = read_json_if_exists(path)
+    if not payload:
+        return 10**9
     generated_at = str(payload.get("generated_at", ""))
     try:
         generated_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
@@ -696,7 +871,9 @@ def sync_manifest_status_overlay(config: SupervisorConfig, payload: dict[str, An
     manifest_path = config.output_dir / "m12_37_auto_runner_manifest.json"
     if not manifest_path.exists():
         return False
-    manifest = load_json(manifest_path)
+    manifest = read_json_if_exists(manifest_path)
+    if not manifest:
+        return False
     market_status = str(payload.get("market_status", ""))
     if not market_status:
         return False
@@ -709,11 +886,19 @@ def sync_manifest_status_overlay(config: SupervisorConfig, payload: dict[str, An
             "beijing_time": str(payload.get("beijing_time", "")),
         }
     )
-    if market_status in {"非交易日等待", "等待下一交易日", "等待开盘前预热"}:
+    audit_only = market_status in {"非交易日等待", "等待下一交易日", "等待开盘前预热"}
+    if audit_only:
         manifest["loop_can_continue_now"] = False
         manifest["session_monitoring_active_now"] = False
         manifest["regular_session_active_now"] = False
         manifest["plain_language_result"] = dashboard_runtime_status_from_supervisor(payload)
+        if not payload.get("child_running") and manifest.get("refresh_state") == "refresh_in_progress":
+            manifest.setdefault("refresh_state_before_idle_overlay", manifest.get("refresh_state", ""))
+            manifest.setdefault("refresh_started_at_before_idle_overlay", manifest.get("refresh_started_at", ""))
+            manifest.setdefault("active_step_before_idle_overlay", manifest.get("active_step", ""))
+            manifest["refresh_state"] = "idle_waiting_market_window"
+            manifest["refresh_started_at"] = ""
+            manifest["active_step"] = "idle"
     manifest["status_overlay"] = {
         "schema_version": "m12.47.manifest-status-overlay.v1",
         "source": "m12_47_session_supervisor",
@@ -722,7 +907,8 @@ def sync_manifest_status_overlay(config: SupervisorConfig, payload: dict[str, An
         "market_status": market_status,
         "session_should_run": bool(payload.get("session_should_run")),
         "child_running": bool(payload.get("child_running")),
-        "audit_only": market_status in {"非交易日等待", "等待下一交易日", "等待开盘前预热"},
+        "audit_only": audit_only,
+        "manifest_refresh_state": str(manifest.get("refresh_state", "")),
     }
     write_json(manifest_path, manifest)
     return True
@@ -745,22 +931,44 @@ def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, st
     if now_dt is None or child_started_dt is None:
         return ""
     refresh_seconds = m1237_refresh_seconds(config)
-    child_grace_seconds = max(refresh_seconds * 15, 900)
+    child_grace_seconds = max(refresh_seconds * 5, 300)
     child_age_seconds = int((now_dt - child_started_dt).total_seconds())
     if child_age_seconds < child_grace_seconds:
-        return ""
-    if child_has_recent_artifact_activity(config, now_dt, max(refresh_seconds * 10, 600)):
         return ""
     dashboard = read_json_if_exists(dashboard_json_path(config))
     dashboard_generated_at = str(dashboard.get("generated_at") or dashboard.get("summary", {}).get("generated_at") or "")
     dashboard_dt = parse_utc_timestamp(dashboard_generated_at)
     stale_after_seconds = max(refresh_seconds * 5, 600)
+    progress = read_json_if_exists(auto_runner_manifest_path(config))
+    refresh_state = str(progress.get("refresh_state") or "")
+    refresh_started_dt = parse_utc_timestamp(str(progress.get("refresh_started_at") or ""))
+    active_step = str(progress.get("active_step") or "")
+    active_refresh_timeout_seconds = active_refresh_timeout_for_step(active_step, refresh_seconds)
+    if refresh_state == "refresh_in_progress" and refresh_started_dt is not None:
+        refresh_age_seconds = int((now_dt - refresh_started_dt).total_seconds())
+        progress_belongs_to_child = refresh_started_dt >= child_started_dt
+        if progress_belongs_to_child and refresh_age_seconds <= active_refresh_timeout_seconds:
+            return ""
+        if progress_belongs_to_child and child_has_recent_artifact_activity(config, now_dt, active_refresh_timeout_seconds):
+            return ""
     if dashboard_dt is None:
+        if child_has_recent_artifact_activity(config, now_dt, max(refresh_seconds * 10, 600)):
+            return ""
         return f"dashboard_missing_after_child_age_{child_age_seconds}s"
     dashboard_age_seconds = int((now_dt - dashboard_dt).total_seconds())
     if dashboard_age_seconds > stale_after_seconds:
         return f"dashboard_stale_{dashboard_age_seconds}s_over_{stale_after_seconds}s"
     return ""
+
+
+def active_refresh_timeout_for_step(active_step: str, refresh_seconds: int) -> int:
+    default_timeout = max(refresh_seconds * 30, 1800)
+    step_timeout_floor = {
+        "m12_29_current_day_scan_dashboard": 5400,
+        "m13_daily_strategy_test_runner": 2400,
+        "m14_strategy_challenge_gate": 2400,
+    }
+    return max(default_timeout, step_timeout_floor.get(active_step, 0))
 
 
 def child_has_recent_artifact_activity(config: SupervisorConfig, now_dt: datetime, within_seconds: int) -> bool:
@@ -919,10 +1127,12 @@ def run_foreground(config: SupervisorConfig) -> int:
                 failure_reason = failure_payload["failure_reason"]
                 write_failure_dossier(config, failure_payload)
                 should_run = False
+            current_restart_reason = ""
             if should_run and child_running and child is not None:
                 stale_reason = stale_dashboard_restart_reason(config, phase, child_started_at)
                 if stale_reason:
                     stale_dashboard_restart_count += 1
+                    current_restart_reason = stale_reason
                     last_restart_reason = stale_reason
                     child.terminate()
                     try:
@@ -961,7 +1171,7 @@ def run_foreground(config: SupervisorConfig) -> int:
                     failure_state=failure_state,
                     failure_reason=failure_reason,
                     stale_dashboard_restart_count=stale_dashboard_restart_count,
-                    last_restart_reason=last_restart_reason,
+                    last_restart_reason=current_restart_reason,
                 ),
             )
             time.sleep(config.check_interval_seconds)
@@ -1026,8 +1236,17 @@ def start_daemon(config: SupervisorConfig, config_path: str | Path) -> int:
 
 def print_status(config: SupervisorConfig) -> int:
     stored = read_json_if_exists(status_path(config))
-    stored_pid = int(stored.get("supervisor_pid") or read_existing_pid(config) or 0) if stored else (read_existing_pid(config) or 0)
-    supervisor_alive = process_alive(stored_pid)
+    pid_file_pid = read_existing_pid(config) or 0
+    stored_status_pid = int(stored.get("supervisor_pid") or 0) if stored else 0
+    if process_alive(pid_file_pid):
+        stored_pid = pid_file_pid
+        supervisor_alive = True
+    elif process_alive(stored_status_pid):
+        stored_pid = stored_status_pid
+        supervisor_alive = True
+    else:
+        stored_pid = stored_status_pid or pid_file_pid
+        supervisor_alive = False
     child_pid = int(stored.get("child_pid") or 0) if stored else 0
     child_running = bool(stored.get("child_running")) and process_alive(child_pid)
     raw_exit_code = stored.get("child_last_exit_code") if stored else None

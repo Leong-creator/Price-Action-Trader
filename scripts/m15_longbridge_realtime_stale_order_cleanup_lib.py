@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -37,6 +38,8 @@ class StaleOrderCleanupConfig:
     cli_name: str
     cli_timeout_seconds: int
     cancel_stale_buy_orders: bool
+    cleanup_current_session_stale_buy_orders: bool
+    stale_buy_order_ttl_seconds: int
     max_cancel_per_run: int
     hard_boundaries: dict[str, bool]
 
@@ -64,6 +67,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> StaleOrderCleanupConf
         cli_name=str(cleanup.get("cli_name", "longbridge")),
         cli_timeout_seconds=int(cleanup.get("cli_timeout_seconds", 6)),
         cancel_stale_buy_orders=bool(cleanup.get("cancel_stale_buy_orders", True)),
+        cleanup_current_session_stale_buy_orders=bool(cleanup.get("cleanup_current_session_stale_buy_orders", True)),
+        stale_buy_order_ttl_seconds=int(cleanup.get("stale_buy_order_ttl_seconds", 900)),
         max_cancel_per_run=int(cleanup.get("max_cancel_per_run", 20)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
@@ -78,6 +83,8 @@ def validate_config(config: StaleOrderCleanupConfig) -> None:
         raise ValueError("M15 stale order cleanup CLI timeout must be positive")
     if not config.cancel_stale_buy_orders:
         raise ValueError("M15 stale order cleanup must be enabled explicitly")
+    if config.stale_buy_order_ttl_seconds <= 0:
+        raise ValueError("M15 stale order cleanup TTL must be positive")
     if config.max_cancel_per_run <= 0:
         raise ValueError("M15 stale order cleanup max_cancel_per_run must be positive")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
@@ -103,7 +110,7 @@ def run_stale_order_cleanup(
     session_start = parse_utc_datetime(session_started_at)
     account_state = read_json(config.account_state_path)
     blockers = account_blockers(config, account_state)
-    stale_orders = stale_buy_open_orders(account_state, session_start)
+    stale_orders = stale_buy_open_orders(config, account_state, session_start, now)
     runner = command_runner or (lambda command: run_command(command, timeout_seconds=config.cli_timeout_seconds))
     cli_path = shutil.which(config.cli_name) or config.cli_name
     ledger_rows: list[dict[str, Any]] = []
@@ -141,10 +148,15 @@ def run_stale_order_cleanup(
         "paper_account_verified": bool(account_state.get("paper_account_verified") is True and not blockers),
         "account_channel": str(account_state.get("account_channel") or ""),
         "stale_buy_open_order_count": len(stale_orders),
+        "current_session_stale_buy_open_order_count": sum(
+            1 for row in stale_orders if row.get("cleanup_reason") == "current_session_buy_order_ttl_expired"
+        ),
         "canceled_count": canceled_count,
         "failed_count": failed_count,
         "skipped_count": skipped_count,
         "max_cancel_per_run": config.max_cancel_per_run,
+        "cleanup_current_session_stale_buy_orders": config.cleanup_current_session_stale_buy_orders,
+        "stale_buy_order_ttl_seconds": config.stale_buy_order_ttl_seconds,
         "stale_buy_order_symbols": [base_symbol(str(row.get("symbol") or "")) for row in stale_orders],
         "cancel_sell_orders": False,
         "local_simulation_isolated": True,
@@ -180,7 +192,12 @@ def account_blockers(config: StaleOrderCleanupConfig, account_state: dict[str, A
     return blockers
 
 
-def stale_buy_open_orders(account_state: dict[str, Any], session_start: datetime) -> list[dict[str, Any]]:
+def stale_buy_open_orders(
+    config: StaleOrderCleanupConfig,
+    account_state: dict[str, Any],
+    session_start: datetime,
+    now: datetime,
+) -> list[dict[str, Any]]:
     rows = account_state.get("open_orders") if isinstance(account_state.get("open_orders"), list) else []
     stale: list[dict[str, Any]] = []
     for row in rows:
@@ -189,8 +206,18 @@ def stale_buy_open_orders(account_state: dict[str, Any], session_start: datetime
         if str(row.get("side") or "").strip().lower() != "buy":
             continue
         created_at = parse_order_time(row.get("created_at"))
-        if created_at and created_at < session_start:
-            stale.append(row)
+        if not created_at:
+            continue
+        order = dict(row)
+        if created_at < session_start:
+            order["cleanup_reason"] = "previous_session_buy_order"
+            stale.append(order)
+            continue
+        age_seconds = max(0, int((now - created_at).total_seconds()))
+        if config.cleanup_current_session_stale_buy_orders and age_seconds >= config.stale_buy_order_ttl_seconds:
+            order["cleanup_reason"] = "current_session_buy_order_ttl_expired"
+            order["age_seconds"] = str(age_seconds)
+            stale.append(order)
     return stale
 
 
@@ -276,6 +303,8 @@ def cleanup_row(
         "quantity": str(order.get("quantity") or ""),
         "price": str(order.get("price") or ""),
         "created_at": str(order.get("created_at") or ""),
+        "cleanup_reason": str(order.get("cleanup_reason") or ""),
+        "age_seconds": str(order.get("age_seconds") or ""),
         "cleanup_status": status,
         "response": response,
         "local_simulation_ignored": True,
@@ -299,9 +328,9 @@ def summary_status_for(blockers: list[str], stale_orders: list[dict[str, Any]], 
 
 def plain_language(status: str, stale_count: int, canceled_count: int, failed_count: int) -> str:
     if status == "stale_buy_open_orders_canceled":
-        return f"已清理 {canceled_count} 个上一交易窗口遗留的长桥模拟账户买入挂单，今晚只保留新实时信号下单。"
+        return f"已清理 {canceled_count} 个长桥模拟账户旧买入挂单，释放被旧挂单占用的模拟仓位；卖出保护单不会被撤。"
     if status == "no_stale_buy_open_orders":
-        return "没有发现上一交易窗口遗留的买入挂单。"
+        return "没有发现需要清理的旧买入挂单。"
     if status == "partial_cleanup_failed":
         return f"发现 {stale_count} 个旧买入挂单，已撤 {canceled_count} 个，失败 {failed_count} 个；开盘前需要继续检查。"
     return "旧挂单清理没有通过安全检查，未执行撤单。"
@@ -347,7 +376,9 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:

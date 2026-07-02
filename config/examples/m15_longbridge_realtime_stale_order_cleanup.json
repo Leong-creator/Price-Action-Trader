@@ -12,6 +12,8 @@
     "cli_name": "longbridge",
     "cli_timeout_seconds": 6,
     "cancel_stale_buy_orders": true,
+    "cleanup_current_session_stale_buy_orders": true,
+    "stale_buy_order_ttl_seconds": 900,
     "max_cancel_per_run": 20
   },
   "hard_boundaries": {

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
-from subprocess import TimeoutExpired
+from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import patch
 
 from scripts import m12_28_trading_session_dashboard_lib as MODULE
@@ -93,10 +93,42 @@ class M1228TradingSessionDashboardTests(unittest.TestCase):
                 "scripts.m12_28_trading_session_dashboard_lib.subprocess.run",
                 side_effect=TimeoutExpired(cmd=["longbridge", "quote"], timeout=MODULE.LONGRIDGE_QUOTE_TIMEOUT_SECONDS),
             ) as run_mock:
-                with self.assertRaisesRegex(RuntimeError, "longbridge quote timed out after 6s"):
-                    MODULE.fetch_longbridge_quotes(["INTC"], "US", "2026-05-28T16:00:00Z")
+                with patch("scripts.m12_28_trading_session_dashboard_lib.time_module.sleep"):
+                    with self.assertRaisesRegex(RuntimeError, "longbridge quote timed out after 6s; retry_attempts=3"):
+                        MODULE.fetch_longbridge_quotes(["INTC"], "US", "2026-05-28T16:00:00Z")
         self.assertEqual(run_mock.call_args.kwargs["env"]["LONGBRIDGE_REGION"], "cn")
         self.assertEqual(run_mock.call_args.kwargs["env"]["LONGBRIDGE_HTTP_URL"], "https://openapi.longbridge.cn")
+        self.assertEqual(run_mock.call_count, MODULE.LONGRIDGE_QUOTE_RETRY_ATTEMPTS)
+
+    def test_quote_timeout_retries_before_success_without_yahoo_fallback(self) -> None:
+        payload = json.dumps(
+            [
+                {
+                    "symbol": "INTC.US",
+                    "last": "118.19",
+                    "prev_close": "120.89",
+                    "open": "120.00",
+                    "high": "126.64",
+                    "low": "117.66",
+                    "volume": "53760261",
+                    "status": "Normal",
+                }
+            ]
+        )
+        with patch("scripts.m12_28_trading_session_dashboard_lib.shutil.which", return_value="/usr/bin/longbridge"):
+            with patch(
+                "scripts.m12_28_trading_session_dashboard_lib.subprocess.run",
+                side_effect=[
+                    TimeoutExpired(cmd=["longbridge", "quote"], timeout=MODULE.LONGRIDGE_QUOTE_TIMEOUT_SECONDS),
+                    CompletedProcess(args=["longbridge"], returncode=0, stdout=payload, stderr=""),
+                ],
+            ) as run_mock:
+                with patch("scripts.m12_28_trading_session_dashboard_lib.time_module.sleep"):
+                    quotes = MODULE.fetch_longbridge_quotes(["INTC"], "US", "2026-05-28T16:00:00Z")
+
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(quotes["INTC"]["quote_source"], "longbridge_quote_readonly")
+        self.assertEqual(quotes["INTC"]["latest_price"], "118.19")
 
     def test_build_quotes_uses_yahoo_chart_after_longbridge_error(self) -> None:
         config = MODULE.load_config()

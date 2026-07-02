@@ -32,13 +32,27 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     build_dashboard_data_freshness_warning,
     build_dashboard_html,
     build_dashboard_update_status,
+    build_dedicated_bucket_runtime_review_rows,
+    build_local_simulation_history_quality,
     build_extended_session_monitor,
     build_longbridge_paper_dashboard_view,
     build_quote_lookup,
     current_us_scan_date,
     filter_rescue_signal_rows,
     load_config,
+    is_longbridge_non_degraded_freshness_notice,
     market_session_status,
+    m15_apply_longbridge_reconciliation_to_account_pnl,
+    m15_longbridge_closed_trade_quality_summary,
+    m15_longbridge_equity_curve_summary,
+    m15_longbridge_account_pnl_summary,
+    m15_longbridge_reconciliation_fresh_for_account_state,
+    m15_longbridge_strategy_trade_pnl_rows,
+    m15_longbridge_strategy_quality_summary,
+    m15_longbridge_symbol_pnl_rows,
+    m15_longbridge_trade_quality_summary,
+    m15_unfilled_order_diagnostic_rows,
+    m15_longbridge_virtual_bucket_rows,
     m15_submission_counts_for_date,
     open_new_positions,
     pa011_orb_rebuild_signal,
@@ -46,12 +60,367 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     pa004_momentum_breakout_quality_signal,
     pa004_momentum_breakout_signal,
     rescue_signal_filter,
+    read_jsonl,
     run_m12_29_current_day_scan_dashboard,
+    write_jsonl,
+    write_text_atomic,
 )
 from scripts.run_m12_29_current_day_scan_dashboard import validate_generated_at
 
 
 class M1229CurrentDayScanDashboardTest(unittest.TestCase):
+    def test_local_simulation_history_quality_uses_closed_local_ledger_by_lane(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            write_jsonl(
+                output_dir / "m12_46_account_trade_ledger.jsonl",
+                [
+                    {
+                        "event_type": "close",
+                        "runtime_id": "M10-PA-004-long-1d",
+                        "strategy_id": "M10-PA-004",
+                        "timeframe": "1d",
+                        "symbol": "AAPL",
+                        "realized_pnl": "20.00",
+                    },
+                    {
+                        "event_type": "close",
+                        "runtime_id": "M10-PA-004-long-1d",
+                        "strategy_id": "M10-PA-004",
+                        "timeframe": "1d",
+                        "symbol": "MSFT",
+                        "realized_pnl": "-10.00",
+                    },
+                    {
+                        "event_type": "close",
+                        "runtime_id": "M10-PA-013-5m",
+                        "strategy_id": "M10-PA-013",
+                        "timeframe": "5m",
+                        "symbol": "NVDA",
+                        "realized_pnl": "6.00",
+                    },
+                    {
+                        "event_type": "close",
+                        "runtime_id": "M10-PA-013-5m",
+                        "strategy_id": "M10-PA-013",
+                        "timeframe": "5m",
+                        "symbol": "TSLA",
+                        "realized_pnl": "4.00",
+                    },
+                    {
+                        "event_type": "close",
+                        "runtime_id": "M10-PA-013-5m",
+                        "strategy_id": "M10-PA-013",
+                        "timeframe": "5m",
+                        "symbol": "META",
+                        "realized_pnl": "-5.00",
+                    },
+                    {
+                        "event_type": "open",
+                        "runtime_id": "M10-PA-013-5m",
+                        "strategy_id": "M10-PA-013",
+                        "timeframe": "5m",
+                        "symbol": "META",
+                        "realized_pnl": "999.00",
+                    },
+                ],
+            )
+            config = SimpleNamespace(output_dir=output_dir)
+
+            quality = build_local_simulation_history_quality(
+                config,
+                [
+                    {"runtime_id": "M10-PA-004-long-1d", "strategy_id": "M10-PA-004", "timeframe": "1d", "lane": "mainline"},
+                    {"runtime_id": "M10-PA-013-5m", "strategy_id": "M10-PA-013", "timeframe": "5m", "lane": "experimental"},
+                ],
+            )
+
+        self.assertEqual(quality["overall"]["closed_trade_count"], "5")
+        self.assertEqual(quality["overall"]["net_realized_pnl"], "15.00")
+        self.assertEqual(quality["overall"]["profit_loss_ratio"], "1.33")
+        self.assertEqual(quality["overall"]["profit_factor"], "2.00")
+        by_lane = {row["lane"]: row for row in quality["lane_rows"]}
+        self.assertEqual(by_lane["mainline"]["profit_loss_ratio"], "2.00")
+        self.assertEqual(by_lane["experimental"]["profit_loss_ratio"], "1.00")
+        by_timeframe = {row["timeframe"]: row for row in quality["timeframe_rows"]}
+        self.assertEqual(by_timeframe["1d"]["net_realized_pnl"], "10.00")
+        self.assertEqual(by_timeframe["5m"]["net_realized_pnl"], "5.00")
+
+    def test_longbridge_account_pnl_summary_uses_reconciliation_when_available(self):
+        summary = m15_longbridge_account_pnl_summary(
+            {"cash": "97736.61", "buying_power": "100596.16", "total_open_order_notional": "0.00"},
+            {"position_market_value": "4622.27", "position_cost_value": "4672.27", "total_unrealized_pnl": "-50.00"},
+            "10000",
+        )
+        m15_apply_longbridge_reconciliation_to_account_pnl(
+            summary,
+            {
+                "query_range": {"start": "2026-06-01", "end": "2026-06-08"},
+                "account_pnl": {
+                    "initial_asset_value": "102524.64",
+                    "ending_asset_value": "102358.88",
+                    "sum_profit": "-165.76",
+                    "sum_profit_percent": "-0.16",
+                },
+                "trading_pnl": {
+                    "stock_total_pnl": "-154.18",
+                    "realized_pnl_estimate": "-104.18",
+                    "current_position_unrealized_pnl": "-50.00",
+                },
+                "account_snapshot": {
+                    "portfolio_total_cash": "97736.61",
+                    "portfolio_market_cap": "4622.27",
+                    "portfolio_total_today_pl": "12.34",
+                },
+            },
+        )
+
+        self.assertEqual(summary["account_total_equity_estimate"], "102358.88")
+        self.assertEqual(summary["account_total_pnl_estimate"], "-165.76")
+        self.assertEqual(summary["account_total_return_percent"], "-0.16")
+        self.assertEqual(summary["longbridge_stock_total_pnl"], "-154.18")
+        self.assertEqual(summary["longbridge_realized_pnl_estimate"], "-104.18")
+        self.assertEqual(summary["longbridge_unrealized_pnl"], "-50.00")
+        self.assertEqual(summary["longbridge_today_total_pnl"], "12.34")
+        self.assertIn("profit-analysis", summary["account_total_pnl_note"])
+
+    def test_longbridge_reconciliation_must_not_be_older_than_account_state(self):
+        stale_reconciliation = {"generated_at": "2026-06-08T03:32:43Z", "pnl_reconciliation_ok": True}
+        fresh_reconciliation = {"generated_at": "2026-06-12T20:00:00Z", "pnl_reconciliation_ok": True}
+        account_state = {"generated_at": "2026-06-12T19:59:50Z"}
+
+        self.assertFalse(
+            m15_longbridge_reconciliation_fresh_for_account_state(stale_reconciliation, account_state)
+        )
+        self.assertTrue(
+            m15_longbridge_reconciliation_fresh_for_account_state(fresh_reconciliation, account_state)
+        )
+
+    def test_longbridge_symbol_and_strategy_pnl_rows_use_reconciliation(self):
+        symbol_rows = m15_longbridge_symbol_pnl_rows(
+            {
+                "symbol_pnl_rows": [
+                    {
+                        "security_code": "TSLA",
+                        "name": "特斯拉",
+                        "profit": "-36.43",
+                        "profit_rate": "-0.0431",
+                        "holding_value": "391",
+                        "invest_cost": "845.32",
+                        "realized_cash": "417.89",
+                        "is_holding": False,
+                    },
+                    {
+                        "security_code": "NVDA",
+                        "name": "英伟达",
+                        "profit": "12.50",
+                        "profit_rate": "0.0125",
+                        "holding_value": "500",
+                        "invest_cost": "487.50",
+                        "is_holding": True,
+                    },
+                ]
+            }
+        )
+        strategy_rows = m15_longbridge_strategy_trade_pnl_rows(
+            {
+                "rows": [
+                    {
+                        "counts_for_performance": True,
+                        "attribution_status": "matched_m15_realtime_ledger",
+                        "side": "buy",
+                        "symbol": "TSLA",
+                        "runtime_id": "M10-PA-004-long-1d",
+                    },
+                    {
+                        "counts_for_performance": True,
+                        "attribution_status": "matched_m15_realtime_ledger",
+                        "side": "buy",
+                        "symbol": "NVDA",
+                        "runtime_id": "M10-PA-013-1d",
+                    },
+                    {
+                        "counts_for_performance": False,
+                        "attribution_status": "matched_m15_realtime_ledger",
+                        "side": "buy",
+                        "symbol": "TSLA",
+                        "runtime_id": "M10-PA-001-1d",
+                    },
+                ]
+            },
+            symbol_rows,
+        )
+
+        self.assertEqual(symbol_rows[0]["symbol"], "TSLA")
+        self.assertEqual(symbol_rows[0]["profit"], "-36.43")
+        by_runtime = {row["runtime_id"]: row for row in strategy_rows}
+        self.assertEqual(by_runtime["M10-PA-004-long-1d"]["trade_pnl"], "-36.43")
+        self.assertIn("实际成交", by_runtime["M10-PA-004-long-1d"]["attribution_note"])
+        self.assertEqual(by_runtime["M10-PA-013-1d"]["trade_pnl"], "12.50")
+        self.assertNotIn("M10-PA-001-1d", by_runtime)
+
+    def test_longbridge_trade_quality_summary_uses_symbol_pnl_rows(self):
+        symbol_rows = m15_longbridge_symbol_pnl_rows(
+            {
+                "symbol_pnl_rows": [
+                    {
+                        "security_code": "TSLA",
+                        "profit": "-36.43",
+                        "profit_rate": "-0.0431",
+                    },
+                    {
+                        "security_code": "NVDA",
+                        "profit": "12.50",
+                        "profit_rate": "0.0125",
+                    },
+                    {
+                        "security_code": "MSFT",
+                        "profit": "0",
+                        "profit_rate": "0",
+                    },
+                ]
+            }
+        )
+
+        summary = m15_longbridge_trade_quality_summary(symbol_rows)
+
+        self.assertEqual(summary["win_rate_percent"], "50.00")
+        self.assertEqual(summary["win_rate_label"], "50.00%")
+        self.assertEqual(summary["win_count"], "1")
+        self.assertEqual(summary["loss_count"], "1")
+        self.assertEqual(summary["flat_count"], "1")
+        self.assertEqual(summary["average_win"], "12.50")
+        self.assertEqual(summary["average_loss"], "36.43")
+        self.assertEqual(summary["profit_loss_ratio"], "0.34")
+        self.assertEqual(summary["worst_symbol"], "TSLA")
+        self.assertEqual(summary["worst_symbol_loss_percent"], "-4.31")
+        self.assertIn("逐标的盈亏", summary["source_note"])
+        self.assertIn("最大回撤只看长桥账户权益曲线", summary["worst_symbol_loss_note"])
+
+    def test_longbridge_equity_curve_summary_computes_full_max_drawdown(self):
+        summary = m15_longbridge_equity_curve_summary(
+            [
+                {"generated_at": "2026-06-04T14:00:00Z", "account_total_equity_estimate": "10000.00"},
+                {"generated_at": "2026-06-04T15:00:00Z", "account_total_equity_estimate": "10500.00"},
+                {"generated_at": "2026-06-04T16:00:00Z", "account_total_equity_estimate": "9450.00"},
+                {"generated_at": "2026-06-04T17:00:00Z", "account_total_equity_estimate": "9800.00"},
+            ]
+        )
+
+        self.assertEqual(summary["snapshot_count"], "4")
+        self.assertEqual(summary["max_drawdown_percent"], "10.00")
+        self.assertEqual(summary["max_drawdown_label"], "10.00%")
+        self.assertEqual(summary["peak_at"], "2026-06-04T15:00:00Z")
+        self.assertEqual(summary["trough_at"], "2026-06-04T16:00:00Z")
+
+    def test_longbridge_closed_trade_quality_summary_pairs_filled_orders(self):
+        summary = m15_longbridge_closed_trade_quality_summary(
+            {
+                "orders": [
+                    {"created_at": "2026-06-04T13:00:00Z", "status": "Filled", "side": "Buy", "symbol": "IGNORED.US", "executed_quantity": "1", "executed_price": "10"},
+                    {"created_at": "2026-06-04T13:05:00Z", "status": "Filled", "side": "Sell", "symbol": "IGNORED.US", "executed_quantity": "1", "executed_price": "9"},
+                ],
+                "historical_executions": [
+                    {"created_at": "2026-06-04T14:00:00Z", "status": "Filled", "side": "Buy", "symbol": "AAPL.US", "executed_quantity": "1", "executed_price": "100"},
+                    {"created_at": "2026-06-04T14:05:00Z", "status": "Filled", "side": "Sell", "symbol": "AAPL.US", "executed_quantity": "1", "executed_price": "105"},
+                    {"created_at": "2026-06-04T14:10:00Z", "status": "Filled", "side": "Buy", "symbol": "MSFT.US", "executed_quantity": "2", "executed_price": "50"},
+                    {"created_at": "2026-06-04T14:15:00Z", "status": "Filled", "side": "Sell", "symbol": "MSFT.US", "executed_quantity": "2", "executed_price": "49"},
+                    {"created_at": "2026-06-04T14:20:00Z", "status": "Filled", "side": "Sell", "symbol": "TSLA.US", "executed_quantity": "1", "executed_price": "300"},
+                ]
+            }
+        )
+
+        self.assertEqual(summary["win_rate_label"], "50.00%")
+        self.assertEqual(summary["win_count"], "1")
+        self.assertEqual(summary["loss_count"], "1")
+        self.assertEqual(summary["sample_count"], "2")
+        self.assertEqual(summary["unmatched_sell_count"], "1")
+        self.assertEqual(summary["total_pnl"], "3.00")
+        self.assertIn("历史成交明细", summary["source_note"])
+        self.assertIn("不读取本地模拟账本", summary["source_note"])
+
+    def test_longbridge_strategy_quality_summary_uses_longbridge_executions_and_submission_ledger(self):
+        summary = m15_longbridge_strategy_quality_summary(
+            {
+                "historical_executions": [
+                    {"time": "2026-06-08T14:00:00Z", "side": "buy", "symbol": "AAPL.US", "quantity": "1", "price": "100"},
+                    {"time": "2026-06-08T14:05:00Z", "side": "sell", "symbol": "AAPL.US", "quantity": "1", "price": "96"},
+                    {"time": "2026-06-09T03:20:00Z", "side": "buy", "symbol": "MSFT.US", "quantity": "1", "price": "200"},
+                    {"time": "2026-06-09T03:25:00Z", "side": "sell", "symbol": "MSFT.US", "quantity": "1", "price": "212"},
+                ]
+            },
+            [
+                {
+                    "submission_status": "submitted",
+                    "submitted_at": "2026-06-08T13:59:30Z",
+                    "runtime_id": "M10-PA-004-long-1d",
+                    "strategy_id": "M10-PA-004",
+                    "side": "buy",
+                    "symbol": "AAPL",
+                    "quantity": "1",
+                },
+                {
+                    "submission_status": "submitted",
+                    "submitted_at": "2026-06-08T14:04:30Z",
+                    "runtime_id": "M10-PA-004-long-1d",
+                    "strategy_id": "M10-PA-004",
+                    "side": "sell",
+                    "symbol": "AAPL",
+                    "quantity": "1",
+                },
+                {
+                    "submission_status": "submitted",
+                    "submitted_at": "2026-06-09T03:19:30Z",
+                    "runtime_id": "M10-PA-001-1d",
+                    "strategy_id": "M10-PA-001",
+                    "side": "buy",
+                    "symbol": "MSFT",
+                    "quantity": "1",
+                },
+                {
+                    "submission_status": "submitted",
+                    "submitted_at": "2026-06-09T03:24:30Z",
+                    "runtime_id": "M10-PA-001-1d",
+                    "strategy_id": "M10-PA-001",
+                    "side": "sell",
+                    "symbol": "MSFT",
+                    "quantity": "1",
+                },
+            ],
+        )
+
+        rows = {row["runtime_id"]: row for row in summary["rows"]}
+
+        self.assertEqual(summary["pre_fix_closed_trade_count"], "1")
+        self.assertEqual(summary["post_fix_closed_trade_count"], "1")
+        self.assertEqual(rows["M10-PA-004-long-1d"]["quality_tier"], "主交易策略")
+        self.assertEqual(rows["M10-PA-004-long-1d"]["total_pnl"], "-4.00")
+        self.assertEqual(rows["M10-PA-001-1d"]["quality_tier"], "严格小仓位测试策略")
+        self.assertEqual(rows["M10-PA-001-1d"]["post_fix_closed_trade_count"], "1")
+        self.assertIn("不读取本地模拟账本", summary["note"])
+
+    def test_read_jsonl_ignores_partial_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "events.jsonl"
+            path.write_text('{"ok": 1}\n{"broken"\n{"ok": 2}\n', encoding="utf-8")
+
+            rows = read_jsonl(path)
+
+        self.assertEqual(rows, [{"ok": 1}, {"ok": 2}])
+
+    def test_write_helpers_replace_files_atomically(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            jsonl_path = root / "events.jsonl"
+            html_path = root / "dashboard.html"
+
+            write_jsonl(jsonl_path, [{"symbol": "AAPL"}])
+            write_text_atomic(html_path, "<html>ok</html>")
+
+            self.assertEqual(read_jsonl(jsonl_path), [{"symbol": "AAPL"}])
+            self.assertEqual(html_path.read_text(encoding="utf-8"), "<html>ok</html>")
+            self.assertEqual(list(root.glob(".*.tmp")), [])
+
     def run_stage(self, *, output_dir: Path | None = None, generated_at: str = "2026-04-29T02:30:00Z"):
         temp_dir = None
         if output_dir is None:
@@ -134,6 +503,22 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             ),
             "",
         )
+
+    def test_data_freshness_warning_does_not_call_longbridge_cache_gap_degraded(self):
+        warning = build_dashboard_data_freshness_warning(
+            quote_source="longbridge_quote_readonly",
+            current_day_runtime_ready=True,
+            current_day_scan_complete=False,
+            daily_ready_symbols=0,
+            current_5m_ready_symbols=147,
+            active_universe_symbol_count=147,
+            runtime_readiness_note="日线沿用上一份 cache",
+        )
+
+        self.assertIn("严格全量扫描口径未完成", warning)
+        self.assertIn("长桥只读行情没有降级", warning)
+        self.assertNotIn("数据源降级", warning)
+        self.assertNotIn("fallback quotes / no-fetch", warning)
 
     def test_longbridge_paper_panel_uses_10000_model_and_fee_gate_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -263,10 +648,141 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             queue_dir = root / "m15_longbridge_fast_signal_queue"
             realtime_dir = root / "m15_longbridge_realtime_execution"
             connection_dir = root / "m15_longbridge_paper_connection_check"
+            output_dir.mkdir(parents=True)
             submitter_dir.mkdir(parents=True)
             queue_dir.mkdir(parents=True)
             realtime_dir.mkdir(parents=True)
             connection_dir.mkdir(parents=True)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps(
+                    {
+                        "local_simulation_history_quality": {
+                            "runtime_rows": [
+                                {
+                                    "runtime_id": "M10-PA-002-1d",
+                                    "timeframe": "1d",
+                                    "net_realized_pnl": "10.00",
+                                    "win_rate_percent": "40.00",
+                                    "profit_loss_ratio": "1.20",
+                                    "closed_trade_count": "5",
+                                },
+                                {
+                                    "runtime_id": "M10-PA-002-5m",
+                                    "timeframe": "5m",
+                                    "net_realized_pnl": "25.00",
+                                    "win_rate_percent": "55.00",
+                                    "profit_loss_ratio": "1.80",
+                                    "closed_trade_count": "8",
+                                },
+                            ]
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_account_state.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.longbridge-realtime-account-state.v1",
+                        "generated_at": fresh_generated_at,
+                        "account_channel": "lb_papertrading",
+                        "account_type": "M",
+                        "paper_account_detected": True,
+                        "auth_ok": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "buying_power": "102524.64",
+                        "total_open_order_notional": "200.00",
+                        "position_row_count": 1,
+                        "open_order_count": 2,
+                        "held_symbols": ["NVDA"],
+                        "positions": [{"symbol": "NVDA.US", "quantity": "2", "available": "2", "cost_price": "100.00"}],
+                        "orders": [
+                            {
+                                "created_at": fresh_generated_at,
+                                "status": "Filled",
+                                "side": "Buy",
+                                "symbol": "NVDA.US",
+                                "executed_quantity": "2",
+                                "executed_price": "100.00",
+                            },
+                            {
+                                "created_at": fresh_generated_at,
+                                "status": "Rejected",
+                                "side": "Sell",
+                                "symbol": "NVDA.US",
+                                "quantity": "1",
+                                "price": "95.00",
+                            },
+                            {
+                                "created_at": fresh_generated_at,
+                                "status": "New",
+                                "side": "Buy",
+                                "symbol": "MSFT.US",
+                                "quantity": "1",
+                                "price": "200.00",
+                            },
+                        ],
+                        "local_sim_position_migration": False,
+                        "real_money_actions": False,
+                        "live_execution": False,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_account_pnl_reconciliation.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.longbridge-account-pnl-reconciliation.v2",
+                        "generated_at": fresh_generated_at,
+                        "query_range": {"start": "2026-06-01", "end": "2026-06-30"},
+                        "account_pnl": {
+                            "initial_asset_value": "102500.00",
+                            "ending_asset_value": "102735.00",
+                            "sum_profit": "235.00",
+                            "sum_profit_percent": "0.23",
+                        },
+                        "trading_pnl": {
+                            "stock_total_pnl": "91.83",
+                            "realized_pnl_estimate": "-178.04",
+                            "current_position_unrealized_pnl": "269.87",
+                        },
+                        "account_snapshot": {
+                            "portfolio_total_cash": "95948.45",
+                            "portfolio_market_cap": "6686.85",
+                            "portfolio_total_asset": "102635.30",
+                            "portfolio_total_pl": "269.866",
+                            "portfolio_total_today_pl": "234.00",
+                        },
+                        "current_holdings": [
+                            {
+                                "symbol": "NVDA.US",
+                                "quantity": "2",
+                                "market_price": "105.00",
+                                "prev_close": "103.00",
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_realtime_market_events.jsonl").write_text(
+                json.dumps(
+                    {
+                        "event_id": "nvda-latest",
+                        "symbol": "NVDA",
+                        "event_time": fresh_generated_at,
+                        "close": "105.00",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (submitter_dir / "m15_longbridge_paper_account_state.json").write_text(
                 json.dumps(
                     {
@@ -396,6 +912,26 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                         "blocked_signal_count": 0,
                         "submitted_count": 0,
                         "latency_counts": {"target_met": 1, "acceptable": 0, "delayed_revalidated": 0},
+                        "runtime_whitelist": [
+                            "M10-PA-004-long-1d",
+                            "M10-PA-002-5m",
+                            "M12-FTD-001-baseline-1d",
+                            "M12-FTD-001-loss-streak-guard-1d",
+                            "M10-PA-004-MBF-1d",
+                            "M10-PA-004-MBF-QC-1d",
+                            "M10-PA-013-5m",
+                            "M10-PA-011-ORB-R1-5m",
+                        ],
+                        "virtual_capital_buckets": [
+                            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "runtime_ids": ["M10-PA-004-long-1d"]},
+                            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
+                            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
+                            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
+                            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "runtime_ids": ["M10-PA-004-MBF-1d"]},
+                            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "runtime_ids": ["M10-PA-004-MBF-QC-1d"]},
+                            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "runtime_ids": ["M10-PA-013-5m"]},
+                            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "runtime_ids": ["M10-PA-011-ORB-R1-5m"]},
+                        ],
                         "plain_language_result": "长桥实时链路有 1 条实时信号通过风控，但当前是只读演练，未提交订单。",
                     },
                     ensure_ascii=False,
@@ -421,10 +957,31 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertTrue(panel["data_available"])
         self.assertTrue(panel["paper_account_detected"])
         self.assertEqual(panel["account_channel"], "lb_papertrading")
+        self.assertEqual(panel["longbridge_panel_generated_at"], fresh_generated_at)
+        self.assertEqual(panel["position_count"], "1")
         self.assertEqual(panel["position_row_count"], "1")
         self.assertEqual(panel["open_order_count"], "2")
+        self.assertEqual(panel["today_total_pnl"], "234.00")
+        self.assertEqual(panel["longbridge_account_today_total_pnl"], "234.00")
+        self.assertEqual(panel["longbridge_account_total_pnl"], "269.866")
+        self.assertEqual(panel["total_pnl"], "269.866")
+        self.assertEqual(panel["account_total_equity_estimate"], "102635.30")
+        self.assertEqual(panel["account_total_pnl_estimate"], "235.00")
+        self.assertEqual(panel["account_total_return_percent"], "0.23")
+        self.assertEqual(panel["project_model_exposure_label"], "410.00 / 6000.00 (6.83%)")
+        self.assertIn("成交 1 / 拒单 1 / 挂单 1", panel_json)
         self.assertEqual(panel["submit_ready_count"], "1")
         self.assertEqual(panel["new_open_signal_count"], "1")
+        self.assertIn("长桥账户总资产", panel_json)
+        self.assertIn("当前持仓总盈亏", panel_json)
+        self.assertIn("portfolio.total_pl", panel_json)
+        self.assertIn("项目资金模型占用", panel_json)
+        pnl_cards_by_label = {row["label"]: row for row in panel["realtime_pnl_cards"]}
+        self.assertEqual(pnl_cards_by_label["接口持仓今日浮动"]["value"], "234.00")
+        self.assertEqual(pnl_cards_by_label["账户当日盈亏"]["value"], "无法计算")
+        self.assertEqual(pnl_cards_by_label["当前持仓总盈亏"]["value"], "269.87")
+        self.assertEqual(pnl_cards_by_label["持仓浮动"]["value"], "269.87")
+        self.assertNotIn("长桥总盈亏", panel_json)
         self.assertIn("项目按 10000 USD 模型控制仓位", panel_json)
         self.assertIn("长桥实时链路本轮已完成", panel_json)
         self.assertIn("长桥只读行情采集器新增 2 条实时行情事件", panel_json)
@@ -434,11 +991,91 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("实时行情采集", html)
         self.assertIn("实时信号生成", html)
         self.assertIn("实时链路", html)
+        self.assertIn("实时盈亏", html)
+        self.assertIn("持仓浮动", html)
+        self.assertIn("逐标的盈亏", html)
+        self.assertIn("逐策略成交盈亏", html)
+        dedicated_rows = {row["runtime_id"]: row for row in panel["dedicated_bucket_runtime_review_rows"]}
+        self.assertEqual(dedicated_rows["M10-PA-002-5m"]["review_status"], "已按运行单元复核")
+        self.assertEqual(dedicated_rows["M10-PA-004-MBF-QC-1d"]["review_status"], "已按运行单元复核")
+        self.assertIn("单策略仓运行单元复核", html)
+        self.assertIn("PA002-5m单仓", html)
         self.assertNotIn("实时链路与旧队列", html)
         self.assertIn('http-equiv="Cache-Control"', html)
         self.assertIn('content="no-store, no-cache, must-revalidate"', html)
         self.assertIn("dashboard_reload", html)
         self.assertNotIn("order_id", panel_json)
+
+    def test_longbridge_panel_includes_trade_quality_metrics(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fresh_generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+            output_dir = root / "m12_29"
+            realtime_dir = root / "m15_longbridge_realtime_execution"
+            realtime_dir.mkdir(parents=True)
+            (realtime_dir / "m15_longbridge_realtime_account_state.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": fresh_generated_at,
+                        "account_channel": "lb_papertrading",
+                        "account_type": "M",
+                        "paper_account_detected": True,
+                        "auth_ok": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "buying_power": "10000.00",
+                        "position_row_count": 0,
+                        "open_order_count": 0,
+                        "local_sim_position_migration": False,
+                        "real_money_actions": False,
+                        "live_execution": False,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_account_pnl_reconciliation.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.longbridge-account-pnl-reconciliation.v1",
+                        "generated_at": fresh_generated_at,
+                        "query_range": {"start": "2026-06-01", "end": "2026-06-08"},
+                        "account_pnl": {"sum_profit": "-10.00"},
+                        "trading_pnl": {"stock_total_pnl": "-10.00", "current_position_unrealized_pnl": "0.00"},
+                        "symbol_pnl_rows": [
+                            {"security_code": "NVDA", "profit": "20.00", "profit_rate": "0.0200"},
+                            {"security_code": "TSLA", "profit": "-10.00", "profit_rate": "-0.0500"},
+                            {"security_code": "MSFT", "profit": "0", "profit_rate": "0"},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (realtime_dir / "m15_longbridge_realtime_equity_curve.jsonl").write_text(
+                "\n".join(
+                    json.dumps(row, ensure_ascii=False)
+                    for row in [
+                        {"generated_at": "2026-06-04T14:00:00Z", "account_total_equity_estimate": "10000.00"},
+                        {"generated_at": "2026-06-04T15:00:00Z", "account_total_equity_estimate": "10500.00"},
+                        {"generated_at": "2026-06-04T16:00:00Z", "account_total_equity_estimate": "9450.00"},
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            panel = build_longbridge_paper_dashboard_view(replace(load_config(), output_dir=output_dir))
+            panel_json = json.dumps(panel, ensure_ascii=False)
+
+        self.assertEqual(panel["longbridge_symbol_win_rate_label"], "50.00%")
+        self.assertEqual(panel["longbridge_worst_symbol_loss_label"], "-5.00%")
+        self.assertEqual(panel["longbridge_max_drawdown_label"], "10.00%")
+        self.assertEqual(panel["longbridge_profit_loss_ratio"], "2.00")
+        self.assertIn("长桥逐标的胜率", panel_json)
+        self.assertIn("长桥完整最大回撤", panel_json)
+        self.assertNotIn("长桥回撤代理", panel_json)
 
     def test_longbridge_panel_prefers_realtime_account_state_over_legacy_submitter_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -545,9 +1182,15 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertNotIn("OLD", status_by_label["持仓 / 挂单"]["note"])
         self.assertEqual(status_by_label["实时账户状态"]["value"], "paper_account_ready")
         self.assertEqual(panel["managed_position_count"], "0")
-        self.assertEqual(panel["unmanaged_position_count"], "1")
-        self.assertEqual(panel["unmanaged_position_symbols"], ["AAPL"])
+        self.assertEqual(panel["exit_only_position_count"], "1")
+        self.assertEqual(panel["exit_only_position_symbols"], ["AAPL"])
+        self.assertEqual(panel["unmanaged_position_count"], "0")
+        self.assertEqual(panel["raw_unmanaged_position_count"], "1")
+        self.assertEqual(panel["raw_unmanaged_position_symbols"], ["AAPL"])
         self.assertIn("非本轮 M15 开仓", status_by_label["实时持仓退出"]["note"])
+        self.assertIn("只接管退出待实时复核", status_by_label["实时持仓退出"]["note"])
+        self.assertEqual(panel["submission_status"], "paper_account_ready")
+        self.assertNotEqual(panel["submission_status"], "submitter_state_stale_waiting_refresh")
         self.assertTrue(panel["refs"]["realtime_account_state"])
         self.assertTrue(panel["refs"]["paper_account_state"])
 
@@ -655,10 +1298,14 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(panel["position_row_count"], "9")
         self.assertEqual(panel["open_order_count"], "5")
         self.assertEqual(panel["skipped_previously_processed_signal_count"], "609")
-        self.assertIn("上一轮长桥审计快照", panel["plain_language_result"])
-        self.assertIn("上一交易窗口累计提交 4 笔模拟订单", panel["plain_language_result"])
+        self.assertEqual(panel["generated_at"], old_generated_at)
+        self.assertEqual(panel["account_state_generated_at"], old_generated_at)
+        self.assertIn("账户状态已只读刷新", panel["plain_language_result"])
+        self.assertIn("等待下一交易日自动运行", panel["plain_language_result"])
+        self.assertIn("长桥面板刷新时间", json.dumps(panel["status_rows"], ensure_ascii=False))
+        self.assertNotIn("累计提交 4", panel["plain_language_result"])
         self.assertNotIn("实时链路本轮已提交", panel["plain_language_result"])
-        self.assertIn("7系统管理 / 2非系统管理", json.dumps(panel["status_rows"], ensure_ascii=False))
+        self.assertIn("7系统管理 / 2只接管退出 / 0未接管退出", json.dumps(panel["status_rows"], ensure_ascii=False))
 
     def test_longbridge_panel_does_not_show_legacy_submitter_blocker_when_realtime_is_available(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -755,6 +1402,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         status_by_label = {row["label"]: row for row in panel["status_rows"]}
         self.assertNotIn("not_us_regular_session", panel["plain_language_result"])
         self.assertNotIn("提交器状态来自旧交易日", panel["plain_language_result"])
+        self.assertNotEqual(panel["submission_status"], "submitter_state_stale_waiting_refresh")
         self.assertEqual(status_by_label["市场窗口"]["value"], "美股常规交易时段")
 
     def test_m15_submission_counts_infers_market_date_from_realtime_timestamps(self):
@@ -894,7 +1542,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(panel["open_order_count"], "状态未刷新")
         self.assertEqual(panel["submit_ready_count"], "0")
         self.assertIn("旧交易日", panel["plain_language_result"])
-        self.assertIn("提交器状态待刷新", json.dumps(panel["status_rows"], ensure_ascii=False))
+        self.assertIn("旧提交器仅审计", json.dumps(panel["status_rows"], ensure_ascii=False))
 
     def test_longbridge_panel_marks_old_same_day_account_state_as_stale(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1150,11 +1798,13 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                             "trading_date": "2026-06-03",
                             "submission_status": "submitted",
                             "signal_fingerprint": "aapl",
+                            "submission_response": {"order_id": "order-aapl"},
                         },
                         {
                             "trading_date": "2026-06-03",
                             "submission_status": "submitted",
                             "signal_fingerprint": "xlu",
+                            "submission_response": {"order_id": "order-xlu"},
                         },
                     ]
                 )
@@ -1199,6 +1849,206 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
 
         self.assertEqual(panel["submitted_order_count"], "2")
         self.assertIn("2 / 2", json.dumps(panel["queue_rows"], ensure_ascii=False))
+
+    def test_longbridge_virtual_bucket_rows_separate_new_epoch_from_old_history(self):
+        realtime = {
+            "virtual_capital_buckets": [
+                {
+                    "capital_bucket": "main",
+                    "label": "主力仓",
+                    "equity": "10000.00",
+                    "max_total_exposure": "6000.00",
+                    "max_symbol_exposure": "1500.00",
+                    "used_exposure": "100.00",
+                },
+                {
+                    "capital_bucket": "experimental",
+                    "label": "实验仓",
+                    "equity": "10000.00",
+                    "max_total_exposure": "6000.00",
+                    "max_symbol_exposure": "1000.00",
+                    "used_exposure": "0.00",
+                },
+            ]
+        }
+        epoch = {"test_epoch_id": "unit-new-epoch", "status": "active"}
+        ledger = [
+            {
+                "test_epoch_id": "unit-new-epoch",
+                "capital_bucket": "main",
+                "side": "buy",
+                "submission_status": "submitted",
+                "notional": "100.00",
+            },
+            {
+                "test_epoch_id": "old-epoch",
+                "capital_bucket": "main",
+                "side": "buy",
+                "submission_status": "submitted",
+                "notional": "100.00",
+            },
+        ]
+
+        rows = m15_longbridge_virtual_bucket_rows(realtime, ledger, epoch)
+        by_bucket = {row["capital_bucket"]: row for row in rows}
+
+        self.assertEqual(by_bucket["main"]["submitted_buy_count"], "1")
+        self.assertEqual(by_bucket["experimental"]["label"], "实验仓")
+        self.assertEqual(by_bucket["old_history"]["submitted_buy_count"], "1")
+        self.assertEqual(by_bucket["local_repair"]["submitted_buy_count"], "0")
+
+    def test_longbridge_virtual_bucket_rows_count_only_actual_fills_when_reconciled(self):
+        realtime = {
+            "virtual_capital_buckets": [
+                {
+                    "capital_bucket": "main",
+                    "label": "主力仓",
+                    "equity": "10000.00",
+                    "max_total_exposure": "6000.00",
+                    "max_symbol_exposure": "1500.00",
+                    "used_exposure": "999.00",
+                }
+            ]
+        }
+        epoch = {"test_epoch_id": "epoch-live", "status": "active"}
+        ledger = [
+            {
+                "test_epoch_id": "epoch-live",
+                "capital_bucket": "main",
+                "side": "buy",
+                "submission_status": "submitted",
+                "notional": "999.00",
+            }
+        ]
+        reconciliation = {
+            "current_holdings": [
+                {"symbol": "AAPL.US", "quantity": "1", "market_price": "110.00", "cost_price": "100.00"}
+            ]
+        }
+        order_reconciliation = {
+            "rows": [
+                {
+                    "test_epoch_id": "epoch-live",
+                    "capital_bucket": "main",
+                    "symbol": "AAPL",
+                    "side": "buy",
+                    "executed_quantity": "1",
+                    "executed_price": "100.00",
+                    "price": "100.00",
+                    "counts_for_performance": True,
+                    "attribution_status": "matched_m15_realtime_ledger",
+                },
+                {
+                    "test_epoch_id": "epoch-live",
+                    "capital_bucket": "main",
+                    "symbol": "MSFT",
+                    "side": "buy",
+                    "quantity": "1",
+                    "price": "300.00",
+                    "counts_for_performance": False,
+                    "attribution_status": "matched_m15_realtime_ledger",
+                },
+            ]
+        }
+
+        rows = m15_longbridge_virtual_bucket_rows(realtime, ledger, epoch, reconciliation, order_reconciliation)
+        by_bucket = {row["capital_bucket"]: row for row in rows}
+
+        self.assertEqual(by_bucket["main"]["submitted_buy_count"], "1")
+        self.assertEqual(by_bucket["main"]["used_exposure"], "110.00")
+        self.assertEqual(by_bucket["main"]["current_position_total_pnl"], "10.00")
+        self.assertEqual(by_bucket["main"]["realized_pnl"], "0.00")
+        self.assertEqual(by_bucket["main"]["trading_total_pnl"], "10.00")
+        self.assertEqual(by_bucket["main"]["bucket_today_pnl"], "0.00")
+        self.assertEqual(by_bucket["main"]["total_pnl"], "10.00")
+        self.assertIn("未成交请求不计入表现", by_bucket["main"]["note"])
+
+    def test_unfilled_order_diagnostics_hide_raw_order_ids_from_dashboard(self):
+        rows = m15_unfilled_order_diagnostic_rows(
+            {
+                "rows": [
+                    {
+                        "order_id": "1246481618579767296",
+                        "symbol": "VTI",
+                        "side": "buy",
+                        "status": "Expired",
+                        "runtime_id": "M10-PA-004-long-1d",
+                        "capital_bucket": "main",
+                        "diagnostic_category": "expired_price_not_touched",
+                        "diagnostic_evidence": "长桥订单历史显示过期。",
+                        "repair_action": "后续订单继续记录触价路径。",
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(rows[0]["diagnostic_ref"], "未成交-1")
+        self.assertNotIn("order_id", rows[0])
+        self.assertNotIn("1246481618579767296", json.dumps(rows, ensure_ascii=False))
+
+    def test_dedicated_pa002_review_requires_runtime_level_bucket_match(self):
+        local_history = {
+            "runtime_rows": [
+                {
+                    "runtime_id": "M10-PA-002-1d",
+                    "timeframe": "1d",
+                    "net_realized_pnl": "10.00",
+                    "win_rate_percent": "40.00",
+                    "profit_loss_ratio": "1.20",
+                    "closed_trade_count": "5",
+                },
+                {
+                    "runtime_id": "M10-PA-002-5m",
+                    "timeframe": "5m",
+                    "net_realized_pnl": "25.00",
+                    "win_rate_percent": "55.00",
+                    "profit_loss_ratio": "1.80",
+                    "closed_trade_count": "8",
+                },
+            ]
+        }
+        longbridge = {
+            "runtime_whitelist": [
+                "M10-PA-004-long-1d",
+                "M10-PA-002-5m",
+                "M12-FTD-001-baseline-1d",
+                "M12-FTD-001-loss-streak-guard-1d",
+                "M10-PA-004-MBF-1d",
+                "M10-PA-004-MBF-QC-1d",
+                "M10-PA-013-5m",
+                "M10-PA-011-ORB-R1-5m",
+            ],
+            "virtual_capital_bucket_definitions": [
+                {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "runtime_ids": ["M10-PA-004-long-1d"]},
+                {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
+                {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
+                {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
+                {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "runtime_ids": ["M10-PA-004-MBF-1d"]},
+                {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "runtime_ids": ["M10-PA-004-MBF-QC-1d"]},
+                {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "runtime_ids": ["M10-PA-013-5m"]},
+                {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "runtime_ids": ["M10-PA-011-ORB-R1-5m"]},
+            ],
+        }
+
+        rows = {row["runtime_id"]: row for row in build_dedicated_bucket_runtime_review_rows(local_history, longbridge)}
+
+        self.assertEqual(rows["M10-PA-002-5m"]["review_status"], "已按运行单元复核")
+        self.assertEqual(rows["M10-PA-002-5m"]["expected_bucket"], "pa002_5m")
+        self.assertIn("PA002-5m单仓", rows["M10-PA-002-5m"]["longbridge_buckets"])
+        self.assertEqual(rows["M12-FTD-001-loss-streak-guard-1d"]["expected_bucket"], "ftd_loss_streak")
+        self.assertEqual(rows["M10-PA-004-MBF-QC-1d"]["expected_bucket"], "pa004_mbf_qc")
+
+        broken = {
+            **longbridge,
+            "virtual_capital_bucket_definitions": [
+                {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
+            ],
+        }
+        broken_rows = {
+            row["runtime_id"]: row for row in build_dedicated_bucket_runtime_review_rows(local_history, broken)
+        }
+        self.assertEqual(broken_rows["M10-PA-004-long-1d"]["review_status"], "需要修正配置")
+        self.assertEqual(broken_rows["M10-PA-002-5m"]["review_status"], "已按运行单元复核")
 
     def _minimal_dashboard_for_html(self, longbridge_panel: dict) -> dict:
         empty_overview = {
@@ -1379,6 +2229,35 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         }
         html = build_dashboard_html(load_config(), dashboard)
         self.assertIn("非交易日审计快照", html)
+        self.assertNotIn("<h2>数据刷新告警</h2>", html)
+
+    def test_longbridge_not_degraded_scan_gap_renders_as_notice_not_warning(self):
+        warning = build_dashboard_data_freshness_warning(
+            quote_source="longbridge_quote_readonly",
+            current_day_runtime_ready=True,
+            current_day_scan_complete=False,
+            daily_ready_symbols=0,
+            current_5m_ready_symbols=147,
+            active_universe_symbol_count=147,
+            runtime_readiness_note="日线沿用缓存。",
+        )
+        dashboard = self._minimal_dashboard_for_html({})
+        dashboard["summary"] = {
+            "audit_only_snapshot": False,
+            "data_freshness_warning": warning,
+            "quote_source": "longbridge_quote_readonly",
+            "current_day_runtime_ready": True,
+            "current_day_scan_complete": False,
+            "active_universe_daily_ready_symbols": 0,
+            "active_universe_current_5m_ready_symbols": 147,
+            "active_universe_symbol_count": 147,
+            "runtime_readiness_note": "日线沿用缓存。",
+        }
+
+        html = build_dashboard_html(load_config(), dashboard)
+
+        self.assertTrue(is_longbridge_non_degraded_freshness_notice(warning))
+        self.assertIn("<h2>数据刷新提示</h2>", html)
         self.assertNotIn("<h2>数据刷新告警</h2>", html)
 
     def test_mainline_and_experimental_accounts_are_separated(self):

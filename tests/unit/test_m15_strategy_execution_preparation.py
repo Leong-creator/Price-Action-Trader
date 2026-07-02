@@ -72,7 +72,7 @@ class M15StrategyExecutionPreparationTest(unittest.TestCase):
             )
 
             repairs = {row["runtime_id"]: row for row in payload["repair_execution_queue"]}
-            self.assertEqual(payload["summary"]["repair_priority_counts"], {"P0": 4, "P1": 5})
+            self.assertEqual(payload["summary"]["repair_priority_counts"], {"P0": 3, "P1": 5})
             self.assertTrue(payload["summary"]["repair_queue_ready_before_monday"])
             self.assertTrue(
                 all(row["m12_runtime_rule_status"] == "implemented_in_m12_account_runtime" for row in repairs.values())
@@ -85,10 +85,12 @@ class M15StrategyExecutionPreparationTest(unittest.TestCase):
             self.assertIn("连续亏损", "".join(pa001["fix_steps"]))
             self.assertFalse(pa001["broker_paper_start_allowed"])
 
-            pa002_5m = repairs["M10-PA-002-5m"]
-            self.assertIn("假突破", "".join(pa002_5m["fix_steps"]))
-            self.assertIn("冷却", "".join(pa002_5m["fix_steps"]))
-            self.assertEqual(pa002_5m["longbridge_paper_scope"], "blocked_until_repaired")
+            second_batch = {row["runtime_id"]: row for row in payload["second_batch_internal_sim_candidates"]}
+            pa002_5m = second_batch["M10-PA-002-5m"]
+            self.assertEqual(pa002_5m["action_state"], "advance_single_strategy_bucket")
+            self.assertEqual(pa002_5m["position_size_multiplier"], "1.0")
+            self.assertEqual(pa002_5m["longbridge_paper_scope"], "not_first_order_candidate")
+            self.assertIn("PA002-5m 单策略仓", pa002_5m["plain_status"])
 
             pa007 = repairs["M10-PA-007-1d"]
             self.assertIn("第二腿", "".join(pa007["fix_steps"]))

@@ -47,7 +47,42 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
 
             self.assertEqual(signals[0]["position_action"], "stop_loss")
 
-    def test_no_local_or_untracked_position_exit_signal(self) -> None:
+    def test_unavailable_position_does_not_generate_repeated_exit_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_json(root / "account_state.json", self.account_state(available="0"))
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(close="94")])
+            self.write_jsonl(root / "execution_ledger.jsonl", [self.open_row(stop_price="95")])
+
+            payload = run_realtime_position_manager(config, generated_at="2026-06-04T14:00:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_exit_signal_event_count"], 0)
+            self.assertEqual(rows[0]["manager_status"], "position_not_available_for_exit")
+            self.assertEqual(rows[0]["available_quantity"], "0")
+            self.assertEqual(signals, [])
+
+    def test_exit_signal_id_is_stable_across_cycles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_json(root / "account_state.json", self.account_state())
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(close="94")])
+            self.write_jsonl(root / "execution_ledger.jsonl", [self.open_row(stop_price="95")])
+
+            first = run_realtime_position_manager(config, generated_at="2026-06-04T14:00:00Z")
+            second = run_realtime_position_manager(config, generated_at="2026-06-04T14:01:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(first["new_exit_signal_event_count"], 1)
+            self.assertEqual(second["new_exit_signal_event_count"], 0)
+            self.assertEqual(rows[0]["manager_status"], "duplicate_exit_signal_event")
+            self.assertEqual(len(signals), 1)
+
+    def test_untracked_position_is_exit_only_takeover_not_local_migration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = self.make_config(root)
@@ -59,13 +94,35 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
 
             self.assertEqual(payload["new_exit_signal_event_count"], 0)
-            self.assertEqual(rows[0]["manager_status"], "legacy_unmanaged_longbridge_position")
-            self.assertEqual(rows[0]["position_management_scope"], "longbridge_account_unmanaged")
+            self.assertEqual(rows[0]["manager_status"], "exit_only_hold_no_exit_trigger")
+            self.assertEqual(rows[0]["position_management_scope"], "longbridge_account_exit_only")
+            self.assertTrue(rows[0]["exit_only_takeover"])
+            self.assertTrue(rows[0]["exit_allowed"])
             self.assertEqual(payload["managed_position_count"], 0)
-            self.assertEqual(payload["unmanaged_position_count"], 1)
-            self.assertEqual(payload["unmanaged_position_symbols"], ["AAPL"])
-            self.assertIn("只展示，不自动平仓", payload["plain_language_result"])
+            self.assertEqual(payload["exit_only_position_count"], 1)
+            self.assertEqual(payload["unmanaged_position_count"], 0)
+            self.assertEqual(payload["exit_only_position_symbols"], ["AAPL"])
+            self.assertIn("只接管退出", payload["plain_language_result"])
             self.assertEqual(payload["inputs"]["local_simulation_ledger"], "")
+
+    def test_untracked_position_exit_only_can_create_stop_loss_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_json(root / "account_state.json", self.account_state(cost_price="100"))
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(close="96")])
+            self.write_jsonl(root / "execution_ledger.jsonl", [])
+
+            payload = run_realtime_position_manager(config, generated_at="2026-06-04T14:00:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_exit_signal_event_count"], 1)
+            self.assertEqual(payload["exit_only_position_count"], 1)
+            self.assertEqual(rows[0]["position_management_scope"], "longbridge_account_exit_only")
+            self.assertEqual(signals[0]["position_action"], "stop_loss")
+            self.assertTrue(signals[0]["longbridge_untracked_exit_only"])
+            self.assertTrue(signals[0]["longbridge_position_exit_source"])
 
     def make_config(self, root: Path):
         payload = {
@@ -91,11 +148,14 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
         self.write_json(path, payload)
         return load_config(path)
 
-    def account_state(self) -> dict:
+    def account_state(self, *, available: str = "2", cost_price: str | None = None) -> dict:
+        position = {"symbol": "AAPL.US", "quantity": "2", "available": available, "market_price": "100"}
+        if cost_price is not None:
+            position["cost_price"] = cost_price
         return {
             "account_channel": "lb_papertrading",
             "paper_account_verified": True,
-            "positions": [{"symbol": "AAPL.US", "quantity": "2", "market_price": "100"}],
+            "positions": [position],
             "held_symbols": ["AAPL"],
         }
 

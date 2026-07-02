@@ -5,19 +5,23 @@
   ],
   "alerts": [
     {
-      "level": "正常",
-      "message": "当前主线和实验账户都已刷新，没有明显数据阻塞。"
+      "level": "数据",
+      "message": "仍有 127 条旧日期候选留在观察信号里，不能当作今日新开仓。"
+    },
+    {
+      "level": "数据",
+      "message": "当前有 147 只日线因本轮禁抓取而沿用上一份 cache：AAPL、ABBV、ABNB、ADBE、ADI；这不影响当前只读账户刷新，但会让严格“147/147 当日全齐”口径显示未完成。"
     }
   ],
   "dashboard_refresh_seconds": 60,
-  "generated_at": "2026-06-01T23:58:50Z",
+  "generated_at": "2026-07-01T23:51:35Z",
   "latest_dashboard_html": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard.html",
   "latest_dashboard_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_32_minute_readonly_dashboard_data.json",
   "live_execution": false,
   "market_session": {
-    "beijing_time": "2026-06-02 07:58:50 CST",
-    "new_york_date": "2026-06-01",
-    "new_york_time": "2026-06-01 19:58:50 EDT",
+    "beijing_time": "2026-07-02 07:51:35 CST",
+    "new_york_date": "2026-07-01",
+    "new_york_time": "2026-07-01 19:51:35 EDT",
     "status": "盘后"
   },
   "observer_inbox": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m12_29_current_day_scan_dashboard/m12_38_codex_observer_inbox.jsonl",
@@ -25,9 +29,9 @@
   "observer_mode": "codex_heartbeat_or_file_inbox",
   "paper_simulated_only": true,
   "paper_trading_approval": false,
-  "plain_language_summary": "主线模拟权益 162287.04，主线今日盈亏 4962.92；实验账户权益 204830.90，实验今日盈亏 4574.67。活跃周期：1d 日线测试, 5m 五分钟测试。另有 8 条非当前时段快照已隐藏，不作为当前 headline。 FTD001 原版今日 2511.99，连亏保护版今日 1629.91；重点看当前模拟回撤、连亏和是否过度触发。",
+  "plain_language_summary": "主线模拟权益 169811.23，主线今日盈亏 1248.28；实验账户权益 206162.82，实验今日盈亏 843.15。活跃周期：1d 日线测试, 5m 五分钟测试。另有 17 条非当前时段快照已隐藏，不作为当前 headline。 FTD001 原版今日 376.01，连亏保护版今日 360.00；重点看当前模拟回撤、连亏和是否过度触发。",
   "real_money_actions": false,
-  "recommended_codex_message": "盘后只读快照：主线权益 162287.04，今日 4962.92；实验账户今日 4574.67。另有 8 条非当前时段快照已隐藏，不作为当前 headline。 FTD001 原版今日 2511.99，连亏保护版今日 1629.91；重点看当前模拟回撤、连亏和是否过度触发。 当前提醒：正常：当前主线和实验账户都已刷新，没有明显数据阻塞。",
+  "recommended_codex_message": "盘后只读快照：主线权益 169811.23，今日 1248.28；实验账户今日 843.15。另有 17 条非当前时段快照已隐藏，不作为当前 headline。 FTD001 原版今日 376.01，连亏保护版今日 360.00；重点看当前模拟回撤、连亏和是否过度触发。 当前提醒：数据：仍有 127 条旧日期候选留在观察信号里，不能当作今日新开仓。；数据：当前有 147 只日线因本轮禁抓取而沿用上一份 cache：AAPL、ABBV、ABNB、ADBE、ADI；这不影响当前只读账户刷新，但会让严格“147/147 当日全齐”口径显示未完成。",
   "schema_version": "m12.46.codex-observer.v1",
   "stage": "M12.46.codex_observer",
   "trading_connection": false
