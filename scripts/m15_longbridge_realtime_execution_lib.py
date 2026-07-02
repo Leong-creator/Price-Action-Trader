@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import time
+import gzip
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation, ROUND_FLOOR
@@ -37,6 +38,7 @@ DEFAULT_EPOCH_STATE = DEFAULT_OUTPUT_DIR / "m15_longbridge_virtual_account_epoch
 SUMMARY_JSON = "m15_longbridge_realtime_execution.json"
 LEDGER_JSONL = "m15_longbridge_realtime_execution_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_execution.md"
+MAX_EXECUTION_LEDGER_BYTES = 50 * 1024 * 1024
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
 FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER = Decimal("0.995")
@@ -543,6 +545,10 @@ def run_realtime_execution(
     account_state = read_json(config.paper_account_state_path)
     epoch_state = load_or_update_test_epoch_state(config, account_state, now)
     signal_events = read_jsonl(config.realtime_signal_events_path)
+    ledger_retention = compact_execution_ledger_if_needed(
+        config.output_dir / LEDGER_JSONL,
+        current_epoch_id=str(epoch_state.get("test_epoch_id") or ""),
+    )
     existing_ledger = read_jsonl(config.output_dir / LEDGER_JSONL)
     current_epoch_ledger = ledger_rows_for_epoch(existing_ledger, epoch_state)
     existing_submitted_ids = {
@@ -682,6 +688,7 @@ def run_realtime_execution(
         "paper_account_verified": paper_account_verified(config, account_state),
         "session_started_at": session_started_at,
         "test_epoch": epoch_state,
+        "ledger_retention": ledger_retention,
         "virtual_capital_buckets": virtual_bucket_summary(
             config,
             current_epoch_ledger,
@@ -788,7 +795,7 @@ def run_realtime_execution(
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(config.output_dir / SUMMARY_JSON, summary)
-    write_jsonl(config.output_dir / LEDGER_JSONL, existing_ledger + ledger_rows)
+    append_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
     (config.output_dir / REPORT_MD).write_text(render_report(summary, ledger_rows), encoding="utf-8")
     return summary
 
@@ -2027,6 +2034,88 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         "".join(json.dumps(json_ready(row), ensure_ascii=False, sort_keys=True) + "\n" for row in rows),
         encoding="utf-8",
     )
+    tmp_path.replace(path)
+
+
+def append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(json_ready(row), ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def compact_execution_ledger_if_needed(
+    path: Path,
+    *,
+    current_epoch_id: str,
+    max_bytes: int = MAX_EXECUTION_LEDGER_BYTES,
+) -> dict[str, Any]:
+    if max_bytes <= 0 or not path.exists():
+        return {"compacted": False, "reason": "missing_or_disabled"}
+    before_bytes = path.stat().st_size
+    if before_bytes <= max_bytes:
+        return {"compacted": False, "reason": "below_threshold", "bytes": before_bytes}
+
+    retained_lines: list[str] = []
+    archived_lines: list[str] = []
+    malformed_lines: list[str] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            malformed_lines.append(line)
+            continue
+        if current_epoch_id and str(row.get("test_epoch_id") or "") == current_epoch_id:
+            retained_lines.append(line)
+        else:
+            archived_lines.append(line)
+
+    if not archived_lines and not malformed_lines:
+        return {
+            "compacted": False,
+            "reason": "threshold_exceeded_but_all_rows_current_epoch",
+            "bytes": before_bytes,
+            "current_epoch_id": current_epoch_id,
+            "retained_rows": len(retained_lines),
+        }
+
+    archive_dir = path.parent / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    archive_path = archive_dir / f"{path.stem}.{timestamp}.archived.jsonl.gz"
+    archived_payload = "\n".join(archived_lines + malformed_lines)
+    write_gzip_text_atomic(archive_path, archived_payload + ("\n" if archived_payload else ""))
+    write_text_atomic(path, "\n".join(retained_lines) + ("\n" if retained_lines else ""))
+    after_bytes = path.stat().st_size if path.exists() else 0
+    return {
+        "compacted": True,
+        "reason": "archived_non_current_epoch_rows",
+        "current_epoch_id": current_epoch_id,
+        "before_bytes": before_bytes,
+        "after_bytes": after_bytes,
+        "archived_rows": len(archived_lines),
+        "malformed_archived_rows": len(malformed_lines),
+        "retained_rows": len(retained_lines),
+        "archive_path": project_path(archive_path),
+    }
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def write_gzip_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    with gzip.open(tmp_path, "wt", encoding="utf-8") as handle:
+        handle.write(text)
     tmp_path.replace(path)
 
 
