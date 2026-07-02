@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -29,6 +32,8 @@ DEFAULT_MARKET_EVENTS = DEFAULT_OUTPUT_DIR / "m15_realtime_market_events.jsonl"
 SUMMARY_JSON = "m15_longbridge_realtime_market_event_ingestor.json"
 LEDGER_JSONL = "m15_longbridge_realtime_market_event_ingestor_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_market_event_ingestor.md"
+DEFAULT_MAX_MARKET_EVENT_FILE_BYTES = 60 * 1024 * 1024
+DEFAULT_KEEP_MARKET_EVENT_LINES = 20000
 TIMEFRAME_TO_LONGBRIDGE_PERIOD = {
     "1m": "1m",
     "5m": "5m",
@@ -58,8 +63,12 @@ class RealtimeMarketEventIngestorConfig:
     symbol_cursor_path: Path
     timeframes: tuple[str, ...]
     kline_count: int
+    kline_retry_attempts: int
+    kline_retry_sleep_seconds: float
     watch_interval_seconds: int
     cli_timeout_seconds: int
+    max_market_event_file_bytes: int
+    keep_market_event_lines: int
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -100,8 +109,14 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeMarketEventIn
         symbol_cursor_path=resolve_repo_path(market_data.get("symbol_cursor_path", output_dir / "m15_realtime_symbol_cursor.json")),
         timeframes=tuple(str(item) for item in market_data.get("timeframes", ["1d", "5m"])),
         kline_count=int(market_data.get("kline_count", 2)),
+        kline_retry_attempts=int(market_data.get("kline_retry_attempts", 3)),
+        kline_retry_sleep_seconds=float(market_data.get("kline_retry_sleep_seconds", 0.2)),
         watch_interval_seconds=int(market_data.get("watch_interval_seconds", 1)),
         cli_timeout_seconds=int(market_data.get("cli_timeout_seconds", 6)),
+        max_market_event_file_bytes=int(
+            market_data.get("max_market_event_file_bytes", DEFAULT_MAX_MARKET_EVENT_FILE_BYTES)
+        ),
+        keep_market_event_lines=int(market_data.get("keep_market_event_lines", DEFAULT_KEEP_MARKET_EVENT_LINES)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -119,10 +134,18 @@ def validate_config(config: RealtimeMarketEventIngestorConfig) -> None:
         raise ValueError("M15 realtime market event ingestor max_symbols_per_cycle must be positive")
     if config.kline_count <= 0:
         raise ValueError("M15 realtime market event ingestor kline_count must be positive")
+    if config.kline_retry_attempts <= 0:
+        raise ValueError("M15 realtime market event ingestor kline_retry_attempts must be positive")
+    if config.kline_retry_sleep_seconds < 0:
+        raise ValueError("M15 realtime market event ingestor kline_retry_sleep_seconds cannot be negative")
     if config.watch_interval_seconds <= 0:
         raise ValueError("M15 realtime market event ingestor watch interval must be positive")
     if config.cli_timeout_seconds <= 0:
         raise ValueError("M15 realtime market event ingestor CLI timeout must be positive")
+    if config.max_market_event_file_bytes <= 0:
+        raise ValueError("M15 realtime market event ingestor market event file byte limit must be positive")
+    if config.keep_market_event_lines <= 0:
+        raise ValueError("M15 realtime market event ingestor keep_market_event_lines must be positive")
     unsupported = sorted(set(config.timeframes) - set(TIMEFRAME_TO_LONGBRIDGE_PERIOD))
     if unsupported:
         raise ValueError(f"Unsupported M15 realtime timeframes: {unsupported}")
@@ -151,6 +174,11 @@ def run_realtime_market_event_ingestor(
     session_started_at = resolve_session_started_at(config.session_started_at, now)
     config.output_dir.mkdir(parents=True, exist_ok=True)
     config.market_events_path.parent.mkdir(parents=True, exist_ok=True)
+    archive_before_path = rotate_market_events_if_needed(
+        config.market_events_path,
+        max_bytes=config.max_market_event_file_bytes,
+        keep_lines=config.keep_market_event_lines,
+    )
 
     existing_events = read_jsonl(config.market_events_path)
     existing_event_ids = {str(row.get("event_id")) for row in existing_events if row.get("event_id")}
@@ -169,7 +197,7 @@ def run_realtime_market_event_ingestor(
             for timeframe in config.timeframes:
                 args = build_kline_args(config, symbol=symbol, timeframe=timeframe)
                 try:
-                    payload = runner(binary, args, config.cli_timeout_seconds)
+                    payload, retry_attempts_used = run_with_kline_retries(config, runner, binary, args)
                 except Exception as exc:  # pragma: no cover - runtime provider path
                     ledger_rows.append(
                         {
@@ -178,6 +206,7 @@ def run_realtime_market_event_ingestor(
                             "timeframe": timeframe,
                             "ingest_status": "deferred_longbridge_kline_failed",
                             "reason": str(exc)[:300],
+                            "retry_attempts": config.kline_retry_attempts,
                             "readonly_command": ["longbridge", *args],
                         }
                     )
@@ -200,6 +229,7 @@ def run_realtime_market_event_ingestor(
                             "timeframe": timeframe,
                             "ingest_status": "deferred_no_kline_rows",
                             "reason": "no_kline_rows_returned",
+                            "retry_attempts": retry_attempts_used,
                             "readonly_command": ["longbridge", *args],
                         }
                     )
@@ -228,6 +258,7 @@ def run_realtime_market_event_ingestor(
                             "timeframe": timeframe,
                             "event_time": event["event_time"],
                             "ingest_status": status,
+                            "retry_attempts": retry_attempts_used,
                             "readonly_command": ["longbridge", *args],
                             "local_simulation_ignored": True,
                             "account_or_order_command_used": False,
@@ -235,6 +266,11 @@ def run_realtime_market_event_ingestor(
                     )
 
     write_jsonl(config.market_events_path, existing_events + new_events)
+    archive_after_path = rotate_market_events_if_needed(
+        config.market_events_path,
+        max_bytes=config.max_market_event_file_bytes,
+        keep_lines=config.keep_market_event_lines,
+    )
     write_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
     summary = {
         "stage": config.stage,
@@ -250,9 +286,14 @@ def run_realtime_market_event_ingestor(
         "hot_symbols": list(config.hot_symbols),
         "max_symbols_per_cycle": config.max_symbols_per_cycle,
         "timeframes": list(config.timeframes),
+        "kline_retry_attempts": config.kline_retry_attempts,
         "existing_market_event_count": len(existing_events),
         "new_market_event_count": len(new_events),
         "market_event_total_count": len(existing_events) + len(new_events),
+        "market_event_archive_before": project_path(archive_before_path) if archive_before_path else "",
+        "market_event_archive_after": project_path(archive_after_path) if archive_after_path else "",
+        "market_event_file_max_bytes": config.max_market_event_file_bytes,
+        "market_event_keep_lines": config.keep_market_event_lines,
         "deferred_count": len(deferred_rows),
         "deferred_rows": deferred_rows[:50],
         "local_simulation_isolated": True,
@@ -341,20 +382,46 @@ def build_kline_args(config: RealtimeMarketEventIngestorConfig, *, symbol: str, 
     return args
 
 
+def run_with_kline_retries(
+    config: RealtimeMarketEventIngestorConfig,
+    runner: CommandRunner,
+    cli_path: str,
+    args: list[str],
+) -> tuple[Any, int]:
+    last_exc: Exception | None = None
+    for attempt in range(1, config.kline_retry_attempts + 1):
+        try:
+            return runner(cli_path, args, config.cli_timeout_seconds), attempt
+        except Exception as exc:
+            last_exc = exc
+            if attempt < config.kline_retry_attempts and config.kline_retry_sleep_seconds:
+                time.sleep(config.kline_retry_sleep_seconds)
+    raise RuntimeError(str(last_exc) if last_exc else "longbridge kline failed after retries")
+
+
 def run_longbridge_json(cli_path: str, args: list[str], timeout_seconds: int) -> Any:
     _assert_readonly_command(args)
-    completed = subprocess.run(
+    process = subprocess.Popen(
         [cli_path, *args],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        check=False,
-        timeout=timeout_seconds,
         env=build_longbridge_cli_env(),
+        start_new_session=True,
     )
-    if completed.returncode != 0:
-        detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())
-        raise RuntimeError(detail or f"longbridge {' '.join(args)} failed with {completed.returncode}")
-    stdout = completed.stdout.strip()
+    try:
+        stdout_text, stderr_text = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            process.kill()
+        process.communicate()
+        raise RuntimeError(f"longbridge {' '.join(args)} timed out after {timeout_seconds}s") from exc
+    if process.returncode != 0:
+        detail = clean_cli_text((stderr_text or stdout_text or "").strip())
+        raise RuntimeError(detail or f"longbridge {' '.join(args)} failed with {process.returncode}")
+    stdout = stdout_text.strip()
     if not stdout:
         return []
     try:
@@ -459,6 +526,27 @@ def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def rotate_market_events_if_needed(path: Path, *, max_bytes: int, keep_lines: int) -> Path | None:
+    if not path.exists() or path.stat().st_size <= max_bytes:
+        return None
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if len(lines) <= keep_lines:
+        return None
+    archive_dir = path.parent / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    archive_path = archive_dir / f"{path.stem}.{timestamp}.archived.jsonl"
+    archived_lines = lines[:-keep_lines]
+    kept_lines = lines[-keep_lines:]
+    tmp_archive = archive_path.with_name(f".{archive_path.name}.{os.getpid()}.tmp")
+    tmp_current = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_archive.write_text("\n".join(archived_lines) + "\n", encoding="utf-8")
+    tmp_current.write_text("\n".join(kept_lines) + "\n", encoding="utf-8")
+    tmp_archive.replace(archive_path)
+    tmp_current.replace(path)
+    return archive_path
+
+
 def int_like(value: Any) -> int:
     try:
         return int(str(value))
@@ -473,11 +561,17 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.write_text(
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(
         "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in rows),
         encoding="utf-8",
     )
+    tmp_path.replace(path)

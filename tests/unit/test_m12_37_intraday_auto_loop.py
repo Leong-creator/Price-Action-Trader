@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from dataclasses import dataclass, replace
@@ -14,6 +15,8 @@ from scripts.run_m12_37_intraday_auto_loop import (
     session_refresh_policy,
     should_run_m14_finalization,
     validate_generated_at,
+    write_refresh_progress_manifest,
+    write_light_heartbeat_manifest,
     write_idle_manifest,
 )
 
@@ -136,6 +139,128 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertFalse(manifest["current_day_runtime_ready"])
             self.assertFalse(manifest["current_day_scan_complete"])
             self.assertIn("fallback quotes / no-fetch", manifest["data_freshness_warning"])
+
+    def test_run_once_writes_refresh_progress_before_dashboard_work(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            captured_manifest = {}
+            fake_result = {
+                "summary": {
+                    "scan_date": "2026-05-05",
+                    "quote_source": "longbridge_quote_readonly",
+                    "quote_count": 1,
+                    "quote_error": "",
+                    "current_day_runtime_ready": True,
+                    "current_day_scan_complete": True,
+                    "data_freshness_warning": "",
+                },
+                "dashboard": {"codex_observer": {"recommended_codex_message": "测试消息"}},
+            }
+
+            def fake_dashboard(*args, **kwargs):
+                nonlocal captured_manifest
+                captured_manifest = json.loads((output_dir / "m12_37_auto_runner_manifest.json").read_text(encoding="utf-8"))
+                return fake_result
+
+            with patch(
+                "scripts.run_m12_37_intraday_auto_loop.run_m12_29_current_day_scan_dashboard",
+                side_effect=fake_dashboard,
+            ):
+                outcome = run_once(
+                    config,
+                    generated_at="2026-05-05T14:00:00Z",
+                    execute_fetch=False,
+                    refresh_quotes=False,
+                )
+
+            self.assertEqual(captured_manifest["refresh_state"], "refresh_in_progress")
+            self.assertEqual(captured_manifest["active_step"], "m12_29_current_day_scan_dashboard")
+            self.assertEqual(outcome["manifest"]["refresh_state"], "refresh_complete")
+            self.assertEqual(outcome["manifest"]["active_step"], "complete")
+
+    def test_refresh_progress_manifest_records_failure_without_account_actions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            manifest = write_refresh_progress_manifest(
+                config,
+                m12_29_output_dir=output_dir,
+                generated_at="2026-05-05T14:00:00Z",
+                refresh_started_at="2026-05-05T14:00:00Z",
+                refresh_state="refresh_failed",
+                active_step="m12_29_current_day_scan_dashboard",
+                execute_fetch=True,
+                max_native_fetches=294,
+                refresh_quotes=True,
+                force_refresh_current_intraday=True,
+                error_type="RuntimeError",
+                error="boom",
+            )
+
+            self.assertEqual(manifest["refresh_state"], "refresh_failed")
+            self.assertEqual(manifest["error_type"], "RuntimeError")
+            self.assertFalse(manifest["trading_connection"])
+            self.assertFalse(manifest["live_execution"])
+
+    def test_regular_session_policy_skips_heavy_dashboard_inside_same_5m_bucket(self):
+        first = session_refresh_policy(
+            "2026-06-22T14:01:00Z",
+            "美股常规交易时段",
+            no_fetch=False,
+            no_refresh_quotes=False,
+            last_intraday_refresh_bucket=None,
+        )
+        self.assertTrue(first["run_dashboard"])
+        self.assertTrue(first["execute_fetch"])
+
+        same_bucket = session_refresh_policy(
+            "2026-06-22T14:03:00Z",
+            "美股常规交易时段",
+            no_fetch=False,
+            no_refresh_quotes=False,
+            last_intraday_refresh_bucket=first["intraday_refresh_bucket"],
+        )
+        self.assertFalse(same_bucket["run_dashboard"])
+        self.assertFalse(same_bucket["execute_fetch"])
+        self.assertTrue(same_bucket["refresh_quotes"])
+
+        next_bucket = session_refresh_policy(
+            "2026-06-22T14:06:00Z",
+            "美股常规交易时段",
+            no_fetch=False,
+            no_refresh_quotes=False,
+            last_intraday_refresh_bucket=first["intraday_refresh_bucket"],
+        )
+        self.assertTrue(next_bucket["run_dashboard"])
+        self.assertTrue(next_bucket["execute_fetch"])
+
+    def test_light_heartbeat_manifest_does_not_fake_core_dashboard_refresh(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            manifest = write_light_heartbeat_manifest(
+                config,
+                generated_at="2026-06-22T14:03:00Z",
+                market={
+                    "status": "美股常规交易时段",
+                    "new_york_date": "2026-06-22",
+                    "new_york_time": "2026-06-22 10:03:00 EDT",
+                    "beijing_time": "2026-06-22 22:03:00 CST",
+                },
+                reason="waiting_next_5m_bar_for_heavy_dashboard_refresh",
+                intraday_refresh_bucket="2026-06-22T10:00:00-04:00",
+            )
+
+            self.assertEqual(manifest["refresh_state"], "light_heartbeat_waiting_next_5m_bar")
+            self.assertEqual(manifest["active_step"], "light_heartbeat")
+            self.assertTrue(manifest["heavy_dashboard_run_skipped"])
+            self.assertTrue(manifest["loop_can_continue_now"])
+            self.assertFalse(manifest["trading_connection"])
+            self.assertFalse(manifest["live_execution"])
 
     def test_regular_session_manifest_allows_loop(self):
         with tempfile.TemporaryDirectory() as tmp:

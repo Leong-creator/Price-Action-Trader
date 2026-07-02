@@ -1,0 +1,13 @@
+{
+  "consecutive_failures": 3,
+  "failure_reason": "M12.37 子会话连续 3 次非零退出，已停止自动重启。",
+  "generated_at": "2026-07-01T17:28:07Z",
+  "last_exit_code": 1,
+  "live_execution": false,
+  "market_status": "美股常规交易时段",
+  "paper_simulated_only": true,
+  "real_money_actions": false,
+  "schema_version": "m12.47.session-failure-dossier.v1",
+  "stage": "M12.47.session_supervisor",
+  "trading_connection": false
+}

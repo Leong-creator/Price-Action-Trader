@@ -56,6 +56,7 @@ M15_PAPER_ORDER_SUBMITTER_DIR = "m15_longbridge_paper_order_submitter"
 M15_FAST_SIGNAL_QUEUE_DIR = "m15_longbridge_fast_signal_queue"
 M15_REALTIME_EXECUTION_DIR = "m15_longbridge_realtime_execution"
 M15_PAPER_CONNECTION_CHECK_DIR = "m15_longbridge_paper_connection_check"
+M15_LONGBRIDGE_QUALITY_POLICY_STARTED_AT = "2026-06-09T03:15:00Z"
 M15_ACCOUNT_STATE_STALE_AFTER_SECONDS = 300
 M15_SUBMITTER_STATE_STALE_AFTER_SECONDS = 300
 MONEY = Decimal("0.01")
@@ -2530,6 +2531,258 @@ def build_account_overview(name: str, accounts: list[dict[str, str]]) -> dict[st
     }
 
 
+def build_local_simulation_history_quality(config: M1229Config, account_rows: list[dict[str, str]]) -> dict[str, Any]:
+    ledger_rows = read_jsonl(config.output_dir / "m12_46_account_trade_ledger.jsonl")
+    runtime_meta = {
+        str(row.get("runtime_id", "")): {
+            "runtime_id": str(row.get("runtime_id", "")),
+            "strategy_id": str(row.get("strategy_id", "")),
+            "timeframe": str(row.get("timeframe", "")),
+            "lane": str(row.get("lane", "")),
+        }
+        for row in account_rows
+        if row.get("runtime_id")
+    }
+    closed_records: list[dict[str, Any]] = []
+    for row in ledger_rows:
+        if row.get("event_type") != "close" or row.get("realized_pnl") in (None, ""):
+            continue
+        runtime_id = str(row.get("runtime_id") or "")
+        meta = runtime_meta.get(runtime_id, {})
+        pnl = money_to_decimal(str(row.get("realized_pnl") or "0"))
+        closed_records.append(
+            {
+                "runtime_id": runtime_id,
+                "strategy_id": str(row.get("strategy_id") or meta.get("strategy_id") or m15_parent_strategy_id(runtime_id)),
+                "timeframe": str(row.get("timeframe") or meta.get("timeframe") or ""),
+                "lane": str(meta.get("lane") or "unmapped"),
+                "symbol": str(row.get("symbol") or ""),
+                "pnl": pnl,
+            }
+        )
+
+    lane_order = ["mainline", "experimental", "rescue", "unmapped"]
+    lane_rows = []
+    for lane in lane_order:
+        records = [record for record in closed_records if record["lane"] == lane]
+        if records:
+            lane_rows.append(
+                {
+                    "lane": lane,
+                    "display_name": local_simulation_lane_label(lane),
+                    **local_simulation_quality_summary([record["pnl"] for record in records]),
+                }
+            )
+
+    timeframe_rows = []
+    for timeframe in PRIMARY_TIMEFRAME_ORDER:
+        records = [record for record in closed_records if record["timeframe"] == timeframe]
+        if records:
+            timeframe_rows.append(
+                {
+                    "timeframe": timeframe,
+                    "display_name": TIMEFRAME_LABELS.get(timeframe, timeframe),
+                    **local_simulation_quality_summary([record["pnl"] for record in records]),
+                }
+            )
+
+    runtime_groups: dict[str, dict[str, Any]] = {}
+    for record in closed_records:
+        runtime_id = record["runtime_id"]
+        group = runtime_groups.setdefault(
+            runtime_id,
+            {
+                "runtime_id": runtime_id,
+                "strategy_id": record["strategy_id"],
+                "timeframe": record["timeframe"],
+                "lane": record["lane"],
+                "symbols": set(),
+                "pnls": [],
+            },
+        )
+        group["symbols"].add(record["symbol"])
+        group["pnls"].append(record["pnl"])
+
+    runtime_rows = []
+    for group in runtime_groups.values():
+        runtime_rows.append(
+            {
+                "runtime_id": group["runtime_id"],
+                "strategy_id": group["strategy_id"],
+                "timeframe": group["timeframe"],
+                "lane": group["lane"],
+                "lane_label": local_simulation_lane_label(str(group["lane"])),
+                "symbols": ", ".join(sorted(symbol for symbol in group["symbols"] if symbol)),
+                **local_simulation_quality_summary(group["pnls"]),
+            }
+        )
+    runtime_rows.sort(
+        key=lambda row: (
+            money_to_decimal(str(row.get("net_realized_pnl", "0"))),
+            money_to_decimal(str(row.get("profit_factor", "0"))) if row.get("profit_factor") != "暂无" else ZERO,
+        ),
+        reverse=True,
+    )
+
+    overall = local_simulation_quality_summary([record["pnl"] for record in closed_records])
+    return {
+        "schema_version": "m12.46.local-simulation-history-quality.v1",
+        "source": project_path(config.output_dir / "m12_46_account_trade_ledger.jsonl"),
+        "calculation_note": "只统计本地模拟账本里的已平仓记录；盈亏比=平均盈利单金额/平均亏损单金额；不使用旧版错误利润字段。",
+        "overall": overall,
+        "lane_rows": lane_rows,
+        "timeframe_rows": timeframe_rows,
+        "runtime_rows": runtime_rows,
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def local_simulation_quality_summary(pnls: list[Decimal]) -> dict[str, str]:
+    wins = [pnl for pnl in pnls if pnl > ZERO]
+    losses = [pnl for pnl in pnls if pnl < ZERO]
+    flats = [pnl for pnl in pnls if pnl == ZERO]
+    total_win = sum(wins, ZERO)
+    total_loss = abs(sum(losses, ZERO))
+    average_win = total_win / Decimal(len(wins)) if wins else ZERO
+    average_loss = total_loss / Decimal(len(losses)) if losses else ZERO
+    active = len(wins) + len(losses)
+    return {
+        "closed_trade_count": str(len(pnls)),
+        "winning_trade_count": str(len(wins)),
+        "losing_trade_count": str(len(losses)),
+        "flat_trade_count": str(len(flats)),
+        "win_rate_percent": pct(Decimal(len(wins)) / Decimal(active) * HUNDRED) if active else "暂无",
+        "total_win": money(total_win),
+        "total_loss_abs": money(total_loss),
+        "net_realized_pnl": money(sum(pnls, ZERO)),
+        "average_win": money(average_win) if wins else "暂无",
+        "average_loss": money(average_loss) if losses else "暂无",
+        "profit_loss_ratio": str((average_win / average_loss).quantize(PERCENT)) if wins and losses and average_loss > ZERO else "暂无",
+        "profit_factor": str((total_win / total_loss).quantize(PERCENT)) if wins and losses and total_loss > ZERO else "暂无",
+    }
+
+
+def local_simulation_lane_label(lane: str) -> str:
+    return {
+        "mainline": "主线策略",
+        "experimental": "实验策略",
+        "rescue": "修复/救援策略",
+        "unmapped": "未归类",
+    }.get(lane, lane or "未归类")
+
+
+def build_dedicated_bucket_runtime_review_rows(
+    local_history_quality: dict[str, Any],
+    longbridge_paper_account: dict[str, Any],
+) -> list[dict[str, str]]:
+    runtime_rows = {
+        str(row.get("runtime_id") or ""): row
+        for row in local_history_quality.get("runtime_rows", [])
+        if isinstance(row, dict)
+    }
+    bucket_defs = longbridge_paper_account.get("virtual_capital_bucket_definitions", [])
+    runtime_buckets: dict[str, list[str]] = {}
+    runtime_bucket_labels: dict[str, list[str]] = {}
+    if isinstance(bucket_defs, list):
+        for bucket in bucket_defs:
+            if not isinstance(bucket, dict):
+                continue
+            bucket_id = str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+            label = str(bucket.get("label") or bucket_id)
+            for runtime_id in bucket.get("runtime_ids", []) if isinstance(bucket.get("runtime_ids"), list) else []:
+                runtime_buckets.setdefault(str(runtime_id), []).append(bucket_id)
+                runtime_bucket_labels.setdefault(str(runtime_id), []).append(label)
+    allowed = set(str(item) for item in longbridge_paper_account.get("runtime_whitelist", []) if str(item))
+    review_targets = [
+        {
+            "runtime_id": "M10-PA-004-long-1d",
+            "expected_bucket": "pa004_long",
+            "action": "进入 PA004-long 单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M10-PA-002-5m",
+            "expected_bucket": "pa002_5m",
+            "action": "进入 PA002-5m 单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M12-FTD-001-baseline-1d",
+            "expected_bucket": "ftd_baseline",
+            "action": "进入 FTD 原版单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M12-FTD-001-loss-streak-guard-1d",
+            "expected_bucket": "ftd_loss_streak",
+            "action": "进入 FTD 连亏保护单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M10-PA-004-MBF-1d",
+            "expected_bucket": "pa004_mbf",
+            "action": "进入 PA004-MBF 单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M10-PA-004-MBF-QC-1d",
+            "expected_bucket": "pa004_mbf_qc",
+            "action": "进入 PA004-MBF-QC 单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M10-PA-013-5m",
+            "expected_bucket": "pa013_5m",
+            "action": "进入 PA013-5m 单策略仓，按 1.0 正常测试。",
+        },
+        {
+            "runtime_id": "M10-PA-011-ORB-R1-5m",
+            "expected_bucket": "pa011_orb_r1",
+            "action": "进入 PA011-ORB-R1 单策略仓，按 1.0 正常测试。",
+        },
+    ]
+    rows: list[dict[str, str]] = []
+    for target in review_targets:
+        runtime_id = target["runtime_id"]
+        local = runtime_rows.get(runtime_id, {})
+        buckets = runtime_buckets.get(runtime_id, [])
+        labels = runtime_bucket_labels.get(runtime_id, [])
+        expected_buckets = target["expected_bucket"].split(" + ")
+        has_expected_buckets = all(bucket in buckets for bucket in expected_buckets)
+        rows.append(
+            {
+                "runtime_id": runtime_id,
+                "timeframe": str(local.get("timeframe") or runtime_id.rsplit("-", 1)[-1]),
+                "local_net_realized_pnl": str(local.get("net_realized_pnl") or "暂无"),
+                "local_win_rate_percent": str(local.get("win_rate_percent") or "暂无"),
+                "local_profit_loss_ratio": str(local.get("profit_loss_ratio") or "暂无"),
+                "local_closed_trade_count": str(local.get("closed_trade_count") or "暂无"),
+                "longbridge_buckets": ", ".join(labels or buckets) or "未进入长桥资金池",
+                "expected_bucket": target["expected_bucket"],
+                "realtime_allowed": "是" if runtime_id in allowed else "否",
+                "action": target["action"],
+                "review_status": (
+                    "已按运行单元复核"
+                    if runtime_id in allowed and has_expected_buckets
+                    else "需要修正配置"
+                ),
+            }
+        )
+    return rows
+
+
+def m15_virtual_capital_bucket_definitions(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    buckets = payload.get("virtual_capital_buckets")
+    if isinstance(buckets, list):
+        return [bucket for bucket in buckets if isinstance(bucket, dict)]
+    if isinstance(buckets, dict):
+        rows: list[dict[str, Any]] = []
+        for bucket_id, bucket in buckets.items():
+            if not isinstance(bucket, dict):
+                continue
+            rows.append({"capital_bucket": str(bucket_id), **bucket})
+        return rows
+    return []
+
+
 def build_accountized_timeframe_views(account_rows: list[dict[str, str]]) -> dict[str, Any]:
     views: dict[str, Any] = {}
     for timeframe in PRIMARY_TIMEFRAME_ORDER:
@@ -2839,20 +3092,41 @@ def build_dashboard_data_freshness_warning(
     active_universe_symbol_count: Any,
     runtime_readiness_note: str,
 ) -> str:
+    quote_source_value = str(quote_source or "")
+    quote_source_lower = quote_source_value.lower()
     fallback_or_no_fetch = any(
-        token in quote_source.lower()
+        token in quote_source_lower
         for token in ("fallback", "no-fetch", "no_fetch", "no-refresh", "no_refresh")
     )
     if current_day_runtime_ready and current_day_scan_complete and not fallback_or_no_fetch:
         return ""
+    if not fallback_or_no_fetch and quote_source_lower == "longbridge_quote_readonly":
+        return (
+            "看板已生成但严格全量扫描口径未完成；长桥只读行情没有降级："
+            f"quote_source={quote_source_value}，"
+            f"current_day_runtime_ready={str(current_day_runtime_ready).lower()}，"
+            f"current_day_scan_complete={str(current_day_scan_complete).lower()}，"
+            f"当前 {active_universe_symbol_count} 只种子池日线 {daily_ready_symbols}/{active_universe_symbol_count}，"
+            f"当日 5m {current_5m_ready_symbols}/{active_universe_symbol_count}。"
+            f"{runtime_readiness_note}"
+        )
     return (
         "看板已生成但数据源降级 / fallback quotes / no-fetch："
-        f"quote_source={quote_source or 'unknown'}，"
+        f"quote_source={quote_source_value or 'unknown'}，"
         f"current_day_runtime_ready={str(current_day_runtime_ready).lower()}，"
         f"current_day_scan_complete={str(current_day_scan_complete).lower()}，"
         f"当前 {active_universe_symbol_count} 只种子池日线 {daily_ready_symbols}/{active_universe_symbol_count}，"
         f"当日 5m {current_5m_ready_symbols}/{active_universe_symbol_count}。"
         f"{runtime_readiness_note}"
+    )
+
+
+def is_longbridge_non_degraded_freshness_notice(message: str) -> bool:
+    lowered = message.lower()
+    return (
+        "longbridge_quote_readonly" in lowered
+        and "没有降级" in message
+        and not any(token in lowered for token in ("fallback quotes", "no-fetch", "no_fetch", "no-refresh", "no_refresh"))
     )
 
 
@@ -3383,7 +3657,12 @@ def build_accountized_dashboard_payload(
         trade_ledger_rows,
         update_status,
     )
+    local_history_quality = build_local_simulation_history_quality(config, runtime["account_rows"])
     longbridge_paper_account = build_longbridge_paper_dashboard_view(config)
+    longbridge_paper_account["dedicated_bucket_runtime_review_rows"] = build_dedicated_bucket_runtime_review_rows(
+        local_history_quality,
+        longbridge_paper_account,
+    )
     experimental_lane_note = experimental_lane_plain_reason(runtime["account_input_audit_rows"])
     return {
         "schema_version": "m12.46.accountized-readonly-dashboard.v1",
@@ -3403,7 +3682,19 @@ def build_accountized_dashboard_payload(
             "FTD001 对照": ftd001_monitor["current_plain_status"],
             "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
             "长桥模拟账户": longbridge_paper_account["top_metric"],
-            "长桥可提交订单": longbridge_paper_account["submit_ready_count"],
+            "长桥账户当日盈亏": longbridge_paper_account.get("longbridge_account_intraday_pnl", "等待长桥字段对齐"),
+            "长桥接口持仓今日浮动": longbridge_paper_account["longbridge_account_today_total_pnl"],
+            "长桥当前持仓总盈亏": longbridge_paper_account["longbridge_account_total_pnl"],
+            "长桥账户总资产": longbridge_paper_account["account_total_equity_estimate"],
+            "长桥交易累计盈亏": longbridge_paper_account["longbridge_stock_total_pnl"],
+            "长桥逐标的胜率": longbridge_paper_account["longbridge_symbol_win_rate_label"],
+            "长桥交易胜率": longbridge_paper_account["longbridge_closed_trade_win_rate_label"],
+            "长桥修复后样本": longbridge_paper_account["longbridge_post_fix_closed_trade_count"],
+            "长桥最大回撤": longbridge_paper_account["longbridge_max_drawdown_label"],
+            "长桥项目资金占用": longbridge_paper_account["project_model_exposure_label"],
+            "长桥本轮可新开仓": longbridge_paper_account["submit_ready_count"],
+            "本地历史盈亏比": local_history_quality["overall"]["profit_loss_ratio"],
+            "本地盈利因子": local_history_quality["overall"]["profit_factor"],
             "北京时间更新": update_status["beijing_time"],
             "运行状态": update_status["runtime_status"],
         },
@@ -3451,6 +3742,7 @@ def build_accountized_dashboard_payload(
         "ftd001_monitor": ftd001_monitor,
         "extended_session_monitor": extended_session_monitor,
         "longbridge_paper_account": longbridge_paper_account,
+        "local_simulation_history_quality": local_history_quality,
         "codex_observer": codex_observer,
         "summary": summary,
         "trade_rows": trade_ledger_rows,
@@ -3637,6 +3929,12 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_position_manager_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_position_manager.json"
     realtime_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_execution.json"
     realtime_ledger_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_execution_ledger.jsonl"
+    realtime_market_events_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_realtime_market_events.jsonl"
+    realtime_equity_curve_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_equity_curve.jsonl"
+    realtime_epoch_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_virtual_account_epoch.json"
+    pnl_reconciliation_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_account_pnl_reconciliation.json"
+    order_reconciliation_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_order_reconciliation.json"
+    unfilled_order_diagnostics_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_unfilled_order_diagnostics.json"
     connection_path = daily_dir / M15_PAPER_CONNECTION_CHECK_DIR / "m15_longbridge_paper_connection_check.json"
     legacy_account_state = load_optional_json(legacy_account_state_path)
     realtime_account_state = load_optional_json(realtime_account_state_path)
@@ -3651,18 +3949,36 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_position_manager = load_optional_json(realtime_position_manager_path)
     realtime = load_optional_json(realtime_path)
     realtime_ledger = read_jsonl(realtime_ledger_path)
+    realtime_market_events = read_jsonl(realtime_market_events_path)
+    realtime_equity_curve = read_jsonl(realtime_equity_curve_path)
+    realtime_epoch = load_optional_json(realtime_epoch_path)
+    pnl_reconciliation = load_optional_json(pnl_reconciliation_path)
+    order_reconciliation = load_optional_json(order_reconciliation_path)
+    unfilled_order_diagnostics = load_optional_json(unfilled_order_diagnostics_path)
     connection = load_optional_json(connection_path)
+    paper_execution_config = load_optional_json(
+        ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_orders_enabled.json"
+    )
     submitter_account = submitter.get("longbridge_account", {}) if isinstance(submitter.get("longbridge_account"), dict) else {}
+    paper_account_equity_model = str(
+        submitter.get("paper_account_equity_model") or connection.get("paper_account_equity_model") or "10000"
+    )
     queue_summary = fast_queue.get("summary", {}) if isinstance(fast_queue.get("summary"), dict) else {}
     confluence_summary = fast_queue.get("confluence_summary", {}) if isinstance(fast_queue.get("confluence_summary"), dict) else {}
     queue_market_date = str(fast_queue.get("current_market_date") or fast_queue.get("scan_date") or "")
     queue_scan_date = str(fast_queue.get("scan_date") or "")
     panel_market_date = datetime.now(UTC).astimezone(ZoneInfo("America/New_York")).date().isoformat()
     queue_stale_for_panel = bool(queue_market_date and queue_market_date != panel_market_date)
+    submitter_market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
+    realtime_market_window = realtime_supervisor.get("window", {}) if isinstance(realtime_supervisor.get("window"), dict) else {}
+    market_window = realtime_market_window if realtime_market_window else submitter_market_window
+    market_status = str(market_window.get("market_status") or "")
+    realtime_waiting_window = m15_waiting_market_window(realtime_supervisor, market_status)
     account_state_stale = m15_artifact_stale_for_market(
         account_state,
         "",
         max_age_seconds=M15_ACCOUNT_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     submitter_stale = m15_artifact_stale_for_market(
         submitter,
@@ -3673,6 +3989,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         realtime,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_supervisor_stale = m15_artifact_stale_for_market(
         realtime_supervisor,
@@ -3683,21 +4000,25 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         realtime_router,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_ingestor_stale = m15_artifact_stale_for_market(
         realtime_ingestor,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_account_state_stale = m15_artifact_stale_for_market(
         realtime_account_state if realtime_account_state else {},
         "",
         max_age_seconds=M15_ACCOUNT_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_position_manager_stale = m15_artifact_stale_for_market(
         realtime_position_manager,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
+        allow_audit_snapshot=realtime_waiting_window,
     )
     if realtime_account_state:
         account_state_stale = realtime_account_state_stale
@@ -3720,16 +4041,30 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         held_symbol_text = "账户状态来自旧交易日，等待提交器只读刷新"
     else:
         held_symbol_text = ", ".join(str(item) for item in held_symbols[:12]) if isinstance(held_symbols, list) and held_symbols else "暂无"
-    submit_status = "submitter_state_stale_waiting_refresh" if submitter_stale else str(submitter.get("submission_status") or "")
-    submitter_market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
-    realtime_market_window = realtime_supervisor.get("window", {}) if isinstance(realtime_supervisor.get("window"), dict) else {}
-    market_window = realtime_market_window if realtime_market_window else submitter_market_window
-    market_status = str(market_window.get("market_status") or "")
+    realtime_chain_state_available = bool(
+        realtime_account_state
+        or realtime_account_state_summary
+        or realtime_supervisor
+        or realtime
+    )
+    legacy_submit_status = "submitter_state_stale_waiting_refresh" if submitter_stale else str(submitter.get("submission_status") or "")
+    if realtime_chain_state_available:
+        submit_status = str(
+            realtime.get("submission_status")
+            or realtime.get("execution_status")
+            or realtime_supervisor.get("supervisor_status")
+            or realtime_account_state_summary.get("account_status")
+            or "realtime_account_state_only"
+        )
+    else:
+        submit_status = legacy_submit_status
     raw_queue_ready_count = int_like(queue_summary.get("ready_after_user_approval_count", 0))
     queue_ready_count = 0 if queue_stale_for_panel else raw_queue_ready_count
     legacy_eligible_count = queue_ready_count if submitter_stale else int_like(submitter.get("eligible_order_count", queue_ready_count))
     realtime_ready_count = 0 if realtime_stale else int_like(realtime.get("ready_order_count", 0))
     realtime_signal_count = 0 if realtime_stale else int_like(realtime.get("signal_event_count", 0))
+    realtime_input_signal_count = 0 if realtime_stale else int_like(realtime.get("input_signal_event_count", realtime_signal_count))
+    realtime_skipped_processed_count = 0 if realtime_stale else int_like(realtime.get("skipped_previously_processed_signal_count", 0))
     realtime_blocked_count = 0 if realtime_stale else int_like(realtime.get("blocked_signal_count", 0))
     realtime_submitted_count = 0 if realtime_stale else int_like(realtime.get("submitted_count", 0))
     realtime_market_event_count = 0 if realtime_router_stale else int_like(realtime_router.get("market_event_count", 0))
@@ -3740,22 +4075,86 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_account_status = str(realtime_account_state_summary.get("account_status") or "")
     realtime_exit_signal_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("new_exit_signal_event_count", 0))
     realtime_managed_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("managed_position_count", 0))
+    realtime_unmanaged_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("unmanaged_position_count", 0))
+    realtime_exit_only_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("exit_only_position_count", 0))
+    realtime_unmanaged_symbols_raw = (
+        realtime_position_manager.get("unmanaged_position_symbols", [])
+        if isinstance(realtime_position_manager.get("unmanaged_position_symbols"), list)
+        else []
+    )
+    realtime_exit_only_symbols_raw = (
+        realtime_position_manager.get("exit_only_position_symbols", [])
+        if isinstance(realtime_position_manager.get("exit_only_position_symbols"), list)
+        else []
+    )
+    realtime_unmanaged_symbols = [str(item) for item in realtime_unmanaged_symbols_raw if str(item)]
+    realtime_exit_only_symbols = [str(item) for item in realtime_exit_only_symbols_raw if str(item)]
+    raw_realtime_unmanaged_position_count = realtime_unmanaged_position_count
+    raw_realtime_unmanaged_symbols = list(realtime_unmanaged_symbols)
+    if realtime_unmanaged_position_count and not realtime_position_manager_stale:
+        realtime_exit_only_position_count += realtime_unmanaged_position_count
+        realtime_unmanaged_position_count = 0
+        realtime_exit_only_symbols = list(dict.fromkeys(realtime_exit_only_symbols + realtime_unmanaged_symbols))
+        realtime_unmanaged_symbols = []
+    realtime_position_manager_note = str(
+        realtime_position_manager.get("plain_language_result")
+        or f"新平仓信号 {realtime_exit_signal_count}；本地模拟平仓不触发长桥平仓。"
+    )
+    realtime_position_manager_note = realtime_position_manager_note.replace(
+        "只展示，不自动平仓",
+        "只接管退出待实时复核",
+    )
     realtime_available = bool(realtime) and not realtime_stale
     eligible_count = realtime_ready_count if realtime_available else legacy_eligible_count
     legacy_ledger_submission_counts = m15_submission_counts_for_date(submission_ledger, panel_market_date)
     realtime_ledger_submission_counts = m15_submission_counts_for_date(realtime_ledger, panel_market_date)
+    account_order_counts = m15_account_order_counts_for_date(account_state, panel_market_date)
+    pnl_summary = m15_longbridge_pnl_summary(account_state, realtime_market_events, panel_market_date)
+    account_pnl_summary = m15_longbridge_account_pnl_summary(account_state, pnl_summary, paper_account_equity_model)
+    active_pnl_reconciliation = (
+        pnl_reconciliation
+        if m15_longbridge_reconciliation_fresh_for_account_state(pnl_reconciliation, account_state)
+        else {}
+    )
+    if active_pnl_reconciliation:
+        m15_apply_longbridge_reconciliation_to_account_pnl(account_pnl_summary, active_pnl_reconciliation)
+    elif pnl_reconciliation:
+        m15_mark_stale_longbridge_reconciliation(account_pnl_summary, pnl_reconciliation, account_state)
+    official_position_rows = m15_longbridge_position_pnl_rows_from_reconciliation(active_pnl_reconciliation)
+    order_reconciliation_summary = m15_order_reconciliation_summary(order_reconciliation)
+    unfilled_order_rows = m15_unfilled_order_diagnostic_rows(unfilled_order_diagnostics)
+    symbol_pnl_rows = m15_longbridge_symbol_pnl_rows(active_pnl_reconciliation)
+    trade_quality_summary = m15_longbridge_trade_quality_summary(symbol_pnl_rows)
+    closed_trade_quality_summary = m15_longbridge_closed_trade_quality_summary(account_state)
+    equity_curve_summary = m15_longbridge_equity_curve_summary(realtime_equity_curve)
+    strategy_trade_pnl_rows = m15_longbridge_strategy_trade_pnl_rows(order_reconciliation, symbol_pnl_rows)
+    strategy_quality_summary = m15_longbridge_strategy_quality_summary(account_state, realtime_ledger)
+    virtual_bucket_rows = m15_longbridge_virtual_bucket_rows(
+        realtime,
+        realtime_ledger,
+        realtime_epoch,
+        active_pnl_reconciliation,
+        order_reconciliation,
+    )
     last_run_submitted_count = 0 if submitter_stale else int_like(submitter.get("submitted_order_count", 0))
     last_run_attempted_count = 0 if submitter_stale else int_like(submitter.get("attempted_order_count", 0))
+    realtime_attempted_count = 0 if realtime_stale else int_like(realtime.get("attempted_order_count", 0))
+    realtime_unconfirmed_count = 0 if realtime_stale else int_like(realtime.get("unconfirmed_submission_count", 0))
     submitted_count = max(
         legacy_ledger_submission_counts["submitted"],
         realtime_ledger_submission_counts["submitted"],
         last_run_submitted_count,
-        realtime_submitted_count,
     )
     attempted_count = max(
         legacy_ledger_submission_counts["attempted"],
         realtime_ledger_submission_counts["attempted"],
         last_run_attempted_count,
+        realtime_attempted_count,
+    )
+    unconfirmed_count = max(
+        legacy_ledger_submission_counts["unconfirmed"],
+        realtime_ledger_submission_counts["unconfirmed"],
+        realtime_unconfirmed_count,
     )
     queue_status = str(fast_queue.get("fast_queue_status") or fast_queue.get("preview_status") or "")
     new_signal_count = int_like(queue_summary.get("new_open_signal_count", 0))
@@ -3771,6 +4170,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     global_blockers = submitter.get("global_blockers", []) if isinstance(submitter.get("global_blockers"), list) else []
     queue_blockers = fast_queue.get("current_day_blockers", []) if isinstance(fast_queue.get("current_day_blockers"), list) else []
     realtime_latency_counts = realtime.get("latency_counts", {}) if isinstance(realtime.get("latency_counts"), dict) else {}
+    realtime_delayed_age_blocked_count = 0 if realtime_stale else int_like(realtime.get("delayed_signal_age_blocked_count", 0))
     data_available = bool(account_state or submitter or fast_queue or realtime_supervisor or realtime_ingestor or realtime_router or realtime_position_manager or realtime or connection)
     account_label = "模拟账户已连接" if paper_detected else "等待模拟账户确认" if auth_ok else "等待授权或状态文件"
     top_metric = (
@@ -3786,14 +4186,28 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language = "长桥模拟账户连接过，但账户持仓/挂单状态来自旧交易日或已经过期；当前数字需要提交器只读刷新后再看。"
     elif not paper_detected:
         plain_language = "长桥账户尚未被确认成模拟账户，所以看板只显示状态，不允许提交。"
-    elif realtime_available and submitted_count > 0:
-        plain_language = f"长桥模拟账户已连接，实时链路本轮已提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
-    elif realtime_available and realtime_ready_count > 0:
-        plain_language = f"长桥模拟账户已连接，实时链路有 {realtime_ready_count} 条实时信号通过风控；旧快速队列只作审计。"
     elif realtime_available:
-        plain_language = "长桥模拟账户已连接，实时链路已和本地模拟隔离；当前没有合格实时信号。"
+        if realtime_waiting_window:
+            if submitted_count > 0:
+                plain_language = (
+                    f"长桥模拟账户已连接；当前不是美股常规交易时段，账户状态已只读刷新。"
+                    f"上一交易窗口确认提交 {submitted_count} 笔模拟订单，本地模拟没有参与下单判断；等待下一交易日自动运行。"
+                )
+            else:
+                plain_language = "长桥模拟账户已连接；当前不是美股常规交易时段，账户状态已只读刷新，交易循环等待下一交易日自动运行。"
+        elif submitted_count > 0:
+            plain_language = f"长桥模拟账户已连接，实时链路今日已确认提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
+        elif attempted_count > 0:
+            plain_language = (
+                f"长桥模拟账户已连接，本轮没有确认提交；今日历史请求 {attempted_count} 个，"
+                f"其中 {unconfirmed_count} 个未确认成功，订单成交/拒单以长桥账户状态为准。"
+            )
+        elif realtime_ready_count > 0:
+            plain_language = f"长桥模拟账户已连接，实时链路有 {realtime_ready_count} 条实时信号通过风控。"
+        else:
+            plain_language = "长桥模拟账户已连接，实时链路已和本地模拟隔离；当前没有合格实时信号。"
     elif submitter_stale:
-        plain_language = "长桥模拟账户已连接，账户持仓/挂单是最新只读读取；实时链路状态尚未刷新，旧提交器和快速队列只作审计。"
+        plain_language = "长桥模拟账户已连接，账户持仓/挂单是最新只读读取；实时链路状态尚未刷新。"
     elif submitted_count > 0:
         plain_language = f"长桥模拟账户已连接，本轮已提交 {submitted_count} 笔模拟订单；仍是模拟账户，不触碰真实资金。"
     elif eligible_count > 0:
@@ -3806,13 +4220,114 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language += f" 队列阻断：{', '.join(str(item) for item in queue_blockers)}。"
     if submitter_stale and not realtime_available:
         plain_language += " 提交器状态来自旧交易日，等待只读刷新。"
-    if queue_stale_for_panel:
-        plain_language += " 快速队列是旧交易日，只作审计，不作为今天可提交订单。"
+    panel_last_refreshed_at = str(
+        realtime_account_state.get("generated_at")
+        or realtime_account_state_summary.get("generated_at")
+        or active_pnl_reconciliation.get("generated_at")
+        or realtime_supervisor.get("generated_at")
+        or account_state.get("generated_at")
+        or ""
+    )
+    account_state_generated_at = str(realtime_account_state.get("generated_at") or account_state.get("generated_at") or "")
+    pnl_reconciliation_generated_at = str(active_pnl_reconciliation.get("generated_at") or "")
     status_rows = [
         {"label": "账户状态", "value": account_label, "note": f"通道 {account_channel or '暂无'}，类型 {account_type or '暂无'}"},
-        {"label": "模拟资金模型", "value": str(submitter.get("paper_account_equity_model") or connection.get("paper_account_equity_model") or "10000"), "note": "项目按 10000 USD 模型控制仓位，不用长桥余额放大风险。"},
+        {
+            "label": "长桥面板刷新时间",
+            "value": panel_last_refreshed_at or "暂无",
+            "note": "这是长桥模拟账户面板自己的只读刷新时间；本地模拟大看板时间可能仍停留在上一轮 M12.37 快照。",
+        },
+        {"label": "模拟资金模型", "value": paper_account_equity_model, "note": "项目按 10000 USD 模型控制仓位，不用长桥余额放大风险。"},
+        {
+            "label": "本地分仓基线",
+            "value": f"{realtime_epoch.get('test_epoch_id', '未生成')} / {realtime_epoch.get('status', '未生成')}",
+            "note": "新测试只统计该基线之后的长桥实时订单；旧订单保留审计，但默认不参与单策略仓/统一实验仓表现。",
+        },
+        {
+            "label": "本地虚拟资金池",
+            "value": "单策略仓每仓 10000 / 统一实验仓 10000",
+            "note": "每个单策略仓各自控制敞口，不设置所有单仓合计总上限；同一标的允许不同策略仓分别持有并分别归因。",
+        },
+        {
+            "label": "长桥账户总资产",
+            "value": account_pnl_summary["account_total_equity_estimate"],
+            "note": account_pnl_summary["account_total_equity_note"],
+        },
+        {
+            "label": "账户当日盈亏",
+            "value": account_pnl_summary.get("longbridge_account_intraday_pnl", "等待长桥字段对齐"),
+            "note": account_pnl_summary.get("longbridge_account_intraday_pnl_note", "来自长桥 profit-analysis 当日查询。"),
+        },
+        {
+            "label": "当前持仓总盈亏",
+            "value": account_pnl_summary["longbridge_account_total_pnl"],
+            "note": account_pnl_summary["longbridge_account_total_pnl_note"],
+        },
+        {
+            "label": "接口持仓今日浮动",
+            "value": account_pnl_summary["longbridge_account_today_total_pnl"],
+            "note": account_pnl_summary["longbridge_account_today_total_pnl_note"],
+        },
+        {
+            "label": "长桥交易累计盈亏",
+            "value": account_pnl_summary["longbridge_stock_total_pnl"],
+            "note": account_pnl_summary["longbridge_stock_total_pnl_note"],
+        },
+        {
+            "label": "已实现 / 持仓浮动",
+            "value": f"{account_pnl_summary['longbridge_realized_pnl_estimate']} / {account_pnl_summary['longbridge_unrealized_pnl']}",
+            "note": "已实现为长桥股票总盈亏减当前持仓浮动后的估算；持仓浮动来自长桥 portfolio。",
+        },
+        {
+            "label": "长桥逐标的胜率",
+            "value": trade_quality_summary["win_rate_label"],
+            "note": trade_quality_summary["win_rate_note"],
+        },
+        {
+            "label": "长桥交易胜率",
+            "value": closed_trade_quality_summary["win_rate_label"],
+            "note": closed_trade_quality_summary["win_rate_note"],
+        },
+        {
+            "label": "长桥修复后样本",
+            "value": strategy_quality_summary["post_fix_closed_trade_count"],
+            "note": strategy_quality_summary["note"],
+        },
+        {
+            "label": "策略限权分层",
+            "value": "主交易 / 严格小仓位 / 本地修复",
+            "note": "PA004 为主交易；PA013、PA002、PA005、FTD001 等为严格小仓位；PA001-5m 等弱入场策略只留本地修复。",
+        },
+        {
+            "label": "长桥盈亏比",
+            "value": trade_quality_summary["profit_loss_ratio"],
+            "note": trade_quality_summary["profit_loss_note"],
+        },
+        {
+            "label": "长桥完整最大回撤",
+            "value": equity_curve_summary["max_drawdown_label"],
+            "note": equity_curve_summary["max_drawdown_note"],
+        },
+        {
+            "label": "项目资金模型占用",
+            "value": account_pnl_summary["project_model_exposure_label"],
+            "note": account_pnl_summary["project_model_exposure_note"],
+        },
         {"label": "可用购买力", "value": buying_power, "note": "来自长桥模拟账户资产读取，仅用于确认连接状态。"},
         {"label": "持仓 / 挂单", "value": f"{position_count} / {open_order_count}", "note": f"当前持仓标的：{held_symbol_text}"},
+        {"label": "订单结果", "value": account_order_counts["summary_label"], "note": account_order_counts["note"]},
+        {
+            "label": "长桥实际成交",
+            "value": (
+                f"成交 {order_reconciliation_summary['filled_order_count']} / "
+                f"未成交 {order_reconciliation_summary['unfilled_order_count']}"
+            ),
+            "note": (
+                "成绩只统计长桥实际 Filled/部分成交；"
+                f"未归因旧路径 {order_reconciliation_summary['legacy_or_unattributed_order_count']}，"
+                f"本地未确认提交 {order_reconciliation_summary['local_submitted_no_longbridge_order_count']}。"
+            ),
+        },
         {
             "label": "实时守护器",
             "value": realtime_supervisor_status_label(realtime_supervisor, realtime_supervisor_stale),
@@ -3821,7 +4336,12 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         {
             "label": "实时执行链路",
             "value": realtime_execution_status_label(realtime, realtime_stale),
-            "note": str(realtime.get("plain_language_result") or "实时链路尚未生成；旧快速队列只作审计。"),
+            "note": str(realtime.get("plain_language_result") or "实时链路尚未生成；等待长桥实时行情触发新信号。"),
+        },
+        {
+            "label": "旧提交器状态",
+            "value": submit_status_label(submit_status),
+            "note": "旧快速队列/旧提交器只保留审计和历史兼容用途，不作为长桥实时下单来源。",
         },
         {
             "label": "实时行情采集",
@@ -3840,37 +4360,130 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         },
         {
             "label": "实时持仓退出",
-            "value": "过期" if realtime_position_manager_stale else f"{realtime_exit_signal_count}平仓信号",
-            "note": str(realtime_position_manager.get("plain_language_result") or f"管理持仓 {realtime_managed_position_count} 条；本地模拟平仓不触发长桥平仓。"),
-        },
-        {
-            "label": "旧提交器状态",
-            "value": submit_status_label(submit_status),
-            "note": "旧提交器不再作为实时下单热路径。" if submitter_stale else str(submitter.get("plain_language_result") or "暂无提交器摘要"),
+            "value": "过期" if realtime_position_manager_stale else f"{realtime_managed_position_count}系统管理 / {realtime_exit_only_position_count}只接管退出 / {realtime_unmanaged_position_count}未接管退出",
+            "note": realtime_position_manager_note,
         },
         {"label": "市场窗口", "value": market_status_label(market_status), "note": str(market_window.get("new_york_time") or "暂无")},
         {"label": "接口读取", "value": health_label(auth_ok, assets_ok, positions_ok, orders_ok), "note": "认证、资产、持仓、挂单状态只读检查。"},
         {"label": "延迟", "value": latency_label(submitter.get("latency_ms", {})), "note": f"下一轮检查间隔 {submitter.get('next_interval_seconds', '暂无')} 秒"},
     ]
+    realtime_pnl_cards = [
+        {
+            "label": "账户当日盈亏",
+            "value": longbridge_realtime_pnl_value(account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算")),
+            "note": account_pnl_summary.get("longbridge_account_intraday_pnl_note", "来自长桥 profit-analysis 当日查询。"),
+            "value_type": "money",
+        },
+        {
+            "label": "接口持仓今日浮动",
+            "value": longbridge_realtime_pnl_value(account_pnl_summary["longbridge_account_today_total_pnl"]),
+            "note": account_pnl_summary["longbridge_account_today_total_pnl_note"],
+            "value_type": "money",
+        },
+        {
+            "label": "当前持仓总盈亏",
+            "value": longbridge_realtime_pnl_value(account_pnl_summary["longbridge_account_total_pnl"]),
+            "note": account_pnl_summary["longbridge_account_total_pnl_note"],
+            "value_type": "money",
+        },
+        {
+            "label": "交易累计盈亏",
+            "value": longbridge_realtime_pnl_value(account_pnl_summary["longbridge_stock_total_pnl"]),
+            "note": account_pnl_summary["longbridge_stock_total_pnl_note"],
+            "value_type": "money",
+        },
+        {
+            "label": "已实现估算",
+            "value": longbridge_realtime_pnl_value(account_pnl_summary["longbridge_realized_pnl_estimate"]),
+            "note": "长桥股票交易总盈亏减当前持仓浮动后的估算值。",
+            "value_type": "money",
+        },
+        {
+            "label": "持仓浮动",
+            "value": longbridge_realtime_pnl_value(account_pnl_summary["longbridge_unrealized_pnl"]),
+            "note": "来自长桥当前持仓成本价和最新价格。",
+            "value_type": "money",
+        },
+        {
+            "label": "项目资金占用",
+            "value": account_pnl_summary["project_model_exposure_label"],
+            "note": account_pnl_summary["project_model_exposure_note"],
+            "value_type": "text",
+        },
+    ]
     queue_rows = [
         {"label": "行情事件", "value": str(realtime_market_event_count), "note": f"采集器新增 {realtime_ingestor_new_event_count} / 累计 {realtime_ingestor_total_event_count} / 延期 {realtime_ingestor_deferred_count}"},
-        {"label": "实时信号", "value": str(realtime_signal_count), "note": f"通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
-        {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": "1 秒内是目标，5 秒内第一版可接受。"},
-        {"label": "旧队列日期", "value": str(fast_queue.get("scan_date") or "暂无"), "note": f"当前美股交易日 {fast_queue.get('current_market_date', '暂无')}"},
-        {"label": "旧队列状态", "value": fast_queue_status_label(queue_status), "note": "本地审计/历史兼容，不作为长桥实时下单来源。"},
-        {"label": "旧队列新信号", "value": str(new_signal_count), "note": f"旧队列快速风控 {legacy_eligible_count}，名义金额 {ready_notional}"},
-        {"label": "被阻断信号", "value": str(blocked_signal_count), "note": status_counts_label(status_counts)},
-        {"label": "扣费后合格", "value": str(net_profitable_ready_count), "note": f"扣费后不赚钱阻断 {fee_profit_blocked_count}"},
-        {"label": "修复策略信号", "value": str(repair_signal_count), "note": "修复策略只生成本地草稿，不提交长桥模拟账户。"},
-        {"label": "旧快照阻断", "value": str(stale_blocked_count), "note": str(fast_queue.get("snapshot_freshness_status") or "暂无")},
-        {"label": "多策略共振", "value": f"{confluence_primary_count}主 / {confluence_support_count}辅", "note": f"最高倍率 {confluence_summary.get('max_confluence_multiplier', '1')}"},
-        {"label": "已提交 / 已尝试", "value": f"{submitted_count} / {attempted_count}", "note": "按今天提交流水累计，不包含本地模拟账本。"},
+        {"label": "实时信号", "value": str(realtime_signal_count), "note": f"输入 {realtime_input_signal_count}，跳过已处理 {realtime_skipped_processed_count}，通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
+        {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": f"1 秒内是目标，5 秒内第一版可接受；超过最大年龄的旧信号不补交。本轮旧信号阻断 {realtime_delayed_age_blocked_count} 条。"},
+        {
+            "label": "整股化取整",
+            "value": str(realtime.get("quantity_normalized_count", realtime_router.get("quantity_normalized_count", 0))),
+            "note": "禁用碎股时，大于等于 1 股的小数建议数量统一向下取整，例如 24.0964 股会按 24 股继续重算风控。",
+        },
+        {
+            "label": "不足 1 股阻断",
+            "value": str(
+                realtime.get(
+                    "quantity_below_one_blocked_count",
+                    realtime_router.get("quantity_below_one_blocked_count", 0),
+                )
+            ),
+            "note": "取整后不足 1 股的信号不提交长桥，原因固定为 blocked_quantity_below_one_share。",
+        },
+        {
+            "label": "取整后风控阻断",
+            "value": str(
+                realtime.get(
+                    "quantity_normalized_risk_or_profit_blocked_count",
+                    realtime_router.get("quantity_normalized_risk_or_profit_blocked_count", 0),
+                )
+            ),
+            "note": "数量向下取整后仍会重新检查单笔风险、单标的敞口、资金池总敞口、扣费后利润和收益风险比。",
+        },
+        {
+            "label": "做空未启用",
+            "value": str(realtime.get("short_disabled_count", realtime_router.get("short_disabled_count", 0))),
+            "note": "当前长桥只做多；FTD 或其他策略出现看跌/做空机会时只记录，不提交订单。",
+        },
+        {"label": "低利润阻断", "value": str(realtime.get("low_profit_blocked_count", 0) if realtime_available else fee_profit_blocked_count), "note": "扣费后预计净利润低于当前运行单元门槛的实时信号只记录，不提交长桥；普通信号最低 8 USD，PA001 等弱策略最低 12 USD。"},
+        {"label": "盈亏比阻断", "value": str(realtime.get("reward_r_blocked_count", 0) if realtime_available else 0), "note": "目标利润/止损风险低于门槛的信号不提交；普通信号最低 1.5，弱策略最低 2.0。"},
+        {"label": "已确认提交 / 已请求", "value": f"{submitted_count} / {attempted_count}", "note": f"请求数只用于链路诊断；长桥实际成交 {order_reconciliation_summary['filled_order_count']}，未成交 {order_reconciliation_summary['unfilled_order_count']}，未确认 {unconfirmed_count}。"},
+        {"label": "未成交诊断", "value": str(order_reconciliation_summary["unfilled_order_count"]), "note": f"拒绝/取消/过期/未确认全部进诊断，不计入胜率、盈亏、回撤或分仓占用。原因统计：{status_counts_label(order_reconciliation_summary['diagnostic_category_counts'])}"},
+        {"label": "扣费后合格", "value": str(net_profitable_ready_count), "note": f"旧快速队列审计口径；扣费后不赚钱阻断 {fee_profit_blocked_count}，不作为实时下单来源。"},
+        {"label": "旧队列阻断", "value": str(blocked_signal_count), "note": f"修复策略 {repair_signal_count}，旧快照阻断 {stale_blocked_count}，状态明细：{status_counts_label(status_counts)}"},
+        {"label": "本地模拟隔离", "value": "已隔离", "note": "旧快速队列、旧本地账本和平仓记录不作为长桥实时下单来源。"},
     ]
+    existing_dashboard = load_optional_json(config.output_dir / "m12_32_minute_readonly_dashboard_data.json")
+    local_history_quality = (
+        existing_dashboard.get("local_simulation_history_quality", {})
+        if isinstance(existing_dashboard.get("local_simulation_history_quality"), dict)
+        else {}
+    )
+    virtual_capital_bucket_definitions = (
+        m15_virtual_capital_bucket_definitions(paper_execution_config)
+        or m15_virtual_capital_bucket_definitions(realtime)
+    )
+    runtime_whitelist = (
+        paper_execution_config.get("longbridge_realtime", {}).get("allowed_runtime_ids", [])
+        if isinstance(paper_execution_config.get("longbridge_realtime"), dict)
+        else []
+    ) or realtime.get("runtime_whitelist", realtime_router.get("allowed_runtime_ids", []))
+    dedicated_bucket_runtime_review_rows = build_dedicated_bucket_runtime_review_rows(
+        local_history_quality,
+        {
+            "virtual_capital_bucket_definitions": virtual_capital_bucket_definitions,
+            "runtime_whitelist": runtime_whitelist,
+        },
+    )
     return {
         "schema_version": "m15.longbridge-paper-dashboard-panel.v2",
         "stage": "M15.longbridge_paper_dashboard_panel",
         "title": "长桥模拟账户",
-        "generated_from": "m15 realtime account state + realtime position manager + realtime execution + legacy fast queue audit",
+        "generated_from": "m15 realtime account state + realtime position manager + realtime execution",
+        "generated_at": panel_last_refreshed_at,
+        "longbridge_panel_generated_at": panel_last_refreshed_at,
+        "account_state_generated_at": account_state_generated_at,
+        "pnl_reconciliation_generated_at": pnl_reconciliation_generated_at,
         "data_available": data_available,
         "top_metric": top_metric,
         "submit_ready_count": str(eligible_count),
@@ -3878,8 +4491,100 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "account_channel": account_channel,
         "account_type": account_type,
         "buying_power": buying_power,
+        "cash": account_pnl_summary["cash"],
+        "longbridge_account_baseline_equity": account_pnl_summary["longbridge_account_baseline_equity"],
+        "account_total_equity_estimate": account_pnl_summary["account_total_equity_estimate"],
+        "account_total_pnl_estimate": account_pnl_summary["account_total_pnl_estimate"],
+        "account_total_return_percent": account_pnl_summary["account_total_return_percent"],
+        "longbridge_account_total_pnl": account_pnl_summary["longbridge_account_total_pnl"],
+        "longbridge_account_intraday_pnl": account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算"),
+        "longbridge_account_today_total_pnl": account_pnl_summary["longbridge_account_today_total_pnl"],
+        "longbridge_app_display_today_pnl": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
+        "longbridge_portfolio_today_holding_pnl": account_pnl_summary.get("longbridge_portfolio_today_holding_pnl", account_pnl_summary["longbridge_account_today_total_pnl"]),
+        "longbridge_stock_total_pnl": account_pnl_summary["longbridge_stock_total_pnl"],
+        "longbridge_realized_pnl_estimate": account_pnl_summary["longbridge_realized_pnl_estimate"],
+        "longbridge_unrealized_pnl": account_pnl_summary["longbridge_unrealized_pnl"],
+        "longbridge_symbol_win_rate_percent": trade_quality_summary["win_rate_percent"],
+        "longbridge_symbol_win_rate_label": trade_quality_summary["win_rate_label"],
+        "longbridge_symbol_win_count": trade_quality_summary["win_count"],
+        "longbridge_symbol_loss_count": trade_quality_summary["loss_count"],
+        "longbridge_symbol_flat_count": trade_quality_summary["flat_count"],
+        "longbridge_symbol_sample_count": trade_quality_summary["sample_count"],
+        "longbridge_closed_trade_win_rate_percent": closed_trade_quality_summary["win_rate_percent"],
+        "longbridge_closed_trade_win_rate_label": closed_trade_quality_summary["win_rate_label"],
+        "longbridge_closed_trade_win_count": closed_trade_quality_summary["win_count"],
+        "longbridge_closed_trade_loss_count": closed_trade_quality_summary["loss_count"],
+        "longbridge_closed_trade_sample_count": closed_trade_quality_summary["sample_count"],
+        "longbridge_closed_trade_unmatched_sell_count": closed_trade_quality_summary["unmatched_sell_count"],
+        "longbridge_closed_trade_total_pnl": closed_trade_quality_summary["total_pnl"],
+        "longbridge_closed_trade_note": closed_trade_quality_summary["source_note"],
+        "longbridge_quality_policy_started_at": strategy_quality_summary["policy_started_at"],
+        "longbridge_pre_fix_closed_trade_count": strategy_quality_summary["pre_fix_closed_trade_count"],
+        "longbridge_post_fix_closed_trade_count": strategy_quality_summary["post_fix_closed_trade_count"],
+        "longbridge_strategy_quality_note": strategy_quality_summary["note"],
+        "longbridge_average_win": trade_quality_summary["average_win"],
+        "longbridge_average_loss": trade_quality_summary["average_loss"],
+        "longbridge_profit_loss_ratio": trade_quality_summary["profit_loss_ratio"],
+        "longbridge_worst_symbol_loss_percent": trade_quality_summary["worst_symbol_loss_percent"],
+        "longbridge_worst_symbol_loss_label": trade_quality_summary["worst_symbol_loss_label"],
+        "longbridge_worst_symbol": trade_quality_summary["worst_symbol"],
+        "longbridge_largest_win_symbol": trade_quality_summary["largest_win_symbol"],
+        "longbridge_largest_win": trade_quality_summary["largest_win"],
+        "longbridge_largest_loss_symbol": trade_quality_summary["largest_loss_symbol"],
+        "longbridge_largest_loss": trade_quality_summary["largest_loss"],
+        "longbridge_trade_quality_note": trade_quality_summary["source_note"],
+        "longbridge_equity_curve_snapshot_count": equity_curve_summary["snapshot_count"],
+        "longbridge_equity_curve_start_at": equity_curve_summary["start_at"],
+        "longbridge_equity_curve_end_at": equity_curve_summary["end_at"],
+        "longbridge_max_drawdown_percent": equity_curve_summary["max_drawdown_percent"],
+        "longbridge_max_drawdown_label": equity_curve_summary["max_drawdown_label"],
+        "longbridge_max_drawdown_peak_at": equity_curve_summary["peak_at"],
+        "longbridge_max_drawdown_trough_at": equity_curve_summary["trough_at"],
+        "longbridge_max_drawdown_note": equity_curve_summary["max_drawdown_note"],
+        "longbridge_profit_analysis_start_date": account_pnl_summary["longbridge_profit_analysis_start_date"],
+        "longbridge_profit_analysis_end_date": account_pnl_summary["longbridge_profit_analysis_end_date"],
+        "symbol_pnl_rows": symbol_pnl_rows,
+        "strategy_trade_pnl_rows": strategy_trade_pnl_rows,
+        "strategy_quality_rows": strategy_quality_summary["rows"],
+        "virtual_bucket_rows": virtual_bucket_rows,
+        "order_reconciliation_summary": order_reconciliation_summary,
+        "unfilled_order_rows": unfilled_order_rows,
+        "unfilled_order_diagnostics_summary": (
+            unfilled_order_diagnostics.get("summary", {})
+            if isinstance(unfilled_order_diagnostics.get("summary"), dict)
+            else {}
+        ),
+        "virtual_capital_bucket_definitions": virtual_capital_bucket_definitions,
+        "runtime_whitelist": runtime_whitelist,
+        "dedicated_bucket_runtime_review_rows": dedicated_bucket_runtime_review_rows,
+        "test_epoch": realtime_epoch,
+        "position_market_value": account_pnl_summary["position_market_value"],
+        "position_cost_value": account_pnl_summary["position_cost_value"],
+        "open_order_notional": account_pnl_summary["open_order_notional"],
+        "project_model_equity": account_pnl_summary["project_model_equity"],
+        "project_model_used_exposure": account_pnl_summary["project_model_used_exposure"],
+        "project_model_exposure_percent": account_pnl_summary["project_model_exposure_percent"],
+        "project_model_exposure_label": account_pnl_summary["project_model_exposure_label"],
+        "project_model_unrealized_return_percent": account_pnl_summary["project_model_unrealized_return_percent"],
+        "today_total_pnl": account_pnl_summary["longbridge_account_today_total_pnl"],
+        "today_realized_pnl": pnl_summary["today_realized_pnl"],
+        "today_unrealized_pnl": account_pnl_summary["longbridge_unrealized_pnl"],
+        "total_pnl": account_pnl_summary["longbridge_account_total_pnl"],
+        "total_unrealized_pnl": account_pnl_summary["longbridge_unrealized_pnl"],
+        "pnl_price_source": "longbridge_portfolio_current_holdings" if official_position_rows else "waiting_for_longbridge_portfolio_current_holdings",
+        "pnl_position_rows": official_position_rows,
+        "order_status_counts": account_order_counts["counts"],
+        "rejected_order_count_today": str(account_order_counts["rejected"]),
+        "position_count": position_count,
         "position_row_count": position_count,
         "open_order_count": open_order_count,
+        "managed_position_count": str(realtime_managed_position_count),
+        "exit_only_position_count": str(realtime_exit_only_position_count),
+        "exit_only_position_symbols": realtime_exit_only_symbols,
+        "unmanaged_position_count": str(realtime_unmanaged_position_count),
+        "unmanaged_position_symbols": realtime_unmanaged_symbols,
+        "raw_unmanaged_position_count": str(raw_realtime_unmanaged_position_count),
+        "raw_unmanaged_position_symbols": raw_realtime_unmanaged_symbols,
         "account_state_stale": account_state_stale,
         "submitter_state_stale": submitter_stale,
         "realtime_session_supervisor_state_stale": realtime_supervisor_stale,
@@ -3893,9 +4598,15 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "realtime_execution_status": str(realtime.get("plain_language_result") or ""),
         "fast_queue_status": queue_status,
         "new_open_signal_count": str(realtime_signal_count if realtime_available else new_signal_count),
+        "input_signal_event_count": str(realtime_input_signal_count),
+        "skipped_previously_processed_signal_count": str(realtime_skipped_processed_count),
         "blocked_signal_count": str(realtime_blocked_count if realtime_available else blocked_signal_count),
         "submitted_order_count": str(submitted_count),
+        "attempted_order_count": str(attempted_count),
+        "unconfirmed_submission_count": str(unconfirmed_count),
+        "delayed_signal_age_blocked_count": str(realtime_delayed_age_blocked_count),
         "plain_language_result": plain_language,
+        "realtime_pnl_cards": realtime_pnl_cards,
         "status_rows": status_rows,
         "queue_rows": queue_rows,
         "refs": {
@@ -3910,6 +4621,11 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
             "realtime_position_manager": project_path(realtime_position_manager_path) if realtime_position_manager_path.exists() else "",
             "realtime_execution": project_path(realtime_path) if realtime_path.exists() else "",
             "realtime_execution_ledger": project_path(realtime_ledger_path) if realtime_ledger_path.exists() else "",
+            "realtime_equity_curve": project_path(realtime_equity_curve_path) if realtime_equity_curve_path.exists() else "",
+            "realtime_epoch": project_path(realtime_epoch_path) if realtime_epoch_path.exists() else "",
+            "pnl_reconciliation": project_path(pnl_reconciliation_path) if pnl_reconciliation_path.exists() else "",
+            "order_reconciliation": project_path(order_reconciliation_path) if order_reconciliation_path.exists() else "",
+            "unfilled_order_diagnostics": project_path(unfilled_order_diagnostics_path) if unfilled_order_diagnostics_path.exists() else "",
             "fast_signal_queue": project_path(fast_queue_path) if fast_queue_path.exists() else "",
             "connection_check": project_path(connection_path) if connection_path.exists() else "",
         },
@@ -3926,7 +4642,7 @@ def load_optional_json(path: Path) -> dict[str, Any]:
         return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return {}
 
 
@@ -3935,6 +4651,7 @@ def m15_artifact_stale_for_market(
     market_date: str,
     *,
     max_age_seconds: int | None = None,
+    allow_audit_snapshot: bool = False,
 ) -> bool:
     if not payload:
         return False
@@ -3948,8 +4665,21 @@ def m15_artifact_stale_for_market(
             return True
     if max_age_seconds is None:
         return False
+    if allow_audit_snapshot:
+        return False
     age_seconds = m15_generated_age_seconds(payload)
     return bool(age_seconds is None or age_seconds > max_age_seconds)
+
+
+def m15_waiting_market_window(supervisor: dict[str, Any], market_status: str) -> bool:
+    supervisor_status = str(supervisor.get("supervisor_status") or "")
+    normalized = market_status.strip().lower()
+    return supervisor_status == "waiting_market_window" or normalized in {
+        "等待下一交易日",
+        "非交易日等待",
+        "waiting_market_window",
+        "non_trading_day",
+    }
 
 
 def m15_generated_market_date(payload: dict[str, Any]) -> str:
@@ -3977,11 +4707,13 @@ def m15_generated_age_seconds(payload: dict[str, Any]) -> int | None:
 
 
 def m15_submission_counts_for_date(rows: list[dict[str, Any]], market_date: str) -> dict[str, int]:
-    counts = {"submitted": 0, "attempted": 0}
+    counts = {"submitted": 0, "attempted": 0, "unconfirmed": 0, "failed": 0}
     if not market_date:
         return counts
     submitted_fingerprints: set[str] = set()
     attempted_fingerprints: set[str] = set()
+    unconfirmed_fingerprints: set[str] = set()
+    failed_fingerprints: set[str] = set()
     for row in rows:
         row_market_date = str(row.get("trading_date") or row.get("market_date") or "")
         if not row_market_date:
@@ -3990,14 +4722,1434 @@ def m15_submission_counts_for_date(rows: list[dict[str, Any]], market_date: str)
             continue
         status = str(row.get("submission_status") or "")
         fingerprint = str(row.get("signal_fingerprint") or row.get("preview_id") or row.get("signal_id") or "")
-        if status == "submitted":
+        confirmed_order_id = m15_confirmed_order_id(row)
+        if status == "submitted" and confirmed_order_id:
             submitted_fingerprints.add(fingerprint or f"submitted:{len(submitted_fingerprints)}")
             attempted_fingerprints.add(fingerprint or f"submitted:{len(attempted_fingerprints)}")
-        elif status == "submit_failed":
+        elif status == "submitted" or status == "submit_unconfirmed_missing_order_id":
+            unconfirmed_fingerprints.add(fingerprint or f"unconfirmed:{len(unconfirmed_fingerprints)}")
+            attempted_fingerprints.add(fingerprint or f"unconfirmed:{len(attempted_fingerprints)}")
+        elif status.startswith("submit_failed"):
+            failed_fingerprints.add(fingerprint or f"failed:{len(failed_fingerprints)}")
             attempted_fingerprints.add(fingerprint or f"failed:{len(attempted_fingerprints)}")
     counts["submitted"] = len(submitted_fingerprints)
     counts["attempted"] = len(attempted_fingerprints)
+    counts["unconfirmed"] = len(unconfirmed_fingerprints)
+    counts["failed"] = len(failed_fingerprints)
     return counts
+
+
+def m15_confirmed_order_id(row: dict[str, Any]) -> str:
+    response = row.get("submission_response", {})
+    if isinstance(response, dict):
+        for key in ("order_id", "id"):
+            value = str(response.get(key) or "")
+            if value:
+                return value
+        nested = response.get("response")
+        if isinstance(nested, dict):
+            for key in ("order_id", "id"):
+                value = str(nested.get(key) or "")
+                if value:
+                    return value
+    return str(row.get("order_id") or "")
+
+
+def m15_account_order_counts_for_date(account_state: dict[str, Any], market_date: str) -> dict[str, Any]:
+    orders = account_state.get("orders") if isinstance(account_state.get("orders"), list) else []
+    counts: Counter[str] = Counter()
+    for order in orders:
+        if not isinstance(order, dict):
+            continue
+        if market_date and m15_order_market_date(order) != market_date:
+            continue
+        counts[str(order.get("status") or "Unknown")] += 1
+    filled = counts.get("Filled", 0) + counts.get("Executed", 0)
+    rejected = counts.get("Rejected", 0)
+    open_count = counts.get("New", 0) + counts.get("Submitted", 0) + counts.get("Pending", 0)
+    canceled = counts.get("Canceled", 0) + counts.get("Cancelled", 0)
+    return {
+        "counts": dict(sorted(counts.items())),
+        "filled": filled,
+        "rejected": rejected,
+        "open": open_count,
+        "canceled": canceled,
+        "summary_label": f"成交 {filled} / 拒单 {rejected} / 挂单 {open_count}",
+        "note": f"按长桥账户今日订单状态统计；取消 {canceled}。拒单不算成交，也不算已确认提交。",
+    }
+
+
+def m15_order_market_date(order: dict[str, Any]) -> str:
+    for key in ("created_at", "updated_at", "submitted_at", "filled_at"):
+        raw_value = str(order.get(key) or "")
+        if not raw_value:
+            continue
+        try:
+            timestamp = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        return timestamp.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+    return ""
+
+
+def m15_longbridge_pnl_summary(
+    account_state: dict[str, Any],
+    market_events: list[dict[str, Any]],
+    market_date: str,
+) -> dict[str, Any]:
+    latest_prices = m15_latest_price_by_symbol(market_events)
+    positions = account_state.get("positions") if isinstance(account_state.get("positions"), list) else []
+    cost_basis_by_symbol: dict[str, Decimal] = {}
+    total_unrealized = ZERO
+    position_market_value = ZERO
+    position_cost_value = ZERO
+    position_rows: list[dict[str, str]] = []
+    for row in positions:
+        if not isinstance(row, dict):
+            continue
+        symbol = m15_base_symbol(str(row.get("symbol") or ""))
+        quantity = money_to_decimal(str(row.get("quantity", row.get("qty", "0"))))
+        cost_price = money_to_decimal(str(row.get("cost_price", row.get("avg_cost", "0"))))
+        latest_price = latest_prices.get(symbol) or money_to_decimal(str(row.get("market_price", row.get("last_price", "0"))))
+        if symbol and cost_price > ZERO:
+            cost_basis_by_symbol[symbol] = cost_price
+        if quantity > ZERO and cost_price > ZERO:
+            position_cost_value += cost_price * quantity
+        if quantity > ZERO:
+            if latest_price > ZERO:
+                position_market_value += latest_price * quantity
+            elif cost_price > ZERO:
+                position_market_value += cost_price * quantity
+        pnl = (latest_price - cost_price) * quantity if symbol and quantity > ZERO and cost_price > ZERO and latest_price > ZERO else ZERO
+        total_unrealized += pnl
+        position_rows.append(
+            {
+                "symbol": symbol,
+                "quantity": money(quantity),
+                "cost_price": money(cost_price) if cost_price > ZERO else "",
+                "latest_price": money(latest_price) if latest_price > ZERO else "",
+                "unrealized_pnl": money(pnl),
+            }
+        )
+    today_realized, total_realized = m15_realized_pnl_from_orders(
+        account_state.get("orders") if isinstance(account_state.get("orders"), list) else [],
+        market_date,
+        cost_basis_by_symbol,
+    )
+    today_total = today_realized + total_unrealized
+    total_pnl = total_realized + total_unrealized
+    priced_rows = sum(1 for row in position_rows if row.get("latest_price"))
+    return {
+        "today_total_pnl": money(today_total),
+        "today_realized_pnl": money(today_realized),
+        "today_unrealized_pnl": money(total_unrealized),
+        "total_pnl": money(total_pnl),
+        "total_unrealized_pnl": money(total_unrealized),
+        "total_realized_pnl": money(total_realized),
+        "position_market_value": money(position_market_value),
+        "position_cost_value": money(position_cost_value),
+        "price_source": "longbridge_realtime_market_events" if latest_prices else "account_position_market_price_or_missing",
+        "position_rows": position_rows[:30],
+        "today_note": (
+            f"今日已实现 {money(today_realized)} + 当前持仓浮动 {money(total_unrealized)}；"
+            f"按 {priced_rows}/{len(position_rows)} 个持仓的最新长桥行情估算，不是实盘净值承诺。"
+        ),
+        "total_note": (
+            f"已成交订单估算累计 {money(total_realized)} + 当前持仓浮动 {money(total_unrealized)}；"
+            "订单明细不足时以持仓成本和最新行情为主。"
+        ),
+    }
+
+
+def m15_longbridge_account_pnl_summary(
+    account_state: dict[str, Any],
+    pnl_summary: dict[str, Any],
+    paper_account_equity_model: str,
+) -> dict[str, str]:
+    buying_power = money_to_decimal(str(account_state.get("buying_power") or "0"))
+    cash = money_to_decimal(
+        str(
+            account_state.get("cash")
+            or account_state.get("total_cash")
+            or account_state.get("available_cash")
+            or "0"
+        )
+    )
+    cash_source = "cash"
+    if cash <= ZERO and buying_power > ZERO:
+        cash = buying_power
+        cash_source = "buying_power_fallback"
+    position_market_value = money_to_decimal(str(pnl_summary.get("position_market_value") or "0"))
+    position_cost_value = money_to_decimal(str(pnl_summary.get("position_cost_value") or "0"))
+    open_order_notional = money_to_decimal(str(account_state.get("total_open_order_notional") or "0"))
+    baseline_raw = account_state.get("longbridge_account_baseline_equity") or account_state.get("account_baseline_equity")
+    baseline = money_to_decimal(str(baseline_raw or "0"))
+    baseline_confirmed = bool(baseline_raw) and baseline > ZERO
+    project_model_equity = money_to_decimal(str(paper_account_equity_model or "10000"))
+    if project_model_equity <= ZERO:
+        project_model_equity = Decimal("10000")
+    account_total_equity = cash + position_market_value
+    account_total_pnl = account_total_equity - baseline if baseline_confirmed else ZERO
+    account_total_return_percent = account_total_pnl / baseline * HUNDRED if baseline_confirmed else ZERO
+    project_model_used_exposure = position_market_value + open_order_notional
+    project_model_exposure_percent = (
+        project_model_used_exposure / project_model_equity * HUNDRED if project_model_equity > ZERO else ZERO
+    )
+    total_unrealized = money_to_decimal(str(pnl_summary.get("total_unrealized_pnl") or "0"))
+    project_model_unrealized_return_percent = (
+        total_unrealized / project_model_equity * HUNDRED if project_model_equity > ZERO else ZERO
+    )
+    cash_note = "现金字段" if cash_source == "cash" else "账户未给现金字段，临时用购买力兜底"
+    return {
+        "cash": money(cash),
+        "longbridge_account_baseline_equity": money(baseline) if baseline_confirmed else "",
+        "account_total_equity_estimate": money(account_total_equity),
+        "account_total_pnl_estimate": money(account_total_pnl) if baseline_confirmed else "无法计算",
+        "account_total_return_percent": pct(account_total_return_percent) if baseline_confirmed else "",
+        "position_market_value": money(position_market_value),
+        "position_cost_value": money(position_cost_value),
+        "open_order_notional": money(open_order_notional),
+        "project_model_equity": money(project_model_equity),
+        "project_model_used_exposure": money(project_model_used_exposure),
+        "project_model_exposure_percent": pct(project_model_exposure_percent),
+        "project_model_exposure_label": f"{money(project_model_used_exposure)} / {money(project_model_equity)} ({pct(project_model_exposure_percent)}%)",
+        "project_model_unrealized_return_percent": pct(project_model_unrealized_return_percent),
+        "account_total_equity_note": (
+            f"按{cash_note} {money(cash)} + 当前持仓市值 {money(position_market_value)} 估算；"
+            f"未成交挂单名义金额 {money(open_order_notional)} 单独展示，不重复计入总资产。"
+        ),
+        "account_total_pnl_note": (
+            f"按长桥模拟账户基准 {money(baseline)} 估算，总收益率 {pct(account_total_return_percent)}%；"
+            "这是账户净值展示口径，不用于放大下单仓位。"
+            if baseline_confirmed
+            else "长桥账户状态没有提供初始资金或入金流水，不能用 100000 硬减；当前总盈亏不展示，只看账户总资产和持仓盈亏。"
+        ),
+        "project_model_exposure_note": (
+            f"当前持仓市值 + 未成交挂单名义金额占项目资金模型 {pct(project_model_exposure_percent)}%；"
+            f"持仓浮盈亏折合项目模型 {pct(project_model_unrealized_return_percent)}%。"
+        ),
+        "longbridge_stock_total_pnl": "无法计算",
+        "longbridge_realized_pnl_estimate": "无法计算",
+        "longbridge_unrealized_pnl": money(total_unrealized),
+        "longbridge_account_total_pnl": "无法计算",
+        "longbridge_account_intraday_pnl": "无法计算",
+        "longbridge_account_today_total_pnl": str(pnl_summary.get("today_total_pnl") or "无法计算"),
+        "longbridge_app_display_today_pnl": "等待长桥字段对齐",
+        "longbridge_portfolio_today_holding_pnl": str(pnl_summary.get("today_total_pnl") or "无法计算"),
+        "longbridge_account_total_pnl_note": "等待长桥 portfolio 总盈亏；缺数据时不使用旧本地模拟估算覆盖。",
+        "longbridge_account_intraday_pnl_note": "等待长桥当日 profit-analysis；缺数据时不使用本地估算覆盖。",
+        "longbridge_account_today_total_pnl_note": (
+            str(pnl_summary.get("today_note") or "")
+            or "等待长桥 portfolio 当日盈亏；缺数据时不使用旧本地模拟估算覆盖。"
+        ),
+        "longbridge_today_total_pnl": str(pnl_summary.get("today_total_pnl") or "无法计算"),
+        "longbridge_today_total_pnl_note": (
+            str(pnl_summary.get("today_note") or "")
+            or "等待长桥 portfolio 今日盈亏；缺数据时不使用旧本地模拟估算覆盖。"
+        ),
+        "longbridge_profit_analysis_start_date": "",
+        "longbridge_profit_analysis_end_date": "",
+        "longbridge_stock_total_pnl_note": "等待长桥 profit-analysis 对账产物；缺数据时不使用假本金或旧错误历史字段硬算。",
+    }
+
+
+def m15_apply_longbridge_reconciliation_to_account_pnl(
+    account_pnl_summary: dict[str, str],
+    reconciliation: dict[str, Any],
+) -> None:
+    if not reconciliation:
+        return
+    account_pnl = reconciliation.get("account_pnl", {}) if isinstance(reconciliation.get("account_pnl"), dict) else {}
+    today_account_pnl = (
+        reconciliation.get("today_account_pnl", {})
+        if isinstance(reconciliation.get("today_account_pnl"), dict)
+        else {}
+    )
+    trading_pnl = reconciliation.get("trading_pnl", {}) if isinstance(reconciliation.get("trading_pnl"), dict) else {}
+    account_snapshot = reconciliation.get("account_snapshot", {}) if isinstance(reconciliation.get("account_snapshot"), dict) else {}
+    query_range = reconciliation.get("query_range", {}) if isinstance(reconciliation.get("query_range"), dict) else {}
+    account_total = str(account_pnl.get("sum_profit") or "")
+    today_account_total = str(today_account_pnl.get("sum_profit") or "")
+    stock_total = str(trading_pnl.get("stock_total_pnl") or "")
+    unrealized = str(trading_pnl.get("current_position_unrealized_pnl") or "")
+    realized_estimate = str(trading_pnl.get("realized_pnl_estimate") or "")
+    account_portfolio_total_pl = str(account_snapshot.get("portfolio_total_pl") or "")
+    account_portfolio_today_pl = str(account_snapshot.get("portfolio_total_today_pl") or "")
+    if account_total:
+        account_pnl_summary["account_total_pnl_estimate"] = account_total
+    if account_pnl.get("sum_profit_percent") not in (None, ""):
+        account_pnl_summary["account_total_return_percent"] = str(account_pnl.get("sum_profit_percent"))
+    if account_pnl.get("initial_asset_value"):
+        account_pnl_summary["longbridge_account_baseline_equity"] = str(account_pnl.get("initial_asset_value"))
+    if account_snapshot.get("app_like_total_asset"):
+        account_pnl_summary["account_total_equity_estimate"] = str(account_snapshot.get("app_like_total_asset"))
+    elif account_snapshot.get("portfolio_total_asset"):
+        account_pnl_summary["account_total_equity_estimate"] = str(account_snapshot.get("portfolio_total_asset"))
+    elif account_pnl.get("ending_asset_value"):
+        account_pnl_summary["account_total_equity_estimate"] = str(account_pnl.get("ending_asset_value"))
+    if account_snapshot.get("app_like_market_value"):
+        account_pnl_summary["position_market_value"] = str(account_snapshot.get("app_like_market_value"))
+    elif account_snapshot.get("portfolio_market_cap"):
+        account_pnl_summary["position_market_value"] = str(account_snapshot.get("portfolio_market_cap"))
+    if account_snapshot.get("portfolio_total_cash"):
+        account_pnl_summary["cash"] = str(account_snapshot.get("portfolio_total_cash"))
+    if account_portfolio_total_pl:
+        account_pnl_summary["longbridge_account_total_pnl"] = account_portfolio_total_pl
+    if today_account_total:
+        account_pnl_summary["longbridge_account_intraday_pnl"] = today_account_total
+        account_pnl_summary["longbridge_app_display_today_pnl"] = today_account_total
+    if account_portfolio_today_pl:
+        account_pnl_summary["longbridge_account_today_total_pnl"] = account_portfolio_today_pl
+        account_pnl_summary["longbridge_today_total_pnl"] = account_portfolio_today_pl
+    if not today_account_total:
+        account_pnl_summary["longbridge_app_display_today_pnl"] = "等待长桥字段对齐"
+    account_pnl_summary["longbridge_portfolio_today_holding_pnl"] = account_portfolio_today_pl or "无法计算"
+    account_pnl_summary["longbridge_stock_total_pnl"] = stock_total or "无法计算"
+    account_pnl_summary["longbridge_realized_pnl_estimate"] = realized_estimate or "无法计算"
+    account_pnl_summary["longbridge_unrealized_pnl"] = unrealized or account_pnl_summary.get("longbridge_unrealized_pnl", "0.00")
+    account_pnl_summary["longbridge_profit_analysis_start_date"] = str(query_range.get("start") or "")
+    account_pnl_summary["longbridge_profit_analysis_end_date"] = str(query_range.get("end") or "")
+    account_pnl_summary["account_total_pnl_note"] = (
+        f"来自长桥只读 profit-analysis，区间 {query_range.get('start', '')} ~ {query_range.get('end', '')}，"
+        f"初始资产 {account_pnl.get('initial_asset_value', '暂无')}，期末资产 {account_pnl.get('ending_asset_value', '暂无')}。"
+    )
+    account_pnl_summary["longbridge_account_intraday_pnl_note"] = (
+        f"来自长桥只读 profit-analysis 当日查询，区间 "
+        f"{today_account_pnl.get('start_date', '暂无')} ~ {today_account_pnl.get('end_date', '暂无')}，"
+        f"初始资产 {today_account_pnl.get('initial_asset_value', '暂无')}，"
+        f"当前资产 {today_account_pnl.get('current_total_asset', '暂无')}。"
+    )
+    account_pnl_summary["account_total_equity_note"] = (
+        f"来自长桥 portfolio：现金 {account_snapshot.get('portfolio_total_cash', '暂无')} + "
+        f"美股持仓市值 {account_snapshot.get('app_like_market_value', account_snapshot.get('portfolio_market_cap', '暂无'))}；"
+        f"该口径用于贴近 App 总资产显示。"
+    )
+    account_pnl_summary["longbridge_stock_total_pnl_note"] = (
+        f"来自长桥只读 profit-analysis by-market US；股票交易合并盈亏 {stock_total or '暂无'}，"
+        f"其中已实现估算 {realized_estimate or '暂无'}，当前持仓浮动 {unrealized or '暂无'}。"
+    )
+    account_pnl_summary["longbridge_today_total_pnl_note"] = (
+        f"来自长桥只读 portfolio.total_today_pl，当前更像持仓今日浮动；数值 {account_snapshot.get('portfolio_total_today_pl', '暂无')}。"
+        "它不等同于 App 顶部当日盈亏字段，App 字段仍待接口对齐。"
+    )
+    account_pnl_summary["longbridge_account_total_pnl_note"] = (
+        f"来自长桥只读 portfolio.total_pl；这是当前持仓总盈亏，"
+        f"等于当前持仓按现价减成本价的合计，当前值 {account_portfolio_total_pl or '暂无'}。"
+    )
+    account_pnl_summary["longbridge_account_today_total_pnl_note"] = (
+        f"来自长桥只读 portfolio.total_today_pl；当前值 {account_portfolio_today_pl or '暂无'}。"
+        "该字段与 App 顶部“当日盈亏”截图不一致，因此看板只作为接口持仓今日浮动展示。"
+    )
+
+
+def m15_longbridge_reconciliation_fresh_for_account_state(
+    reconciliation: dict[str, Any],
+    account_state: dict[str, Any],
+) -> bool:
+    if not reconciliation:
+        return False
+    if reconciliation.get("pnl_reconciliation_ok") is False:
+        return False
+    account_generated = parse_iso_datetime_or_none(str(account_state.get("generated_at") or ""))
+    reconciliation_generated = parse_iso_datetime_or_none(str(reconciliation.get("generated_at") or ""))
+    if account_generated and reconciliation_generated:
+        return reconciliation_generated + timedelta(hours=1) >= account_generated
+    if account_generated and not reconciliation_generated:
+        return False
+    return True
+
+
+def m15_mark_stale_longbridge_reconciliation(
+    account_pnl_summary: dict[str, str],
+    reconciliation: dict[str, Any],
+    account_state: dict[str, Any],
+) -> None:
+    reconciliation_generated = str(reconciliation.get("generated_at") or "未知时间")
+    account_generated = str(account_state.get("generated_at") or "未知时间")
+    account_pnl_summary["longbridge_profit_analysis_start_date"] = ""
+    account_pnl_summary["longbridge_profit_analysis_end_date"] = ""
+    account_pnl_summary["longbridge_stock_total_pnl"] = "等待长桥数据"
+    account_pnl_summary["longbridge_realized_pnl_estimate"] = "等待长桥数据"
+    account_pnl_summary["longbridge_today_total_pnl"] = "等待长桥数据"
+    account_pnl_summary["longbridge_account_total_pnl"] = "等待长桥数据"
+    account_pnl_summary["longbridge_account_today_total_pnl"] = "等待长桥数据"
+    account_pnl_summary["account_total_pnl_note"] = (
+        f"检测到长桥盈亏对账产物过旧，已忽略：对账生成 {reconciliation_generated}，"
+        f"账户状态生成 {account_generated}。等待下一次长桥只读对账刷新。"
+    )
+    account_pnl_summary["longbridge_stock_total_pnl_note"] = (
+        "旧长桥盈亏对账不会覆盖当前账户状态；缺新数据时显示等待，不使用假本金或旧本地模拟数据。"
+    )
+    account_pnl_summary["longbridge_today_total_pnl_note"] = (
+        "旧长桥账户当日盈亏对账不会覆盖当前账户状态；等待下一次长桥只读 profit-analysis 同日刷新。"
+    )
+    account_pnl_summary["longbridge_account_total_pnl_note"] = (
+        "旧长桥当前持仓总盈亏对账不会覆盖当前账户状态；等待下一次长桥只读 portfolio 刷新。"
+    )
+    account_pnl_summary["longbridge_account_today_total_pnl_note"] = (
+        "旧长桥接口持仓今日浮动对账不会覆盖当前账户状态；等待下一次长桥只读 portfolio 刷新。"
+    )
+
+
+def m15_longbridge_symbol_pnl_rows(reconciliation: dict[str, Any]) -> list[dict[str, str]]:
+    raw_rows = reconciliation.get("symbol_pnl_rows", []) if isinstance(reconciliation, dict) else []
+    if not isinstance(raw_rows, list):
+        return []
+    rows: list[dict[str, str]] = []
+    for raw in raw_rows:
+        if not isinstance(raw, dict):
+            continue
+        symbol = str(raw.get("security_code") or raw.get("symbol") or "").upper().split(".")[0]
+        if not symbol:
+            continue
+        profit = money_to_decimal(str(raw.get("profit") or raw.get("underlying_profit") or "0"))
+        rows.append(
+            {
+                "symbol": symbol,
+                "name": str(raw.get("name") or ""),
+                "profit": money(profit),
+                "profit_rate": pct(money_to_decimal(str(raw.get("profit_rate") or "0")) * HUNDRED),
+                "holding_value": str(raw.get("holding_value") or "0"),
+                "invest_cost": str(raw.get("invest_cost") or raw.get("open_cost") or "0"),
+                "realized_cash": str(raw.get("realized_cash") or "0"),
+                "is_holding": str(bool(raw.get("is_holding"))).lower(),
+                "attribution_source": "longbridge_profit_analysis_symbol",
+            }
+        )
+    rows.sort(key=lambda row: abs(money_to_decimal(row["profit"])), reverse=True)
+    return rows
+
+
+def m15_longbridge_position_pnl_rows_from_reconciliation(reconciliation: dict[str, Any]) -> list[dict[str, str]]:
+    holdings = reconciliation.get("current_holdings") if isinstance(reconciliation.get("current_holdings"), list) else []
+    rows: list[dict[str, str]] = []
+    for raw in holdings:
+        if not isinstance(raw, dict):
+            continue
+        symbol = m15_base_symbol(str(raw.get("symbol") or ""))
+        quantity = money_to_decimal(str(raw.get("quantity") or raw.get("qty") or "0"))
+        cost_price = money_to_decimal(str(raw.get("cost_price") or raw.get("avg_cost") or "0"))
+        latest_price = money_to_decimal(str(raw.get("market_price") or raw.get("last_price") or raw.get("last_done") or "0"))
+        market_value = money_to_decimal(str(raw.get("market_value_usd") or raw.get("market_value") or "0"))
+        if market_value <= ZERO and latest_price > ZERO and quantity > ZERO:
+            market_value = latest_price * quantity
+        cost_value = money_to_decimal(str(raw.get("cost_value") or raw.get("invest_cost") or "0"))
+        if cost_value <= ZERO and cost_price > ZERO and quantity > ZERO:
+            cost_value = cost_price * quantity
+        pnl = market_value - cost_value if market_value > ZERO and cost_value > ZERO else ZERO
+        rows.append(
+            {
+                "symbol": symbol,
+                "quantity": money(quantity),
+                "cost_price": money(cost_price) if cost_price > ZERO else "",
+                "latest_price": money(latest_price) if latest_price > ZERO else "",
+                "market_value": money(market_value) if market_value > ZERO else "",
+                "unrealized_pnl": money(pnl),
+                "price_source": "longbridge_portfolio_current_holdings",
+            }
+        )
+    return rows[:30]
+
+
+def m15_order_reconciliation_summary(order_reconciliation: dict[str, Any]) -> dict[str, Any]:
+    summary = order_reconciliation.get("summary", {}) if isinstance(order_reconciliation.get("summary"), dict) else {}
+    diagnostic_counts = (
+        summary.get("diagnostic_category_counts", {})
+        if isinstance(summary.get("diagnostic_category_counts"), dict)
+        else {}
+    )
+    return {
+        "longbridge_order_count": int_like(summary.get("longbridge_order_count", 0)),
+        "local_submission_count": int_like(summary.get("local_submission_count", 0)),
+        "filled_order_count": int_like(summary.get("filled_order_count", 0)),
+        "unfilled_order_count": int_like(summary.get("unfilled_order_count", 0)),
+        "matched_local_submission_count": int_like(summary.get("matched_local_submission_count", 0)),
+        "local_submitted_no_longbridge_order_count": int_like(summary.get("local_submitted_no_longbridge_order_count", 0)),
+        "legacy_or_unattributed_order_count": int_like(summary.get("legacy_or_unattributed_order_count", 0)),
+        "diagnostic_category_counts": diagnostic_counts,
+    }
+
+
+def m15_unfilled_order_diagnostic_rows(diagnostics: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = diagnostics.get("rows", []) if isinstance(diagnostics.get("rows"), list) else []
+    clean_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(rows[:40], start=1):
+        if not isinstance(row, dict):
+            continue
+        clean_rows.append(
+            {
+                "diagnostic_ref": f"未成交-{index}",
+                "symbol": str(row.get("symbol") or ""),
+                "side": str(row.get("side") or ""),
+                "status": str(row.get("status") or ""),
+                "runtime_id": str(row.get("runtime_id") or ""),
+                "capital_bucket": str(row.get("capital_bucket") or ""),
+                "diagnostic_category": str(row.get("diagnostic_category") or ""),
+                "diagnostic_evidence": str(row.get("diagnostic_evidence") or ""),
+                "repair_action": str(row.get("repair_action") or ""),
+                "requires_future_tracking": str(bool(row.get("requires_future_tracking"))).lower(),
+            }
+        )
+    return clean_rows
+
+
+def m15_longbridge_trade_quality_summary(symbol_pnl_rows: list[dict[str, str]]) -> dict[str, str]:
+    parsed_rows: list[dict[str, Any]] = []
+    for row in symbol_pnl_rows:
+        profit = money_to_decimal(str(row.get("profit") or "0"))
+        rate = decimal_or_none(row.get("profit_rate"))
+        parsed_rows.append(
+            {
+                "symbol": str(row.get("symbol") or ""),
+                "profit": profit,
+                "profit_rate": rate,
+            }
+        )
+
+    if not parsed_rows:
+        return {
+            "win_rate_percent": "暂无",
+            "win_rate_label": "暂无",
+            "win_count": "0",
+            "loss_count": "0",
+            "flat_count": "0",
+            "sample_count": "0",
+            "average_win": "暂无",
+            "average_loss": "暂无",
+            "profit_loss_ratio": "暂无",
+            "profit_loss_note": "等待长桥逐标的盈亏数据；不使用本地模拟账本或旧历史净利润字段硬算。",
+            "worst_symbol_loss_percent": "暂无",
+            "worst_symbol_loss_label": "暂无",
+            "worst_symbol": "暂无",
+            "worst_symbol_loss_note": "等待长桥逐标的盈亏数据；当前无法计算最差亏损标的。",
+            "largest_win_symbol": "暂无",
+            "largest_win": "暂无",
+            "largest_loss_symbol": "暂无",
+            "largest_loss": "暂无",
+            "win_rate_note": "等待长桥逐标的盈亏数据；当前无法计算胜率。",
+            "source_note": "等待长桥 profit-analysis 逐标的盈亏数据。",
+        }
+
+    wins = [row for row in parsed_rows if row["profit"] > ZERO]
+    losses = [row for row in parsed_rows if row["profit"] < ZERO]
+    flats = [row for row in parsed_rows if row["profit"] == ZERO]
+    active_count = len(wins) + len(losses)
+    win_rate = pct(Decimal(len(wins)) / Decimal(active_count) * HUNDRED) if active_count else "0.00"
+    average_win_value = sum((row["profit"] for row in wins), ZERO) / Decimal(len(wins)) if wins else None
+    average_loss_value = sum((abs(row["profit"]) for row in losses), ZERO) / Decimal(len(losses)) if losses else None
+    average_win = money(average_win_value) if average_win_value is not None else "暂无"
+    average_loss = money(average_loss_value) if average_loss_value is not None else "暂无"
+    profit_loss_ratio = (
+        str((average_win_value / average_loss_value).quantize(PERCENT))
+        if average_win_value is not None and average_loss_value is not None and average_loss_value > ZERO
+        else "暂无"
+    )
+    largest_win_row = max(wins, key=lambda row: row["profit"]) if wins else None
+    largest_loss_row = min(losses, key=lambda row: row["profit"]) if losses else None
+    worst_loss_rate = largest_loss_row.get("profit_rate") if largest_loss_row else ZERO
+    worst_loss_rate_label = f"{pct(worst_loss_rate)}%" if isinstance(worst_loss_rate, Decimal) else "暂无"
+    worst_symbol = str(largest_loss_row.get("symbol") or "暂无") if largest_loss_row else "暂无"
+    largest_win_symbol = str(largest_win_row.get("symbol") or "暂无") if largest_win_row else "暂无"
+    largest_loss_symbol = str(largest_loss_row.get("symbol") or "暂无") if largest_loss_row else "暂无"
+    largest_win = money(largest_win_row["profit"]) if largest_win_row else "暂无"
+    largest_loss = money(largest_loss_row["profit"]) if largest_loss_row else "暂无"
+    source_note = (
+        "指标来自长桥只读 profit-analysis 逐标的盈亏；"
+        "胜率按盈利标的数 / 有盈亏标的数计算，最差亏损标的只用于诊断。"
+    )
+    return {
+        "win_rate_percent": win_rate,
+        "win_rate_label": f"{win_rate}%",
+        "win_count": str(len(wins)),
+        "loss_count": str(len(losses)),
+        "flat_count": str(len(flats)),
+        "sample_count": str(len(parsed_rows)),
+        "average_win": average_win,
+        "average_loss": average_loss,
+        "profit_loss_ratio": profit_loss_ratio,
+        "profit_loss_note": (
+            f"平均盈利 {average_win}，平均亏损 {average_loss}，"
+            f"最大盈利 {largest_win_symbol} {largest_win}，最大亏损 {largest_loss_symbol} {largest_loss}。"
+        ),
+        "worst_symbol_loss_percent": pct(worst_loss_rate) if isinstance(worst_loss_rate, Decimal) else "暂无",
+        "worst_symbol_loss_label": worst_loss_rate_label,
+        "worst_symbol": worst_symbol,
+        "worst_symbol_loss_note": (
+            f"当前最差亏损标的是 {worst_symbol}，亏损率 {worst_loss_rate_label}；"
+            "这不是最大回撤，最大回撤只看长桥账户权益曲线。"
+        ),
+        "largest_win_symbol": largest_win_symbol,
+        "largest_win": largest_win,
+        "largest_loss_symbol": largest_loss_symbol,
+        "largest_loss": largest_loss,
+        "win_rate_note": (
+            f"按长桥逐标的盈亏统计：盈利 {len(wins)}，亏损 {len(losses)}，"
+            f"持平 {len(flats)}，总样本 {len(parsed_rows)}。"
+        ),
+        "source_note": source_note,
+    }
+
+
+def m15_longbridge_closed_trade_quality_summary(account_state: dict[str, Any]) -> dict[str, str]:
+    historical_executions = (
+        account_state.get("historical_executions") if isinstance(account_state.get("historical_executions"), list) else []
+    )
+    historical_orders = (
+        account_state.get("historical_orders") if isinstance(account_state.get("historical_orders"), list) else []
+    )
+    current_orders = account_state.get("orders") if isinstance(account_state.get("orders"), list) else []
+    if historical_executions:
+        filled_orders = [row for row in historical_executions if isinstance(row, dict)]
+        source_label = "长桥历史成交明细"
+        sort_key = "time"
+    else:
+        order_source = historical_orders or current_orders
+        filled_orders = [
+            row
+            for row in order_source
+            if isinstance(row, dict)
+            and (
+                str(row.get("status") or "") in {"Filled", "Executed"}
+                or money_to_decimal(str(row.get("executed_quantity") or "0")) > ZERO
+            )
+        ]
+        source_label = "长桥历史订单列表" if historical_orders else "长桥今日订单列表"
+        sort_key = "created_at"
+    filled_orders.sort(key=lambda row: str(row.get(sort_key) or row.get("created_at") or row.get("time") or ""))
+    lots: dict[str, list[list[Any]]] = {}
+    closed_pnls: list[Decimal] = []
+    unmatched_sell_count = 0
+    for order in filled_orders:
+        symbol = str(order.get("symbol") or "").upper().split(".")[0]
+        side = str(order.get("side") or "").strip().lower()
+        quantity = money_to_decimal(str(order.get("executed_quantity") or order.get("quantity") or "0"))
+        price = money_to_decimal(str(order.get("executed_price") or order.get("price") or "0"))
+        if not symbol or quantity <= ZERO or price <= ZERO:
+            continue
+        if side == "buy":
+            lots.setdefault(symbol, []).append([quantity, price])
+            continue
+        if side != "sell":
+            continue
+        remaining = quantity
+        while remaining > ZERO and lots.get(symbol):
+            lot = lots[symbol][0]
+            matched_quantity = min(remaining, lot[0])
+            closed_pnls.append((price - lot[1]) * matched_quantity)
+            lot[0] -= matched_quantity
+            remaining -= matched_quantity
+            if lot[0] <= ZERO:
+                lots[symbol].pop(0)
+        if remaining > ZERO:
+            unmatched_sell_count += 1
+    wins = [pnl for pnl in closed_pnls if pnl > ZERO]
+    losses = [pnl for pnl in closed_pnls if pnl < ZERO]
+    active_count = len(wins) + len(losses)
+    if active_count == 0:
+        return {
+            "win_rate_percent": "暂无",
+            "win_rate_label": "暂无",
+            "win_count": "0",
+            "loss_count": "0",
+            "sample_count": "0",
+            "unmatched_sell_count": str(unmatched_sell_count),
+            "total_pnl": "暂无",
+            "win_rate_note": (
+                f"当前{source_label}还没有可配对的买卖成交；未配对卖出 {unmatched_sell_count} 条只做审计。"
+            ),
+            "source_note": f"基于{source_label} FIFO 配对，不读取本地模拟账本。",
+        }
+    win_rate = pct(Decimal(len(wins)) / Decimal(active_count) * HUNDRED)
+    total_pnl = sum(closed_pnls, ZERO)
+    return {
+        "win_rate_percent": win_rate,
+        "win_rate_label": f"{win_rate}%",
+        "win_count": str(len(wins)),
+        "loss_count": str(len(losses)),
+        "sample_count": str(len(closed_pnls)),
+        "unmatched_sell_count": str(unmatched_sell_count),
+        "total_pnl": money(total_pnl),
+        "win_rate_note": (
+            f"按{source_label} FIFO 配对：盈利 {len(wins)}，亏损 {len(losses)}，"
+            f"可配对成交 {len(closed_pnls)}，未配对卖出 {unmatched_sell_count}，配对盈亏 {money(total_pnl)}。"
+        ),
+        "source_note": f"基于{source_label} FIFO 配对，不读取本地模拟账本。",
+    }
+
+
+def m15_longbridge_equity_curve_summary(equity_curve_rows: list[dict[str, Any]]) -> dict[str, str]:
+    points: list[dict[str, Any]] = []
+    seen: set[tuple[str, Decimal]] = set()
+    for row in equity_curve_rows:
+        if not isinstance(row, dict):
+            continue
+        equity = money_to_decimal(str(row.get("account_total_equity_estimate") or "0"))
+        timestamp = str(row.get("generated_at") or row.get("snapshot_at") or "")
+        if equity <= ZERO or not timestamp:
+            continue
+        key = (timestamp, equity)
+        if key in seen:
+            continue
+        seen.add(key)
+        points.append({"generated_at": timestamp, "equity": equity})
+    points.sort(key=lambda row: str(row["generated_at"]))
+    if len(points) < 2:
+        return {
+            "snapshot_count": str(len(points)),
+            "start_at": str(points[0]["generated_at"]) if points else "",
+            "end_at": str(points[-1]["generated_at"]) if points else "",
+            "max_drawdown_percent": "暂无",
+            "max_drawdown_label": "样本不足",
+            "peak_at": "",
+            "trough_at": "",
+            "max_drawdown_note": "长桥完整最大回撤需要至少 2 个账户权益快照；新权益曲线会从当前版本开始逐轮记录。",
+        }
+
+    peak = points[0]["equity"]
+    peak_at = str(points[0]["generated_at"])
+    max_drawdown = ZERO
+    max_peak_at = peak_at
+    trough_at = peak_at
+    for point in points:
+        equity = point["equity"]
+        timestamp = str(point["generated_at"])
+        if equity > peak:
+            peak = equity
+            peak_at = timestamp
+        if peak <= ZERO:
+            continue
+        drawdown = (peak - equity) / peak * HUNDRED
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
+            max_peak_at = peak_at
+            trough_at = timestamp
+    drawdown_label = f"{pct(max_drawdown)}%"
+    return {
+        "snapshot_count": str(len(points)),
+        "start_at": str(points[0]["generated_at"]),
+        "end_at": str(points[-1]["generated_at"]),
+        "max_drawdown_percent": pct(max_drawdown),
+        "max_drawdown_label": drawdown_label,
+        "peak_at": max_peak_at,
+        "trough_at": trough_at,
+        "max_drawdown_note": (
+            f"按长桥模拟账户权益曲线逐点计算：样本 {len(points)} 个，"
+            f"峰值时间 {max_peak_at or '暂无'}，谷值时间 {trough_at or '暂无'}。"
+        ),
+    }
+
+
+def m15_longbridge_strategy_trade_pnl_rows(
+    order_reconciliation: dict[str, Any] | list[dict[str, Any]],
+    symbol_pnl_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    if isinstance(order_reconciliation, list):
+        reconciliation_rows = order_reconciliation
+    else:
+        reconciliation_rows = (
+            order_reconciliation.get("rows", [])
+            if isinstance(order_reconciliation.get("rows"), list)
+            else []
+        )
+    runtime_symbols: dict[str, set[str]] = {}
+    symbol_runtimes: dict[str, set[str]] = {}
+    runtime_buckets: dict[str, set[str]] = {}
+    for row in reconciliation_rows:
+        if not row.get("counts_for_performance") or row.get("attribution_status") != "matched_m15_realtime_ledger":
+            continue
+        if str(row.get("side") or "").lower() != "buy":
+            continue
+        symbol = str(row.get("symbol") or "").upper().split(".")[0]
+        runtime_id = str(row.get("runtime_id") or "")
+        capital_bucket = str(row.get("capital_bucket") or "未归属资金池")
+        if not symbol or not runtime_id:
+            continue
+        runtime_symbols.setdefault(runtime_id, set()).add(symbol)
+        symbol_runtimes.setdefault(symbol, set()).add(runtime_id)
+        runtime_buckets.setdefault(runtime_id, set()).add(capital_bucket)
+    strategy_rows: dict[str, dict[str, Any]] = {}
+    for symbol_row in symbol_pnl_rows:
+        symbol = str(symbol_row.get("symbol") or "")
+        profit = money_to_decimal(symbol_row.get("profit", "0"))
+        runtimes = sorted(symbol_runtimes.get(symbol, set()))
+        if not runtimes:
+            key = "未归属长桥账户持仓"
+            target = strategy_rows.setdefault(
+                key,
+                {"runtime_id": key, "strategy_id": key, "profit": ZERO, "symbols": set(), "notes": set()},
+            )
+            target["profit"] += profit
+            target["symbols"].add(symbol)
+            target["notes"].add("长桥有标的盈亏，但没有可归因的长桥实际成交买入；不混入具体策略。")
+            continue
+        split_profit = profit / Decimal(len(runtimes))
+        for runtime_id in runtimes:
+            strategy_id = m15_parent_strategy_id(runtime_id)
+            target = strategy_rows.setdefault(
+                runtime_id,
+                {
+                    "runtime_id": runtime_id,
+                    "strategy_id": strategy_id,
+                    "capital_buckets": set(),
+                    "profit": ZERO,
+                    "symbols": set(),
+                    "notes": set(),
+                },
+            )
+            target["profit"] += split_profit
+            target["symbols"].add(symbol)
+            target["capital_buckets"].update(runtime_buckets.get(runtime_id, set()))
+            if len(runtimes) == 1:
+                target["notes"].add("按长桥实际成交归属到唯一策略。")
+            else:
+                target["notes"].add("同一标的有多个已成交策略归因，盈亏按策略数量分摊估算。")
+    rows: list[dict[str, str]] = []
+    for item in strategy_rows.values():
+        rows.append(
+            {
+                "runtime_id": str(item["runtime_id"]),
+                "strategy_id": str(item["strategy_id"]),
+                "capital_bucket": ", ".join(sorted(item.get("capital_buckets", set()))) or "未归属资金池",
+                "trade_pnl": money(item["profit"]),
+                "symbol_count": str(len(item["symbols"])),
+                "symbols": ", ".join(sorted(item["symbols"])),
+                "attribution_note": "；".join(sorted(item["notes"])),
+            }
+        )
+    rows.sort(key=lambda row: abs(money_to_decimal(row["trade_pnl"])), reverse=True)
+    return rows
+
+
+def m15_longbridge_strategy_quality_summary(
+    account_state: dict[str, Any],
+    realtime_ledger: list[dict[str, Any]],
+    *,
+    policy_started_at: str = M15_LONGBRIDGE_QUALITY_POLICY_STARTED_AT,
+) -> dict[str, Any]:
+    executions = (
+        account_state.get("historical_executions")
+        if isinstance(account_state.get("historical_executions"), list)
+        else []
+    )
+    matched_executions = m15_match_executions_to_runtime(executions, realtime_ledger)
+    lots: dict[str, list[dict[str, Any]]] = {}
+    closed_trades: list[dict[str, Any]] = []
+    cutoff = parse_iso_datetime_or_none(policy_started_at)
+    for fill in sorted(matched_executions, key=lambda row: str(row.get("time") or row.get("created_at") or "")):
+        symbol = m15_base_symbol(str(fill.get("symbol") or ""))
+        side = str(fill.get("side") or "").strip().lower()
+        quantity = money_to_decimal(str(fill.get("quantity") or fill.get("executed_quantity") or "0"))
+        price = money_to_decimal(str(fill.get("price") or fill.get("executed_price") or "0"))
+        if not symbol or quantity <= ZERO or price <= ZERO:
+            continue
+        if side == "buy":
+            lots.setdefault(symbol, []).append(
+                {
+                    "quantity": quantity,
+                    "price": price,
+                    "time": str(fill.get("time") or fill.get("created_at") or ""),
+                    "runtime_id": str(fill.get("runtime_id") or "未匹配长桥策略"),
+                    "strategy_id": str(fill.get("strategy_id") or m15_parent_strategy_id(str(fill.get("runtime_id") or ""))),
+                }
+            )
+            continue
+        if side != "sell":
+            continue
+        remaining = quantity
+        while remaining > ZERO and lots.get(symbol):
+            lot = lots[symbol][0]
+            matched_quantity = min(remaining, lot["quantity"])
+            pnl = (price - lot["price"]) * matched_quantity
+            buy_time = str(lot.get("time") or "")
+            buy_dt = parse_iso_datetime_or_none(buy_time)
+            sample_phase = "post_fix" if cutoff and buy_dt and buy_dt >= cutoff else "pre_fix"
+            closed_trades.append(
+                {
+                    "runtime_id": lot["runtime_id"],
+                    "strategy_id": lot["strategy_id"],
+                    "symbol": symbol,
+                    "quantity": matched_quantity,
+                    "pnl": pnl,
+                    "sample_phase": sample_phase,
+                }
+            )
+            lot["quantity"] -= matched_quantity
+            remaining -= matched_quantity
+            if lot["quantity"] <= ZERO:
+                lots[symbol].pop(0)
+    rows = m15_strategy_quality_rows_from_closed_trades(closed_trades)
+    pre_fix_count = sum(1 for row in closed_trades if row["sample_phase"] == "pre_fix")
+    post_fix_count = sum(1 for row in closed_trades if row["sample_phase"] == "post_fix")
+    post_fix_rows = [row for row in rows if int(row["post_fix_closed_trade_count"]) > 0]
+    return {
+        "policy_started_at": policy_started_at,
+        "matched_execution_count": str(sum(1 for row in matched_executions if row.get("runtime_id"))),
+        "historical_execution_count": str(len(executions)),
+        "closed_trade_count": str(len(closed_trades)),
+        "pre_fix_closed_trade_count": str(pre_fix_count),
+        "post_fix_closed_trade_count": str(post_fix_count),
+        "post_fix_runtime_count": str(len(post_fix_rows)),
+        "rows": rows,
+        "note": (
+            f"修复前样本 {pre_fix_count} 个，修复后样本 {post_fix_count} 个；"
+            "成交按长桥历史成交明细 FIFO 配对，策略归因来自长桥实时提交流水近似匹配，不读取本地模拟账本。"
+        ),
+    }
+
+
+def m15_longbridge_virtual_bucket_rows(
+    realtime: dict[str, Any],
+    realtime_ledger: list[dict[str, Any]],
+    realtime_epoch: dict[str, Any],
+    reconciliation: dict[str, Any] | None = None,
+    order_reconciliation: dict[str, Any] | None = None,
+    ) -> list[dict[str, str]]:
+    realtime_epoch_from_summary = realtime.get("test_epoch", {}) if isinstance(realtime.get("test_epoch"), dict) else {}
+    epoch_id = str(realtime_epoch.get("test_epoch_id") or realtime_epoch_from_summary.get("test_epoch_id") or "")
+    epoch_status = str(realtime_epoch.get("status") or realtime_epoch_from_summary.get("status") or "未生成")
+    active_rows = [
+        row for row in realtime_ledger
+        if not epoch_id or str(row.get("test_epoch_id") or "") == epoch_id
+    ]
+    bucket_defs = realtime.get("virtual_capital_buckets", [])
+    if not isinstance(bucket_defs, list) or not bucket_defs:
+        bucket_defs = [
+            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "experimental", "label": "统一实验仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1000.00", "used_exposure": "0.00"},
+        ]
+    bucket_performance = (
+        m15_virtual_bucket_performance_from_order_reconciliation(order_reconciliation or {}, reconciliation or {}, epoch_id)
+        if order_reconciliation
+        else m15_virtual_bucket_performance(active_rows, reconciliation or {})
+    )
+
+    def bucket_pnl_fields(performance: dict[str, str], quality: dict[str, str], has_closed: bool) -> dict[str, str]:
+        no_trade = "等待新基线成交"
+        realized = str(performance.get("realized_pnl") or (quality["net_realized_pnl"] if has_closed else no_trade))
+        current_total = str(performance.get("current_position_total_pnl") or ("0.00" if has_closed else no_trade))
+        current_today = str(performance.get("current_position_today_pnl") or ("0.00" if has_closed else no_trade))
+        bucket_today = str(performance.get("bucket_today_pnl") or performance.get("today_pnl") or (quality["net_realized_pnl"] if has_closed else no_trade))
+        trading_total = str(performance.get("trading_total_pnl") or performance.get("total_pnl") or (quality["net_realized_pnl"] if has_closed else no_trade))
+        return {
+            "bucket_today_pnl": bucket_today,
+            "current_position_today_pnl": current_today,
+            "current_position_total_pnl": current_total,
+            "realized_pnl": realized,
+            "trading_total_pnl": trading_total,
+            # Backward-compatible aliases. Do not use these as labels in new UI.
+            "today_pnl": bucket_today,
+            "total_pnl": trading_total,
+        }
+
+    rows: list[dict[str, str]] = []
+    for bucket in bucket_defs:
+        if not isinstance(bucket, dict):
+            continue
+        bucket_id = str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+        bucket_rows = [row for row in active_rows if str(row.get("capital_bucket") or "") == bucket_id]
+        submitted_buys = [
+            row for row in bucket_rows
+            if row.get("submission_status") == "submitted" and str(row.get("side") or "").lower() == "buy"
+        ]
+        closed = [
+            money_to_decimal(str(row.get("realized_pnl") or row.get("pnl") or "0"))
+            for row in bucket_rows
+            if row.get("submission_status") == "submitted"
+            and str(row.get("side") or "").lower() == "sell"
+            and str(row.get("realized_pnl") or row.get("pnl") or "") not in {"", "None"}
+        ]
+        quality = local_simulation_quality_summary(closed)
+        performance = bucket_performance.get(bucket_id, {})
+        filled_buy_count = str(performance.get("filled_buy_count") or len(submitted_buys))
+        pnl_fields = bucket_pnl_fields(performance, quality, bool(closed))
+        rows.append(
+            {
+                "capital_bucket": bucket_id,
+                "label": str(bucket.get("label") or bucket_id),
+                "test_epoch_id": epoch_id or "未生成",
+                "epoch_status": epoch_status,
+                "equity": str(bucket.get("equity") or "10000.00"),
+                "max_total_exposure": str(bucket.get("max_total_exposure") or ""),
+                "max_symbol_exposure": str(bucket.get("max_symbol_exposure") or ""),
+                "used_exposure": str(performance.get("used_exposure") or bucket.get("used_exposure") or m15_bucket_used_exposure(bucket_rows)),
+                "submitted_buy_count": filled_buy_count,
+                "closed_trade_count": str(performance.get("closed_trade_count") or quality["closed_trade_count"]),
+                **pnl_fields,
+                "win_rate_percent": str(performance.get("win_rate_percent") or quality["win_rate_percent"]),
+                "profit_loss_ratio": str(performance.get("profit_loss_ratio") or quality["profit_loss_ratio"]),
+                "max_drawdown_percent": "等待新基线成交" if not performance and not closed else "暂无",
+                "note": (
+                    "清仓完成并激活新基线后才统计新测试表现。"
+                    if epoch_status == "pending_flatten"
+                    else "只按长桥实际成交和当前持仓做本地资金池归因；未成交请求不计入表现。"
+                ),
+            }
+        )
+    old_buy_count = len(
+        [
+            row for row in realtime_ledger
+            if epoch_id
+            and str(row.get("test_epoch_id") or "") != epoch_id
+            and str(row.get("side") or "").lower() == "buy"
+        ]
+    )
+    rows.append(
+        {
+            "capital_bucket": "local_repair",
+            "label": "本地修复仓",
+            "test_epoch_id": epoch_id or "未生成",
+            "epoch_status": "本地模拟",
+            "equity": "不占长桥资金",
+            "max_total_exposure": "0.00",
+            "max_symbol_exposure": "0.00",
+            "used_exposure": "0.00",
+            "submitted_buy_count": "0",
+            "closed_trade_count": "本地单独统计",
+            "bucket_today_pnl": "本地模拟",
+            "current_position_today_pnl": "本地模拟",
+            "current_position_total_pnl": "本地模拟",
+            "realized_pnl": "本地模拟",
+            "trading_total_pnl": "本地模拟",
+            "today_pnl": "本地模拟",
+            "total_pnl": "本地模拟",
+            "win_rate_percent": "本地模拟",
+            "profit_loss_ratio": "本地模拟",
+            "max_drawdown_percent": "本地模拟",
+            "note": "修复策略、影子策略和辅助模块不进入长桥买入通道。",
+        }
+    )
+    rows.append(
+        {
+            "capital_bucket": "old_history",
+            "label": "旧测试历史",
+            "test_epoch_id": "旧基线",
+            "epoch_status": "已归档",
+            "equity": "不参与新统计",
+            "max_total_exposure": "不参与新统计",
+            "max_symbol_exposure": "不参与新统计",
+            "used_exposure": "不参与新统计",
+            "submitted_buy_count": str(old_buy_count),
+            "closed_trade_count": "复盘页查看",
+            "bucket_today_pnl": "不参与新统计",
+            "current_position_today_pnl": "不参与新统计",
+            "current_position_total_pnl": "不参与新统计",
+            "realized_pnl": "不参与新统计",
+            "trading_total_pnl": "不参与新统计",
+            "today_pnl": "不参与新统计",
+            "total_pnl": "不参与新统计",
+            "win_rate_percent": "不参与新统计",
+            "profit_loss_ratio": "不参与新统计",
+            "max_drawdown_percent": "不参与新统计",
+            "note": "旧订单、旧持仓、旧盈亏只保留审计，不参与单策略仓/统一实验仓准入判断。",
+        }
+    )
+    return rows
+
+
+def m15_bucket_used_exposure(rows: list[dict[str, Any]]) -> str:
+    exposure = ZERO
+    for row in rows:
+        if row.get("submission_status") != "submitted":
+            continue
+        notional = money_to_decimal(str(row.get("notional") or "0"))
+        if str(row.get("side") or "").lower() == "buy":
+            exposure += notional
+        elif str(row.get("side") or "").lower() == "sell":
+            exposure -= notional
+    return money(max(exposure, ZERO))
+
+
+def m15_virtual_bucket_performance(
+    rows: list[dict[str, Any]],
+    reconciliation: dict[str, Any],
+) -> dict[str, dict[str, str]]:
+    holding_prices = m15_holding_price_context(reconciliation)
+    lots: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    stats: dict[str, dict[str, Any]] = {}
+    for row in sorted(rows, key=lambda item: str(item.get("submitted_at") or item.get("processed_at") or item.get("created_at") or "")):
+        if row.get("submission_status") != "submitted":
+            continue
+        bucket = str(row.get("capital_bucket") or "未归属资金池")
+        symbol = m15_base_symbol(str(row.get("symbol") or ""))
+        side = str(row.get("side") or "").lower()
+        quantity = money_to_decimal(str(row.get("quantity") or row.get("submitted_quantity") or "0"))
+        price = money_to_decimal(str(row.get("submitted_price") or row.get("limit_price") or row.get("price") or "0"))
+        if not bucket or not symbol or quantity <= ZERO or price <= ZERO:
+            continue
+        bucket_stats = stats.setdefault(
+            bucket,
+            {"closed_pnls": [], "today_realized": ZERO, "total_realized": ZERO, "open_pnls": ZERO, "today_open_pnls": ZERO},
+        )
+        bucket_lots = lots.setdefault(bucket, {}).setdefault(symbol, [])
+        if side == "buy":
+            bucket_lots.append({"quantity": quantity, "price": price})
+            continue
+        if side != "sell":
+            continue
+        remaining = quantity
+        while remaining > ZERO and bucket_lots:
+            lot = bucket_lots[0]
+            matched = min(remaining, lot["quantity"])
+            pnl = (price - lot["price"]) * matched
+            bucket_stats["closed_pnls"].append(pnl)
+            bucket_stats["total_realized"] += pnl
+            bucket_stats["today_realized"] += pnl
+            lot["quantity"] -= matched
+            remaining -= matched
+            if lot["quantity"] <= ZERO:
+                bucket_lots.pop(0)
+    for bucket, symbol_lots in lots.items():
+        bucket_stats = stats.setdefault(
+            bucket,
+            {"closed_pnls": [], "today_realized": ZERO, "total_realized": ZERO, "open_pnls": ZERO, "today_open_pnls": ZERO},
+        )
+        for symbol, symbol_lot_rows in symbol_lots.items():
+            context = holding_prices.get(symbol, {})
+            market_price = money_to_decimal(str(context.get("market_price") or "0"))
+            prev_close = money_to_decimal(str(context.get("prev_close") or "0"))
+            for lot in symbol_lot_rows:
+                quantity = lot["quantity"]
+                if quantity <= ZERO or market_price <= ZERO:
+                    continue
+                bucket_stats["open_pnls"] += (market_price - lot["price"]) * quantity
+                if prev_close > ZERO:
+                    bucket_stats["today_open_pnls"] += (market_price - prev_close) * quantity
+    output: dict[str, dict[str, str]] = {}
+    for bucket, item in stats.items():
+        closed_pnls = item["closed_pnls"]
+        wins = [pnl for pnl in closed_pnls if pnl > ZERO]
+        losses = [pnl for pnl in closed_pnls if pnl < ZERO]
+        output[bucket] = {
+            "closed_trade_count": str(len(closed_pnls)),
+            "bucket_today_pnl": money(item["today_realized"] + item["today_open_pnls"]),
+            "current_position_today_pnl": money(item["today_open_pnls"]),
+            "current_position_total_pnl": money(item["open_pnls"]),
+            "realized_pnl": money(item["total_realized"]),
+            "trading_total_pnl": money(item["total_realized"] + item["open_pnls"]),
+            "today_pnl": money(item["today_realized"] + item["today_open_pnls"]),
+            "total_pnl": money(item["total_realized"] + item["open_pnls"]),
+            "win_rate_percent": m15_win_rate_percent(wins, losses),
+            "profit_loss_ratio": m15_profit_loss_ratio(wins, losses),
+        }
+    return output
+
+
+def m15_virtual_bucket_performance_from_order_reconciliation(
+    order_reconciliation: dict[str, Any],
+    reconciliation: dict[str, Any],
+    epoch_id: str,
+) -> dict[str, dict[str, str]]:
+    rows = order_reconciliation.get("rows", []) if isinstance(order_reconciliation.get("rows"), list) else []
+    holding_prices = m15_holding_price_context(reconciliation)
+    lots: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    stats: dict[str, dict[str, Any]] = {}
+    for row in sorted(rows, key=lambda item: str(item.get("created_at") or item.get("updated_at") or "")):
+        if not row.get("counts_for_performance"):
+            continue
+        if row.get("attribution_status") != "matched_m15_realtime_ledger":
+            continue
+        if epoch_id and str(row.get("test_epoch_id") or "") != epoch_id:
+            continue
+        bucket = str(row.get("capital_bucket") or "未归属资金池")
+        symbol = m15_base_symbol(str(row.get("symbol") or ""))
+        side = str(row.get("side") or "").lower()
+        quantity = money_to_decimal(str(row.get("executed_quantity") or row.get("filled_quantity") or row.get("quantity") or "0"))
+        price = money_to_decimal(str(row.get("executed_price") or row.get("price") or "0"))
+        if not bucket or not symbol or quantity <= ZERO or price <= ZERO:
+            continue
+        bucket_stats = stats.setdefault(
+            bucket,
+            {
+                "closed_pnls": [],
+                "today_realized": ZERO,
+                "total_realized": ZERO,
+                "open_pnls": ZERO,
+                "today_open_pnls": ZERO,
+                "used_exposure": ZERO,
+                "filled_buy_count": 0,
+            },
+        )
+        bucket_lots = lots.setdefault(bucket, {}).setdefault(symbol, [])
+        if side == "buy":
+            bucket_lots.append({"quantity": quantity, "price": price, "symbol": symbol})
+            bucket_stats["filled_buy_count"] += 1
+            continue
+        if side != "sell":
+            continue
+        remaining = quantity
+        while remaining > ZERO and bucket_lots:
+            lot = bucket_lots[0]
+            matched = min(remaining, lot["quantity"])
+            pnl = (price - lot["price"]) * matched
+            bucket_stats["closed_pnls"].append(pnl)
+            bucket_stats["total_realized"] += pnl
+            bucket_stats["today_realized"] += pnl
+            lot["quantity"] -= matched
+            remaining -= matched
+            if lot["quantity"] <= ZERO:
+                bucket_lots.pop(0)
+    for bucket, symbol_lots in lots.items():
+        bucket_stats = stats.setdefault(
+            bucket,
+            {
+                "closed_pnls": [],
+                "today_realized": ZERO,
+                "total_realized": ZERO,
+                "open_pnls": ZERO,
+                "today_open_pnls": ZERO,
+                "used_exposure": ZERO,
+                "filled_buy_count": 0,
+            },
+        )
+        for symbol, symbol_lot_rows in symbol_lots.items():
+            context = holding_prices.get(symbol, {})
+            market_price = money_to_decimal(str(context.get("market_price") or "0"))
+            prev_close = money_to_decimal(str(context.get("prev_close") or "0"))
+            for lot in symbol_lot_rows:
+                quantity = lot["quantity"]
+                if quantity <= ZERO:
+                    continue
+                exposure_price = market_price if market_price > ZERO else lot["price"]
+                bucket_stats["used_exposure"] += exposure_price * quantity
+                if market_price <= ZERO:
+                    continue
+                bucket_stats["open_pnls"] += (market_price - lot["price"]) * quantity
+                if prev_close > ZERO:
+                    bucket_stats["today_open_pnls"] += (market_price - prev_close) * quantity
+    output: dict[str, dict[str, str]] = {}
+    for bucket, item in stats.items():
+        closed_pnls = item["closed_pnls"]
+        wins = [pnl for pnl in closed_pnls if pnl > ZERO]
+        losses = [pnl for pnl in closed_pnls if pnl < ZERO]
+        output[bucket] = {
+            "closed_trade_count": str(len(closed_pnls)),
+            "bucket_today_pnl": money(item["today_realized"] + item["today_open_pnls"]),
+            "current_position_today_pnl": money(item["today_open_pnls"]),
+            "current_position_total_pnl": money(item["open_pnls"]),
+            "realized_pnl": money(item["total_realized"]),
+            "trading_total_pnl": money(item["total_realized"] + item["open_pnls"]),
+            "today_pnl": money(item["today_realized"] + item["today_open_pnls"]),
+            "total_pnl": money(item["total_realized"] + item["open_pnls"]),
+            "win_rate_percent": m15_win_rate_percent(wins, losses),
+            "profit_loss_ratio": m15_profit_loss_ratio(wins, losses),
+            "used_exposure": money(item["used_exposure"]),
+            "filled_buy_count": str(item["filled_buy_count"]),
+        }
+    return output
+
+
+def m15_holding_price_context(reconciliation: dict[str, Any]) -> dict[str, dict[str, str]]:
+    holdings = reconciliation.get("current_holdings") if isinstance(reconciliation.get("current_holdings"), list) else []
+    context: dict[str, dict[str, str]] = {}
+    for row in holdings:
+        if not isinstance(row, dict):
+            continue
+        symbol = m15_base_symbol(str(row.get("symbol") or ""))
+        if not symbol:
+            continue
+        context[symbol] = {
+            "market_price": str(row.get("market_price") or row.get("last_price") or ""),
+            "prev_close": str(row.get("prev_close") or ""),
+        }
+    return context
+
+
+def m15_match_executions_to_runtime(
+    executions: list[Any],
+    realtime_ledger: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    submitted_rows = [
+        row
+        for row in realtime_ledger
+        if row.get("submission_status") in {"submitted", "confirmed_submitted", "submit_unconfirmed_missing_order_id"}
+    ]
+    matched: list[dict[str, Any]] = []
+    for execution in executions:
+        if not isinstance(execution, dict):
+            continue
+        symbol = m15_base_symbol(str(execution.get("symbol") or ""))
+        side = str(execution.get("side") or "").strip().lower()
+        quantity = money_to_decimal(str(execution.get("quantity") or execution.get("executed_quantity") or "0"))
+        execution_time = parse_iso_datetime_or_none(str(execution.get("time") or execution.get("created_at") or ""))
+        best_row: dict[str, Any] | None = None
+        best_delta: float | None = None
+        for row in submitted_rows:
+            row_symbol = m15_base_symbol(str(row.get("symbol") or ""))
+            row_side = str(row.get("side") or "").strip().lower()
+            row_quantity = money_to_decimal(str(row.get("quantity") or "0"))
+            row_time = parse_iso_datetime_or_none(str(row.get("submitted_at") or row.get("processed_at") or row.get("created_at") or ""))
+            if not execution_time or not row_time:
+                continue
+            if row_symbol != symbol or row_side != side or row_quantity != quantity:
+                continue
+            delta = (execution_time - row_time).total_seconds()
+            if -120 <= delta <= 600 and (best_delta is None or abs(delta) < best_delta):
+                best_delta = abs(delta)
+                best_row = row
+        output = dict(execution)
+        if best_row:
+            output["runtime_id"] = str(best_row.get("runtime_id") or "")
+            output["strategy_id"] = str(best_row.get("strategy_id") or m15_parent_strategy_id(str(best_row.get("runtime_id") or "")))
+            output["execution_match_delta_seconds"] = str(int(best_delta or 0))
+        matched.append(output)
+    return matched
+
+
+def m15_strategy_quality_rows_from_closed_trades(closed_trades: list[dict[str, Any]]) -> list[dict[str, str]]:
+    stats: dict[str, dict[str, Any]] = {}
+    for trade in closed_trades:
+        runtime_id = str(trade.get("runtime_id") or "未匹配长桥策略")
+        target = stats.setdefault(
+            runtime_id,
+            {
+                "runtime_id": runtime_id,
+                "strategy_id": str(trade.get("strategy_id") or m15_parent_strategy_id(runtime_id)),
+                "pnls": [],
+                "post_fix_pnls": [],
+                "symbols": set(),
+            },
+        )
+        pnl = money_to_decimal(str(trade.get("pnl") or "0"))
+        target["pnls"].append(pnl)
+        if trade.get("sample_phase") == "post_fix":
+            target["post_fix_pnls"].append(pnl)
+        target["symbols"].add(str(trade.get("symbol") or ""))
+    rows: list[dict[str, str]] = []
+    for item in stats.values():
+        pnls = item["pnls"]
+        post_fix_pnls = item["post_fix_pnls"]
+        wins = [pnl for pnl in pnls if pnl > ZERO]
+        losses = [pnl for pnl in pnls if pnl < ZERO]
+        post_wins = [pnl for pnl in post_fix_pnls if pnl > ZERO]
+        post_losses = [pnl for pnl in post_fix_pnls if pnl < ZERO]
+        rows.append(
+            {
+                "runtime_id": str(item["runtime_id"]),
+                "strategy_id": str(item["strategy_id"]),
+                "quality_tier": m15_longbridge_runtime_quality_tier(str(item["runtime_id"])),
+                "closed_trade_count": str(len(pnls)),
+                "win_rate_percent": m15_win_rate_percent(wins, losses),
+                "average_win": money(sum(wins, ZERO) / Decimal(len(wins))) if wins else "暂无",
+                "average_loss": money(abs(sum(losses, ZERO)) / Decimal(len(losses))) if losses else "暂无",
+                "profit_loss_ratio": m15_profit_loss_ratio(wins, losses),
+                "total_pnl": money(sum(pnls, ZERO)),
+                "post_fix_closed_trade_count": str(len(post_fix_pnls)),
+                "post_fix_win_rate_percent": m15_win_rate_percent(post_wins, post_losses),
+                "post_fix_total_pnl": money(sum(post_fix_pnls, ZERO)),
+                "symbols": ", ".join(sorted(symbol for symbol in item["symbols"] if symbol)),
+            }
+        )
+    rows.sort(key=lambda row: abs(money_to_decimal(row["total_pnl"])), reverse=True)
+    return rows
+
+
+def m15_longbridge_runtime_quality_tier(runtime_id: str) -> str:
+    if runtime_id == "M10-PA-004-long-1d":
+        return "主交易策略"
+    if runtime_id in {"M10-PA-001-1d", "M10-PA-002-1d", "M10-PA-005-1d", "M10-PA-005-5m", "M10-PA-013-1d", "M10-PA-013-5m", "M12-FTD-001-baseline-1d"}:
+        return "严格小仓位测试策略"
+    if runtime_id == "M10-PA-001-5m":
+        return "本地修复策略"
+    return "未匹配/历史样本"
+
+
+def m15_win_rate_percent(wins: list[Decimal], losses: list[Decimal]) -> str:
+    active = len(wins) + len(losses)
+    return pct(Decimal(len(wins)) / Decimal(active) * HUNDRED) if active else "暂无"
+
+
+def m15_profit_loss_ratio(wins: list[Decimal], losses: list[Decimal]) -> str:
+    if not wins or not losses:
+        return "暂无"
+    average_win = sum(wins, ZERO) / Decimal(len(wins))
+    average_loss = abs(sum(losses, ZERO)) / Decimal(len(losses))
+    return str((average_win / average_loss).quantize(PERCENT)) if average_loss > ZERO else "暂无"
+
+
+def m15_parent_strategy_id(runtime_id: str) -> str:
+    parts = runtime_id.split("-")
+    if len(parts) >= 3 and parts[0] == "M10" and parts[1] == "PA":
+        return "-".join(parts[:3])
+    if runtime_id.startswith("M12-FTD-001"):
+        return "M12-FTD-001"
+    return runtime_id
+
+
+def m15_latest_price_by_symbol(market_events: list[dict[str, Any]]) -> dict[str, Decimal]:
+    latest: dict[str, tuple[str, Decimal]] = {}
+    for event in market_events:
+        symbol = m15_base_symbol(str(event.get("symbol") or ""))
+        price = money_to_decimal(str(event.get("close") or event.get("last_price") or "0"))
+        event_time = str(event.get("event_time") or event.get("received_at") or "")
+        if not symbol or price <= ZERO:
+            continue
+        if symbol not in latest or event_time >= latest[symbol][0]:
+            latest[symbol] = (event_time, price)
+    return {symbol: price for symbol, (_event_time, price) in latest.items()}
+
+
+def m15_realized_pnl_from_orders(
+    orders: list[Any],
+    market_date: str,
+    fallback_cost_basis: dict[str, Decimal],
+) -> tuple[Decimal, Decimal]:
+    lots: dict[str, list[list[Decimal]]] = {}
+    today_realized = ZERO
+    total_realized = ZERO
+    normalized_orders = [order for order in orders if isinstance(order, dict)]
+    normalized_orders.sort(key=lambda order: str(order.get("created_at") or ""))
+    for order in normalized_orders:
+        status = str(order.get("status") or "")
+        if status not in {"Filled", "Executed"}:
+            continue
+        symbol = m15_base_symbol(str(order.get("symbol") or ""))
+        side = str(order.get("side") or "").strip().lower()
+        quantity = money_to_decimal(str(order.get("executed_quantity") or "0"))
+        if quantity <= ZERO:
+            quantity = money_to_decimal(str(order.get("quantity") or "0"))
+        price = money_to_decimal(str(order.get("executed_price") or "0"))
+        if price <= ZERO:
+            price = money_to_decimal(str(order.get("price") or "0"))
+        if not symbol or quantity <= ZERO or price <= ZERO:
+            continue
+        if side == "buy":
+            lots.setdefault(symbol, []).append([quantity, price])
+            continue
+        if side != "sell":
+            continue
+        realized = ZERO
+        remaining = quantity
+        symbol_lots = lots.setdefault(symbol, [])
+        while remaining > ZERO and symbol_lots:
+            lot_qty, lot_price = symbol_lots[0]
+            take = min(remaining, lot_qty)
+            realized += (price - lot_price) * take
+            lot_qty -= take
+            remaining -= take
+            if lot_qty <= ZERO:
+                symbol_lots.pop(0)
+            else:
+                symbol_lots[0][0] = lot_qty
+        fallback_cost = fallback_cost_basis.get(symbol, ZERO)
+        if remaining > ZERO and fallback_cost > ZERO:
+            realized += (price - fallback_cost) * remaining
+        total_realized += realized
+        if market_date and m15_order_market_date(order) == market_date:
+            today_realized += realized
+    return today_realized, total_realized
+
+
+def m15_base_symbol(symbol: str) -> str:
+    return symbol.upper().split(".")[0]
 
 
 def m15_row_market_date(row: dict[str, Any]) -> str:
@@ -4028,7 +6180,9 @@ def realtime_execution_status_label(realtime: dict[str, Any], stale: bool) -> st
     if stale:
         return "实时链路状态待刷新"
     if int_like(realtime.get("submitted_count", 0)) > 0:
-        return "已提交模拟订单"
+        return "已确认提交模拟订单"
+    if int_like(realtime.get("unconfirmed_submission_count", 0)) > 0:
+        return "订单请求未确认"
     if int_like(realtime.get("ready_order_count", 0)) > 0:
         return "实时信号通过风控"
     if int_like(realtime.get("blocked_signal_count", 0)) > 0:
@@ -4082,7 +6236,7 @@ def submit_status_label(status: str) -> str:
         "waiting_for_regular_session": "等待常规交易时段",
         "no_eligible_orders": "当前无合格订单",
         "ready_but_not_submitted": "已合格但未提交",
-        "submitter_state_stale_waiting_refresh": "提交器状态待刷新",
+        "submitter_state_stale_waiting_refresh": "旧提交器仅审计",
     }
     return labels.get(status, status or "暂无")
 
@@ -4236,7 +6390,10 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
         for line in handle:
             stripped = line.strip()
             if stripped:
-                rows.append(json.loads(stripped))
+                try:
+                    rows.append(json.loads(stripped))
+                except json.JSONDecodeError:
+                    continue
     return rows
 
 
@@ -4863,6 +7020,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     summary = dashboard.get("summary", {})
     terminal = dashboard.get("broker_terminal_view", {})
     longbridge = dashboard.get("longbridge_paper_account", {})
+    local_history = dashboard.get("local_simulation_history_quality", {})
     mainline = dashboard["mainline_account_view"]
     experimental = dashboard["experimental_account_view"]
     timeframe_views = dashboard["timeframe_views"]["views"]
@@ -4891,10 +7049,15 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
             active_universe_symbol_count=summary.get("active_universe_symbol_count", 50),
             runtime_readiness_note=str(summary.get("runtime_readiness_note", "")),
         )
-        data_freshness_section = (
-            f"<section class=\"panel warning\"><h2>数据刷新告警</h2><div class=\"note\">{html.escape(str(data_freshness_warning))}</div></section>"
-            if data_freshness_warning else ""
-        )
+        if data_freshness_warning:
+            freshness_panel_class = "notice" if is_longbridge_non_degraded_freshness_notice(str(data_freshness_warning)) else "warning"
+            freshness_panel_title = "数据刷新提示" if freshness_panel_class == "notice" else "数据刷新告警"
+            data_freshness_section = (
+                f"<section class=\"panel {freshness_panel_class}\"><h2>{freshness_panel_title}</h2>"
+                f"<div class=\"note\">{html.escape(str(data_freshness_warning))}</div></section>"
+            )
+        else:
+            data_freshness_section = ""
     mainline_rows = "\n".join(
         f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(value))}</td></tr>"
         for label, value in [
@@ -4935,6 +7098,17 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     pa004_terminal_rows = "\n".join(terminal_account_row_html(row) for row in terminal.get("pa004_comparison", {}).get("rows", [])) or "<tr><td colspan=\"17\">暂无 PA004 对照行</td></tr>"
     longbridge_status_rows = "\n".join(longbridge_panel_row_html(row) for row in longbridge.get("status_rows", [])) or "<tr><td colspan=\"3\">暂无长桥模拟账户状态</td></tr>"
     longbridge_queue_rows = "\n".join(longbridge_panel_row_html(row) for row in longbridge.get("queue_rows", [])) or "<tr><td colspan=\"3\">暂无长桥实时链路状态</td></tr>"
+    longbridge_realtime_pnl_cards = "\n".join(longbridge_realtime_pnl_card_html(row) for row in longbridge.get("realtime_pnl_cards", [])) or "<div class=\"pnl-card\"><small>实时盈亏</small><strong>等待长桥数据</strong><span>暂无可用盈亏字段。</span></div>"
+    longbridge_virtual_bucket_rows = "\n".join(longbridge_virtual_bucket_row_html(row) for row in longbridge.get("virtual_bucket_rows", [])) or "<tr><td colspan=\"16\">等待长桥本地分仓状态</td></tr>"
+    longbridge_dedicated_runtime_rows = "\n".join(longbridge_dedicated_runtime_review_row_html(row) for row in longbridge.get("dedicated_bucket_runtime_review_rows", [])) or "<tr><td colspan=\"11\">等待专项仓运行单元复核</td></tr>"
+    longbridge_symbol_pnl_rows = "\n".join(longbridge_symbol_pnl_row_html(row) for row in longbridge.get("symbol_pnl_rows", [])[:30]) or "<tr><td colspan=\"7\">等待长桥逐标的盈亏数据</td></tr>"
+    longbridge_strategy_pnl_rows = "\n".join(longbridge_strategy_pnl_row_html(row) for row in longbridge.get("strategy_trade_pnl_rows", [])[:30]) or "<tr><td colspan=\"6\">等待长桥逐策略盈亏归因</td></tr>"
+    longbridge_strategy_quality_rows = "\n".join(longbridge_strategy_quality_row_html(row) for row in longbridge.get("strategy_quality_rows", [])[:30]) or "<tr><td colspan=\"10\">等待长桥策略质量样本</td></tr>"
+    longbridge_unfilled_order_rows = "\n".join(longbridge_unfilled_order_row_html(row) for row in longbridge.get("unfilled_order_rows", [])[:40]) or "<tr><td colspan=\"9\">暂无未成交诊断，或等待长桥订单对账产物</td></tr>"
+    local_overall = local_history.get("overall", {})
+    local_lane_rows = "\n".join(local_simulation_quality_row_html(row, "display_name") for row in local_history.get("lane_rows", [])) or "<tr><td colspan=\"10\">等待本地模拟历史账本</td></tr>"
+    local_timeframe_rows = "\n".join(local_simulation_quality_row_html(row, "display_name") for row in local_history.get("timeframe_rows", [])) or "<tr><td colspan=\"10\">等待本地模拟周期样本</td></tr>"
+    local_runtime_rows = "\n".join(local_simulation_runtime_quality_row_html(row) for row in local_history.get("runtime_rows", [])[:40]) or "<tr><td colspan=\"12\">等待本地模拟运行单元样本</td></tr>"
     timeframe_sections = "\n".join(timeframe_view_html(timeframe_views[timeframe]) for timeframe in PRIMARY_TIMEFRAME_ORDER)
     ftd_rows = "".join(ftd_account_row_html(row) for row in ftd["accounts"])
     extended_monitor = dashboard["extended_session_monitor"]
@@ -4970,12 +7144,18 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     .grid {{ display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:10px; }}
     .metric,.panel {{ background:#fff; border:1px solid #d8dee9; border-radius:8px; }}
     .warning {{ border-left:6px solid #b42318; background:#fff7f5; }}
+    .notice {{ border-left:6px solid #175cd3; background:#f5f8ff; }}
     .audit-only {{ border-left:6px solid #175cd3; background:#f5f8ff; }}
     .metric {{ padding:12px; }} .metric span {{ display:block; color:#667085; font-size:12px; }} .metric strong {{ display:block; margin-top:8px; font-size:22px; }}
     h2 {{ margin:0; padding:14px 16px; font-size:18px; border-bottom:1px solid #d8dee9; }}
     .note {{ padding:12px 16px; color:#667085; line-height:1.6; }}
     .two-col {{ display:grid; grid-template-columns:minmax(280px,0.9fr) minmax(320px,1.1fr); gap:14px; padding:14px 16px; }}
     .mini-card {{ border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff; }}
+    .pnl-grid {{ display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:10px; padding:12px 16px; }}
+    .pnl-card {{ border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; background:#f8fafc; min-height:96px; }}
+    .pnl-card small {{ display:block; color:#667085; margin-bottom:6px; }}
+    .pnl-card strong {{ display:block; font-size:22px; line-height:1.2; word-break:break-word; }}
+    .pnl-card span {{ display:block; margin-top:6px; color:#667085; font-size:12px; line-height:1.4; }}
     table {{ width:100%; border-collapse:collapse; font-size:13px; }} th,td {{ padding:9px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }}
     th {{ background:#eef2f7; }} .wrap {{ max-height:520px; overflow:auto; }}
     .good {{ color:#18794e; font-weight:700; }} .bad {{ color:#b42318; font-weight:700; }}
@@ -4999,7 +7179,7 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
     .bar-track {{ height:12px; background:#eef2f7; border-radius:999px; overflow:hidden; }}
     .bar-fill {{ height:12px; min-width:2px; }}
     .bar-good {{ background:#2f9e6b; }} .bar-bad {{ background:#d92d20; }}
-    @media (max-width:1180px) {{ .terminal {{ grid-template-columns:1fr; }} .terminal-band {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
+    @media (max-width:1180px) {{ .terminal {{ grid-template-columns:1fr; }} .terminal-band,.pnl-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
     @media (max-width:980px) {{ .grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} header,.two-col,.timeframes {{ display:block; }} }}
   </style>
   <script>
@@ -5026,14 +7206,15 @@ def build_dashboard_html(config: M1229Config, dashboard: dict[str, Any]) -> str:
       <div><small>可交易展示</small>{html.escape(terminal.get('top_status', {}).get('fully_ready_for_trading_display', 'false'))}</div>
     </section>
     <div class="grid">{cards}</div>
-    {data_freshness_section}
-    <section class="panel"><h2>长桥模拟账户</h2><div class="note">{html.escape(str(longbridge.get('plain_language_result', '长桥模拟账户状态暂未生成。')))}</div><div class="two-col"><div class="mini-card"><h2>账户与执行</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_status_rows}</tbody></table></div><div class="mini-card"><h2>实时链路与旧队列</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_queue_rows}</tbody></table></div></div></section>
+{data_freshness_section}
+    <section class="panel"><h2>长桥模拟账户</h2><div class="note">{html.escape(str(longbridge.get('plain_language_result', '长桥模拟账户状态暂未生成。')))}</div><div class="mini-card" style="margin:0 16px 14px;"><h2>实时盈亏</h2><div class="pnl-grid">{longbridge_realtime_pnl_cards}</div></div><div class="mini-card" style="margin:0 16px 14px;"><h2>本地分仓</h2><div class="wrap"><table><thead>{longbridge_virtual_bucket_head()}</thead><tbody>{longbridge_virtual_bucket_rows}</tbody></table></div></div><div class="mini-card" style="margin:0 16px 14px;"><h2>单策略仓运行单元复核</h2><div class="wrap"><table><thead>{longbridge_dedicated_runtime_review_head()}</thead><tbody>{longbridge_dedicated_runtime_rows}</tbody></table></div></div><div class="two-col"><div class="mini-card"><h2>账户与执行</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_status_rows}</tbody></table></div><div class="mini-card"><h2>实时链路</h2><table><thead>{longbridge_panel_head()}</thead><tbody>{longbridge_queue_rows}</tbody></table></div></div><div class="mini-card" style="margin:0 16px 14px;"><h2>未成交订单分析</h2><div class="note">本地请求但长桥未成交的订单只用于诊断，不进入盈亏、胜率、回撤、分仓占用或策略表现。</div><div class="wrap"><table><thead>{longbridge_unfilled_order_head()}</thead><tbody>{longbridge_unfilled_order_rows}</tbody></table></div></div><div class="two-col"><div class="mini-card"><h2>逐标的盈亏</h2><table><thead>{longbridge_symbol_pnl_head()}</thead><tbody>{longbridge_symbol_pnl_rows}</tbody></table></div><div class="mini-card"><h2>逐策略成交盈亏</h2><table><thead>{longbridge_strategy_pnl_head()}</thead><tbody>{longbridge_strategy_pnl_rows}</tbody></table></div></div><div class="mini-card" style="margin:0 16px 14px;"><h2>策略质量与限权</h2><div class="wrap"><table><thead>{longbridge_strategy_quality_head()}</thead><tbody>{longbridge_strategy_quality_rows}</tbody></table></div></div></section>
     <section class="terminal">
       <div class="terminal-panel"><h2>策略账户</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{terminal_account_rows}</tbody></table></div></div>
       <div class="terminal-panel"><h2>持仓 / 信号 / PA004 对照</h2><div class="note">{html.escape(terminal.get('pa004_comparison', {}).get('plain_language_result', ''))}</div><div class="wrap"><table class="terminal-table"><thead>{table_head()}</thead><tbody>{terminal_position_rows}</tbody></table></div><h2>今日正式信号</h2><div class="wrap"><table class="terminal-table"><thead>{watchlist_head()}</thead><tbody>{terminal_signal_rows}</tbody></table></div><h2>PA004 baseline / MBF / QC 对照</h2><div class="wrap"><table class="terminal-table"><thead>{terminal_account_head()}</thead><tbody>{pa004_terminal_rows}</tbody></table></div></div>
       <div class="terminal-panel"><h2>自选股与新闻</h2><div class="watch-grid">{terminal_watchlist_sections}</div>{terminal_news_sections}</div>
     </section>
     <section class="panel"><h2>审计与报告</h2><div class="note">以下保留原账户成绩单、模拟交易明细、正式信号清单、账户输入审计和参考样例，用于回看与验证。首屏交易终端不改变任何策略、风控或执行结果。</div></section>
+    <section class="panel"><h2>本地模拟历史质量</h2><div class="note">本地模拟历史至今：已平仓 {html.escape(str(local_overall.get('closed_trade_count', '0')))} 笔，胜率 {html.escape(str(local_overall.get('win_rate_percent', '暂无')))}%，盈亏比 {html.escape(str(local_overall.get('profit_loss_ratio', '暂无')))}，盈利因子 {html.escape(str(local_overall.get('profit_factor', '暂无')))}，累计已实现盈亏 {html.escape(str(local_overall.get('net_realized_pnl', '0.00')))}。{html.escape(str(local_history.get('calculation_note', '')))}</div><div class="two-col"><div class="mini-card"><h2>按策略分组</h2><table><thead>{local_simulation_quality_head('分组')}</thead><tbody>{local_lane_rows}</tbody></table></div><div class="mini-card"><h2>按周期分组</h2><table><thead>{local_simulation_quality_head('周期')}</thead><tbody>{local_timeframe_rows}</tbody></table></div></div><div class="mini-card" style="margin:0 16px 14px;"><h2>运行单元明细</h2><div class="wrap"><table><thead>{local_simulation_runtime_quality_head()}</thead><tbody>{local_runtime_rows}</tbody></table></div></div></section>
     <section class="panel"><h2>主线正式账户</h2><div class="note">这里只看已经进入正式账户测试的策略，不混入实验策略收益。</div><div class="two-col"><div class="mini-card"><table><tbody>{mainline_rows}</tbody></table></div><div class="mini-card"><h2>各账户今日盈亏</h2>{pnl_bars}</div></div></section>
     <section class="panel"><h2>实验账户</h2><div class="note">实验策略也已经真实入账；没触发就显示零开仓零盈亏，不再空挂。</div><div class="two-col"><div class="mini-card"><table><tbody>{experimental_rows}</tbody></table></div><div class="mini-card"><h2>挂件 A/B 位</h2><table><thead><tr><th>挂件</th><th>名称</th><th>模式</th><th>状态</th><th>说明</th></tr></thead><tbody>{supporting_rows}</tbody></table></div></div></section>
     <section class="panel"><h2>FTD001 双版本对照</h2><div class="note">{html.escape(ftd['plain_language_summary'])}</div><div class="wrap"><table><thead><tr><th>版本</th><th>今日盈亏</th><th>当前权益</th><th>当前胜率</th><th>当前最大回撤</th></tr></thead><tbody>{ftd_rows}</tbody></table></div><div class="note">当前判断：{html.escape(ftd['current_plain_status'])}；风险标记：{html.escape('，'.join(ftd['risk_flags']))}</div></section>
@@ -5064,12 +7245,226 @@ def longbridge_panel_head() -> str:
     return "<tr><th>项目</th><th>当前值</th><th>说明</th></tr>"
 
 
+def longbridge_unfilled_order_head() -> str:
+    return (
+        "<tr><th>诊断序号</th><th>标的</th><th>方向</th><th>状态</th><th>资金池</th>"
+        "<th>运行单元</th><th>诊断</th><th>证据</th><th>动作</th></tr>"
+    )
+
+
+def longbridge_unfilled_order_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('diagnostic_ref', '')))}</td>"
+        f"<td>{html.escape(str(row.get('symbol', '')))}</td>"
+        f"<td>{html.escape(str(row.get('side', '')))}</td>"
+        f"<td>{html.escape(str(row.get('status', '')))}</td>"
+        f"<td>{html.escape(str(row.get('capital_bucket', '')))}</td>"
+        f"<td>{html.escape(str(row.get('runtime_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('diagnostic_category', '')))}</td>"
+        f"<td>{html.escape(str(row.get('diagnostic_evidence', '')))}</td>"
+        f"<td>{html.escape(str(row.get('repair_action', '')))}</td>"
+        "</tr>"
+    )
+
+
+def longbridge_virtual_bucket_head() -> str:
+    return (
+        "<tr><th>资金池</th><th>基线</th><th>状态</th><th>资金</th><th>总敞口上限</th>"
+        "<th>单标的上限</th><th>已用敞口</th><th>买入成交数</th><th>当日盈亏</th>"
+        "<th>持仓今日浮动</th><th>当前持仓总盈亏</th><th>已实现盈亏</th><th>交易累计盈亏</th>"
+        "<th>胜率</th><th>盈亏比</th>"
+        "<th>最大回撤</th><th>说明</th></tr>"
+    )
+
+
+def longbridge_virtual_bucket_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('label', '')))}</td>"
+        f"<td>{html.escape(str(row.get('test_epoch_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('epoch_status', '')))}</td>"
+        f"<td>{html.escape(str(row.get('equity', '')))}</td>"
+        f"<td>{html.escape(str(row.get('max_total_exposure', '')))}</td>"
+        f"<td>{html.escape(str(row.get('max_symbol_exposure', '')))}</td>"
+        f"<td>{html.escape(str(row.get('used_exposure', '')))}</td>"
+        f"<td>{html.escape(str(row.get('submitted_buy_count', '')))}</td>"
+        f"<td>{html.escape(str(row.get('bucket_today_pnl', row.get('today_pnl', ''))))}</td>"
+        f"<td>{html.escape(str(row.get('current_position_today_pnl', '')))}</td>"
+        f"<td>{html.escape(str(row.get('current_position_total_pnl', '')))}</td>"
+        f"<td>{html.escape(str(row.get('realized_pnl', '')))}</td>"
+        f"<td>{html.escape(str(row.get('trading_total_pnl', row.get('total_pnl', ''))))}</td>"
+        f"<td>{html.escape(str(row.get('win_rate_percent', '')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_loss_ratio', '')))}</td>"
+        f"<td>{html.escape(str(row.get('max_drawdown_percent', '')))}</td>"
+        f"<td>{html.escape(str(row.get('note', '')))}</td>"
+        "</tr>"
+    )
+
+
+def longbridge_dedicated_runtime_review_head() -> str:
+    return (
+        "<tr><th>运行单元</th><th>周期</th><th>本地净盈亏</th><th>本地胜率</th>"
+        "<th>本地盈亏比</th><th>本地样本</th><th>长桥资金池</th><th>预期资金池</th>"
+        "<th>允许实时交易</th><th>动作</th><th>复核状态</th></tr>"
+    )
+
+
+def longbridge_dedicated_runtime_review_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('runtime_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('timeframe', '')))}</td>"
+        f"<td>{html.escape(str(row.get('local_net_realized_pnl', '')))}</td>"
+        f"<td>{html.escape(str(row.get('local_win_rate_percent', '')))}</td>"
+        f"<td>{html.escape(str(row.get('local_profit_loss_ratio', '')))}</td>"
+        f"<td>{html.escape(str(row.get('local_closed_trade_count', '')))}</td>"
+        f"<td>{html.escape(str(row.get('longbridge_buckets', '')))}</td>"
+        f"<td>{html.escape(str(row.get('expected_bucket', '')))}</td>"
+        f"<td>{html.escape(str(row.get('realtime_allowed', '')))}</td>"
+        f"<td>{html.escape(str(row.get('action', '')))}</td>"
+        f"<td>{html.escape(str(row.get('review_status', '')))}</td>"
+        "</tr>"
+    )
+
+
 def longbridge_panel_row_html(row: dict[str, Any]) -> str:
     return (
         "<tr>"
         f"<td>{html.escape(str(row.get('label', '')))}</td>"
         f"<td>{html.escape(str(row.get('value', '')))}</td>"
         f"<td>{html.escape(str(row.get('note', '')))}</td>"
+        "</tr>"
+    )
+
+
+def longbridge_realtime_pnl_value(value: Any) -> str:
+    raw_value = str(value or "")
+    if raw_value in {"", "无法计算", "等待长桥数据", "暂无"}:
+        return raw_value or "暂无"
+    return money(money_to_decimal(raw_value))
+
+
+def longbridge_realtime_pnl_card_html(row: dict[str, Any]) -> str:
+    value = str(row.get("value", ""))
+    value_type = str(row.get("value_type", ""))
+    value_class = pnl_css_class(value) if value_type == "money" and value not in {"", "无法计算"} else ""
+    return (
+        "<div class=\"pnl-card\">"
+        f"<small>{html.escape(str(row.get('label', '')))}</small>"
+        f"<strong class=\"{value_class}\">{html.escape(value or '暂无')}</strong>"
+        f"<span>{html.escape(str(row.get('note', '')))}</span>"
+        "</div>"
+    )
+
+
+def longbridge_symbol_pnl_head() -> str:
+    return "<tr><th>标的</th><th>名称</th><th>盈亏</th><th>收益率</th><th>持仓市值</th><th>投入成本</th><th>是否持仓</th></tr>"
+
+
+def local_simulation_quality_head(first_label: str) -> str:
+    return (
+        f"<tr><th>{html.escape(first_label)}</th><th>已平仓</th><th>盈利</th><th>亏损</th><th>打平</th>"
+        "<th>胜率</th><th>平均盈利</th><th>平均亏损</th><th>盈亏比</th><th>盈利因子</th><th>累计已实现盈亏</th></tr>"
+    )
+
+
+def local_simulation_quality_row_html(row: dict[str, Any], label_key: str) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get(label_key, '')))}</td>"
+        f"<td>{html.escape(str(row.get('closed_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('winning_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('losing_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('flat_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('win_rate_percent', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('average_win', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('average_loss', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_loss_ratio', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_factor', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('net_realized_pnl', '0.00')))}</td>"
+        "</tr>"
+    )
+
+
+def local_simulation_runtime_quality_head() -> str:
+    return (
+        "<tr><th>运行单元</th><th>父策略</th><th>分组</th><th>周期</th><th>已平仓</th>"
+        "<th>胜率</th><th>平均盈利</th><th>平均亏损</th><th>盈亏比</th><th>盈利因子</th><th>累计已实现盈亏</th><th>标的</th></tr>"
+    )
+
+
+def local_simulation_runtime_quality_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('runtime_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('strategy_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('lane_label', '')))}</td>"
+        f"<td>{html.escape(str(row.get('timeframe', '')))}</td>"
+        f"<td>{html.escape(str(row.get('closed_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('win_rate_percent', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('average_win', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('average_loss', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_loss_ratio', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_factor', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('net_realized_pnl', '0.00')))}</td>"
+        f"<td>{html.escape(str(row.get('symbols', '')))}</td>"
+        "</tr>"
+    )
+
+
+def longbridge_symbol_pnl_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('symbol', '')))}</td>"
+        f"<td>{html.escape(str(row.get('name', '')))}</td>"
+        f"<td>{html.escape(str(row.get('profit', '')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_rate', '')))}</td>"
+        f"<td>{html.escape(str(row.get('holding_value', '')))}</td>"
+        f"<td>{html.escape(str(row.get('invest_cost', '')))}</td>"
+        f"<td>{html.escape(str(row.get('is_holding', '')))}</td>"
+        "</tr>"
+    )
+
+
+def longbridge_strategy_pnl_head() -> str:
+    return "<tr><th>运行单元</th><th>父策略</th><th>资金池</th><th>成交盈亏</th><th>标的数</th><th>标的</th><th>说明</th></tr>"
+
+
+def longbridge_strategy_pnl_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('runtime_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('strategy_id', '')))}</td>"
+        f"<td>{html.escape(str(row.get('capital_bucket', '')))}</td>"
+        f"<td>{html.escape(str(row.get('trade_pnl', '')))}</td>"
+        f"<td>{html.escape(str(row.get('symbol_count', '')))}</td>"
+        f"<td>{html.escape(str(row.get('symbols', '')))}</td>"
+        f"<td>{html.escape(str(row.get('attribution_note', '')))}</td>"
+        "</tr>"
+    )
+
+
+def longbridge_strategy_quality_head() -> str:
+    return (
+        "<tr><th>运行单元</th><th>分层</th><th>已平仓</th><th>胜率</th>"
+        "<th>平均盈利</th><th>平均亏损</th><th>盈亏比</th><th>总盈亏</th><th>修复后样本</th><th>标的</th></tr>"
+    )
+
+
+def longbridge_strategy_quality_row_html(row: dict[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html.escape(str(row.get('runtime_id', '')))}<br><small>{html.escape(str(row.get('strategy_id', '')))}</small></td>"
+        f"<td>{html.escape(str(row.get('quality_tier', '')))}</td>"
+        f"<td>{html.escape(str(row.get('closed_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('win_rate_percent', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('average_win', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('average_loss', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('profit_loss_ratio', '暂无')))}</td>"
+        f"<td>{html.escape(str(row.get('total_pnl', '0.00')))}</td>"
+        f"<td>{html.escape(str(row.get('post_fix_closed_trade_count', '0')))}</td>"
+        f"<td>{html.escape(str(row.get('symbols', '')))}</td>"
         "</tr>"
     )
 
@@ -5338,7 +7733,7 @@ def build_run_status_md(status: dict[str, Any]) -> str:
 
 
 def build_gate_md(gate: dict[str, Any]) -> str:
-    lines = ["# M11.8 模拟交易试运行准入复查", "", f"- 结论：{gate['plain_language_result']}", f"- 是否批准：`{str(gate['paper_trial_approval']).lower()}`", ""]
+    lines = ["# M11.8 模拟交易试运行准入复查", "", f"- 结论：{gate['plain_language_result']}", f"- 是否批准：`{str(gate['paper_trial_approval']).lower()}`"]
     if gate["blocking_items"]:
         lines.append("## 还差什么")
         for item in gate["blocking_items"]:
@@ -5432,12 +7827,21 @@ def write_json(path: Path, payload: Any) -> None:
     tmp_path.replace(path)
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    tmp_path.replace(path)
+
+
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
         for row in rows:
             row = strip_legacy_history_metrics(row)
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    tmp_path.replace(path)
 
 
 def strip_legacy_history_metrics(value: Any) -> Any:
@@ -5528,6 +7932,19 @@ def decimal_or_none(value: Any) -> Decimal | None:
 
 def money_to_decimal(value: str) -> Decimal:
     return decimal_or_none(value) or ZERO
+
+
+def parse_iso_datetime_or_none(value: str) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def quantity_from_prices(entry: Decimal, stop: Decimal) -> Decimal:

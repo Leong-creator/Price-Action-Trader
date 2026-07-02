@@ -53,8 +53,9 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                                 "order_type": "trigger_limit",
                                 "trigger_price": "101.00",
                                 "limit_price": "101.20",
+                                "quantity": "1",
                                 "stop_price": "98.00",
-                                "target_price": "110.00",
+                                "target_price": "115.00",
                             }
                         ],
                     )
@@ -71,6 +72,295 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertIn("net_profit_after_fees_at_target", signals[0])
             self.assertFalse(signals[0]["local_simulation_source"])
 
+    def test_fractional_quantity_at_least_one_is_floored_before_risk_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="fractional-ge-one",
+                        symbol="AAPL",
+                        strategy_signal_intents=[
+                            self.intent(
+                                quantity="24.0964",
+                                limit_price="20.00",
+                                stop_price="19.50",
+                                target_price="21.00",
+                            )
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(payload["quantity_normalized_count"], 1)
+            self.assertEqual(rows[0]["raw_suggested_quantity"], "24.0964")
+            self.assertEqual(rows[0]["submitted_quantity"], "24")
+            self.assertEqual(rows[0]["quantity_rounding_adjustment"], "0.0964")
+            self.assertEqual(rows[0]["quantity_normalization_status"], "rounded_down_to_whole_share")
+            self.assertNotIn("blocked_fractional_disabled", rows[0]["blockers"])
+            self.assertEqual(rows[0]["notional"], "480.00")
+            self.assertEqual(rows[0]["risk_amount"], "12.00")
+            self.assertEqual(signals[0]["quantity"], "24")
+            self.assertEqual(signals[0]["submitted_quantity"], "24")
+
+    def test_fractional_quantity_below_one_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="fractional-below-one",
+                        symbol="AAPL",
+                        strategy_signal_intents=[
+                            self.intent(
+                                quantity="0.9999",
+                                limit_price="20.00",
+                                stop_price="19.50",
+                                target_price="40.00",
+                            )
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 0)
+            self.assertEqual(payload["quantity_below_one_blocked_count"], 1)
+            self.assertEqual(signals, [])
+            self.assertIn("blocked_quantity_below_one_share", rows[0]["blockers"])
+            self.assertNotIn("blocked_fractional_disabled", rows[0]["blockers"])
+
+    def test_ftd_loss_streak_guard_can_emit_independent_longbridge_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=["M12-FTD-001-loss-streak-guard-1d"],
+                runtime_position_multipliers={"M12-FTD-001-loss-streak-guard-1d": "0.10"},
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="ftd-loss-streak",
+                        symbol="SPY",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M12-FTD-001-loss-streak-guard-1d",
+                                strategy_id="M12-FTD-001",
+                                quantity="1",
+                                limit_price="100.00",
+                                stop_price="99.00",
+                                target_price="115.00",
+                            )
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(signals[0]["runtime_id"], "M12-FTD-001-loss-streak-guard-1d")
+            self.assertEqual(signals[0]["capital_bucket"], "ftd_loss_streak")
+
+    def test_ftd_baseline_and_loss_streak_are_not_merged_by_confluence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=[
+                    "M12-FTD-001-baseline-1d",
+                    "M12-FTD-001-loss-streak-guard-1d",
+                ],
+                runtime_position_multipliers={
+                    "M12-FTD-001-baseline-1d": "0.10",
+                    "M12-FTD-001-loss-streak-guard-1d": "0.10",
+                },
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="ftd-both",
+                        symbol="SPY",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M12-FTD-001-baseline-1d",
+                                strategy_id="M12-FTD-001",
+                                quantity="1",
+                                limit_price="100.00",
+                                stop_price="99.00",
+                                target_price="115.00",
+                            ),
+                            self.intent(
+                                runtime_id="M12-FTD-001-loss-streak-guard-1d",
+                                strategy_id="M12-FTD-001",
+                                quantity="1",
+                                limit_price="100.00",
+                                stop_price="99.00",
+                                target_price="115.00",
+                            ),
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 2)
+            self.assertEqual(payload["confluence_merged_support_count"], 0)
+            self.assertEqual(
+                {row["runtime_id"]: row["capital_bucket"] for row in signals},
+                {
+                    "M12-FTD-001-baseline-1d": "ftd_baseline",
+                    "M12-FTD-001-loss-streak-guard-1d": "ftd_loss_streak",
+                },
+            )
+
+    def test_profit_and_reward_r_gates_block_weak_longbridge_signals(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="low-profit",
+                        symbol="AAPL",
+                        strategy_signal_intents=[
+                            self.intent(quantity="1", limit_price="100", stop_price="95", target_price="108")
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="below-normal-profit",
+                        symbol="MSFT",
+                        strategy_signal_intents=[
+                            self.intent(quantity="1", limit_price="100", stop_price="95", target_price="109")
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="low-reward-r",
+                        symbol="GOOG",
+                        strategy_signal_intents=[
+                            self.intent(quantity="3", limit_price="100", stop_price="95", target_price="106")
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="strong",
+                        symbol="META",
+                        strategy_signal_intents=[
+                            self.intent(quantity="1", limit_price="100", stop_price="95", target_price="115")
+                        ],
+                    ),
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            rows = {row["source_market_event_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(payload["low_profit_blocked_count"], 2)
+            self.assertEqual(payload["reward_r_blocked_count"], 1)
+            self.assertIn("blocked_fee_profit_below_minimum", rows["low-profit"]["blockers"])
+            self.assertIn("blocked_fee_profit_below_minimum", rows["below-normal-profit"]["blockers"])
+            self.assertIn("blocked_reward_r_below_minimum", rows["low-reward-r"]["blockers"])
+            self.assertEqual(signals[0]["symbol"], "META")
+            self.assertEqual(signals[0]["profit_quality_gate"], "normal_profit")
+
+    def test_pa001_thresholds_and_pa001_5m_local_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, allowed_runtime_ids=["M10-PA-001-1d", "M10-PA-001-5m"])
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="pa001-low-profit",
+                        symbol="AAPL",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-001-1d",
+                                strategy_id="M10-PA-001",
+                                quantity="1",
+                                limit_price="100",
+                                stop_price="95",
+                                target_price="111.99",
+                            )
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="pa001-low-r",
+                        symbol="MSFT",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-001-1d",
+                                strategy_id="M10-PA-001",
+                                quantity="3",
+                                limit_price="100",
+                                stop_price="95",
+                                target_price="108",
+                            )
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="pa001-5m",
+                        symbol="GOOG",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-001-5m",
+                                strategy_id="M10-PA-001",
+                                quantity="2",
+                                limit_price="100",
+                                stop_price="95",
+                                target_price="120",
+                            )
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="pa001-strong",
+                        symbol="META",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-001-1d",
+                                strategy_id="M10-PA-001",
+                                quantity="1",
+                                limit_price="100",
+                                stop_price="95",
+                                target_price="117",
+                            )
+                        ],
+                    ),
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            rows = {row["source_market_event_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertIn("blocked_fee_profit_below_minimum", rows["pa001-low-profit"]["blockers"])
+            self.assertIn("blocked_reward_r_below_minimum", rows["pa001-low-r"]["blockers"])
+            self.assertEqual(rows["pa001-5m"]["router_decision_status"], "blocked_repair_runtime_local_only")
+            self.assertEqual(signals[0]["symbol"], "META")
+            self.assertEqual(signals[0]["minimum_net_profit_after_fees"], "12.00")
+            self.assertEqual(signals[0]["minimum_reward_r"], "2")
+
     def test_repair_auxiliary_and_shadow_intents_do_not_emit_signals(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -80,7 +370,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 [
                     self.market_event(
                         strategy_signal_intents=[
-                            self.intent(runtime_id="M10-PA-002-5m", strategy_id="M10-PA-002"),
+                            self.intent(runtime_id="M10-PA-007-1d", strategy_id="M10-PA-007"),
                             self.intent(runtime_id="M10-PA-003", strategy_id="M10-PA-003"),
                             self.intent(runtime_id="M10-PA-004-MBF-1d", strategy_id="M10-PA-004"),
                         ]
@@ -95,6 +385,37 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(rows[0]["router_decision_status"], "blocked_repair_runtime_local_only")
             self.assertEqual(rows[1]["router_decision_status"], "blocked_auxiliary_module_local_only")
             self.assertEqual(rows[2]["router_decision_status"], "blocked_shadow_runtime_local_only")
+
+    def test_pa004_mbf_and_qc_can_emit_when_explicitly_whitelisted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=["M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"],
+                runtime_position_multipliers={
+                    "M10-PA-004-MBF-1d": "1.0",
+                    "M10-PA-004-MBF-QC-1d": "1.0",
+                },
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="mbf-intents",
+                        strategy_signal_intents=[
+                            self.intent(runtime_id="M10-PA-004-MBF-1d", strategy_id="M10-PA-004"),
+                            self.intent(runtime_id="M10-PA-004-MBF-QC-1d", strategy_id="M10-PA-004"),
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            signals = {row["runtime_id"]: row for row in self.read_jsonl(root / "signals.jsonl")}
+
+            self.assertEqual(payload["new_signal_event_count"], 2)
+            self.assertEqual(signals["M10-PA-004-MBF-1d"]["capital_bucket"], "pa004_mbf")
+            self.assertEqual(signals["M10-PA-004-MBF-QC-1d"]["capital_bucket"], "pa004_mbf_qc")
 
     def test_pa004_builtin_detector_generates_signal_from_new_daily_bar(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -145,7 +466,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                     "M12-FTD-001-baseline-1d",
                 ],
                 runtime_position_multipliers={
-                    "M10-PA-002-1d": "0.25",
+                    "M10-PA-002-1d": "1.0",
                     "M10-PA-012-5m": "0.5",
                     "M12-FTD-001-baseline-1d": "0.25",
                 },
@@ -210,7 +531,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                         (13, 50, "100.2", "100.6", "99.8", "100.1"),
                         (13, 55, "100.1", "100.5", "99.9", "100.3"),
                         (14, 0, "100.3", "100.8", "100.1", "100.5"),
-                        (14, 5, "100.5", "102.2", "101.5", "102.0"),
+                        (14, 5, "100.5", "102.2", "100.8", "102.0"),
                     ]
                 )
             ]
@@ -220,14 +541,113 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             signals = self.read_jsonl(root / "signals.jsonl")
             by_runtime = {row["runtime_id"]: row for row in signals}
 
-            self.assertEqual(payload["new_signal_event_count"], 2)
-            self.assertEqual(payload["confluence_merged_support_count"], 1)
-            self.assertEqual(set(by_runtime), {"M10-PA-002-1d", "M10-PA-012-5m"})
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(payload["confluence_merged_support_count"], 0)
+            self.assertEqual(set(by_runtime), {"M10-PA-002-1d"})
             self.assertEqual(by_runtime["M10-PA-002-1d"]["order_type"], "trigger_limit")
-            self.assertEqual(by_runtime["M10-PA-002-1d"]["confluence_multiplier"], "1.5")
-            self.assertEqual(by_runtime["M10-PA-002-1d"]["confluence_support_runtime_ids"], ["M12-FTD-001-baseline-1d"])
-            self.assertEqual(by_runtime["M10-PA-012-5m"]["order_type"], "trigger_limit")
+            self.assertEqual(by_runtime["M10-PA-002-1d"]["capital_bucket"], "experimental")
+            self.assertEqual(by_runtime["M10-PA-002-1d"]["confluence_multiplier"], "1")
+            self.assertEqual(by_runtime["M10-PA-002-1d"]["confluence_support_runtime_ids"], [])
+            ledger_rows = {row["runtime_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+            self.assertIn("blocked_reward_r_below_minimum", ledger_rows["M10-PA-012-5m"]["blockers"])
             self.assertTrue(all(not row["local_simulation_source"] for row in signals))
+
+    def test_pa002_1d_stays_in_unified_experimental_bucket_without_mirror(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=["M10-PA-002-1d"],
+                runtime_position_multipliers={"M10-PA-002-1d": "0.25"},
+                virtual_capital_buckets={
+                    "experimental": {
+                        "label": "统一实验仓",
+                        "equity": "10000",
+                        "max_total_exposure": "6000",
+                        "max_symbol_exposure": "1000",
+                        "max_risk_per_order": "20",
+                        "min_cash_reserve": "4000",
+                        "runtime_ids": ["M10-PA-002-1d"],
+                    },
+                },
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="pa002-embedded",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-002-1d",
+                                strategy_id="M10-PA-002",
+                                order_type="trigger_limit",
+                                trigger_price="101",
+                                limit_price="101",
+                                stop_price="96",
+                                target_price="116",
+                                quantity="1",
+                            )
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(signals[0]["capital_bucket"], "experimental")
+            self.assertEqual(signals[0]["capital_bucket_label"], "统一实验仓")
+            self.assertFalse(signals[0]["additional_bucket_route"])
+
+    def test_pa002_5m_routes_to_dedicated_bucket_as_primary_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=["M10-PA-002-5m"],
+                runtime_position_multipliers={"M10-PA-002-5m": "1.0"},
+                virtual_capital_buckets={
+                    "pa002_5m": {
+                        "label": "PA002-5m单仓",
+                        "equity": "10000",
+                        "max_total_exposure": "6000",
+                        "max_symbol_exposure": "1500",
+                        "max_risk_per_order": "20",
+                        "min_cash_reserve": "4000",
+                        "runtime_ids": ["M10-PA-002-5m"],
+                    },
+                },
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="pa002-5m-embedded",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-002-5m",
+                                strategy_id="M10-PA-002",
+                                order_type="trigger_limit",
+                                trigger_price="101",
+                                limit_price="101",
+                                stop_price="96",
+                                target_price="116",
+                                quantity="1",
+                            )
+                        ],
+                    )
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(signals[0]["runtime_id"], "M10-PA-002-5m")
+            self.assertEqual(signals[0]["capital_bucket"], "pa002_5m")
+            self.assertEqual(signals[0]["capital_bucket_label"], "PA002-5m单仓")
+            self.assertFalse(signals[0]["additional_bucket_route"])
 
     def test_confluence_merges_same_symbol_same_direction_and_boosts_size(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -289,6 +709,61 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(payload["new_signal_event_count"], 0)
             self.assertIn("duplicate_signal_event", rows[0]["blockers"])
 
+    def test_router_ignores_market_events_before_current_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, session_started_at="2026-06-04T13:30:00Z")
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="old-session",
+                        symbol="TSLA",
+                        received_at="2026-06-03T20:00:01Z",
+                        event_time="2026-06-03T20:00:00Z",
+                        strategy_signal_intents=[],
+                    ),
+                    self.market_event(
+                        event_id="current-session",
+                        received_at="2026-06-04T14:00:01Z",
+                        event_time="2026-06-04T14:00:00Z",
+                    ),
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:02Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["raw_market_event_count"], 2)
+            self.assertEqual(payload["current_session_market_event_count"], 1)
+            self.assertEqual(payload["stale_market_event_ignored_count"], 1)
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(signals[0]["source_market_event_id"], "current-session")
+
+    def test_router_rebuilds_pre_epoch_signal_after_new_test_epoch_activation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            epoch = {
+                "enabled": True,
+                "test_epoch_id": "unit-epoch",
+                "status": "active",
+                "test_started_at": "2026-06-04T14:05:00Z",
+            }
+            config = self.make_config(root, epoch_state=epoch)
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(received_at="2026-06-04T14:00:00Z")])
+
+            run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:06:00Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(payload["epoch_rebuilt_signal_count"], 1)
+            self.assertEqual(len(signals), 2)
+            self.assertTrue(signals[-1]["signal_id"].endswith("-unit-epoch"))
+            self.assertTrue(signals[-1]["realtime_rebuilt_after_epoch_activation"])
+            self.assertEqual(signals[-1]["original_signal_created_at"], "2026-06-04T14:00:00Z")
+            self.assertEqual(signals[-1]["created_at"], "2026-06-04T14:06:00Z")
+
     def test_replay_before_session_start_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -347,11 +822,14 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
         enabled_detectors: list[str] | None = None,
         allowed_runtime_ids: list[str] | None = None,
         runtime_position_multipliers: dict[str, str] | None = None,
+        additional_runtime_bucket_routes: dict[str, list[str]] | None = None,
+        virtual_capital_buckets: dict[str, dict] | None = None,
+        epoch_state: dict | None = None,
     ):
         allowed_runtime_ids = allowed_runtime_ids or ["M10-PA-004-long-1d", "M10-PA-013-1d"]
         runtime_position_multipliers = runtime_position_multipliers or {
             "M10-PA-004-long-1d": "1.0",
-            "M10-PA-013-1d": "1.0",
+            "M10-PA-013-1d": "0.25",
         }
         payload = {
             "stage": "M15.longbridge_realtime_signal_router",
@@ -377,7 +855,12 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 "allow_fractional_shares": False,
                 "allow_short_selling": False,
                 "allow_options": False,
-                "minimum_net_profit_after_fees": "0",
+                "minimum_net_profit_after_fees": "5",
+                "normal_minimum_net_profit_after_fees": "8",
+                "minimum_reward_r": "1.5",
+                "runtime_minimum_net_profit_after_fees": {"M10-PA-001": "12"},
+                "runtime_minimum_reward_r": {"M10-PA-001": "2.0"},
+                "conditional_net_profit_requires_confluence": True,
             },
             "hard_boundaries": {
                 "paper_simulated_only": True,
@@ -386,6 +869,13 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 "local_simulation_as_signal_source": False,
             },
         }
+        if additional_runtime_bucket_routes:
+            payload["realtime_signal_router"]["additional_runtime_bucket_routes"] = additional_runtime_bucket_routes
+        if virtual_capital_buckets:
+            payload["virtual_capital_buckets"] = virtual_capital_buckets
+        if epoch_state is not None:
+            self.write_json(root / "epoch.json", epoch_state)
+            payload["inputs"]["test_epoch_state"] = str(root / "epoch.json")
         config_path = root / "router_config.json"
         self.write_json(config_path, payload)
         return load_config(config_path)
@@ -428,6 +918,11 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 "allow_fractional_shares": False,
                 "allow_short_selling": False,
                 "allow_options": False,
+                "minimum_net_profit_after_fees": "5",
+                "normal_minimum_net_profit_after_fees": "8",
+                "minimum_reward_r": "1.5",
+                "runtime_minimum_net_profit_after_fees": {"M10-PA-001": "12"},
+                "runtime_minimum_reward_r": {"M10-PA-001": "2.0"},
             },
             "hard_boundaries": {
                 "paper_simulated_only": True,

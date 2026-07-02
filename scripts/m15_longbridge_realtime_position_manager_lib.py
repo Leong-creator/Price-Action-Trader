@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -16,6 +17,7 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     decimal,
     fmt_decimal,
     fmt_money,
+    parse_signal_time,
     parse_utc_datetime,
     project_path,
     to_iso,
@@ -44,6 +46,10 @@ class RealtimePositionManagerConfig:
     realtime_execution_ledger_path: Path
     output_dir: Path
     max_exit_events_per_run: int
+    exit_attempt_cooldown_seconds: int
+    manage_untracked_positions_for_exit: bool
+    untracked_stop_loss_percent: Decimal
+    untracked_take_profit_percent: Decimal
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -70,6 +76,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
         realtime_execution_ledger_path=resolve_repo_path(inputs.get("realtime_execution_ledger", DEFAULT_EXECUTION_LEDGER)),
         output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
         max_exit_events_per_run=int(manager.get("max_exit_events_per_run", 10)),
+        exit_attempt_cooldown_seconds=int(manager.get("exit_attempt_cooldown_seconds", 900)),
+        manage_untracked_positions_for_exit=bool(manager.get("manage_untracked_positions_for_exit", True)),
+        untracked_stop_loss_percent=decimal(manager.get("untracked_stop_loss_percent", "3")),
+        untracked_take_profit_percent=decimal(manager.get("untracked_take_profit_percent", "3")),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -79,6 +89,12 @@ def validate_config(config: RealtimePositionManagerConfig) -> None:
         raise ValueError("M15 realtime position manager stage drift")
     if config.max_exit_events_per_run <= 0:
         raise ValueError("M15 realtime position manager max_exit_events_per_run must be positive")
+    if config.exit_attempt_cooldown_seconds <= 0:
+        raise ValueError("M15 realtime position manager exit_attempt_cooldown_seconds must be positive")
+    if config.manage_untracked_positions_for_exit and (
+        config.untracked_stop_loss_percent <= ZERO or config.untracked_take_profit_percent <= ZERO
+    ):
+        raise ValueError("M15 realtime position manager untracked exit percents must be positive")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime position manager must stay paper/simulated only")
     if config.hard_boundaries.get("live_execution", False):
@@ -107,13 +123,22 @@ def run_realtime_position_manager(
 
     latest_prices = latest_price_by_symbol(market_events)
     open_metadata = submitted_open_metadata(execution_rows)
+    recent_exit_attempts = recent_exit_attempt_keys(execution_rows, now, config.exit_attempt_cooldown_seconds)
     ledger_rows: list[dict[str, Any]] = []
     exit_events: list[dict[str, Any]] = []
     for position in account_positions(account_state):
         symbol = str(position["symbol"])
         metadata = open_metadata.get(symbol, {})
         latest = latest_prices.get(symbol, ZERO)
-        row, event = evaluate_position(config, position, metadata, latest, generated_at_iso, existing_signal_ids)
+        row, event = evaluate_position(
+            config,
+            position,
+            metadata,
+            latest,
+            generated_at_iso,
+            existing_signal_ids,
+            recent_exit_attempts,
+        )
         ledger_rows.append(row)
         if event and len(exit_events) < config.max_exit_events_per_run:
             exit_events.append(event)
@@ -132,7 +157,21 @@ def run_realtime_position_manager(
         "local_simulation_isolated": True,
         "local_close_signal_used": False,
         "position_count": len(account_positions(account_state)),
-        "managed_position_count": sum(1 for row in ledger_rows if row.get("manager_status") != "no_submitted_open_metadata"),
+        "managed_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "m15_realtime_managed"),
+        "unmanaged_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_unmanaged"),
+        "exit_only_position_count": sum(
+            1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_exit_only"
+        ),
+        "unmanaged_position_symbols": [
+            str(row.get("symbol", ""))
+            for row in ledger_rows
+            if row.get("position_management_scope") == "longbridge_account_unmanaged"
+        ],
+        "exit_only_position_symbols": [
+            str(row.get("symbol", ""))
+            for row in ledger_rows
+            if row.get("position_management_scope") == "longbridge_account_exit_only"
+        ],
         "new_exit_signal_event_count": len(exit_events),
         "blocked_by_reason": count_statuses(ledger_rows),
         "paper_simulated_only": True,
@@ -164,16 +203,47 @@ def evaluate_position(
     latest_price: Decimal,
     generated_at: str,
     existing_signal_ids: set[str],
+    recent_exit_attempts: set[tuple[str, str]],
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     symbol = str(position["symbol"])
     quantity = decimal(position.get("quantity", "0"))
+    available_quantity = decimal(position.get("available", quantity))
     stop_price = decimal(metadata.get("stop_price", "0"))
     target_price = decimal(metadata.get("target_price", "0"))
     runtime_id = str(metadata.get("runtime_id", ""))
+    strategy_id = str(metadata.get("strategy_id", ""))
+    cost_price = position_cost_price(position)
+    latest_for_pnl = latest_price if latest_price > ZERO else decimal(position.get("current_price", position.get("last_price", "0")))
+    unrealized_pnl = (latest_for_pnl - cost_price) * quantity if latest_for_pnl > ZERO and cost_price > ZERO else ZERO
     status = "hold_no_exit_trigger"
+    management_scope = "m15_realtime_managed"
+    management_note = "本轮 M15 实时链路管理的长桥模拟账户持仓。"
     exit_reason = ""
     if not metadata:
-        status = "no_submitted_open_metadata"
+        if config.manage_untracked_positions_for_exit:
+            runtime_id = "M15-LONGBRIDGE-EXIT-ONLY"
+            strategy_id = "M15-LONGBRIDGE-EXIT-ONLY"
+            management_scope = "longbridge_account_exit_only"
+            management_note = "长桥账户已有持仓，未迁移成本地策略；只接管退出，不参与新开仓或加仓。"
+            basis_price = cost_price if cost_price > ZERO else latest_for_pnl
+            if basis_price > ZERO:
+                stop_price = basis_price * (Decimal("1") - config.untracked_stop_loss_percent / Decimal("100"))
+                target_price = basis_price * (Decimal("1") + config.untracked_take_profit_percent / Decimal("100"))
+                status = "exit_only_hold_no_exit_trigger"
+                if latest_price <= ZERO:
+                    status = "missing_latest_price"
+                elif latest_price <= stop_price:
+                    status = "exit_signal_created"
+                    exit_reason = "stop_loss"
+                elif latest_price >= target_price:
+                    status = "exit_signal_created"
+                    exit_reason = "take_profit"
+            else:
+                status = "missing_cost_basis_for_exit_only"
+        else:
+            status = "legacy_unmanaged_longbridge_position"
+            management_scope = "longbridge_account_unmanaged"
+            management_note = "长桥模拟账户已有持仓，但只接管退出配置关闭；不参与新开仓或加仓，需人工复核退出计划。"
     elif latest_price <= ZERO:
         status = "missing_latest_price"
     elif stop_price <= ZERO or target_price <= ZERO:
@@ -187,15 +257,25 @@ def evaluate_position(
     signal_id = ""
     event: dict[str, Any] | None = None
     if status == "exit_signal_created":
-        signal_id = deterministic_exit_signal_id(symbol=symbol, runtime_id=runtime_id, exit_reason=exit_reason, generated_at=generated_at)
-        if signal_id in existing_signal_ids:
+        signal_id = deterministic_exit_signal_id(
+            symbol=symbol,
+            runtime_id=runtime_id,
+            exit_reason=exit_reason,
+            source_open_signal_id=str(metadata.get("signal_id", "")),
+        )
+        if available_quantity <= ZERO:
+            status = "position_not_available_for_exit"
+        elif (symbol, exit_reason) in recent_exit_attempts:
+            status = "recent_exit_attempt_cooldown"
+        elif signal_id in existing_signal_ids:
             status = "duplicate_exit_signal_event"
         else:
+            exit_quantity = min(quantity, available_quantity)
             event = {
                 "signal_id": signal_id,
                 "created_at": generated_at,
                 "runtime_id": runtime_id,
-                "strategy_id": str(metadata.get("strategy_id", "")),
+                "strategy_id": strategy_id,
                 "symbol": symbol,
                 "timeframe": str(metadata.get("timeframe", "")),
                 "direction": "long",
@@ -204,26 +284,35 @@ def evaluate_position(
                 "order_type": "limit",
                 "limit_price": fmt_money(latest_price),
                 "current_price": fmt_money(latest_price),
-                "quantity": fmt_decimal(quantity),
-                "notional": fmt_money(quantity * latest_price),
+                "quantity": fmt_decimal(exit_quantity),
+                "notional": fmt_money(exit_quantity * latest_price),
                 "risk_amount": "0.00",
                 "net_profit_after_fees_at_target": "0.01",
                 "source_market_event_id": str(metadata.get("source_market_event_id", "")),
                 "source_open_signal_id": str(metadata.get("signal_id", "")),
                 "local_simulation_source": False,
                 "longbridge_position_exit_source": True,
+                "longbridge_untracked_exit_only": management_scope == "longbridge_account_exit_only",
             }
     row = {
         "stage": config.stage,
         "symbol": symbol,
         "runtime_id": runtime_id,
+        "strategy_id": strategy_id,
         "quantity": fmt_decimal(quantity),
+        "available_quantity": fmt_decimal(available_quantity),
+        "cost_price": fmt_money(cost_price) if cost_price > ZERO else "",
+        "unrealized_pnl": fmt_money(unrealized_pnl) if latest_for_pnl > ZERO and cost_price > ZERO else "",
         "latest_price": fmt_money(latest_price) if latest_price > ZERO else "",
         "stop_price": fmt_money(stop_price) if stop_price > ZERO else "",
         "target_price": fmt_money(target_price) if target_price > ZERO else "",
         "manager_status": status,
+        "position_management_scope": management_scope,
+        "management_note": management_note,
         "exit_reason": exit_reason,
         "exit_signal_id": signal_id,
+        "exit_allowed": management_scope in {"m15_realtime_managed", "longbridge_account_exit_only"},
+        "exit_only_takeover": management_scope == "longbridge_account_exit_only",
         "local_simulation_ignored": True,
     }
     return row, event
@@ -242,6 +331,25 @@ def account_positions(account_state: dict[str, Any]) -> list[dict[str, Any]]:
         if symbol and quantity > ZERO:
             positions.append({**row, "symbol": symbol, "quantity": fmt_decimal(quantity)})
     return positions
+
+
+def position_cost_price(position: dict[str, Any]) -> Decimal:
+    for key in (
+        "cost_price",
+        "average_cost",
+        "avg_cost",
+        "average_price",
+        "avg_price",
+        "cost",
+    ):
+        price = decimal(position.get(key, "0"))
+        if price > ZERO:
+            return price
+    quantity = decimal(position.get("quantity", position.get("qty", "0")))
+    cost_amount = decimal(position.get("cost_amount", position.get("invest_cost", "0")))
+    if quantity > ZERO and cost_amount > ZERO:
+        return cost_amount / quantity
+    return ZERO
 
 
 def latest_price_by_symbol(market_events: list[dict[str, Any]]) -> dict[str, Decimal]:
@@ -271,8 +379,38 @@ def submitted_open_metadata(execution_rows: list[dict[str, Any]]) -> dict[str, d
     return metadata
 
 
-def deterministic_exit_signal_id(*, symbol: str, runtime_id: str, exit_reason: str, generated_at: str) -> str:
-    digest = sha256(f"{symbol}|{runtime_id}|{exit_reason}|{generated_at}".encode("utf-8")).hexdigest()[:16]
+def recent_exit_attempt_keys(
+    execution_rows: list[dict[str, Any]],
+    now: datetime,
+    cooldown_seconds: int,
+) -> set[tuple[str, str]]:
+    attempts: set[tuple[str, str]] = set()
+    for row in execution_rows:
+        if str(row.get("side") or "").lower() != "sell":
+            continue
+        status = str(row.get("submission_status") or "")
+        if not status or status == "blocked_not_submitted":
+            continue
+        attempted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
+        if attempted_at and (now - attempted_at).total_seconds() > cooldown_seconds:
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        exit_reason = str(row.get("position_action") or row.get("exit_reason") or "")
+        if symbol and exit_reason:
+            attempts.add((symbol, exit_reason))
+    return attempts
+
+
+def deterministic_exit_signal_id(
+    *,
+    symbol: str,
+    runtime_id: str,
+    exit_reason: str,
+    source_open_signal_id: str = "",
+    generated_at: str = "",
+) -> str:
+    del generated_at
+    digest = sha256(f"{symbol}|{runtime_id}|{exit_reason}|{source_open_signal_id}".encode("utf-8")).hexdigest()[:16]
     return f"m15exit-{digest}"
 
 
@@ -287,6 +425,26 @@ def count_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
 def plain_language_result(exit_count: int, rows: list[dict[str, Any]]) -> str:
     if exit_count:
         return f"长桥持仓退出管理生成 {exit_count} 条平仓信号；这些信号来自长桥账户持仓和实时行情，不来自本地模拟。"
+    exit_only_symbols = [
+        str(row.get("symbol", ""))
+        for row in rows
+        if row.get("position_management_scope") == "longbridge_account_exit_only"
+    ]
+    if exit_only_symbols:
+        return (
+            "长桥持仓退出管理已检查账户持仓；"
+            f"{', '.join(exit_only_symbols)} 是非系统元数据持仓，已按只接管退出模式管理，不参与新开仓或加仓。"
+        )
+    unmanaged_symbols = [
+        str(row.get("symbol", ""))
+        for row in rows
+        if row.get("position_management_scope") == "longbridge_account_unmanaged"
+    ]
+    if unmanaged_symbols:
+        return (
+            "长桥持仓退出管理已检查账户持仓；"
+            f"{', '.join(unmanaged_symbols)} 是账户已有但非本轮 M15 开仓的持仓，当前未接管退出配置关闭，需人工复核退出计划。"
+        )
     if rows:
         return "长桥持仓退出管理已检查账户持仓；当前没有触发止损或止盈。"
     return "长桥持仓退出管理已就绪；当前长桥账户没有可管理持仓。"
@@ -298,16 +456,17 @@ def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         "",
         f"- 生成时间: `{summary['generated_at']}`",
         f"- 持仓数: `{summary['position_count']}`",
+        f"- 系统管理持仓 / 只接管退出持仓 / 未接管退出持仓: `{summary['managed_position_count']} / {summary.get('exit_only_position_count', 0)} / {summary['unmanaged_position_count']}`",
         f"- 新平仓信号: `{summary['new_exit_signal_event_count']}`",
         f"- 结论: {summary['plain_language_result']}",
         "",
-        "| 标的 | 运行单元 | 状态 | 当前价 | 止损 | 目标 |",
-        "|---|---|---|---:|---:|---:|",
+        "| 标的 | 运行单元 | 管理范围 | 状态 | 成本 | 当前价 | 浮盈亏 | 止损 | 目标 |",
+        "|---|---|---|---|---:|---:|---:|---:|---:|",
     ]
     for row in rows[:30]:
         lines.append(
-            f"| `{row.get('symbol', '')}` | `{row.get('runtime_id', '')}` | `{row.get('manager_status', '')}` | "
-            f"`{row.get('latest_price', '')}` | `{row.get('stop_price', '')}` | `{row.get('target_price', '')}` |"
+            f"| `{row.get('symbol', '')}` | `{row.get('runtime_id', '')}` | `{row.get('position_management_scope', '')}` | `{row.get('manager_status', '')}` | "
+            f"`{row.get('cost_price', '')}` | `{row.get('latest_price', '')}` | `{row.get('unrealized_pnl', '')}` | `{row.get('stop_price', '')}` | `{row.get('target_price', '')}` |"
         )
     lines.extend(
         [
@@ -340,11 +499,20 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(json_ready(payload), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(json.dumps(json_ready(payload), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.write_text("".join(json.dumps(json_ready(row), ensure_ascii=False, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(
+        "".join(json.dumps(json_ready(row), ensure_ascii=False, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
 
 
 def json_ready(value: Any) -> Any:

@@ -25,6 +25,8 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertTrue(payload["paper_account_verified"])
             self.assertEqual(payload["fail_count"], 0)
             self.assertEqual(payload["waiting_count"], 1)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertIn("process=alive", checks["m15_realtime_daemon_alive"]["actual"])
 
     def test_blocks_when_execution_config_enables_live_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -38,6 +40,35 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertGreater(payload["fail_count"], 0)
             checks = {row["check"]: row for row in payload["checks"]}
             self.assertEqual(checks["paper_only_boundaries"]["status"], "fail")
+
+    def test_reports_dead_m15_pid_and_stale_status_age(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(root, paper_enabled=True, live_execution=False)
+            (root / "realtime" / "m15_longbridge_realtime_session_supervisor.pid").write_text("99999999", encoding="utf-8")
+            (root / "realtime" / "m15_longbridge_realtime_session_supervisor.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-06-04T13:00:00Z",
+                        "local_simulation_isolated": True,
+                        "local_ledger_input_ref": "",
+                        "legacy_fast_queue_used": False,
+                        "manual_m12_37_once_used": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(config_path)
+
+            payload = run_m15_opening_trade_readiness(config, generated_at="2026-06-04T14:00:00Z")
+
+            self.assertFalse(payload["m15_realtime_daemon_alive"])
+            self.assertEqual(payload["m15_realtime_daemon_pid"], 99999999)
+            self.assertEqual(payload["m15_realtime_status_age_seconds"], 3600)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["m15_realtime_daemon_alive"]["status"], "fail")
+            self.assertIn("process=dead", checks["m15_realtime_daemon_alive"]["actual"])
+            self.assertIn("status_age_seconds=3600", checks["m15_realtime_daemon_alive"]["actual"])
 
     def write_fixture(self, root: Path, *, paper_enabled: bool, live_execution: bool) -> Path:
         output_dir = root / "realtime"
@@ -104,7 +135,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             },
             "runtime_layering": {
                 "longbridge_realtime_candidates": ["M10-PA-004-long-1d"],
-                "local_repair_or_shadow_only": ["M10-PA-002-5m"],
+                "local_repair_or_shadow_only": ["M10-PA-007-1d"],
                 "auxiliary_modules_local_only": ["M10-PA-003"],
             },
             "hard_boundaries": {

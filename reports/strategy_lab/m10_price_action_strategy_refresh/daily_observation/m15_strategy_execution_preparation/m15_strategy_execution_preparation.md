@@ -1,8 +1,8 @@
 # M15 策略推进准备
 
-- 生成时间: `2026-06-01T17:29:01Z`
-- 第一批 / 第二批 / 立即修复 / 辅助模块: `4/5/9/7`
-- 修复优先级: `{'P0': 4, 'P1': 5}`
+- 生成时间: `2026-06-30T03:16:58Z`
+- 第一批 / 第二批 / 立即修复 / 辅助模块: `4/6/8/7`
+- 修复优先级: `{'P0': 3, 'P1': 5}`
 - 已接入 M12 账户化运行规则: `18` 条
 - 第一笔长桥模拟候选: `M10-PA-004-long-1d`
 - 边界: 不读凭证、不连接账户、不提交订单、不启用实盘。
@@ -24,6 +24,7 @@
 | M10-PA-013-5m | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 过滤弱支撑/阻力失败信号后继续内部模拟 |
 | M10-PA-012-5m | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 修目标价和止损几何，先跑 1 倍风险目标价影子账本 |
 | M10-PA-002-1d | risk_limited_advance | 0.25 | implemented_in_m12_account_runtime | 加强突破质量和回撤控制后继续内部模拟 |
+| M10-PA-002-5m | advance_dedicated_pa002_bucket | 1.0 | implemented_in_m12_account_runtime | 已提升到 002 专项主力仓，按正常测试仓位验证五分钟突破确认 |
 | M10-PA-004-MBF-1d | risk_limited_advance | 0.50 | implemented_in_m12_account_runtime | 作为 PA004 并行变体对照，不覆盖主线 PA004 |
 
 ## 立即修复队列
@@ -64,25 +65,6 @@
   - 风控阻断必须写明是止损距离、连续亏损还是敞口原因
   - 修复试验阶段仓位保持 0.10 倍
 - 修好后推进: 5 分钟账本转正或风险阻断下降后，单独升为风险受限推进
-- 长桥模拟账户: `blocked_until_repaired`
-
-### M10-PA-002-5m
-
-- 优先级: `P0`
-- 周期: `5m`
-- 仓位: `0.10`
-- M12 规则状态: `implemented_in_m12_account_runtime`
-- 修复窗口: 周一交易日前完成假突破过滤和失败后冷却规则
-- 修复目标: 修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户
-- 修复动作:
-  - 突破必须有收盘确认，不能只用盘中刺破当作有效突破
-  - 突破后若快速回到区间内，标记为假突破并进入冷却
-  - 同一标的同一方向失败后延迟下一次入场，避免连续追错
-- 验收条件:
-  - 周一刷新后必须能区分有效突破、假突破和冷却跳过
-  - 有信号无账户操作时必须写明 no-op 原因
-  - 修复前不进入长桥模拟账户候选
-- 修好后推进: 假突破过滤通过且冷却生效后，先进入 0.10 倍修复试验
 - 长桥模拟账户: `blocked_until_repaired`
 
 ### M10-PA-004-MBF-QC-1d
@@ -218,7 +200,7 @@
 - `regular_us_session`: 当前市场窗口为美股常规交易时段
 - `m12_37_owned_by_supervisor`: M12.37 只能由 M12.47 自动拉起
 - `quote_source`: 行情来源必须为 longbridge_quote_readonly
-- `daily_and_5m_complete`: 第一批 50 只日线和当日 5 分钟数据完整
+- `daily_and_5m_complete`: 当前种子池日线和当日 5 分钟数据完整
 - `m13_current_day_ledger`: M13 生成当天策略账本
 - `m14_recompute`: M14 重算内部模拟、修复队列、影子参数和长桥预演
 - `no_fallback_or_old_snapshot`: 备用行情或旧快照当天不允许进入长桥模拟账户

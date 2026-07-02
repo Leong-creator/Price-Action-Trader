@@ -132,6 +132,7 @@ SECOND_BATCH_ROWS = (
     ("M10-PA-013-5m", "M10-PA-013", "5m", "risk_limited_advance", "0.50", "过滤弱支撑/阻力失败信号后继续内部模拟"),
     ("M10-PA-012-5m", "M10-PA-012", "5m", "risk_limited_advance", "0.50", "修目标价和止损几何，先跑 1 倍风险目标价影子账本"),
     ("M10-PA-002-1d", "M10-PA-002", "1d", "risk_limited_advance", "0.25", "加强突破质量和回撤控制后继续内部模拟"),
+    ("M10-PA-002-5m", "M10-PA-002", "5m", "advance_single_strategy_bucket", "1.0", "已提升到 PA002-5m 单策略仓，按 1.0 正常测试五分钟突破确认"),
     ("M10-PA-004-MBF-1d", "M10-PA-004-MBF", "1d", "risk_limited_advance", "0.50", "作为 PA004 并行变体对照，不覆盖主线 PA004"),
 )
 
@@ -175,26 +176,6 @@ REPAIR_ROWS = (
             "修复试验阶段仓位保持 0.10 倍",
         ],
         "advance_after_fix": "5 分钟账本转正或风险阻断下降后，单独升为风险受限推进",
-    },
-    {
-        "runtime_id": "M10-PA-002-5m",
-        "strategy_id": "M10-PA-002",
-        "timeframe": "5m",
-        "position_size_multiplier": "0.10",
-        "repair_priority": "P0",
-        "repair_window": "周一交易日前完成假突破过滤和失败后冷却规则",
-        "repair_plan": "修假突破过滤、突破确认、失败后冷却；未修完不进模拟账户",
-        "fix_steps": [
-            "突破必须有收盘确认，不能只用盘中刺破当作有效突破",
-            "突破后若快速回到区间内，标记为假突破并进入冷却",
-            "同一标的同一方向失败后延迟下一次入场，避免连续追错",
-        ],
-        "acceptance_checks": [
-            "周一刷新后必须能区分有效突破、假突破和冷却跳过",
-            "有信号无账户操作时必须写明 no-op 原因",
-            "修复前不进入长桥模拟账户候选",
-        ],
-        "advance_after_fix": "假突破过滤通过且冷却生效后，先进入 0.10 倍修复试验",
     },
     {
         "runtime_id": "M10-PA-004-MBF-QC-1d",

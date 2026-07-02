@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
@@ -12,6 +14,7 @@ from scripts.m15_longbridge_realtime_market_event_ingestor_lib import (
     RealtimeMarketEventIngestorConfig,
     build_kline_args,
     load_config,
+    run_longbridge_json,
     run_realtime_market_event_ingestor,
 )
 from scripts.m15_longbridge_realtime_signal_router_lib import load_config as load_router_config
@@ -85,6 +88,82 @@ class M15LongbridgeRealtimeMarketEventIngestorTest(unittest.TestCase):
             self.assertEqual(payload["new_market_event_count"], 0)
             self.assertEqual(len(events), 2)
             self.assertEqual(ledger[0]["ingest_status"], "duplicate_market_event_skipped")
+
+    def test_ingestor_rotates_large_market_event_file_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = replace(
+                self.make_config(root, symbols=("AAPL",), timeframes=("1d",)),
+                max_market_event_file_bytes=4000,
+                keep_market_event_lines=2,
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    {
+                        "event_id": f"old-{idx}",
+                        "symbol": "OLD",
+                        "timeframe": "1d",
+                        "event_time": f"2026-06-03T13:0{idx}:00Z",
+                        "padding": "x" * 1000,
+                    }
+                    for idx in range(5)
+                ],
+            )
+
+            payload = run_realtime_market_event_ingestor(
+                config,
+                generated_at="2026-06-04T14:00:01Z",
+                command_runner=lambda *_args: self.kline_rows(),
+                cli_path="/usr/bin/longbridge",
+            )
+            events = self.read_jsonl(root / "market_events.jsonl")
+            archives = list((root / "archive").glob("market_events.*.archived.jsonl"))
+
+            self.assertEqual(payload["new_market_event_count"], 2)
+            self.assertTrue(payload["market_event_archive_before"])
+            self.assertTrue(archives)
+            self.assertEqual([row["event_id"] for row in events[:2]], ["old-3", "old-4"])
+            self.assertEqual(len(events), 4)
+
+    def test_kline_timeout_is_retried_before_deferred(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = replace(self.make_config(root, symbols=("AAPL",), timeframes=("1d",)), kline_retry_attempts=2, kline_retry_sleep_seconds=0)
+            calls = 0
+
+            def flaky_runner(_cli_path: str, _args: list[str], _timeout: int):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise RuntimeError("Error: connect timeout")
+                return self.kline_rows()
+
+            payload = run_realtime_market_event_ingestor(
+                config,
+                generated_at="2026-06-04T14:00:01Z",
+                command_runner=flaky_runner,
+                cli_path="/usr/bin/longbridge",
+            )
+            ledger = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(calls, 2)
+            self.assertEqual(payload["deferred_count"], 0)
+            self.assertEqual(payload["new_market_event_count"], 2)
+            self.assertEqual(ledger[0]["retry_attempts"], 2)
+
+    def test_longbridge_cli_timeout_kills_process_group(self) -> None:
+        process = mock.Mock()
+        process.pid = 12345
+        process.communicate.side_effect = [subprocess.TimeoutExpired(cmd=["longbridge"], timeout=2), ("", "")]
+
+        with mock.patch("scripts.m15_longbridge_realtime_market_event_ingestor_lib.subprocess.Popen", return_value=process):
+            with mock.patch("scripts.m15_longbridge_realtime_market_event_ingestor_lib.os.killpg") as killpg:
+                with self.assertRaisesRegex(RuntimeError, "timed out after 2s"):
+                    run_longbridge_json("/usr/bin/longbridge", ["kline", "AAPL.US", "--format", "json"], 2)
+
+        killpg.assert_called_once_with(12345, 9)
+        self.assertEqual(process.communicate.call_count, 2)
 
     def test_readonly_guard_blocks_forbidden_command_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -250,6 +329,9 @@ class M15LongbridgeRealtimeMarketEventIngestorTest(unittest.TestCase):
 
     def write_json(self, path: Path, payload: dict) -> None:
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def write_jsonl(self, path: Path, rows: list[dict]) -> None:
+        path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
 
     def read_jsonl(self, path: Path) -> list[dict]:
         if not path.exists():

@@ -8,7 +8,9 @@
   "longbridge_account_state": {
     "cli_name": "longbridge",
     "required_account_channel": "lb_papertrading",
-    "cli_timeout_seconds": 6
+    "cli_timeout_seconds": 6,
+    "historical_order_start_date": "2026-06-01",
+    "unfilled_order_detail_lookup_limit": 120
   },
   "hard_boundaries": {
     "paper_simulated_only": true,
