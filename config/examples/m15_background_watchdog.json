@@ -17,6 +17,7 @@
     "paper_simulated_only": true,
     "live_execution": false,
     "real_money_actions": false,
-    "manual_m12_37_once": false
+    "manual_m12_37_once": false,
+    "margin_financing": false
   }
 }

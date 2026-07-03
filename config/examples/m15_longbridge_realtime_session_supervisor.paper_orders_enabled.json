@@ -48,6 +48,7 @@
     "local_simulation_as_signal_source": false,
     "manual_m12_37_once": false,
     "legacy_fast_queue_as_order_source": false,
-    "account_or_order_commands_in_ingestor": false
+    "account_or_order_commands_in_ingestor": false,
+    "margin_financing": false
   }
 }

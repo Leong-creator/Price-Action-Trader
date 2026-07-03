@@ -204,6 +204,7 @@ class RealtimeExecutionConfig:
     allow_fractional_shares: bool
     allow_short_selling: bool
     allow_options: bool
+    allow_margin_financing: bool
     minimum_net_profit_after_fees: Decimal
     normal_minimum_net_profit_after_fees: Decimal
     minimum_reward_r: Decimal
@@ -386,6 +387,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
         allow_fractional_shares=bool(account_model.get("allow_fractional_shares", False)),
         allow_short_selling=bool(account_model.get("allow_short_selling", False)),
         allow_options=bool(account_model.get("allow_options", False)),
+        allow_margin_financing=bool(account_model.get("allow_margin_financing", False)),
         minimum_net_profit_after_fees=decimal(account_model.get("minimum_net_profit_after_fees", "2")),
         normal_minimum_net_profit_after_fees=decimal(
             account_model.get("normal_minimum_net_profit_after_fees", "5")
@@ -522,6 +524,8 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
         raise ValueError("M15 realtime execution forbids short selling")
     if config.allow_options:
         raise ValueError("M15 realtime execution forbids options")
+    if config.allow_margin_financing:
+        raise ValueError("M15 realtime execution forbids margin financing")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime execution must stay paper/simulated only")
     if config.hard_boundaries.get("live_execution", False):
@@ -947,6 +951,9 @@ def evaluate_signal_event(
     max_risk = min(config.max_risk_per_order, bucket.max_risk_per_order) if bucket else config.max_risk_per_order
     max_symbol_exposure = bucket.max_symbol_exposure if bucket else config.max_symbol_exposure
     max_total_exposure = bucket.max_total_exposure if bucket else config.max_total_exposure
+    order_currency = order_currency_for_symbol(symbol)
+    order_currency_cash = order_currency_available_cash(account_state, order_currency)
+    order_currency_cash_after_order = order_currency_cash - notional if side == "buy" else order_currency_cash
     bucket_symbol_exposure = (
         existing_submitted_exposure.get((capital_bucket, symbol), ZERO)
         + selected_bucket_symbol_exposure.get((capital_bucket, symbol), ZERO)
@@ -964,6 +971,8 @@ def evaluate_signal_event(
         blockers.append("blocked_total_exposure_over_cap")
     if side == "buy" and available_cash(account_state) - notional < ZERO:
         blockers.append("blocked_cash_reserve")
+    if side == "buy" and not config.allow_margin_financing and order_currency_cash_after_order < ZERO:
+        blockers.append("blocked_margin_financing_disabled")
     reward_r = reward_r_ratio(limit_price, stop_price, target_price) if side == "buy" else ZERO
     minimum_reward_r = runtime_minimum_reward_r(config, runtime_id, strategy_id) if side == "buy" else ZERO
     minimum_net_profit = runtime_minimum_net_profit(config, runtime_id, strategy_id) if side == "buy" else ZERO
@@ -1046,6 +1055,10 @@ def evaluate_signal_event(
         "bucket_max_total_exposure": fmt_money(max_total_exposure),
         "bucket_max_symbol_exposure": fmt_money(max_symbol_exposure),
         "bucket_max_risk_per_order": fmt_money(max_risk),
+        "order_currency": order_currency,
+        "order_currency_available_cash": fmt_money(order_currency_cash),
+        "order_currency_cash_after_order": fmt_money(order_currency_cash_after_order),
+        "margin_financing_allowed": config.allow_margin_financing,
         "confluence_support_count": int_decimal(signal.get("confluence_support_count", "0")),
         "confluence_multiplier": fmt_decimal(decimal(signal.get("confluence_multiplier", "1"))),
         "high_quality_signal": signal_is_high_quality(signal),
@@ -1418,6 +1431,34 @@ def available_cash(account_state: dict[str, Any]) -> Decimal:
             if key in assets:
                 return decimal(assets.get(key, "0"))
     return ZERO
+
+
+def order_currency_for_symbol(symbol: str) -> str:
+    text = str(symbol or "").upper()
+    if text.endswith(".HK"):
+        return "HKD"
+    if text.endswith(".SG"):
+        return "SGD"
+    return "USD"
+
+
+def order_currency_available_cash(account_state: dict[str, Any], currency: str) -> Decimal:
+    currency_key = str(currency or "USD").upper()
+    currency_cash = account_state.get("currency_cash")
+    if isinstance(currency_cash, dict):
+        row = currency_cash.get(currency_key)
+        if isinstance(row, dict):
+            for key in ("available_cash", "withdraw_cash", "cash", "total_cash"):
+                if key in row:
+                    return decimal(row.get(key, "0"))
+    direct_key = f"{currency_key.lower()}_available_cash"
+    if direct_key in account_state:
+        return decimal(account_state.get(direct_key, "0"))
+    if currency_key == "USD":
+        for key in ("usd_cash", "usd_total_cash"):
+            if key in account_state:
+                return decimal(account_state.get(key, "0"))
+    return available_cash(account_state)
 
 
 def held_symbol_quantities(account_state: dict[str, Any]) -> dict[str, Decimal]:

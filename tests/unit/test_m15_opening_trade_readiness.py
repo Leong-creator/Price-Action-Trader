@@ -131,6 +131,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
                 "allow_fractional_shares": False,
                 "allow_short_selling": False,
                 "allow_options": False,
+                "allow_margin_financing": False,
                 "minimum_net_profit_after_fees": "0",
             },
             "runtime_layering": {
@@ -147,6 +148,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
                 "fractional_shares": False,
                 "short_selling": False,
                 "options": False,
+                "margin_financing": False,
             },
         }
         execution_config.write_text(json.dumps(execution_payload), encoding="utf-8")
@@ -181,6 +183,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
                 "real_money_actions": False,
                 "local_simulation_as_signal_source": False,
                 "manual_m12_37_once": False,
+                "margin_financing": False,
             },
         }
         supervisor_config.write_text(json.dumps(supervisor_payload), encoding="utf-8")

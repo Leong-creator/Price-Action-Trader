@@ -610,6 +610,39 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertIn("blocked_symbol_exposure_over_cap", rows["exposure"]["blockers"])
             self.assertNotIn("dup", rows)
 
+    def test_us_buy_blocks_margin_financing_even_when_total_cash_is_high(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                account_state={
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "cash": "100000",
+                    "buying_power": "100000",
+                    "currency_cash": {
+                        "USD": {
+                            "available_cash": "-8728.61",
+                            "total_cash": "-8537.25",
+                            "settling_cash": "-11771.44",
+                            "frozen_cash": "191.36",
+                        },
+                        "HKD": {"available_cash": "722057.68"},
+                    },
+                    "live_execution": False,
+                    "real_money_actions": False,
+                },
+            )
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="usd-margin")])
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertIn("blocked_margin_financing_disabled", rows[0]["blockers"])
+            self.assertEqual(rows[0]["order_currency"], "USD")
+            self.assertEqual(rows[0]["order_currency_available_cash"], "-8728.61")
+            self.assertEqual(rows[0]["submission_status"], "blocked_not_submitted")
+
     def test_existing_longbridge_position_or_open_order_does_not_block_new_bucket_buy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

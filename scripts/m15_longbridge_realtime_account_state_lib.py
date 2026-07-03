@@ -661,6 +661,8 @@ def build_account_state(
     total_open_order_notional = sum(open_order_notional.values(), ZERO)
     cash = available_cash(assets)
     buying_power = available_buying_power(assets)
+    currency_cash = currency_cash_snapshot(assets)
+    usd_cash = currency_cash.get("USD", {})
     account_total_equity, account_total_equity_source = account_total_equity_estimate(
         assets,
         cash=cash,
@@ -686,6 +688,11 @@ def build_account_state(
         "paper_account_verified": bool(auth.get("ok")) and channel == config.required_account_channel,
         "cash": fmt_money(cash),
         "buying_power": fmt_money(buying_power),
+        "currency_cash": currency_cash,
+        "usd_available_cash": usd_cash.get("available_cash", ""),
+        "usd_total_cash": usd_cash.get("total_cash", ""),
+        "usd_settling_cash": usd_cash.get("settling_cash", ""),
+        "usd_frozen_cash": usd_cash.get("frozen_cash", ""),
         "account_total_equity_estimate": fmt_money(account_total_equity),
         "account_total_equity_source": account_total_equity_source,
         "held_symbols": sorted(held_symbol_set(position_rows)),
@@ -1399,6 +1406,28 @@ def available_cash(assets: dict[str, Any]) -> Decimal:
     if not rows:
         return ZERO
     return first_decimal(rows[0], ("cash", "available_cash", "total_cash", "buy_power", "buying_power"))
+
+
+def currency_cash_snapshot(assets: dict[str, Any]) -> dict[str, dict[str, str]]:
+    payload = assets.get("json")
+    rows = payload if isinstance(payload, list) else []
+    if not rows or not isinstance(rows[0], dict):
+        return {}
+    snapshot: dict[str, dict[str, str]] = {}
+    for row in rows[0].get("cash_infos", []) or []:
+        if not isinstance(row, dict):
+            continue
+        currency = str(row.get("currency") or "").upper()
+        if not currency:
+            continue
+        snapshot[currency] = {
+            "available_cash": fmt_money(first_decimal(row, ("available_cash", "cash", "withdraw_cash"))),
+            "total_cash": fmt_money(first_decimal(row, ("total_cash", "cash", "available_cash", "withdraw_cash"))),
+            "settling_cash": fmt_money(first_decimal(row, ("settling_cash",))),
+            "frozen_cash": fmt_money(first_decimal(row, ("frozen_cash",))),
+            "withdraw_cash": fmt_money(first_decimal(row, ("withdraw_cash", "available_cash"))),
+        }
+    return snapshot
 
 
 def account_total_equity_estimate(

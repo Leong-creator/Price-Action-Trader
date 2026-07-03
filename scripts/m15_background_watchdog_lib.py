@@ -94,7 +94,7 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog command timeout must be positive")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 background watchdog must stay paper/simulated only")
-    for key in ("live_execution", "real_money_actions", "manual_m12_37_once"):
+    for key in ("live_execution", "real_money_actions", "manual_m12_37_once", "margin_financing"):
         if config.hard_boundaries.get(key, False):
             raise ValueError(f"M15 background watchdog cannot enable {key}")
 

@@ -167,6 +167,7 @@
     "allow_fractional_shares": false,
     "allow_short_selling": false,
     "allow_options": false,
+    "allow_margin_financing": false,
     "minimum_net_profit_after_fees": "5",
     "normal_minimum_net_profit_after_fees": "8",
     "minimum_reward_r": "1.5",
@@ -223,6 +224,7 @@
     "manual_m12_37_once": false,
     "fractional_shares": false,
     "short_selling": false,
-    "options": false
+    "options": false,
+    "margin_financing": false
   }
 }

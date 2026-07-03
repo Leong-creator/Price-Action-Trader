@@ -159,6 +159,8 @@ def validate_config(config: RealtimeSessionSupervisorConfig) -> None:
         raise ValueError("M15 realtime session supervisor cannot use local simulation as signal source")
     if config.hard_boundaries.get("manual_m12_37_once", False):
         raise ValueError("M15 realtime session supervisor cannot enable manual M12.37 once-mode")
+    if config.hard_boundaries.get("margin_financing", False):
+        raise ValueError("M15 realtime session supervisor cannot enable margin financing")
 
 
 def parse_market_holidays(values: list[str]) -> frozenset[date]:

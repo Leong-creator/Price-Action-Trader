@@ -232,6 +232,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "fractional_shares": False,
             "short_selling": False,
             "options": False,
+            "margin_financing": False,
             "manual_m12_37_once": False,
             "local_simulation_as_order_source": False,
         },
@@ -293,6 +294,7 @@ def order_safety_ok(execution_config: Any) -> bool:
         and not execution_config.allow_fractional_shares
         and not execution_config.allow_short_selling
         and not execution_config.allow_options
+        and not execution_config.allow_margin_financing
     )
 
 
@@ -302,6 +304,7 @@ def paper_only_boundaries_ok(execution_payload: dict[str, Any], supervisor_bound
         boundaries.get("paper_simulated_only") is True
         and boundaries.get("live_execution") is False
         and boundaries.get("real_money_actions") is False
+        and boundaries.get("margin_financing") is False
         and supervisor_boundaries.get("paper_simulated_only") is True
         and supervisor_boundaries.get("live_execution") is False
         and supervisor_boundaries.get("real_money_actions") is False
