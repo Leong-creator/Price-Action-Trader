@@ -923,14 +923,14 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                             "M10-PA-011-ORB-R1-5m",
                         ],
                         "virtual_capital_buckets": [
-                            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "runtime_ids": ["M10-PA-004-long-1d"]},
-                            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
-                            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
-                            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
-                            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "runtime_ids": ["M10-PA-004-MBF-1d"]},
-                            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "runtime_ids": ["M10-PA-004-MBF-QC-1d"]},
-                            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "runtime_ids": ["M10-PA-013-5m"]},
-                            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "runtime_ids": ["M10-PA-011-ORB-R1-5m"]},
+                            {"capital_bucket": "pa004_long", "label": "PA004-long单仓（M10-PA-004-long-1d）", "runtime_ids": ["M10-PA-004-long-1d"]},
+                            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓（M10-PA-002-5m）", "runtime_ids": ["M10-PA-002-5m"]},
+                            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓（M12-FTD-001-baseline-1d）", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
+                            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
+                            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓（M10-PA-004-MBF-1d）", "runtime_ids": ["M10-PA-004-MBF-1d"]},
+                            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓（M10-PA-004-MBF-QC-1d）", "runtime_ids": ["M10-PA-004-MBF-QC-1d"]},
+                            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓（M10-PA-013-5m）", "runtime_ids": ["M10-PA-013-5m"]},
+                            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓（M10-PA-011-ORB-R1-5m）", "runtime_ids": ["M10-PA-011-ORB-R1-5m"]},
                         ],
                         "plain_language_result": "长桥实时链路有 1 条实时信号通过风控，但当前是只读演练，未提交订单。",
                     },
@@ -1910,9 +1910,9 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             "status": "waiting_runtime_refresh",
         }
         configured_buckets = [
-            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "runtime_ids": ["M10-PA-004-long-1d"]},
-            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
-            {"capital_bucket": "experimental", "label": "统一实验仓", "runtime_ids": ["M10-PA-002-1d"]},
+            {"capital_bucket": "pa004_long", "label": "PA004-long单仓（M10-PA-004-long-1d）", "runtime_ids": ["M10-PA-004-long-1d"]},
+            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓（M10-PA-002-5m）", "runtime_ids": ["M10-PA-002-5m"]},
+            {"capital_bucket": "experimental", "label": "统一实验仓（M10-PA-002-1d）", "runtime_ids": ["M10-PA-002-1d"]},
         ]
 
         rows = m15_longbridge_virtual_bucket_rows(
@@ -2055,14 +2055,14 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 "M10-PA-011-ORB-R1-5m",
             ],
             "virtual_capital_bucket_definitions": [
-                {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "runtime_ids": ["M10-PA-004-long-1d"]},
-                {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
-                {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
-                {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
-                {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "runtime_ids": ["M10-PA-004-MBF-1d"]},
-                {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "runtime_ids": ["M10-PA-004-MBF-QC-1d"]},
-                {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "runtime_ids": ["M10-PA-013-5m"]},
-                {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "runtime_ids": ["M10-PA-011-ORB-R1-5m"]},
+                {"capital_bucket": "pa004_long", "label": "PA004-long单仓（M10-PA-004-long-1d）", "runtime_ids": ["M10-PA-004-long-1d"]},
+                {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓（M10-PA-002-5m）", "runtime_ids": ["M10-PA-002-5m"]},
+                {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓（M12-FTD-001-baseline-1d）", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
+                {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
+                {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓（M10-PA-004-MBF-1d）", "runtime_ids": ["M10-PA-004-MBF-1d"]},
+                {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓（M10-PA-004-MBF-QC-1d）", "runtime_ids": ["M10-PA-004-MBF-QC-1d"]},
+                {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓（M10-PA-013-5m）", "runtime_ids": ["M10-PA-013-5m"]},
+                {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓（M10-PA-011-ORB-R1-5m）", "runtime_ids": ["M10-PA-011-ORB-R1-5m"]},
             ],
         }
 
@@ -2077,7 +2077,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         broken = {
             **longbridge,
             "virtual_capital_bucket_definitions": [
-                {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "runtime_ids": ["M10-PA-002-5m"]},
+                {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓（M10-PA-002-5m）", "runtime_ids": ["M10-PA-002-5m"]},
             ],
         }
         broken_rows = {

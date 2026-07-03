@@ -5649,15 +5649,15 @@ def m15_longbridge_virtual_bucket_rows(
     bucket_defs = configured_bucket_defs if use_configured_epoch and configured_bucket_defs else realtime.get("virtual_capital_buckets", [])
     if not isinstance(bucket_defs, list) or not bucket_defs:
         bucket_defs = [
-            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "experimental", "label": "统一实验仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1000.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_long", "label": "PA004-long单仓（M10-PA-004-long-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓（M10-PA-002-5m）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓（M12-FTD-001-baseline-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓（M10-PA-004-MBF-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓（M10-PA-004-MBF-QC-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓（M10-PA-013-5m）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓（M10-PA-011-ORB-R1-5m）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "experimental", "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1000.00", "used_exposure": "0.00"},
         ]
     bucket_performance = (
         m15_virtual_bucket_performance_from_order_reconciliation(order_reconciliation or {}, reconciliation or {}, epoch_id)

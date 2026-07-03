@@ -956,7 +956,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 allowed_runtime_ids=["M10-PA-002-1d"],
                 virtual_capital_buckets={
                     "experimental": {
-                        "label": "统一实验仓",
+                        "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
                         "equity": "10000",
                         "max_total_exposure": "6000",
                         "max_symbol_exposure": "1000",
@@ -975,7 +975,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                         runtime_id="M10-PA-002-1d",
                         strategy_id="M10-PA-002",
                         capital_bucket="experimental",
-                        capital_bucket_label="统一实验仓",
+                        capital_bucket_label="统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
                     ),
                 ],
             )
@@ -994,7 +994,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 allowed_runtime_ids=["M10-PA-002-5m"],
                 virtual_capital_buckets={
                     "pa002_5m": {
-                        "label": "PA002-5m单仓",
+                        "label": "PA002-5m单仓（M10-PA-002-5m）",
                         "equity": "10000",
                         "max_total_exposure": "6000",
                         "max_symbol_exposure": "1500",
@@ -1013,7 +1013,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                         runtime_id="M10-PA-002-5m",
                         strategy_id="M10-PA-002",
                         capital_bucket="pa002_5m",
-                        capital_bucket_label="PA002-5m单仓",
+                        capital_bucket_label="PA002-5m单仓（M10-PA-002-5m）",
                     ),
                 ],
             )

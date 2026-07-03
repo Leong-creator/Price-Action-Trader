@@ -561,7 +561,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 runtime_position_multipliers={"M10-PA-002-1d": "0.25"},
                 virtual_capital_buckets={
                     "experimental": {
-                        "label": "统一实验仓",
+                        "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
                         "equity": "10000",
                         "max_total_exposure": "6000",
                         "max_symbol_exposure": "1000",
@@ -597,7 +597,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
 
             self.assertEqual(payload["new_signal_event_count"], 1)
             self.assertEqual(signals[0]["capital_bucket"], "experimental")
-            self.assertEqual(signals[0]["capital_bucket_label"], "统一实验仓")
+            self.assertEqual(signals[0]["capital_bucket_label"], "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）")
             self.assertFalse(signals[0]["additional_bucket_route"])
 
     def test_pa002_5m_routes_to_dedicated_bucket_as_primary_runtime(self) -> None:
@@ -609,7 +609,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 runtime_position_multipliers={"M10-PA-002-5m": "1.0"},
                 virtual_capital_buckets={
                     "pa002_5m": {
-                        "label": "PA002-5m单仓",
+                        "label": "PA002-5m单仓（M10-PA-002-5m）",
                         "equity": "10000",
                         "max_total_exposure": "6000",
                         "max_symbol_exposure": "1500",
@@ -646,7 +646,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(payload["new_signal_event_count"], 1)
             self.assertEqual(signals[0]["runtime_id"], "M10-PA-002-5m")
             self.assertEqual(signals[0]["capital_bucket"], "pa002_5m")
-            self.assertEqual(signals[0]["capital_bucket_label"], "PA002-5m单仓")
+            self.assertEqual(signals[0]["capital_bucket_label"], "PA002-5m单仓（M10-PA-002-5m）")
             self.assertFalse(signals[0]["additional_bucket_route"])
 
     def test_confluence_merges_same_symbol_same_direction_and_boosts_size(self) -> None:

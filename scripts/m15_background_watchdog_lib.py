@@ -283,9 +283,10 @@ def render_markdown(payload: dict[str, Any]) -> str:
         "|---|---:|---:|---|",
     ]
     for step in payload.get("steps", []):
+        summary = markdown_table_cell(str(step.get("stdout_tail") or step.get("stderr_tail") or ""))[:120]
         lines.append(
-            f"| {step.get('label', '')} | {step.get('returncode', '')} | {step.get('elapsed_ms', '')} | "
-            f"{str(step.get('stdout_tail') or step.get('stderr_tail') or '')[:120]} |"
+            f"| {markdown_table_cell(str(step.get('label', '')))} | {step.get('returncode', '')} | "
+            f"{step.get('elapsed_ms', '')} | {summary} |"
         )
     lines.extend(
         [
@@ -299,6 +300,10 @@ def render_markdown(payload: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def markdown_table_cell(value: str) -> str:
+    return clean_text(value).replace("|", "\\|").replace("\n", "<br>")
 
 
 def run_command(command: list[str], timeout_seconds: int) -> subprocess.CompletedProcess[str]:

@@ -75,14 +75,14 @@ EXPERIMENT_CAPITAL_BUCKET_RUNTIME_IDS = (
 )
 
 SINGLE_STRATEGY_CAPITAL_BUCKET_SPECS = (
-    ("pa004_long", "PA004-long单仓", "M10-PA-004-long-1d"),
-    ("pa002_5m", "PA002-5m单仓", "M10-PA-002-5m"),
-    ("ftd_baseline", "FTD原版单仓", "M12-FTD-001-baseline-1d"),
-    ("ftd_loss_streak", "FTD连亏保护单仓", "M12-FTD-001-loss-streak-guard-1d"),
-    ("pa004_mbf", "PA004-MBF单仓", "M10-PA-004-MBF-1d"),
-    ("pa004_mbf_qc", "PA004-MBF-QC单仓", "M10-PA-004-MBF-QC-1d"),
-    ("pa013_5m", "PA013-5m单仓", "M10-PA-013-5m"),
-    ("pa011_orb_r1", "PA011-ORB-R1单仓", "M10-PA-011-ORB-R1-5m"),
+    ("pa004_long", "PA004-long单仓（M10-PA-004-long-1d）", "M10-PA-004-long-1d"),
+    ("pa002_5m", "PA002-5m单仓（M10-PA-002-5m）", "M10-PA-002-5m"),
+    ("ftd_baseline", "FTD原版单仓（M12-FTD-001-baseline-1d）", "M12-FTD-001-baseline-1d"),
+    ("ftd_loss_streak", "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "M12-FTD-001-loss-streak-guard-1d"),
+    ("pa004_mbf", "PA004-MBF单仓（M10-PA-004-MBF-1d）", "M10-PA-004-MBF-1d"),
+    ("pa004_mbf_qc", "PA004-MBF-QC单仓（M10-PA-004-MBF-QC-1d）", "M10-PA-004-MBF-QC-1d"),
+    ("pa013_5m", "PA013-5m单仓（M10-PA-013-5m）", "M10-PA-013-5m"),
+    ("pa011_orb_r1", "PA011-ORB-R1单仓（M10-PA-011-ORB-R1-5m）", "M10-PA-011-ORB-R1-5m"),
 )
 
 AUXILIARY_STRATEGY_IDS = {
@@ -439,7 +439,7 @@ def parse_virtual_capital_buckets(
                 "runtime_ids": [runtime_id],
             }
         raw["experimental"] = {
-            "label": "统一实验仓",
+            "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
             "equity": "10000",
             "max_total_exposure": "6000",
             "max_symbol_exposure": "1000",
