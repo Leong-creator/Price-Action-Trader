@@ -161,8 +161,8 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-002-5m", "strategy_id": "M10-PA-002", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-002 五分钟账户", "variant_id": "base"},
     {"account_id": "M10-PA-004-long-1d", "strategy_id": "M10-PA-004", "timeframe": "1d", "lane": "mainline", "display_name": "M10-PA-004 只做多日线账户", "variant_id": "long_only"},
     {"account_id": "M10-PA-012-5m", "strategy_id": "M10-PA-012", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-012 五分钟账户", "variant_id": "base"},
-    {"account_id": "M12-FTD-001-baseline-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001 原版日线账户", "variant_id": "baseline"},
-    {"account_id": "M12-FTD-001-loss-streak-guard-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001 连亏保护日线账户", "variant_id": "loss_streak_guard"},
+    {"account_id": "M12-FTD-001-baseline-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001-baseline-1d 原版日线账户", "variant_id": "baseline"},
+    {"account_id": "M12-FTD-001-loss-streak-guard-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001-loss-streak-guard-1d 连亏保护日线账户", "variant_id": "loss_streak_guard"},
     {"account_id": "M10-PA-005-1d", "strategy_id": "M10-PA-005", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-005 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-005-5m", "strategy_id": "M10-PA-005", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-005 五分钟实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-007-1d", "strategy_id": "M10-PA-007", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-007 日线实验账户", "variant_id": "base"},
@@ -2850,11 +2850,15 @@ def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[s
         "schema_version": "m12.46.ftd-account-monitor.v1",
         "stage": "M12.46.ftd_account_monitor",
         "accounts": rows,
-        "current_plain_status": f"FTD001 对照：原版 {baseline['today_total_pnl'] if baseline else '暂无'} / 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}",
+        "current_plain_status": (
+            "FTD001 对照："
+            f"M12-FTD-001-baseline-1d 原版 {baseline['today_total_pnl'] if baseline else '暂无'} / "
+            f"M12-FTD-001-loss-streak-guard-1d 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}"
+        ),
         "risk_flags": risk_flags,
         "plain_language_summary": (
-            f"FTD001 原版今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
-            f"连亏保护版今日 {guard['today_total_pnl'] if guard else '暂无'}；"
+            f"FTD001 原版（M12-FTD-001-baseline-1d）今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
+            f"FTD001 连亏保护（M12-FTD-001-loss-streak-guard-1d）今日 {guard['today_total_pnl'] if guard else '暂无'}；"
             f"重点看当前模拟回撤、连亏和是否过度触发。"
         ),
         "paper_simulated_only": True,
@@ -5646,6 +5650,11 @@ def m15_longbridge_virtual_bucket_rows(
         row for row in realtime_ledger
         if not epoch_id or str(row.get("test_epoch_id") or "") == epoch_id
     ]
+    configured_bucket_by_id: dict[str, dict[str, Any]] = {
+        str(bucket.get("capital_bucket") or bucket.get("bucket_id") or ""): bucket
+        for bucket in (configured_bucket_defs or [])
+        if isinstance(bucket, dict) and str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+    }
     bucket_defs = configured_bucket_defs if use_configured_epoch and configured_bucket_defs else realtime.get("virtual_capital_buckets", [])
     if not isinstance(bucket_defs, list) or not bucket_defs:
         bucket_defs = [
@@ -5688,6 +5697,8 @@ def m15_longbridge_virtual_bucket_rows(
         if not isinstance(bucket, dict):
             continue
         bucket_id = str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+        configured_bucket = configured_bucket_by_id.get(bucket_id, {})
+        bucket_label = str(configured_bucket.get("label") or bucket.get("label") or bucket_id)
         bucket_rows = [row for row in active_rows if str(row.get("capital_bucket") or "") == bucket_id]
         submitted_buys = [
             row for row in bucket_rows
@@ -5707,7 +5718,7 @@ def m15_longbridge_virtual_bucket_rows(
         rows.append(
             {
                 "capital_bucket": bucket_id,
-                "label": str(bucket.get("label") or bucket_id),
+                "label": bucket_label,
                 "test_epoch_id": epoch_id or "未生成",
                 "epoch_status": epoch_status,
                 "equity": str(bucket.get("equity") or "10000.00"),
@@ -6832,7 +6843,8 @@ def build_ftd_plain_summary(card: dict[str, str] | None, rows: list[dict[str, st
     direction = "盈利" if today_pnl > ZERO else "亏损" if today_pnl < ZERO else "持平"
     symbols = ", ".join(sorted({row["symbol"] for row in rows})[:8]) or "暂无"
     return (
-        f"FTD001 今天触发 {len(rows)} 条，股票：{symbols}，"
+        "FTD001（M12-FTD-001-baseline-1d / M12-FTD-001-loss-streak-guard-1d）"
+        f"今天触发 {len(rows)} 条，股票：{symbols}，"
         f"当前模拟{direction} {money(today_pnl)}。重点风险：{'，'.join(risk_flags)}。"
     )
 
@@ -7044,8 +7056,8 @@ def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
         "",
         "| 版本 | 今日盈亏 | 当前权益 | 当前胜率 | 当前最大回撤 |",
         "|---|---:|---:|---:|---:|",
-        f"| 原版 baseline | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('win_rate_percent', '')}% | {baseline.get('max_drawdown_percent', '')}% |",
-        f"| 连亏保护 loss_streak_guard | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('win_rate_percent', '')}% | {guard.get('max_drawdown_percent', '')}% |",
+        f"| M12-FTD-001-baseline-1d 原版 | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('win_rate_percent', '')}% | {baseline.get('max_drawdown_percent', '')}% |",
+        f"| M12-FTD-001-loss-streak-guard-1d 连亏保护 | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('win_rate_percent', '')}% | {guard.get('max_drawdown_percent', '')}% |",
         "",
         f"- 风险标记：{'，'.join(monitor['risk_flags'])}",
     ]
@@ -7749,7 +7761,11 @@ def extended_session_row_html(row: dict[str, str]) -> str:
 
 
 def ftd_account_row_html(row: dict[str, str]) -> str:
-    label = "原版 baseline" if row["variant_id"] == "baseline" else "连亏保护 loss_streak_guard"
+    label = (
+        "M12-FTD-001-baseline-1d 原版"
+        if row["variant_id"] == "baseline"
+        else "M12-FTD-001-loss-streak-guard-1d 连亏保护"
+    )
     return (
         "<tr>"
         f"<td>{html.escape(label)}</td>"

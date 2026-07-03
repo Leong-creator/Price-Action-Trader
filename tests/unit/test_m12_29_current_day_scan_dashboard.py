@@ -35,10 +35,12 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     build_dedicated_bucket_runtime_review_rows,
     build_local_simulation_history_quality,
     build_extended_session_monitor,
+    build_ftd_plain_summary,
     build_longbridge_paper_dashboard_view,
     build_quote_lookup,
     current_us_scan_date,
     filter_rescue_signal_rows,
+    ftd_account_row_html,
     load_config,
     is_longbridge_non_degraded_freshness_notice,
     market_session_status,
@@ -1933,6 +1935,38 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(by_bucket["pa002_5m"]["epoch_status"], "waiting_runtime_refresh")
         self.assertIn("新单策略仓", by_bucket["pa002_5m"]["note"])
 
+    def test_longbridge_virtual_bucket_rows_prefer_configured_labels_when_epoch_matches(self):
+        realtime = {
+            "test_epoch": {"test_epoch_id": "m15-single-strategy-buckets-20260702", "status": "active"},
+            "virtual_capital_buckets": [
+                {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
+                {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
+            ],
+        }
+        configured_epoch = {
+            "test_epoch_id": "m15-single-strategy-buckets-20260702",
+            "status": "waiting_runtime_refresh",
+        }
+        configured_buckets = [
+            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓（M12-FTD-001-baseline-1d）", "runtime_ids": ["M12-FTD-001-baseline-1d"]},
+            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "runtime_ids": ["M12-FTD-001-loss-streak-guard-1d"]},
+        ]
+
+        rows = m15_longbridge_virtual_bucket_rows(
+            realtime,
+            [],
+            {"test_epoch_id": "m15-single-strategy-buckets-20260702", "status": "active"},
+            configured_bucket_defs=configured_buckets,
+            configured_epoch=configured_epoch,
+        )
+        by_bucket = {row["capital_bucket"]: row for row in rows}
+
+        self.assertEqual(by_bucket["ftd_baseline"]["label"], "FTD原版单仓（M12-FTD-001-baseline-1d）")
+        self.assertEqual(
+            by_bucket["ftd_loss_streak"]["label"],
+            "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）",
+        )
+
     def test_longbridge_virtual_bucket_rows_count_only_actual_fills_when_reconciled(self):
         realtime = {
             "virtual_capital_buckets": [
@@ -2363,10 +2397,41 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         _, result, output_dir = self.run_stage()
         monitor = result["dashboard"]["ftd001_monitor"]
         self.assertEqual([row["variant_id"] for row in monitor["accounts"]], ["baseline", "loss_streak_guard"])
-        self.assertIn("原版", monitor["plain_language_summary"])
-        self.assertIn("连亏保护", monitor["plain_language_summary"])
+        self.assertIn("M12-FTD-001-baseline-1d", monitor["plain_language_summary"])
+        self.assertIn("M12-FTD-001-loss-streak-guard-1d", monitor["plain_language_summary"])
         self.assertTrue((output_dir / "m12_36_ftd001_monitor.json").exists())
         self.assertTrue((output_dir / "m12_46_supporting_rule_ab_results.json").exists())
+
+    def test_ftd_labels_include_runtime_ids_without_full_stage(self):
+        summary = build_ftd_plain_summary(
+            {"strategy_id": "M12-FTD-001"},
+            [{"symbol": "AAPL"}],
+            Decimal("1.23"),
+            ["risk_clear"],
+        )
+        baseline_html = ftd_account_row_html(
+            {
+                "variant_id": "baseline",
+                "today_total_pnl": "1.23",
+                "equity": "10001.23",
+                "win_rate_percent": "50",
+                "max_drawdown_percent": "1.0",
+            }
+        )
+        guard_html = ftd_account_row_html(
+            {
+                "variant_id": "loss_streak_guard",
+                "today_total_pnl": "1.23",
+                "equity": "10001.23",
+                "win_rate_percent": "50",
+                "max_drawdown_percent": "1.0",
+            }
+        )
+
+        self.assertIn("M12-FTD-001-baseline-1d", summary)
+        self.assertIn("M12-FTD-001-loss-streak-guard-1d", summary)
+        self.assertIn("M12-FTD-001-baseline-1d", baseline_html)
+        self.assertIn("M12-FTD-001-loss-streak-guard-1d", guard_html)
 
     def test_runtime_trade_view_and_detail_views_use_runtime_id_not_real_account_terms(self):
         _, result, output_dir = self.run_stage()
