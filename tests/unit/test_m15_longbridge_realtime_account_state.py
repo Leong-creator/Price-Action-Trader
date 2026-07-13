@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts.m15_longbridge_realtime_account_state_lib import (
@@ -20,13 +21,27 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
     build_order_reconciliation,
     enrich_order_reconciliation_with_stale_cleanup,
     load_config,
+    longbridge_account_pnl_market_date,
     parse_json,
+    historical_order_history_refresh_due,
     preserve_previous_holding_prices_if_degraded,
+    refresh_trusted_order_history,
+    restore_historical_order_history_if_unavailable,
     run_realtime_account_state,
 )
 
 
 class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
+    def test_account_pnl_market_date_uses_new_york_trading_date_after_utc_midnight(self) -> None:
+        self.assertEqual(
+            longbridge_account_pnl_market_date(datetime(2026, 7, 7, 2, 15, tzinfo=UTC)),
+            "2026-07-06",
+        )
+        self.assertEqual(
+            longbridge_account_pnl_market_date(datetime(2026, 7, 7, 14, 0, tzinfo=UTC)),
+            "2026-07-07",
+        )
+
     def test_reads_paper_account_state_without_order_submit_or_local_simulation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -106,6 +121,9 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
             self.assertTrue(payload["pnl_reconciliation_ok"])
             self.assertEqual(payload["account_total_pnl_estimate"], "15.50")
             self.assertEqual(payload["longbridge_stock_total_pnl"], "12.00")
+            self.assertEqual(payload["app_display_today_pnl"], "等待长桥字段对齐")
+            self.assertEqual(payload["net_asset_intraday_pnl"], "15.50")
+            self.assertEqual(payload["account_today_total_pnl"], "15.50")
             self.assertEqual(reconciliation["account_pnl"]["ending_asset_value"], "10215.50")
             self.assertEqual(reconciliation["trading_pnl"]["stock_total_pnl"], "12.00")
             self.assertEqual(reconciliation["trading_pnl"]["current_position_unrealized_pnl"], "10.00")
@@ -136,6 +154,27 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
 
             self.assertEqual(payload["account_status"], "account_channel_not_paper")
             self.assertIn("account_channel_not_paper", payload["blockers"])
+
+    def test_hot_refresh_reads_only_order_safety_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            commands: list[list[str]] = []
+
+            payload = run_realtime_account_state(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                command_runner=self.runner(commands=commands),
+                refresh_historical_order_history=False,
+                refresh_analytics=False,
+            )
+
+            self.assertEqual(payload["analytics_refresh_status"], "deferred_to_background")
+            self.assertEqual(payload["account_status"], "paper_account_ready")
+            self.assertTrue(payload["paper_account_verified"])
+            self.assertFalse(any("history" in command for command in commands))
+            self.assertFalse(any(command[1:2] == ["portfolio"] for command in commands))
+            self.assertFalse(any(command[1:2] == ["profit-analysis"] for command in commands))
 
     def test_command_guard_rejects_submit_or_cancel_shapes(self) -> None:
         with self.assertRaisesRegex(ValueError, "cannot submit or cancel"):
@@ -199,6 +238,143 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
         self.assertEqual(preserved["trading_pnl"]["current_position_unrealized_pnl"], "3.00")
         self.assertTrue(preserved["source_status"]["portfolio_price_snapshot_degraded"])
         self.assertTrue(preserved["source_status"]["holding_prices_restored_from_previous_reconciliation"])
+
+    def test_preserves_previous_holding_prices_when_prev_close_is_zero_string(self) -> None:
+        current = {
+            "generated_at": "2026-07-01T12:00:00Z",
+            "current_holdings": [
+                {"symbol": "A.US", "quantity": "1", "cost_price": "10", "market_price": "10", "prev_close": "0"},
+                {"symbol": "B.US", "quantity": "1", "cost_price": "20", "market_price": "20", "prev_close": "0.00"},
+                {"symbol": "C.US", "quantity": "1", "cost_price": "30", "market_price": "30", "prev_close": "0"},
+            ],
+            "account_snapshot": {
+                "portfolio_total_pl": "0",
+                "portfolio_total_today_pl": "0",
+                "app_like_market_value": "60",
+                "app_like_total_asset": "10060",
+            },
+            "trading_pnl": {
+                "stock_total_pnl": "100.00",
+                "realized_pnl_estimate": "100.00",
+                "current_position_unrealized_pnl": "0.00",
+            },
+            "source_status": {"portfolio_ok": True},
+        }
+        previous = {
+            "generated_at": "2026-07-01T11:59:00Z",
+            "current_holdings": [
+                {"symbol": "A.US", "quantity": "1", "cost_price": "10", "market_price": "11", "prev_close": "10.5"},
+                {"symbol": "B.US", "quantity": "1", "cost_price": "20", "market_price": "19", "prev_close": "20.5"},
+                {"symbol": "C.US", "quantity": "1", "cost_price": "30", "market_price": "33", "prev_close": "31"},
+            ],
+            "account_snapshot": {
+                "portfolio_total_pl": "3.00",
+                "portfolio_total_today_pl": "1.50",
+                "app_like_market_value": "63.00",
+                "app_like_total_asset": "10063.00",
+            },
+            "trading_pnl": {
+                "stock_total_pnl": "100.00",
+                "realized_pnl_estimate": "97.00",
+                "current_position_unrealized_pnl": "3.00",
+            },
+        }
+
+        preserved = preserve_previous_holding_prices_if_degraded(current, previous)
+
+        self.assertEqual(preserved["account_snapshot"]["portfolio_total_pl"], "3.00")
+        self.assertEqual(preserved["trading_pnl"]["current_position_unrealized_pnl"], "3.00")
+        self.assertTrue(preserved["source_status"]["portfolio_price_snapshot_degraded"])
+
+    def test_marks_degraded_snapshot_when_no_trustworthy_previous_snapshot_exists(self) -> None:
+        current = {
+            "current_holdings": [
+                {"symbol": "A.US", "quantity": "1", "cost_price": "10", "market_price": "10", "prev_close": None},
+                {"symbol": "B.US", "quantity": "1", "cost_price": "20", "market_price": "20", "prev_close": None},
+                {"symbol": "C.US", "quantity": "1", "cost_price": "30", "market_price": "30", "prev_close": None},
+            ],
+            "account_snapshot": {"portfolio_total_pl": "0", "portfolio_total_today_pl": "0"},
+            "source_status": {},
+        }
+
+        preserved = preserve_previous_holding_prices_if_degraded(current, {})
+
+        self.assertEqual(preserved["account_snapshot"]["portfolio_total_pl"], "0")
+        self.assertTrue(preserved["source_status"]["portfolio_price_snapshot_degraded"])
+        self.assertFalse(preserved["source_status"]["holding_price_snapshot_available"])
+        self.assertNotIn("holding_prices_restored_from_previous_reconciliation", preserved["source_status"])
+
+    def test_restores_historical_orders_from_cache_when_longbridge_history_read_fails(self) -> None:
+        orders, executions = restore_historical_order_history_if_unavailable(
+            {"ok": False, "json": {}, "stderr": "timed out"},
+            {"ok": False, "json": {}, "stderr": "timed out"},
+            {
+                "generated_at": "2026-07-10T10:00:00Z",
+                "historical_orders": [{"order_id": "o-1"}],
+                "historical_executions": [{"order_id": "o-1", "trade_id": "t-1"}],
+            },
+        )
+
+        self.assertFalse(orders["ok"])
+        self.assertTrue(orders["cache_used"])
+        self.assertEqual(orders["json"], [{"order_id": "o-1"}])
+        self.assertTrue(executions["cache_used"])
+        self.assertEqual(executions["cache_generated_at"], "2026-07-10T10:00:00Z")
+
+    def test_uses_recent_historical_order_cache_without_requerying(self) -> None:
+        self.assertFalse(
+            historical_order_history_refresh_due(
+                {
+                    "generated_at": "2026-07-10T10:00:00Z",
+                    "historical_orders": [],
+                    "historical_executions": [],
+                },
+                datetime(2026, 7, 10, 10, 4, 59, tzinfo=UTC),
+                300,
+            )
+        )
+
+    def test_reading_order_history_cache_does_not_extend_cache_freshness(self) -> None:
+        existing = {
+            "generated_at": "2026-07-10T10:00:00Z",
+            "historical_orders": [{"order_id": "o-1"}],
+            "historical_executions": [{"order_id": "o-1", "trade_id": "t-1"}],
+        }
+
+        refreshed = refresh_trusted_order_history(
+            existing,
+            {"ok": True, "json": existing["historical_orders"], "cache_used": True},
+            {"ok": True, "json": existing["historical_executions"], "cache_used": True},
+            "2026-07-10T10:04:00Z",
+        )
+
+        self.assertEqual(refreshed, existing)
+
+    def test_can_skip_historical_order_queries_for_realtime_execution_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            (config.output_dir / "m15_longbridge_last_trustworthy_order_history.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-07-10T10:00:00Z",
+                        "historical_orders": [{"order_id": "o-1", "status": "Filled"}],
+                        "historical_executions": [{"order_id": "o-1", "trade_id": "t-1"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            commands: list[list[str]] = []
+
+            run_realtime_account_state(
+                config,
+                generated_at="2026-07-10T10:10:00Z",
+                command_runner=self.runner(commands=commands),
+                refresh_historical_order_history=False,
+            )
+
+            self.assertFalse(any("--history" in command for command in commands))
 
     def test_order_reconciliation_includes_current_orders_missing_from_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -142,7 +142,10 @@ PRICE_ACTION_RUNTIME_SPECS = {
         "timeframe": "1d",
         "rule": "follow_through_day",
         "target_r": Decimal("1.50"),
-        "min_close_position": Decimal("0.55"),
+        "min_close_position": Decimal("0.70"),
+        "min_close_to_close_percent": Decimal("1.70"),
+        "min_volume_ratio": Decimal("1.15"),
+        "require_market_confirmation": True,
         "max_risk_percent": Decimal("6.00"),
     },
     "M12-FTD-001-loss-streak-guard-1d": {
@@ -150,7 +153,10 @@ PRICE_ACTION_RUNTIME_SPECS = {
         "timeframe": "1d",
         "rule": "follow_through_day",
         "target_r": Decimal("1.50"),
-        "min_close_position": Decimal("0.55"),
+        "min_close_position": Decimal("0.75"),
+        "min_close_to_close_percent": Decimal("2.00"),
+        "min_volume_ratio": Decimal("1.25"),
+        "require_market_confirmation": True,
         "max_risk_percent": Decimal("6.00"),
     },
 }
@@ -340,6 +346,7 @@ def run_realtime_signal_router(
     raw_intents.extend(detector_signal_candidates(config, market_events, generated_at=now))
     raw_intents = expand_additional_bucket_routes(config, raw_intents)
     routed_intents, merged_support_intents = merge_confluence_intents(config, raw_intents)
+    routed_intents = sorted(routed_intents, key=realtime_intent_sort_key)
     for support_intent in merged_support_intents:
         row, _signal = build_signal_from_intent(
             config=config,
@@ -405,6 +412,22 @@ def run_realtime_signal_router(
         "epoch_rebuilt_signal_count": sum(1 for signal in new_signal_events if signal.get("realtime_rebuilt_after_epoch_activation")),
         "confluence_primary_count": sum(1 for intent in routed_intents if decimal(intent.get("confluence_multiplier", "1")) > Decimal("1")),
         "confluence_merged_support_count": len(merged_support_intents),
+        "quality_sorted_candidate_count": len(routed_intents),
+        "market_confirmation_blocked_count": sum(
+            1 for row in ledger_rows if "blocked_market_confirmation_missing" in row.get("blockers", [])
+        ),
+        "quality_gate_blocked_count": sum(
+            1
+            for row in ledger_rows
+            if any(
+                reason in row.get("blockers", [])
+                for reason in (
+                    "blocked_close_position_below_runtime_minimum",
+                    "blocked_volume_ratio_below_runtime_minimum",
+                    "blocked_close_to_close_below_runtime_minimum",
+                )
+            )
+        ),
         "low_profit_blocked_count": sum(
             1 for row in ledger_rows if "blocked_fee_profit_below_minimum" in row.get("blockers", [])
         ),
@@ -773,6 +796,7 @@ def price_action_realtime_candidates(
                 spec=spec,
                 symbol=symbol,
                 rows=rows,
+                grouped_events=grouped_events,
                 generated_at=generated_at,
             )
             if signal:
@@ -786,6 +810,7 @@ def price_action_signal_for_runtime(
     spec: dict[str, Any],
     symbol: str,
     rows: list[dict[str, Any]],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
     generated_at: datetime,
 ) -> dict[str, Any] | None:
     if symbol in {"SQQQ", "TQQQ"}:
@@ -805,7 +830,13 @@ def price_action_signal_for_runtime(
     elif rule == "support_resistance_failure":
         signal = support_resistance_failure_signal(symbol, rows, spec=spec, generated_at=generated_at)
     elif rule == "follow_through_day":
-        signal = follow_through_day_signal(symbol, rows, spec=spec, generated_at=generated_at)
+        signal = follow_through_day_signal(
+            symbol,
+            rows,
+            spec=spec,
+            grouped_events=grouped_events,
+            generated_at=generated_at,
+        )
     else:
         signal = None
     if not signal:
@@ -1034,6 +1065,7 @@ def follow_through_day_signal(
     rows: list[dict[str, Any]],
     *,
     spec: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
     generated_at: datetime,
 ) -> dict[str, Any] | None:
     if len(rows) < 2:
@@ -1041,27 +1073,72 @@ def follow_through_day_signal(
     previous, latest = rows[-2], rows[-1]
     previous_close = decimal(previous.get("close", "0"))
     latest_close = decimal(latest.get("close", "0"))
-    previous_volume = decimal(previous.get("volume", "0"))
-    latest_volume = decimal(latest.get("volume", "0"))
     latest_low = decimal(latest.get("low", "0"))
-    if min(previous_close, latest_close, previous_volume, latest_volume, latest_low) <= ZERO:
+    if min(previous_close, latest_close, latest_low) <= ZERO:
         return None
-    close_to_close_percent = (latest_close - previous_close) / previous_close * HUNDRED
-    if close_to_close_percent < Decimal("1.25") or latest_volume <= previous_volume:
-        return None
-    if close_position(latest) < decimal(spec.get("min_close_position", "0.55")):
-        return None
-    return build_price_action_long_signal(
+    close_to_close_percent = row_close_to_close_percent(previous, latest)
+    volume_ratio = row_volume_ratio(previous, latest)
+    latest_close_position = close_position(latest)
+    min_close_to_close = decimal(spec.get("min_close_to_close_percent", "1.25"))
+    min_volume_ratio = decimal(spec.get("min_volume_ratio", "1.00"))
+    min_close_position = decimal(spec.get("min_close_position", "0.55"))
+    target_date = ny_event_date(latest)
+    market_confirmed, market_symbols = market_follow_through_confirmed(grouped_events, target_date)
+    pre_gate_blockers: list[str] = []
+    if spec.get("require_market_confirmation") and not market_confirmed:
+        pre_gate_blockers.append("blocked_market_confirmation_missing")
+    if close_to_close_percent < min_close_to_close:
+        pre_gate_blockers.append("blocked_close_to_close_below_runtime_minimum")
+    if volume_ratio < min_volume_ratio:
+        pre_gate_blockers.append("blocked_volume_ratio_below_runtime_minimum")
+    if latest_close_position < min_close_position:
+        pre_gate_blockers.append("blocked_close_position_below_runtime_minimum")
+    target_r = decimal(spec.get("target_r", "1.5"))
+    signal = build_price_action_long_signal(
         detector_id="ftd001_follow_through_day_realtime",
         symbol=symbol,
         latest=latest,
         entry=latest_close,
         stop=latest_low,
-        target_r=decimal(spec.get("target_r", "1.5")),
+        target_r=target_r,
         max_risk_percent=decimal(spec.get("max_risk_percent", "0")),
         order_type="limit",
         generated_at=generated_at,
     )
+    if not signal:
+        return None
+    risk_percent = (latest_close - latest_low) / latest_close * HUNDRED
+    quality_score = base_quality_score(
+        close_position_value=latest_close_position,
+        close_to_close_percent=close_to_close_percent,
+        volume_ratio=volume_ratio,
+        reward_r=target_r,
+        net_profit=(latest_close - latest_low) * target_r,
+        risk_percent=risk_percent,
+        market_confirmed=market_confirmed,
+    )
+    signal.update(
+        {
+            "close_position": fmt_decimal(latest_close_position),
+            "close_to_close_percent": fmt_decimal(close_to_close_percent),
+            "volume_ratio": fmt_decimal(volume_ratio),
+            "market_confirmation_status": "confirmed" if market_confirmed else "not_required",
+            "market_confirmation_symbols": market_symbols,
+            "pre_gate_blockers": pre_gate_blockers,
+            "quality_score": fmt_decimal(quality_score),
+            "signal_quality_score": fmt_decimal(quality_score),
+            "quality_score_components": {
+                "close_position": fmt_decimal(latest_close_position),
+                "close_to_close_percent": fmt_decimal(close_to_close_percent),
+                "volume_ratio": fmt_decimal(volume_ratio),
+                "reward_r": fmt_decimal(target_r),
+                "risk_percent": fmt_decimal(risk_percent),
+                "market_confirmed": market_confirmed,
+            },
+            "high_quality_signal": quality_score >= Decimal("80"),
+        }
+    )
+    return signal
 
 
 def build_price_action_long_signal(
@@ -1127,6 +1204,79 @@ def ny_event_date(row: dict[str, Any]) -> str:
         return value[:10]
 
 
+def row_volume_ratio(previous: dict[str, Any], latest: dict[str, Any]) -> Decimal:
+    previous_volume = decimal(previous.get("volume", "0"))
+    latest_volume = decimal(latest.get("volume", "0"))
+    if previous_volume <= ZERO or latest_volume <= ZERO:
+        return ZERO
+    return latest_volume / previous_volume
+
+
+def row_close_to_close_percent(previous: dict[str, Any], latest: dict[str, Any]) -> Decimal:
+    previous_close = decimal(previous.get("close", "0"))
+    latest_close = decimal(latest.get("close", "0"))
+    if previous_close <= ZERO or latest_close <= ZERO:
+        return ZERO
+    return (latest_close - previous_close) / previous_close * HUNDRED
+
+
+def market_follow_through_confirmed(
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    target_date: str,
+) -> tuple[bool, str]:
+    confirmed: list[str] = []
+    for symbol in ("SPY", "QQQ"):
+        rows = grouped_events.get((symbol, "1d"), [])
+        if len(rows) < 2:
+            continue
+        previous, latest = rows[-2], rows[-1]
+        if target_date and ny_event_date(latest) != target_date:
+            continue
+        if (
+            row_close_to_close_percent(previous, latest) >= Decimal("1.25")
+            and row_volume_ratio(previous, latest) > Decimal("1.00")
+            and close_position(latest) >= Decimal("0.60")
+        ):
+            confirmed.append(symbol)
+    return bool(confirmed), ",".join(confirmed)
+
+
+def base_quality_score(
+    *,
+    close_position_value: Decimal,
+    close_to_close_percent: Decimal,
+    volume_ratio: Decimal,
+    reward_r: Decimal = ZERO,
+    net_profit: Decimal = ZERO,
+    risk_percent: Decimal = ZERO,
+    market_confirmed: bool = False,
+) -> Decimal:
+    score = ZERO
+    score += min(max(close_position_value, ZERO), Decimal("1")) * Decimal("35")
+    score += min(max(close_to_close_percent, ZERO), Decimal("5")) / Decimal("5") * Decimal("20")
+    score += min(max(volume_ratio - Decimal("1"), ZERO), Decimal("1")) * Decimal("15")
+    score += min(max(reward_r - Decimal("1"), ZERO), Decimal("2")) / Decimal("2") * Decimal("10")
+    score += min(max(net_profit, ZERO), Decimal("40")) / Decimal("40") * Decimal("10")
+    if risk_percent > ZERO:
+        score += max(Decimal("0"), Decimal("10") - min(risk_percent, Decimal("10")))
+    if market_confirmed:
+        score += Decimal("10")
+    return min(score, Decimal("100"))
+
+
+def realtime_intent_sort_key(intent: dict[str, Any]) -> tuple[int, str, Decimal, Decimal, Decimal, str]:
+    side = str(intent.get("side") or intent.get("direction") or "").lower()
+    sell_priority = 0 if side in {"sell", "close", "exit_long", "stop_loss", "take_profit"} else 1
+    return (
+        sell_priority,
+        str(intent.get("capital_bucket") or ""),
+        -decimal(intent.get("quality_score", intent.get("signal_quality_score", "0"))),
+        -decimal(intent.get("net_profit_after_fees_at_target", "0")),
+        -decimal(intent.get("reward_r", "0")),
+        str(intent.get("symbol") or ""),
+    )
+
+
 def pa004_followthrough_long_signal(
     symbol: str,
     previous: dict[str, Any],
@@ -1146,18 +1296,33 @@ def pa004_followthrough_long_signal(
     close_to_close_percent = (close - previous_close) / previous_close * HUNDRED
     gap_percent = (open_price - previous_close) / previous_close * HUNDRED
     close_position = (close - low) / (high - low)
+    volume_ratio = row_volume_ratio(previous, latest)
     strong_followthrough = close_to_close_percent >= Decimal("3.00")
     strong_gap_hold = gap_percent >= Decimal("2.50") and close_to_close_percent >= Decimal("1.50")
     if not (strong_followthrough or strong_gap_hold):
         return None
-    if close_position < Decimal("0.25"):
-        return None
+    min_close_position = Decimal("0.65") if strong_gap_hold and not strong_followthrough else Decimal("0.60")
+    pre_gate_blockers: list[str] = []
+    if close_position < min_close_position:
+        pre_gate_blockers.append("blocked_close_position_below_runtime_minimum")
+    if volume_ratio < Decimal("1.10"):
+        pre_gate_blockers.append("blocked_volume_ratio_below_runtime_minimum")
     entry = close
     risk = max(entry - low, entry * Decimal("0.025"))
     if risk <= ZERO:
         return None
     stop = entry - risk
     target = entry + risk * Decimal("2")
+    risk_percent = risk / entry * HUNDRED
+    quality_score = base_quality_score(
+        close_position_value=close_position,
+        close_to_close_percent=close_to_close_percent,
+        volume_ratio=volume_ratio,
+        reward_r=Decimal("2"),
+        net_profit=target - entry,
+        risk_percent=risk_percent,
+        market_confirmed=False,
+    )
     return {
         "detector_id": "pa004_followthrough_long",
         "symbol": symbol,
@@ -1171,6 +1336,26 @@ def pa004_followthrough_long_signal(
         "source_market_event_id": str(latest.get("event_id") or latest.get("market_event_id") or ""),
         "market_event_time": str(latest.get("event_time") or latest.get("bar_time") or latest.get("timestamp") or ""),
         "created_at": str(latest.get("received_at") or to_iso(generated_at)),
+        "close_position": fmt_decimal(close_position),
+        "close_to_close_percent": fmt_decimal(close_to_close_percent),
+        "gap_percent": fmt_decimal(gap_percent),
+        "volume_ratio": fmt_decimal(volume_ratio),
+        "market_confirmation_status": "not_required",
+        "market_confirmation_symbols": "",
+        "pre_gate_blockers": pre_gate_blockers,
+        "quality_score": fmt_decimal(quality_score),
+        "signal_quality_score": fmt_decimal(quality_score),
+        "quality_score_components": {
+            "close_position": fmt_decimal(close_position),
+            "close_to_close_percent": fmt_decimal(close_to_close_percent),
+            "gap_percent": fmt_decimal(gap_percent),
+            "volume_ratio": fmt_decimal(volume_ratio),
+            "reward_r": "2",
+            "risk_percent": fmt_decimal(risk_percent),
+            "volume_requirement": "1.10",
+            "minimum_close_position": fmt_decimal(min_close_position),
+        },
+        "high_quality_signal": quality_score >= Decimal("80"),
     }
 
 
@@ -1221,6 +1406,8 @@ def build_signal_from_intent(
     target = decimal(intent.get("target_price", "0"))
     current = decimal(intent.get("current_price", entry))
     blockers = strategy_isolation_blockers(runtime_id, strategy_id, config.allowed_runtime_ids)
+    if isinstance(intent.get("pre_gate_blockers"), list):
+        blockers.extend(str(item) for item in intent.get("pre_gate_blockers", []) if str(item))
     if not source_event_id:
         blockers.append("missing_source_market_event_id")
     if not runtime_id:
@@ -1275,6 +1462,7 @@ def build_signal_from_intent(
     fees = config.commission_per_order_side * Decimal("2") + config.regulatory_fee_per_sell_order
     net_profit = gross_profit - fees
     reward_r = reward_r_ratio(entry, stop, target)
+    intent_quality_score = decimal(intent.get("quality_score", intent.get("signal_quality_score", "0")))
     minimum_reward_r = runtime_minimum_reward_r(config, runtime_id, strategy_id)
     minimum_net_profit = runtime_minimum_net_profit(config, runtime_id, strategy_id)
     profit_gate_status = profit_quality_gate(config, intent, net_profit, runtime_id, strategy_id)
@@ -1321,6 +1509,17 @@ def build_signal_from_intent(
         "net_profit_after_fees_at_target": fmt_money(net_profit),
         "profit_quality_gate": profit_gate_status,
         "reward_r": fmt_decimal(reward_r),
+        "quality_score": fmt_decimal(intent_quality_score),
+        "signal_quality_score": fmt_decimal(intent_quality_score),
+        "quality_score_components": intent.get("quality_score_components", {})
+        if isinstance(intent.get("quality_score_components"), dict)
+        else {},
+        "market_confirmation_status": str(intent.get("market_confirmation_status") or ""),
+        "market_confirmation_symbols": str(intent.get("market_confirmation_symbols") or ""),
+        "close_position": str(intent.get("close_position") or ""),
+        "close_to_close_percent": str(intent.get("close_to_close_percent") or ""),
+        "gap_percent": str(intent.get("gap_percent") or ""),
+        "volume_ratio": str(intent.get("volume_ratio") or ""),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
         "minimum_net_profit_after_fees": fmt_money(minimum_net_profit),
         "bucket_max_total_exposure": fmt_money(base_total_exposure),
@@ -1382,6 +1581,17 @@ def build_signal_from_intent(
         "net_profit_after_fees_at_target": fmt_money(net_profit),
         "profit_quality_gate": profit_gate_status,
         "reward_r": fmt_decimal(reward_r),
+        "quality_score": fmt_decimal(intent_quality_score),
+        "signal_quality_score": fmt_decimal(intent_quality_score),
+        "quality_score_components": intent.get("quality_score_components", {})
+        if isinstance(intent.get("quality_score_components"), dict)
+        else {},
+        "market_confirmation_status": str(intent.get("market_confirmation_status") or ""),
+        "market_confirmation_symbols": str(intent.get("market_confirmation_symbols") or ""),
+        "close_position": str(intent.get("close_position") or ""),
+        "close_to_close_percent": str(intent.get("close_to_close_percent") or ""),
+        "gap_percent": str(intent.get("gap_percent") or ""),
+        "volume_ratio": str(intent.get("volume_ratio") or ""),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
         "minimum_net_profit_after_fees": fmt_money(minimum_net_profit),
         "bucket_max_total_exposure": fmt_money(base_total_exposure),
@@ -1536,7 +1746,9 @@ def intent_is_high_quality(intent: dict[str, Any]) -> bool:
         if value in {"high", "strong", "excellent", "高质量", "强"}:
             return True
     score = decimal(intent.get("quality_score", intent.get("signal_quality_score", "0")))
-    return score >= Decimal("0.8")
+    if ZERO < score <= Decimal("1"):
+        return score >= Decimal("0.8")
+    return score >= Decimal("80")
 
 
 def int_decimal(value: Any) -> int:

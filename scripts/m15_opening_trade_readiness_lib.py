@@ -8,13 +8,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from scripts.m15_longbridge_realtime_execution_lib import SUMMARY_JSON as EXECUTION_SUMMARY_JSON
 from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config
 from scripts.m15_longbridge_realtime_execution_lib import parse_utc_datetime
+from scripts.m15_longbridge_realtime_execution_lib import read_jsonl as read_execution_jsonl
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     DEFAULT_CONFIG_PATH as DEFAULT_REALTIME_SUPERVISOR_CONFIG_PATH,
     build_window_state,
     load_config as load_realtime_supervisor_config,
     pid_path as realtime_pid_path,
+    supervisor_health_issues,
 )
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
@@ -110,6 +113,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         execution_config = None
         execution_config_error = str(exc)
     execution_payload = read_json_payload(config.execution_config_path)
+    execution_summary = read_json(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else {}
     account_state = read_json(config.realtime_account_state_path)
     realtime_status = read_json(config.realtime_supervisor_status_path)
     window = build_window_state(realtime_config, generated_at=generated_at)
@@ -122,6 +126,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     execution_config_linked = config.execution_config_path.resolve() == realtime_config.execution_config_path.resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     paper_account_ready = paper_account_verified(account_state)
+    realtime_health_issues = supervisor_health_issues(
+        realtime_config,
+        realtime_status,
+        expected_pid=realtime_pid,
+        process_alive_now=realtime_alive,
+    )
     stale_buy_orders = stale_buy_open_orders(
         cleanup_config,
         account_state,
@@ -130,13 +140,16 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     )
     cleanup_enabled = bool(getattr(realtime_config, "run_stale_order_cleanup", False))
     cleanup_failed = int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
+    actual_runtime_ids = execution_summary.get("runtime_ids_seen_this_cycle", []) if isinstance(execution_summary, dict) else []
+    recent_execution_inputs = build_recent_execution_inputs(execution_summary, execution_config)
     checks = [
         check_row("m12_47_daemon_alive", "M12.47 自动刷新守护器存活", "pass" if m12_alive else "fail", actual=str(m12_alive)),
         check_row(
             "m15_realtime_daemon_alive",
             "M15 长桥实时链路守护器存活",
-            "pass" if realtime_alive else "fail",
-            actual=pid_health_label(realtime_pid, realtime_alive, realtime_status_generated_at, realtime_status_age_seconds),
+            "pass" if realtime_alive and not realtime_health_issues else "fail",
+            actual=pid_health_label(realtime_pid, realtime_alive, realtime_status_generated_at, realtime_status_age_seconds)
+            + (f", issues={','.join(realtime_health_issues)}" if realtime_health_issues else ""),
         ),
         check_row(
             "regular_session_window",
@@ -188,6 +201,18 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             actual=f"whitelist={len(execution_config.allowed_runtime_ids) if execution_config else 0}",
         ),
         check_row(
+            "actual_runtime_ids_seen",
+            "值守检查必须展示最近真实执行涉及的 runtime",
+            "pass" if execution_summary else "fail",
+            actual=",".join(str(item) for item in actual_runtime_ids) or "none",
+        ),
+        check_row(
+            "recent_execution_input_seen",
+            "值守检查必须展示最近执行输入",
+            "pass" if recent_execution_inputs else "fail",
+            actual=render_recent_execution_inputs(recent_execution_inputs),
+        ),
+        check_row(
             "stale_open_buy_order_cleanup",
             "上一交易窗口遗留买入挂单必须在执行新信号前清理或阻断",
             "fail" if stale_buy_orders and (not cleanup_enabled or cleanup_failed) else "pass",
@@ -220,6 +245,9 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "m15_realtime_status_generated_at": realtime_status_generated_at,
         "m15_realtime_status_age_seconds": realtime_status_age_seconds,
         "paper_account_verified": paper_account_ready,
+        "execution_runtime_identity": execution_summary.get("runtime_identity", {}) if isinstance(execution_summary, dict) else {},
+        "actual_runtime_ids_seen": actual_runtime_ids,
+        "recent_execution_inputs": recent_execution_inputs,
         "pass_count": pass_count,
         "waiting_count": waiting_count,
         "fail_count": fail_count,
@@ -232,6 +260,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "fractional_shares": False,
             "short_selling": False,
             "options": False,
+            "margin_financing": False,
             "manual_m12_37_once": False,
             "local_simulation_as_order_source": False,
         },
@@ -239,6 +268,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "m12_47_status": project_path(config.m12_47_status_path),
             "realtime_supervisor_config": project_path(config.realtime_supervisor_config_path),
             "execution_config": project_path(config.execution_config_path),
+            "execution_summary": project_path(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else "",
             "realtime_account_state": project_path(config.realtime_account_state_path),
             "realtime_supervisor_status": project_path(config.realtime_supervisor_status_path),
         },
@@ -293,6 +323,7 @@ def order_safety_ok(execution_config: Any) -> bool:
         and not execution_config.allow_fractional_shares
         and not execution_config.allow_short_selling
         and not execution_config.allow_options
+        and not execution_config.allow_margin_financing
     )
 
 
@@ -302,6 +333,7 @@ def paper_only_boundaries_ok(execution_payload: dict[str, Any], supervisor_bound
         boundaries.get("paper_simulated_only") is True
         and boundaries.get("live_execution") is False
         and boundaries.get("real_money_actions") is False
+        and boundaries.get("margin_financing") is False
         and supervisor_boundaries.get("paper_simulated_only") is True
         and supervisor_boundaries.get("live_execution") is False
         and supervisor_boundaries.get("real_money_actions") is False
@@ -345,6 +377,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"- M12.47 daemon alive: `{payload['m12_47_daemon_alive']}`",
         f"- M15 realtime daemon alive: `{payload['m15_realtime_daemon_alive']}`",
         f"- Paper account verified: `{payload['paper_account_verified']}`",
+        f"- Actual runtimes seen: `{','.join(payload.get('actual_runtime_ids_seen', [])) or 'none'}`",
         f"- Pass / waiting / fail: `{payload['pass_count']}/{payload['waiting_count']}/{payload['fail_count']}`",
         f"- Result: {payload['plain_language_result']}",
         "",
@@ -366,6 +399,41 @@ def render_markdown(payload: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def build_recent_execution_inputs(
+    execution_summary: dict[str, Any],
+    execution_config: Any | None,
+    *,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    summary_rows = execution_summary.get("recent_execution_inputs", []) if isinstance(execution_summary, dict) else []
+    if isinstance(summary_rows, list):
+        normalized_rows = [row for row in summary_rows if isinstance(row, dict)]
+        if normalized_rows:
+            return normalized_rows[:limit]
+    if execution_config is None or not execution_config.realtime_signal_events_path.exists():
+        return []
+    rows = read_execution_jsonl(execution_config.realtime_signal_events_path)
+    return [
+        {
+            "signal_id": str(row.get("signal_id") or ""),
+            "runtime_id": str(row.get("runtime_id") or ""),
+            "symbol": str(row.get("symbol") or ""),
+            "created_at": str(row.get("created_at") or row.get("generated_at") or ""),
+        }
+        for row in rows[-limit:]
+        if isinstance(row, dict)
+    ]
+
+
+def render_recent_execution_inputs(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "none"
+    return "; ".join(
+        f"{row.get('signal_id', '')}/{row.get('runtime_id', '')}/{row.get('symbol', '')}/{row.get('created_at', '')}"
+        for row in rows
+    )
 
 
 def read_json(path: Path) -> dict[str, Any]:

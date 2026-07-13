@@ -431,6 +431,47 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(client.orders[1]["order_type"], "trigger_limit")
             self.assertEqual(client.orders[1]["trigger_price"], "101.00")
 
+    def test_trigger_limit_at_current_price_is_submitted_as_limit_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
+            client = FakeRealtimePaperClient()
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="trigger-at-market",
+                        symbol="LCID",
+                        order_type="trigger_limit",
+                        trigger_price="6.46",
+                        limit_price="6.46",
+                        current_price="6.46",
+                        stop_price="6.30",
+                        target_price="6.74",
+                        quantity="10",
+                    ),
+                ],
+            )
+
+            payload = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=client,
+            )
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["submitted_count"], 1)
+            self.assertEqual(client.orders[0]["order_type"], "limit")
+            self.assertNotIn("trigger_price", client.orders[0])
+            self.assertEqual(rows[0]["original_order_type"], "trigger_limit")
+            self.assertEqual(rows[0]["order_type"], "limit")
+            self.assertEqual(rows[0]["original_trigger_price"], "6.46")
+            self.assertEqual(rows[0]["trigger_price"], "")
+            self.assertEqual(
+                rows[0]["order_type_adjustment_status"],
+                "trigger_limit_downgraded_to_limit_trigger_already_reached",
+            )
+
     def test_longbridge_cli_client_builds_limit_and_trigger_commands(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -559,6 +600,64 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(payload["submitted_count"], 0)
             self.assertEqual(payload["unconfirmed_submission_count"], 1)
             self.assertEqual(rows[0]["submission_status"], "submit_unconfirmed_missing_order_id")
+            self.assertEqual(rows[0]["longbridge_order_id"], "")
+
+    def test_unconfirmed_submission_can_retry_same_signal_id_later(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
+
+            class EmptyResponseClient:
+                def submit_order(self, order_payload: dict) -> dict:
+                    return {"submitted": False, "status": "submit_unconfirmed_missing_order_id", "order_id": ""}
+
+            class ConfirmedClient:
+                def submit_order(self, order_payload: dict) -> dict:
+                    return {"submitted": True, "status": "submitted", "order_id": "LB-RETRY-1"}
+
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="sig-retry")])
+            first = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=EmptyResponseClient(),
+            )
+            second = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:02Z",
+                broker_client=ConfirmedClient(),
+            )
+            rows = [row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL) if row["signal_id"] == "sig-retry"]
+
+            self.assertEqual(first["submitted_count"], 0)
+            self.assertEqual(second["submitted_count"], 1)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[-1]["submission_status"], "submitted")
+            self.assertEqual(rows[-1]["longbridge_order_id"], "LB-RETRY-1")
+
+    def test_dry_run_signal_can_submit_later_when_orders_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dry_run_config = self.make_config(root, execute_orders=False, paper_trading_approval=False)
+            live_config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
+
+            class ConfirmedClient:
+                def submit_order(self, order_payload: dict) -> dict:
+                    return {"submitted": True, "status": "submitted", "order_id": "LB-DRYRUN-1"}
+
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="sig-dry-run")])
+            first = run_realtime_execution(dry_run_config, generated_at="2026-06-04T14:00:00Z")
+            second = run_realtime_execution(
+                live_config,
+                generated_at="2026-06-04T14:00:02Z",
+                broker_client=ConfirmedClient(),
+            )
+            rows = [row for row in self.read_jsonl(live_config.output_dir / LEDGER_JSONL) if row["signal_id"] == "sig-dry-run"]
+
+            self.assertEqual(first["submitted_count"], 0)
+            self.assertEqual(rows[0]["submission_status"], "dry_run_ready_not_submitted")
+            self.assertEqual(second["submitted_count"], 1)
+            self.assertEqual(rows[-1]["submission_status"], "submitted")
+            self.assertEqual(rows[-1]["longbridge_order_id"], "LB-DRYRUN-1")
 
     def test_longbridge_order_command_rejects_unsupported_side(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -587,10 +686,26 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 root / "signals.jsonl",
                 [
                     self.signal(signal_id="short", side="sell_short", direction="short"),
-                    self.signal(signal_id="below-one", quantity="0.9999", notional="99.99"),
+                    self.signal(signal_id="below-one", symbol="MSFT", quantity="0.9999", notional="99.99"),
                     self.signal(signal_id="option", symbol="AAPL250620C00100000"),
-                    self.signal(signal_id="risk", stop_price="79.00", target_price="140.00", net_profit_after_fees_at_target="40"),
-                    self.signal(signal_id="exposure", notional="1600", quantity="16", limit_price="100"),
+                    self.signal(
+                        signal_id="risk",
+                        symbol="GOOG",
+                        stop_price="79.00",
+                        target_price="140.00",
+                        net_profit_after_fees_at_target="40",
+                    ),
+                    self.signal(
+                        signal_id="exposure",
+                        symbol="EXPO",
+                        notional="1600",
+                        quantity="16",
+                        limit_price="100",
+                        stop_price="99.50",
+                        target_price="110.00",
+                        risk_amount="8.00",
+                        net_profit_after_fees_at_target="160.00",
+                    ),
                     self.signal(signal_id="dup"),
                 ],
             )
@@ -607,8 +722,102 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertNotIn("blocked_fractional_disabled", rows["below-one"]["blockers"])
             self.assertIn("blocked_options_disabled", rows["option"]["blockers"])
             self.assertIn("blocked_risk_over_cap", rows["risk"]["blockers"])
-            self.assertIn("blocked_symbol_exposure_over_cap", rows["exposure"]["blockers"])
+            self.assertEqual(rows["exposure"]["quantity"], "15")
+            self.assertEqual(rows["exposure"]["quantity_cap_adjustment_status"], "reduced_to_bucket_remaining_exposure")
+            self.assertNotIn("blocked_symbol_exposure_over_cap", rows["exposure"]["blockers"])
             self.assertNotIn("dup", rows)
+
+    def test_bucket_pressure_quality_gate_blocks_weak_last_capacity_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            self.write_jsonl(
+                config.output_dir / LEDGER_JSONL,
+                [
+                    {
+                        "signal_id": "existing",
+                        "submission_status": "submitted",
+                        "submitted_at": "2026-06-04T13:30:00Z",
+                        "side": "buy",
+                        "symbol": "HELD",
+                        "capital_bucket": "pa004_long",
+                        "quantity": "46",
+                        "limit_price": "100",
+                        "notional": "4600",
+                    }
+                ],
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="weak-pressure",
+                        symbol="WEAK",
+                        quality_score="50",
+                        quantity="1",
+                        limit_price="100",
+                        stop_price="95",
+                        target_price="115",
+                        net_profit_after_fees_at_target="15",
+                    ),
+                    self.signal(
+                        signal_id="strong-pressure",
+                        symbol="STRONG",
+                        quality_score="95",
+                        quantity="1",
+                        limit_price="100",
+                        stop_price="95",
+                        target_price="115",
+                        net_profit_after_fees_at_target="15",
+                    ),
+                ],
+            )
+
+            payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {
+                row["signal_id"]: row
+                for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+                if row.get("processed_at") == "2026-06-04T14:00:00Z"
+            }
+
+            self.assertEqual(payload["bucket_pressure_quality_blocked_count"], 1)
+            self.assertEqual(rows["strong-pressure"]["realtime_decision_status"], "latency_target_met_ready")
+            self.assertIn("blocked_bucket_pressure_quality_below_threshold", rows["weak-pressure"]["blockers"])
+            self.assertEqual(rows["weak-pressure"]["bucket_pressure_quality_threshold"], "80")
+
+    def test_us_buy_blocks_margin_financing_even_when_total_cash_is_high(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                account_state={
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "cash": "100000",
+                    "buying_power": "100000",
+                    "currency_cash": {
+                        "USD": {
+                            "available_cash": "-8728.61",
+                            "total_cash": "-8537.25",
+                            "settling_cash": "-11771.44",
+                            "frozen_cash": "191.36",
+                        },
+                        "HKD": {"available_cash": "722057.68"},
+                    },
+                    "live_execution": False,
+                    "real_money_actions": False,
+                },
+            )
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="usd-margin")])
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertIn("blocked_margin_financing_disabled", rows[0]["blockers"])
+            self.assertEqual(rows[0]["order_currency"], "USD")
+            self.assertEqual(rows[0]["order_currency_available_cash"], "-8728.61")
+            self.assertEqual(rows[0]["submission_status"], "blocked_not_submitted")
 
     def test_existing_longbridge_position_or_open_order_does_not_block_new_bucket_buy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -825,7 +1034,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
             main_bucket = next(row for row in payload["virtual_capital_buckets"] if row["capital_bucket"] == "pa004_long")
 
-            self.assertIn("blocked_total_exposure_over_cap", rows["new-msft"]["blockers"])
+            self.assertIn("blocked_bucket_remaining_exposure_below_one_share", rows["new-msft"]["blockers"])
             self.assertEqual(main_bucket["used_exposure"], "5950.00")
 
     def test_prior_session_filled_position_counts_toward_bucket_total_cap(self) -> None:
@@ -875,7 +1084,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
             rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
 
-            self.assertIn("blocked_total_exposure_over_cap", rows["new-msft"]["blockers"])
+            self.assertIn("blocked_bucket_remaining_exposure_below_one_share", rows["new-msft"]["blockers"])
 
     def test_same_cycle_same_symbol_second_buy_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -923,7 +1132,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 allowed_runtime_ids=["M10-PA-002-1d"],
                 virtual_capital_buckets={
                     "experimental": {
-                        "label": "统一实验仓",
+                        "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
                         "equity": "10000",
                         "max_total_exposure": "6000",
                         "max_symbol_exposure": "1000",
@@ -942,7 +1151,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                         runtime_id="M10-PA-002-1d",
                         strategy_id="M10-PA-002",
                         capital_bucket="experimental",
-                        capital_bucket_label="统一实验仓",
+                        capital_bucket_label="统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
                     ),
                 ],
             )
@@ -961,7 +1170,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 allowed_runtime_ids=["M10-PA-002-5m"],
                 virtual_capital_buckets={
                     "pa002_5m": {
-                        "label": "PA002-5m单仓",
+                        "label": "PA002-5m单仓（M10-PA-002-5m）",
                         "equity": "10000",
                         "max_total_exposure": "6000",
                         "max_symbol_exposure": "1500",
@@ -980,7 +1189,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                         runtime_id="M10-PA-002-5m",
                         strategy_id="M10-PA-002",
                         capital_bucket="pa002_5m",
-                        capital_bucket_label="PA002-5m单仓",
+                        capital_bucket_label="PA002-5m单仓（M10-PA-002-5m）",
                     ),
                 ],
             )
@@ -1309,7 +1518,95 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
             rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
 
-            self.assertIn("blocked_total_exposure_over_cap", rows["over-total"]["blockers"])
+            self.assertIn("blocked_bucket_remaining_exposure_below_one_share", rows["over-total"]["blockers"])
+
+    def test_buy_quantity_is_reduced_to_remaining_bucket_exposure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            self.write_jsonl(
+                config.output_dir / LEDGER_JSONL,
+                [
+                    {
+                        "signal_id": "main-bucket-near-cap",
+                        "submission_status": "submitted",
+                        "submitted_at": "2026-06-04T13:31:00Z",
+                        "side": "buy",
+                        "symbol": "SPY",
+                        "capital_bucket": "pa004_long",
+                        "quantity": "55",
+                        "notional": "5500.00",
+                    }
+                ],
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="fit-remaining-cap",
+                        symbol="MSFT",
+                        quantity="10",
+                        limit_price="100.00",
+                        stop_price="99.00",
+                        target_price="110.00",
+                        risk_amount="10.00",
+                        net_profit_after_fees_at_target="100.00",
+                    )
+                ],
+            )
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(rows["fit-remaining-cap"]["quantity"], "5")
+            self.assertEqual(rows["fit-remaining-cap"]["notional"], "500.00")
+            self.assertEqual(rows["fit-remaining-cap"]["quantity_before_bucket_cap"], "10")
+            self.assertEqual(rows["fit-remaining-cap"]["quantity_cap_adjustment_status"], "reduced_to_bucket_remaining_exposure")
+            self.assertNotIn("blocked_total_exposure_over_cap", rows["fit-remaining-cap"]["blockers"])
+
+    def test_buy_is_blocked_when_remaining_bucket_exposure_cannot_buy_one_share(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            self.write_jsonl(
+                config.output_dir / LEDGER_JSONL,
+                [
+                    {
+                        "signal_id": "main-bucket-full",
+                        "submission_status": "submitted",
+                        "submitted_at": "2026-06-04T13:31:00Z",
+                        "side": "buy",
+                        "symbol": "SPY",
+                        "capital_bucket": "pa004_long",
+                        "quantity": "59.5",
+                        "notional": "5950.00",
+                    }
+                ],
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="below-one-share-remaining",
+                        symbol="MSFT",
+                        quantity="10",
+                        limit_price="100.00",
+                        stop_price="99.00",
+                        target_price="110.00",
+                        risk_amount="10.00",
+                        net_profit_after_fees_at_target="100.00",
+                    )
+                ],
+            )
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(rows["below-one-share-remaining"]["quantity"], "0")
+            self.assertIn("blocked_bucket_remaining_exposure_below_one_share", rows["below-one-share-remaining"]["blockers"])
+            self.assertEqual(rows["below-one-share-remaining"]["submission_status"], "blocked_not_submitted")
 
     def test_non_paper_account_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1354,6 +1651,30 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(payload["session_started_at"], "2026-06-04T13:30:00Z")
             self.assertIn("blocked_delayed_signal_age_over_limit", rows["fresh"]["blockers"])
             self.assertIn("blocked_replay_signal_before_session_start", rows["old"]["blockers"])
+
+    def test_execution_summary_and_rows_include_run_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
+
+            class ConfirmedClient:
+                def submit_order(self, order_payload: dict) -> dict:
+                    return {"submitted": True, "status": "submitted", "order_id": "LB-IDENT-1"}
+
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="sig-ident")])
+            payload = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=ConfirmedClient(),
+            )
+            row = next(row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL) if row["signal_id"] == "sig-ident")
+
+            self.assertEqual(payload["runtime_identity"]["config_digest"], config.config_digest)
+            self.assertTrue(payload["runtime_identity"]["execution_run_id"])
+            self.assertEqual(payload["runtime_identity"]["session_run_id"], row["session_run_id"])
+            self.assertEqual(row["execution_config_digest"], config.config_digest)
+            self.assertTrue(row["execution_run_id"])
+            self.assertEqual(row["longbridge_order_id"], "LB-IDENT-1")
 
     def make_config(
         self,

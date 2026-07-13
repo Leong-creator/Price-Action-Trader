@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time as wall_time, timedelta
 from pathlib import Path
@@ -56,6 +57,8 @@ StepRunner = Callable[[str | None], dict[str, Any]]
 class RealtimeSessionSupervisorConfig:
     stage: str
     title: str
+    config_path: Path
+    config_digest: str
     output_dir: Path
     ingestor_config_path: Path
     router_config_path: Path
@@ -104,6 +107,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSessionSuperv
     return RealtimeSessionSupervisorConfig(
         stage=str(payload.get("stage", "M15.longbridge_realtime_session_supervisor")),
         title=str(payload.get("title", "长桥实时链路守护器")),
+        config_path=config_path,
+        config_digest=config_digest(config_path),
         output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
         ingestor_config_path=resolve_repo_path(inputs.get("ingestor_config", DEFAULT_INGESTOR_CONFIG_PATH)),
         router_config_path=resolve_repo_path(inputs.get("router_config", DEFAULT_ROUTER_CONFIG_PATH)),
@@ -159,6 +164,8 @@ def validate_config(config: RealtimeSessionSupervisorConfig) -> None:
         raise ValueError("M15 realtime session supervisor cannot use local simulation as signal source")
     if config.hard_boundaries.get("manual_m12_37_once", False):
         raise ValueError("M15 realtime session supervisor cannot enable manual M12.37 once-mode")
+    if config.hard_boundaries.get("margin_financing", False):
+        raise ValueError("M15 realtime session supervisor cannot enable margin financing")
 
 
 def parse_market_holidays(values: list[str]) -> frozenset[date]:
@@ -280,7 +287,11 @@ def run_realtime_session_once(
             try:
                 if account_state_runner is None:
                     account_state_config = account_state_config or load_account_state_config(config.account_state_config_path)
-                    account_state_payload = run_realtime_account_state(account_state_config, generated_at=generated_at_iso)
+                    account_state_payload = run_account_state_step(
+                        account_state_config,
+                        generated_at=generated_at_iso,
+                        refresh_analytics=False,
+                    )
                 else:
                     account_state_payload = account_state_runner(generated_at_iso)
                 elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
@@ -355,7 +366,8 @@ def run_realtime_session_once(
     else:
         status = "running"
         cycle_ran = True
-        steps = build_step_plan(
+        step_generated_at = generated_at_iso if generated_at else None
+        runners = build_step_runners(
             config,
             ingestor_runner,
             router_runner,
@@ -365,10 +377,21 @@ def run_realtime_session_once(
             execution_runner,
             str(window["session_started_at"]),
         )
-        for step_id, runner in steps:
+        ordered_step_ids = [
+            "market_event_ingestor",
+            "signal_router",
+            "account_state",
+            "stale_order_cleanup",
+            "position_manager",
+            "paper_execution",
+        ]
+        for step_id in ordered_step_ids:
+            runner = runners.get(step_id)
+            if runner is None:
+                continue
             started = datetime.now(UTC)
             try:
-                payload = runner(generated_at_iso)
+                payload = runner(step_generated_at)
                 elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
                 step_payloads[step_id] = payload
                 step_rows.append(
@@ -393,6 +416,37 @@ def run_realtime_session_once(
                 )
                 status = "cycle_failed"
                 break
+            if step_id == "stale_order_cleanup" and cleanup_requires_account_refresh(payload):
+                started = datetime.now(UTC)
+                try:
+                    refresh_runner = runners.get("account_state_after_cleanup")
+                    if refresh_runner is None:
+                        raise RuntimeError("missing account_state_after_cleanup runner")
+                    refresh_payload = refresh_runner(step_generated_at)
+                    elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+                    step_payloads["account_state_after_cleanup"] = refresh_payload
+                    step_rows.append(
+                        {
+                            "step_id": "account_state_after_cleanup",
+                            "status": "ok",
+                            "elapsed_ms": elapsed_ms,
+                            "summary": payload_summary("account_state_after_cleanup", refresh_payload),
+                        }
+                    )
+                except Exception as exc:  # pragma: no cover - runtime provider path
+                    elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+                    failure_state = "account_state_after_cleanup_failed"
+                    failure_reason = str(exc)[:500]
+                    step_rows.append(
+                        {
+                            "step_id": "account_state_after_cleanup",
+                            "status": "failed",
+                            "elapsed_ms": elapsed_ms,
+                            "error": failure_reason,
+                        }
+                    )
+                    status = "cycle_failed"
+                    break
         if not failure_state:
             status = "cycle_completed"
 
@@ -423,7 +477,7 @@ def run_realtime_session_once(
     return summary
 
 
-def build_step_plan(
+def build_step_runners(
     config: RealtimeSessionSupervisorConfig,
     ingestor_runner: StepRunner | None,
     router_runner: StepRunner | None,
@@ -432,8 +486,8 @@ def build_step_plan(
     position_manager_runner: StepRunner | None,
     execution_runner: StepRunner | None,
     session_started_at: str,
-) -> list[tuple[str, StepRunner]]:
-    steps: list[tuple[str, StepRunner]] = []
+) -> dict[str, StepRunner]:
+    steps: dict[str, StepRunner] = {}
     if config.run_ingestor:
         if ingestor_runner is None:
             def ingestor_runner(generated_at: str | None) -> dict[str, Any]:
@@ -441,7 +495,7 @@ def build_step_plan(
                 ingestor_config = replace(ingestor_config, session_started_at=session_started_at)
                 return run_realtime_market_event_ingestor(ingestor_config, generated_at=generated_at)
 
-        steps.append(("market_event_ingestor", ingestor_runner))
+        steps["market_event_ingestor"] = ingestor_runner
     if config.run_router:
         if router_runner is None:
             def router_runner(generated_at: str | None) -> dict[str, Any]:
@@ -449,14 +503,14 @@ def build_step_plan(
                 router_config = replace(router_config, session_started_at=session_started_at)
                 return run_realtime_signal_router(router_config, generated_at=generated_at)
 
-        steps.append(("signal_router", router_runner))
+        steps["signal_router"] = router_runner
     if config.run_account_state:
         if account_state_runner is None:
             def account_state_runner(generated_at: str | None) -> dict[str, Any]:
                 account_state_config = load_account_state_config(config.account_state_config_path)
-                return run_realtime_account_state(account_state_config, generated_at=generated_at)
+                return run_account_state_step(account_state_config, generated_at=generated_at, refresh_analytics=False)
 
-        steps.append(("account_state", account_state_runner))
+        steps["account_state"] = account_state_runner
     if config.run_stale_order_cleanup:
         if stale_order_cleanup_runner is None:
             def stale_order_cleanup_runner(generated_at: str | None) -> dict[str, Any]:
@@ -467,23 +521,23 @@ def build_step_plan(
                     session_started_at=session_started_at,
                 )
 
-        steps.append(("stale_order_cleanup", stale_order_cleanup_runner))
+        steps["stale_order_cleanup"] = stale_order_cleanup_runner
         if config.run_account_state:
             if account_state_runner is None:
                 def account_state_after_cleanup_runner(generated_at: str | None) -> dict[str, Any]:
                     account_state_config = load_account_state_config(config.account_state_config_path)
-                    return run_realtime_account_state(account_state_config, generated_at=generated_at)
+                    return run_account_state_step(account_state_config, generated_at=generated_at, refresh_analytics=False)
             else:
                 account_state_after_cleanup_runner = account_state_runner
 
-            steps.append(("account_state_after_cleanup", account_state_after_cleanup_runner))
+            steps["account_state_after_cleanup"] = account_state_after_cleanup_runner
     if config.run_position_manager:
         if position_manager_runner is None:
             def position_manager_runner(generated_at: str | None) -> dict[str, Any]:
                 position_manager_config = load_position_manager_config(config.position_manager_config_path)
                 return run_realtime_position_manager(position_manager_config, generated_at=generated_at)
 
-        steps.append(("position_manager", position_manager_runner))
+        steps["position_manager"] = position_manager_runner
     if config.run_execution:
         if execution_runner is None:
             def execution_runner(generated_at: str | None) -> dict[str, Any]:
@@ -491,8 +545,30 @@ def build_step_plan(
                 execution_config = replace(execution_config, session_started_at=session_started_at)
                 return run_realtime_execution(execution_config, generated_at=generated_at)
 
-        steps.append(("paper_execution", execution_runner))
+        steps["paper_execution"] = execution_runner
     return steps
+
+
+def cleanup_requires_account_refresh(payload: dict[str, Any]) -> bool:
+    return int_like(payload.get("canceled_count", 0)) > 0
+
+
+def run_account_state_step(account_state_config: Any, *, generated_at: str | None, refresh_analytics: bool) -> dict[str, Any]:
+    try:
+        return run_realtime_account_state(
+            account_state_config,
+            generated_at=generated_at,
+            refresh_historical_order_history=False,
+            refresh_analytics=refresh_analytics,
+        )
+    except TypeError as exc:
+        if "refresh_analytics" not in str(exc):
+            raise
+        return run_realtime_account_state(
+            account_state_config,
+            generated_at=generated_at,
+            refresh_historical_order_history=False,
+        )
 
 
 def build_status_payload(
@@ -550,7 +626,9 @@ def build_status_payload(
         "paper_simulated_only": True,
         "real_money_actions": False,
         "live_execution": False,
+        "runtime_identity": runtime_identity_payload(config, window),
         "inputs": {
+            "supervisor_config": project_path(config.config_path),
             "ingestor_config": project_path(config.ingestor_config_path),
             "router_config": project_path(config.router_config_path),
             "account_state_config": project_path(config.account_state_config_path),
@@ -559,6 +637,15 @@ def build_status_payload(
             "execution_config": project_path(config.execution_config_path),
             "local_simulation_ledger": "",
             "fast_signal_queue": "",
+        },
+        "input_config_digests": {
+            "supervisor_config": config.config_digest,
+            "ingestor_config": config_digest(config.ingestor_config_path),
+            "router_config": config_digest(config.router_config_path),
+            "account_state_config": config_digest(config.account_state_config_path),
+            "stale_order_cleanup_config": config_digest(config.stale_order_cleanup_config_path),
+            "position_manager_config": config_digest(config.position_manager_config_path),
+            "execution_config": config_digest(config.execution_config_path),
         },
         "outputs": {
             "supervisor_status": project_path(status_path(config)),
@@ -678,11 +765,14 @@ def apply_dashboard_longbridge_panel_overlay(dashboard: dict[str, Any], longbrid
         "长桥总盈亏",
         "长桥交易总盈亏",
         "长桥当日总盈亏",
-        "长桥App当日盈亏",
+        "长桥账户当日盈亏",
+        "长桥接口交易日盈亏",
         "长桥账户总盈亏",
+        "长桥接口净值日内变化",
     ):
         top_metrics.pop(legacy_key, None)
-    top_metrics["长桥账户当日盈亏"] = str(longbridge_context.get("longbridge_account_intraday_pnl") or longbridge_context.get("app_display_today_pnl") or "暂无")
+    top_metrics["长桥App当日盈亏"] = str(longbridge_context.get("longbridge_app_display_today_pnl") or "等待长桥字段对齐")
+    top_metrics["长桥接口净值日内变化"] = str(longbridge_context.get("longbridge_account_intraday_pnl") or "无法计算")
     top_metrics["长桥接口持仓今日浮动"] = str(longbridge_context.get("today_total_pnl", "暂无"))
     top_metrics["长桥当前持仓总盈亏"] = str(longbridge_context.get("total_pnl", "暂无"))
     top_metrics["长桥账户总资产"] = str(longbridge_context.get("account_total_equity_estimate", "暂无"))
@@ -757,6 +847,7 @@ def render_report(summary: dict[str, Any]) -> str:
         f"- 市场窗口: `{summary['window']['market_status']}`",
         f"- 是否运行交易循环: `{summary['cycle_ran']}`",
         f"- 结论: {summary['plain_language_result']}",
+        f"- 运行身份: `{summary.get('runtime_identity', {}).get('session_run_id', '')}`",
         "",
         "## 本轮步骤",
         "",
@@ -863,3 +954,57 @@ def int_like(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def config_digest(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def runtime_identity_payload(config: RealtimeSessionSupervisorConfig, window: dict[str, Any]) -> dict[str, Any]:
+    process_pid = os.getpid()
+    session_started_at = str(window.get("session_started_at") or "")
+    session_run_id = f"{session_started_at}|pid={process_pid}|cfg={config.config_digest[:12]}"
+    return {
+        "config_path": project_path(config.config_path),
+        "config_digest": config.config_digest,
+        "process_pid": process_pid,
+        "pid_file": project_path(pid_path(config)),
+        "session_started_at": session_started_at,
+        "session_run_id": session_run_id,
+    }
+
+
+def supervisor_health_issues(
+    config: RealtimeSessionSupervisorConfig,
+    payload: dict[str, Any],
+    *,
+    expected_pid: int | None,
+    process_alive_now: bool,
+) -> list[str]:
+    issues: list[str] = []
+    runtime_identity = payload.get("runtime_identity", {}) if isinstance(payload.get("runtime_identity"), dict) else {}
+    if not process_alive_now:
+        issues.append("process_not_alive")
+    if str(runtime_identity.get("config_path") or "") != project_path(config.config_path):
+        issues.append("supervisor_config_path_drift")
+    if str(runtime_identity.get("config_digest") or "") != config.config_digest:
+        issues.append("supervisor_config_digest_drift")
+    runtime_pid = int_like(runtime_identity.get("process_pid"))
+    if expected_pid and runtime_pid and runtime_pid != expected_pid:
+        issues.append("runtime_pid_mismatch")
+    stored_digests = payload.get("input_config_digests", {}) if isinstance(payload.get("input_config_digests"), dict) else {}
+    current_digests = {
+        "supervisor_config": config.config_digest,
+        "ingestor_config": config_digest(config.ingestor_config_path),
+        "router_config": config_digest(config.router_config_path),
+        "account_state_config": config_digest(config.account_state_config_path),
+        "stale_order_cleanup_config": config_digest(config.stale_order_cleanup_config_path),
+        "position_manager_config": config_digest(config.position_manager_config_path),
+        "execution_config": config_digest(config.execution_config_path),
+    }
+    for key, value in current_digests.items():
+        if str(stored_digests.get(key) or "") != value:
+            issues.append(f"{key}_digest_drift")
+    return issues

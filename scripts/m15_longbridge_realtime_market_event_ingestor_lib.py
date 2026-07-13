@@ -7,13 +7,14 @@ import signal
 import shutil
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable
 
-from scripts.longbridge_cli_env import build_longbridge_cli_env
+from scripts.longbridge_cli_env import build_longbridge_quote_cli_env
 from scripts.m12_liquid_universe_scanner_lib import US_LIQUID_SEED_V1
 from scripts.m12_readonly_auth_preflight_lib import _assert_readonly_command, clean_cli_text
 from scripts.m15_longbridge_realtime_execution_lib import (
@@ -62,6 +63,9 @@ class RealtimeMarketEventIngestorConfig:
     max_symbols_per_cycle: int
     symbol_cursor_path: Path
     timeframes: tuple[str, ...]
+    daily_refresh_interval_seconds: int
+    daily_refresh_state_path: Path
+    max_parallel_kline_requests: int
     kline_count: int
     kline_retry_attempts: int
     kline_retry_sleep_seconds: float
@@ -108,6 +112,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeMarketEventIn
         max_symbols_per_cycle=int(market_data.get("max_symbols_per_cycle", market_data.get("symbol_limit", 147))),
         symbol_cursor_path=resolve_repo_path(market_data.get("symbol_cursor_path", output_dir / "m15_realtime_symbol_cursor.json")),
         timeframes=tuple(str(item) for item in market_data.get("timeframes", ["1d", "5m"])),
+        daily_refresh_interval_seconds=int(market_data.get("daily_refresh_interval_seconds", 0)),
+        daily_refresh_state_path=resolve_repo_path(
+            market_data.get("daily_refresh_state_path", output_dir / "m15_realtime_daily_refresh_state.json")
+        ),
+        max_parallel_kline_requests=int(market_data.get("max_parallel_kline_requests", 1)),
         kline_count=int(market_data.get("kline_count", 2)),
         kline_retry_attempts=int(market_data.get("kline_retry_attempts", 3)),
         kline_retry_sleep_seconds=float(market_data.get("kline_retry_sleep_seconds", 0.2)),
@@ -140,6 +149,10 @@ def validate_config(config: RealtimeMarketEventIngestorConfig) -> None:
         raise ValueError("M15 realtime market event ingestor kline_retry_sleep_seconds cannot be negative")
     if config.watch_interval_seconds <= 0:
         raise ValueError("M15 realtime market event ingestor watch interval must be positive")
+    if config.daily_refresh_interval_seconds < 0:
+        raise ValueError("M15 realtime daily refresh interval cannot be negative")
+    if config.max_parallel_kline_requests <= 0:
+        raise ValueError("M15 realtime max parallel kline requests must be positive")
     if config.cli_timeout_seconds <= 0:
         raise ValueError("M15 realtime market event ingestor CLI timeout must be positive")
     if config.max_market_event_file_bytes <= 0:
@@ -188,24 +201,27 @@ def run_realtime_market_event_ingestor(
     binary = cli_path or shutil.which("longbridge")
     configured = configured_symbols(config)
     cycle_symbols = symbols_for_cycle(config, configured)
+    cycle_timeframes = timeframes_for_cycle(config, now)
 
     if binary is None:
         deferred_rows.append({"scope": "market_data", "reason": "longbridge_cli_missing"})
     else:
         runner = command_runner or run_longbridge_json
-        for symbol in cycle_symbols:
-            for timeframe in config.timeframes:
-                args = build_kline_args(config, symbol=symbol, timeframe=timeframe)
-                try:
-                    payload, retry_attempts_used = run_with_kline_retries(config, runner, binary, args)
-                except Exception as exc:  # pragma: no cover - runtime provider path
+        requests = [
+            (symbol, timeframe, build_kline_args(config, symbol=symbol, timeframe=timeframe))
+            for symbol in cycle_symbols
+            for timeframe in cycle_timeframes
+        ]
+        results = run_kline_requests(config, runner, binary, requests)
+        for symbol, timeframe, args, payload, retry_attempts_used, error in results:
+                if error:
                     ledger_rows.append(
                         {
                             "stage": config.stage,
                             "symbol": symbol,
                             "timeframe": timeframe,
                             "ingest_status": "deferred_longbridge_kline_failed",
-                            "reason": str(exc)[:300],
+                            "reason": error[:300],
                             "retry_attempts": config.kline_retry_attempts,
                             "readonly_command": ["longbridge", *args],
                         }
@@ -216,7 +232,7 @@ def run_realtime_market_event_ingestor(
                             "symbol": symbol,
                             "timeframe": timeframe,
                             "reason": "longbridge_kline_failed",
-                            "detail": str(exc)[:300],
+                            "detail": error[:300],
                         }
                     )
                     continue
@@ -286,6 +302,9 @@ def run_realtime_market_event_ingestor(
         "hot_symbols": list(config.hot_symbols),
         "max_symbols_per_cycle": config.max_symbols_per_cycle,
         "timeframes": list(config.timeframes),
+        "cycle_timeframes": list(cycle_timeframes),
+        "daily_refresh_interval_seconds": config.daily_refresh_interval_seconds,
+        "max_parallel_kline_requests": config.max_parallel_kline_requests,
         "kline_retry_attempts": config.kline_retry_attempts,
         "existing_market_event_count": len(existing_events),
         "new_market_event_count": len(new_events),
@@ -359,6 +378,56 @@ def symbols_for_cycle(config: RealtimeMarketEventIngestorConfig, symbols: tuple[
     return tuple(selected)
 
 
+def timeframes_for_cycle(config: RealtimeMarketEventIngestorConfig, now: datetime) -> tuple[str, ...]:
+    if "1d" not in config.timeframes or config.daily_refresh_interval_seconds == 0:
+        return config.timeframes
+    state = read_json(config.daily_refresh_state_path)
+    last_daily_refresh = parse_optional_datetime(str(state.get("last_daily_refresh_at") or ""))
+    elapsed_seconds = (now - last_daily_refresh).total_seconds() if last_daily_refresh else None
+    daily_due = last_daily_refresh is None or elapsed_seconds is None or elapsed_seconds >= config.daily_refresh_interval_seconds
+    if daily_due:
+        config.daily_refresh_state_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(
+            config.daily_refresh_state_path,
+            {
+                "schema_version": "m15.realtime-daily-refresh-state.v1",
+                "last_daily_refresh_at": to_iso(now),
+                "daily_refresh_interval_seconds": config.daily_refresh_interval_seconds,
+            },
+        )
+        return config.timeframes
+    return tuple(timeframe for timeframe in config.timeframes if timeframe != "1d")
+
+
+def parse_optional_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return parse_utc_datetime(value)
+    except ValueError:
+        return None
+
+
+def run_kline_requests(
+    config: RealtimeMarketEventIngestorConfig,
+    runner: CommandRunner,
+    cli_path: str,
+    requests: list[tuple[str, str, list[str]]],
+) -> list[tuple[str, str, list[str], Any, int, str]]:
+    def fetch(request: tuple[str, str, list[str]]) -> tuple[str, str, list[str], Any, int, str]:
+        symbol, timeframe, args = request
+        try:
+            payload, retry_attempts = run_with_kline_retries(config, runner, cli_path, args)
+            return symbol, timeframe, args, payload, retry_attempts, ""
+        except Exception as exc:  # pragma: no cover - provider failure behavior
+            return symbol, timeframe, args, [], config.kline_retry_attempts, str(exc)
+
+    if config.max_parallel_kline_requests == 1 or len(requests) < 2:
+        return [fetch(request) for request in requests]
+    with ThreadPoolExecutor(max_workers=min(config.max_parallel_kline_requests, len(requests))) as executor:
+        return list(executor.map(fetch, requests))
+
+
 def build_longbridge_symbol(symbol: str, market: str) -> str:
     return symbol if "." in symbol else f"{symbol}.{market.upper()}"
 
@@ -406,7 +475,7 @@ def run_longbridge_json(cli_path: str, args: list[str], timeout_seconds: int) ->
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env=build_longbridge_cli_env(),
+        env=build_longbridge_quote_cli_env(),
         start_new_session=True,
     )
     try:

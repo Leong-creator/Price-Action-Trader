@@ -22,6 +22,12 @@ from scripts.m15_longbridge_realtime_signal_router_lib import run_realtime_signa
 
 
 class M15LongbridgeRealtimeMarketEventIngestorTest(unittest.TestCase):
+    def test_checked_in_config_keeps_kline_timeout_headroom_and_retry(self) -> None:
+        config = load_config()
+
+        self.assertGreaterEqual(config.cli_timeout_seconds, 6)
+        self.assertGreaterEqual(config.kline_retry_attempts, 2)
+
     def test_ingestor_uses_readonly_kline_and_writes_market_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -236,6 +242,53 @@ class M15LongbridgeRealtimeMarketEventIngestorTest(unittest.TestCase):
             self.assertEqual(second["cycle_symbols"], ["NVDA", "MSFT"])
             self.assertEqual([command[1] for command in first_commands], ["NVDA.US", "AAPL.US"])
             self.assertEqual([command[1] for command in second_commands], ["NVDA.US", "MSFT.US"])
+
+    def test_daily_kline_is_throttled_without_delaying_five_minute_polling(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = replace(
+                self.make_config(root, symbols=("AAPL",), timeframes=("1d", "5m")),
+                daily_refresh_interval_seconds=900,
+                daily_refresh_state_path=root / "daily_refresh.json",
+            )
+            first_commands: list[list[str]] = []
+            second_commands: list[list[str]] = []
+
+            run_realtime_market_event_ingestor(
+                config,
+                generated_at="2026-06-04T14:00:01Z",
+                command_runner=lambda _cli, args, _timeout: first_commands.append(args) or self.kline_rows(),
+                cli_path="/usr/bin/longbridge",
+            )
+            second = run_realtime_market_event_ingestor(
+                config,
+                generated_at="2026-06-04T14:00:06Z",
+                command_runner=lambda _cli, args, _timeout: second_commands.append(args) or self.kline_rows(),
+                cli_path="/usr/bin/longbridge",
+            )
+
+            self.assertEqual([command[3] for command in first_commands], ["day", "5m"])
+            self.assertEqual([command[3] for command in second_commands], ["5m"])
+            self.assertEqual(second["cycle_timeframes"], ["5m"])
+
+    def test_parallel_requests_preserve_request_order_in_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = replace(
+                self.make_config(root, symbols=("AAPL", "MSFT"), timeframes=("5m",)),
+                max_parallel_kline_requests=2,
+            )
+
+            payload = run_realtime_market_event_ingestor(
+                config,
+                generated_at="2026-06-04T14:00:01Z",
+                command_runner=lambda _cli, _args, _timeout: self.kline_rows(),
+                cli_path="/usr/bin/longbridge",
+            )
+            ledger = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["max_parallel_kline_requests"], 2)
+            self.assertEqual([row["symbol"] for row in ledger], ["AAPL", "AAPL", "MSFT", "MSFT"])
 
     def make_config(
         self,

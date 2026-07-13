@@ -5,11 +5,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.m12_29_current_day_scan_dashboard_lib import load_config as load_m12_29_config
 from scripts.run_m12_37_intraday_auto_loop import (
     M1237AutoLoopConfig,
     intraday_refresh_bucket,
     load_auto_config,
+    run_postclose_final_daily_refresh,
     run_once,
     run_post_run_strategy_ledgers,
     session_refresh_policy,
@@ -139,6 +139,50 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
             self.assertFalse(manifest["current_day_runtime_ready"])
             self.assertFalse(manifest["current_day_scan_complete"])
             self.assertIn("fallback quotes / no-fetch", manifest["data_freshness_warning"])
+
+    def test_run_once_adds_postclose_final_daily_refresh_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_37"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            fake_result = {
+                "summary": {
+                    "scan_date": "2026-05-05",
+                    "quote_source": "longbridge_quote_readonly",
+                    "quote_count": 1,
+                    "quote_error": "",
+                    "current_day_runtime_ready": True,
+                    "current_day_scan_complete": True,
+                    "data_freshness_warning": "",
+                },
+                "dashboard": {"codex_observer": {"recommended_codex_message": "测试消息"}},
+            }
+
+            with (
+                patch("scripts.run_m12_37_intraday_auto_loop.run_m12_29_current_day_scan_dashboard", return_value=fake_result),
+                patch(
+                    "scripts.run_m12_37_intraday_auto_loop.run_postclose_final_daily_refresh",
+                    return_value={
+                        "schema_version": "m12.37.postclose-final-daily-refresh-147.v1",
+                        "attempted": True,
+                        "failed_symbol_count": 2,
+                        "failed_symbols": [{"symbol": "AAPL"}, {"symbol": "MSFT"}],
+                    },
+                ),
+            ):
+                outcome = run_once(
+                    config,
+                    generated_at="2026-05-05T20:30:00Z",
+                    execute_fetch=False,
+                    refresh_quotes=False,
+                )
+
+        self.assertTrue(outcome["manifest"]["postclose_final_daily_refresh_147"]["attempted"])
+        self.assertEqual(outcome["manifest"]["postclose_final_daily_refresh_147"]["failed_symbol_count"], 2)
+        self.assertEqual(
+            [row["symbol"] for row in outcome["manifest"]["postclose_final_daily_refresh_147"]["failed_symbols"]],
+            ["AAPL", "MSFT"],
+        )
 
     def test_run_once_writes_refresh_progress_before_dashboard_work(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -360,6 +404,58 @@ class M1237IntradayAutoLoopTest(unittest.TestCase):
         self.assertTrue(postmarket["refresh_quotes"])
         self.assertTrue(postmarket["continue_session"])
         self.assertFalse(closed["continue_session"])
+
+    def test_postclose_final_daily_refresh_runs_once_and_lists_failed_symbols(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "m12_29"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = self.make_config(output_dir)
+            fake_inventory = [
+                {"symbol": "AAPL", "timeframe": "1d", "ready_for_daily_test": True},
+                {
+                    "symbol": "MSFT",
+                    "timeframe": "1d",
+                    "ready_for_daily_test": False,
+                    "coverage_status": "missing_daily_cache",
+                    "coverage_reason": "provider timeout",
+                    "cache_path": "",
+                },
+            ]
+            fake_summary = {"daily_ready_symbols": 1}
+            fake_fetch_results = [
+                {"symbol": "AAPL", "timeframe": "1d", "fetch_mode": "full_daily", "status": "fetched", "skipped_reason": ""},
+                {
+                    "symbol": "MSFT",
+                    "timeframe": "1d",
+                    "fetch_mode": "full_daily",
+                    "status": "deferred",
+                    "skipped_reason": "provider timeout",
+                },
+            ]
+
+            with (
+                patch("scripts.run_m12_37_intraday_auto_loop.select_first_batch_symbols", return_value=["AAPL", "MSFT"]),
+                patch("scripts.run_m12_37_intraday_auto_loop.run_fetch_plan", return_value=fake_fetch_results),
+                patch("scripts.run_m12_37_intraday_auto_loop.build_cache_inventory", return_value=(fake_inventory, fake_summary)),
+            ):
+                first = run_postclose_final_daily_refresh(
+                    config,
+                    generated_at="2026-05-05T20:30:00Z",
+                    trading_date="2026-05-05",
+                    market_status="盘后",
+                )
+                second = run_postclose_final_daily_refresh(
+                    config,
+                    generated_at="2026-05-05T20:31:00Z",
+                    trading_date="2026-05-05",
+                    market_status="盘后",
+                )
+
+        self.assertTrue(first["attempted"])
+        self.assertEqual(first["failed_symbol_count"], 1)
+        self.assertEqual(first["failed_symbols"][0]["symbol"], "MSFT")
+        self.assertEqual(first["status_counts"]["deferred"], 1)
+        self.assertEqual(second["failed_symbol_count"], 1)
 
     def test_m14_finalization_policy_waits_for_postmarket_by_default(self):
         degraded = {"current_day_runtime_ready": False}

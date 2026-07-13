@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time as wall_time
 from pathlib import Path
@@ -24,6 +25,13 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (  # noqa: E402
     validate_generated_at_for_artifacts,
     write_json,
 )
+from scripts.m12_12_daily_observation_loop_lib import (  # noqa: E402
+    FetchPolicy,
+    build_cache_inventory,
+    load_config as load_m12_12_config,
+    run_fetch_plan,
+    select_first_batch_symbols,
+)
 from scripts.m13_daily_strategy_test_runner_lib import (  # noqa: E402
     load_config as load_m13_config,
     run_m13_daily_strategy_test_runner,
@@ -37,6 +45,8 @@ from scripts.m14_strategy_challenge_gate_lib import (  # noqa: E402
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_37_intraday_auto_loop.json"
 PREOPEN_NATIVE_FETCH_BUDGET = 100
 REGULAR_NATIVE_FETCH_BUDGET = 294
+POSTCLOSE_FINAL_DAILY_REFRESH_SYMBOL_COUNT = 147
+POSTCLOSE_FINAL_DAILY_REFRESH_FETCH_BUDGET = 147
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +69,144 @@ class M1237AutoLoopConfig:
     real_money_actions: bool
     live_execution: bool
     paper_trading_approval: bool
+
+
+def postclose_final_daily_refresh_path(output_dir: Path) -> Path:
+    return output_dir / "m12_37_postclose_final_daily_refresh_147.json"
+
+
+def build_skipped_postclose_final_daily_refresh(
+    *,
+    generated_at: str,
+    trading_date: str,
+    market_status: str,
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "m12.37.postclose-final-daily-refresh-147.v1",
+        "generated_at": generated_at,
+        "trading_date": trading_date,
+        "market_status": market_status,
+        "symbol_count": POSTCLOSE_FINAL_DAILY_REFRESH_SYMBOL_COUNT,
+        "attempted": False,
+        "completed": False,
+        "skip_reason": reason,
+        "daily_ready_symbol_count": 0,
+        "failed_symbol_count": 0,
+        "failed_symbols": [],
+        "status_counts": {},
+        "plain_language_result": f"盘后 147 标的最终日线刷新未执行：{reason}",
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+
+
+def run_postclose_final_daily_refresh(
+    config: M1237AutoLoopConfig,
+    *,
+    generated_at: str,
+    trading_date: str,
+    market_status: str,
+) -> dict[str, Any]:
+    output_path = postclose_final_daily_refresh_path(load_m12_29_config(config.source_m12_29_config_path).output_dir)
+    if market_status != "盘后":
+        return build_skipped_postclose_final_daily_refresh(
+            generated_at=generated_at,
+            trading_date=trading_date,
+            market_status=market_status,
+            reason="market_not_postclose",
+        )
+    previous = {}
+    if output_path.exists():
+        try:
+            previous = json.loads(output_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = {}
+    if str(previous.get("trading_date") or "") == trading_date and bool(previous.get("attempted")):
+        return previous
+
+    m12_29_config = load_m12_29_config(config.source_m12_29_config_path)
+    base_m12_12_config = load_m12_12_config(m12_29_config.source_m12_12_config_path)
+    daily_only_config = replace(
+        base_m12_12_config,
+        output_dir=m12_29_config.output_dir / "m12_12_postclose_final_daily_refresh_147",
+        first_batch_size=POSTCLOSE_FINAL_DAILY_REFRESH_SYMBOL_COUNT,
+        daily_end=datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York")).date(),
+        intraday_current_start=datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York")).date(),
+        intraday_end=datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York")).date(),
+        fetch_policy=FetchPolicy(
+            allow_readonly_fetch=base_m12_12_config.fetch_policy.allow_readonly_fetch,
+            fetch_timeframes=("1d",),
+            max_native_fetches=POSTCLOSE_FINAL_DAILY_REFRESH_FETCH_BUDGET,
+            missing_data_behavior=base_m12_12_config.fetch_policy.missing_data_behavior,
+        ),
+    )
+    symbols = select_first_batch_symbols(daily_only_config)
+    fetch_results = run_fetch_plan(
+        daily_only_config,
+        symbols,
+        generated_at=generated_at,
+        execute_fetch=True,
+        max_native_fetches=POSTCLOSE_FINAL_DAILY_REFRESH_FETCH_BUDGET,
+        force_refresh_current_intraday=False,
+    )
+    cache_inventory, cache_summary = build_cache_inventory(
+        daily_only_config,
+        symbols,
+        generated_at,
+        fetch_results,
+    )
+    fetch_by_symbol = {
+        (str(item.get("symbol") or ""), str(item.get("timeframe") or ""), str(item.get("fetch_mode") or "")): item
+        for item in fetch_results
+    }
+    failed_symbols: list[dict[str, Any]] = []
+    for row in cache_inventory:
+        if row.get("timeframe") != "1d" or row.get("ready_for_daily_test"):
+            continue
+        symbol = str(row.get("symbol") or "")
+        fetch_result = fetch_by_symbol.get((symbol, "1d", "full_daily"), {})
+        failed_symbols.append(
+            {
+                "symbol": symbol,
+                "fetch_status": str(fetch_result.get("status") or "not_ready_after_refresh"),
+                "fetch_reason": str(fetch_result.get("skipped_reason") or fetch_result.get("error") or ""),
+                "coverage_status": str(row.get("coverage_status") or ""),
+                "coverage_reason": str(row.get("coverage_reason") or ""),
+                "cache_path": str(row.get("cache_path") or ""),
+            }
+        )
+    failed_symbols.sort(key=lambda item: item["symbol"])
+    status_counts = Counter(str(item.get("status") or "unknown") for item in fetch_results if item.get("timeframe") == "1d")
+    payload = {
+        "schema_version": "m12.37.postclose-final-daily-refresh-147.v1",
+        "generated_at": generated_at,
+        "trading_date": trading_date,
+        "market_status": market_status,
+        "symbol_count": len(symbols),
+        "attempted": True,
+        "completed": True,
+        "skip_reason": "",
+        "daily_ready_symbol_count": int(cache_summary.get("daily_ready_symbols", 0)),
+        "failed_symbol_count": len(failed_symbols),
+        "failed_symbols": failed_symbols,
+        "status_counts": dict(sorted(status_counts.items())),
+        "plain_language_result": (
+            f"盘后已执行 147 标的最终日线刷新；"
+            f"成功就绪 {cache_summary.get('daily_ready_symbols', 0)}，"
+            f"失败 {len(failed_symbols)}。"
+        ),
+        "paper_simulated_only": True,
+        "trading_connection": False,
+        "real_money_actions": False,
+        "live_execution": False,
+        "paper_trading_approval": False,
+    }
+    write_json(output_path, payload)
+    return payload
 
 
 def resolve_repo_path(path: str | Path) -> Path:
@@ -178,6 +326,12 @@ def run_once(
             market_status=market["status"],
             reason="market_not_in_monitoring_window",
         )
+    postclose_final_daily_refresh = run_postclose_final_daily_refresh(
+        config,
+        generated_at=generated_at,
+        trading_date=str(result["summary"].get("scan_date", "")),
+        market_status=market["status"],
+    )
     observer = result["dashboard"]["codex_observer"]
     summary = result["summary"]
     manifest = {
@@ -208,6 +362,7 @@ def run_once(
         "data_freshness_warning": summary.get("data_freshness_warning", ""),
         "plain_language_result": observer["recommended_codex_message"],
         "post_run_strategy_ledgers": post_run_strategy_ledgers,
+        "postclose_final_daily_refresh_147": postclose_final_daily_refresh,
         "paper_simulated_only": True,
         "trading_connection": False,
         "real_money_actions": False,

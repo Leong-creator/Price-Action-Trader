@@ -161,8 +161,8 @@ ACCOUNT_SPECS = (
     {"account_id": "M10-PA-002-5m", "strategy_id": "M10-PA-002", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-002 五分钟账户", "variant_id": "base"},
     {"account_id": "M10-PA-004-long-1d", "strategy_id": "M10-PA-004", "timeframe": "1d", "lane": "mainline", "display_name": "M10-PA-004 只做多日线账户", "variant_id": "long_only"},
     {"account_id": "M10-PA-012-5m", "strategy_id": "M10-PA-012", "timeframe": "5m", "lane": "mainline", "display_name": "M10-PA-012 五分钟账户", "variant_id": "base"},
-    {"account_id": "M12-FTD-001-baseline-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001 原版日线账户", "variant_id": "baseline"},
-    {"account_id": "M12-FTD-001-loss-streak-guard-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001 连亏保护日线账户", "variant_id": "loss_streak_guard"},
+    {"account_id": "M12-FTD-001-baseline-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001-baseline-1d 原版日线账户", "variant_id": "baseline"},
+    {"account_id": "M12-FTD-001-loss-streak-guard-1d", "strategy_id": "M12-FTD-001", "timeframe": "1d", "lane": "mainline", "display_name": "M12-FTD-001-loss-streak-guard-1d 连亏保护日线账户", "variant_id": "loss_streak_guard"},
     {"account_id": "M10-PA-005-1d", "strategy_id": "M10-PA-005", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-005 日线实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-005-5m", "strategy_id": "M10-PA-005", "timeframe": "5m", "lane": "experimental", "display_name": "M10-PA-005 五分钟实验账户", "variant_id": "base"},
     {"account_id": "M10-PA-007-1d", "strategy_id": "M10-PA-007", "timeframe": "1d", "lane": "experimental", "display_name": "M10-PA-007 日线实验账户", "variant_id": "base"},
@@ -2850,11 +2850,15 @@ def build_ftd_account_monitor(mainline_accounts: list[dict[str, str]]) -> dict[s
         "schema_version": "m12.46.ftd-account-monitor.v1",
         "stage": "M12.46.ftd_account_monitor",
         "accounts": rows,
-        "current_plain_status": f"FTD001 对照：原版 {baseline['today_total_pnl'] if baseline else '暂无'} / 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}",
+        "current_plain_status": (
+            "FTD001 对照："
+            f"M12-FTD-001-baseline-1d 原版 {baseline['today_total_pnl'] if baseline else '暂无'} / "
+            f"M12-FTD-001-loss-streak-guard-1d 连亏保护 {guard['today_total_pnl'] if guard else '暂无'}"
+        ),
         "risk_flags": risk_flags,
         "plain_language_summary": (
-            f"FTD001 原版今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
-            f"连亏保护版今日 {guard['today_total_pnl'] if guard else '暂无'}；"
+            f"FTD001 原版（M12-FTD-001-baseline-1d）今日 {baseline['today_total_pnl'] if baseline else '暂无'}，"
+            f"FTD001 连亏保护（M12-FTD-001-loss-streak-guard-1d）今日 {guard['today_total_pnl'] if guard else '暂无'}；"
             f"重点看当前模拟回撤、连亏和是否过度触发。"
         ),
         "paper_simulated_only": True,
@@ -3694,7 +3698,8 @@ def build_accountized_dashboard_payload(
             "FTD001 对照": ftd001_monitor["current_plain_status"],
             "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
             "长桥模拟账户": longbridge_paper_account["top_metric"],
-            "长桥账户当日盈亏": longbridge_paper_account.get("longbridge_account_intraday_pnl", "等待长桥字段对齐"),
+            "长桥App当日盈亏": longbridge_paper_account.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
+            "长桥接口净值日内变化": longbridge_paper_account.get("longbridge_account_intraday_pnl", "无法计算"),
             "长桥接口持仓今日浮动": longbridge_paper_account["longbridge_account_today_total_pnl"],
             "长桥当前持仓总盈亏": longbridge_paper_account["longbridge_account_total_pnl"],
             "长桥账户总资产": longbridge_paper_account["account_total_equity_estimate"],
@@ -4132,6 +4137,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         m15_apply_longbridge_reconciliation_to_account_pnl(account_pnl_summary, active_pnl_reconciliation)
     elif pnl_reconciliation:
         m15_mark_stale_longbridge_reconciliation(account_pnl_summary, pnl_reconciliation, account_state)
+    if account_state_stale:
+        m15_mask_account_pnl_summary_for_stale_account_state(account_pnl_summary, account_state)
     official_position_rows = m15_longbridge_position_pnl_rows_from_reconciliation(active_pnl_reconciliation)
     order_reconciliation_summary = m15_order_reconciliation_summary(order_reconciliation)
     unfilled_order_rows = m15_unfilled_order_diagnostic_rows(unfilled_order_diagnostics)
@@ -4154,6 +4161,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         order_reconciliation,
         virtual_capital_bucket_definitions,
         configured_realtime_epoch,
+        panel_market_date,
     )
     last_run_submitted_count = 0 if submitter_stale else int_like(submitter.get("submitted_order_count", 0))
     last_run_attempted_count = 0 if submitter_stale else int_like(submitter.get("attempted_order_count", 0))
@@ -4175,6 +4183,10 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         realtime_ledger_submission_counts["unconfirmed"],
         realtime_unconfirmed_count,
     )
+    order_id_count = max(
+        m15_order_id_count_for_date(submission_ledger, panel_market_date),
+        m15_order_id_count_for_date(realtime_ledger, panel_market_date),
+    )
     queue_status = str(fast_queue.get("fast_queue_status") or fast_queue.get("preview_status") or "")
     new_signal_count = int_like(queue_summary.get("new_open_signal_count", 0))
     blocked_signal_count = int_like(queue_summary.get("blocked_signal_count", 0))
@@ -4190,6 +4202,14 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     queue_blockers = fast_queue.get("current_day_blockers", []) if isinstance(fast_queue.get("current_day_blockers"), list) else []
     realtime_latency_counts = realtime.get("latency_counts", {}) if isinstance(realtime.get("latency_counts"), dict) else {}
     realtime_delayed_age_blocked_count = 0 if realtime_stale else int_like(realtime.get("delayed_signal_age_blocked_count", 0))
+    realtime_router_quality_sorted_count = 0 if realtime_router_stale else int_like(realtime_router.get("quality_sorted_candidate_count", 0))
+    realtime_router_market_confirmation_blocked_count = (
+        0 if realtime_router_stale else int_like(realtime_router.get("market_confirmation_blocked_count", 0))
+    )
+    realtime_router_quality_gate_blocked_count = 0 if realtime_router_stale else int_like(realtime_router.get("quality_gate_blocked_count", 0))
+    realtime_bucket_pressure_blocked_count = (
+        0 if realtime_stale else int_like(realtime.get("bucket_pressure_quality_blocked_count", 0))
+    )
     data_available = bool(account_state or submitter or fast_queue or realtime_supervisor or realtime_ingestor or realtime_router or realtime_position_manager or realtime or connection)
     account_label = "模拟账户已连接" if paper_detected else "等待模拟账户确认" if auth_ok else "等待授权或状态文件"
     top_metric = (
@@ -4249,6 +4269,15 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     )
     account_state_generated_at = str(realtime_account_state.get("generated_at") or account_state.get("generated_at") or "")
     pnl_reconciliation_generated_at = str(active_pnl_reconciliation.get("generated_at") or "")
+    actual_account_exposure = money_to_decimal(account_pnl_summary.get("position_market_value", "0")) + money_to_decimal(
+        account_pnl_summary.get("open_order_notional", "0")
+    )
+    virtual_slice_count = len(
+        [
+            bucket for bucket in virtual_capital_bucket_definitions
+            if isinstance(bucket, dict) and str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+        ]
+    )
     status_rows = [
         {"label": "账户状态", "value": account_label, "note": f"通道 {account_channel or '暂无'}，类型 {account_type or '暂无'}"},
         {
@@ -4265,7 +4294,17 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         {
             "label": "本地虚拟资金池",
             "value": "单策略仓每仓 10000 / 统一实验仓 10000",
-            "note": "每个单策略仓各自控制敞口，不设置所有单仓合计总上限；同一标的允许不同策略仓分别持有并分别归因。",
+            "note": "每个单策略仓各自控制敞口，不设置所有单仓合计总上限；同一标的允许不同策略仓分别持有并分别归因。这些切片只用于本地归因，不是长桥真实子账户。",
+        },
+        {
+            "label": "长桥真实账户敞口",
+            "value": "等待长桥数据" if account_state_stale else money(actual_account_exposure),
+            "note": (
+                f"真实持仓市值 {account_pnl_summary['position_market_value']} + 未成交挂单名义金额 "
+                f"{account_pnl_summary['open_order_notional']}；真实持仓标的 {raw_position_count} 个，本地虚拟切片 {virtual_slice_count} 个。"
+                if not account_state_stale
+                else f"当前账户状态产物已过期；真实持仓标的和真实账户敞口等待下一次长桥只读刷新。本地虚拟切片 {virtual_slice_count} 个。"
+            ),
         },
         {
             "label": "长桥账户总资产",
@@ -4273,9 +4312,14 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
             "note": account_pnl_summary["account_total_equity_note"],
         },
         {
-            "label": "账户当日盈亏",
-            "value": account_pnl_summary.get("longbridge_account_intraday_pnl", "等待长桥字段对齐"),
-            "note": account_pnl_summary.get("longbridge_account_intraday_pnl_note", "来自长桥 profit-analysis 当日查询。"),
+            "label": "App当日盈亏",
+            "value": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
+            "note": account_pnl_summary.get("longbridge_app_display_today_pnl_note", "长桥 App 顶部当日盈亏字段等待接口对齐。"),
+        },
+        {
+            "label": "接口净值日内变化",
+            "value": account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算"),
+            "note": account_pnl_summary.get("longbridge_account_intraday_pnl_note", "来自长桥 profit-analysis 交易日查询，不等同于 App 当日盈亏。"),
         },
         {
             "label": "当前持仓总盈亏",
@@ -4388,9 +4432,15 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     ]
     realtime_pnl_cards = [
         {
-            "label": "账户当日盈亏",
+            "label": "App当日盈亏",
+            "value": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
+            "note": account_pnl_summary.get("longbridge_app_display_today_pnl_note", "长桥 App 顶部当日盈亏字段等待接口对齐。"),
+            "value_type": "status",
+        },
+        {
+            "label": "接口净值日内变化",
             "value": longbridge_realtime_pnl_value(account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算")),
-            "note": account_pnl_summary.get("longbridge_account_intraday_pnl_note", "来自长桥 profit-analysis 当日查询。"),
+            "note": account_pnl_summary.get("longbridge_account_intraday_pnl_note", "来自长桥 profit-analysis 交易日查询，不等同于 App 当日盈亏。"),
             "value_type": "money",
         },
         {
@@ -4431,8 +4481,51 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         },
     ]
     queue_rows = [
+        {
+            "label": "实时提交流程",
+            "value": (
+                f"行情 {realtime_market_event_count} / 合格信号 {realtime_ready_count} / 草稿 {attempted_count} / "
+                f"真实提交 {submitted_count} / 有订单号 {order_id_count} / 成交 {order_reconciliation_summary['filled_order_count']}"
+            ),
+            "note": (
+                "阻断原因："
+                + m15_blocker_reason_summary(
+                    {
+                        "blocked_signal_count": blocked_signal_count + realtime_blocked_count,
+                        "fee_profit_blocked_count": fee_profit_blocked_count,
+                        "stale_snapshot_blocked_count": stale_blocked_count,
+                        "market_confirmation_blocked_count": realtime_router_market_confirmation_blocked_count,
+                        "quality_gate_blocked_count": realtime_router_quality_gate_blocked_count,
+                        "bucket_pressure_quality_blocked_count": realtime_bucket_pressure_blocked_count,
+                        "delayed_signal_age_blocked_count": realtime_delayed_age_blocked_count,
+                        "unconfirmed_submission_count": unconfirmed_count,
+                        "status_counts": status_counts,
+                    }
+                )
+            ),
+        },
         {"label": "行情事件", "value": str(realtime_market_event_count), "note": f"采集器新增 {realtime_ingestor_new_event_count} / 累计 {realtime_ingestor_total_event_count} / 延期 {realtime_ingestor_deferred_count}"},
         {"label": "实时信号", "value": str(realtime_signal_count), "note": f"输入 {realtime_input_signal_count}，跳过已处理 {realtime_skipped_processed_count}，通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
+        {
+            "label": "轻量质量排序",
+            "value": str(realtime_router_quality_sorted_count),
+            "note": "路由器只用本轮候选已有字段排序，不额外请求长桥接口；买入按质量分优先，卖出仍优先处理。",
+        },
+        {
+            "label": "大盘确认阻断",
+            "value": str(realtime_router_market_confirmation_blocked_count),
+            "note": "FTD原版和FTD连亏保护需要 SPY/QQQ 当日跟进确认；不满足时不生成可提交信号。",
+        },
+        {
+            "label": "信号质量门槛阻断",
+            "value": str(realtime_router_quality_gate_blocked_count),
+            "note": "收盘位置、涨幅或放量不达标的 PA004/FTD 候选会被挡住，避免弱信号占用单策略仓。",
+        },
+        {
+            "label": "仓位压力阻断",
+            "value": str(realtime_bucket_pressure_blocked_count),
+            "note": "单仓剩余额度低于 1500 时只收质量分 80 以上，低于 750 时只收 90 以上；不是每日笔数限制。",
+        },
         {"label": "实时延迟", "value": f"{realtime_latency_counts.get('target_met', 0)}优 / {realtime_latency_counts.get('acceptable', 0)}可接受 / {realtime_latency_counts.get('delayed_revalidated', 0)}复核", "note": f"1 秒内是目标，5 秒内第一版可接受；超过最大年龄的旧信号不补交。本轮旧信号阻断 {realtime_delayed_age_blocked_count} 条。"},
         {
             "label": "整股化取整",
@@ -4513,6 +4606,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "account_total_return_percent": account_pnl_summary["account_total_return_percent"],
         "longbridge_account_total_pnl": account_pnl_summary["longbridge_account_total_pnl"],
         "longbridge_account_intraday_pnl": account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算"),
+        "longbridge_net_asset_intraday_pnl": account_pnl_summary.get("longbridge_net_asset_intraday_pnl", account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算")),
+        "longbridge_profit_analysis_market_day_pnl": account_pnl_summary.get("longbridge_profit_analysis_market_day_pnl", "无法计算"),
         "longbridge_account_today_total_pnl": account_pnl_summary["longbridge_account_today_total_pnl"],
         "longbridge_app_display_today_pnl": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
         "longbridge_portfolio_today_holding_pnl": account_pnl_summary.get("longbridge_portfolio_today_holding_pnl", account_pnl_summary["longbridge_account_today_total_pnl"]),
@@ -4531,6 +4626,10 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "longbridge_closed_trade_loss_count": closed_trade_quality_summary["loss_count"],
         "longbridge_closed_trade_sample_count": closed_trade_quality_summary["sample_count"],
         "longbridge_closed_trade_unmatched_sell_count": closed_trade_quality_summary["unmatched_sell_count"],
+        "longbridge_realtime_quality_sorted_candidate_count": realtime_router_quality_sorted_count,
+        "longbridge_realtime_market_confirmation_blocked_count": realtime_router_market_confirmation_blocked_count,
+        "longbridge_realtime_quality_gate_blocked_count": realtime_router_quality_gate_blocked_count,
+        "longbridge_realtime_bucket_pressure_blocked_count": realtime_bucket_pressure_blocked_count,
         "longbridge_closed_trade_total_pnl": closed_trade_quality_summary["total_pnl"],
         "longbridge_closed_trade_note": closed_trade_quality_summary["source_note"],
         "longbridge_quality_policy_started_at": strategy_quality_summary["policy_started_at"],
@@ -4763,6 +4862,45 @@ def m15_submission_counts_for_date(rows: list[dict[str, Any]], market_date: str)
     return counts
 
 
+def m15_order_id_count_for_date(rows: list[dict[str, Any]], market_date: str) -> int:
+    count = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row_market_date = str(row.get("trading_date") or row.get("market_date") or "")
+        if not row_market_date:
+            row_market_date = m15_row_market_date(row)
+        if market_date and row_market_date != market_date:
+            continue
+        if m15_confirmed_order_id(row):
+            count += 1
+    return count
+
+
+def m15_blocker_reason_summary(summary: dict[str, Any]) -> str:
+    reasons: list[str] = []
+    mappings = (
+        ("blocked_signal_count", "总阻断"),
+        ("fee_profit_blocked_count", "扣费后不赚钱"),
+        ("stale_snapshot_blocked_count", "旧快照"),
+        ("market_confirmation_blocked_count", "大盘确认"),
+        ("quality_gate_blocked_count", "质量门槛"),
+        ("bucket_pressure_quality_blocked_count", "仓位压力"),
+        ("delayed_signal_age_blocked_count", "信号过期"),
+        ("unconfirmed_submission_count", "未确认提交"),
+    )
+    for key, label in mappings:
+        count = int_like(summary.get(key, 0))
+        if count > 0:
+            reasons.append(f"{label} {count}")
+    status_counts = summary.get("status_counts", {}) if isinstance(summary.get("status_counts"), dict) else {}
+    for key, value in sorted(status_counts.items()):
+        count = int_like(value)
+        if count > 0:
+            reasons.append(f"{key} {count}")
+    return "；".join(reasons) if reasons else "暂无阻断"
+
+
 def m15_confirmed_order_id(row: dict[str, Any]) -> str:
     response = row.get("submission_response", {})
     if isinstance(response, dict):
@@ -4993,6 +5131,7 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
     )
     trading_pnl = reconciliation.get("trading_pnl", {}) if isinstance(reconciliation.get("trading_pnl"), dict) else {}
     account_snapshot = reconciliation.get("account_snapshot", {}) if isinstance(reconciliation.get("account_snapshot"), dict) else {}
+    source_status = reconciliation.get("source_status", {}) if isinstance(reconciliation.get("source_status"), dict) else {}
     query_range = reconciliation.get("query_range", {}) if isinstance(reconciliation.get("query_range"), dict) else {}
     account_total = str(account_pnl.get("sum_profit") or "")
     today_account_total = str(today_account_pnl.get("sum_profit") or "")
@@ -5001,6 +5140,8 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
     realized_estimate = str(trading_pnl.get("realized_pnl_estimate") or "")
     account_portfolio_total_pl = str(account_snapshot.get("portfolio_total_pl") or "")
     account_portfolio_today_pl = str(account_snapshot.get("portfolio_total_today_pl") or "")
+    holding_prices_degraded = bool(source_status.get("portfolio_price_snapshot_degraded"))
+    holding_prices_restored = bool(source_status.get("holding_prices_restored_from_previous_reconciliation"))
     if account_total:
         account_pnl_summary["account_total_pnl_estimate"] = account_total
     if account_pnl.get("sum_profit_percent") not in (None, ""):
@@ -5019,20 +5160,27 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         account_pnl_summary["position_market_value"] = str(account_snapshot.get("portfolio_market_cap"))
     if account_snapshot.get("portfolio_total_cash"):
         account_pnl_summary["cash"] = str(account_snapshot.get("portfolio_total_cash"))
-    if account_portfolio_total_pl:
+    if account_portfolio_total_pl and not (holding_prices_degraded and not holding_prices_restored):
         account_pnl_summary["longbridge_account_total_pnl"] = account_portfolio_total_pl
-    if today_account_total:
-        account_pnl_summary["longbridge_account_intraday_pnl"] = today_account_total
-        account_pnl_summary["longbridge_app_display_today_pnl"] = today_account_total
-    if account_portfolio_today_pl:
+    account_pnl_summary["longbridge_account_intraday_pnl"] = today_account_total or "无法计算"
+    account_pnl_summary["longbridge_net_asset_intraday_pnl"] = today_account_total or "无法计算"
+    account_pnl_summary["longbridge_app_display_today_pnl"] = "等待长桥字段对齐"
+    account_pnl_summary["longbridge_profit_analysis_market_day_pnl"] = today_account_total or "无法计算"
+    if account_portfolio_today_pl and not (holding_prices_degraded and not holding_prices_restored):
         account_pnl_summary["longbridge_account_today_total_pnl"] = account_portfolio_today_pl
         account_pnl_summary["longbridge_today_total_pnl"] = account_portfolio_today_pl
-    if not today_account_total:
-        account_pnl_summary["longbridge_app_display_today_pnl"] = "等待长桥字段对齐"
-    account_pnl_summary["longbridge_portfolio_today_holding_pnl"] = account_portfolio_today_pl or "无法计算"
+    account_pnl_summary["longbridge_portfolio_today_holding_pnl"] = (
+        account_portfolio_today_pl
+        if not (holding_prices_degraded and not holding_prices_restored)
+        else "等待长桥持仓行情"
+    )
     account_pnl_summary["longbridge_stock_total_pnl"] = stock_total or "无法计算"
     account_pnl_summary["longbridge_realized_pnl_estimate"] = realized_estimate or "无法计算"
-    account_pnl_summary["longbridge_unrealized_pnl"] = unrealized or account_pnl_summary.get("longbridge_unrealized_pnl", "0.00")
+    account_pnl_summary["longbridge_unrealized_pnl"] = (
+        unrealized or account_pnl_summary.get("longbridge_unrealized_pnl", "0.00")
+        if not (holding_prices_degraded and not holding_prices_restored)
+        else "等待长桥持仓行情"
+    )
     account_pnl_summary["longbridge_profit_analysis_start_date"] = str(query_range.get("start") or "")
     account_pnl_summary["longbridge_profit_analysis_end_date"] = str(query_range.get("end") or "")
     account_pnl_summary["account_total_pnl_note"] = (
@@ -5040,7 +5188,14 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         f"初始资产 {account_pnl.get('initial_asset_value', '暂无')}，期末资产 {account_pnl.get('ending_asset_value', '暂无')}。"
     )
     account_pnl_summary["longbridge_account_intraday_pnl_note"] = (
-        f"来自长桥只读 profit-analysis 当日查询，区间 "
+        f"来自长桥只读 profit-analysis 交易日查询，表示接口净值日内变化，区间 "
+        f"{today_account_pnl.get('start_date', '暂无')} ~ {today_account_pnl.get('end_date', '暂无')}，"
+        f"初始资产 {today_account_pnl.get('initial_asset_value', '暂无')}，"
+        f"当前资产 {today_account_pnl.get('current_total_asset', '暂无')}。"
+        "它不等同于长桥 App 顶部“当日盈亏”截图字段。"
+    )
+    account_pnl_summary["longbridge_profit_analysis_market_day_pnl_note"] = (
+        f"来自长桥只读 profit-analysis 交易日区间查询，区间 "
         f"{today_account_pnl.get('start_date', '暂无')} ~ {today_account_pnl.get('end_date', '暂无')}，"
         f"初始资产 {today_account_pnl.get('initial_asset_value', '暂无')}，"
         f"当前资产 {today_account_pnl.get('current_total_asset', '暂无')}。"
@@ -5065,6 +5220,19 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
     account_pnl_summary["longbridge_account_today_total_pnl_note"] = (
         f"来自长桥只读 portfolio.total_today_pl；当前值 {account_portfolio_today_pl or '暂无'}。"
         "该字段与 App 顶部“当日盈亏”截图不一致，因此看板只作为接口持仓今日浮动展示。"
+    )
+    if holding_prices_degraded:
+        source_time = str(source_status.get("previous_reconciliation_generated_at") or "")
+        if holding_prices_restored:
+            note = f"本次长桥持仓行情快照退化，已沿用上一份可信快照{('（' + source_time + '）') if source_time else ''}。"
+        else:
+            note = "本次长桥持仓行情快照退化，持仓浮盈和持仓今日浮动暂不显示零值，等待长桥恢复正常报价。"
+        account_pnl_summary["longbridge_account_total_pnl_note"] = note
+        account_pnl_summary["longbridge_account_today_total_pnl_note"] = note
+        account_pnl_summary["longbridge_today_total_pnl_note"] = note
+    account_pnl_summary["longbridge_app_display_today_pnl_note"] = (
+        "长桥 App 顶部当日盈亏截图口径暂未在当前 CLI 的 portfolio、profit-analysis、cash-flow 字段中找到；"
+        "看板保留该状态，禁止用其它口径硬填。"
     )
 
 
@@ -5107,7 +5275,7 @@ def m15_mark_stale_longbridge_reconciliation(
         "旧长桥盈亏对账不会覆盖当前账户状态；缺新数据时显示等待，不使用假本金或旧本地模拟数据。"
     )
     account_pnl_summary["longbridge_today_total_pnl_note"] = (
-        "旧长桥账户当日盈亏对账不会覆盖当前账户状态；等待下一次长桥只读 profit-analysis 同日刷新。"
+        "旧长桥接口净值日内变化对账不会覆盖当前账户状态；等待下一次长桥只读 profit-analysis 同日刷新。"
     )
     account_pnl_summary["longbridge_account_total_pnl_note"] = (
         "旧长桥当前持仓总盈亏对账不会覆盖当前账户状态；等待下一次长桥只读 portfolio 刷新。"
@@ -5115,6 +5283,39 @@ def m15_mark_stale_longbridge_reconciliation(
     account_pnl_summary["longbridge_account_today_total_pnl_note"] = (
         "旧长桥接口持仓今日浮动对账不会覆盖当前账户状态；等待下一次长桥只读 portfolio 刷新。"
     )
+
+
+def m15_mask_account_pnl_summary_for_stale_account_state(
+    account_pnl_summary: dict[str, str],
+    account_state: dict[str, Any],
+) -> None:
+    account_generated = str(account_state.get("generated_at") or "未知时间")
+    stale_value = "等待长桥数据"
+    for key in (
+        "account_total_equity_estimate",
+        "account_total_pnl_estimate",
+        "longbridge_stock_total_pnl",
+        "longbridge_realized_pnl_estimate",
+        "longbridge_unrealized_pnl",
+        "longbridge_account_total_pnl",
+        "longbridge_account_intraday_pnl",
+        "longbridge_account_today_total_pnl",
+        "longbridge_today_total_pnl",
+        "longbridge_portfolio_today_holding_pnl",
+    ):
+        account_pnl_summary[key] = stale_value
+    account_pnl_summary["account_total_return_percent"] = ""
+    account_pnl_summary["account_total_equity_note"] = (
+        f"当前账户状态产物已过期（生成于 {account_generated}）；为避免把陈旧数值当成实时值，看板暂不展示账户总资产。"
+    )
+    account_pnl_summary["account_total_pnl_note"] = "当前账户状态产物已过期；累计净值、已实现和持仓浮动全部等待下一次长桥只读刷新。"
+    account_pnl_summary["longbridge_stock_total_pnl_note"] = "当前账户状态产物已过期；不把陈旧交易累计盈亏继续显示在实时面板。"
+    account_pnl_summary["longbridge_account_total_pnl_note"] = "当前账户状态产物已过期；不继续展示旧的持仓总盈亏。"
+    account_pnl_summary["longbridge_account_intraday_pnl_note"] = "当前账户状态产物已过期；接口净值日内变化等待下一次只读对账刷新。"
+    account_pnl_summary["longbridge_account_today_total_pnl_note"] = "当前账户状态产物已过期；接口持仓今日浮动等待下一次只读 portfolio 刷新。"
+    account_pnl_summary["longbridge_today_total_pnl_note"] = "当前账户状态产物已过期；今日盈亏相关字段全部等待下一次长桥只读刷新。"
+    account_pnl_summary["longbridge_app_display_today_pnl"] = "等待长桥字段对齐"
+    account_pnl_summary["longbridge_app_display_today_pnl_note"] = "当前账户状态产物已过期；App 当日盈亏字段继续等待接口对齐。"
 
 
 def m15_longbridge_symbol_pnl_rows(reconciliation: dict[str, Any]) -> list[dict[str, str]]:
@@ -5243,7 +5444,7 @@ def m15_longbridge_trade_quality_summary(symbol_pnl_rows: list[dict[str, str]]) 
             "average_win": "暂无",
             "average_loss": "暂无",
             "profit_loss_ratio": "暂无",
-            "profit_loss_note": "等待长桥逐标的盈亏数据；不使用本地模拟账本或旧历史净利润字段硬算。",
+            "profit_loss_note": "等待长桥逐标的盈亏数据；不使用本地模拟账本或旧版利润字段硬算。",
             "worst_symbol_loss_percent": "暂无",
             "worst_symbol_loss_label": "暂无",
             "worst_symbol": "暂无",
@@ -5631,7 +5832,8 @@ def m15_longbridge_virtual_bucket_rows(
     order_reconciliation: dict[str, Any] | None = None,
     configured_bucket_defs: list[dict[str, Any]] | None = None,
     configured_epoch: dict[str, Any] | None = None,
-    ) -> list[dict[str, str]]:
+    market_date: str = "",
+) -> list[dict[str, str]]:
     realtime_epoch_from_summary = realtime.get("test_epoch", {}) if isinstance(realtime.get("test_epoch"), dict) else {}
     summary_epoch_id = str(realtime_epoch.get("test_epoch_id") or realtime_epoch_from_summary.get("test_epoch_id") or "")
     configured_epoch_id = str((configured_epoch or {}).get("test_epoch_id") or "")
@@ -5646,32 +5848,58 @@ def m15_longbridge_virtual_bucket_rows(
         row for row in realtime_ledger
         if not epoch_id or str(row.get("test_epoch_id") or "") == epoch_id
     ]
+    configured_bucket_by_id: dict[str, dict[str, Any]] = {
+        str(bucket.get("capital_bucket") or bucket.get("bucket_id") or ""): bucket
+        for bucket in (configured_bucket_defs or [])
+        if isinstance(bucket, dict) and str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+    }
     bucket_defs = configured_bucket_defs if use_configured_epoch and configured_bucket_defs else realtime.get("virtual_capital_buckets", [])
     if not isinstance(bucket_defs, list) or not bucket_defs:
         bucket_defs = [
-            {"capital_bucket": "pa004_long", "label": "PA004-long单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
-            {"capital_bucket": "experimental", "label": "统一实验仓", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1000.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_long", "label": "PA004-long单仓（M10-PA-004-long-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa002_5m", "label": "PA002-5m单仓（M10-PA-002-5m）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "ftd_baseline", "label": "FTD原版单仓（M12-FTD-001-baseline-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "ftd_loss_streak", "label": "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_mbf", "label": "PA004-MBF单仓（M10-PA-004-MBF-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa004_mbf_qc", "label": "PA004-MBF-QC单仓（M10-PA-004-MBF-QC-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa013_5m", "label": "PA013-5m单仓（M10-PA-013-5m）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "pa011_orb_r1", "label": "PA011-ORB-R1单仓（M10-PA-011-ORB-R1-5m）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1500.00", "used_exposure": "0.00"},
+            {"capital_bucket": "experimental", "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）", "equity": "10000.00", "max_total_exposure": "6000.00", "max_symbol_exposure": "1000.00", "used_exposure": "0.00"},
         ]
     bucket_performance = (
-        m15_virtual_bucket_performance_from_order_reconciliation(order_reconciliation or {}, reconciliation or {}, epoch_id)
+        m15_virtual_bucket_performance_from_order_reconciliation(
+            order_reconciliation or {},
+            reconciliation or {},
+            epoch_id,
+            market_date,
+        )
         if order_reconciliation
-        else m15_virtual_bucket_performance(active_rows, reconciliation or {})
+        else m15_virtual_bucket_performance(active_rows, reconciliation or {}, market_date)
     )
 
     def bucket_pnl_fields(performance: dict[str, str], quality: dict[str, str], has_closed: bool) -> dict[str, str]:
         no_trade = "等待新基线成交"
-        realized = str(performance.get("realized_pnl") or (quality["net_realized_pnl"] if has_closed else no_trade))
-        current_total = str(performance.get("current_position_total_pnl") or ("0.00" if has_closed else no_trade))
-        current_today = str(performance.get("current_position_today_pnl") or ("0.00" if has_closed else no_trade))
-        bucket_today = str(performance.get("bucket_today_pnl") or performance.get("today_pnl") or (quality["net_realized_pnl"] if has_closed else no_trade))
-        trading_total = str(performance.get("trading_total_pnl") or performance.get("total_pnl") or (quality["net_realized_pnl"] if has_closed else no_trade))
+        waiting_today = "等待长桥当日对账"
+        waiting_reconciled = "等待长桥成交对账"
+        waiting_positions = "等待长桥持仓对账"
+        if performance:
+            realized = str(performance.get("realized_pnl") or waiting_reconciled)
+            current_total = str(performance.get("current_position_total_pnl") or waiting_positions)
+            current_today = str(performance.get("current_position_today_pnl") or waiting_today)
+            bucket_today = str(performance.get("bucket_today_pnl") or performance.get("today_pnl") or waiting_today)
+            trading_total = str(performance.get("trading_total_pnl") or performance.get("total_pnl") or waiting_reconciled)
+        elif has_closed:
+            realized = waiting_reconciled
+            current_total = waiting_positions
+            current_today = waiting_today
+            bucket_today = waiting_today
+            trading_total = waiting_reconciled
+        else:
+            realized = no_trade
+            current_total = no_trade
+            current_today = no_trade
+            bucket_today = no_trade
+            trading_total = no_trade
         return {
             "bucket_today_pnl": bucket_today,
             "current_position_today_pnl": current_today,
@@ -5688,6 +5916,8 @@ def m15_longbridge_virtual_bucket_rows(
         if not isinstance(bucket, dict):
             continue
         bucket_id = str(bucket.get("capital_bucket") or bucket.get("bucket_id") or "")
+        configured_bucket = configured_bucket_by_id.get(bucket_id, {})
+        bucket_label = str(configured_bucket.get("label") or bucket.get("label") or bucket_id)
         bucket_rows = [row for row in active_rows if str(row.get("capital_bucket") or "") == bucket_id]
         submitted_buys = [
             row for row in bucket_rows
@@ -5707,7 +5937,7 @@ def m15_longbridge_virtual_bucket_rows(
         rows.append(
             {
                 "capital_bucket": bucket_id,
-                "label": str(bucket.get("label") or bucket_id),
+                "label": bucket_label,
                 "test_epoch_id": epoch_id or "未生成",
                 "epoch_status": epoch_status,
                 "equity": str(bucket.get("equity") or "10000.00"),
@@ -5808,6 +6038,7 @@ def m15_bucket_used_exposure(rows: list[dict[str, Any]]) -> str:
 def m15_virtual_bucket_performance(
     rows: list[dict[str, Any]],
     reconciliation: dict[str, Any],
+    market_date: str,
 ) -> dict[str, dict[str, str]]:
     holding_prices = m15_holding_price_context(reconciliation)
     lots: dict[str, dict[str, list[dict[str, Any]]]] = {}
@@ -5839,7 +6070,8 @@ def m15_virtual_bucket_performance(
             pnl = (price - lot["price"]) * matched
             bucket_stats["closed_pnls"].append(pnl)
             bucket_stats["total_realized"] += pnl
-            bucket_stats["today_realized"] += pnl
+            if not market_date or m15_row_market_date(row) == market_date:
+                bucket_stats["today_realized"] += pnl
             lot["quantity"] -= matched
             remaining -= matched
             if lot["quantity"] <= ZERO:
@@ -5884,6 +6116,7 @@ def m15_virtual_bucket_performance_from_order_reconciliation(
     order_reconciliation: dict[str, Any],
     reconciliation: dict[str, Any],
     epoch_id: str,
+    market_date: str,
 ) -> dict[str, dict[str, str]]:
     rows = order_reconciliation.get("rows", []) if isinstance(order_reconciliation.get("rows"), list) else []
     holding_prices = m15_holding_price_context(reconciliation)
@@ -5929,7 +6162,8 @@ def m15_virtual_bucket_performance_from_order_reconciliation(
             pnl = (price - lot["price"]) * matched
             bucket_stats["closed_pnls"].append(pnl)
             bucket_stats["total_realized"] += pnl
-            bucket_stats["today_realized"] += pnl
+            if not market_date or m15_order_market_date(row) == market_date:
+                bucket_stats["today_realized"] += pnl
             lot["quantity"] -= matched
             remaining -= matched
             if lot["quantity"] <= ZERO:
@@ -6832,7 +7066,8 @@ def build_ftd_plain_summary(card: dict[str, str] | None, rows: list[dict[str, st
     direction = "盈利" if today_pnl > ZERO else "亏损" if today_pnl < ZERO else "持平"
     symbols = ", ".join(sorted({row["symbol"] for row in rows})[:8]) or "暂无"
     return (
-        f"FTD001 今天触发 {len(rows)} 条，股票：{symbols}，"
+        "FTD001（M12-FTD-001-baseline-1d / M12-FTD-001-loss-streak-guard-1d）"
+        f"今天触发 {len(rows)} 条，股票：{symbols}，"
         f"当前模拟{direction} {money(today_pnl)}。重点风险：{'，'.join(risk_flags)}。"
     )
 
@@ -7044,8 +7279,8 @@ def build_ftd001_monitor_md(monitor: dict[str, Any]) -> str:
         "",
         "| 版本 | 今日盈亏 | 当前权益 | 当前胜率 | 当前最大回撤 |",
         "|---|---:|---:|---:|---:|",
-        f"| 原版 baseline | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('win_rate_percent', '')}% | {baseline.get('max_drawdown_percent', '')}% |",
-        f"| 连亏保护 loss_streak_guard | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('win_rate_percent', '')}% | {guard.get('max_drawdown_percent', '')}% |",
+        f"| M12-FTD-001-baseline-1d 原版 | {baseline.get('today_total_pnl', '暂无')} | {baseline.get('equity', '暂无')} | {baseline.get('win_rate_percent', '')}% | {baseline.get('max_drawdown_percent', '')}% |",
+        f"| M12-FTD-001-loss-streak-guard-1d 连亏保护 | {guard.get('today_total_pnl', '暂无')} | {guard.get('equity', '暂无')} | {guard.get('win_rate_percent', '')}% | {guard.get('max_drawdown_percent', '')}% |",
         "",
         f"- 风险标记：{'，'.join(monitor['risk_flags'])}",
     ]
@@ -7307,8 +7542,8 @@ def longbridge_unfilled_order_row_html(row: dict[str, Any]) -> str:
 
 def longbridge_virtual_bucket_head() -> str:
     return (
-        "<tr><th>资金池</th><th>基线</th><th>状态</th><th>资金</th><th>总敞口上限</th>"
-        "<th>单标的上限</th><th>已用敞口</th><th>买入成交数</th><th>当日盈亏</th>"
+        "<tr><th>虚拟切片</th><th>基线</th><th>状态</th><th>每仓资金</th><th>每仓总敞口上限</th>"
+        "<th>每仓单标的上限</th><th>真实已用敞口</th><th>真实买入成交数</th><th>当日盈亏</th>"
         "<th>持仓今日浮动</th><th>当前持仓总盈亏</th><th>已实现盈亏</th><th>交易累计盈亏</th>"
         "<th>胜率</th><th>盈亏比</th>"
         "<th>最大回撤</th><th>说明</th></tr>"
@@ -7377,15 +7612,18 @@ def longbridge_panel_row_html(row: dict[str, Any]) -> str:
 
 def longbridge_realtime_pnl_value(value: Any) -> str:
     raw_value = str(value or "")
-    if raw_value in {"", "无法计算", "等待长桥数据", "暂无"}:
+    if raw_value in {"", "无法计算", "等待长桥数据", "等待长桥字段对齐", "暂无"}:
         return raw_value or "暂无"
-    return money(money_to_decimal(raw_value))
+    parsed_value = money_to_decimal(raw_value)
+    if parsed_value == ZERO and raw_value.strip() not in {"0", "0.0", "0.00", "+0", "+0.0", "+0.00", "-0", "-0.0", "-0.00"}:
+        return raw_value
+    return money(parsed_value)
 
 
 def longbridge_realtime_pnl_card_html(row: dict[str, Any]) -> str:
     value = str(row.get("value", ""))
     value_type = str(row.get("value_type", ""))
-    value_class = pnl_css_class(value) if value_type == "money" and value not in {"", "无法计算"} else ""
+    value_class = pnl_css_class(value) if value_type == "money" and value not in {"", "无法计算", "等待长桥数据", "等待长桥字段对齐", "暂无"} else ""
     return (
         "<div class=\"pnl-card\">"
         f"<small>{html.escape(str(row.get('label', '')))}</small>"
@@ -7465,7 +7703,7 @@ def longbridge_symbol_pnl_row_html(row: dict[str, Any]) -> str:
 
 
 def longbridge_strategy_pnl_head() -> str:
-    return "<tr><th>运行单元</th><th>父策略</th><th>资金池</th><th>成交盈亏</th><th>标的数</th><th>标的</th><th>说明</th></tr>"
+    return "<tr><th>运行单元</th><th>父策略</th><th>资金池</th><th>成交盈亏</th><th>真实标的数</th><th>标的</th><th>说明</th></tr>"
 
 
 def longbridge_strategy_pnl_row_html(row: dict[str, Any]) -> str:
@@ -7749,7 +7987,11 @@ def extended_session_row_html(row: dict[str, str]) -> str:
 
 
 def ftd_account_row_html(row: dict[str, str]) -> str:
-    label = "原版 baseline" if row["variant_id"] == "baseline" else "连亏保护 loss_streak_guard"
+    label = (
+        "M12-FTD-001-baseline-1d 原版"
+        if row["variant_id"] == "baseline"
+        else "M12-FTD-001-loss-streak-guard-1d 连亏保护"
+    )
     return (
         "<tr>"
         f"<td>{html.escape(label)}</td>"
