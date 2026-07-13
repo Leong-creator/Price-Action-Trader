@@ -15,13 +15,22 @@
     "exit_attempt_cooldown_seconds": 900,
     "manage_untracked_positions_for_exit": true,
     "untracked_stop_loss_percent": "3",
-    "untracked_take_profit_percent": "3"
+    "untracked_take_profit_percent": "3",
+    "paper_short_testing": {
+      "enabled": true,
+      "test_epoch_id": "m15-short-single-strategy-20260713",
+      "runtime_ids": [
+        "M10-PA-002-5m-short",
+        "M10-PA-013-5m-short",
+        "M10-PA-011-ORB-R1-5m-short"
+      ]
+    }
   },
   "hard_boundaries": {
     "paper_simulated_only": true,
     "live_execution": false,
     "real_money_actions": false,
     "local_simulation_as_exit_source": false,
-    "short_selling": false
+    "short_selling": true
   }
 }

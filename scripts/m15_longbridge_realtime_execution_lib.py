@@ -39,6 +39,7 @@ DEFAULT_EPOCH_STATE = DEFAULT_OUTPUT_DIR / "m15_longbridge_virtual_account_epoch
 SUMMARY_JSON = "m15_longbridge_realtime_execution.json"
 LEDGER_JSONL = "m15_longbridge_realtime_execution_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_execution.md"
+ORDER_RECONCILIATION_JSON = "m15_longbridge_order_reconciliation.json"
 MAX_EXECUTION_LEDGER_BYTES = 50 * 1024 * 1024
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
@@ -64,6 +65,15 @@ DEFAULT_REALTIME_RUNTIME_IDS = (
     "M12-FTD-001-loss-streak-guard-1d",
     "M10-PA-001-1d",
     "M10-PA-011-ORB-R1-5m",
+    "M10-PA-002-5m-short",
+    "M10-PA-013-5m-short",
+    "M10-PA-011-ORB-R1-5m-short",
+)
+
+PAPER_SHORT_RUNTIME_IDS = (
+    "M10-PA-002-5m-short",
+    "M10-PA-013-5m-short",
+    "M10-PA-011-ORB-R1-5m-short",
 )
 
 EXPERIMENT_CAPITAL_BUCKET_RUNTIME_IDS = (
@@ -85,6 +95,9 @@ SINGLE_STRATEGY_CAPITAL_BUCKET_SPECS = (
     ("pa004_mbf_qc", "PA004-MBF-QC单仓（M10-PA-004-MBF-QC-1d）", "M10-PA-004-MBF-QC-1d"),
     ("pa013_5m", "PA013-5m单仓（M10-PA-013-5m）", "M10-PA-013-5m"),
     ("pa011_orb_r1", "PA011-ORB-R1单仓（M10-PA-011-ORB-R1-5m）", "M10-PA-011-ORB-R1-5m"),
+    ("pa002_5m_short", "PA002-5m做空测试仓（M10-PA-002-5m）", "M10-PA-002-5m-short"),
+    ("pa013_5m_short", "PA013-5m做空测试仓（M10-PA-013-5m）", "M10-PA-013-5m-short"),
+    ("pa011_orb_r1_short", "PA011-ORB-R1做空测试仓（M10-PA-011-ORB-R1-5m）", "M10-PA-011-ORB-R1-5m-short"),
 )
 
 AUXILIARY_STRATEGY_IDS = {
@@ -175,6 +188,7 @@ class VirtualCapitalBucket:
     daily_new_symbol_limit: int
     runtime_daily_new_symbol_limits: dict[str, int]
     runtime_ids: tuple[str, ...]
+    position_direction: str = "long"
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +214,10 @@ class RealtimeExecutionConfig:
     latency_acceptable_ms: int
     max_delayed_signal_age_seconds: int
     allowed_runtime_ids: tuple[str, ...]
+    paper_short_testing_enabled: bool
+    paper_short_runtime_ids: tuple[str, ...]
+    short_test_epoch_id: str
+    short_test_started_at: str
     paper_account_equity: Decimal
     max_total_exposure: Decimal
     max_symbol_exposure: Decimal
@@ -238,6 +256,15 @@ class NullRealtimePaperClient:
             "order_payload": order_payload,
         }
 
+    def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
+        del symbol, limit_price
+        return {
+            "ok": False,
+            "status": "short_capacity_unavailable_dry_run_client",
+            "max_quantity": ZERO,
+            "elapsed_ms": 0,
+        }
+
 
 class LongbridgeCliRealtimePaperClient:
     def __init__(
@@ -260,7 +287,7 @@ class LongbridgeCliRealtimePaperClient:
                 "blockers": blockers,
                 "command": redact_command(command),
             }
-        result = self.command_runner(command)
+        result = self.run_command(command)
         returncode = int(getattr(result, "returncode", 1))
         stdout = str(getattr(result, "stdout", ""))
         stderr = clean_cli_text(str(getattr(result, "stderr", "")))
@@ -272,26 +299,16 @@ class LongbridgeCliRealtimePaperClient:
                 "command": redact_command(command),
             }
         response = parse_json(stdout)
-        order_id = str(response.get("order_id", response.get("id", ""))) if isinstance(response, dict) else ""
+        order_id = response_order_id(response)
         if not order_id:
-            account_state_match = self.find_recent_matching_order(order_payload)
-            if account_state_match:
-                return {
-                    "submitted": True,
-                    "status": "submitted",
-                    "confirmation_source": "account_state_lookup",
-                    "order_id": str(account_state_match.get("order_id") or account_state_match.get("id") or ""),
-                    "response": response,
-                    "matched_order": account_state_match,
-                    "command": redact_command(command),
-                }
             return {
                 "submitted": False,
                 "status": "submit_unconfirmed_missing_order_id",
                 "order_id": "",
+                "confirmation_required": True,
                 "response": response,
                 "command": redact_command(command),
-                "error": "Longbridge CLI returned success code but no order_id; treat as unconfirmed, not filled/submitted.",
+                "error": "Longbridge CLI returned success code but no order_id; defer confirmation to background reconciliation.",
             }
         return {
             "submitted": True,
@@ -301,39 +318,60 @@ class LongbridgeCliRealtimePaperClient:
             "command": redact_command(command),
         }
 
-    def find_recent_matching_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
-        command = [self.cli_path, "order", "--format", "json"]
-        result = self.command_runner(command)
-        if int(getattr(result, "returncode", 1)) != 0:
-            return {}
-        payload = parse_json(str(getattr(result, "stdout", "")))
-        if not isinstance(payload, list):
-            return {}
-        symbol = longbridge_symbol(str(order_payload.get("symbol") or ""))
-        side = str(order_payload.get("side") or "").strip().lower()
-        quantity = decimal(order_payload.get("quantity", "0"))
-        limit_price = decimal(order_payload.get("limit_price", "0"))
-        candidates: list[dict[str, Any]] = []
-        for row in payload:
-            if not isinstance(row, dict):
-                continue
-            if str(row.get("order_id") or row.get("id") or "") == "":
-                continue
-            if str(row.get("symbol") or "") != symbol:
-                continue
-            if str(row.get("side") or "").strip().lower() != side:
-                continue
-            if decimal(row.get("quantity", "0")) != quantity:
-                continue
-            row_price = decimal(row.get("price", row.get("limit_price", row.get("executed_price", "0"))))
-            if row_price != limit_price:
-                continue
-            if str(row.get("status") or "") in {"Canceled", "Rejected"}:
-                continue
-            candidates.append(row)
-        candidates.sort(key=lambda row: str(row.get("created_at") or row.get("updated_at") or ""), reverse=True)
-        return candidates[0] if candidates else {}
+    def run_command(self, command: list[str]) -> Any:
+        try:
+            return self.command_runner(command, self.config.cli_timeout_seconds)
+        except TypeError:
+            # Unit-test runners and compatibility integrations historically
+            # accepted only the command positional argument.
+            return self.command_runner(command)
 
+    def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
+        command = [
+            self.cli_path,
+            "max-qty",
+            longbridge_symbol(symbol),
+            "--side",
+            "sell",
+            "--price",
+            fmt_money(limit_price),
+            "--format",
+            "json",
+        ]
+        started = time.monotonic()
+        result = self.run_command(command)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        returncode = int(getattr(result, "returncode", 1))
+        stdout = str(getattr(result, "stdout", ""))
+        stderr = clean_cli_text(str(getattr(result, "stderr", "")))
+        if returncode != 0:
+            return {
+                "ok": False,
+                "status": "short_capacity_query_failed",
+                "max_quantity": ZERO,
+                "elapsed_ms": elapsed_ms,
+                "error": (stderr or clean_cli_text(stdout))[:300],
+                "command": redact_command(command),
+            }
+        response = parse_json(stdout)
+        max_quantity = response_max_sell_quantity(response)
+        if max_quantity <= ZERO:
+            return {
+                "ok": False,
+                "status": "short_capacity_zero_or_permission_denied",
+                "max_quantity": ZERO,
+                "elapsed_ms": elapsed_ms,
+                "response": response,
+                "command": redact_command(command),
+            }
+        return {
+            "ok": True,
+            "status": "short_capacity_confirmed",
+            "max_quantity": max_quantity,
+            "elapsed_ms": elapsed_ms,
+            "response": response,
+            "command": redact_command(command),
+        }
 
 def resolve_repo_path(value: str | Path) -> Path:
     path = Path(value)
@@ -354,6 +392,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
     outputs = payload.get("outputs", {})
     realtime = payload.get("longbridge_realtime", {})
     account_model = payload.get("paper_account_model", {})
+    short_testing = payload.get("paper_short_testing", {})
     virtual_buckets, runtime_bucket_map = parse_virtual_capital_buckets(payload, account_model)
     epoch = payload.get("test_epoch", {}) if isinstance(payload.get("test_epoch"), dict) else {}
     return RealtimeExecutionConfig(
@@ -385,6 +424,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
             str(item)
             for item in realtime.get("allowed_runtime_ids", list(DEFAULT_REALTIME_RUNTIME_IDS))
         ),
+        paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
+        paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
+        short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
+        short_test_started_at=str(short_testing.get("test_started_at") or ""),
         paper_account_equity=decimal(account_model.get("equity", "10000")),
         max_total_exposure=decimal(account_model.get("max_total_exposure", "6000")),
         max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "1500")),
@@ -479,6 +522,7 @@ def parse_virtual_capital_buckets(
             daily_new_symbol_limit=int(row.get("daily_new_symbol_limit", 0) or 0),
             runtime_daily_new_symbol_limits=runtime_limits,
             runtime_ids=runtime_ids,
+            position_direction=str(row.get("position_direction") or "long").strip().lower(),
         )
         buckets[key] = bucket
         for runtime_id in runtime_ids:
@@ -527,7 +571,37 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
     if config.allow_fractional_shares:
         raise ValueError("M15 realtime execution forbids fractional shares")
     if config.allow_short_selling:
-        raise ValueError("M15 realtime execution forbids short selling")
+        if not config.paper_short_testing_enabled:
+            raise ValueError("M15 realtime execution short selling needs explicit paper_short_testing.enabled")
+        if not config.paper_short_runtime_ids:
+            raise ValueError("M15 realtime execution short selling needs an explicit runtime whitelist")
+        if not config.short_test_epoch_id or not config.short_test_started_at:
+            raise ValueError("M15 realtime execution short selling needs an independent short test epoch")
+        parse_utc_datetime(config.short_test_started_at)
+        invalid_short_runtimes = set(config.paper_short_runtime_ids) - set(PAPER_SHORT_RUNTIME_IDS)
+        if invalid_short_runtimes:
+            raise ValueError(
+                "M15 realtime execution short runtime is not an approved paper-short runtime: "
+                f"{sorted(invalid_short_runtimes)}"
+            )
+        if not set(config.paper_short_runtime_ids).issubset(set(config.allowed_runtime_ids)):
+            raise ValueError("M15 realtime execution short runtime is not in the main runtime whitelist")
+        for runtime_id in config.paper_short_runtime_ids:
+            bucket_id = config.runtime_capital_bucket_map.get(runtime_id, "")
+            bucket = config.virtual_capital_buckets.get(bucket_id)
+            if bucket is None or bucket.position_direction != "short":
+                raise ValueError(f"M15 realtime execution short runtime missing a short capital bucket: {runtime_id}")
+            if (
+                bucket.equity != Decimal("10000")
+                or bucket.max_total_exposure != Decimal("2000")
+                or bucket.max_symbol_exposure != Decimal("500")
+                or bucket.max_risk_per_order != Decimal("10")
+            ):
+                raise ValueError(f"M15 realtime execution short bucket risk limits drifted: {bucket_id}")
+        if config.hard_boundaries.get("short_selling") is not True:
+            raise ValueError("M15 realtime execution short selling needs explicit paper-only boundary")
+    elif config.paper_short_testing_enabled or config.paper_short_runtime_ids:
+        raise ValueError("M15 realtime execution short test configuration requires allow_short_selling")
     if config.allow_options:
         raise ValueError("M15 realtime execution forbids options")
     if config.allow_margin_financing:
@@ -560,9 +634,14 @@ def run_realtime_execution(
     ledger_retention = compact_execution_ledger_if_needed(
         config.output_dir / LEDGER_JSONL,
         current_epoch_id=str(epoch_state.get("test_epoch_id") or ""),
+        additional_current_epoch_ids=current_test_epoch_ids(config, epoch_state),
     )
-    existing_ledger = read_jsonl(config.output_dir / LEDGER_JSONL)
-    current_epoch_ledger = ledger_rows_for_epoch(existing_ledger, epoch_state)
+    existing_ledger = hydrate_unconfirmed_execution_rows(
+        read_jsonl(config.output_dir / LEDGER_JSONL),
+        account_state,
+        read_json(config.output_dir / ORDER_RECONCILIATION_JSON),
+    )
+    current_epoch_ledger = ledger_rows_for_epoch(existing_ledger, epoch_state, config)
     existing_submitted_ids = {
         str(row.get("signal_id"))
         for row in current_epoch_ledger
@@ -577,13 +656,13 @@ def run_realtime_execution(
             event
             for event in signal_events
             if str(event.get("signal_id") or "") not in existing_processed_ids
-            and signal_event_in_current_epoch(event, epoch_state)
+            and signal_event_in_current_epoch(event, epoch_state, config)
         ]
         suppressed_by_epoch = sum(
             1
             for event in signal_events
             if str(event.get("signal_id") or "") not in existing_processed_ids
-            and not signal_event_in_current_epoch(event, epoch_state)
+            and not signal_event_in_current_epoch(event, epoch_state, config)
         )
     signal_events_to_process = sorted(signal_events_to_process, key=realtime_execution_signal_sort_key)
     existing_submitted_exposure = submitted_ledger_open_exposure_by_bucket(
@@ -598,6 +677,32 @@ def run_realtime_execution(
         session_started_at,
         generated_at=generated_at_iso,
     )
+    existing_submitted_long_open_symbols = submitted_open_long_symbol_set(current_epoch_ledger, session_started_at)
+    tracked_short_open_order_ids = submitted_short_order_ids_by_symbol(
+        current_epoch_ledger,
+        session_started_at,
+        position_action="open_short",
+    )
+    tracked_short_cover_order_ids = submitted_short_order_ids_by_symbol(
+        current_epoch_ledger,
+        session_started_at,
+        position_action="close_short",
+    )
+    existing_submitted_short_cover_keys = submitted_short_cover_key_set(
+        current_epoch_ledger,
+        session_started_at,
+        account_state=account_state,
+    )
+    existing_submitted_short_cover_symbols = submitted_short_cover_symbol_set(
+        current_epoch_ledger,
+        session_started_at,
+        account_state=account_state,
+    )
+    tracked_short_positions_by_open_order = tracked_short_position_quantities_by_open_order(
+        current_epoch_ledger,
+        account_state,
+    )
+    short_reentry_low_by_key = confirmed_short_cover_structure_lows(current_epoch_ledger, account_state)
     broker_client = broker_client or (
         LongbridgeCliRealtimePaperClient(config) if config.execute_orders else NullRealtimePaperClient()
     )
@@ -634,6 +739,14 @@ def run_realtime_execution(
             selected_strategy_symbols=selected_strategy_symbols,
             same_day_loss_exit_symbols=same_day_loss_exit_symbols,
             existing_submitted_sell_symbols=existing_submitted_sell_symbols,
+            existing_submitted_long_open_symbols=existing_submitted_long_open_symbols,
+            tracked_short_open_order_ids=tracked_short_open_order_ids,
+            tracked_short_cover_order_ids=tracked_short_cover_order_ids,
+            existing_submitted_short_cover_keys=existing_submitted_short_cover_keys,
+            existing_submitted_short_cover_symbols=existing_submitted_short_cover_symbols,
+            tracked_short_positions_by_open_order=tracked_short_positions_by_open_order,
+            short_reentry_low_by_key=short_reentry_low_by_key,
+            broker_client=broker_client,
         )
         row = decision["ledger_row"]
         if decision["ready"]:
@@ -641,21 +754,40 @@ def run_realtime_execution(
             order_payload = decision["order_payload"]
             if config.execute_orders:
                 attempted_count += 1
+                broker_request_started_at = datetime.now(UTC)
+                broker_request_started_monotonic = time.monotonic()
+                row["broker_request_started_at"] = to_iso(broker_request_started_at)
                 submission = broker_client.submit_order(order_payload)
+                broker_response_at = datetime.now(UTC)
+                row["broker_response_at"] = to_iso(broker_response_at)
+                row["broker_request_elapsed_ms"] = max(
+                    0,
+                    int((time.monotonic() - broker_request_started_monotonic) * 1000),
+                )
                 row["submission_response"] = submission
                 row["longbridge_order_id"] = str(submission.get("order_id") or "")
                 row["broker_order_id"] = str(submission.get("order_id") or "")
                 row["order_id"] = str(submission.get("order_id") or "")
                 if submission.get("submitted") and submission.get("order_id"):
                     row["submission_status"] = "submitted"
+                    row["submission_confirmation_state"] = "broker_order_id_received"
+                    row["confirmation_required"] = False
                     row["submitted_at"] = generated_at_iso
-                    if row.get("side") == "sell":
+                    if ledger_row_closes_position(row):
                         row["exit_state"] = "submitted"
+                    if ledger_row_closes_short(row):
+                        short_cover_key = submitted_short_cover_key_from_row(row)
+                        if short_cover_key:
+                            existing_submitted_short_cover_keys.add(short_cover_key)
+                        existing_submitted_short_cover_symbols.add(base_symbol(str(row.get("symbol") or "")))
                     submitted_count += 1
                     submitted_signal_ids.add(str(row["signal_id"]))
                 else:
                     row["submission_status"] = str(submission.get("status", "submit_failed"))
-                    if row.get("side") == "sell":
+                    if row["submission_status"] == "submit_unconfirmed_missing_order_id":
+                        row["submission_confirmation_state"] = "awaiting_broker_reconciliation"
+                        row["confirmation_required"] = True
+                    if ledger_row_closes_position(row):
                         row["exit_state"] = (
                             "unconfirmed"
                             if row["submission_status"] == "submit_unconfirmed_missing_order_id"
@@ -665,7 +797,12 @@ def run_realtime_execution(
                         unconfirmed_count += 1
             else:
                 row["submission_status"] = "dry_run_ready_not_submitted"
-            if row.get("side") == "buy":
+                row["submission_confirmation_state"] = "dry_run_not_sent"
+                row["confirmation_required"] = False
+                row["broker_request_started_at"] = ""
+                row["broker_response_at"] = ""
+                row["broker_request_elapsed_ms"] = 0
+            if ledger_row_opens_position(row):
                 symbol = str(row["symbol"])
                 notional = decimal(row.get("notional", "0"))
                 bucket_id = str(row.get("capital_bucket") or "")
@@ -673,12 +810,13 @@ def run_realtime_execution(
                 selected_bucket_symbol_exposure[(bucket_id, symbol)] = (
                     selected_bucket_symbol_exposure.get((bucket_id, symbol), ZERO) + notional
                 )
-                strategy_key = parent_strategy_id(str(row.get("strategy_id") or row.get("runtime_id") or ""))
-                selected_strategy_symbols.setdefault((bucket_id, strategy_key), set()).add(symbol)
+                if row.get("direction") != "short":
+                    strategy_key = parent_strategy_id(str(row.get("strategy_id") or row.get("runtime_id") or ""))
+                    selected_strategy_symbols.setdefault((bucket_id, strategy_key), set()).add(symbol)
         else:
             blocked_count += 1
             row["submission_status"] = "blocked_not_submitted"
-            if row.get("side") == "sell":
+            if ledger_row_closes_position(row):
                 row["exit_state"] = "blocked"
         if row.get("latency_band") == "target_met":
             target_met_count += 1
@@ -853,7 +991,16 @@ def evaluate_signal_event(
     selected_strategy_symbols: dict[tuple[str, str], set[str]],
     same_day_loss_exit_symbols: set[tuple[str, str]],
     existing_submitted_sell_symbols: set[str],
+    existing_submitted_long_open_symbols: set[str],
+    tracked_short_open_order_ids: dict[str, set[str]],
+    tracked_short_cover_order_ids: dict[str, set[str]],
+    existing_submitted_short_cover_keys: set[tuple[str, str, str, str]],
+    existing_submitted_short_cover_symbols: set[str],
+    tracked_short_positions_by_open_order: dict[tuple[str, str, str, str], Decimal],
+    short_reentry_low_by_key: dict[tuple[str, str, str], Decimal],
+    broker_client: Any,
 ) -> dict[str, Any]:
+    risk_check_started_at = datetime.now(UTC)
     signal_id = str(signal.get("signal_id") or "")
     runtime_id = str(signal.get("runtime_id") or "")
     strategy_id = str(signal.get("strategy_id") or parent_strategy_id(runtime_id))
@@ -861,6 +1008,12 @@ def evaluate_signal_event(
     order_type = normalize_order_type(signal.get("order_type"))
     position_action = normalize_position_action(signal.get("position_action") or signal.get("event_type") or signal.get("action"))
     side = normalize_side(signal.get("side") or signal.get("direction"), position_action=position_action)
+    opening_long = is_open_long(side, position_action)
+    closing_long = is_close_long(side, position_action)
+    opening_short = is_open_short(side, position_action)
+    closing_short = is_close_short(side, position_action)
+    direction = "short" if opening_short or closing_short or str(signal.get("direction") or "").lower() == "short" else "long"
+    effective_epoch_state = test_epoch_state_for_direction(config, epoch_state, direction)
     raw_quantity = decimal(signal.get("quantity", signal.get("suggested_quantity", "0")))
     quantity_normalization = normalize_whole_share_quantity(raw_quantity, config.allow_fractional_shares)
     quantity = quantity_normalization.submitted_quantity
@@ -883,7 +1036,11 @@ def evaluate_signal_event(
         trigger_price = ZERO
         order_type_adjustment_status = "trigger_limit_downgraded_to_limit_trigger_already_reached"
     risk_per_share = abs(limit_price - stop_price) if limit_price > ZERO and stop_price > ZERO else ZERO
-    risk_amount = risk_per_share * quantity if side == "buy" and risk_per_share > ZERO else decimal(signal.get("risk_amount", "0"))
+    risk_amount = (
+        risk_per_share * quantity
+        if (opening_long or opening_short) and risk_per_share > ZERO
+        else decimal(signal.get("risk_amount", "0"))
+    )
     notional = quantity * limit_price if limit_price > ZERO else decimal(signal.get("notional", quantity * limit_price))
     capital_bucket = str(signal.get("capital_bucket") or capital_bucket_for_runtime(config, runtime_id, strategy_id) or "")
     bucket = config.virtual_capital_buckets.get(capital_bucket)
@@ -900,8 +1057,12 @@ def evaluate_signal_event(
         + decimal(signal.get("estimated_exit_fees_at_target", "0"))
         + decimal(signal.get("estimated_regulatory_fees_at_target", "0"))
     )
-    if side == "buy" and target_price > ZERO and limit_price > ZERO:
-        gross_profit = (target_price - limit_price) * quantity
+    if (opening_long or opening_short) and target_price > ZERO and limit_price > ZERO:
+        gross_profit = (
+            (target_price - limit_price) * quantity
+            if opening_long
+            else (limit_price - target_price) * quantity
+        )
         if known_fees > ZERO:
             net_profit = gross_profit - known_fees
     created_at = parse_signal_time(signal.get("created_at") or signal.get("generated_at") or signal.get("signal_time"))
@@ -929,15 +1090,48 @@ def evaluate_signal_event(
     if not (side == "sell" and exit_only_position_signal):
         blockers.extend(strategy_isolation_blockers(runtime_id, strategy_id, config.allowed_runtime_ids))
     held_quantities = held_symbol_quantities(account_state)
+    held_long_quantities = long_held_symbol_quantities(account_state)
     available_quantities = available_symbol_quantities(account_state)
-    open_order_symbols = open_order_symbol_set(account_state)
     open_sell_order_quantities = open_order_quantities_by_side(account_state, "sell")
-    if side == "sell_short":
-        blockers.append("blocked_short_disabled")
-    elif side == "sell":
-        if position_action not in {"close_long", "exit_long", "stop_loss", "take_profit"}:
+    open_buy_order_quantities = open_order_quantities_by_side(account_state, "buy")
+    broker_short_quantities = account_short_position_quantities(account_state)
+    short_position_key = (capital_bucket, runtime_id, symbol)
+    source_open_order_id = str(signal.get("source_open_order_id") or "")
+    short_lot_key = (capital_bucket, runtime_id, symbol, source_open_order_id)
+    tracked_short_quantity = tracked_short_positions_by_open_order.get(short_lot_key, ZERO)
+    short_capacity_check: dict[str, Any] = {
+        "status": "not_applicable",
+        "max_quantity": ZERO,
+        "elapsed_ms": 0,
+    }
+    if opening_short:
+        if not config.allow_short_selling or not config.paper_short_testing_enabled:
             blockers.append("blocked_short_disabled")
-        elif held_quantities.get(symbol, ZERO) <= ZERO:
+        elif runtime_id not in set(config.paper_short_runtime_ids):
+            blockers.append("blocked_short_runtime_not_whitelisted")
+        elif not bucket or bucket.position_direction != "short":
+            blockers.append("blocked_missing_short_capital_bucket")
+        if held_long_quantities.get(symbol, ZERO) > ZERO:
+            blockers.append("blocked_short_conflicts_with_existing_long_position")
+        if symbol in existing_submitted_long_open_symbols or has_untracked_open_order(
+            account_state,
+            symbol,
+            "buy",
+            tracked_short_cover_order_ids,
+        ):
+            blockers.append("blocked_short_conflicts_with_pending_long_buy")
+        if has_untracked_open_order(account_state, symbol, "sell", tracked_short_open_order_ids):
+            blockers.append("blocked_unattributed_open_sell_order_same_symbol")
+        if symbol in existing_submitted_short_cover_symbols:
+            blockers.append("blocked_short_pending_cover_same_symbol")
+        previous_cover_low = short_reentry_low_by_key.get(short_position_key, ZERO)
+        current_structure_low = decimal(signal.get("short_structure_low", "0"))
+        if previous_cover_low > ZERO and current_structure_low <= ZERO:
+            blockers.append("blocked_short_reentry_structure_unavailable")
+        elif previous_cover_low > ZERO and current_structure_low >= previous_cover_low:
+            blockers.append("blocked_short_reentry_requires_new_structure_low")
+    elif closing_long:
+        if held_quantities.get(symbol, ZERO) <= ZERO:
             blockers.append("blocked_close_without_long_position")
         elif quantity > held_quantities.get(symbol, ZERO):
             blockers.append("blocked_close_quantity_over_position")
@@ -947,9 +1141,27 @@ def evaluate_signal_event(
             blockers.append("blocked_existing_sell_open_order_same_symbol")
         if symbol in existing_submitted_sell_symbols:
             blockers.append("blocked_existing_submitted_sell_same_symbol")
-    elif side != "buy":
+    elif closing_short:
+        if not source_open_order_id:
+            blockers.append("blocked_close_short_missing_source_open_order_id")
+        elif tracked_short_quantity <= ZERO:
+            blockers.append("blocked_close_short_without_verified_short_position")
+        elif broker_short_quantities.get(symbol, ZERO) <= ZERO:
+            blockers.append("blocked_short_position_state_unverified")
+        elif quantity > tracked_short_quantity or quantity > broker_short_quantities.get(symbol, ZERO):
+            blockers.append("blocked_close_short_quantity_over_position")
+        if has_untracked_open_order(
+            account_state,
+            symbol,
+            "buy",
+            tracked_short_cover_order_ids,
+        ):
+            blockers.append("blocked_existing_buy_open_order_same_symbol")
+        if short_lot_key in existing_submitted_short_cover_keys:
+            blockers.append("blocked_existing_submitted_short_cover_same_short_lot")
+    elif not opening_long:
         blockers.append("blocked_unknown_side")
-    if side == "buy":
+    if opening_long or opening_short:
         if not bucket:
             blockers.append("blocked_missing_capital_bucket")
         bucket_symbol = (capital_bucket, symbol)
@@ -957,7 +1169,7 @@ def evaluate_signal_event(
             blockers.append("blocked_existing_submitted_order_same_bucket_symbol")
         if selected_bucket_symbol_exposure.get(bucket_symbol, ZERO) > ZERO:
             blockers.append("blocked_existing_selected_order_same_bucket_symbol")
-        if bucket_symbol in same_day_loss_exit_symbols:
+        if opening_long and bucket_symbol in same_day_loss_exit_symbols:
             blockers.append("blocked_same_day_loss_exit_cooldown")
         strategy_key = parent_strategy_id(strategy_id or runtime_id)
         bucket_limit = bucket.daily_new_symbol_limit if bucket else 0
@@ -970,7 +1182,7 @@ def evaluate_signal_event(
             ),
         )
         daily_limit = runtime_limit or config_limit or bucket_limit
-        if daily_limit > 0:
+        if opening_long and daily_limit > 0:
             strategy_bucket_key = (capital_bucket, strategy_key)
             existing_symbols = existing_strategy_symbols.get(strategy_bucket_key, set())
             selected_symbols = selected_strategy_symbols.get(strategy_bucket_key, set())
@@ -988,19 +1200,25 @@ def evaluate_signal_event(
         blockers.append("blocked_non_positive_quantity")
     if limit_price <= ZERO:
         blockers.append("missing_limit_price")
-    if side == "buy" and (stop_price <= ZERO or target_price <= ZERO):
+    if (opening_long or opening_short) and (stop_price <= ZERO or target_price <= ZERO):
         blockers.append("missing_stop_or_target")
-    if side == "buy" and current_price > ZERO:
-        if stop_price >= current_price:
-            blockers.append("blocked_invalid_stop_vs_current_price")
-        if target_price <= current_price:
-            blockers.append("blocked_invalid_target_vs_current_price")
+    if (opening_long or opening_short) and current_price > ZERO:
+        if opening_long:
+            if stop_price >= current_price:
+                blockers.append("blocked_invalid_stop_vs_current_price")
+            if target_price <= current_price:
+                blockers.append("blocked_invalid_target_vs_current_price")
+        else:
+            if stop_price <= current_price:
+                blockers.append("blocked_invalid_short_stop_vs_current_price")
+            if target_price >= current_price:
+                blockers.append("blocked_invalid_short_target_vs_current_price")
     max_risk = min(config.max_risk_per_order, bucket.max_risk_per_order) if bucket else config.max_risk_per_order
     max_symbol_exposure = bucket.max_symbol_exposure if bucket else config.max_symbol_exposure
     max_total_exposure = bucket.max_total_exposure if bucket else config.max_total_exposure
     order_currency = order_currency_for_symbol(symbol)
     order_currency_cash = order_currency_available_cash(account_state, order_currency)
-    order_currency_cash_after_order = order_currency_cash - notional if side == "buy" else order_currency_cash
+    order_currency_cash_after_order = order_currency_cash - notional if opening_long else order_currency_cash
     bucket_symbol_exposure = (
         existing_submitted_exposure.get((capital_bucket, symbol), ZERO)
         + selected_bucket_symbol_exposure.get((capital_bucket, symbol), ZERO)
@@ -1014,12 +1232,12 @@ def evaluate_signal_event(
     bucket_remaining_symbol_exposure = max_symbol_exposure - bucket_symbol_exposure
     bucket_pressure_quality_threshold = bucket_pressure_minimum_quality(bucket_remaining_total_exposure)
     bucket_pressure_quality_status = "not_applicable"
-    if side == "buy" and bucket_pressure_quality_threshold > ZERO:
+    if (opening_long or opening_short) and bucket_pressure_quality_threshold > ZERO:
         bucket_pressure_quality_status = "passed"
         if quality_score < bucket_pressure_quality_threshold:
             bucket_pressure_quality_status = "blocked"
             blockers.append("blocked_bucket_pressure_quality_below_threshold")
-    if side == "buy" and limit_price > ZERO and quantity > ZERO and not quantity_normalization.blocker:
+    if (opening_long or opening_short) and limit_price > ZERO and quantity > ZERO and not quantity_normalization.blocker:
         remaining_exposure = min(bucket_remaining_total_exposure, bucket_remaining_symbol_exposure, max_symbol_exposure)
         if remaining_exposure <= ZERO:
             quantity_cap_adjustment_status = "blocked_no_bucket_exposure_remaining"
@@ -1033,34 +1251,54 @@ def evaluate_signal_event(
             notional = quantity * limit_price if limit_price > ZERO else ZERO
             risk_amount = risk_per_share * quantity if risk_per_share > ZERO else risk_amount
             if target_price > ZERO and limit_price > ZERO and known_fees > ZERO:
-                net_profit = (target_price - limit_price) * quantity - known_fees
-    order_currency_cash_after_order = order_currency_cash - notional if side == "buy" else order_currency_cash
-    if side == "buy" and quantity_before_bucket_cap > ZERO and quantity <= ZERO and quantity_cap_adjustment_status:
+                net_profit = (
+                    (target_price - limit_price) * quantity
+                    if opening_long
+                    else (limit_price - target_price) * quantity
+                ) - known_fees
+    order_currency_cash_after_order = order_currency_cash - notional if opening_long else order_currency_cash
+    if (opening_long or opening_short) and quantity_before_bucket_cap > ZERO and quantity <= ZERO and quantity_cap_adjustment_status:
         blockers.append("blocked_bucket_remaining_exposure_below_one_share")
-    if side == "buy" and risk_amount > max_risk:
+    if (opening_long or opening_short) and risk_amount > max_risk:
         blockers.append("blocked_risk_over_cap")
-    if side == "buy" and notional > max_symbol_exposure:
+    if (opening_long or opening_short) and notional > max_symbol_exposure:
         blockers.append("blocked_symbol_exposure_over_cap")
-    if side == "buy" and bucket_symbol_exposure + notional > max_symbol_exposure:
+    if (opening_long or opening_short) and bucket_symbol_exposure + notional > max_symbol_exposure:
         blockers.append("blocked_symbol_exposure_over_cap")
-    if side == "buy" and bucket_total_exposure + notional > max_total_exposure:
+    if (opening_long or opening_short) and bucket_total_exposure + notional > max_total_exposure:
         blockers.append("blocked_total_exposure_over_cap")
-    if side == "buy" and available_cash(account_state) - notional < ZERO:
+    if opening_long and available_cash(account_state) - notional < ZERO:
         blockers.append("blocked_cash_reserve")
-    if side == "buy" and not config.allow_margin_financing and order_currency_cash_after_order < ZERO:
+    if opening_long and not config.allow_margin_financing and order_currency_cash_after_order < ZERO:
         blockers.append("blocked_margin_financing_disabled")
-    reward_r = reward_r_ratio(limit_price, stop_price, target_price) if side == "buy" else ZERO
-    minimum_reward_r = runtime_minimum_reward_r(config, runtime_id, strategy_id) if side == "buy" else ZERO
-    minimum_net_profit = runtime_minimum_net_profit(config, runtime_id, strategy_id) if side == "buy" else ZERO
+    reward_r = directional_reward_r_ratio(limit_price, stop_price, target_price, direction) if (opening_long or opening_short) else ZERO
+    minimum_reward_r = runtime_minimum_reward_r(config, runtime_id, strategy_id) if (opening_long or opening_short) else ZERO
+    minimum_net_profit = runtime_minimum_net_profit(config, runtime_id, strategy_id) if (opening_long or opening_short) else ZERO
     profit_gate_status = (
-        profit_quality_gate(config, signal, net_profit, runtime_id, strategy_id) if side == "buy" else "not_applicable"
+        profit_quality_gate(config, signal, net_profit, runtime_id, strategy_id) if (opening_long or opening_short) else "not_applicable"
     )
     if profit_gate_status == "below_minimum":
         blockers.append("blocked_fee_profit_below_minimum")
     elif profit_gate_status == "requires_confluence_or_quality":
         blockers.append("blocked_fee_profit_requires_confluence")
-    if side == "buy" and reward_r < minimum_reward_r:
+    if (opening_long or opening_short) and reward_r < minimum_reward_r:
         blockers.append("blocked_reward_r_below_minimum")
+    if opening_short and not blockers and config.execute_orders:
+        capacity_provider = getattr(broker_client, "max_short_quantity", None)
+        if not callable(capacity_provider):
+            blockers.append("blocked_short_capacity_query_unavailable")
+            short_capacity_check = {
+                "status": "short_capacity_query_unavailable",
+                "max_quantity": ZERO,
+                "elapsed_ms": 0,
+            }
+        else:
+            short_capacity_check = capacity_provider(symbol, limit_price)
+            broker_max_quantity = decimal(short_capacity_check.get("max_quantity", "0"))
+            if not short_capacity_check.get("ok"):
+                blockers.append("blocked_short_broker_capacity_unavailable")
+            elif broker_max_quantity < quantity:
+                blockers.append("blocked_short_broker_capacity_insufficient")
     if signal_expires_at and generated_at > signal_expires_at:
         blockers.append("blocked_realtime_signal_expired")
     if latency_ms is not None and latency_ms > config.latency_acceptable_ms:
@@ -1081,7 +1319,17 @@ def evaluate_signal_event(
     elif latency_band == "acceptable":
         status = "latency_acceptable_ready"
 
-    order_payload = build_order_payload(signal, side, order_type, symbol, quantity, limit_price, trigger_price)
+    risk_check_finished_at = datetime.now(UTC)
+    order_payload = build_order_payload(
+        signal,
+        side,
+        order_type,
+        symbol,
+        quantity,
+        limit_price,
+        trigger_price,
+        position_action=position_action,
+    )
     order_payload.update(
         {
             "capital_bucket": capital_bucket,
@@ -1089,7 +1337,7 @@ def evaluate_signal_event(
             "execution_run_id": execution_run_id,
             "execution_config_digest": config.config_digest,
             "session_run_id": session_run_id,
-            "test_epoch_id": str(epoch_state.get("test_epoch_id") or ""),
+            "test_epoch_id": str(effective_epoch_state.get("test_epoch_id") or ""),
             "raw_suggested_quantity": fmt_decimal(quantity_normalization.raw_quantity),
             "submitted_quantity": fmt_decimal(quantity),
             "quantity_rounding_adjustment": fmt_decimal(quantity_normalization.rounded_down_quantity),
@@ -1102,6 +1350,10 @@ def evaluate_signal_event(
             "quality_score": fmt_decimal(quality_score),
             "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
             "bucket_pressure_quality_status": bucket_pressure_quality_status,
+            "short_capacity_check": short_capacity_check,
+            "source_open_order_id": str(signal.get("source_open_order_id") or ""),
+            "short_structure_low": str(signal.get("short_structure_low") or ""),
+            "exit_reason": str(signal.get("exit_reason") or ""),
         }
     )
     ledger_row = {
@@ -1115,12 +1367,12 @@ def evaluate_signal_event(
         "strategy_id": strategy_id,
         "capital_bucket": capital_bucket,
         "capital_bucket_label": bucket_label,
-        "test_epoch_id": str(epoch_state.get("test_epoch_id") or ""),
-        "test_started_at": str(epoch_state.get("test_started_at") or ""),
-        "test_epoch_status": str(epoch_state.get("status") or ""),
+        "test_epoch_id": str(effective_epoch_state.get("test_epoch_id") or ""),
+        "test_started_at": str(effective_epoch_state.get("test_started_at") or ""),
+        "test_epoch_status": str(effective_epoch_state.get("status") or ""),
         "symbol": symbol,
         "timeframe": str(signal.get("timeframe") or ""),
-        "direction": str(signal.get("direction") or ""),
+        "direction": direction,
         "position_action": position_action,
         "side": side,
         "order_type": order_type,
@@ -1156,6 +1408,10 @@ def evaluate_signal_event(
         "volume_ratio": str(signal.get("volume_ratio") or ""),
         "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
         "bucket_pressure_quality_status": bucket_pressure_quality_status,
+        "short_capacity_check_status": str(short_capacity_check.get("status") or ""),
+        "short_capacity_max_quantity": fmt_decimal(decimal(short_capacity_check.get("max_quantity", "0"))),
+        "short_capacity_query_ms": int_decimal(short_capacity_check.get("elapsed_ms", 0)),
+        "short_position_verified_quantity": fmt_decimal(tracked_short_quantity),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
         "minimum_net_profit_after_fees": fmt_money(minimum_net_profit),
         "bucket_equity": fmt_money(bucket.equity) if bucket else "",
@@ -1170,10 +1426,18 @@ def evaluate_signal_event(
         "confluence_multiplier": fmt_decimal(decimal(signal.get("confluence_multiplier", "1"))),
         "high_quality_signal": signal_is_high_quality(signal),
         "source_market_event_id": str(signal.get("source_market_event_id") or signal.get("market_event_id") or ""),
+        "source_open_signal_id": str(signal.get("source_open_signal_id") or ""),
+        "source_open_order_id": str(signal.get("source_open_order_id") or ""),
+        "short_structure_low": str(signal.get("short_structure_low") or ""),
+        "exit_reason": str(signal.get("exit_reason") or ""),
         "execute_orders": config.execute_orders,
         "paper_trading_approval": config.paper_trading_approval,
         "created_at": to_iso(created_at) if created_at else "",
         "processed_at": to_iso(generated_at),
+        "market_event_time": str(signal.get("market_event_time") or ""),
+        "risk_check_started_at": to_iso(risk_check_started_at),
+        "risk_check_finished_at": to_iso(risk_check_finished_at),
+        "risk_check_elapsed_ms": max(0, int((risk_check_finished_at - risk_check_started_at).total_seconds() * 1000)),
         "latency_ms": latency_ms if latency_ms is not None else "",
         "latency_band": latency_band,
         "signal_age_limit_seconds": age_limit_seconds,
@@ -1185,6 +1449,8 @@ def evaluate_signal_event(
         "longbridge_order_id": "",
         "broker_order_id": "",
         "order_id": "",
+        "submission_confirmation_state": "not_attempted",
+        "confirmation_required": False,
         "local_simulation_ignored": True,
         "local_close_event_ignored": bool(signal.get("latest_close_event_time_after_open") or signal.get("local_close_event_id")),
         "longbridge_account_position_checked": True,
@@ -1192,7 +1458,11 @@ def evaluate_signal_event(
         "longbridge_realtime_submitted_ledger_checked": True,
         "m13_m14_gate_used_for_order": False,
         "fast_queue_used_for_order": False,
-        "exit_state": "ready_to_submit" if side == "sell" and not blockers else ("blocked" if side == "sell" else ""),
+        "exit_state": (
+            "ready_to_submit"
+            if (closing_long or closing_short) and not blockers
+            else ("blocked" if (closing_long or closing_short) else "")
+        ),
         "exit_only_position_signal": exit_only_position_signal,
     }
     return {"ready": not blockers, "ledger_row": ledger_row, "order_payload": order_payload}
@@ -1229,13 +1499,16 @@ def build_order_payload(
     quantity: Decimal,
     limit_price: Decimal,
     trigger_price: Decimal,
+    *,
+    position_action: str = "",
 ) -> dict[str, Any]:
     payload = {
         "source": "longbridge_realtime_signal_event",
         "signal_id": str(signal.get("signal_id") or ""),
         "runtime_id": str(signal.get("runtime_id") or ""),
         "strategy_id": str(signal.get("strategy_id") or ""),
-        "position_action": str(signal.get("position_action") or signal.get("event_type") or signal.get("action") or ""),
+        "position_action": position_action
+        or str(signal.get("position_action") or signal.get("event_type") or signal.get("action") or ""),
         "symbol": symbol,
         "side": side,
         "order_type": order_type,
@@ -1251,6 +1524,8 @@ def build_order_payload(
 
 def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, order_payload: dict[str, Any]) -> tuple[list[str], list[str]]:
     side = str(order_payload.get("side") or "")
+    position_action = normalize_position_action(order_payload.get("position_action"))
+    broker_side = longbridge_broker_side(side, position_action)
     symbol = longbridge_symbol(str(order_payload.get("symbol") or ""))
     quantity = int(decimal(order_payload.get("quantity", "0")))
     limit_price = str(order_payload.get("limit_price") or "")
@@ -1258,8 +1533,12 @@ def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, ord
     trigger_price = str(order_payload.get("trigger_price") or "")
     signal_id = str(order_payload.get("signal_id") or "")
     blockers: list[str] = []
-    if side not in {"buy", "sell"}:
+    if not broker_side:
         blockers.append("unsupported_longbridge_order_side")
+    if side == "sell_short" and position_action != "open_short":
+        blockers.append("invalid_open_short_position_action")
+    if position_action == "close_short" and broker_side != "buy":
+        blockers.append("invalid_close_short_broker_side")
     if not symbol:
         blockers.append("missing_symbol")
     if quantity <= 0:
@@ -1272,11 +1551,14 @@ def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, ord
         blockers.append("missing_trigger_price")
     if blockers:
         return [], blockers
-    remark = f"PAT-RT {signal_id} {order_payload.get('runtime_id', '')}"[:255]
+    remark = (
+        f"PAT-RT {signal_id} {order_payload.get('runtime_id', '')} "
+        f"{position_action or 'open_long'} {order_payload.get('capital_bucket', '')}"
+    )[:255]
     command = [
         cli_path,
         "order",
-        side,
+        broker_side,
         symbol,
         str(quantity),
         "--price",
@@ -1299,6 +1581,17 @@ def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, ord
     return command, []
 
 
+def longbridge_broker_side(side: str, position_action: str) -> str:
+    normalized_side = str(side or "").strip().lower()
+    if normalized_side == "sell_short" and position_action == "open_short":
+        return "sell"
+    if normalized_side == "buy" and position_action == "close_short":
+        return "buy"
+    if normalized_side in {"buy", "sell"}:
+        return normalized_side
+    return ""
+
+
 def assert_submit_command(command: list[str]) -> None:
     if len(command) < 5:
         raise ValueError("Longbridge realtime order command is incomplete")
@@ -1309,13 +1602,13 @@ def assert_submit_command(command: list[str]) -> None:
         raise ValueError(f"Longbridge realtime order command is missing safety flags: {args}")
 
 
-def run_longbridge_command(command: list[str]) -> Any:
+def run_longbridge_command(command: list[str], timeout_seconds: int = 30) -> Any:
     return subprocess.run(
         command,
         capture_output=True,
         text=True,
         check=False,
-        timeout=30,
+        timeout=timeout_seconds,
         env=build_longbridge_cli_env(),
     )
 
@@ -1403,25 +1696,65 @@ def load_or_update_test_epoch_state(
     return current
 
 
-def signal_event_in_current_epoch(signal: dict[str, Any], epoch_state: dict[str, Any]) -> bool:
-    if not epoch_state.get("enabled") or epoch_state.get("status") == "legacy":
+def test_epoch_state_for_direction(
+    config: RealtimeExecutionConfig,
+    primary_epoch_state: dict[str, Any],
+    direction: str,
+) -> dict[str, Any]:
+    if direction != "short":
+        return primary_epoch_state
+    return {
+        "enabled": config.paper_short_testing_enabled,
+        "status": "active" if config.paper_short_testing_enabled else "disabled",
+        "test_epoch_id": config.short_test_epoch_id,
+        "test_started_at": config.short_test_started_at,
+        "archive_previous_records": True,
+        "position_direction": "short",
+    }
+
+
+def current_test_epoch_ids(config: RealtimeExecutionConfig, epoch_state: dict[str, Any]) -> set[str]:
+    ids = {str(epoch_state.get("test_epoch_id") or "")}
+    if config.paper_short_testing_enabled:
+        ids.add(config.short_test_epoch_id)
+    return {item for item in ids if item}
+
+
+def signal_event_in_current_epoch(
+    signal: dict[str, Any],
+    epoch_state: dict[str, Any],
+    config: RealtimeExecutionConfig,
+) -> bool:
+    position_action = normalize_position_action(signal.get("position_action") or signal.get("event_type") or signal.get("action"))
+    side = normalize_side(signal.get("side") or signal.get("direction"), position_action=position_action)
+    direction = "short" if is_open_short(side, position_action) or is_close_short(side, position_action) else "long"
+    effective_epoch = test_epoch_state_for_direction(config, epoch_state, direction)
+    if not effective_epoch.get("enabled") or effective_epoch.get("status") == "legacy":
         return True
-    started_at = parse_signal_time(epoch_state.get("test_started_at"))
+    started_at = parse_signal_time(effective_epoch.get("test_started_at"))
     if not started_at:
         return False
     created_at = parse_signal_time(signal.get("created_at") or signal.get("generated_at") or signal.get("signal_time"))
     return bool(created_at and created_at >= started_at)
 
 
-def ledger_rows_for_epoch(rows: list[dict[str, Any]], epoch_state: dict[str, Any]) -> list[dict[str, Any]]:
+def ledger_rows_for_epoch(
+    rows: list[dict[str, Any]],
+    epoch_state: dict[str, Any],
+    config: RealtimeExecutionConfig,
+) -> list[dict[str, Any]]:
     if not epoch_state.get("enabled") or epoch_state.get("status") == "legacy":
         return rows
+    epoch_ids = current_test_epoch_ids(config, epoch_state)
     epoch_id = str(epoch_state.get("test_epoch_id") or "")
     started_at = parse_signal_time(epoch_state.get("test_started_at"))
     matched: list[dict[str, Any]] = []
     for row in rows:
-        if epoch_id and str(row.get("test_epoch_id") or "") == epoch_id:
+        row_epoch_id = str(row.get("test_epoch_id") or "")
+        if row_epoch_id and row_epoch_id in epoch_ids:
             matched.append(row)
+            continue
+        if row_epoch_id == config.short_test_epoch_id:
             continue
         if not started_at:
             continue
@@ -1590,6 +1923,42 @@ def held_symbol_quantities(account_state: dict[str, Any]) -> dict[str, Decimal]:
     return quantities
 
 
+def is_short_position_row(row: dict[str, Any]) -> bool:
+    if bool(row.get("is_short")):
+        return True
+    for key in ("position_side", "side", "direction", "position_type", "holding_side"):
+        value = str(row.get(key) or "").strip().lower()
+        if value in {"short", "sell_short", "sell", "bearish"}:
+            return True
+    return decimal(row.get("quantity", row.get("qty", "0"))) < ZERO
+
+
+def long_held_symbol_quantities(account_state: dict[str, Any]) -> dict[str, Decimal]:
+    quantities: dict[str, Decimal] = {}
+    positions = account_state.get("positions") if isinstance(account_state.get("positions"), list) else []
+    for row in positions:
+        if not isinstance(row, dict) or is_short_position_row(row):
+            continue
+        symbol = base_symbol(str(row.get("symbol", "")))
+        quantity = decimal(row.get("quantity", row.get("qty", "0")))
+        if symbol and quantity > ZERO:
+            quantities[symbol] = quantities.get(symbol, ZERO) + quantity
+    return quantities
+
+
+def account_short_position_quantities(account_state: dict[str, Any]) -> dict[str, Decimal]:
+    quantities: dict[str, Decimal] = {}
+    positions = account_state.get("positions") if isinstance(account_state.get("positions"), list) else []
+    for row in positions:
+        if not isinstance(row, dict) or not is_short_position_row(row):
+            continue
+        symbol = base_symbol(str(row.get("symbol", "")))
+        quantity = abs(decimal(row.get("quantity", row.get("qty", "0"))))
+        if symbol and quantity > ZERO:
+            quantities[symbol] = quantities.get(symbol, ZERO) + quantity
+    return quantities
+
+
 def available_symbol_quantities(account_state: dict[str, Any]) -> dict[str, Decimal]:
     quantities: dict[str, Decimal] = {}
     positions = account_state.get("positions")
@@ -1728,6 +2097,16 @@ def reward_r_ratio(entry: Decimal, stop: Decimal, target: Decimal) -> Decimal:
     return reward / risk
 
 
+def directional_reward_r_ratio(entry: Decimal, stop: Decimal, target: Decimal, direction: str) -> Decimal:
+    if direction == "short":
+        risk = stop - entry
+        reward = entry - target
+        if risk <= ZERO or reward <= ZERO:
+            return ZERO
+        return reward / risk
+    return reward_r_ratio(entry, stop, target)
+
+
 def signal_has_confluence(signal: dict[str, Any]) -> bool:
     support_count = int_decimal(signal.get("confluence_support_count", "0"))
     multiplier = decimal(signal.get("confluence_multiplier", "1"))
@@ -1800,11 +2179,12 @@ def submitted_ledger_open_exposure(
             continue
         quantity = decimal(row.get("quantity", "0"))
         notional = decimal(row.get("notional", "0"))
-        side = str(row.get("side") or "").lower()
-        if side == "buy":
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        if is_open_long(side, position_action) or is_open_short(side, position_action):
             quantities[symbol] = quantities.get(symbol, ZERO) + quantity
             notionals[symbol] = notionals.get(symbol, ZERO) + notional
-        elif side == "sell":
+        elif is_close_long(side, position_action) or is_close_short(side, position_action):
             quantities[symbol] = quantities.get(symbol, ZERO) - quantity
             if quantities[symbol] <= ZERO:
                 quantities.pop(symbol, None)
@@ -1836,20 +2216,23 @@ def submitted_ledger_open_exposure_by_bucket(
         key = (bucket, symbol)
         quantity = decimal(row.get("quantity", "0"))
         notional = decimal(row.get("notional", "0"))
-        side = str(row.get("side") or "").lower()
-        if side == "buy":
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        opening_short = is_open_short(side, position_action)
+        if is_open_long(side, position_action) or opening_short:
             order_id = ledger_row_order_id(row)
-            account_order = order_by_id.get(order_id) if order_id else None
-            active_quantity, active_notional = submitted_buy_active_exposure(
+            account_order = broker_order_for_ledger_row(row, order_by_id)
+            active_quantity, active_notional = submitted_open_active_exposure(
                 row,
                 account_order,
                 symbol_materialized=symbol in materialized_symbols,
+                opening_short=opening_short,
             )
             if active_quantity <= ZERO or active_notional <= ZERO:
                 continue
             quantities[key] = quantities.get(key, ZERO) + active_quantity
             notionals[key] = notionals.get(key, ZERO) + active_notional
-        elif side == "sell":
+        elif is_close_long(side, position_action) or is_close_short(side, position_action):
             old_quantity = quantities.get(key, ZERO)
             if old_quantity <= ZERO:
                 continue
@@ -1895,11 +2278,123 @@ def latest_account_orders_by_id(account_state: dict[str, Any]) -> dict[str, dict
     return orders_by_id
 
 
-def submitted_buy_active_exposure(
+def hydrate_unconfirmed_execution_rows(
+    rows: list[dict[str, Any]],
+    account_state: dict[str, Any],
+    order_reconciliation: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Overlay exact broker reconciliation on immutable local request rows.
+
+    The realtime ledger records the original CLI response and is intentionally
+    append-only.  If a successful response omitted an order id, the hot account
+    snapshot or background reconciliation can later prove the broker order from
+    its exact ``PAT-RT <signal_id>`` remark.  Consumers receive that confirmed
+    identity in memory without racing a concurrent execution append.
+    """
+    direct_by_signal = exact_account_orders_by_signal_id(account_state)
+    reconciled_by_signal = exact_reconciled_orders_by_signal_id(order_reconciliation)
+    hydrated: list[dict[str, Any]] = []
+    for source_row in rows:
+        row = dict(source_row)
+        if str(row.get("submission_status") or "") != "submit_unconfirmed_missing_order_id":
+            hydrated.append(row)
+            continue
+        signal_id = str(row.get("signal_id") or "")
+        broker_order = direct_by_signal.get(signal_id) or reconciled_by_signal.get(signal_id)
+        order_id = str(broker_order.get("order_id") or broker_order.get("id") or "") if broker_order else ""
+        if not signal_id or not order_id:
+            hydrated.append(row)
+            continue
+        broker_status = str(broker_order.get("canonical_status") or broker_order.get("status") or "unknown")
+        terminal = broker_order_is_terminal({"status": broker_status})
+        row.update(
+            {
+                "order_id": order_id,
+                "longbridge_order_id": order_id,
+                "broker_order_id": order_id,
+                "submission_status": "submitted",
+                "submission_confirmation_state": (
+                    "broker_reconciled_terminal" if terminal else "broker_reconciled_open"
+                ),
+                "confirmation_required": False,
+                "broker_reconciliation_status": broker_status,
+                "broker_reconciliation_match_method": str(
+                    broker_order.get("attribution_match_method") or "account_order_remark_signal_id"
+                ),
+                "_broker_order_from_reconciliation": dict(broker_order),
+            }
+        )
+        hydrated.append(row)
+    return hydrated
+
+
+def exact_account_orders_by_signal_id(account_state: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    candidates: dict[str, dict[str, dict[str, Any]]] = {}
+    for key in ("historical_orders", "orders", "open_orders"):
+        rows = account_state.get(key)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            signal_id = realtime_signal_id_from_order_remark(row)
+            order_id = str(row.get("order_id") or row.get("id") or "")
+            if signal_id and order_id:
+                candidates.setdefault(signal_id, {})[order_id] = row
+    return {
+        signal_id: next(iter(orders.values()))
+        for signal_id, orders in candidates.items()
+        if len(orders) == 1
+    }
+
+
+def exact_reconciled_orders_by_signal_id(order_reconciliation: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = order_reconciliation.get("rows") if isinstance(order_reconciliation.get("rows"), list) else []
+    candidates: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("attribution_status") != "matched_m15_realtime_ledger":
+            continue
+        if row.get("attribution_match_method") != "remark_signal_id":
+            continue
+        signal_id = str(row.get("signal_id") or "")
+        order_id = str(row.get("order_id") or "")
+        if signal_id and order_id:
+            candidates.setdefault(signal_id, {})[order_id] = row
+    return {
+        signal_id: next(iter(orders.values()))
+        for signal_id, orders in candidates.items()
+        if len(orders) == 1
+    }
+
+
+def realtime_signal_id_from_order_remark(order: dict[str, Any]) -> str:
+    for key in ("remark", "note", "message"):
+        text = str(order.get(key) or "")
+        match = re.search(r"(?:^|\s)PAT-RT\s+(\S+)", text)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def broker_order_for_ledger_row(
+    row: dict[str, Any],
+    order_by_id: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    order_id = ledger_row_order_id(row)
+    if order_id and order_id in order_by_id:
+        return order_by_id[order_id]
+    reconciled = row.get("_broker_order_from_reconciliation")
+    return reconciled if isinstance(reconciled, dict) else None
+
+
+def submitted_open_active_exposure(
     ledger_row: dict[str, Any],
     account_order: dict[str, Any] | None,
     *,
     symbol_materialized: bool,
+    opening_short: bool = False,
 ) -> tuple[Decimal, Decimal]:
     row_quantity = decimal(ledger_row.get("quantity", "0"))
     row_notional = decimal(ledger_row.get("notional", "0"))
@@ -1929,6 +2424,13 @@ def submitted_buy_active_exposure(
     if status in terminal_without_position and executed_quantity <= ZERO:
         return ZERO, ZERO
     if executed_quantity > ZERO:
+        if opening_short:
+            notional = (
+                executed_quantity * executed_price
+                if executed_price > ZERO
+                else row_notional * (executed_quantity / row_quantity)
+            )
+            return executed_quantity, notional
         if not symbol_materialized and status in {"filled", "done", "completed"}:
             return ZERO, ZERO
         notional = executed_quantity * executed_price if executed_price > ZERO else row_notional * (executed_quantity / row_quantity)
@@ -2019,6 +2521,293 @@ def submitted_sell_symbol_set(
     return symbols
 
 
+def submitted_open_long_symbol_set(rows: list[dict[str, Any]], session_started_at: str) -> set[str]:
+    session_start = parse_utc_datetime(session_started_at)
+    symbols: set[str] = set()
+    for row in rows:
+        if row.get("submission_status") != "submitted":
+            continue
+        submitted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
+        if submitted_at and submitted_at < session_start:
+            continue
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        if not is_open_long(side, position_action):
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        if symbol:
+            symbols.add(symbol)
+    return symbols
+
+
+def submitted_short_order_ids_by_symbol(
+    rows: list[dict[str, Any]],
+    session_started_at: str,
+    *,
+    position_action: str,
+) -> dict[str, set[str]]:
+    """Return broker order ids already attributed to a controlled paper short action.
+
+    The broker only exposes Buy/Sell, so this local attribution prevents a
+    tracked buy-to-cover from being mistaken for a pending long buy and allows
+    separate short buckets to keep their own pending short opens. Unknown
+    broker orders deliberately remain blockers.
+    """
+    session_start = parse_utc_datetime(session_started_at)
+    output: dict[str, set[str]] = {}
+    for row in rows:
+        if row.get("submission_status") != "submitted":
+            continue
+        submitted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
+        if submitted_at and submitted_at < session_start:
+            continue
+        action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        if action != position_action:
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        order_id = ledger_row_order_id(row)
+        if symbol and order_id:
+            output.setdefault(symbol, set()).add(order_id)
+    return output
+
+
+def submitted_short_cover_symbol_set(
+    rows: list[dict[str, Any]],
+    session_started_at: str,
+    *,
+    account_state: dict[str, Any],
+) -> set[str]:
+    session_start = parse_utc_datetime(session_started_at)
+    order_by_id = latest_account_orders_by_id(account_state)
+    symbols: set[str] = set()
+    for row in rows:
+        if not short_cover_submission_is_pending(row, order_by_id):
+            continue
+        action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        if action != "close_short":
+            continue
+        submitted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
+        if submitted_at and submitted_at < session_start:
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        if symbol:
+            symbols.add(symbol)
+    return symbols
+
+
+def submitted_short_cover_key_from_row(row: dict[str, Any]) -> tuple[str, str, str, str] | None:
+    bucket = str(row.get("capital_bucket") or "")
+    runtime_id = str(row.get("runtime_id") or "")
+    symbol = base_symbol(str(row.get("symbol") or ""))
+    source_open_order_id = str(row.get("source_open_order_id") or "")
+    if not all((bucket, runtime_id, symbol, source_open_order_id)):
+        return None
+    return bucket, runtime_id, symbol, source_open_order_id
+
+
+def submitted_short_cover_key_set(
+    rows: list[dict[str, Any]],
+    session_started_at: str,
+    *,
+    account_state: dict[str, Any],
+) -> set[tuple[str, str, str, str]]:
+    session_start = parse_utc_datetime(session_started_at)
+    order_by_id = latest_account_orders_by_id(account_state)
+    keys: set[tuple[str, str, str, str]] = set()
+    for row in rows:
+        if not short_cover_submission_is_pending(row, order_by_id):
+            continue
+        action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        if action != "close_short":
+            continue
+        submitted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
+        if submitted_at and submitted_at < session_start:
+            continue
+        key = submitted_short_cover_key_from_row(row)
+        if key:
+            keys.add(key)
+    return keys
+
+
+def short_cover_submission_is_pending(
+    row: dict[str, Any],
+    order_by_id: dict[str, dict[str, Any]],
+) -> bool:
+    """Keep a short lot blocked until its cover order reaches a broker terminal state.
+
+    A time-based guard can expire while a day order is still open.  That would
+    allow a fresh exit signal to buy-to-cover the same original short twice.
+    Missing broker state is also deliberately treated as unresolved until the
+    background reconciliation proves that the cover order became terminal.
+    """
+    submission_status = str(row.get("submission_status") or "")
+    if submission_status not in {"submitted", "submit_unconfirmed_missing_order_id"}:
+        return False
+    action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+    if action != "close_short":
+        return False
+    order_id = ledger_row_order_id(row)
+    if not order_id:
+        return True
+    broker_order = broker_order_for_ledger_row(row, order_by_id)
+    if not broker_order:
+        return True
+    return not broker_order_is_terminal(broker_order)
+
+
+def broker_order_is_terminal(row: dict[str, Any]) -> bool:
+    status = str(row.get("status") or "").strip().lower().replace(" ", "_")
+    return status in {
+        "filled",
+        "executed",
+        "done",
+        "completed",
+        "canceled",
+        "cancelled",
+        "rejected",
+        "expired",
+        "withdrawn",
+        "failed",
+    }
+
+
+def has_untracked_open_order(
+    account_state: dict[str, Any],
+    symbol: str,
+    side_filter: str,
+    known_order_ids_by_symbol: dict[str, set[str]],
+) -> bool:
+    """Treat any broker order without an exact controlled-short id as unsafe.
+
+    This keeps a real pending long buy or an externally created sell from being
+    netted with the virtual short slices, while allowing separately attributed
+    short buckets to share a symbol in the single paper account.
+    """
+    expected_symbol = base_symbol(symbol)
+    expected_side = side_filter.lower()
+    known_ids = known_order_ids_by_symbol.get(expected_symbol, set())
+    open_orders = account_state.get("open_orders") if isinstance(account_state.get("open_orders"), list) else []
+    for row in open_orders:
+        if not isinstance(row, dict) or base_symbol(str(row.get("symbol") or "")) != expected_symbol:
+            continue
+        side = str(row.get("side") or row.get("order_side") or "").strip().lower()
+        if expected_side == "buy" and not side.startswith("buy"):
+            continue
+        if expected_side == "sell" and not side.startswith("sell"):
+            continue
+        order_id = str(row.get("order_id") or row.get("id") or row.get("orderId") or "")
+        if not order_id or order_id not in known_ids:
+            return True
+    return False
+
+
+def order_has_confirmed_fill(account_order: dict[str, Any] | None) -> bool:
+    if not isinstance(account_order, dict):
+        return False
+    status = str(account_order.get("status") or "").strip().lower().replace(" ", "_")
+    if status in {"filled", "executed", "done", "completed", "partially_filled", "partial_filled"}:
+        return True
+    return decimal(account_order.get("executed_quantity", account_order.get("filled_quantity", "0"))) > ZERO
+
+
+def confirmed_order_quantity(account_order: dict[str, Any], fallback: Decimal) -> Decimal:
+    quantity = decimal(
+        account_order.get(
+            "executed_quantity",
+            account_order.get("filled_quantity", account_order.get("filled_qty", fallback)),
+        )
+    )
+    return quantity if quantity > ZERO else fallback
+
+
+def tracked_short_position_quantities_by_open_order(
+    rows: list[dict[str, Any]],
+    account_state: dict[str, Any],
+) -> dict[tuple[str, str, str, str], Decimal]:
+    """Return only short lots whose broker order is confirmed as filled.
+
+    Local submissions are intentionally insufficient: a buy-to-cover is allowed
+    only against a short opening that is present in Longbridge order state.
+    """
+    order_by_id = latest_account_orders_by_id(account_state)
+    quantities: dict[tuple[str, str, str, str], Decimal] = {}
+    for row in sorted(rows, key=lambda item: str(item.get("submitted_at") or item.get("processed_at") or "")):
+        if row.get("submission_status") != "submitted":
+            continue
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        runtime_id = str(row.get("runtime_id") or "")
+        bucket = str(row.get("capital_bucket") or "")
+        if not symbol or not runtime_id or not bucket:
+            continue
+        order_id = ledger_row_order_id(row)
+        account_order = broker_order_for_ledger_row(row, order_by_id)
+        if not order_has_confirmed_fill(account_order):
+            continue
+        quantity = confirmed_order_quantity(account_order, decimal(row.get("quantity", row.get("submitted_quantity", "0"))))
+        if quantity <= ZERO:
+            continue
+        if is_open_short(side, position_action):
+            if not order_id:
+                continue
+            key = (bucket, runtime_id, symbol, order_id)
+            quantities[key] = quantities.get(key, ZERO) + quantity
+        elif is_close_short(side, position_action):
+            source_open_order_id = str(row.get("source_open_order_id") or "")
+            if not source_open_order_id:
+                continue
+            key = (bucket, runtime_id, symbol, source_open_order_id)
+            remaining = quantities.get(key, ZERO) - quantity
+            if remaining > ZERO:
+                quantities[key] = remaining
+            else:
+                quantities.pop(key, None)
+    return quantities
+
+
+def tracked_short_position_quantities(
+    rows: list[dict[str, Any]],
+    account_state: dict[str, Any],
+) -> dict[tuple[str, str, str], Decimal]:
+    """Compatibility aggregate; close-short validation uses the exact-lot helper."""
+    aggregate: dict[tuple[str, str, str], Decimal] = {}
+    for (bucket, runtime_id, symbol, _order_id), quantity in tracked_short_position_quantities_by_open_order(
+        rows,
+        account_state,
+    ).items():
+        key = (bucket, runtime_id, symbol)
+        aggregate[key] = aggregate.get(key, ZERO) + quantity
+    return aggregate
+
+
+def confirmed_short_cover_structure_lows(
+    rows: list[dict[str, Any]],
+    account_state: dict[str, Any],
+) -> dict[tuple[str, str, str], Decimal]:
+    order_by_id = latest_account_orders_by_id(account_state)
+    lows: dict[tuple[str, str, str], Decimal] = {}
+    for row in rows:
+        if row.get("submission_status") != "submitted":
+            continue
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        if not is_close_short(side, position_action):
+            continue
+        order_id = ledger_row_order_id(row)
+        if not order_has_confirmed_fill(broker_order_for_ledger_row(row, order_by_id)):
+            continue
+        key = (
+            str(row.get("capital_bucket") or ""),
+            str(row.get("runtime_id") or ""),
+            base_symbol(str(row.get("symbol") or "")),
+        )
+        structure_low = decimal(row.get("short_structure_low", "0"))
+        if all(key) and structure_low > ZERO:
+            lows[key] = structure_low
+    return lows
+
+
 def processed_signal_ids(rows: list[dict[str, Any]], config: RealtimeExecutionConfig) -> set[str]:
     processed: set[str] = set()
     for row in rows:
@@ -2032,7 +2821,7 @@ def processed_signal_ids(rows: list[dict[str, Any]], config: RealtimeExecutionCo
 
 def row_is_permanently_processed(row: dict[str, Any], config: RealtimeExecutionConfig) -> bool:
     submission_status = str(row.get("submission_status") or "")
-    if submission_status in {"submit_failed", "submit_unconfirmed_missing_order_id"}:
+    if submission_status == "submit_failed":
         return False
     if submission_status == "dry_run_ready_not_submitted":
         previous_execute_orders = bool(row.get("execute_orders"))
@@ -2086,6 +2875,10 @@ def int_decimal(value: Any) -> int:
 
 def normalize_side(value: Any, *, position_action: str = "") -> str:
     text = str(value or "").strip().lower()
+    if position_action == "close_short":
+        return "buy"
+    if position_action == "open_short":
+        return "sell_short"
     if text in {"buy", "long", "open_long", "bullish", "看涨", "买入", "做多"}:
         return "buy"
     if text in {"sell", "close_long", "sell_long", "平仓", "卖出平多"} or position_action in {
@@ -2110,7 +2903,45 @@ def normalize_position_action(value: Any) -> str:
         return "take_profit"
     if text in {"open", "open_long", "buy"}:
         return "open_long"
+    if text in {"open_short", "sell_short", "short", "开空", "做空"}:
+        return "open_short"
+    if text in {"close_short", "buy_to_cover", "cover_short", "平空", "回补"}:
+        return "close_short"
     return text
+
+
+def is_open_long(side: str, position_action: str) -> bool:
+    return side == "buy" and position_action != "close_short"
+
+
+def is_close_long(side: str, position_action: str) -> bool:
+    return side == "sell" and position_action in {"close_long", "exit_long", "stop_loss", "take_profit"}
+
+
+def is_open_short(side: str, position_action: str) -> bool:
+    return side == "sell_short" or (side == "sell" and position_action == "open_short")
+
+
+def is_close_short(side: str, position_action: str) -> bool:
+    return side == "buy" and position_action == "close_short"
+
+
+def ledger_row_opens_position(row: dict[str, Any]) -> bool:
+    position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+    side = normalize_side(row.get("side"), position_action=position_action)
+    return is_open_long(side, position_action) or is_open_short(side, position_action)
+
+
+def ledger_row_closes_position(row: dict[str, Any]) -> bool:
+    position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+    side = normalize_side(row.get("side"), position_action=position_action)
+    return is_close_long(side, position_action) or is_close_short(side, position_action)
+
+
+def ledger_row_closes_short(row: dict[str, Any]) -> bool:
+    position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+    side = normalize_side(row.get("side"), position_action=position_action)
+    return is_close_short(side, position_action)
 
 
 def normalize_order_type(value: Any) -> str:
@@ -2193,7 +3024,7 @@ def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
             "- 长桥模拟账户只看自己的现金、持仓、挂单、成交和订单编号。",
             "- 本地模拟账本、旧快速队列、本地平仓和 M13/M14 完整重算不参与实时下单决策。",
             "- 修复策略、影子变体、救援策略和辅助模块只留在本地模拟。",
-            "- 继续不做碎股、不做空、不做期权，不触碰真实资金。",
+            "- 不做真正碎股、期权或真实资金；做空仅限三条受限纸面短仓，且必须按原开空订单号回补。",
             "",
         ]
     )
@@ -2246,6 +3077,7 @@ def compact_execution_ledger_if_needed(
     path: Path,
     *,
     current_epoch_id: str,
+    additional_current_epoch_ids: set[str] | None = None,
     max_bytes: int = MAX_EXECUTION_LEDGER_BYTES,
 ) -> dict[str, Any]:
     if max_bytes <= 0 or not path.exists():
@@ -2254,6 +3086,8 @@ def compact_execution_ledger_if_needed(
     if before_bytes <= max_bytes:
         return {"compacted": False, "reason": "below_threshold", "bytes": before_bytes}
 
+    current_epoch_ids = {current_epoch_id} if current_epoch_id else set()
+    current_epoch_ids.update(item for item in (additional_current_epoch_ids or set()) if item)
     retained_lines: list[str] = []
     archived_lines: list[str] = []
     malformed_lines: list[str] = []
@@ -2265,7 +3099,7 @@ def compact_execution_ledger_if_needed(
         except json.JSONDecodeError:
             malformed_lines.append(line)
             continue
-        if current_epoch_id and str(row.get("test_epoch_id") or "") == current_epoch_id:
+        if str(row.get("test_epoch_id") or "") in current_epoch_ids:
             retained_lines.append(line)
         else:
             archived_lines.append(line)
@@ -2275,7 +3109,7 @@ def compact_execution_ledger_if_needed(
             "compacted": False,
             "reason": "threshold_exceeded_but_all_rows_current_epoch",
             "bytes": before_bytes,
-            "current_epoch_id": current_epoch_id,
+            "current_epoch_ids": sorted(current_epoch_ids),
             "retained_rows": len(retained_lines),
         }
 
@@ -2290,7 +3124,7 @@ def compact_execution_ledger_if_needed(
     return {
         "compacted": True,
         "reason": "archived_non_current_epoch_rows",
-        "current_epoch_id": current_epoch_id,
+        "current_epoch_ids": sorted(current_epoch_ids),
         "before_bytes": before_bytes,
         "after_bytes": after_bytes,
         "archived_rows": len(archived_lines),
@@ -2334,6 +3168,62 @@ def parse_json(text: str) -> Any:
         return json.loads(text or "{}")
     except json.JSONDecodeError:
         return {}
+
+
+def response_order_id(response: Any) -> str:
+    """Extract a broker order id without a hot-path account-history scan."""
+    if isinstance(response, dict):
+        for key in ("order_id", "orderId", "id"):
+            value = str(response.get(key) or "").strip()
+            if value:
+                return value
+        for key in ("data", "result", "order"):
+            nested = response.get(key)
+            order_id = response_order_id(nested)
+            if order_id:
+                return order_id
+    if isinstance(response, list):
+        for item in response:
+            order_id = response_order_id(item)
+            if order_id:
+                return order_id
+    return ""
+
+
+def response_max_sell_quantity(response: Any) -> Decimal:
+    if isinstance(response, dict):
+        for key in ("cash_max_qty", "short_max_qty", "sell_max_qty", "max_sell_quantity", "max_qty"):
+            quantity = decimal(response.get(key, "0"))
+            if quantity > ZERO:
+                return quantity
+        # `longbridge max-qty --format json` currently returns CLI table rows
+        # such as {"field": "Cash Max Qty", "value": "903"}, rather than a
+        # keyed API object. Only consume explicitly cash/short sell capacity;
+        # margin capacity stays excluded because margin financing is disabled.
+        field = str(response.get("field") or "").strip().lower().replace("_", " ")
+        field = " ".join(field.split())
+        if field in {
+            "cash max qty",
+            "cash max quantity",
+            "short max qty",
+            "short max quantity",
+            "sell max qty",
+            "sell max quantity",
+            "max sell quantity",
+        }:
+            quantity = decimal(response.get("value", "0"))
+            if quantity > ZERO:
+                return quantity
+        for key in ("data", "result", "max_quantity"):
+            quantity = response_max_sell_quantity(response.get(key))
+            if quantity > ZERO:
+                return quantity
+    if isinstance(response, list):
+        for item in response:
+            quantity = response_max_sell_quantity(item)
+            if quantity > ZERO:
+                return quantity
+    return ZERO
 
 
 def decimal(value: Any) -> Decimal:

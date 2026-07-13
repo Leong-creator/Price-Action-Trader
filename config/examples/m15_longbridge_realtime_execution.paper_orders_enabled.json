@@ -40,7 +40,10 @@
       "M10-PA-005-1d",
       "M10-PA-005-5m",
       "M10-PA-008-1d",
-      "M10-PA-012-5m"
+      "M10-PA-012-5m",
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
     ]
   },
   "test_epoch": {
@@ -139,6 +142,42 @@
         "M10-PA-011-ORB-R1-5m"
       ]
     },
+    "pa002_5m_short": {
+      "label": "PA002-5m做空测试仓（M10-PA-002-5m）",
+      "position_direction": "short",
+      "equity": "10000",
+      "max_total_exposure": "2000",
+      "max_symbol_exposure": "500",
+      "max_risk_per_order": "10",
+      "min_cash_reserve": "8000",
+      "runtime_ids": [
+        "M10-PA-002-5m-short"
+      ]
+    },
+    "pa013_5m_short": {
+      "label": "PA013-5m做空测试仓（M10-PA-013-5m）",
+      "position_direction": "short",
+      "equity": "10000",
+      "max_total_exposure": "2000",
+      "max_symbol_exposure": "500",
+      "max_risk_per_order": "10",
+      "min_cash_reserve": "8000",
+      "runtime_ids": [
+        "M10-PA-013-5m-short"
+      ]
+    },
+    "pa011_orb_r1_short": {
+      "label": "PA011-ORB-R1做空测试仓（M10-PA-011-ORB-R1-5m）",
+      "position_direction": "short",
+      "equity": "10000",
+      "max_total_exposure": "2000",
+      "max_symbol_exposure": "500",
+      "max_risk_per_order": "10",
+      "min_cash_reserve": "8000",
+      "runtime_ids": [
+        "M10-PA-011-ORB-R1-5m-short"
+      ]
+    },
     "experimental": {
       "label": "统一实验仓（M10-PA-002-1d/M10-PA-013-1d/M10-PA-008-1d/M10-PA-005-1d/M10-PA-005-5m/M10-PA-012-5m/M10-PA-001-1d）",
       "equity": "10000",
@@ -165,19 +204,35 @@
     "max_risk_per_order": "20",
     "min_cash_reserve": "4000",
     "allow_fractional_shares": false,
-    "allow_short_selling": false,
+    "allow_short_selling": true,
     "allow_options": false,
     "allow_margin_financing": false,
     "minimum_net_profit_after_fees": "5",
     "normal_minimum_net_profit_after_fees": "8",
     "minimum_reward_r": "1.5",
     "runtime_minimum_net_profit_after_fees": {
-      "M10-PA-001": "12"
+      "M10-PA-001": "12",
+      "M10-PA-002-5m-short": "12",
+      "M10-PA-013-5m-short": "12",
+      "M10-PA-011-ORB-R1-5m-short": "15"
     },
     "runtime_minimum_reward_r": {
-      "M10-PA-001": "2.0"
+      "M10-PA-001": "2.0",
+      "M10-PA-002-5m-short": "2.0",
+      "M10-PA-013-5m-short": "2.0",
+      "M10-PA-011-ORB-R1-5m-short": "2.25"
     },
     "conditional_net_profit_requires_confluence": true
+  },
+  "paper_short_testing": {
+    "enabled": true,
+    "test_epoch_id": "m15-short-single-strategy-20260713",
+    "test_started_at": "2026-07-13T00:00:00Z",
+    "runtime_ids": [
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
+    ]
   },
   "runtime_layering": {
     "longbridge_realtime_candidates": [
@@ -195,7 +250,10 @@
       "M10-PA-005-1d",
       "M10-PA-005-5m",
       "M10-PA-008-1d",
-      "M10-PA-012-5m"
+      "M10-PA-012-5m",
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
     ],
     "local_repair_or_shadow_only": [
       "M10-PA-007-1d",
@@ -223,7 +281,7 @@
     "local_simulation_as_order_source": false,
     "manual_m12_37_once": false,
     "fractional_shares": false,
-    "short_selling": false,
+    "short_selling": true,
     "options": false,
     "margin_financing": false
   }

@@ -14,9 +14,22 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     DEFAULT_DAILY_DIR,
     DEFAULT_OUTPUT_DIR,
     LEDGER_JSONL as EXECUTION_LEDGER_JSONL,
+    ORDER_RECONCILIATION_JSON,
+    PAPER_SHORT_RUNTIME_IDS,
+    account_short_position_quantities,
+    broker_order_for_ledger_row,
+    broker_order_is_terminal,
+    confirmed_order_quantity,
     decimal,
+    is_short_position_row,
+    ledger_row_order_id,
+    latest_account_orders_by_id,
+    normalize_position_action,
+    normalize_side,
+    order_has_confirmed_fill,
     fmt_decimal,
     fmt_money,
+    hydrate_unconfirmed_execution_rows,
     parse_signal_time,
     parse_utc_datetime,
     project_path,
@@ -50,6 +63,9 @@ class RealtimePositionManagerConfig:
     manage_untracked_positions_for_exit: bool
     untracked_stop_loss_percent: Decimal
     untracked_take_profit_percent: Decimal
+    paper_short_testing_enabled: bool
+    short_test_epoch_id: str
+    paper_short_runtime_ids: tuple[str, ...]
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -67,6 +83,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
     inputs = payload.get("inputs", {})
     outputs = payload.get("outputs", {})
     manager = payload.get("longbridge_position_manager", {})
+    short_testing = manager.get("paper_short_testing", {}) if isinstance(manager.get("paper_short_testing"), dict) else {}
     return RealtimePositionManagerConfig(
         stage=str(payload.get("stage", "M15.longbridge_realtime_position_manager")),
         title=str(payload.get("title", "长桥模拟账户实时持仓退出管理")),
@@ -80,6 +97,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
         manage_untracked_positions_for_exit=bool(manager.get("manage_untracked_positions_for_exit", True)),
         untracked_stop_loss_percent=decimal(manager.get("untracked_stop_loss_percent", "3")),
         untracked_take_profit_percent=decimal(manager.get("untracked_take_profit_percent", "3")),
+        paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
+        short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
+        paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -104,7 +124,15 @@ def validate_config(config: RealtimePositionManagerConfig) -> None:
     if config.hard_boundaries.get("local_simulation_as_exit_source", False):
         raise ValueError("M15 realtime position manager cannot use local simulation as exit source")
     if config.hard_boundaries.get("short_selling", False):
-        raise ValueError("M15 realtime position manager cannot enable short selling")
+        if not config.paper_short_testing_enabled:
+            raise ValueError("M15 realtime position manager short exit needs explicit paper short testing")
+        if not config.short_test_epoch_id or not config.paper_short_runtime_ids:
+            raise ValueError("M15 realtime position manager short exit needs a short test epoch and whitelist")
+        invalid = set(config.paper_short_runtime_ids) - set(PAPER_SHORT_RUNTIME_IDS)
+        if invalid:
+            raise ValueError(f"M15 realtime position manager has unapproved short runtime: {sorted(invalid)}")
+    elif config.paper_short_testing_enabled or config.paper_short_runtime_ids:
+        raise ValueError("M15 realtime position manager short config requires the paper short boundary")
 
 
 def run_realtime_position_manager(
@@ -117,13 +145,24 @@ def run_realtime_position_manager(
     generated_at_iso = to_iso(now)
     account_state = read_json(config.account_state_path)
     market_events = read_jsonl(config.market_events_path)
-    execution_rows = read_jsonl(config.realtime_execution_ledger_path)
+    execution_rows = hydrate_unconfirmed_execution_rows(
+        read_jsonl(config.realtime_execution_ledger_path),
+        account_state,
+        read_json(config.output_dir / ORDER_RECONCILIATION_JSON),
+    )
     existing_signal_events = read_jsonl(config.realtime_signal_events_path)
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
 
     latest_prices = latest_price_by_symbol(market_events)
     position_slices = account_position_slices(account_state, execution_rows, config.manage_untracked_positions_for_exit)
-    recent_exit_attempts = recent_exit_attempt_keys(execution_rows, now, config.exit_attempt_cooldown_seconds)
+    position_slices.extend(confirmed_short_position_slices(account_state, execution_rows, config))
+    retriable_short_exit_signal_ids = terminal_retriable_short_exit_signal_ids(execution_rows, account_state)
+    recent_exit_attempts = recent_exit_attempt_keys(
+        execution_rows,
+        now,
+        config.exit_attempt_cooldown_seconds,
+        retriable_short_exit_signal_ids,
+    )
     ledger_rows: list[dict[str, Any]] = []
     exit_events: list[dict[str, Any]] = []
     for position, metadata in position_slices:
@@ -137,6 +176,7 @@ def run_realtime_position_manager(
             generated_at_iso,
             existing_signal_ids,
             recent_exit_attempts,
+            retriable_short_exit_signal_ids,
         )
         ledger_rows.append(row)
         if event and len(exit_events) < config.max_exit_events_per_run:
@@ -156,6 +196,9 @@ def run_realtime_position_manager(
         "local_simulation_isolated": True,
         "local_close_signal_used": False,
         "position_count": len(position_slices),
+        "managed_short_position_count": sum(
+            1 for _position, metadata in position_slices if str(metadata.get("position_direction") or "") == "short"
+        ),
         "account_position_count": len(account_positions(account_state)),
         "managed_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "m15_realtime_managed"),
         "unmanaged_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_unmanaged"),
@@ -203,7 +246,8 @@ def evaluate_position(
     latest_price: Decimal,
     generated_at: str,
     existing_signal_ids: set[str],
-    recent_exit_attempts: set[tuple[str, str]],
+    recent_exit_attempts: set[tuple[str, str, str, str]],
+    retriable_short_exit_signal_ids: set[str],
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     symbol = str(position["symbol"])
     quantity = decimal(position.get("quantity", "0"))
@@ -212,9 +256,15 @@ def evaluate_position(
     target_price = decimal(metadata.get("target_price", "0"))
     runtime_id = str(metadata.get("runtime_id", ""))
     strategy_id = str(metadata.get("strategy_id", ""))
+    position_direction = str(metadata.get("position_direction") or "long").lower()
+    source_open_order_id = str(metadata.get("short_open_order_id") or metadata.get("order_id") or "")
     cost_price = position_cost_price(position)
     latest_for_pnl = latest_price if latest_price > ZERO else decimal(position.get("current_price", position.get("last_price", "0")))
-    unrealized_pnl = (latest_for_pnl - cost_price) * quantity if latest_for_pnl > ZERO and cost_price > ZERO else ZERO
+    unrealized_pnl = (
+        ((cost_price - latest_for_pnl) if position_direction == "short" else (latest_for_pnl - cost_price)) * quantity
+        if latest_for_pnl > ZERO and cost_price > ZERO
+        else ZERO
+    )
     status = "hold_no_exit_trigger"
     management_scope = "m15_realtime_managed"
     management_note = "本轮 M15 实时链路管理的长桥模拟账户持仓。"
@@ -244,10 +294,19 @@ def evaluate_position(
             status = "legacy_unmanaged_longbridge_position"
             management_scope = "longbridge_account_unmanaged"
             management_note = "长桥模拟账户已有持仓，但只接管退出配置关闭；不参与新开仓或加仓，需人工复核退出计划。"
+    elif position_direction == "short" and not source_open_order_id:
+        status = "missing_short_open_order_identity"
     elif latest_price <= ZERO:
         status = "missing_latest_price"
     elif stop_price <= ZERO or target_price <= ZERO:
         status = "missing_stop_or_target_metadata"
+    elif position_direction == "short":
+        if latest_price >= stop_price:
+            status = "exit_signal_created"
+            exit_reason = "stop_loss"
+        elif latest_price <= target_price:
+            status = "exit_signal_created"
+            exit_reason = "take_profit"
     elif latest_price <= stop_price:
         status = "exit_signal_created"
         exit_reason = "stop_loss"
@@ -255,50 +314,77 @@ def evaluate_position(
         status = "exit_signal_created"
         exit_reason = "take_profit"
     signal_id = ""
+    exit_retry_attempt = 1
+    exit_retry_of_signal_id = ""
     event: dict[str, Any] | None = None
     if status == "exit_signal_created":
-        signal_id = deterministic_exit_signal_id(
+        base_signal_id = deterministic_exit_signal_id(
             symbol=symbol,
             runtime_id=runtime_id,
             exit_reason=exit_reason,
             source_open_signal_id=str(metadata.get("signal_id", "")),
+            source_open_order_id=source_open_order_id if position_direction == "short" else "",
+        )
+        signal_id = base_signal_id
+        exit_attempt_key = (
+            symbol,
+            position_direction,
+            exit_reason,
+            source_open_order_id if position_direction == "short" else "",
         )
         if available_quantity <= ZERO:
             status = "position_not_available_for_exit"
-        elif (symbol, exit_reason) in recent_exit_attempts:
+        elif exit_attempt_key in recent_exit_attempts:
             status = "recent_exit_attempt_cooldown"
-        elif signal_id in existing_signal_ids:
-            status = "duplicate_exit_signal_event"
         else:
-            exit_quantity = min(quantity, available_quantity)
-            event = {
-                "signal_id": signal_id,
-                "created_at": generated_at,
-                "runtime_id": runtime_id,
-                "strategy_id": strategy_id,
-                "symbol": symbol,
-                "timeframe": str(metadata.get("timeframe", "")),
-                "direction": "long",
-                "side": "sell",
-                "position_action": exit_reason,
-                "order_type": "limit",
-                "limit_price": fmt_money(latest_price),
-                "current_price": fmt_money(latest_price),
-                "quantity": fmt_decimal(exit_quantity),
-                "notional": fmt_money(exit_quantity * latest_price),
-                "risk_amount": "0.00",
-                "net_profit_after_fees_at_target": "0.01",
-                "source_market_event_id": str(metadata.get("source_market_event_id", "")),
-                "source_open_signal_id": str(metadata.get("signal_id", "")),
-                "local_simulation_source": False,
-                "longbridge_position_exit_source": True,
-                "longbridge_untracked_exit_only": management_scope == "longbridge_account_exit_only",
-            }
+            retry_signal_id, retry_attempt = next_short_exit_retry_signal_id(
+                base_signal_id,
+                existing_signal_ids,
+                retriable_short_exit_signal_ids,
+                position_direction,
+            )
+            if retry_signal_id:
+                signal_id = retry_signal_id
+                exit_retry_attempt = retry_attempt
+                exit_retry_of_signal_id = base_signal_id
+            elif signal_id in existing_signal_ids:
+                status = "duplicate_exit_signal_event"
+            if status == "exit_signal_created":
+                exit_quantity = min(quantity, available_quantity)
+                event = {
+                    "signal_id": signal_id,
+                    "created_at": generated_at,
+                    "runtime_id": runtime_id,
+                    "strategy_id": strategy_id,
+                    "symbol": symbol,
+                    "timeframe": str(metadata.get("timeframe", "")),
+                    "direction": position_direction,
+                    "side": "buy" if position_direction == "short" else "sell",
+                    "position_action": "close_short" if position_direction == "short" else exit_reason,
+                    "exit_reason": exit_reason,
+                    "order_type": "limit",
+                    "limit_price": fmt_money(latest_price),
+                    "current_price": fmt_money(latest_price),
+                    "quantity": fmt_decimal(exit_quantity),
+                    "notional": fmt_money(exit_quantity * latest_price),
+                    "risk_amount": "0.00",
+                    "net_profit_after_fees_at_target": "0.01",
+                    "source_market_event_id": str(metadata.get("source_market_event_id", "")),
+                    "source_open_signal_id": str(metadata.get("signal_id", "")),
+                    "source_open_order_id": source_open_order_id,
+                    "exit_retry_attempt": exit_retry_attempt,
+                    "exit_retry_of_signal_id": exit_retry_of_signal_id,
+                    "short_structure_low": str(metadata.get("short_structure_low") or ""),
+                    "local_simulation_source": False,
+                    "longbridge_position_exit_source": True,
+                    "longbridge_untracked_exit_only": management_scope == "longbridge_account_exit_only",
+                }
     row = {
         "stage": config.stage,
         "symbol": symbol,
         "runtime_id": runtime_id,
         "strategy_id": strategy_id,
+        "position_direction": position_direction,
         "quantity": fmt_decimal(quantity),
         "available_quantity": fmt_decimal(available_quantity),
         "account_symbol_quantity": str(position.get("account_symbol_quantity") or ""),
@@ -317,6 +403,8 @@ def evaluate_position(
         "management_note": management_note,
         "exit_reason": exit_reason,
         "exit_signal_id": signal_id,
+        "exit_retry_attempt": exit_retry_attempt,
+        "exit_retry_of_signal_id": exit_retry_of_signal_id,
         "exit_allowed": management_scope in {"m15_realtime_managed", "longbridge_account_exit_only"},
         "exit_only_takeover": management_scope == "longbridge_account_exit_only",
         "local_simulation_ignored": True,
@@ -331,6 +419,8 @@ def account_positions(account_state: dict[str, Any]) -> list[dict[str, Any]]:
     positions: list[dict[str, Any]] = []
     for row in raw_positions:
         if not isinstance(row, dict):
+            continue
+        if is_short_position_row(row):
             continue
         symbol = base_symbol(str(row.get("symbol", "")))
         quantity = decimal(row.get("quantity", row.get("qty", "0")))
@@ -369,6 +459,105 @@ def latest_price_by_symbol(market_events: list[dict[str, Any]]) -> dict[str, Dec
         if symbol not in latest or event_time >= latest[symbol][0]:
             latest[symbol] = (event_time, price)
     return {symbol: value[1] for symbol, value in latest.items()}
+
+
+def confirmed_short_position_slices(
+    account_state: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+    config: RealtimePositionManagerConfig,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Build cover-only slices from Longbridge-confirmed short fills.
+
+    A local submitted sell is deliberately not enough. Both a confirmed M15
+    opening sell and an explicit short position in the Longbridge account are
+    required before the manager can emit a buy-to-cover signal.
+    """
+    if not config.paper_short_testing_enabled:
+        return []
+    order_by_id = latest_account_orders_by_id(account_state)
+    broker_short_quantities = account_short_position_quantities(account_state)
+    lots: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in sorted(execution_rows, key=lambda item: str(item.get("submitted_at") or item.get("processed_at") or "")):
+        if row.get("submission_status") != "submitted":
+            continue
+        if str(row.get("test_epoch_id") or "") != config.short_test_epoch_id:
+            continue
+        runtime_id = str(row.get("runtime_id") or "")
+        if runtime_id not in set(config.paper_short_runtime_ids):
+            continue
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        bucket = str(row.get("capital_bucket") or "")
+        order_id = ledger_row_order_id(row)
+        account_order = broker_order_for_ledger_row(row, order_by_id)
+        if not symbol or not bucket or not order_has_confirmed_fill(account_order):
+            continue
+        quantity = confirmed_order_quantity(
+            account_order,
+            decimal(row.get("submitted_quantity", row.get("quantity", "0"))),
+        )
+        if quantity <= ZERO:
+            continue
+        key = (bucket, runtime_id, symbol)
+        if side == "sell_short" or position_action == "open_short":
+            lots.setdefault(key, []).append(
+                {
+                    "quantity": quantity,
+                    "cost_price": decimal(
+                        account_order.get("executed_price", account_order.get("avg_price", row.get("limit_price", "0")))
+                    ),
+                    "metadata": {**row, "position_direction": "short", "short_open_order_id": order_id},
+                }
+            )
+        elif position_action == "close_short":
+            source_open_order_id = str(row.get("source_open_order_id") or "")
+            if not source_open_order_id:
+                continue
+            remaining = quantity
+            for lot in lots.get(key, []):
+                if remaining <= ZERO:
+                    break
+                lot_open_order_id = str(lot.get("metadata", {}).get("short_open_order_id") or "")
+                if lot_open_order_id != source_open_order_id:
+                    continue
+                matched = min(remaining, lot["quantity"])
+                lot["quantity"] -= matched
+                remaining -= matched
+
+    remaining_broker_quantity = dict(broker_short_quantities)
+    slices: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for (_bucket, _runtime_id, symbol), symbol_lots in lots.items():
+        broker_available = remaining_broker_quantity.get(symbol, ZERO)
+        if broker_available <= ZERO:
+            continue
+        for lot in symbol_lots:
+            quantity = min(lot["quantity"], broker_available)
+            if quantity <= ZERO:
+                continue
+            cost_price = decimal(lot.get("cost_price", "0"))
+            metadata = dict(lot.get("metadata", {}))
+            metadata["virtual_position_quantity"] = fmt_decimal(lot["quantity"])
+            metadata["virtual_position_slice_quantity"] = fmt_decimal(quantity)
+            metadata["virtual_position_slice_available"] = fmt_decimal(quantity)
+            slices.append(
+                (
+                    {
+                        "symbol": symbol,
+                        "quantity": fmt_decimal(quantity),
+                        "available": fmt_decimal(quantity),
+                        "cost_price": fmt_money(cost_price) if cost_price > ZERO else "",
+                        "account_symbol_quantity": fmt_decimal(broker_short_quantities.get(symbol, ZERO)),
+                        "account_symbol_available_quantity": fmt_decimal(broker_available),
+                        "virtual_position_quantity": fmt_decimal(lot["quantity"]),
+                        "virtual_position_capped_by_account": lot["quantity"] > quantity,
+                    },
+                    metadata,
+                )
+            )
+            broker_available -= quantity
+            remaining_broker_quantity[symbol] = broker_available
+    return slices
 
 
 def account_position_slices(
@@ -468,25 +657,98 @@ def submitted_open_position_groups(execution_rows: list[dict[str, Any]]) -> dict
     return groups
 
 
+def terminal_retriable_short_exit_signal_ids(
+    execution_rows: list[dict[str, Any]],
+    account_state: dict[str, Any],
+) -> set[str]:
+    """Return canceled/rejected/expired short-cover attempts eligible for one fresh retry.
+
+    A fully filled cover remains non-retriable until the broker position snapshot
+    has caught up.  This is intentionally limited to explicitly attributable
+    paper-short lots; generic long exits keep their existing conservative flow.
+    """
+    order_by_id = latest_account_orders_by_id(account_state)
+    latest_by_signal_id: dict[str, dict[str, Any]] = {}
+    for row in execution_rows:
+        signal_id = str(row.get("signal_id") or "")
+        action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        if not signal_id or action != "close_short":
+            continue
+        latest_by_signal_id[signal_id] = row
+    retriable: set[str] = set()
+    for signal_id, row in latest_by_signal_id.items():
+        if str(row.get("submission_status") or "") != "submitted":
+            continue
+        broker_order = broker_order_for_ledger_row(row, order_by_id)
+        if not broker_order or not broker_order_is_terminal(broker_order):
+            continue
+        status = str(broker_order.get("status") or "").strip().lower().replace(" ", "_")
+        if status not in {"filled", "executed", "done", "completed"}:
+            retriable.add(signal_id)
+    return retriable
+
+
+def next_short_exit_retry_signal_id(
+    base_signal_id: str,
+    existing_signal_ids: set[str],
+    retriable_short_exit_signal_ids: set[str],
+    position_direction: str,
+) -> tuple[str, int]:
+    if position_direction != "short":
+        return "", 1
+    previous_ids: list[tuple[int, str]] = []
+    for signal_id in existing_signal_ids:
+        if signal_id == base_signal_id:
+            previous_ids.append((1, signal_id))
+            continue
+        prefix = f"{base_signal_id}-retry-"
+        if signal_id.startswith(prefix):
+            suffix = signal_id.removeprefix(prefix)
+            if suffix.isdigit() and int(suffix) >= 2:
+                previous_ids.append((int(suffix), signal_id))
+    if not previous_ids:
+        return "", 1
+    previous_ids.sort()
+    last_attempt, last_signal_id = previous_ids[-1]
+    if last_signal_id not in retriable_short_exit_signal_ids:
+        return "", last_attempt
+    next_attempt = last_attempt + 1
+    return f"{base_signal_id}-retry-{next_attempt}", next_attempt
+
+
 def recent_exit_attempt_keys(
     execution_rows: list[dict[str, Any]],
     now: datetime,
     cooldown_seconds: int,
-) -> set[tuple[str, str]]:
-    attempts: set[tuple[str, str]] = set()
+    retriable_short_exit_signal_ids: set[str] | None = None,
+) -> set[tuple[str, str, str, str]]:
+    retriable_short_exit_signal_ids = retriable_short_exit_signal_ids or set()
+    attempts: set[tuple[str, str, str, str]] = set()
     for row in execution_rows:
-        if str(row.get("side") or "").lower() != "sell":
+        position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        side = normalize_side(row.get("side"), position_action=position_action)
+        if side not in {"sell", "buy"} or position_action not in {
+            "close_long",
+            "exit_long",
+            "stop_loss",
+            "take_profit",
+            "close_short",
+        }:
             continue
         status = str(row.get("submission_status") or "")
         if not status or status == "blocked_not_submitted":
+            continue
+        if position_action == "close_short" and str(row.get("signal_id") or "") in retriable_short_exit_signal_ids:
             continue
         attempted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
         if attempted_at and (now - attempted_at).total_seconds() > cooldown_seconds:
             continue
         symbol = base_symbol(str(row.get("symbol") or ""))
-        exit_reason = str(row.get("position_action") or row.get("exit_reason") or "")
+        exit_reason = str(row.get("exit_reason") or row.get("position_action") or "")
+        direction = "short" if position_action == "close_short" else "long"
         if symbol and exit_reason:
-            attempts.add((symbol, exit_reason))
+            source_open_order_id = str(row.get("source_open_order_id") or "") if direction == "short" else ""
+            attempts.add((symbol, direction, exit_reason, source_open_order_id))
     return attempts
 
 
@@ -496,10 +758,13 @@ def deterministic_exit_signal_id(
     runtime_id: str,
     exit_reason: str,
     source_open_signal_id: str = "",
+    source_open_order_id: str = "",
     generated_at: str = "",
 ) -> str:
     del generated_at
-    digest = sha256(f"{symbol}|{runtime_id}|{exit_reason}|{source_open_signal_id}".encode("utf-8")).hexdigest()[:16]
+    digest = sha256(
+        f"{symbol}|{runtime_id}|{exit_reason}|{source_open_signal_id}|{source_open_order_id}".encode("utf-8")
+    ).hexdigest()[:16]
     return f"m15exit-{digest}"
 
 
@@ -564,7 +829,7 @@ def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
             "",
             "- 只看长桥模拟账户持仓、长桥实时行情和长桥实时执行记录。",
             "- 本地模拟平仓不触发长桥平仓。",
-            "- 平仓是卖出已有多头，不是融券做空。",
+            "- 多头平仓只卖出已有多头；三条受限纸面短仓的平仓只能买入回补已确认的短仓，二者不会混用。",
             "",
         ]
     )
