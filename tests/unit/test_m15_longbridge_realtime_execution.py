@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 from scripts.m15_longbridge_realtime_execution_lib import (
@@ -529,7 +530,42 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(response["status"], "submit_unconfirmed_missing_order_id")
             self.assertEqual(response["order_id"], "")
 
-    def test_longbridge_cli_client_confirms_empty_submit_by_account_order_lookup(self) -> None:
+    def test_longbridge_cli_short_capacity_parses_cash_table_without_margin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
+            commands: list[list[str]] = []
+
+            def runner(command: list[str], timeout_seconds: int):
+                del timeout_seconds
+                commands.append(command)
+                return type(
+                    "Result",
+                    (),
+                    {
+                        "returncode": 0,
+                        "stdout": json.dumps(
+                            [
+                                {"field": "Symbol", "value": "TSLA.US"},
+                                {"field": "Cash Max Qty", "value": "903"},
+                                {"field": "Margin Max Qty", "value": "9999"},
+                            ]
+                        ),
+                        "stderr": "",
+                    },
+                )()
+
+            client = LongbridgeCliRealtimePaperClient(config, command_runner=runner, cli_path="longbridge")
+            response = client.max_short_quantity("TSLA", Decimal("300"))
+
+            self.assertTrue(response["ok"])
+            self.assertEqual(response["max_quantity"], Decimal("903"))
+            self.assertEqual(
+                commands[0],
+                ["longbridge", "max-qty", "TSLA.US", "--side", "sell", "--price", "300.00", "--format", "json"],
+            )
+
+    def test_longbridge_cli_client_marks_empty_submit_for_background_reconciliation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
@@ -574,10 +610,10 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 }
             )
 
-            self.assertTrue(response["submitted"])
-            self.assertEqual(response["order_id"], "rt-lookup-1")
-            self.assertEqual(response["confirmation_source"], "account_state_lookup")
-            self.assertEqual(commands[1], ["longbridge", "order", "--format", "json"])
+            self.assertFalse(response["submitted"])
+            self.assertEqual(response["order_id"], "")
+            self.assertEqual(response["status"], "submit_unconfirmed_missing_order_id")
+            self.assertEqual(len(commands), 1)
 
     def test_unconfirmed_submission_is_not_counted_as_confirmed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -602,7 +638,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(rows[0]["submission_status"], "submit_unconfirmed_missing_order_id")
             self.assertEqual(rows[0]["longbridge_order_id"], "")
 
-    def test_unconfirmed_submission_can_retry_same_signal_id_later(self) -> None:
+    def test_unconfirmed_submission_waits_for_reconciliation_without_retry(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
@@ -611,9 +647,9 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 def submit_order(self, order_payload: dict) -> dict:
                     return {"submitted": False, "status": "submit_unconfirmed_missing_order_id", "order_id": ""}
 
-            class ConfirmedClient:
+            class UnexpectedRetryClient:
                 def submit_order(self, order_payload: dict) -> dict:
-                    return {"submitted": True, "status": "submitted", "order_id": "LB-RETRY-1"}
+                    self.fail("同一信号在订单号未确认时不得重复提交")
 
             self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="sig-retry")])
             first = run_realtime_execution(
@@ -624,15 +660,16 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             second = run_realtime_execution(
                 config,
                 generated_at="2026-06-04T14:00:02Z",
-                broker_client=ConfirmedClient(),
+                broker_client=UnexpectedRetryClient(),
             )
             rows = [row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL) if row["signal_id"] == "sig-retry"]
 
             self.assertEqual(first["submitted_count"], 0)
-            self.assertEqual(second["submitted_count"], 1)
-            self.assertEqual(len(rows), 2)
-            self.assertEqual(rows[-1]["submission_status"], "submitted")
-            self.assertEqual(rows[-1]["longbridge_order_id"], "LB-RETRY-1")
+            self.assertEqual(second["attempted_order_count"], 0)
+            self.assertEqual(second["submitted_count"], 0)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["submission_status"], "submit_unconfirmed_missing_order_id")
+            self.assertEqual(rows[0]["submission_confirmation_state"], "awaiting_broker_reconciliation")
 
     def test_dry_run_signal_can_submit_later_when_orders_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

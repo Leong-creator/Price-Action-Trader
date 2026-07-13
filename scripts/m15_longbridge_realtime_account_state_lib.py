@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -900,21 +901,32 @@ def build_order_reconciliation(
         if isinstance(row, dict)
         and str(row.get("submission_status") or "") in {"submitted", "confirmed_submitted", "submit_unconfirmed_missing_order_id"}
     ]
-    local_by_order_id = {
-        str(row.get("order_id") or row.get("longbridge_order_id") or ""): row
-        for row in local_submissions
-        if str(row.get("order_id") or row.get("longbridge_order_id") or "")
-    }
+    local_by_order_id: dict[str, list[dict[str, Any]]] = {}
+    local_by_signal_id: dict[str, list[dict[str, Any]]] = {}
+    for row in local_submissions:
+        local_order_id = str(row.get("order_id") or row.get("longbridge_order_id") or "")
+        if local_order_id:
+            local_by_order_id.setdefault(local_order_id, []).append(row)
+        signal_id = str(row.get("signal_id") or "")
+        if signal_id:
+            local_by_signal_id.setdefault(signal_id, []).append(row)
     local_queues: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
     for row in sorted(local_submissions, key=order_time_sort_key):
+        if requires_exact_realtime_attribution(row):
+            continue
         local_queues.setdefault(order_match_key(row), []).append(row)
 
     used_local_ids: set[int] = set()
     rows: list[dict[str, Any]] = []
     for order in sorted(longbridge_orders, key=order_time_sort_key):
         order_id = str(order.get("order_id") or order.get("id") or "")
-        local_row: dict[str, Any] | None = local_by_order_id.get(order_id) if order_id else None
-        match_method = "order_id" if local_row else ""
+        local_row = unique_unconsumed_local_row(local_by_order_id.get(order_id, []), used_local_ids) if order_id else None
+        match_method = "order_id" if local_row is not None else ""
+        if local_row is None:
+            remark_signal_id = realtime_signal_id_from_order_remark(order)
+            local_row = unique_unconsumed_local_row(local_by_signal_id.get(remark_signal_id, []), used_local_ids)
+            if local_row is not None:
+                match_method = "remark_signal_id"
         if local_row is None:
             key = order_match_key(order)
             queue = local_queues.get(key, [])
@@ -934,7 +946,7 @@ def build_order_reconciliation(
 
     summary = order_reconciliation_summary(rows, len(longbridge_orders), len(local_submissions))
     return {
-        "schema_version": "m15.longbridge-order-reconciliation.v1",
+        "schema_version": "m15.longbridge-order-reconciliation.v2",
         "stage": "M15.longbridge_order_reconciliation",
         "generated_at": generated_at,
         "source_mode": "longbridge_current_and_historical_orders_plus_realtime_submission_attribution",
@@ -954,6 +966,7 @@ def build_order_reconciliation(
         },
         "notes": [
             "长桥当前订单列表和历史订单列表先按订单号合并；避免当天订单尚未进入历史查询时被误判为本地未确认。",
+            "当前做空测试基线只接受长桥订单号或 PAT-RT 订单备注中的精确 signal_id 归因；不会使用标的、方向、数量和价格的近似匹配。",
             "只有长桥订单状态为 Filled 或存在可确认成交数量的行计入分仓、策略、胜率和盈亏。",
             "Rejected/Canceled/Expired/本地未确认提交只进入未成交诊断，不计入交易成绩。",
             "本地实时提交流水只用于把长桥真实成交归因到资金池和运行单元，不作为成绩事实源。",
@@ -1291,10 +1304,15 @@ def reconciled_longbridge_order_row(
     diagnostic = longbridge_order_diagnostic(status, executed_quantity, order)
     runtime_id = str(local_row.get("runtime_id") or "") if local_row else ""
     strategy_id = str(local_row.get("strategy_id") or "") if local_row else ""
+    capital_bucket = str(local_row.get("capital_bucket") or "未归因") if local_row else "未归因"
+    direction = local_position_direction(local_row) if local_row else ""
+    position_action = str(local_row.get("position_action") or "") if local_row else ""
+    source_open_order_id = str(local_row.get("source_open_order_id") or "") if local_row else ""
+    order_id = str(order.get("order_id") or order.get("id") or "")
     if runtime_id and not strategy_id:
         strategy_id = runtime_id_parent(runtime_id)
     return {
-        "order_id": str(order.get("order_id") or order.get("id") or ""),
+        "order_id": order_id,
         "symbol": base_symbol(str(order.get("symbol") or "")),
         "side": normalize_order_side(order.get("side")),
         "order_type": str(order.get("order_type") or order.get("type") or ""),
@@ -1307,11 +1325,23 @@ def reconciled_longbridge_order_row(
         "filled_quantity": fmt_decimal(executed_quantity),
         "created_at": first_string(order, ("created_at", "submitted_at", "time", "updated_at")),
         "updated_at": first_string(order, ("updated_at", "last_done_at", "time", "created_at")),
-        "capital_bucket": str(local_row.get("capital_bucket") or "未归因") if local_row else "未归因",
+        "capital_bucket": capital_bucket,
         "runtime_id": runtime_id or "未归因长桥成交",
         "strategy_id": strategy_id or "未归因长桥成交",
         "signal_id": str(local_row.get("signal_id") or "") if local_row else "",
         "test_epoch_id": str(local_row.get("test_epoch_id") or "") if local_row else "",
+        "direction": direction,
+        "position_action": position_action,
+        "source_open_order_id": source_open_order_id,
+        "attribution_key": attribution_key(
+            capital_bucket=capital_bucket,
+            runtime_id=runtime_id,
+            direction=direction,
+            symbol=base_symbol(str(order.get("symbol") or "")),
+            order_id=order_id,
+        )
+        if local_row is not None
+        else "",
         "attribution_status": attribution_status,
         "attribution_match_method": match_method or "no_local_match",
         "counts_for_performance": counts_for_performance,
@@ -1324,9 +1354,14 @@ def reconciled_longbridge_order_row(
 def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> dict[str, Any]:
     runtime_id = str(local_row.get("runtime_id") or "")
     strategy_id = str(local_row.get("strategy_id") or runtime_id_parent(runtime_id))
+    direction = local_position_direction(local_row)
+    position_action = str(local_row.get("position_action") or "")
+    order_id = str(local_row.get("order_id") or local_row.get("longbridge_order_id") or "")
+    symbol = base_symbol(str(local_row.get("symbol") or ""))
+    capital_bucket = str(local_row.get("capital_bucket") or "未归因")
     return {
-        "order_id": str(local_row.get("order_id") or local_row.get("longbridge_order_id") or ""),
-        "symbol": base_symbol(str(local_row.get("symbol") or "")),
+        "order_id": order_id,
+        "symbol": symbol,
         "side": normalize_order_side(local_row.get("side")),
         "order_type": str(local_row.get("order_type") or local_row.get("longbridge_order_type") or ""),
         "status": "LocalSubmittedNoLongbridgeOrder",
@@ -1338,11 +1373,21 @@ def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> 
         "filled_quantity": "0",
         "created_at": first_string(local_row, ("submitted_at", "processed_at", "created_at")),
         "updated_at": first_string(local_row, ("processed_at", "submitted_at", "created_at")),
-        "capital_bucket": str(local_row.get("capital_bucket") or "未归因"),
+        "capital_bucket": capital_bucket,
         "runtime_id": runtime_id or "未归因长桥请求",
         "strategy_id": strategy_id or "未归因长桥请求",
         "signal_id": str(local_row.get("signal_id") or ""),
         "test_epoch_id": str(local_row.get("test_epoch_id") or ""),
+        "direction": direction,
+        "position_action": position_action,
+        "source_open_order_id": str(local_row.get("source_open_order_id") or ""),
+        "attribution_key": attribution_key(
+            capital_bucket=capital_bucket,
+            runtime_id=runtime_id,
+            direction=direction,
+            symbol=symbol,
+            order_id=order_id,
+        ),
         "attribution_status": "local_submitted_no_longbridge_order",
         "attribution_match_method": "no_longbridge_order_match",
         "counts_for_performance": False,
@@ -1433,6 +1478,44 @@ def order_match_key(row: dict[str, Any]) -> tuple[str, str, str, str]:
         fmt_decimal(quantity),
         fmt_money(price) if price > ZERO else "",
     )
+
+
+def requires_exact_realtime_attribution(row: dict[str, Any]) -> bool:
+    """New short test rows must never be paired by an approximate order shape."""
+    direction = local_position_direction(row)
+    epoch_id = str(row.get("test_epoch_id") or "")
+    return direction == "short" or epoch_id.startswith("m15-short-single-strategy-")
+
+
+def local_position_direction(row: dict[str, Any] | None) -> str:
+    if not isinstance(row, dict):
+        return ""
+    direction = str(row.get("direction") or "").strip().lower()
+    position_action = str(row.get("position_action") or "").strip().lower()
+    side = str(row.get("side") or "").strip().lower()
+    if direction == "short" or position_action in {"open_short", "close_short"} or side == "sell_short":
+        return "short"
+    return "long"
+
+
+def unique_unconsumed_local_row(
+    candidates: list[dict[str, Any]], used_local_ids: set[int]
+) -> dict[str, Any] | None:
+    unconsumed = [row for row in candidates if id(row) not in used_local_ids]
+    return unconsumed[0] if len(unconsumed) == 1 else None
+
+
+def realtime_signal_id_from_order_remark(order: dict[str, Any]) -> str:
+    for key in ("remark", "note", "message"):
+        text = str(order.get(key) or "")
+        match = re.search(r"(?:^|\\s)PAT-RT\\s+(\\S+)", text)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def attribution_key(*, capital_bucket: str, runtime_id: str, direction: str, symbol: str, order_id: str) -> str:
+    return "|".join((capital_bucket, runtime_id, direction, symbol, order_id))
 
 
 def order_time_sort_key(row: dict[str, Any]) -> str:

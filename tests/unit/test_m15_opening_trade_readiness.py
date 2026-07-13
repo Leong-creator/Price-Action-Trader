@@ -7,6 +7,12 @@ import unittest
 from pathlib import Path
 
 from scripts.m15_opening_trade_readiness_lib import load_config, run_m15_opening_trade_readiness
+from scripts.m15_longbridge_realtime_session_supervisor_lib import (
+    build_window_state,
+    config_digest,
+    load_config as load_realtime_supervisor_config,
+    runtime_identity_payload,
+)
 
 
 class M15OpeningTradeReadinessTest(unittest.TestCase):
@@ -187,6 +193,47 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             },
         }
         supervisor_config.write_text(json.dumps(supervisor_payload), encoding="utf-8")
+        supervisor_runtime_config = load_realtime_supervisor_config(supervisor_config)
+        window = build_window_state(supervisor_runtime_config, generated_at="2026-06-04T12:20:00Z")
+        runtime_identity = runtime_identity_payload(supervisor_runtime_config, window)
+        realtime_status.write_text(
+            json.dumps(
+                {
+                    "generated_at": "2026-06-04T12:20:00Z",
+                    "runtime_identity": runtime_identity,
+                    "input_config_digests": {
+                        "supervisor_config": supervisor_runtime_config.config_digest,
+                        "ingestor_config": config_digest(supervisor_runtime_config.ingestor_config_path),
+                        "router_config": config_digest(supervisor_runtime_config.router_config_path),
+                        "account_state_config": config_digest(supervisor_runtime_config.account_state_config_path),
+                        "stale_order_cleanup_config": config_digest(supervisor_runtime_config.stale_order_cleanup_config_path),
+                        "position_manager_config": config_digest(supervisor_runtime_config.position_manager_config_path),
+                        "execution_config": config_digest(supervisor_runtime_config.execution_config_path),
+                    },
+                    "local_simulation_isolated": True,
+                    "local_ledger_input_ref": "",
+                    "legacy_fast_queue_used": False,
+                    "manual_m12_37_once_used": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (output_dir / "m15_longbridge_realtime_execution.json").write_text(
+            json.dumps(
+                {
+                    "runtime_ids_seen_this_cycle": ["M10-PA-004-long-1d"],
+                    "recent_execution_inputs": [
+                        {
+                            "signal_id": "fixture-signal",
+                            "runtime_id": "M10-PA-004-long-1d",
+                            "symbol": "AAPL",
+                            "created_at": "2026-06-04T12:19:59Z",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         (output_dir / "m15_longbridge_realtime_session_supervisor.pid").write_text(str(os.getpid()), encoding="utf-8")
         readiness_config.write_text(
             json.dumps(

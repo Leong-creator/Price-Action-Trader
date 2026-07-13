@@ -178,7 +178,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         ),
         check_row(
             "order_safety_boundaries",
-            "整股、只做多、不开期权、常规交易时段、只限日内单",
+            "整股、受限纸面做空、不开期权、常规交易时段、只限日内单",
             "pass" if execution_config and order_safety_ok(execution_config) else "fail",
             actual=execution_config_error or f"RTH={execution_config.outside_rth}, tif={execution_config.time_in_force}",
         ),
@@ -258,7 +258,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "live_execution": False,
             "real_money_actions": False,
             "fractional_shares": False,
-            "short_selling": False,
+            "short_selling": bool(execution_config and execution_config.paper_short_testing_enabled),
             "options": False,
             "margin_financing": False,
             "manual_m12_37_once": False,
@@ -317,11 +317,18 @@ def paper_account_verified(account_state: dict[str, Any]) -> bool:
 
 
 def order_safety_ok(execution_config: Any) -> bool:
+    controlled_short_testing = (
+        execution_config.allow_short_selling
+        and execution_config.paper_short_testing_enabled
+        and bool(execution_config.paper_short_runtime_ids)
+        and bool(execution_config.short_test_epoch_id)
+        and execution_config.hard_boundaries.get("short_selling") is True
+    )
     return (
         execution_config.outside_rth == "RTH_ONLY"
         and execution_config.time_in_force.lower() == "day"
         and not execution_config.allow_fractional_shares
-        and not execution_config.allow_short_selling
+        and (not execution_config.allow_short_selling or controlled_short_testing)
         and not execution_config.allow_options
         and not execution_config.allow_margin_financing
     )
@@ -392,7 +399,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
             "## Boundaries",
             "",
             "- 只允许长桥模拟账户，不允许实盘或真实资金动作。",
-            "- 不做碎股、不做空、不做期权。",
+            "- 不做碎股、不做期权；只允许三条明确白名单的纸面做空测试运行单元，其他做空一律阻断。",
             "- 修复策略、影子变体和辅助模块继续留在本地模拟。",
             "- 长桥实时链路不读取本地模拟账本，也不使用旧快速队列作为下单来源。",
             "",

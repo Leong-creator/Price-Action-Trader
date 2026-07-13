@@ -21,6 +21,7 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     SHADOW_RUNTIME_MARKERS,
     LONG_BRIDGE_ALLOWED_LOSS_STREAK_RUNTIME_IDS,
     LONG_BRIDGE_ALLOWED_SHADOW_RUNTIME_IDS,
+    PAPER_SHORT_RUNTIME_IDS,
     VirtualCapitalBucket,
     capital_bucket_for_runtime,
     decimal,
@@ -159,6 +160,48 @@ PRICE_ACTION_RUNTIME_SPECS = {
         "require_market_confirmation": True,
         "max_risk_percent": Decimal("6.00"),
     },
+    "M10-PA-002-5m-short": {
+        "strategy_id": "M10-PA-002",
+        "timeframe": "5m",
+        "rule": "bearish_breakdown",
+        "target_r": Decimal("2.00"),
+        "max_risk_percent": Decimal("1.50"),
+        "max_close_position": Decimal("0.25"),
+        "max_close_to_close_percent": Decimal("-0.60"),
+        "min_volume_ratio": Decimal("1.30"),
+        "minimum_net_profit_after_fees": Decimal("12"),
+        "minimum_reward_r": Decimal("2.00"),
+        "minimum_quality_score": Decimal("85"),
+        "market_confirmation_requirement": "either",
+    },
+    "M10-PA-013-5m-short": {
+        "strategy_id": "M10-PA-013",
+        "timeframe": "5m",
+        "rule": "bearish_false_breakout",
+        "target_r": Decimal("2.00"),
+        "max_risk_percent": Decimal("1.50"),
+        "max_close_position": Decimal("0.30"),
+        "max_close_to_close_percent": Decimal("-0.50"),
+        "min_volume_ratio": Decimal("1.20"),
+        "minimum_net_profit_after_fees": Decimal("12"),
+        "minimum_reward_r": Decimal("2.00"),
+        "minimum_quality_score": Decimal("85"),
+        "market_confirmation_requirement": "either",
+    },
+    "M10-PA-011-ORB-R1-5m-short": {
+        "strategy_id": "M10-PA-011",
+        "timeframe": "5m",
+        "rule": "opening_range_breakdown",
+        "target_r": Decimal("2.25"),
+        "max_risk_percent": Decimal("1.25"),
+        "max_close_position": Decimal("0.20"),
+        "max_close_to_close_percent": Decimal("-0.75"),
+        "min_volume_ratio": Decimal("1.50"),
+        "minimum_net_profit_after_fees": Decimal("15"),
+        "minimum_reward_r": Decimal("2.25"),
+        "minimum_quality_score": Decimal("90"),
+        "market_confirmation_requirement": "both",
+    },
 }
 
 
@@ -174,6 +217,10 @@ class RealtimeSignalRouterConfig:
     allowed_runtime_ids: tuple[str, ...]
     enabled_detectors: tuple[str, ...]
     max_signal_events_per_run: int
+    paper_short_testing_enabled: bool
+    paper_short_runtime_ids: tuple[str, ...]
+    short_test_epoch_id: str
+    short_test_started_at: str
     paper_account_equity: Decimal
     max_total_exposure: Decimal
     max_symbol_exposure: Decimal
@@ -219,6 +266,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
     outputs = payload.get("outputs", {})
     router = payload.get("realtime_signal_router", {})
     account_model = payload.get("paper_account_model", {})
+    short_testing = payload.get("paper_short_testing", {})
     fee_model = payload.get("fee_model", {})
     virtual_buckets, runtime_bucket_map = parse_virtual_capital_buckets(payload, account_model)
     return RealtimeSignalRouterConfig(
@@ -238,6 +286,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
             )
         ),
         max_signal_events_per_run=int(router.get("max_signal_events_per_run", 50)),
+        paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
+        paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
+        short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
+        short_test_started_at=str(short_testing.get("test_started_at") or ""),
         paper_account_equity=decimal(account_model.get("equity", "10000")),
         max_total_exposure=decimal(account_model.get("max_total_exposure", "6000")),
         max_symbol_exposure=decimal(account_model.get("max_symbol_exposure", "1500")),
@@ -310,7 +362,30 @@ def validate_config(config: RealtimeSignalRouterConfig) -> None:
     if config.allow_fractional_shares:
         raise ValueError("M15 realtime signal router forbids fractional shares")
     if config.allow_short_selling:
-        raise ValueError("M15 realtime signal router forbids short selling")
+        if not config.paper_short_testing_enabled:
+            raise ValueError("M15 realtime signal router short selling needs explicit paper_short_testing.enabled")
+        if not config.paper_short_runtime_ids:
+            raise ValueError("M15 realtime signal router short selling needs an explicit runtime whitelist")
+        if not config.short_test_epoch_id or not config.short_test_started_at:
+            raise ValueError("M15 realtime signal router short selling needs an independent short test epoch")
+        parse_utc_datetime(config.short_test_started_at)
+        invalid_short_runtimes = set(config.paper_short_runtime_ids) - set(PAPER_SHORT_RUNTIME_IDS)
+        if invalid_short_runtimes:
+            raise ValueError(
+                "M15 realtime signal router short runtime is not approved: "
+                f"{sorted(invalid_short_runtimes)}"
+            )
+        if not set(config.paper_short_runtime_ids).issubset(set(config.allowed_runtime_ids)):
+            raise ValueError("M15 realtime signal router short runtime is not in the main whitelist")
+        for runtime_id in config.paper_short_runtime_ids:
+            bucket_id = config.runtime_capital_bucket_map.get(runtime_id, "")
+            bucket = config.virtual_capital_buckets.get(bucket_id)
+            if bucket is None or bucket.position_direction != "short":
+                raise ValueError(f"M15 realtime signal router short runtime missing short bucket: {runtime_id}")
+        if config.hard_boundaries.get("short_selling") is not True:
+            raise ValueError("M15 realtime signal router short selling needs paper-only boundary")
+    elif config.paper_short_testing_enabled or config.paper_short_runtime_ids:
+        raise ValueError("M15 realtime signal router short test configuration requires allow_short_selling")
     if config.allow_options:
         raise ValueError("M15 realtime signal router forbids options")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
@@ -684,6 +759,7 @@ def confluence_key(intent: dict[str, Any]) -> str:
     symbol = str(intent.get("symbol") or "").upper()
     direction = normalize_direction(intent.get("direction") or intent.get("side"))
     side = "buy" if direction == "long" else "sell_short"
+    is_short = direction == "short"
     date_key = ny_date_from_intent(intent)
     return f"{date_key}|{bucket or parent_strategy_id(strategy_id or runtime_id)}|{symbol}|{direction}|{side}"
 
@@ -829,6 +905,30 @@ def price_action_signal_for_runtime(
         signal = opening_range_breakout_signal(symbol, rows, spec=spec, generated_at=generated_at)
     elif rule == "support_resistance_failure":
         signal = support_resistance_failure_signal(symbol, rows, spec=spec, generated_at=generated_at)
+    elif rule == "bearish_breakdown":
+        signal = bearish_breakdown_signal(
+            symbol,
+            rows,
+            spec=spec,
+            grouped_events=grouped_events,
+            generated_at=generated_at,
+        )
+    elif rule == "bearish_false_breakout":
+        signal = bearish_false_breakout_signal(
+            symbol,
+            rows,
+            spec=spec,
+            grouped_events=grouped_events,
+            generated_at=generated_at,
+        )
+    elif rule == "opening_range_breakdown":
+        signal = opening_range_breakdown_signal(
+            symbol,
+            rows,
+            spec=spec,
+            grouped_events=grouped_events,
+            generated_at=generated_at,
+        )
     elif rule == "follow_through_day":
         signal = follow_through_day_signal(
             symbol,
@@ -1058,6 +1158,276 @@ def support_resistance_failure_signal(
         order_type="limit",
         generated_at=generated_at,
     )
+
+
+def bearish_breakdown_signal(
+    symbol: str,
+    rows: list[dict[str, Any]],
+    *,
+    spec: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    if len(rows) < 3:
+        return None
+    prior, previous, latest = rows[-3], rows[-2], rows[-1]
+    prior_low = min(decimal(prior.get("low", "0")), decimal(previous.get("low", "0")))
+    latest_low = decimal(latest.get("low", "0"))
+    latest_high = decimal(latest.get("high", "0"))
+    entry = decimal(latest.get("close", "0"))
+    if min(prior_low, latest_low, latest_high, entry) <= ZERO:
+        return None
+    if entry > prior_low * Decimal("0.998"):
+        return None
+    return build_validated_short_signal(
+        detector_id="pa002_bearish_breakdown_realtime",
+        symbol=symbol,
+        previous=previous,
+        latest=latest,
+        entry=entry,
+        stop=max(latest_high, prior_low),
+        structure_low=latest_low,
+        spec=spec,
+        grouped_events=grouped_events,
+        generated_at=generated_at,
+    )
+
+
+def bearish_false_breakout_signal(
+    symbol: str,
+    rows: list[dict[str, Any]],
+    *,
+    spec: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    if len(rows) < 3:
+        return None
+    prior, previous, latest = rows[-3], rows[-2], rows[-1]
+    resistance = max(decimal(prior.get("high", "0")), decimal(previous.get("high", "0")))
+    latest_high = decimal(latest.get("high", "0"))
+    latest_low = decimal(latest.get("low", "0"))
+    entry = decimal(latest.get("close", "0"))
+    if min(resistance, latest_high, latest_low, entry) <= ZERO:
+        return None
+    if latest_high < resistance * Decimal("1.0015") or entry >= resistance:
+        return None
+    return build_validated_short_signal(
+        detector_id="pa013_bearish_false_breakout_realtime",
+        symbol=symbol,
+        previous=previous,
+        latest=latest,
+        entry=entry,
+        stop=max(latest_high, resistance),
+        structure_low=latest_low,
+        spec=spec,
+        grouped_events=grouped_events,
+        generated_at=generated_at,
+    )
+
+
+def opening_range_breakdown_signal(
+    symbol: str,
+    rows: list[dict[str, Any]],
+    *,
+    spec: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    session_rows = latest_ny_session_rows(rows)
+    opening_bars_required = 6
+    if len(session_rows) <= opening_bars_required:
+        return None
+    opening = session_rows[:opening_bars_required]
+    previous = session_rows[-2]
+    latest = session_rows[-1]
+    opening_high = max(decimal(row.get("high", "0")) for row in opening)
+    opening_low = min(decimal(row.get("low", "0")) for row in opening)
+    previous_close = decimal(previous.get("close", "0"))
+    latest_low = decimal(latest.get("low", "0"))
+    entry = decimal(latest.get("close", "0"))
+    if min(opening_high, opening_low, previous_close, latest_low, entry) <= ZERO or opening_high <= opening_low:
+        return None
+    if previous_close < opening_low or entry > opening_low * Decimal("0.9975"):
+        return None
+    return build_validated_short_signal(
+        detector_id="pa011_orb_r1_bearish_breakdown_realtime",
+        symbol=symbol,
+        previous=previous,
+        latest=latest,
+        entry=entry,
+        stop=min(opening_high, max(decimal(latest.get("high", "0")), opening_low)),
+        structure_low=latest_low,
+        spec=spec,
+        grouped_events=grouped_events,
+        generated_at=generated_at,
+    )
+
+
+def build_validated_short_signal(
+    *,
+    detector_id: str,
+    symbol: str,
+    previous: dict[str, Any],
+    latest: dict[str, Any],
+    entry: Decimal,
+    stop: Decimal,
+    structure_low: Decimal,
+    spec: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    close_position_value = close_position(latest)
+    close_to_close_percent = row_close_to_close_percent(previous, latest)
+    volume_ratio = row_volume_ratio(previous, latest)
+    if entry <= ZERO or stop <= entry or structure_low <= ZERO:
+        return None
+    if close_position_value > decimal(spec.get("max_close_position", "1")):
+        return None
+    if close_to_close_percent > decimal(spec.get("max_close_to_close_percent", "0")):
+        return None
+    if volume_ratio < decimal(spec.get("min_volume_ratio", "1")):
+        return None
+    risk_percent = (stop - entry) / entry * HUNDRED
+    max_risk_percent = decimal(spec.get("max_risk_percent", "0"))
+    if max_risk_percent > ZERO and risk_percent > max_risk_percent:
+        return None
+    market_confirmed, market_symbols = market_bearish_confirmed(
+        grouped_events,
+        latest,
+        requirement=str(spec.get("market_confirmation_requirement") or "either"),
+    )
+    if not market_confirmed:
+        return None
+    target_r = decimal(spec.get("target_r", "2"))
+    target = entry - (stop - entry) * target_r
+    if target <= ZERO:
+        return None
+    quality_score = bearish_quality_score(
+        close_position_value=close_position_value,
+        close_to_close_percent=close_to_close_percent,
+        volume_ratio=volume_ratio,
+        reward_r=target_r,
+        risk_percent=risk_percent,
+        market_confirmed=market_confirmed,
+    )
+    if quality_score < decimal(spec.get("minimum_quality_score", "0")):
+        return None
+    signal = build_price_action_short_signal(
+        detector_id=detector_id,
+        symbol=symbol,
+        latest=latest,
+        entry=entry,
+        stop=stop,
+        target=target,
+        generated_at=generated_at,
+    )
+    if not signal:
+        return None
+    signal.update(
+        {
+            "close_position": fmt_decimal(close_position_value),
+            "close_to_close_percent": fmt_decimal(close_to_close_percent),
+            "volume_ratio": fmt_decimal(volume_ratio),
+            "market_confirmation_status": "confirmed",
+            "market_confirmation_symbols": market_symbols,
+            "quality_score": fmt_decimal(quality_score),
+            "signal_quality_score": fmt_decimal(quality_score),
+            "minimum_quality_score": fmt_decimal(decimal(spec.get("minimum_quality_score", "0"))),
+            "minimum_reward_r": fmt_decimal(decimal(spec.get("minimum_reward_r", target_r))),
+            "minimum_net_profit_after_fees": fmt_money(decimal(spec.get("minimum_net_profit_after_fees", "0"))),
+            "short_structure_low": fmt_money(structure_low),
+            "quality_score_components": {
+                "close_position": fmt_decimal(close_position_value),
+                "close_to_close_percent": fmt_decimal(close_to_close_percent),
+                "volume_ratio": fmt_decimal(volume_ratio),
+                "reward_r": fmt_decimal(target_r),
+                "risk_percent": fmt_decimal(risk_percent),
+                "market_confirmed": market_confirmed,
+            },
+            "high_quality_signal": True,
+        }
+    )
+    return signal
+
+
+def build_price_action_short_signal(
+    *,
+    detector_id: str,
+    symbol: str,
+    latest: dict[str, Any],
+    entry: Decimal,
+    stop: Decimal,
+    target: Decimal,
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    if entry <= ZERO or stop <= entry or target <= ZERO or target >= entry:
+        return None
+    return {
+        "detector_id": detector_id,
+        "symbol": symbol,
+        "direction": "short",
+        "side": "sell_short",
+        "position_action": "open_short",
+        "order_type": "limit",
+        "limit_price": fmt_money(entry),
+        "stop_price": fmt_money(stop),
+        "target_price": fmt_money(target),
+        "current_price": fmt_money(entry),
+        "source_market_event_id": str(latest.get("event_id") or latest.get("market_event_id") or ""),
+        "market_event_time": str(latest.get("event_time") or latest.get("bar_time") or latest.get("timestamp") or ""),
+        "created_at": str(latest.get("received_at") or to_iso(generated_at)),
+    }
+
+
+def market_bearish_confirmed(
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    latest: dict[str, Any],
+    *,
+    requirement: str,
+) -> tuple[bool, str]:
+    target_date = ny_event_date(latest)
+    target_time = parse_optional_utc_datetime(
+        str(latest.get("event_time") or latest.get("bar_time") or latest.get("timestamp") or "")
+    )
+    weak_symbols: list[str] = []
+    for symbol in ("SPY", "QQQ"):
+        rows = grouped_events.get((symbol, "5m"), [])
+        if len(rows) < 2:
+            continue
+        previous, market_latest = rows[-2], rows[-1]
+        if target_date and ny_event_date(market_latest) != target_date:
+            continue
+        market_time = parse_optional_utc_datetime(
+            str(market_latest.get("event_time") or market_latest.get("bar_time") or market_latest.get("timestamp") or "")
+        )
+        if target_time and market_time and abs((market_time - target_time).total_seconds()) > 600:
+            continue
+        if row_close_to_close_percent(previous, market_latest) <= Decimal("-0.25"):
+            weak_symbols.append(symbol)
+    required_count = 2 if requirement == "both" else 1
+    return len(weak_symbols) >= required_count, ",".join(weak_symbols)
+
+
+def bearish_quality_score(
+    *,
+    close_position_value: Decimal,
+    close_to_close_percent: Decimal,
+    volume_ratio: Decimal,
+    reward_r: Decimal,
+    risk_percent: Decimal,
+    market_confirmed: bool,
+) -> Decimal:
+    score = ZERO
+    score += min(max(Decimal("1") - close_position_value, ZERO), Decimal("1")) * Decimal("35")
+    score += min(max(-close_to_close_percent, ZERO), Decimal("2")) / Decimal("2") * Decimal("20")
+    score += min(max(volume_ratio - Decimal("1"), ZERO), Decimal("1")) * Decimal("15")
+    score += min(max(reward_r - Decimal("1"), ZERO), Decimal("2")) / Decimal("2") * Decimal("10")
+    if risk_percent > ZERO:
+        score += max(Decimal("0"), Decimal("10") - min(risk_percent, Decimal("10")))
+    if market_confirmed:
+        score += Decimal("10")
+    return min(score, Decimal("100"))
 
 
 def follow_through_day_signal(
@@ -1384,21 +1754,28 @@ def build_signal_from_intent(
     signal_id = base_signal_id
     original_created_at = created_at
     rebuilt_after_epoch_activation = False
-    epoch_id = str(test_epoch_state.get("test_epoch_id") or "")
-    epoch_started_at = parse_epoch_started_at(test_epoch_state)
+    direction = normalize_direction(intent.get("direction") or intent.get("side"))
+    is_short = direction == "short"
+    effective_epoch_state = short_test_epoch_state(config) if is_short else test_epoch_state
+    epoch_id = str(effective_epoch_state.get("test_epoch_id") or "")
+    epoch_started_at = parse_epoch_started_at(effective_epoch_state)
     original_created_dt = parse_optional_utc_datetime(original_created_at)
     if (
         epoch_id
-        and str(test_epoch_state.get("status") or "") == "active"
+        and str(effective_epoch_state.get("status") or "") == "active"
         and epoch_started_at is not None
         and original_created_dt is not None
         and original_created_dt < epoch_started_at
         and generated_at >= epoch_started_at
     ):
-        signal_id = f"{base_signal_id}-{epoch_id}"
-        created_at = to_iso(generated_at)
-        rebuilt_after_epoch_activation = True
-    direction = normalize_direction(intent.get("direction") or intent.get("side"))
+        if is_short:
+            # Short test rows are never rebuilt from a pre-baseline event.
+            # A new bar must produce the fresh short intent itself.
+            pass
+        else:
+            signal_id = f"{base_signal_id}-{epoch_id}"
+            created_at = to_iso(generated_at)
+            rebuilt_after_epoch_activation = True
     side = "buy" if direction == "long" else "sell_short"
     order_type = normalize_order_type(intent.get("order_type"))
     entry = decimal(intent.get("limit_price", intent.get("entry_price", intent.get("current_price", "0"))))
@@ -1412,7 +1789,7 @@ def build_signal_from_intent(
         blockers.append("missing_source_market_event_id")
     if not runtime_id:
         blockers.append("missing_runtime_id")
-    if side == "buy" and not bucket:
+    if not bucket:
         blockers.append("blocked_missing_capital_bucket")
     if not symbol:
         blockers.append("missing_symbol")
@@ -1426,7 +1803,11 @@ def build_signal_from_intent(
             blockers.append("blocked_replay_market_event_before_session_start")
     except ValueError:
         blockers.append("invalid_signal_created_at")
-    if side != "buy":
+    if is_short and (
+        not config.allow_short_selling
+        or not config.paper_short_testing_enabled
+        or runtime_id not in set(config.paper_short_runtime_ids)
+    ):
         blockers.append("blocked_short_disabled")
     if order_type not in {"limit", "trigger_limit"}:
         blockers.append("blocked_order_type")
@@ -1438,7 +1819,7 @@ def build_signal_from_intent(
     risk_per_share = abs(entry - stop)
     if risk_per_share <= ZERO:
         blockers.append("blocked_invalid_risk_geometry")
-    if target <= entry:
+    if (not is_short and target <= entry) or (is_short and target >= entry):
         blockers.append("blocked_invalid_target_geometry")
     raw_quantity = decimal(intent.get("quantity", "0"))
     multiplier = config.runtime_position_multipliers.get(runtime_id, Decimal("1.0"))
@@ -1458,13 +1839,14 @@ def build_signal_from_intent(
         blockers.append(quantity_normalization.blocker)
     notional = entry * quantity
     risk_amount = risk_per_share * quantity
-    gross_profit = (target - entry) * quantity
+    gross_profit = ((entry - target) if is_short else (target - entry)) * quantity
     fees = config.commission_per_order_side * Decimal("2") + config.regulatory_fee_per_sell_order
     net_profit = gross_profit - fees
-    reward_r = reward_r_ratio(entry, stop, target)
+    reward_r = short_reward_r_ratio(entry, stop, target) if is_short else reward_r_ratio(entry, stop, target)
     intent_quality_score = decimal(intent.get("quality_score", intent.get("signal_quality_score", "0")))
     minimum_reward_r = runtime_minimum_reward_r(config, runtime_id, strategy_id)
     minimum_net_profit = runtime_minimum_net_profit(config, runtime_id, strategy_id)
+    minimum_quality_score = decimal(intent.get("minimum_quality_score", "0")) if is_short else ZERO
     profit_gate_status = profit_quality_gate(config, intent, net_profit, runtime_id, strategy_id)
     if risk_amount > runtime_max_risk:
         blockers.append("blocked_risk_over_cap")
@@ -1479,6 +1861,8 @@ def build_signal_from_intent(
         blockers.append("blocked_fee_profit_requires_confluence")
     if reward_r < minimum_reward_r:
         blockers.append("blocked_reward_r_below_minimum")
+    if is_short and intent_quality_score < minimum_quality_score:
+        blockers.append("blocked_short_quality_score_below_minimum")
     status = "signal_event_ready" if not blockers else blockers[0]
     row = {
         "stage": config.stage,
@@ -1522,6 +1906,7 @@ def build_signal_from_intent(
         "volume_ratio": str(intent.get("volume_ratio") or ""),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
         "minimum_net_profit_after_fees": fmt_money(minimum_net_profit),
+        "minimum_quality_score": fmt_decimal(minimum_quality_score),
         "bucket_max_total_exposure": fmt_money(base_total_exposure),
         "bucket_max_symbol_exposure": fmt_money(base_symbol_exposure),
         "bucket_max_risk_per_order": fmt_money(runtime_max_risk),
@@ -1535,11 +1920,13 @@ def build_signal_from_intent(
         "additional_bucket_route": bool(intent.get("additional_bucket_route", False)),
         "primary_capital_bucket": str(intent.get("primary_capital_bucket") or ""),
         "test_epoch_id": epoch_id,
-        "test_epoch_status": str(test_epoch_state.get("status") or ""),
-        "test_started_at": str(test_epoch_state.get("test_started_at") or ""),
+        "test_epoch_status": str(effective_epoch_state.get("status") or ""),
+        "test_started_at": str(effective_epoch_state.get("test_started_at") or ""),
         "original_signal_created_at": original_created_at if rebuilt_after_epoch_activation else "",
         "realtime_rebuilt_after_epoch_activation": rebuilt_after_epoch_activation,
         "local_simulation_ignored": True,
+        "direction": direction,
+        "position_action": str(intent.get("position_action") or ("open_short" if is_short else "open_long")),
         "fast_queue_used": False,
     }
     if blockers:
@@ -1552,14 +1939,15 @@ def build_signal_from_intent(
         "capital_bucket": capital_bucket,
         "capital_bucket_label": bucket_label,
         "test_epoch_id": epoch_id,
-        "test_epoch_status": str(test_epoch_state.get("status") or ""),
-        "test_started_at": str(test_epoch_state.get("test_started_at") or ""),
+        "test_epoch_status": str(effective_epoch_state.get("status") or ""),
+        "test_started_at": str(effective_epoch_state.get("test_started_at") or ""),
         "original_signal_created_at": original_created_at if rebuilt_after_epoch_activation else "",
         "realtime_rebuilt_after_epoch_activation": rebuilt_after_epoch_activation,
         "symbol": symbol,
         "timeframe": str(intent.get("timeframe") or ""),
-        "direction": "long",
-        "side": "buy",
+        "direction": direction,
+        "side": side,
+        "position_action": str(intent.get("position_action") or ("open_short" if is_short else "open_long")),
         "order_type": order_type,
         "trigger_price": fmt_money(trigger) if trigger > ZERO else "",
         "limit_price": fmt_money(entry),
@@ -1594,6 +1982,7 @@ def build_signal_from_intent(
         "volume_ratio": str(intent.get("volume_ratio") or ""),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
         "minimum_net_profit_after_fees": fmt_money(minimum_net_profit),
+        "minimum_quality_score": fmt_decimal(minimum_quality_score),
         "bucket_max_total_exposure": fmt_money(base_total_exposure),
         "bucket_max_symbol_exposure": fmt_money(base_symbol_exposure),
         "bucket_max_risk_per_order": fmt_money(runtime_max_risk),
@@ -1611,6 +2000,7 @@ def build_signal_from_intent(
         "primary_capital_bucket": str(intent.get("primary_capital_bucket") or ""),
         "source_market_event_id": source_event_id,
         "market_event_time": str(intent.get("market_event_time") or ""),
+        "short_structure_low": str(intent.get("short_structure_low") or ""),
         "signal_validity_seconds": str(intent.get("signal_validity_seconds") or "5"),
         "local_simulation_source": False,
         "fast_queue_source": False,
@@ -1681,6 +2071,16 @@ def parse_epoch_started_at(epoch_state: dict[str, Any]) -> datetime | None:
     return parse_optional_utc_datetime(str(epoch_state.get("test_started_at") or epoch_state.get("activated_at") or ""))
 
 
+def short_test_epoch_state(config: RealtimeSignalRouterConfig) -> dict[str, Any]:
+    return {
+        "enabled": config.paper_short_testing_enabled,
+        "status": "active" if config.paper_short_testing_enabled else "disabled",
+        "test_epoch_id": config.short_test_epoch_id,
+        "test_started_at": config.short_test_started_at,
+        "position_direction": "short",
+    }
+
+
 def count_blockers(rows: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for row in rows:
@@ -1726,6 +2126,14 @@ def runtime_minimum_reward_r(config: RealtimeSignalRouterConfig, runtime_id: str
 def reward_r_ratio(entry: Decimal, stop: Decimal, target: Decimal) -> Decimal:
     risk = entry - stop
     reward = target - entry
+    if risk <= ZERO or reward <= ZERO:
+        return ZERO
+    return reward / risk
+
+
+def short_reward_r_ratio(entry: Decimal, stop: Decimal, target: Decimal) -> Decimal:
+    risk = stop - entry
+    reward = entry - target
     if risk <= ZERO or reward <= ZERO:
         return ZERO
     return reward / risk
