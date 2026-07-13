@@ -43,6 +43,33 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertNotIn("wiki:knowledge/wiki/setups/signal-bar-entry-placeholder.md", spec["source_refs"])
         self.assertFalse(spec["paper_gate_evidence_now"])
 
+    def test_cached_bars_reuses_unchanged_file_and_invalidates_after_rewrite(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "us_SPY_1d_2026-07-10_2026-07-13_longbridge.csv"
+            first_row = {
+                "symbol": "SPY",
+                "market": "US",
+                "timeframe": "1d",
+                "timestamp": "2026-07-10T16:00:00",
+                "timezone": "America/New_York",
+                "open": "100",
+                "high": "101",
+                "low": "99",
+                "close": "100.5",
+                "volume": "1000",
+            }
+            second_row = {**first_row, "timestamp": "2026-07-13T16:00:00", "close": "101.5"}
+            MODULE.write_cache_csv(path, [first_row])
+            MODULE._cached_load_bars.cache_clear()
+            with patch("scripts.m12_12_daily_observation_loop_lib.load_scanner_bars", wraps=MODULE.load_scanner_bars) as load:
+                self.assertEqual(len(MODULE.cached_load_bars(path)), 1)
+                self.assertEqual(len(MODULE.cached_load_bars(path)), 1)
+                self.assertEqual(load.call_count, 1)
+                MODULE.write_cache_csv(path, [first_row, second_row])
+                self.assertEqual(len(MODULE.cached_load_bars(path)), 2)
+                self.assertEqual(load.call_count, 2)
+            MODULE._cached_load_bars.cache_clear()
+
     def test_temp_run_without_fetch_writes_honest_deferred_outputs(self) -> None:
         config = MODULE.load_config()
         with tempfile.TemporaryDirectory() as tmp:

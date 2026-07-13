@@ -28,7 +28,7 @@ from scripts.m12_liquid_universe_scanner_lib import (
     US_LIQUID_SEED_V1,
     aggregate_bars,
     evaluate_strategy_candidate,
-    load_bars,
+    load_bars as load_scanner_bars,
 )
 from scripts.public_backtest_demo_lib import CSV_HEADER, sanitize_vendor_rows, write_cache_csv
 
@@ -154,6 +154,18 @@ def project_path(path: Path | None) -> str:
         return resolved.relative_to(ROOT).as_posix()
     except ValueError:
         return str(resolved)
+
+
+@lru_cache(maxsize=4096)
+def _cached_load_bars(path_text: str, modified_at_ns: int, size: int) -> tuple[Any, ...]:
+    """Cache immutable OHLCV parses and invalidate automatically after a rewrite."""
+    del modified_at_ns, size
+    return tuple(load_scanner_bars(Path(path_text)))
+
+
+def cached_load_bars(path: Path) -> list[Any]:
+    stat = path.stat()
+    return list(_cached_load_bars(str(path), stat.st_mtime_ns, stat.st_size))
 
 
 def decimal(value: Any) -> Decimal:
@@ -951,9 +963,9 @@ def scan_daily_loop(
         }
         bars_by_tf: dict[str, tuple[list[Any], str, Path | None]] = {}
         if paths["1d"]:
-            bars_by_tf["1d"] = (load_bars(paths["1d"]), "native_daily_cache", paths["1d"])
+            bars_by_tf["1d"] = (cached_load_bars(paths["1d"]), "native_daily_cache", paths["1d"])
         if paths["5m"]:
-            five = load_bars(paths["5m"])
+            five = cached_load_bars(paths["5m"])
             bars_by_tf["5m"] = (five, "native_current_session_5m_cache", paths["5m"])
             bars_by_tf["15m"] = (aggregate_bars(five, "15m"), "derived_from_5m_current", paths["5m"])
             bars_by_tf["1h"] = (aggregate_bars(five, "1h"), "derived_from_5m_current", paths["5m"])
@@ -1116,7 +1128,7 @@ def run_formal_daily_strategy(
         if not path:
             deferred.append({"symbol": symbol, "reason": "daily_cache_missing"})
             continue
-        bars = load_bars(path)
+        bars = cached_load_bars(path)
         trades = generate_formal_daily_trades(symbol, bars, config)
         all_trades.extend(trades)
         per_symbol.append(metric_row_for_trades(symbol, trades, config.formal_daily_strategy.starting_capital))
@@ -1733,9 +1745,29 @@ def best_cache_file(roots: Iterable[Path], symbol: str, interval: str, target_st
             candidates.extend(directory.glob(pattern))
     if not candidates:
         return None
-    covering = [path for path in candidates if is_target_ready(path, target_start, target_end)]
-    pool = covering or candidates
-    return max(pool, key=lambda path: (cache_file_date_window(path)[1] or date.min, csv_stats(path)["row_count"], path.name))
+    # Do not scan every historical CSV on every dashboard refresh. The filename
+    # already carries the requested window, so validate only the newest
+    # candidate that claims to cover the target window, then fall back to the
+    # next such candidate only if the file is actually incomplete.
+    def candidate_key(path: Path) -> tuple[date, date, int, str]:
+        request_start, request_end = cache_file_date_window(path)
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 0
+        return (request_end or date.min, request_start or date.min, size, path.name)
+
+    ordered = sorted(candidates, key=candidate_key, reverse=True)
+    requested_coverage = [
+        path
+        for path in ordered
+        if (cache_file_date_window(path)[0] or date.max) <= target_start
+        and (cache_file_date_window(path)[1] or date.min) >= target_end
+    ]
+    for path in requested_coverage:
+        if is_target_ready(path, target_start, target_end):
+            return path
+    return ordered[0]
 
 
 def is_target_ready(path: Path, target_start: date, target_end: date) -> bool:
@@ -1746,6 +1778,18 @@ def is_target_ready(path: Path, target_start: date, target_end: date) -> bool:
 def csv_stats(path: Path | None) -> dict[str, Any]:
     if path is None:
         return {"row_count": 0, "start_date": "", "end_date": "", "timezone": "", "request_start_date": "", "request_end_date": ""}
+    try:
+        stat = path.stat()
+    except OSError:
+        return {"row_count": 0, "start_date": "", "end_date": "", "timezone": "", "request_start_date": "", "request_end_date": ""}
+    return _csv_stats_cached(str(path), stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=4096)
+def _csv_stats_cached(path_text: str, modified_at_ns: int, size: int) -> dict[str, Any]:
+    """Cache CSV scans without reusing a value after a refresh rewrites a file."""
+    del modified_at_ns, size
+    path = Path(path_text)
     request_start, request_end = cache_file_date_window(path)
     row_count = 0
     first = ""

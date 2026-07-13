@@ -456,13 +456,22 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
             self.assertEqual(html_path.read_text(encoding="utf-8"), "<html>ok</html>")
             self.assertEqual(list(root.glob(".*.tmp")), [])
 
-    def run_stage(self, *, output_dir: Path | None = None, generated_at: str = "2026-04-29T02:30:00Z"):
+    def run_stage(
+        self,
+        *,
+        output_dir: Path | None = None,
+        generated_at: str = "2026-04-29T02:30:00Z",
+        first_batch_size: int = 1,
+    ):
         temp_dir = None
         if output_dir is None:
             temp_dir = tempfile.TemporaryDirectory()
             self.addCleanup(temp_dir.cleanup)
             output_dir = Path(temp_dir.name) / "m12_29"
-        config = replace(load_config(), output_dir=output_dir)
+        # Production stays at 147 symbols. This no-fetch unit-test fixture
+        # intentionally exercises one representative cached symbol so a
+        # dashboard logic test does not become a 147-symbol integration run.
+        config = replace(load_config(), output_dir=output_dir, first_batch_size=first_batch_size)
         result = run_m12_29_current_day_scan_dashboard(
             config,
             generated_at=generated_at,
@@ -476,6 +485,17 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         summary = result["summary"]
         self.assertEqual(summary["scan_date"], "2026-04-28")
         self.assertEqual(summary["stage"], "M12.46.accountized_realtime_testing")
+
+    def test_production_dashboard_config_keeps_147_symbol_scope(self):
+        self.assertEqual(load_config().first_batch_size, 147)
+
+    def test_dashboard_source_loop_uses_the_configured_active_scope(self):
+        _, result, output_dir = self.run_stage(first_batch_size=1)
+        source_universe = json.loads((output_dir / "m12_12_current_day_source" / "m12_12_first50_universe.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(source_universe["symbol_count"], 1)
+        self.assertEqual(result["summary"]["active_universe_symbol_count"], 1)
+        self.assertTrue(result["summary"]["current_day_runtime_ready"])
 
     def test_scan_date_uses_prior_session_before_regular_open(self):
         self.assertEqual(current_us_scan_date("2026-04-29T12:00:00Z").isoformat(), "2026-04-28")
@@ -1017,7 +1037,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("暂无阻断", queue_by_label["实时提交流程"]["note"])
         pnl_cards_by_label = {row["label"]: row for row in panel["realtime_pnl_cards"]}
         self.assertEqual(pnl_cards_by_label["接口持仓今日浮动"]["value"], "234.00")
-        self.assertEqual(pnl_cards_by_label["账户当日盈亏"]["value"], "无法计算")
+        self.assertEqual(pnl_cards_by_label["App当日盈亏"]["value"], "等待长桥字段对齐")
         self.assertEqual(pnl_cards_by_label["当前持仓总盈亏"]["value"], "269.87")
         self.assertEqual(pnl_cards_by_label["持仓浮动"]["value"], "269.87")
         self.assertNotIn("长桥总盈亏", panel_json)
@@ -1033,7 +1053,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("实时盈亏", html)
         self.assertIn("持仓浮动", html)
         self.assertIn("逐标的盈亏", html)
-        self.assertIn("逐策略成交盈亏", html)
+        self.assertIn("逐策略做多成交盈亏", html)
         dedicated_rows = {row["runtime_id"]: row for row in panel["dedicated_bucket_runtime_review_rows"]}
         self.assertEqual(dedicated_rows["M10-PA-002-5m"]["review_status"], "已按运行单元复核")
         self.assertEqual(dedicated_rows["M10-PA-004-MBF-QC-1d"]["review_status"], "已按运行单元复核")
@@ -1444,7 +1464,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertNotEqual(panel["submission_status"], "submitter_state_stale_waiting_refresh")
         self.assertEqual(status_by_label["市场窗口"]["value"], "美股常规交易时段")
 
-    def test_m15_submission_counts_infers_market_date_from_realtime_timestamps(self):
+    def test_m15_submission_counts_treats_missing_order_id_as_unconfirmed_request(self):
         rows = [
             {
                 "submission_status": "submitted",
@@ -1470,8 +1490,9 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
 
         counts = m15_submission_counts_for_date(rows, "2026-06-04")
 
-        self.assertEqual(counts["submitted"], 1)
+        self.assertEqual(counts["submitted"], 0)
         self.assertEqual(counts["attempted"], 2)
+        self.assertEqual(counts["unconfirmed"], 1)
 
     def test_longbridge_panel_marks_stale_account_state_instead_of_showing_old_orders(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1937,7 +1958,11 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         rows = m15_longbridge_virtual_bucket_rows(realtime, ledger, epoch)
         by_bucket = {row["capital_bucket"]: row for row in rows}
 
-        self.assertEqual(by_bucket["main"]["submitted_buy_count"], "1")
+        self.assertEqual(by_bucket["main"]["submitted_buy_count"], "0")
+        self.assertEqual(by_bucket["main"]["submitted_request_count"], "1")
+        self.assertEqual(by_bucket["main"]["used_exposure"], "0.00")
+        self.assertEqual(by_bucket["main"]["win_rate_percent"], "等待长桥成交对账")
+        self.assertIn("不计入持仓", by_bucket["main"]["note"])
         self.assertEqual(by_bucket["experimental"]["label"], "实验仓")
         self.assertEqual(by_bucket["old_history"]["submitted_buy_count"], "1")
         self.assertEqual(by_bucket["local_repair"]["submitted_buy_count"], "0")
