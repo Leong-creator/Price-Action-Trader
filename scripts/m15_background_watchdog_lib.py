@@ -38,8 +38,11 @@ class BackgroundWatchdogConfig:
     output_dir: Path
     check_interval_seconds: int
     command_timeout_seconds: int
+    analytics_refresh_interval_seconds: int
+    analytics_command_timeout_seconds: int
     m12_47_config_path: Path
     m15_realtime_supervisor_config_path: Path
+    m15_account_state_config_path: Path
     readiness_config_path: Path
     hard_boundaries: dict[str, bool]
 
@@ -67,6 +70,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
         check_interval_seconds=int(watchdog.get("check_interval_seconds", 60)),
         command_timeout_seconds=int(watchdog.get("command_timeout_seconds", 30)),
+        analytics_refresh_interval_seconds=int(watchdog.get("analytics_refresh_interval_seconds", 300)),
+        analytics_command_timeout_seconds=int(watchdog.get("analytics_command_timeout_seconds", 90)),
         m12_47_config_path=resolve_repo_path(
             inputs.get("m12_47_config", ROOT / "config" / "examples" / "m12_47_session_supervisor.json")
         ),
@@ -74,6 +79,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
             inputs.get(
                 "m15_realtime_supervisor_config",
                 ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
+            )
+        ),
+        m15_account_state_config_path=resolve_repo_path(
+            inputs.get(
+                "m15_account_state_config",
+                ROOT / "config" / "examples" / "m15_longbridge_realtime_account_state.json",
             )
         ),
         readiness_config_path=resolve_repo_path(
@@ -92,6 +103,10 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog check interval must be positive")
     if config.command_timeout_seconds <= 0:
         raise ValueError("M15 background watchdog command timeout must be positive")
+    if config.analytics_refresh_interval_seconds <= 0:
+        raise ValueError("M15 background watchdog analytics refresh interval must be positive")
+    if config.analytics_command_timeout_seconds <= 0:
+        raise ValueError("M15 background watchdog analytics command timeout must be positive")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 background watchdog must stay paper/simulated only")
     for key in ("live_execution", "real_money_actions", "manual_m12_37_once", "margin_financing"):
@@ -109,6 +124,7 @@ def run_background_watchdog_once(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = generated_at or now_utc_iso()
     runner = command_runner or run_command
+    previous = read_json(config.output_dir / SUMMARY_JSON)
     steps = [
         run_step(
             "m12_47_daemon",
@@ -130,6 +146,7 @@ def run_background_watchdog_once(
                 sys.executable,
                 "scripts/run_m15_longbridge_realtime_session_supervisor.py",
                 "--daemon",
+                "--replace-config-drift",
                 "--config",
                 project_path(config.m15_realtime_supervisor_config_path),
             ],
@@ -162,6 +179,7 @@ def run_background_watchdog_once(
             config,
             runner,
         ),
+        analytics_refresh_step(config, runner, generated_at, previous=previous),
         run_step(
             "m15_opening_readiness",
             "M15 开盘值守验收",
@@ -193,6 +211,7 @@ def run_background_watchdog_once(
         "refs": {
             "m12_47_config": project_path(config.m12_47_config_path),
             "m15_realtime_supervisor_config": project_path(config.m15_realtime_supervisor_config_path),
+            "m15_account_state_config": project_path(config.m15_account_state_config_path),
             "readiness_config": project_path(config.readiness_config_path),
         },
     }
@@ -208,18 +227,21 @@ def run_step(
     command: list[str],
     config: BackgroundWatchdogConfig,
     runner: CommandRunner,
+    *,
+    timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     assert_safe_watchdog_command(command)
+    effective_timeout = timeout_seconds or config.command_timeout_seconds
     started = time.perf_counter()
     try:
-        completed = runner(command, config.command_timeout_seconds)
+        completed = runner(command, effective_timeout)
         returncode = int(completed.returncode)
         stdout = str(completed.stdout or "")
         stderr = str(completed.stderr or "")
     except subprocess.TimeoutExpired as exc:
         returncode = 124
         stdout = str(exc.stdout or "")
-        stderr = f"timeout after {config.command_timeout_seconds}s"
+        stderr = f"timeout after {effective_timeout}s"
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     return {
         "step_id": step_id,
@@ -248,6 +270,7 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
     allowed_scripts = {
         "scripts/run_m12_47_session_supervisor.py",
         "scripts/run_m15_longbridge_realtime_session_supervisor.py",
+        "scripts/run_m15_longbridge_realtime_account_state.py",
         "scripts/run_m15_opening_trade_readiness.py",
     }
     script_tokens = [token for token in command if token.startswith("scripts/")]
@@ -265,7 +288,7 @@ def clean_text(value: str) -> str:
 
 def plain_language_result(failed_steps: list[dict[str, Any]]) -> str:
     if not failed_steps:
-        return "后台看护已完成：M12.47 与 M15 长桥实时守护器已按 daemon/status/readiness 顺序检查；没有手动运行 M12.37 once。"
+        return "后台看护已完成：M12.47、M15 实时守护器、只读账户慢路径和 opening readiness 已检查；没有手动运行 M12.37 once。"
     failed_labels = "、".join(str(step["label"]) for step in failed_steps)
     return f"后台看护发现异常：{failed_labels} 未通过；不会手动跑 M12.37 once，也不会直接提交订单。"
 
@@ -294,6 +317,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
             "## 边界",
             "",
             "- 只维护 M12.47 / M15 守护器。",
+            "- 只通过只读账户脚本做慢路径 analytics 刷新。",
             "- 不手动运行 M12.37 once。",
             "- 不提交、撤销或修改订单。",
             "- 仍只限长桥模拟账户。",
@@ -315,6 +339,68 @@ def run_command(command: list[str], timeout_seconds: int) -> subprocess.Complete
         check=False,
         timeout=timeout_seconds,
     )
+
+
+def analytics_refresh_step(
+    config: BackgroundWatchdogConfig,
+    runner: CommandRunner,
+    generated_at: str,
+    *,
+    previous: dict[str, Any],
+) -> dict[str, Any]:
+    previous_success_at = latest_step_generated_at(previous, "m15_account_state_full_refresh")
+    if not analytics_refresh_due(generated_at, previous_success_at, config.analytics_refresh_interval_seconds):
+        return {
+            "step_id": "m15_account_state_full_refresh",
+            "label": "M15 只读账户慢路径 analytics 刷新",
+            "returncode": 0,
+            "elapsed_ms": 0,
+            "command": "",
+            "stdout_tail": f"skipped_until_due interval={config.analytics_refresh_interval_seconds}s",
+            "stderr_tail": "",
+            "skipped_due_to_throttle": True,
+            "last_success_generated_at": previous_success_at,
+        }
+    command = [
+        sys.executable,
+        "scripts/run_m15_longbridge_realtime_account_state.py",
+        "--config",
+        project_path(config.m15_account_state_config_path),
+        "--generated-at",
+        generated_at,
+    ]
+    step = run_step(
+        "m15_account_state_full_refresh",
+        "M15 只读账户慢路径 analytics 刷新",
+        command,
+        config,
+        runner,
+        timeout_seconds=config.analytics_command_timeout_seconds,
+    )
+    step["skipped_due_to_throttle"] = False
+    return step
+
+
+def analytics_refresh_due(generated_at: str, previous_success_at: str, interval_seconds: int) -> bool:
+    if not previous_success_at:
+        return True
+    try:
+        current = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        previous = datetime.fromisoformat(previous_success_at.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    return (current - previous).total_seconds() >= interval_seconds
+
+
+def latest_step_generated_at(payload: dict[str, Any], step_id: str) -> str:
+    if not isinstance(payload.get("steps"), list):
+        return ""
+    for step in payload.get("steps", []):
+        if not isinstance(step, dict):
+            continue
+        if step.get("step_id") == step_id and int(step.get("returncode", 1)) == 0 and not step.get("skipped_due_to_throttle"):
+            return str(payload.get("generated_at") or "")
+    return ""
 
 
 def watch_loop(config: BackgroundWatchdogConfig) -> int:

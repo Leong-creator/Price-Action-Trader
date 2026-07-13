@@ -122,13 +122,12 @@ def run_realtime_position_manager(
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
 
     latest_prices = latest_price_by_symbol(market_events)
-    open_metadata = submitted_open_metadata(execution_rows)
+    position_slices = account_position_slices(account_state, execution_rows, config.manage_untracked_positions_for_exit)
     recent_exit_attempts = recent_exit_attempt_keys(execution_rows, now, config.exit_attempt_cooldown_seconds)
     ledger_rows: list[dict[str, Any]] = []
     exit_events: list[dict[str, Any]] = []
-    for position in account_positions(account_state):
+    for position, metadata in position_slices:
         symbol = str(position["symbol"])
-        metadata = open_metadata.get(symbol, {})
         latest = latest_prices.get(symbol, ZERO)
         row, event = evaluate_position(
             config,
@@ -156,7 +155,8 @@ def run_realtime_position_manager(
         "source_mode": "longbridge_account_positions_plus_realtime_market_events",
         "local_simulation_isolated": True,
         "local_close_signal_used": False,
-        "position_count": len(account_positions(account_state)),
+        "position_count": len(position_slices),
+        "account_position_count": len(account_positions(account_state)),
         "managed_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "m15_realtime_managed"),
         "unmanaged_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_unmanaged"),
         "exit_only_position_count": sum(
@@ -301,6 +301,12 @@ def evaluate_position(
         "strategy_id": strategy_id,
         "quantity": fmt_decimal(quantity),
         "available_quantity": fmt_decimal(available_quantity),
+        "account_symbol_quantity": str(position.get("account_symbol_quantity") or ""),
+        "account_symbol_available_quantity": str(position.get("account_symbol_available_quantity") or ""),
+        "virtual_position_quantity": str(metadata.get("virtual_position_quantity") or position.get("virtual_position_quantity") or ""),
+        "virtual_position_slice_quantity": str(metadata.get("virtual_position_slice_quantity") or ""),
+        "virtual_position_slice_available": str(metadata.get("virtual_position_slice_available") or ""),
+        "virtual_position_capped_by_account": bool(position.get("virtual_position_capped_by_account", False)),
         "cost_price": fmt_money(cost_price) if cost_price > ZERO else "",
         "unrealized_pnl": fmt_money(unrealized_pnl) if latest_for_pnl > ZERO and cost_price > ZERO else "",
         "latest_price": fmt_money(latest_price) if latest_price > ZERO else "",
@@ -365,18 +371,101 @@ def latest_price_by_symbol(market_events: list[dict[str, Any]]) -> dict[str, Dec
     return {symbol: value[1] for symbol, value in latest.items()}
 
 
-def submitted_open_metadata(execution_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    metadata: dict[str, dict[str, Any]] = {}
+def account_position_slices(
+    account_state: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+    include_untracked_exit_only: bool,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    grouped = submitted_open_position_groups(execution_rows)
+    slices: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for account_position in account_positions(account_state):
+        symbol = str(account_position["symbol"])
+        remaining_quantity = decimal(account_position.get("quantity", "0"))
+        remaining_available = decimal(account_position.get("available", remaining_quantity))
+        symbol_groups = [
+            group
+            for group in grouped.values()
+            if group.get("symbol") == symbol and decimal(group.get("open_quantity", "0")) > ZERO
+        ]
+        symbol_groups.sort(key=lambda row: str(row.get("last_buy_at") or row.get("first_buy_at") or ""))
+        for group in symbol_groups:
+            if remaining_quantity <= ZERO:
+                break
+            group_quantity = decimal(group.get("open_quantity", "0"))
+            slice_quantity = min(group_quantity, remaining_quantity)
+            if slice_quantity <= ZERO:
+                continue
+            slice_available = min(slice_quantity, remaining_available)
+            position = {
+                **account_position,
+                "quantity": fmt_decimal(slice_quantity),
+                "available": fmt_decimal(slice_available),
+                "account_symbol_quantity": fmt_decimal(decimal(account_position.get("quantity", "0"))),
+                "account_symbol_available_quantity": fmt_decimal(decimal(account_position.get("available", remaining_quantity))),
+                "virtual_position_quantity": fmt_decimal(group_quantity),
+                "virtual_position_capped_by_account": group_quantity > slice_quantity,
+            }
+            metadata = dict(group.get("metadata", {}))
+            metadata["virtual_position_quantity"] = fmt_decimal(group_quantity)
+            metadata["virtual_position_slice_quantity"] = fmt_decimal(slice_quantity)
+            metadata["virtual_position_slice_available"] = fmt_decimal(slice_available)
+            slices.append((position, metadata))
+            remaining_quantity -= slice_quantity
+            remaining_available = max(remaining_available - slice_available, ZERO)
+        if include_untracked_exit_only and remaining_quantity > ZERO:
+            position = {
+                **account_position,
+                "quantity": fmt_decimal(remaining_quantity),
+                "available": fmt_decimal(min(remaining_quantity, remaining_available)),
+                "account_symbol_quantity": fmt_decimal(decimal(account_position.get("quantity", "0"))),
+                "account_symbol_available_quantity": fmt_decimal(decimal(account_position.get("available", remaining_quantity))),
+                "virtual_position_quantity": "",
+                "virtual_position_capped_by_account": False,
+            }
+            slices.append((position, {}))
+    return slices
+
+
+def submitted_open_position_groups(execution_rows: list[dict[str, Any]]) -> dict[tuple[str, str, str, str], dict[str, Any]]:
+    groups: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for row in execution_rows:
         if row.get("submission_status") != "submitted":
-            continue
-        if row.get("side") != "buy":
             continue
         symbol = base_symbol(str(row.get("symbol", "")))
         if not symbol:
             continue
-        metadata[symbol] = row
-    return metadata
+        side = str(row.get("side", "")).lower()
+        quantity = decimal(row.get("submitted_quantity", row.get("quantity", "0")))
+        if quantity <= ZERO or side not in {"buy", "sell"}:
+            continue
+        capital_bucket = str(row.get("capital_bucket") or "")
+        runtime_id = str(row.get("runtime_id") or "")
+        strategy_id = str(row.get("strategy_id") or "")
+        key = (symbol, capital_bucket, runtime_id, strategy_id)
+        group = groups.setdefault(
+            key,
+            {
+                "symbol": symbol,
+                "capital_bucket": capital_bucket,
+                "runtime_id": runtime_id,
+                "strategy_id": strategy_id,
+                "open_quantity": "0",
+                "first_buy_at": "",
+                "last_buy_at": "",
+                "metadata": {},
+            },
+        )
+        open_quantity = decimal(group.get("open_quantity", "0"))
+        if side == "buy":
+            open_quantity += quantity
+            if not group.get("first_buy_at"):
+                group["first_buy_at"] = str(row.get("generated_at") or row.get("created_at") or "")
+            group["last_buy_at"] = str(row.get("generated_at") or row.get("created_at") or "")
+            group["metadata"] = row
+        else:
+            open_quantity -= quantity
+        group["open_quantity"] = fmt_decimal(max(open_quantity, ZERO))
+    return groups
 
 
 def recent_exit_attempt_keys(

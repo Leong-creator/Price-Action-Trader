@@ -124,6 +124,47 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             self.assertTrue(signals[0]["longbridge_untracked_exit_only"])
             self.assertTrue(signals[0]["longbridge_position_exit_source"])
 
+    def test_exit_quantity_is_capped_to_virtual_bucket_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_json(root / "account_state.json", self.account_state(quantity="10", available="10"))
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(close="111")])
+            self.write_jsonl(
+                root / "execution_ledger.jsonl",
+                [
+                    self.open_row(
+                        signal_id="pa002-open",
+                        runtime_id="M10-PA-002-5m",
+                        strategy_id="M10-PA-002",
+                        capital_bucket="pa002_5m",
+                        quantity="3",
+                        target_price="110",
+                    ),
+                    self.open_row(
+                        signal_id="ftd-open",
+                        runtime_id="M12-FTD-001-baseline-1d",
+                        strategy_id="M12-FTD-001",
+                        capital_bucket="ftd_baseline",
+                        quantity="7",
+                        target_price="120",
+                    ),
+                ],
+            )
+
+            payload = run_realtime_position_manager(config, generated_at="2026-06-04T14:00:00Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["account_position_count"], 1)
+            self.assertEqual(payload["managed_position_count"], 2)
+            self.assertEqual(payload["new_exit_signal_event_count"], 1)
+            self.assertEqual(signals[0]["runtime_id"], "M10-PA-002-5m")
+            self.assertEqual(signals[0]["quantity"], "3")
+            self.assertEqual(rows[0]["quantity"], "3")
+            self.assertEqual(rows[0]["account_symbol_quantity"], "10")
+            self.assertEqual(rows[0]["virtual_position_quantity"], "3")
+
     def make_config(self, root: Path):
         payload = {
             "stage": "M15.longbridge_realtime_position_manager",
@@ -148,8 +189,8 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
         self.write_json(path, payload)
         return load_config(path)
 
-    def account_state(self, *, available: str = "2", cost_price: str | None = None) -> dict:
-        position = {"symbol": "AAPL.US", "quantity": "2", "available": available, "market_price": "100"}
+    def account_state(self, *, quantity: str = "2", available: str = "2", cost_price: str | None = None) -> dict:
+        position = {"symbol": "AAPL.US", "quantity": quantity, "available": available, "market_price": "100"}
         if cost_price is not None:
             position["cost_price"] = cost_price
         return {

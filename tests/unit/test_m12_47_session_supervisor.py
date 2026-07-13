@@ -16,6 +16,7 @@ from scripts.run_m12_47_session_supervisor import (
     build_failure_payload,
     build_status_payload,
     build_window_state,
+    child_progress_snapshot,
     load_config,
     maybe_refresh_longbridge_account_state_for_dashboard,
     pid_path,
@@ -388,6 +389,7 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 "account_total_pnl_estimate": "基准未确认",
                 "longbridge_account_total_pnl": "269.866",
                 "longbridge_account_intraday_pnl": "12.34",
+                "longbridge_profit_analysis_market_day_pnl": "12.34",
                 "longbridge_account_today_total_pnl": "234.00",
                 "longbridge_app_display_today_pnl": "等待长桥字段对齐",
                 "longbridge_stock_total_pnl": "-154.18",
@@ -405,11 +407,13 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertNotIn("长桥可提交订单", dashboard["top_metrics"])
         self.assertEqual(dashboard["top_metrics"]["长桥账户总资产"], "102375.57")
         self.assertEqual(dashboard["top_metrics"]["长桥当前持仓总盈亏"], "269.866")
-        self.assertEqual(dashboard["top_metrics"]["长桥账户当日盈亏"], "12.34")
+        self.assertEqual(dashboard["top_metrics"]["长桥App当日盈亏"], "等待长桥字段对齐")
+        self.assertEqual(dashboard["top_metrics"]["长桥接口净值日内变化"], "12.34")
         self.assertEqual(dashboard["top_metrics"]["长桥接口持仓今日浮动"], "234.00")
         self.assertEqual(dashboard["top_metrics"]["长桥交易累计盈亏"], "-154.18")
         self.assertNotIn("长桥当日总盈亏", dashboard["top_metrics"])
-        self.assertNotIn("长桥App当日盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥账户当日盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥接口交易日盈亏", dashboard["top_metrics"])
         self.assertNotIn("长桥账户总盈亏", dashboard["top_metrics"])
         self.assertNotIn("长桥今日盈亏", dashboard["top_metrics"])
         self.assertNotIn("长桥总盈亏", dashboard["top_metrics"])
@@ -620,12 +624,50 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 child_started_at="2026-05-05T13:25:00Z",
                 child_last_exit_code=None,
                 restart_count=0,
-            )
+        )
         self.assertEqual(payload["latest_dashboard_generated_at"], "2026-05-05T17:15:30Z")
+        self.assertEqual(payload["child_progress_source"], "")
         self.assertEqual(payload["child_pid"], 456)
         self.assertTrue(payload["child_running"])
         self.assertTrue(payload["supervisor_process_alive"])
         self.assertIn("自动调度器正在运行", payload["plain_language_result"])
+
+    def test_status_payload_exposes_child_progress_fields(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T17:15:30Z", "update_status": {}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (output_dir / "m12_37_auto_runner_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-05-05T17:20:00Z",
+                        "refresh_state": "light_heartbeat_waiting_next_5m_bar",
+                        "active_step": "light_heartbeat",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = replace(load_config(), output_dir=output_dir)
+            phase = build_window_state(config, "2026-05-05T17:20:30Z")
+            payload = build_status_payload(
+                config,
+                phase=phase,
+                supervisor_pid=123,
+                supervisor_process_alive=True,
+                child_pid=456,
+                child_running=True,
+                child_started_at="2026-05-05T17:00:00Z",
+                child_last_exit_code=None,
+                restart_count=0,
+            )
+
+        self.assertEqual(payload["child_progress_source"], "manifest_generated_at")
+        self.assertEqual(payload["child_progress_state"], "light_heartbeat_waiting_next_5m_bar")
+        self.assertEqual(payload["child_last_progress_at"], "2026-05-05T17:20:00Z")
 
     def test_status_payload_marks_dead_supervisor_plainly(self):
         config = load_config()
@@ -657,6 +699,22 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         )
         self.assertIn("连续 3 次", payload["failure_reason"])
         self.assertFalse(payload["live_execution"])
+
+    def test_failure_payload_preserves_recent_real_reason_for_stale_breaker(self):
+        config = load_config()
+        phase = build_window_state(config, "2026-05-05T20:30:00Z")
+        payload = build_failure_payload(
+            config,
+            phase=phase,
+            consecutive_failures=0,
+            child_last_exit_code=-15,
+            stale_restart_count=3,
+            last_real_failure_reason="RuntimeError provider timeout",
+            failure_trigger="stale_restart_limit",
+        )
+        self.assertIn("stale restart 已达 3 次", payload["failure_reason"])
+        self.assertEqual(payload["last_real_failure_reason"], "RuntimeError provider timeout")
+        self.assertEqual(payload["failure_trigger"], "stale_restart_limit")
 
     def test_stale_dashboard_restart_reason_detects_alive_child_without_refresh(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -730,6 +788,32 @@ class M1247SessionSupervisorTest(unittest.TestCase):
 
         self.assertEqual(reason, "")
 
+    def test_stale_dashboard_restart_reason_allows_recent_manifest_heartbeat_without_dashboard_refresh(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "m12_47"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(load_config(), output_dir=output_dir)
+            (output_dir / "m12_32_minute_readonly_dashboard_data.json").write_text(
+                json.dumps({"generated_at": "2026-05-05T14:00:00Z"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (output_dir / "m12_37_auto_runner_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-05-05T14:24:30Z",
+                        "refresh_state": "light_heartbeat_waiting_next_5m_bar",
+                        "active_step": "light_heartbeat",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            phase = build_window_state(config, "2026-05-05T14:25:30Z")
+
+            reason = stale_dashboard_restart_reason(config, phase, "2026-05-05T14:00:00Z")
+
+        self.assertEqual(reason, "")
+
     def test_stale_dashboard_restart_reason_allows_long_m1229_refresh_activity(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "m12_47"
@@ -760,8 +844,26 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertEqual(reason, "")
 
     def test_active_refresh_timeout_for_m1229_allows_full_universe_scan(self):
-        self.assertGreaterEqual(active_refresh_timeout_for_step("m12_29_current_day_scan_dashboard", 60), 5400)
+        self.assertGreaterEqual(active_refresh_timeout_for_step("m12_29_current_day_scan_dashboard", 60), 28800)
         self.assertEqual(active_refresh_timeout_for_step("unknown", 60), 1800)
+
+    def test_child_progress_snapshot_uses_manifest_progress_independently_of_dashboard(self):
+        config = load_config()
+        phase = build_window_state(config, "2026-05-05T14:25:30Z")
+        snapshot = child_progress_snapshot(
+            config,
+            phase=phase,
+            child_started_at="2026-05-05T14:00:00Z",
+            child_running=True,
+            manifest={
+                "generated_at": "2026-05-05T14:24:30Z",
+                "refresh_state": "light_heartbeat_waiting_next_5m_bar",
+                "active_step": "light_heartbeat",
+            },
+        )
+        self.assertTrue(snapshot["recent_progress"])
+        self.assertEqual(snapshot["progress_source"], "manifest_generated_at")
+        self.assertEqual(snapshot["progress_state"], "light_heartbeat_waiting_next_5m_bar")
 
     def test_print_status_persists_dead_supervisor_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:

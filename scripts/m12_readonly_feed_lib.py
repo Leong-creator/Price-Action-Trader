@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.m12_readonly_auth_preflight_lib import _assert_readonly_command, clean_cli_text
-from scripts.longbridge_cli_env import build_longbridge_cli_env
+from scripts.longbridge_cli_env import build_longbridge_quote_cli_env
 
 
 M10_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh"
@@ -192,7 +192,7 @@ def run_longbridge_json(cli_path: str, args: list[str]) -> Any:
         text=True,
         check=False,
         timeout=30,
-        env=build_longbridge_cli_env(),
+        env=build_longbridge_quote_cli_env(),
     )
     if completed.returncode != 0:
         detail = clean_cli_text((completed.stderr or completed.stdout or "").strip())

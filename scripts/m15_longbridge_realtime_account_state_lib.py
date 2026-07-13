@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 from scripts.longbridge_cli_env import build_longbridge_cli_env
 from scripts.m12_readonly_auth_preflight_lib import clean_cli_text
@@ -23,6 +24,8 @@ DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_ac
 ACCOUNT_STATE_JSON = "m15_longbridge_realtime_account_state.json"
 SUMMARY_JSON = "m15_longbridge_realtime_account_state_summary.json"
 PNL_RECONCILIATION_JSON = "m15_longbridge_account_pnl_reconciliation.json"
+TRUSTED_PNL_RECONCILIATION_JSON = "m15_longbridge_last_trustworthy_pnl_reconciliation.json"
+TRUSTED_ORDER_HISTORY_JSON = "m15_longbridge_last_trustworthy_order_history.json"
 PNL_RECONCILIATION_MD = "m15_longbridge_account_pnl_reconciliation.md"
 ORDER_RECONCILIATION_JSON = "m15_longbridge_order_reconciliation.json"
 UNFILLED_ORDER_DIAGNOSTICS_JSON = "m15_longbridge_unfilled_order_diagnostics.json"
@@ -34,6 +37,7 @@ REALTIME_EXECUTION_LEDGER_JSONL = "m15_longbridge_realtime_execution_ledger.json
 STALE_ORDER_CLEANUP_LEDGER_JSONL = "m15_longbridge_realtime_stale_order_cleanup_ledger.jsonl"
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
+NEW_YORK_TZ = ZoneInfo("America/New_York")
 
 CommandRunner = Callable[[list[str]], Any]
 
@@ -57,6 +61,8 @@ class RealtimeAccountStateConfig:
     historical_order_start_date: str
     unfilled_order_detail_lookup_limit: int
     hard_boundaries: dict[str, bool]
+    historical_cli_timeout_seconds: int = 30
+    historical_refresh_interval_seconds: int = 300
 
     def __post_init__(self) -> None:
         validate_config(self)
@@ -84,6 +90,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeAccountStateC
         historical_order_start_date=str(account.get("historical_order_start_date", "2026-06-01")),
         unfilled_order_detail_lookup_limit=int(account.get("unfilled_order_detail_lookup_limit", 120)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
+        historical_cli_timeout_seconds=int(account.get("historical_cli_timeout_seconds", 30)),
+        historical_refresh_interval_seconds=int(account.get("historical_refresh_interval_seconds", 300)),
     )
 
 
@@ -98,6 +106,10 @@ def validate_config(config: RealtimeAccountStateConfig) -> None:
         raise ValueError("M15 realtime account state historical order start date is required")
     if config.unfilled_order_detail_lookup_limit < 0:
         raise ValueError("M15 realtime account state unfilled order detail lookup limit cannot be negative")
+    if config.historical_cli_timeout_seconds <= 0:
+        raise ValueError("M15 realtime account state historical CLI timeout must be positive")
+    if config.historical_refresh_interval_seconds <= 0:
+        raise ValueError("M15 realtime account state historical refresh interval must be positive")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime account state must stay paper/simulated only")
     if config.hard_boundaries.get("live_execution", False):
@@ -110,56 +122,112 @@ def validate_config(config: RealtimeAccountStateConfig) -> None:
         raise ValueError("M15 realtime account state cannot submit or cancel orders")
 
 
+def longbridge_account_pnl_market_date(now: datetime) -> str:
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=UTC)
+    return now.astimezone(NEW_YORK_TZ).date().isoformat()
+
+
 def run_realtime_account_state(
     config: RealtimeAccountStateConfig | None = None,
     *,
     generated_at: str | None = None,
     command_runner: CommandRunner | None = None,
+    refresh_historical_order_history: bool = True,
+    refresh_analytics: bool = True,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
+    account_pnl_market_date = longbridge_account_pnl_market_date(now)
     config.output_dir.mkdir(parents=True, exist_ok=True)
     config.account_state_path.parent.mkdir(parents=True, exist_ok=True)
     cli_path = shutil.which(config.cli_name) or config.cli_name
-    runner = command_runner or run_command
+    runner = command_runner or (lambda command: run_command(command, timeout_seconds=config.cli_timeout_seconds))
+    historical_runner = command_runner or (
+        lambda command: run_command(command, timeout_seconds=config.historical_cli_timeout_seconds)
+    )
 
     auth = probe_json(runner, [cli_path, "auth", "status", "--format", "json"], config.cli_timeout_seconds)
     assets = probe_json(runner, [cli_path, "assets", "--format", "json"], config.cli_timeout_seconds)
     positions = probe_json(runner, [cli_path, "positions", "--format", "json"], config.cli_timeout_seconds)
     orders = probe_json(runner, [cli_path, "order", "--format", "json"], config.cli_timeout_seconds)
     history_end_date = now.date().isoformat()
-    historical_orders = probe_json(
-        runner,
-        [
-            cli_path,
-            "order",
-            "--history",
-            "--start",
-            config.historical_order_start_date,
-            "--end",
-            history_end_date,
-            "--format",
-            "json",
-        ],
-        config.cli_timeout_seconds,
+    trusted_order_history = read_json(config.output_dir / TRUSTED_ORDER_HISTORY_JSON)
+    if refresh_historical_order_history and historical_order_history_refresh_due(
+        trusted_order_history,
+        now,
+        config.historical_refresh_interval_seconds,
+    ):
+        historical_orders = probe_json(
+            historical_runner,
+            [
+                cli_path,
+                "order",
+                "--history",
+                "--start",
+                config.historical_order_start_date,
+                "--end",
+                history_end_date,
+                "--format",
+                "json",
+            ],
+            config.historical_cli_timeout_seconds,
+        )
+        historical_executions = probe_json(
+            historical_runner,
+            [
+                cli_path,
+                "order",
+                "executions",
+                "--history",
+                "--start",
+                config.historical_order_start_date,
+                "--end",
+                history_end_date,
+                "--format",
+                "json",
+            ],
+            config.historical_cli_timeout_seconds,
+        )
+    else:
+        historical_orders = cached_order_history_probe(trusted_order_history, "historical_orders")
+        historical_executions = cached_order_history_probe(trusted_order_history, "historical_executions")
+    refreshed_order_history = refresh_trusted_order_history(
+        trusted_order_history,
+        historical_orders,
+        historical_executions,
+        generated_at_iso,
     )
-    historical_executions = probe_json(
-        runner,
-        [
-            cli_path,
-            "order",
-            "executions",
-            "--history",
-            "--start",
-            config.historical_order_start_date,
-            "--end",
-            history_end_date,
-            "--format",
-            "json",
-        ],
-        config.cli_timeout_seconds,
+    if refresh_analytics and refreshed_order_history != trusted_order_history:
+        write_json(config.output_dir / TRUSTED_ORDER_HISTORY_JSON, refreshed_order_history)
+    historical_orders, historical_executions = restore_historical_order_history_if_unavailable(
+        historical_orders,
+        historical_executions,
+        refreshed_order_history,
     )
+    account_state = build_account_state(
+        config,
+        generated_at_iso,
+        auth,
+        assets,
+        positions,
+        orders,
+        historical_orders,
+        historical_executions,
+        history_end_date,
+    )
+    if not refresh_analytics:
+        return write_hot_account_snapshot(
+            config,
+            generated_at_iso,
+            account_state,
+            auth=auth,
+            assets=assets,
+            positions=positions,
+            orders=orders,
+        )
+
     portfolio = probe_json(runner, [cli_path, "portfolio", "--format", "json"], config.cli_timeout_seconds)
     profit_analysis = probe_json(
         runner,
@@ -181,9 +249,9 @@ def run_realtime_account_state(
             cli_path,
             "profit-analysis",
             "--start",
-            history_end_date,
+            account_pnl_market_date,
             "--end",
-            history_end_date,
+            account_pnl_market_date,
             "--format",
             "json",
         ],
@@ -207,17 +275,6 @@ def run_realtime_account_state(
         ],
         config.cli_timeout_seconds,
     )
-    account_state = build_account_state(
-        config,
-        generated_at_iso,
-        auth,
-        assets,
-        positions,
-        orders,
-        historical_orders,
-        historical_executions,
-        history_end_date,
-    )
     pnl_reconciliation = build_pnl_reconciliation(
         config,
         generated_at_iso,
@@ -227,11 +284,17 @@ def run_realtime_account_state(
         by_market_profit,
         account_state,
         history_end_date,
+        account_pnl_market_date,
     )
     previous_pnl_reconciliation = read_json(config.output_dir / PNL_RECONCILIATION_JSON)
+    trusted_pnl_reconciliation = read_json(config.output_dir / TRUSTED_PNL_RECONCILIATION_JSON)
     pnl_reconciliation = preserve_previous_holding_prices_if_degraded(
         pnl_reconciliation,
         previous_pnl_reconciliation,
+    )
+    pnl_reconciliation = preserve_previous_holding_prices_if_degraded(
+        pnl_reconciliation,
+        trusted_pnl_reconciliation,
     )
     realtime_execution_ledger = read_jsonl(config.output_dir / REALTIME_EXECUTION_LEDGER_JSONL)
     order_reconciliation = build_order_reconciliation(
@@ -290,6 +353,8 @@ def run_realtime_account_state(
     write_json(config.account_state_path, account_state)
     write_json(config.output_dir / SUMMARY_JSON, summary)
     write_json(config.output_dir / PNL_RECONCILIATION_JSON, pnl_reconciliation)
+    if not portfolio_price_snapshot_degraded(pnl_reconciliation):
+        write_json(config.output_dir / TRUSTED_PNL_RECONCILIATION_JSON, pnl_reconciliation)
     write_json(config.output_dir / ORDER_RECONCILIATION_JSON, order_reconciliation)
     write_json(config.output_dir / UNFILLED_ORDER_DIAGNOSTICS_JSON, unfilled_order_diagnostics)
     append_jsonl(config.output_dir / LEDGER_JSONL, [ledger_row])
@@ -300,6 +365,69 @@ def run_realtime_account_state(
         encoding="utf-8",
     )
     return summary
+
+
+def write_hot_account_snapshot(
+    config: RealtimeAccountStateConfig,
+    generated_at: str,
+    account_state: dict[str, Any],
+    *,
+    auth: dict[str, Any],
+    assets: dict[str, Any],
+    positions: dict[str, Any],
+    orders: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist only order-safety inputs; reporting stays on the slow analytics path."""
+    previous_summary = read_json(config.output_dir / SUMMARY_JSON)
+    blockers = account_blockers(config, account_state, auth, assets, positions, orders)
+    status = "paper_account_ready" if not blockers else blockers[0]
+    hot_summary = {
+        **previous_summary,
+        "schema_version": "m15.longbridge-realtime-account-state-summary.v1",
+        "stage": config.stage,
+        "title": config.title,
+        "generated_at": generated_at,
+        "account_status": status,
+        "blockers": blockers,
+        "paper_account_verified": account_state["paper_account_verified"],
+        "account_channel": account_state["account_channel"],
+        "cash": account_state["cash"],
+        "buying_power": account_state["buying_power"],
+        "held_symbols": account_state["held_symbols"],
+        "position_row_count": account_state["position_row_count"],
+        "open_order_count": account_state["open_order_count"],
+        "total_position_notional": account_state["total_position_notional"],
+        "total_open_order_notional": account_state["total_open_order_notional"],
+        "analytics_refresh_status": "deferred_to_background",
+        "analytics_last_refreshed_at": str(previous_summary.get("generated_at") or ""),
+        "local_simulation_isolated": True,
+        "order_submit_or_cancel_command_used": False,
+        "paper_simulated_only": True,
+        "live_execution": False,
+        "real_money_actions": False,
+        "outputs": {
+            **(previous_summary.get("outputs", {}) if isinstance(previous_summary.get("outputs"), dict) else {}),
+            "account_state": project_path(config.account_state_path),
+            "summary": project_path(config.output_dir / SUMMARY_JSON),
+        },
+        "plain_language_result": "长桥账户快速快照已更新；历史订单、盈亏和对账由后台刷新，不阻塞实时下单。",
+    }
+    ledger_row = {
+        "stage": config.stage,
+        "generated_at": generated_at,
+        "refresh_mode": "hot",
+        "account_status": status,
+        "paper_account_verified": account_state["paper_account_verified"],
+        "position_row_count": account_state["position_row_count"],
+        "open_order_count": account_state["open_order_count"],
+        "blockers": blockers,
+        "local_simulation_ignored": True,
+        "order_submit_or_cancel_command_used": False,
+    }
+    write_json(config.account_state_path, account_state)
+    write_json(config.output_dir / SUMMARY_JSON, hot_summary)
+    append_jsonl(config.output_dir / LEDGER_JSONL, [ledger_row])
+    return hot_summary
 
 
 def build_summary(
@@ -335,13 +463,29 @@ def build_summary(
         pnl_account_snapshot.get("app_like_market_value")
         or account_state["total_position_notional"]
     )
-    today_holding_pnl = pnl_account_snapshot.get("portfolio_total_today_pl", "无法计算")
+    pnl_source_status = (
+        pnl_reconciliation.get("source_status", {})
+        if isinstance(pnl_reconciliation.get("source_status"), dict)
+        else {}
+    )
+    holding_snapshot_degraded = bool(pnl_source_status.get("portfolio_price_snapshot_degraded")) and not bool(
+        pnl_source_status.get("holding_prices_restored_from_previous_reconciliation")
+    )
+    today_holding_pnl = (
+        "等待长桥持仓行情"
+        if holding_snapshot_degraded
+        else pnl_account_snapshot.get("portfolio_total_today_pl", "无法计算")
+    )
     today_account_pnl = (
         pnl_reconciliation.get("today_account_pnl", {})
         if isinstance(pnl_reconciliation.get("today_account_pnl"), dict)
         else {}
     )
     today_account_sum_profit = today_account_pnl.get("sum_profit") or "无法计算"
+    app_display_today_pnl = "等待长桥字段对齐"
+    historical_history_cached = bool(account_state.get("historical_orders_cache_used")) or bool(
+        account_state.get("historical_executions_cache_used")
+    )
     return {
         "schema_version": "m15.longbridge-realtime-account-state-summary.v1",
         "stage": config.stage,
@@ -357,8 +501,15 @@ def build_summary(
         "account_total_equity_estimate": account_total_equity_estimate,
         "account_total_equity_source": account_total_equity_source,
         "account_today_total_pnl": today_account_sum_profit,
-        "account_today_total_pnl_source": "longbridge profit-analysis --start today --end today",
-        "app_display_today_pnl": today_account_sum_profit,
+        "account_today_total_pnl_source": "longbridge profit-analysis market-day interval",
+        "net_asset_intraday_pnl": today_account_sum_profit,
+        "net_asset_intraday_pnl_source": "longbridge_profit_analysis_market_day",
+        "app_display_today_pnl": app_display_today_pnl,
+        "app_display_today_pnl_source": "not_exposed_by_current_longbridge_cli",
+        "app_display_today_pnl_note": (
+            "长桥 App 顶部当日盈亏截图口径暂未在 portfolio/profit-analysis/cash-flow CLI 字段中找到；"
+            "看板不得用接口净值变化或持仓今日浮动冒充该字段。"
+        ),
         "today_holding_pnl": today_holding_pnl,
         "today_total_pnl_label": "长桥 portfolio.total_today_pl，表示当前持仓今日浮动。",
         "held_symbols": account_state["held_symbols"],
@@ -382,6 +533,9 @@ def build_summary(
         "account_total_pnl_estimate": pnl_reconciliation.get("account_pnl", {}).get("sum_profit", "无法计算"),
         "longbridge_stock_total_pnl": pnl_reconciliation.get("trading_pnl", {}).get("stock_total_pnl", "无法计算"),
         "today_total_pnl": today_holding_pnl,
+        "holding_price_snapshot_status": "degraded_waiting_longbridge_quote" if holding_snapshot_degraded else "available",
+        "historical_order_history_status": "cached_after_longbridge_read_failure" if historical_history_cached else "fresh",
+        "historical_order_history_cache_generated_at": account_state.get("historical_order_history_cache_generated_at", ""),
         "local_simulation_isolated": True,
         "local_simulation_account_source": "",
         "order_submit_or_cancel_command_used": False,
@@ -393,6 +547,7 @@ def build_summary(
             "summary": project_path(config.output_dir / SUMMARY_JSON),
             "pnl_reconciliation": project_path(config.output_dir / PNL_RECONCILIATION_JSON),
             "pnl_reconciliation_report": project_path(config.output_dir / PNL_RECONCILIATION_MD),
+            "trusted_order_history": project_path(config.output_dir / TRUSTED_ORDER_HISTORY_JSON),
             "ledger": project_path(config.output_dir / LEDGER_JSONL),
             "equity_curve": project_path(config.output_dir / EQUITY_CURVE_JSONL),
             "report": project_path(config.output_dir / REPORT_MD),
@@ -410,6 +565,7 @@ def build_pnl_reconciliation(
     by_market_profit: dict[str, Any],
     account_state: dict[str, Any],
     history_end_date: str,
+    account_pnl_market_date: str,
 ) -> dict[str, Any]:
     portfolio_json = portfolio.get("json", {}) if isinstance(portfolio.get("json"), dict) else {}
     profit_json = profit_analysis.get("json", {}) if isinstance(profit_analysis.get("json"), dict) else {}
@@ -462,6 +618,7 @@ def build_pnl_reconciliation(
             "start": config.historical_order_start_date,
             "end": str(profit_json.get("updated_date") or by_market_json.get("end_date") or history_end_date),
             "trade_update_date": str(profit_json.get("trade_update_date") or by_market_json.get("end_date") or ""),
+            "account_pnl_market_date": account_pnl_market_date,
         },
         "account_pnl": {
             "currency": first_string(profit_json, ("currency",), fallback=first_string(overview, ("currency",), fallback="USD")),
@@ -486,8 +643,8 @@ def build_pnl_reconciliation(
                 ("currency",),
                 fallback=first_string(profit_json, ("currency",), fallback="USD"),
             ),
-            "start_date": first_string(today_profit_json, ("start_date",), fallback=history_end_date),
-            "end_date": first_string(today_profit_json, ("end_date",), fallback=history_end_date),
+            "start_date": first_string(today_profit_json, ("start_date",), fallback=account_pnl_market_date),
+            "end_date": first_string(today_profit_json, ("end_date",), fallback=account_pnl_market_date),
             "initial_asset_value": first_string(today_profit_json, ("initial_asset_value",)),
             "current_total_asset": first_string(today_profit_json, ("current_total_asset", "ending_asset_value")),
             "ending_asset_value": first_string(today_profit_json, ("ending_asset_value", "current_total_asset")),
@@ -495,7 +652,7 @@ def build_pnl_reconciliation(
             "sum_profit_rate": first_string(today_profit_json, ("sum_profit_rate",)),
             "updated_at": first_string(today_profit_json, ("updated_at",)),
             "updated_date": first_string(today_profit_json, ("updated_date",)),
-            "source": "longbridge_profit_analysis_same_day",
+            "source": "longbridge_profit_analysis_market_day",
         },
         "trading_pnl": {
             "cumulative_transaction_amount": first_string(profit_section, ("cumulative_transaction_amount",)),
@@ -555,12 +712,18 @@ def preserve_previous_holding_prices_if_degraded(
     current: dict[str, Any],
     previous: dict[str, Any],
 ) -> dict[str, Any]:
-    if not portfolio_price_snapshot_degraded(current) or portfolio_price_snapshot_degraded(previous):
-        return current
-    previous_holdings = previous.get("current_holdings") if isinstance(previous.get("current_holdings"), list) else []
-    if not previous_holdings:
+    if not portfolio_price_snapshot_degraded(current):
         return current
     output = dict(current)
+    source_status = dict(output.get("source_status", {}) if isinstance(output.get("source_status"), dict) else {})
+    source_status["portfolio_price_snapshot_degraded"] = True
+    source_status["holding_price_snapshot_available"] = False
+    output["source_status"] = source_status
+    if portfolio_price_snapshot_degraded(previous):
+        return output
+    previous_holdings = previous.get("current_holdings") if isinstance(previous.get("current_holdings"), list) else []
+    if not previous_holdings:
+        return output
     output["current_holdings"] = previous_holdings
     current_snapshot = dict(output.get("account_snapshot", {}) if isinstance(output.get("account_snapshot"), dict) else {})
     previous_snapshot = previous.get("account_snapshot", {}) if isinstance(previous.get("account_snapshot"), dict) else {}
@@ -584,9 +747,8 @@ def preserve_previous_holding_prices_if_degraded(
         if previous_trading.get(key) not in (None, ""):
             trading[key] = previous_trading.get(key)
     output["trading_pnl"] = trading
-    source_status = dict(output.get("source_status", {}) if isinstance(output.get("source_status"), dict) else {})
-    source_status["portfolio_price_snapshot_degraded"] = True
     source_status["holding_prices_restored_from_previous_reconciliation"] = True
+    source_status["holding_price_snapshot_available"] = True
     source_status["previous_reconciliation_generated_at"] = str(previous.get("generated_at") or "")
     output["source_status"] = source_status
     return output
@@ -610,7 +772,7 @@ def portfolio_price_snapshot_degraded(reconciliation: dict[str, Any]) -> bool:
         == first_decimal(row, ("cost_price", "avg_cost"))
         for row in comparable_rows
     )
-    prev_close_missing = all(row.get("prev_close") in (None, "", "-") for row in comparable_rows)
+    prev_close_missing = all(row.get("prev_close") in (None, "", "-", "0", "0.0", "0.00") for row in comparable_rows)
     snapshot = reconciliation.get("account_snapshot", {}) if isinstance(reconciliation.get("account_snapshot"), dict) else {}
     portfolio_pl_zero = first_decimal(snapshot, ("portfolio_total_pl",)) == ZERO
     portfolio_today_zero = first_decimal(snapshot, ("portfolio_total_today_pl",)) == ZERO
@@ -682,6 +844,11 @@ def build_account_state(
         "orders_ok": bool(orders.get("ok")),
         "historical_orders_ok": bool(historical_orders.get("ok")),
         "historical_executions_ok": bool(historical_executions.get("ok")),
+        "historical_orders_cache_used": bool(historical_orders.get("cache_used")),
+        "historical_executions_cache_used": bool(historical_executions.get("cache_used")),
+        "historical_order_history_cache_generated_at": str(
+            historical_orders.get("cache_generated_at") or historical_executions.get("cache_generated_at") or ""
+        ),
         "account_channel": channel,
         "account_type": account.get("account_type"),
         "paper_account_detected": channel == config.required_account_channel,
@@ -790,8 +957,82 @@ def build_order_reconciliation(
             "只有长桥订单状态为 Filled 或存在可确认成交数量的行计入分仓、策略、胜率和盈亏。",
             "Rejected/Canceled/Expired/本地未确认提交只进入未成交诊断，不计入交易成绩。",
             "本地实时提交流水只用于把长桥真实成交归因到资金池和运行单元，不作为成绩事实源。",
+            *( ["长桥历史订单接口本轮不可用，已使用上一份可信历史订单缓存；当前对账不应被解释为实时新增成交。"]
+               if account_state.get("historical_orders_cache_used") or account_state.get("historical_executions_cache_used") else [] ),
         ],
     }
+
+
+def refresh_trusted_order_history(
+    existing: dict[str, Any],
+    historical_orders: dict[str, Any],
+    historical_executions: dict[str, Any],
+    generated_at: str,
+) -> dict[str, Any]:
+    output = dict(existing) if isinstance(existing, dict) else {}
+    refreshed = False
+    if historical_orders.get("ok") and not historical_orders.get("cache_used") and isinstance(historical_orders.get("json"), list):
+        output["historical_orders"] = historical_orders["json"]
+        refreshed = True
+    if historical_executions.get("ok") and not historical_executions.get("cache_used") and isinstance(historical_executions.get("json"), list):
+        output["historical_executions"] = historical_executions["json"]
+        refreshed = True
+    if refreshed:
+        output["schema_version"] = "m15.longbridge-trusted-order-history.v1"
+        output["generated_at"] = generated_at
+    return output
+
+
+def historical_order_history_refresh_due(
+    trusted_history: dict[str, Any],
+    now: datetime,
+    refresh_interval_seconds: int,
+) -> bool:
+    if not isinstance(trusted_history.get("historical_orders"), list) or not isinstance(
+        trusted_history.get("historical_executions"), list
+    ):
+        return True
+    try:
+        generated_at = parse_utc_datetime(str(trusted_history.get("generated_at") or ""))
+    except (TypeError, ValueError):
+        return True
+    return (now - generated_at).total_seconds() >= refresh_interval_seconds
+
+
+def cached_order_history_probe(trusted_history: dict[str, Any], cache_key: str) -> dict[str, Any]:
+    rows = trusted_history.get(cache_key) if isinstance(trusted_history, dict) else None
+    if not isinstance(rows, list):
+        return {"ok": False, "json": {}, "elapsed_ms": 0, "stderr": "trusted order history cache unavailable"}
+    return {
+        "ok": True,
+        "json": rows,
+        "elapsed_ms": 0,
+        "stderr": "",
+        "cache_used": True,
+        "cache_generated_at": str(trusted_history.get("generated_at") or ""),
+    }
+
+
+def restore_historical_order_history_if_unavailable(
+    historical_orders: dict[str, Any],
+    historical_executions: dict[str, Any],
+    trusted_history: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    cache_generated_at = str(trusted_history.get("generated_at") or "") if isinstance(trusted_history, dict) else ""
+
+    def restore(probe: dict[str, Any], cache_key: str) -> dict[str, Any]:
+        if probe.get("ok"):
+            return probe
+        cached_rows = trusted_history.get(cache_key) if isinstance(trusted_history, dict) else None
+        if not isinstance(cached_rows, list):
+            return probe
+        output = dict(probe)
+        output["json"] = cached_rows
+        output["cache_used"] = True
+        output["cache_generated_at"] = cache_generated_at
+        return output
+
+    return restore(historical_orders, "historical_orders"), restore(historical_executions, "historical_executions")
 
 
 def merged_longbridge_order_rows(account_state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1337,13 +1578,13 @@ def assert_account_state_command(command: list[str]) -> None:
     raise ValueError(f"Longbridge account state command is not allowed: {args}")
 
 
-def run_command(command: list[str]) -> CommandResult:
+def run_command(command: list[str], *, timeout_seconds: int = 30) -> CommandResult:
     completed = subprocess.run(
         command,
         capture_output=True,
         text=True,
         check=False,
-        timeout=30,
+        timeout=timeout_seconds,
         env=build_longbridge_cli_env(),
     )
     return CommandResult(completed.returncode, completed.stdout, completed.stderr)
@@ -1562,7 +1803,7 @@ def render_pnl_reconciliation_report(reconciliation: dict[str, Any]) -> str:
             "## 边界",
             "",
             "- 只读取长桥模拟账户、长桥组合和长桥盈亏分析接口。",
-            "- 不使用本地模拟账本，不使用旧版历史净利润字段。",
+            "- 不使用本地模拟账本，不使用旧版利润字段。",
             "- 不提交、不撤单、不改订单。",
             "",
         ]

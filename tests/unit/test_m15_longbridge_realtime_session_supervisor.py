@@ -13,9 +13,11 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     rotate_jsonl_if_needed,
     rotate_text_log_if_needed,
     run_realtime_session_once,
+    supervisor_health_issues,
     write_json,
 )
 from scripts.run_m15_longbridge_realtime_session_supervisor import (
+    safe_to_replace_config_drift,
     should_print_watch_payload,
     watch_print_key,
     watch_sleep_seconds,
@@ -342,6 +344,47 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
             self.assertEqual(status["inputs"]["local_simulation_ledger"], "")
             self.assertEqual(len(ledger), 1)
 
+    def test_regular_session_reads_account_once_when_cleanup_does_not_cancel_orders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            calls: list[str] = []
+
+            payload = run_realtime_session_once(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                ingestor_runner=lambda _ts: calls.append("ingestor") or {"new_market_event_count": 0, "market_event_total_count": 0},
+                router_runner=lambda _ts: calls.append("router") or {"market_event_count": 0, "new_signal_event_count": 0},
+                account_state_runner=lambda _ts: calls.append("account_state") or {
+                    "account_status": "paper_account_ready",
+                    "paper_account_verified": True,
+                    "position_row_count": 1,
+                    "open_order_count": 1,
+                },
+                stale_order_cleanup_runner=lambda _ts: calls.append("stale_order_cleanup") or {
+                    "cleanup_status": "no_stale_buy_open_orders",
+                    "stale_buy_open_order_count": 0,
+                    "canceled_count": 0,
+                    "failed_count": 0,
+                },
+                position_manager_runner=lambda _ts: calls.append("position_manager") or {
+                    "position_count": 1,
+                    "new_exit_signal_event_count": 0,
+                },
+                execution_runner=lambda _ts: calls.append("execution") or {
+                    "signal_event_count": 0,
+                    "ready_order_count": 0,
+                    "submitted_count": 0,
+                },
+            )
+
+            self.assertEqual(payload["supervisor_status"], "cycle_completed")
+            self.assertEqual(
+                calls,
+                ["ingestor", "router", "account_state", "stale_order_cleanup", "position_manager", "execution"],
+            )
+            self.assertFalse(any(row["step_id"] == "account_state_after_cleanup" for row in payload["step_rows"]))
+
     def test_failure_breaker_trips_after_consecutive_failures(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -407,6 +450,7 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
             "account_total_equity_estimate": "102375.57",
             "account_total_pnl_estimate": "基准未确认",
             "longbridge_account_intraday_pnl": "-2.44",
+            "longbridge_profit_analysis_market_day_pnl": "-2.44",
             "today_total_pnl": "-2.46",
             "total_pnl": "117.88",
             "longbridge_stock_total_pnl": "-154.18",
@@ -425,11 +469,14 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
         self.assertEqual(dashboard["top_metrics"]["长桥模拟账户"], "模拟账户已连接 / 9持仓 / 1挂单")
         self.assertNotIn("长桥可提交订单", dashboard["top_metrics"])
         self.assertEqual(dashboard["top_metrics"]["长桥账户总资产"], "102375.57")
-        self.assertEqual(dashboard["top_metrics"]["长桥账户当日盈亏"], "-2.44")
+        self.assertEqual(dashboard["top_metrics"]["长桥App当日盈亏"], "等待长桥字段对齐")
+        self.assertEqual(dashboard["top_metrics"]["长桥接口净值日内变化"], "-2.44")
         self.assertEqual(dashboard["top_metrics"]["长桥接口持仓今日浮动"], "-2.46")
         self.assertEqual(dashboard["top_metrics"]["长桥当前持仓总盈亏"], "117.88")
         self.assertEqual(dashboard["top_metrics"]["长桥交易累计盈亏"], "-154.18")
         self.assertNotIn("长桥账户总盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥账户当日盈亏", dashboard["top_metrics"])
+        self.assertNotIn("长桥接口交易日盈亏", dashboard["top_metrics"])
         self.assertNotIn("长桥交易总盈亏", dashboard["top_metrics"])
         self.assertNotIn("长桥今日盈亏", dashboard["top_metrics"])
         self.assertNotIn("长桥总盈亏", dashboard["top_metrics"])
@@ -490,6 +537,55 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
         print_key = watch_print_key(payload)
 
         self.assertTrue(should_print_watch_payload(payload, print_key, print_key))
+
+    def test_supervisor_health_issues_detect_config_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            payload = {
+                "runtime_identity": {
+                    "config_path": "config/examples/other.json",
+                    "config_digest": "mismatch",
+                    "process_pid": 999,
+                },
+                "input_config_digests": {
+                    "supervisor_config": "mismatch",
+                    "ingestor_config": "",
+                    "router_config": "",
+                    "account_state_config": "",
+                    "stale_order_cleanup_config": "",
+                    "position_manager_config": "",
+                    "execution_config": "",
+                },
+            }
+
+            issues = supervisor_health_issues(config, payload, expected_pid=123, process_alive_now=True)
+
+            self.assertIn("supervisor_config_path_drift", issues)
+            self.assertIn("supervisor_config_digest_drift", issues)
+            self.assertIn("runtime_pid_mismatch", issues)
+
+    def test_only_known_paper_supervisor_can_be_replaced_for_config_drift(self) -> None:
+        self.assertTrue(
+            safe_to_replace_config_drift(
+                {
+                    "stage": "M15.longbridge_realtime_session_supervisor",
+                    "paper_simulated_only": True,
+                    "live_execution": False,
+                    "real_money_actions": False,
+                }
+            )
+        )
+        self.assertFalse(
+            safe_to_replace_config_drift(
+                {
+                    "stage": "unknown",
+                    "paper_simulated_only": True,
+                    "live_execution": False,
+                    "real_money_actions": False,
+                }
+            )
+        )
 
     def make_config(self, root: Path, *, max_consecutive_failures: int = 3):
         path = root / "config.json"

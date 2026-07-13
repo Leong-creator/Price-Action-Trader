@@ -4,6 +4,7 @@
   "inputs": {
     "m12_47_config": "config/examples/m12_47_session_supervisor.json",
     "m15_realtime_supervisor_config": "config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
+    "m15_account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
     "readiness_config": "config/examples/m15_opening_trade_readiness.paper_orders_enabled.json"
   },
   "outputs": {
@@ -11,7 +12,9 @@
   },
   "watchdog": {
     "check_interval_seconds": 60,
-    "command_timeout_seconds": 30
+    "command_timeout_seconds": 30,
+    "analytics_refresh_interval_seconds": 300,
+    "analytics_command_timeout_seconds": 90
   },
   "hard_boundaries": {
     "paper_simulated_only": true,

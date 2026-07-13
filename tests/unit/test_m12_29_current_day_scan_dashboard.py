@@ -174,6 +174,11 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                     "portfolio_market_cap": "4622.27",
                     "portfolio_total_today_pl": "12.34",
                 },
+                "today_account_pnl": {
+                    "start_date": "2026-06-08",
+                    "end_date": "2026-06-08",
+                    "sum_profit": "56.78",
+                },
             },
         )
 
@@ -184,7 +189,35 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(summary["longbridge_realized_pnl_estimate"], "-104.18")
         self.assertEqual(summary["longbridge_unrealized_pnl"], "-50.00")
         self.assertEqual(summary["longbridge_today_total_pnl"], "12.34")
+        self.assertEqual(summary["longbridge_account_intraday_pnl"], "56.78")
+        self.assertEqual(summary["longbridge_net_asset_intraday_pnl"], "56.78")
+        self.assertEqual(summary["longbridge_app_display_today_pnl"], "等待长桥字段对齐")
+        self.assertEqual(summary["longbridge_profit_analysis_market_day_pnl"], "56.78")
         self.assertIn("profit-analysis", summary["account_total_pnl_note"])
+
+    def test_longbridge_degraded_holding_snapshot_does_not_display_zero_pnl(self):
+        summary = m15_longbridge_account_pnl_summary(
+            {"cash": "10000", "buying_power": "10000", "total_open_order_notional": "0.00"},
+            {"position_market_value": "300", "position_cost_value": "300", "total_unrealized_pnl": "0.00"},
+            "10000",
+        )
+
+        m15_apply_longbridge_reconciliation_to_account_pnl(
+            summary,
+            {
+                "trading_pnl": {"current_position_unrealized_pnl": "0.00"},
+                "account_snapshot": {
+                    "portfolio_total_cash": "10000",
+                    "portfolio_total_pl": "0.00",
+                    "portfolio_total_today_pl": "0.00",
+                },
+                "source_status": {"portfolio_price_snapshot_degraded": True},
+            },
+        )
+
+        self.assertEqual(summary["longbridge_unrealized_pnl"], "等待长桥持仓行情")
+        self.assertEqual(summary["longbridge_portfolio_today_holding_pnl"], "等待长桥持仓行情")
+        self.assertIn("退化", summary["longbridge_account_total_pnl_note"])
 
     def test_longbridge_reconciliation_must_not_be_older_than_account_state(self):
         stale_reconciliation = {"generated_at": "2026-06-08T03:32:43Z", "pnl_reconciliation_ok": True}
@@ -975,9 +1008,13 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(panel["submit_ready_count"], "1")
         self.assertEqual(panel["new_open_signal_count"], "1")
         self.assertIn("长桥账户总资产", panel_json)
+        self.assertIn("长桥真实账户敞口", panel_json)
         self.assertIn("当前持仓总盈亏", panel_json)
         self.assertIn("portfolio.total_pl", panel_json)
         self.assertIn("项目资金模型占用", panel_json)
+        queue_by_label = {row["label"]: row for row in panel["queue_rows"]}
+        self.assertIn("行情 2 / 合格信号 1 / 草稿 0 / 真实提交 0 / 有订单号 0 / 成交 1", queue_by_label["实时提交流程"]["value"])
+        self.assertIn("暂无阻断", queue_by_label["实时提交流程"]["note"])
         pnl_cards_by_label = {row["label"]: row for row in panel["realtime_pnl_cards"]}
         self.assertEqual(pnl_cards_by_label["接口持仓今日浮动"]["value"], "234.00")
         self.assertEqual(pnl_cards_by_label["账户当日盈亏"]["value"], "无法计算")
@@ -1545,6 +1582,10 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(panel["submit_ready_count"], "0")
         self.assertIn("旧交易日", panel["plain_language_result"])
         self.assertIn("旧提交器仅审计", json.dumps(panel["status_rows"], ensure_ascii=False))
+        pnl_cards_by_label = {row["label"]: row for row in panel["realtime_pnl_cards"]}
+        self.assertEqual(pnl_cards_by_label["接口净值日内变化"]["value"], "等待长桥数据")
+        self.assertEqual(pnl_cards_by_label["当前持仓总盈亏"]["value"], "等待长桥数据")
+        self.assertEqual(pnl_cards_by_label["已实现估算"]["value"], "等待长桥数据")
 
     def test_longbridge_panel_marks_old_same_day_account_state_as_stale(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1850,7 +1891,9 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 panel = build_longbridge_paper_dashboard_view(config)
 
         self.assertEqual(panel["submitted_order_count"], "2")
+        queue_by_label = {row["label"]: row for row in panel["queue_rows"]}
         self.assertIn("2 / 2", json.dumps(panel["queue_rows"], ensure_ascii=False))
+        self.assertIn("有订单号 2", queue_by_label["实时提交流程"]["value"])
 
     def test_longbridge_virtual_bucket_rows_separate_new_epoch_from_old_history(self):
         realtime = {
@@ -2032,6 +2075,83 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(by_bucket["main"]["bucket_today_pnl"], "0.00")
         self.assertEqual(by_bucket["main"]["total_pnl"], "10.00")
         self.assertIn("未成交请求不计入表现", by_bucket["main"]["note"])
+
+    def test_longbridge_virtual_bucket_rows_keep_today_realized_separate_from_cumulative_realized(self):
+        realtime = {
+            "virtual_capital_buckets": [
+                {
+                    "capital_bucket": "main",
+                    "label": "主力仓",
+                    "equity": "10000.00",
+                    "max_total_exposure": "6000.00",
+                    "max_symbol_exposure": "1500.00",
+                    "used_exposure": "0.00",
+                }
+            ]
+        }
+        epoch = {"test_epoch_id": "epoch-live", "status": "active"}
+        order_reconciliation = {
+            "rows": [
+                {
+                    "test_epoch_id": "epoch-live",
+                    "capital_bucket": "main",
+                    "symbol": "AAPL",
+                    "side": "buy",
+                    "executed_quantity": "1",
+                    "executed_price": "100.00",
+                    "created_at": "2026-06-03T14:00:00Z",
+                    "counts_for_performance": True,
+                    "attribution_status": "matched_m15_realtime_ledger",
+                },
+                {
+                    "test_epoch_id": "epoch-live",
+                    "capital_bucket": "main",
+                    "symbol": "AAPL",
+                    "side": "sell",
+                    "executed_quantity": "1",
+                    "executed_price": "105.00",
+                    "created_at": "2026-06-03T19:00:00Z",
+                    "counts_for_performance": True,
+                    "attribution_status": "matched_m15_realtime_ledger",
+                },
+                {
+                    "test_epoch_id": "epoch-live",
+                    "capital_bucket": "main",
+                    "symbol": "MSFT",
+                    "side": "buy",
+                    "executed_quantity": "1",
+                    "executed_price": "200.00",
+                    "created_at": "2026-06-04T14:00:00Z",
+                    "counts_for_performance": True,
+                    "attribution_status": "matched_m15_realtime_ledger",
+                },
+                {
+                    "test_epoch_id": "epoch-live",
+                    "capital_bucket": "main",
+                    "symbol": "MSFT",
+                    "side": "sell",
+                    "executed_quantity": "1",
+                    "executed_price": "210.00",
+                    "created_at": "2026-06-04T19:00:00Z",
+                    "counts_for_performance": True,
+                    "attribution_status": "matched_m15_realtime_ledger",
+                },
+            ]
+        }
+
+        rows = m15_longbridge_virtual_bucket_rows(
+            realtime,
+            [],
+            epoch,
+            {},
+            order_reconciliation,
+            market_date="2026-06-04",
+        )
+        bucket = {row["capital_bucket"]: row for row in rows}["main"]
+
+        self.assertEqual(bucket["realized_pnl"], "15.00")
+        self.assertEqual(bucket["bucket_today_pnl"], "10.00")
+        self.assertEqual(bucket["trading_total_pnl"], "15.00")
 
     def test_unfilled_order_diagnostics_hide_raw_order_ids_from_dashboard(self):
         rows = m15_unfilled_order_diagnostic_rows(

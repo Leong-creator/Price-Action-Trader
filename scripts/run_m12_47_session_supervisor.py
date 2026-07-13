@@ -39,6 +39,7 @@ DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m12_47_session_supervisor.
 DEFAULT_M1237_CONFIG_PATH = ROOT / "config" / "examples" / "m12_37_intraday_auto_loop.json"
 DEFAULT_OUTPUT_DIR = ROOT / "reports" / "strategy_lab" / "m10_price_action_strategy_refresh" / "daily_observation" / "m12_29_current_day_scan_dashboard"
 M15_ACCOUNT_REFRESH_MIN_INTERVAL_SECONDS = 60
+DEFAULT_STALE_RESTART_LIMIT = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +64,7 @@ class SupervisorConfig:
     regular_session_start_time: str
     regular_session_end_time: str
     postclose_grace_minutes: int
+    stale_restart_limit: int
     market_holidays: frozenset[date]
     boundary: BoundaryConfig
 
@@ -87,6 +89,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SupervisorConfig:
         regular_session_start_time=payload["regular_session_start_time"],
         regular_session_end_time=payload["regular_session_end_time"],
         postclose_grace_minutes=int(payload["postclose_grace_minutes"]),
+        stale_restart_limit=int(payload.get("stale_restart_limit", DEFAULT_STALE_RESTART_LIMIT)),
         market_holidays=parse_market_holidays(payload.get("market_holidays", [])),
         boundary=BoundaryConfig(
             paper_simulated_only=bool(boundary["paper_simulated_only"]),
@@ -117,6 +120,8 @@ def validate_config(config: SupervisorConfig) -> None:
         raise ValueError("M12.47 stage drift")
     if config.check_interval_seconds <= 0:
         raise ValueError("M12.47 check interval must be positive")
+    if config.stale_restart_limit <= 0:
+        raise ValueError("M12.47 stale restart limit must be positive")
     if not config.boundary.paper_simulated_only:
         raise ValueError("M12.47 must stay paper/simulated only")
     if (
@@ -231,6 +236,10 @@ def dashboard_json_path(config: SupervisorConfig) -> Path:
 
 def auto_runner_manifest_path(config: SupervisorConfig) -> Path:
     return config.output_dir / "m12_37_auto_runner_manifest.json"
+
+
+def postclose_final_daily_refresh_path(config: SupervisorConfig) -> Path:
+    return config.output_dir / "m12_37_postclose_final_daily_refresh_147.json"
 
 
 def m1237_refresh_seconds(config: SupervisorConfig) -> int:
@@ -365,12 +374,21 @@ def build_status_payload(
     failure_reason: str = "",
     stale_dashboard_restart_count: int = 0,
     last_restart_reason: str = "",
+    last_real_failure_reason: str = "",
 ) -> dict[str, Any]:
     dashboard = read_json_if_exists(dashboard_json_path(config))
+    raw_refresh_progress = read_json_if_exists(auto_runner_manifest_path(config))
     refresh_progress = normalize_refresh_progress_for_supervisor_status(
-        read_json_if_exists(auto_runner_manifest_path(config)),
+        raw_refresh_progress,
         phase=phase,
         child_running=child_running,
+    )
+    progress_snapshot = child_progress_snapshot(
+        config,
+        phase=phase,
+        child_started_at=child_started_at,
+        child_running=child_running,
+        manifest=raw_refresh_progress,
     )
     dashboard_generated_at = dashboard.get("generated_at", "")
     dashboard_update = dashboard.get("update_status", {})
@@ -395,6 +413,7 @@ def build_status_payload(
         "last_restart_reason": last_restart_reason,
         "failure_state": failure_state,
         "failure_reason": failure_reason,
+        "last_real_failure_reason": last_real_failure_reason,
         "next_session_start_new_york": phase["next_session_start_new_york"],
         "next_session_start_beijing": phase["next_session_start_beijing"],
         "latest_dashboard_generated_at": dashboard_generated_at,
@@ -404,6 +423,10 @@ def build_status_payload(
         "m12_37_refresh_started_at": refresh_progress.get("refresh_started_at", ""),
         "m12_37_active_step": refresh_progress.get("active_step", ""),
         "m12_37_previous_dashboard_generated_at": refresh_progress.get("previous_dashboard_generated_at", ""),
+        "child_last_progress_at": progress_snapshot.get("progress_at", ""),
+        "child_last_progress_age_seconds": progress_snapshot.get("progress_age_seconds", ""),
+        "child_progress_source": progress_snapshot.get("progress_source", ""),
+        "child_progress_state": progress_snapshot.get("progress_state", ""),
         "plain_language_result": build_plain_language_status(
             phase,
             supervisor_process_alive,
@@ -748,9 +771,12 @@ def apply_dashboard_longbridge_overlay(dashboard: dict[str, Any], longbridge_con
     top_metrics.pop("长桥总盈亏", None)
     top_metrics.pop("长桥交易总盈亏", None)
     top_metrics.pop("长桥当日总盈亏", None)
-    top_metrics.pop("长桥App当日盈亏", None)
+    top_metrics.pop("长桥账户当日盈亏", None)
+    top_metrics.pop("长桥接口交易日盈亏", None)
     top_metrics.pop("长桥账户总盈亏", None)
-    top_metrics["长桥账户当日盈亏"] = str(longbridge_context.get("longbridge_account_intraday_pnl", "等待长桥字段对齐"))
+    top_metrics.pop("长桥接口净值日内变化", None)
+    top_metrics["长桥App当日盈亏"] = str(longbridge_context.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"))
+    top_metrics["长桥接口净值日内变化"] = str(longbridge_context.get("longbridge_account_intraday_pnl", "无法计算"))
     top_metrics["长桥接口持仓今日浮动"] = str(longbridge_context.get("longbridge_account_today_total_pnl", "暂无"))
     top_metrics["长桥当前持仓总盈亏"] = str(longbridge_context.get("longbridge_account_total_pnl", "暂无"))
     top_metrics["长桥账户总资产"] = str(longbridge_context.get("account_total_equity_estimate", "暂无"))
@@ -923,6 +949,79 @@ def parse_utc_timestamp(value: str) -> datetime | None:
         return None
 
 
+def child_progress_snapshot(
+    config: SupervisorConfig,
+    *,
+    phase: dict[str, str],
+    child_started_at: str,
+    child_running: bool,
+    manifest: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    now_dt = parse_utc_timestamp(str(phase.get("generated_at") or ""))
+    child_started_dt = parse_utc_timestamp(child_started_at)
+    if now_dt is None or child_started_dt is None or not child_running:
+        return {
+            "progress_at": "",
+            "progress_age_seconds": "",
+            "progress_source": "",
+            "progress_state": "",
+            "recent_progress": False,
+        }
+    refresh_seconds = m1237_refresh_seconds(config)
+    progress = manifest if manifest is not None else read_json_if_exists(auto_runner_manifest_path(config))
+    progress_generated_dt = parse_utc_timestamp(str(progress.get("generated_at") or ""))
+    refresh_started_dt = parse_utc_timestamp(str(progress.get("refresh_started_at") or ""))
+    progress_state = str(progress.get("refresh_state") or "")
+    active_step = str(progress.get("active_step") or "")
+    progress_dt: datetime | None = None
+    progress_source = ""
+    if progress_generated_dt is not None and progress_generated_dt >= child_started_dt:
+        progress_dt = progress_generated_dt
+        progress_source = "manifest_generated_at"
+    elif refresh_started_dt is not None and refresh_started_dt >= child_started_dt:
+        progress_dt = refresh_started_dt
+        progress_source = "manifest_refresh_started_at"
+    else:
+        log_file = child_log_path(config)
+        if log_file.exists():
+            log_dt = datetime.fromtimestamp(log_file.stat().st_mtime, UTC)
+            if log_dt >= child_started_dt:
+                progress_dt = log_dt
+                progress_source = "child_log_mtime"
+    recent_progress = False
+    progress_age_seconds = ""
+    if progress_dt is not None:
+        progress_age = max(int((now_dt - progress_dt).total_seconds()), 0)
+        progress_age_seconds = str(progress_age)
+        within_seconds = max(refresh_seconds * 3, 180)
+        if progress_state == "refresh_in_progress":
+            within_seconds = active_refresh_timeout_for_step(active_step, refresh_seconds)
+        recent_progress = progress_age <= within_seconds
+    return {
+        "progress_at": progress_dt.isoformat().replace("+00:00", "Z") if progress_dt is not None else "",
+        "progress_age_seconds": progress_age_seconds,
+        "progress_source": progress_source,
+        "progress_state": progress_state,
+        "recent_progress": recent_progress,
+    }
+
+
+def latest_child_failure_reason(config: SupervisorConfig, child_last_exit_code: int | None) -> str:
+    manifest = read_json_if_exists(auto_runner_manifest_path(config))
+    if str(manifest.get("refresh_state") or "") == "refresh_failed":
+        error_type = str(manifest.get("error_type") or "").strip()
+        error = str(manifest.get("error") or "").strip()
+        detail = " ".join(part for part in (error_type, error) if part).strip()
+        if detail:
+            return detail
+        plain = str(manifest.get("plain_language_result") or "").strip()
+        if plain:
+            return plain
+    if child_last_exit_code not in (None, 0):
+        return f"child_exit_code_{child_last_exit_code}"
+    return ""
+
+
 def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, str], child_started_at: str) -> str:
     if phase.get("session_should_run") != "true":
         return ""
@@ -940,6 +1039,15 @@ def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, st
     dashboard_dt = parse_utc_timestamp(dashboard_generated_at)
     stale_after_seconds = max(refresh_seconds * 5, 600)
     progress = read_json_if_exists(auto_runner_manifest_path(config))
+    progress_snapshot = child_progress_snapshot(
+        config,
+        phase=phase,
+        child_started_at=child_started_at,
+        child_running=True,
+        manifest=progress,
+    )
+    if progress_snapshot["recent_progress"]:
+        return ""
     refresh_state = str(progress.get("refresh_state") or "")
     refresh_started_dt = parse_utc_timestamp(str(progress.get("refresh_started_at") or ""))
     active_step = str(progress.get("active_step") or "")
@@ -964,7 +1072,12 @@ def stale_dashboard_restart_reason(config: SupervisorConfig, phase: dict[str, st
 def active_refresh_timeout_for_step(active_step: str, refresh_seconds: int) -> int:
     default_timeout = max(refresh_seconds * 30, 1800)
     step_timeout_floor = {
-        "m12_29_current_day_scan_dashboard": 5400,
+        # Full current-day refresh can scan the expanded universe and run
+        # downstream M13/M14 materialization before the dashboard timestamp
+        # advances. The 147-symbol scan plus post-refresh reports can exceed
+        # four hours, so keep this high enough to avoid killing a healthy
+        # long refresh mid-session.
+        "m12_29_current_day_scan_dashboard": 28800,
         "m13_daily_strategy_test_runner": 2400,
         "m14_strategy_challenge_gate": 2400,
     }
@@ -1023,15 +1136,28 @@ def build_failure_payload(
     phase: dict[str, str],
     consecutive_failures: int,
     child_last_exit_code: int | None,
+    stale_restart_count: int = 0,
+    last_real_failure_reason: str = "",
+    failure_trigger: str = "child_exit_failures",
 ) -> dict[str, Any]:
+    if failure_trigger == "stale_restart_limit":
+        failure_reason = (
+            f"M12.37 子会话 stale restart 已达 {stale_restart_count} 次，已停止自动重启。"
+        )
+    else:
+        failure_reason = f"M12.37 子会话连续 {consecutive_failures} 次非零退出，已停止自动重启。"
     return {
         "schema_version": "m12.47.session-failure-dossier.v1",
         "stage": config.stage,
         "generated_at": phase["generated_at"],
-        "failure_reason": f"M12.37 子会话连续 {consecutive_failures} 次非零退出，已停止自动重启。",
+        "failure_reason": failure_reason,
+        "failure_trigger": failure_trigger,
         "consecutive_failures": consecutive_failures,
+        "stale_restart_count": stale_restart_count,
         "last_exit_code": child_last_exit_code,
+        "last_real_failure_reason": last_real_failure_reason,
         "market_status": phase["market_status"],
+        "postclose_final_daily_refresh_147": read_json_if_exists(postclose_final_daily_refresh_path(config)),
         "paper_simulated_only": True,
         "trading_connection": False,
         "real_money_actions": False,
@@ -1095,6 +1221,7 @@ def run_foreground(config: SupervisorConfig) -> int:
     failure_reason = ""
     stale_dashboard_restart_count = 0
     last_restart_reason = ""
+    last_real_failure_reason = ""
     shutting_down = False
 
     def handle_term(signum, frame):  # type: ignore[no-untyped-def]
@@ -1113,6 +1240,7 @@ def run_foreground(config: SupervisorConfig) -> int:
                 child_last_exit_code = child.poll()
                 if child_last_exit_code not in (None, 0):
                     consecutive_failures += 1
+                    last_real_failure_reason = latest_child_failure_reason(config, child_last_exit_code) or last_real_failure_reason
                 else:
                     consecutive_failures = 0
                 child = None
@@ -1123,6 +1251,7 @@ def run_foreground(config: SupervisorConfig) -> int:
                     phase=phase,
                     consecutive_failures=consecutive_failures,
                     child_last_exit_code=child_last_exit_code,
+                    last_real_failure_reason=last_real_failure_reason,
                 )
                 failure_reason = failure_payload["failure_reason"]
                 write_failure_dossier(config, failure_payload)
@@ -1144,6 +1273,20 @@ def run_foreground(config: SupervisorConfig) -> int:
                     child = None
                     child_running = False
                     consecutive_failures = 0
+                    if stale_dashboard_restart_count >= config.stale_restart_limit:
+                        failure_state = "failed"
+                        failure_payload = build_failure_payload(
+                            config,
+                            phase=phase,
+                            consecutive_failures=consecutive_failures,
+                            child_last_exit_code=child_last_exit_code,
+                            stale_restart_count=stale_dashboard_restart_count,
+                            last_real_failure_reason=last_real_failure_reason,
+                            failure_trigger="stale_restart_limit",
+                        )
+                        failure_reason = failure_payload["failure_reason"]
+                        write_failure_dossier(config, failure_payload)
+                        should_run = False
             if should_run and not child_running:
                 child = spawn_m1237_session(config)
                 child_started_at = phase["generated_at"]
@@ -1171,7 +1314,8 @@ def run_foreground(config: SupervisorConfig) -> int:
                     failure_state=failure_state,
                     failure_reason=failure_reason,
                     stale_dashboard_restart_count=stale_dashboard_restart_count,
-                    last_restart_reason=current_restart_reason,
+                    last_restart_reason=last_restart_reason or current_restart_reason,
+                    last_real_failure_reason=last_real_failure_reason,
                 ),
             )
             time.sleep(config.check_interval_seconds)
@@ -1196,6 +1340,7 @@ def run_foreground(config: SupervisorConfig) -> int:
                 restart_count=restart_count,
                 failure_state=failure_state,
                 failure_reason=failure_reason,
+                last_real_failure_reason=last_real_failure_reason,
             ),
         )
         return 0
@@ -1269,6 +1414,7 @@ def print_status(config: SupervisorConfig) -> int:
         failure_reason=stored.get("failure_reason", "") if stored else "",
         stale_dashboard_restart_count=int(stored.get("stale_dashboard_restart_count", 0)) if stored else 0,
         last_restart_reason=stored.get("last_restart_reason", "") if stored else "",
+        last_real_failure_reason=stored.get("last_real_failure_reason", "") if stored else "",
     )
     write_status(config, payload)
     dashboard_synced = sync_dashboard_status_overlay(config, payload)
@@ -1288,6 +1434,7 @@ def print_status(config: SupervisorConfig) -> int:
             failure_reason=stored.get("failure_reason", "") if stored else "",
             stale_dashboard_restart_count=int(stored.get("stale_dashboard_restart_count", 0)) if stored else 0,
             last_restart_reason=stored.get("last_restart_reason", "") if stored else "",
+            last_real_failure_reason=stored.get("last_real_failure_reason", "") if stored else "",
         )
         write_status(config, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))

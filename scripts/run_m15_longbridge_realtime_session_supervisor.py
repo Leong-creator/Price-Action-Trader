@@ -28,6 +28,7 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (  # noqa: E4
     rotate_text_log_if_needed,
     run_realtime_session_once,
     status_path,
+    supervisor_health_issues,
 )
 
 
@@ -38,6 +39,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--once", action="store_true", help="Run one supervised realtime cycle if the market window allows it.")
     parser.add_argument("--watch", action="store_true", help="Keep running supervised cycles in the foreground.")
     parser.add_argument("--daemon", action="store_true", help="Start the foreground watcher in the background.")
+    parser.add_argument(
+        "--replace-config-drift",
+        action="store_true",
+        help="Only for bootstrap/watchdog: replace a verified stale M15 paper supervisor with this config.",
+    )
     parser.add_argument("--status", action="store_true", help="Print the latest supervisor status without running a cycle.")
     parser.add_argument("--stop", action="store_true", help="Stop a background realtime session supervisor started by --daemon.")
     return parser.parse_args()
@@ -162,8 +168,27 @@ def start_daemon(args: argparse.Namespace, config) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     existing_pid = read_pid(pid_path(config))
     if existing_pid and process_alive(existing_pid):
-        print(f"长桥实时链路守护器已在运行，PID={existing_pid}")
-        return 0
+        payload = {}
+        if status_path(config).exists():
+            try:
+                payload = json.loads(status_path(config).read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                payload = {}
+        issues = supervisor_health_issues(config, payload, expected_pid=existing_pid, process_alive_now=True)
+        if issues:
+            if not args.replace_config_drift:
+                print(f"长桥实时链路守护器进程存活但配置/状态漂移，PID={existing_pid} issues={','.join(issues)}")
+                return 1
+            if not safe_to_replace_config_drift(payload):
+                print(f"拒绝替换未知进程，PID={existing_pid} issues={','.join(issues)}")
+                return 1
+            if not terminate_supervisor_process(existing_pid, pid_path(config)):
+                print(f"长桥实时链路守护器配置漂移但未能安全停止旧进程，PID={existing_pid}")
+                return 1
+            print(f"已停止配置漂移的旧 M15 模拟守护器，PID={existing_pid} issues={','.join(issues)}")
+        else:
+            print(f"长桥实时链路守护器已在运行，PID={existing_pid}")
+            return 0
     rotate_text_log_if_needed(log_path(config), max_bytes=MAX_SUPERVISOR_LOG_BYTES)
     command = [
         sys.executable,
@@ -185,6 +210,29 @@ def start_daemon(args: argparse.Namespace, config) -> int:
     pid_path(config).write_text(str(process.pid) + "\n", encoding="utf-8")
     print(f"长桥实时链路守护器已启动，PID={process.pid}")
     return 0
+
+
+def safe_to_replace_config_drift(payload: dict) -> bool:
+    return (
+        payload.get("stage") == "M15.longbridge_realtime_session_supervisor"
+        and payload.get("paper_simulated_only") is True
+        and payload.get("live_execution") is False
+        and payload.get("real_money_actions") is False
+    )
+
+
+def terminate_supervisor_process(process_id: int, pid_file: Path) -> bool:
+    try:
+        os.kill(process_id, signal.SIGTERM)
+    except OSError:
+        pid_file.unlink(missing_ok=True)
+        return True
+    for _ in range(20):
+        if not process_alive(process_id):
+            pid_file.unlink(missing_ok=True)
+            return True
+        time.sleep(0.25)
+    return False
 
 
 def stop_daemon(config) -> int:
@@ -215,12 +263,12 @@ def print_status(config) -> int:
         pid_text = f"PID={existing_pid}" if existing_pid else "没有 PID 文件"
         print(f"长桥实时链路守护器还没有状态文件；进程存活={alive}，{pid_text}。")
         print(f"当前市场={current_window.get('market_status', '')}")
-        return 0
-    import json
+        return 1
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     generated_at = str(payload.get("generated_at") or "")
     age_text = status_age_label(generated_at)
+    issues = supervisor_health_issues(config, payload, expected_pid=existing_pid, process_alive_now=alive)
     print(path)
     print(payload.get("plain_language_result", ""))
     print(
@@ -228,9 +276,10 @@ def print_status(config) -> int:
         f"状态={payload.get('supervisor_status', '')} "
         f"状态时间={generated_at or '未知'} {age_text} "
         f"状态内市场={payload.get('window', {}).get('market_status', '')} "
-        f"当前市场={current_window.get('market_status', '')}"
+        f"当前市场={current_window.get('market_status', '')} "
+        f"健康问题={','.join(issues) if issues else 'none'}"
     )
-    return 0
+    return 0 if not issues else 1
 
 
 def read_pid(path: Path) -> int | None:

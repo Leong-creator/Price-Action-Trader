@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import time
 import gzip
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation, ROUND_FLOOR
@@ -41,6 +42,7 @@ REPORT_MD = "m15_longbridge_realtime_execution.md"
 MAX_EXECUTION_LEDGER_BYTES = 50 * 1024 * 1024
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
+HUNDRED = Decimal("100")
 FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER = Decimal("0.995")
 FLATTEN_FALLBACK_COST_SELL_LIMIT_MULTIPLIER = Decimal("0.95")
 OPTION_SYMBOL_RE = re.compile(r"^[A-Z]{1,6}\d{6}[CP]\d{8}$")
@@ -179,6 +181,8 @@ class VirtualCapitalBucket:
 class RealtimeExecutionConfig:
     stage: str
     title: str
+    config_path: Path
+    config_digest: str
     realtime_signal_events_path: Path
     paper_account_state_path: Path
     output_dir: Path
@@ -355,6 +359,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
     return RealtimeExecutionConfig(
         stage=str(payload.get("stage", "M15.longbridge_realtime_execution")),
         title=str(payload.get("title", "长桥模拟账户实时执行链路")),
+        config_path=config_path,
+        config_digest=config_digest(config_path),
         realtime_signal_events_path=resolve_repo_path(
             inputs.get("realtime_signal_events", DEFAULT_SIGNAL_EVENTS)
         ),
@@ -546,6 +552,8 @@ def run_realtime_execution(
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
     session_started_at = resolve_session_started_at(config.session_started_at, now)
+    execution_run_id = build_execution_run_id(config, now)
+    session_run_id = build_session_run_id(config, session_started_at)
     account_state = read_json(config.paper_account_state_path)
     epoch_state = load_or_update_test_epoch_state(config, account_state, now)
     signal_events = read_jsonl(config.realtime_signal_events_path)
@@ -560,7 +568,7 @@ def run_realtime_execution(
         for row in current_epoch_ledger
         if row.get("signal_id") and row.get("submission_status") == "submitted"
     }
-    existing_processed_ids = processed_signal_ids(current_epoch_ledger)
+    existing_processed_ids = processed_signal_ids(current_epoch_ledger, config)
     if epoch_state.get("status") == "pending_flatten":
         signal_events_to_process = build_epoch_flatten_signals(config, account_state, now, epoch_state)
         suppressed_by_epoch = len(signal_events)
@@ -577,6 +585,7 @@ def run_realtime_execution(
             if str(event.get("signal_id") or "") not in existing_processed_ids
             and not signal_event_in_current_epoch(event, epoch_state)
         )
+    signal_events_to_process = sorted(signal_events_to_process, key=realtime_execution_signal_sort_key)
     existing_submitted_exposure = submitted_ledger_open_exposure_by_bucket(
         current_epoch_ledger,
         "1970-01-01T00:00:00Z",
@@ -615,6 +624,8 @@ def run_realtime_execution(
             epoch_state=epoch_state,
             generated_at=now,
             session_started_at=session_started_at,
+            execution_run_id=execution_run_id,
+            session_run_id=session_run_id,
             submitted_signal_ids=submitted_signal_ids,
             existing_submitted_exposure=existing_submitted_exposure,
             selected_bucket_exposure=selected_bucket_exposure,
@@ -632,6 +643,9 @@ def run_realtime_execution(
                 attempted_count += 1
                 submission = broker_client.submit_order(order_payload)
                 row["submission_response"] = submission
+                row["longbridge_order_id"] = str(submission.get("order_id") or "")
+                row["broker_order_id"] = str(submission.get("order_id") or "")
+                row["order_id"] = str(submission.get("order_id") or "")
                 if submission.get("submitted") and submission.get("order_id"):
                     row["submission_status"] = "submitted"
                     row["submitted_at"] = generated_at_iso
@@ -690,6 +704,13 @@ def run_realtime_execution(
         "required_account_channel": config.required_account_channel,
         "account_channel": str(account_state.get("account_channel") or account_state.get("channel") or ""),
         "paper_account_verified": paper_account_verified(config, account_state),
+        "runtime_identity": {
+            "config_path": project_path(config.config_path),
+            "config_digest": config.config_digest,
+            "execution_run_id": execution_run_id,
+            "session_run_id": session_run_id,
+            "session_started_at": session_started_at,
+        },
         "session_started_at": session_started_at,
         "test_epoch": epoch_state,
         "ledger_retention": ledger_retention,
@@ -760,6 +781,10 @@ def run_realtime_execution(
                 )
             )
         ),
+        "quality_sorted_signal_count": len(signal_events_to_process),
+        "bucket_pressure_quality_blocked_count": sum(
+            1 for row in ledger_rows if "blocked_bucket_pressure_quality_below_threshold" in row.get("blockers", [])
+        ),
         "same_day_loss_cooldown_blocked_count": sum(
             1 for row in ledger_rows if "blocked_same_day_loss_exit_cooldown" in row.get("blockers", [])
         ),
@@ -767,6 +792,8 @@ def run_realtime_execution(
             1 for row in ledger_rows if "blocked_strategy_daily_new_symbol_limit" in row.get("blockers", [])
         ),
         "allowed_runtime_count": len(config.allowed_runtime_ids),
+        "runtime_ids_seen_this_cycle": sorted({str(row.get("runtime_id") or "") for row in ledger_rows if row.get("runtime_id")}),
+        "recent_execution_inputs": recent_execution_inputs(ledger_rows),
         "blocked_by_reason": count_by_reason(ledger_rows),
         "runtime_whitelist": list(config.allowed_runtime_ids),
         "repair_and_shadow_isolation": {
@@ -775,11 +802,15 @@ def run_realtime_execution(
             "shadow_markers_local_only": list(SHADOW_RUNTIME_MARKERS),
         },
         "inputs": {
+            "execution_config": project_path(config.config_path),
             "realtime_signal_events": project_path(config.realtime_signal_events_path),
             "paper_account_state": project_path(config.paper_account_state_path),
             "test_epoch_state": project_path(config.test_epoch_state_path),
             "local_simulation_ledger": "",
             "fast_signal_queue": "",
+        },
+        "input_config_digests": {
+            "execution_config": config.config_digest,
         },
         "outputs": {
             "summary": project_path(config.output_dir / SUMMARY_JSON),
@@ -812,6 +843,8 @@ def evaluate_signal_event(
     epoch_state: dict[str, Any],
     generated_at: datetime,
     session_started_at: str,
+    execution_run_id: str,
+    session_run_id: str,
     submitted_signal_ids: set[str],
     existing_submitted_exposure: dict[tuple[str, str], Decimal],
     selected_bucket_exposure: dict[str, Decimal],
@@ -836,6 +869,19 @@ def evaluate_signal_event(
     stop_price = decimal(signal.get("stop_price", "0"))
     target_price = decimal(signal.get("target_price", "0"))
     current_price = decimal(signal.get("current_price", signal.get("last_price", limit_price)))
+    original_order_type = order_type
+    original_trigger_price = trigger_price
+    order_type_adjustment_status = ""
+    if (
+        side == "buy"
+        and order_type == "trigger_limit"
+        and trigger_price > ZERO
+        and current_price > ZERO
+        and trigger_price <= current_price
+    ):
+        order_type = "limit"
+        trigger_price = ZERO
+        order_type_adjustment_status = "trigger_limit_downgraded_to_limit_trigger_already_reached"
     risk_per_share = abs(limit_price - stop_price) if limit_price > ZERO and stop_price > ZERO else ZERO
     risk_amount = risk_per_share * quantity if side == "buy" and risk_per_share > ZERO else decimal(signal.get("risk_amount", "0"))
     notional = quantity * limit_price if limit_price > ZERO else decimal(signal.get("notional", quantity * limit_price))
@@ -848,13 +894,14 @@ def evaluate_signal_event(
             signal.get("expected_net_profit_after_fees", signal.get("net_profit_after_fees", "0")),
         )
     )
+    quality_score = normalized_signal_quality_score(signal)
+    known_fees = (
+        decimal(signal.get("estimated_entry_fees", "0"))
+        + decimal(signal.get("estimated_exit_fees_at_target", "0"))
+        + decimal(signal.get("estimated_regulatory_fees_at_target", "0"))
+    )
     if side == "buy" and target_price > ZERO and limit_price > ZERO:
         gross_profit = (target_price - limit_price) * quantity
-        known_fees = (
-            decimal(signal.get("estimated_entry_fees", "0"))
-            + decimal(signal.get("estimated_exit_fees_at_target", "0"))
-            + decimal(signal.get("estimated_regulatory_fees_at_target", "0"))
-        )
         if known_fees > ZERO:
             net_profit = gross_profit - known_fees
     created_at = parse_signal_time(signal.get("created_at") or signal.get("generated_at") or signal.get("signal_time"))
@@ -961,6 +1008,35 @@ def evaluate_signal_event(
     bucket_total_exposure = sum(
         value for (row_bucket, _symbol), value in existing_submitted_exposure.items() if row_bucket == capital_bucket
     ) + selected_bucket_exposure.get(capital_bucket, ZERO)
+    quantity_cap_adjustment_status = ""
+    quantity_before_bucket_cap = quantity
+    bucket_remaining_total_exposure = max_total_exposure - bucket_total_exposure
+    bucket_remaining_symbol_exposure = max_symbol_exposure - bucket_symbol_exposure
+    bucket_pressure_quality_threshold = bucket_pressure_minimum_quality(bucket_remaining_total_exposure)
+    bucket_pressure_quality_status = "not_applicable"
+    if side == "buy" and bucket_pressure_quality_threshold > ZERO:
+        bucket_pressure_quality_status = "passed"
+        if quality_score < bucket_pressure_quality_threshold:
+            bucket_pressure_quality_status = "blocked"
+            blockers.append("blocked_bucket_pressure_quality_below_threshold")
+    if side == "buy" and limit_price > ZERO and quantity > ZERO and not quantity_normalization.blocker:
+        remaining_exposure = min(bucket_remaining_total_exposure, bucket_remaining_symbol_exposure, max_symbol_exposure)
+        if remaining_exposure <= ZERO:
+            quantity_cap_adjustment_status = "blocked_no_bucket_exposure_remaining"
+            quantity = ZERO
+        elif notional > remaining_exposure:
+            capped_quantity = (remaining_exposure / limit_price).to_integral_value(rounding=ROUND_FLOOR)
+            if capped_quantity < quantity:
+                quantity = max(capped_quantity, ZERO)
+                quantity_cap_adjustment_status = "reduced_to_bucket_remaining_exposure"
+        if quantity != quantity_before_bucket_cap:
+            notional = quantity * limit_price if limit_price > ZERO else ZERO
+            risk_amount = risk_per_share * quantity if risk_per_share > ZERO else risk_amount
+            if target_price > ZERO and limit_price > ZERO and known_fees > ZERO:
+                net_profit = (target_price - limit_price) * quantity - known_fees
+    order_currency_cash_after_order = order_currency_cash - notional if side == "buy" else order_currency_cash
+    if side == "buy" and quantity_before_bucket_cap > ZERO and quantity <= ZERO and quantity_cap_adjustment_status:
+        blockers.append("blocked_bucket_remaining_exposure_below_one_share")
     if side == "buy" and risk_amount > max_risk:
         blockers.append("blocked_risk_over_cap")
     if side == "buy" and notional > max_symbol_exposure:
@@ -1010,15 +1086,30 @@ def evaluate_signal_event(
         {
             "capital_bucket": capital_bucket,
             "capital_bucket_label": bucket_label,
+            "execution_run_id": execution_run_id,
+            "execution_config_digest": config.config_digest,
+            "session_run_id": session_run_id,
             "test_epoch_id": str(epoch_state.get("test_epoch_id") or ""),
             "raw_suggested_quantity": fmt_decimal(quantity_normalization.raw_quantity),
             "submitted_quantity": fmt_decimal(quantity),
             "quantity_rounding_adjustment": fmt_decimal(quantity_normalization.rounded_down_quantity),
             "quantity_normalization_status": quantity_normalization.status,
+            "quantity_cap_adjustment_status": quantity_cap_adjustment_status,
+            "quantity_before_bucket_cap": fmt_decimal(quantity_before_bucket_cap),
+            "order_type_adjustment_status": order_type_adjustment_status,
+            "original_order_type": original_order_type,
+            "original_trigger_price": fmt_money(original_trigger_price) if original_trigger_price > ZERO else "",
+            "quality_score": fmt_decimal(quality_score),
+            "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
+            "bucket_pressure_quality_status": bucket_pressure_quality_status,
         }
     )
     ledger_row = {
         "stage": config.stage,
+        "execution_run_id": execution_run_id,
+        "execution_config_path": project_path(config.config_path),
+        "execution_config_digest": config.config_digest,
+        "session_run_id": session_run_id,
         "signal_id": signal_id,
         "runtime_id": runtime_id,
         "strategy_id": strategy_id,
@@ -1033,14 +1124,21 @@ def evaluate_signal_event(
         "position_action": position_action,
         "side": side,
         "order_type": order_type,
+        "original_order_type": original_order_type,
+        "order_type_adjustment_status": order_type_adjustment_status,
         "raw_suggested_quantity": fmt_decimal(quantity_normalization.raw_quantity),
         "submitted_quantity": fmt_decimal(quantity),
         "quantity_rounding_adjustment": fmt_decimal(quantity_normalization.rounded_down_quantity),
         "quantity_normalization_status": quantity_normalization.status,
         "quantity_normalization_blocker": quantity_normalization.blocker,
+        "quantity_cap_adjustment_status": quantity_cap_adjustment_status,
+        "quantity_before_bucket_cap": fmt_decimal(quantity_before_bucket_cap),
+        "bucket_remaining_total_exposure_before_order": fmt_money(bucket_remaining_total_exposure),
+        "bucket_remaining_symbol_exposure_before_order": fmt_money(bucket_remaining_symbol_exposure),
         "quantity": fmt_decimal(quantity),
         "limit_price": fmt_money(limit_price),
         "trigger_price": fmt_money(trigger_price) if trigger_price > ZERO else "",
+        "original_trigger_price": fmt_money(original_trigger_price) if original_trigger_price > ZERO else "",
         "stop_price": fmt_money(stop_price) if stop_price > ZERO else "",
         "target_price": fmt_money(target_price) if target_price > ZERO else "",
         "current_price": fmt_money(current_price) if current_price > ZERO else "",
@@ -1049,6 +1147,15 @@ def evaluate_signal_event(
         "net_profit_after_fees_at_target": fmt_money(net_profit),
         "profit_quality_gate": profit_gate_status,
         "reward_r": fmt_decimal(reward_r),
+        "quality_score": fmt_decimal(quality_score),
+        "signal_quality_score": fmt_decimal(quality_score),
+        "market_confirmation_status": str(signal.get("market_confirmation_status") or ""),
+        "market_confirmation_symbols": str(signal.get("market_confirmation_symbols") or ""),
+        "close_position": str(signal.get("close_position") or ""),
+        "close_to_close_percent": str(signal.get("close_to_close_percent") or ""),
+        "volume_ratio": str(signal.get("volume_ratio") or ""),
+        "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
+        "bucket_pressure_quality_status": bucket_pressure_quality_status,
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
         "minimum_net_profit_after_fees": fmt_money(minimum_net_profit),
         "bucket_equity": fmt_money(bucket.equity) if bucket else "",
@@ -1063,6 +1170,8 @@ def evaluate_signal_event(
         "confluence_multiplier": fmt_decimal(decimal(signal.get("confluence_multiplier", "1"))),
         "high_quality_signal": signal_is_high_quality(signal),
         "source_market_event_id": str(signal.get("source_market_event_id") or signal.get("market_event_id") or ""),
+        "execute_orders": config.execute_orders,
+        "paper_trading_approval": config.paper_trading_approval,
         "created_at": to_iso(created_at) if created_at else "",
         "processed_at": to_iso(generated_at),
         "latency_ms": latency_ms if latency_ms is not None else "",
@@ -1073,6 +1182,9 @@ def evaluate_signal_event(
         "realtime_decision_status": status,
         "blockers": blockers,
         "order_payload": order_payload if not blockers else {},
+        "longbridge_order_id": "",
+        "broker_order_id": "",
+        "order_id": "",
         "local_simulation_ignored": True,
         "local_close_event_ignored": bool(signal.get("latest_close_event_time_after_open") or signal.get("local_close_event_id")),
         "longbridge_account_position_checked": True,
@@ -1631,7 +1743,38 @@ def signal_is_high_quality(signal: dict[str, Any]) -> bool:
         if value in {"high", "strong", "excellent", "高质量", "强"}:
             return True
     score = decimal(signal.get("quality_score", signal.get("signal_quality_score", "0")))
-    return score >= Decimal("0.8")
+    if ZERO < score <= Decimal("1"):
+        return score >= Decimal("0.8")
+    return score >= Decimal("80")
+
+
+def normalized_signal_quality_score(signal: dict[str, Any]) -> Decimal:
+    score = decimal(signal.get("quality_score", signal.get("signal_quality_score", "0")))
+    if ZERO < score <= Decimal("1"):
+        return score * HUNDRED
+    return score
+
+
+def bucket_pressure_minimum_quality(bucket_remaining_total_exposure: Decimal) -> Decimal:
+    if bucket_remaining_total_exposure < Decimal("750"):
+        return Decimal("90")
+    if bucket_remaining_total_exposure < Decimal("1500"):
+        return Decimal("80")
+    return ZERO
+
+
+def realtime_execution_signal_sort_key(signal: dict[str, Any]) -> tuple[int, str, Decimal, Decimal, Decimal, str]:
+    position_action = normalize_position_action(signal.get("position_action") or signal.get("event_type") or signal.get("action"))
+    side = normalize_side(signal.get("side") or signal.get("direction"), position_action=position_action)
+    sell_priority = 0 if side == "sell" else 1
+    return (
+        sell_priority,
+        str(signal.get("capital_bucket") or ""),
+        -normalized_signal_quality_score(signal),
+        -decimal(signal.get("net_profit_after_fees_at_target", "0")),
+        -decimal(signal.get("reward_r", "0")),
+        str(signal.get("symbol") or ""),
+    )
 
 
 def submitted_ledger_open_exposure(
@@ -1876,15 +2019,27 @@ def submitted_sell_symbol_set(
     return symbols
 
 
-def processed_signal_ids(rows: list[dict[str, Any]]) -> set[str]:
+def processed_signal_ids(rows: list[dict[str, Any]], config: RealtimeExecutionConfig) -> set[str]:
     processed: set[str] = set()
     for row in rows:
         signal_id = str(row.get("signal_id") or "")
         if not signal_id:
             continue
-        if row.get("processed_at") or row.get("submitted_at") or row.get("submission_status"):
+        if row_is_permanently_processed(row, config):
             processed.add(signal_id)
     return processed
+
+
+def row_is_permanently_processed(row: dict[str, Any], config: RealtimeExecutionConfig) -> bool:
+    submission_status = str(row.get("submission_status") or "")
+    if submission_status in {"submit_failed", "submit_unconfirmed_missing_order_id"}:
+        return False
+    if submission_status == "dry_run_ready_not_submitted":
+        previous_execute_orders = bool(row.get("execute_orders"))
+        if config.execute_orders and not previous_execute_orders:
+            return False
+        return True
+    return bool(row.get("processed_at") or row.get("submitted_at") or submission_status)
 
 
 def latency_band_for(config: RealtimeExecutionConfig, latency_ms: int | None) -> str:
@@ -2234,3 +2389,35 @@ def to_iso(value: datetime) -> str:
 
 def monotonic_ms() -> int:
     return int(time.monotonic() * 1000)
+
+
+def config_digest(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def build_execution_run_id(config: RealtimeExecutionConfig, now: datetime) -> str:
+    return f"{to_iso(now)}|cfg={config.config_digest[:12]}|mono={monotonic_ms()}"
+
+
+def build_session_run_id(config: RealtimeExecutionConfig, session_started_at: str) -> str:
+    return f"{session_started_at}|cfg={config.config_digest[:12]}"
+
+
+def recent_execution_inputs(rows: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
+    recent_rows = rows[-limit:]
+    return [
+        {
+            "signal_id": str(row.get("signal_id") or ""),
+            "runtime_id": str(row.get("runtime_id") or ""),
+            "symbol": str(row.get("symbol") or ""),
+            "side": str(row.get("side") or ""),
+            "position_action": str(row.get("position_action") or ""),
+            "created_at": str(row.get("created_at") or ""),
+            "processed_at": str(row.get("processed_at") or ""),
+            "exit_only_position_signal": bool(row.get("exit_only_position_signal")),
+            "source_market_event_id": str(row.get("source_market_event_id") or ""),
+        }
+        for row in recent_rows
+    ]
