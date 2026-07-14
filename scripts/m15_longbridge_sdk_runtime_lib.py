@@ -43,13 +43,18 @@ class SdkRuntimeConfig:
     event_keep_lines: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
+    subscription_batch_size: int
     router_config_path: Path
     execution_config_path: Path
+    account_state_config_path: Path
+    position_manager_config_path: Path
+    stale_order_cleanup_config_path: Path
     paper_order_dispatch_enabled: bool
     paper_trading_only: bool
     live_execution: bool
     real_money_actions: bool
     enable_trade_private_push: bool
+    account_maintenance_interval_seconds: int
 
 
 def resolve_path(value: str | Path) -> Path:
@@ -81,15 +86,26 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         event_keep_lines=int(market_data.get("event_keep_lines", 20000)),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
+        subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
         router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
         execution_config_path=resolve_path(
             routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json")
+        ),
+        account_state_config_path=resolve_path(
+            routing.get("account_state_config", "config/examples/m15_longbridge_realtime_account_state.json")
+        ),
+        position_manager_config_path=resolve_path(
+            routing.get("position_manager_config", "config/examples/m15_longbridge_realtime_position_manager.json")
+        ),
+        stale_order_cleanup_config_path=resolve_path(
+            routing.get("stale_order_cleanup_config", "config/examples/m15_longbridge_realtime_stale_order_cleanup.json")
         ),
         paper_order_dispatch_enabled=bool(routing.get("paper_order_dispatch_enabled", False)),
         paper_trading_only=bool(runtime.get("paper_trading_only", True)),
         live_execution=bool(runtime.get("live_execution", False)),
         real_money_actions=bool(runtime.get("real_money_actions", False)),
         enable_trade_private_push=bool(runtime.get("enable_trade_private_push", False)),
+        account_maintenance_interval_seconds=int(runtime.get("account_maintenance_interval_seconds", 60)),
     )
     if not config.paper_trading_only or config.live_execution or config.real_money_actions:
         raise ValueError("M15 SDK runtime must remain paper-only")
@@ -97,6 +113,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK runtime symbol_limit must be between 1 and 500")
     if config.bar_minutes != 5:
         raise ValueError("M15 SDK runtime currently supports only 5-minute bars")
+    if config.account_maintenance_interval_seconds <= 0:
+        raise ValueError("M15 SDK account maintenance interval must be positive")
+    if config.subscription_batch_size <= 0 or config.subscription_batch_size > 50:
+        raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
     return config
 
 
@@ -282,6 +302,7 @@ def build_status(
     last_event_at: str = "",
     sdk_installed: bool | None = None,
     oauth_client_id_present: bool | None = None,
+    pipeline_metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
     payload = {
@@ -290,6 +311,9 @@ def build_status(
         "source_mode": "longbridge_sdk_push", "configured_symbol_count": len(configured_symbols(config)),
         "paper_simulated_only": True, "live_execution": False, "real_money_actions": False,
         "local_simulation_isolated": True,
+        "local_ledger_input_ref": "",
+        "legacy_fast_queue_used": False,
+        "manual_m12_37_once_used": False,
         "sdk_installed": sdk_installed,
         "oauth_client_id_present": oauth_client_id_present,
         "router_config": str(config.router_config_path),
@@ -298,6 +322,7 @@ def build_status(
         "quote_region": config.quote_region,
         "trade_region": config.trade_region,
         "trade_private_push_enabled": config.enable_trade_private_push,
+        "pipeline_latency": pipeline_metrics or {},
     }
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
     config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -333,9 +358,18 @@ def sdk_config_from_oauth(sdk: Any, oauth: Any, region: str) -> Any:
     return sdk.Config.from_oauth(oauth, **sdk_endpoint_overrides(region))
 
 
-def subscribe_quote_and_trades(quote_context: Any, symbols: list[str], subscription_types: list[Any]) -> None:
-    """Subscribe using the installed SDK's stable two-argument API."""
-    quote_context.subscribe(symbols, subscription_types)
+def subscribe_quote_and_trades(
+    quote_context: Any,
+    symbols: list[str],
+    subscription_types: list[Any],
+    *,
+    batch_size: int = 10,
+) -> None:
+    """Subscribe in bounded requests so a large universe cannot time out startup."""
+    if batch_size <= 0:
+        raise ValueError("subscription batch size must be positive")
+    for offset in range(0, len(symbols), batch_size):
+        quote_context.subscribe(symbols[offset : offset + batch_size], subscription_types)
 
 
 def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bool) -> bool:

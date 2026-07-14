@@ -22,14 +22,19 @@
   "routing": {
     "router_config": "config/examples/m15_longbridge_realtime_signal_router.json",
     "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
-    "paper_order_dispatch_enabled": false
+    "account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
+    "position_manager_config": "config/examples/m15_longbridge_realtime_position_manager.json",
+    "stale_order_cleanup_config": "config/examples/m15_longbridge_realtime_stale_order_cleanup.json",
+    "paper_order_dispatch_enabled": true
   },
   "runtime": {
     "heartbeat_interval_seconds": 5,
     "reconnect_backoff_seconds": 5,
+    "subscription_batch_size": 10,
     "paper_trading_only": true,
     "live_execution": false,
     "real_money_actions": false,
-    "enable_trade_private_push": false
+    "enable_trade_private_push": false,
+    "account_maintenance_interval_seconds": 60
   }
 }

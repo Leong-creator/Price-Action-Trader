@@ -59,6 +59,18 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         subscribe_quote_and_trades(quote, ["AAPL.US"], ["Quote", "Trade"])
         self.assertEqual(quote.calls, [(["AAPL.US"], ["Quote", "Trade"])])
 
+    def test_subscription_batches_large_universe_without_a_single_large_request(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, subscription_types) -> None:
+                self.calls.append((symbols, subscription_types))
+
+        quote = QuoteContext()
+        subscribe_quote_and_trades(quote, ["AAPL.US", "MSFT.US", "NVDA.US"], ["Quote"], batch_size=2)
+        self.assertEqual(quote.calls, [(["AAPL.US", "MSFT.US"], ["Quote"]), (["NVDA.US"], ["Quote"])])
+
     def test_sdk_region_endpoints_are_explicit(self) -> None:
         self.assertEqual(
             sdk_endpoint_overrides("cn"),

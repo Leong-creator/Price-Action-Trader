@@ -47,6 +47,9 @@ class OpeningTradeReadinessConfig:
     execution_config_path: Path
     realtime_account_state_path: Path
     realtime_supervisor_status_path: Path
+    realtime_runtime_engine: str
+    sdk_runtime_config_path: Path
+    sdk_runtime_status_path: Path
     output_dir: Path
 
 
@@ -85,6 +88,13 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
         realtime_supervisor_status_path=resolve_repo_path(
             inputs.get("realtime_supervisor_status", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_realtime_session_supervisor.json")
         ),
+        realtime_runtime_engine=str(inputs.get("realtime_runtime_engine", "cli")).strip().lower(),
+        sdk_runtime_config_path=resolve_repo_path(
+            inputs.get("sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+        ),
+        sdk_runtime_status_path=resolve_repo_path(
+            inputs.get("sdk_runtime_status", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_sdk_runtime.json")
+        ),
         output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
     )
 
@@ -104,8 +114,14 @@ def run_m15_opening_trade_readiness(
 
 
 def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> dict[str, Any]:
+    if config.realtime_runtime_engine not in {"cli", "sdk"}:
+        raise ValueError("M15 opening readiness runtime engine must be cli or sdk")
     m12_status = read_json(config.m12_47_status_path)
     realtime_config = load_realtime_supervisor_config(config.realtime_supervisor_config_path)
+    sdk_config = None
+    if config.realtime_runtime_engine == "sdk":
+        from scripts.m15_longbridge_sdk_runtime_lib import load_config as load_sdk_runtime_config
+        sdk_config = load_sdk_runtime_config(config.sdk_runtime_config_path)
     execution_config_error = ""
     try:
         execution_config = load_execution_config(config.execution_config_path)
@@ -115,22 +131,32 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     execution_payload = read_json_payload(config.execution_config_path)
     execution_summary = read_json(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else {}
     account_state = read_json(config.realtime_account_state_path)
-    realtime_status = read_json(config.realtime_supervisor_status_path)
+    realtime_status = read_json(
+        config.sdk_runtime_status_path if sdk_config is not None else config.realtime_supervisor_status_path
+    )
     window = build_window_state(realtime_config, generated_at=generated_at)
     cleanup_config = load_stale_order_cleanup_config(realtime_config.stale_order_cleanup_config_path)
-    realtime_pid = read_pid(realtime_pid_path(realtime_config))
+    realtime_pid = read_pid(
+        sdk_config.output_dir / "m15_longbridge_sdk_runtime.pid" if sdk_config is not None else realtime_pid_path(realtime_config)
+    )
     realtime_alive = bool(realtime_pid and process_alive(realtime_pid))
     realtime_status_generated_at = str(realtime_status.get("generated_at") or "")
     realtime_status_age_seconds = artifact_age_seconds(realtime_status_generated_at, generated_at)
     m12_alive = bool(m12_status.get("supervisor_process_alive", False))
-    execution_config_linked = config.execution_config_path.resolve() == realtime_config.execution_config_path.resolve()
+    execution_config_linked = config.execution_config_path.resolve() == (
+        sdk_config.execution_config_path if sdk_config is not None else realtime_config.execution_config_path
+    ).resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     paper_account_ready = paper_account_verified(account_state)
-    realtime_health_issues = supervisor_health_issues(
-        realtime_config,
-        realtime_status,
-        expected_pid=realtime_pid,
-        process_alive_now=realtime_alive,
+    realtime_health_issues = (
+        sdk_runtime_health_issues(realtime_status, sdk_config, realtime_alive)
+        if sdk_config is not None
+        else supervisor_health_issues(
+            realtime_config,
+            realtime_status,
+            expected_pid=realtime_pid,
+            process_alive_now=realtime_alive,
+        )
     )
     stale_buy_orders = stale_buy_open_orders(
         cleanup_config,
@@ -138,7 +164,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         parse_utc_datetime(str(window["session_started_at"])),
         parse_utc_datetime(generated_at),
     )
-    cleanup_enabled = bool(getattr(realtime_config, "run_stale_order_cleanup", False))
+    cleanup_enabled = bool(sdk_config is not None or getattr(realtime_config, "run_stale_order_cleanup", False))
     cleanup_failed = int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
     actual_runtime_ids = execution_summary.get("runtime_ids_seen_this_cycle", []) if isinstance(execution_summary, dict) else []
     recent_execution_inputs = build_recent_execution_inputs(execution_summary, execution_config)
@@ -146,7 +172,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         check_row("m12_47_daemon_alive", "M12.47 自动刷新守护器存活", "pass" if m12_alive else "fail", actual=str(m12_alive)),
         check_row(
             "m15_realtime_daemon_alive",
-            "M15 长桥实时链路守护器存活",
+            "M15 长桥实时运行层存活",
             "pass" if realtime_alive and not realtime_health_issues else "fail",
             actual=pid_health_label(realtime_pid, realtime_alive, realtime_status_generated_at, realtime_status_age_seconds)
             + (f", issues={','.join(realtime_health_issues)}" if realtime_health_issues else ""),
@@ -172,7 +198,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         ),
         check_row(
             "paper_enabled_config_linked",
-            "实时守护器使用模拟订单启用版执行配置",
+            "实时运行层使用模拟订单启用版执行配置",
             "pass" if execution_config_linked else "fail",
             actual=project_path(realtime_config.execution_config_path),
         ),
@@ -185,7 +211,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         check_row(
             "paper_only_boundaries",
             "禁止实盘和真实资金动作",
-            "pass" if paper_only_boundaries_ok(execution_payload, realtime_config.hard_boundaries) else "fail",
+            "pass" if paper_only_boundaries_ok(execution_payload, sdk_runtime_boundaries(sdk_config, realtime_config)) else "fail",
             actual=str(execution_payload.get("hard_boundaries", {})),
         ),
         check_row(
@@ -267,10 +293,13 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "input_refs": {
             "m12_47_status": project_path(config.m12_47_status_path),
             "realtime_supervisor_config": project_path(config.realtime_supervisor_config_path),
+            "realtime_runtime_engine": config.realtime_runtime_engine,
+            "sdk_runtime_config": project_path(config.sdk_runtime_config_path),
             "execution_config": project_path(config.execution_config_path),
             "execution_summary": project_path(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else "",
             "realtime_account_state": project_path(config.realtime_account_state_path),
             "realtime_supervisor_status": project_path(config.realtime_supervisor_status_path),
+            "sdk_runtime_status": project_path(config.sdk_runtime_status_path),
         },
         "plain_language_result": plain_result(readiness_status, fail_count, waiting_count, window),
     }
@@ -345,6 +374,31 @@ def paper_only_boundaries_ok(execution_payload: dict[str, Any], supervisor_bound
         and supervisor_boundaries.get("live_execution") is False
         and supervisor_boundaries.get("real_money_actions") is False
     )
+
+
+def sdk_runtime_boundaries(sdk_config: Any, realtime_config: Any) -> dict[str, bool]:
+    if sdk_config is None:
+        return realtime_config.hard_boundaries
+    return {
+        "paper_simulated_only": bool(sdk_config.paper_trading_only),
+        "live_execution": bool(sdk_config.live_execution),
+        "real_money_actions": bool(sdk_config.real_money_actions),
+    }
+
+
+def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_alive_now: bool) -> list[str]:
+    issues: list[str] = []
+    if not process_alive_now:
+        issues.append("process_not_alive")
+    if not status:
+        issues.append("status_missing")
+    elif status.get("status") != "running":
+        issues.append(f"runtime_status={status.get('status') or 'missing'}")
+    if status.get("sdk_connected") is not True:
+        issues.append("sdk_not_connected")
+    if sdk_config is not None and not sdk_config.paper_order_dispatch_enabled:
+        issues.append("paper_order_dispatch_disabled")
+    return issues
 
 
 def local_simulation_isolated(realtime_status: dict[str, Any]) -> bool:

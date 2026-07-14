@@ -3,6 +3,8 @@
   "title": "M15 后台看护器",
   "inputs": {
     "m12_47_config": "config/examples/m12_47_session_supervisor.json",
+    "m15_runtime_engine": "sdk",
+    "m15_sdk_runtime_config": "config/examples/m15_longbridge_sdk_runtime.json",
     "m15_realtime_supervisor_config": "config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
     "m15_account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
     "readiness_config": "config/examples/m15_opening_trade_readiness.paper_orders_enabled.json"

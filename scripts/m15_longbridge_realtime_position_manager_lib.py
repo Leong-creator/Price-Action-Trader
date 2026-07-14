@@ -216,6 +216,9 @@ def run_realtime_position_manager(
             if row.get("position_management_scope") == "longbridge_account_exit_only"
         ],
         "new_exit_signal_event_count": len(exit_events),
+        # The SDK runtime consumes these in memory so an exit does not wait
+        # for another file-scan cycle before reaching the paper executor.
+        "emitted_exit_signal_events": exit_events,
         "blocked_by_reason": count_statuses(ledger_rows),
         "paper_simulated_only": True,
         "live_execution": False,

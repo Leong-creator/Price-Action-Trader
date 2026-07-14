@@ -42,6 +42,8 @@ class BackgroundWatchdogConfig:
     analytics_command_timeout_seconds: int
     m12_47_config_path: Path
     m15_realtime_supervisor_config_path: Path
+    m15_runtime_engine: str
+    m15_sdk_runtime_config_path: Path
     m15_account_state_config_path: Path
     readiness_config_path: Path
     hard_boundaries: dict[str, bool]
@@ -81,6 +83,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
                 ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
             )
         ),
+        m15_runtime_engine=str(inputs.get("m15_runtime_engine", "cli")).strip().lower(),
+        m15_sdk_runtime_config_path=resolve_repo_path(
+            inputs.get("m15_sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+        ),
         m15_account_state_config_path=resolve_repo_path(
             inputs.get(
                 "m15_account_state_config",
@@ -107,6 +113,8 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog analytics refresh interval must be positive")
     if config.analytics_command_timeout_seconds <= 0:
         raise ValueError("M15 background watchdog analytics command timeout must be positive")
+    if config.m15_runtime_engine not in {"cli", "sdk"}:
+        raise ValueError("M15 background watchdog runtime engine must be cli or sdk")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 background watchdog must stay paper/simulated only")
     for key in ("live_execution", "real_money_actions", "manual_m12_37_once", "margin_financing"):
@@ -139,20 +147,7 @@ def run_background_watchdog_once(
             config,
             runner,
         ),
-        run_step(
-            "m15_realtime_daemon",
-            "M15 长桥实时守护器自愈拉起",
-            [
-                sys.executable,
-                "scripts/run_m15_longbridge_realtime_session_supervisor.py",
-                "--daemon",
-                "--replace-config-drift",
-                "--config",
-                project_path(config.m15_realtime_supervisor_config_path),
-            ],
-            config,
-            runner,
-        ),
+        m15_runtime_daemon_step(config, runner),
         run_step(
             "m12_47_status",
             "M12.47 守护器状态",
@@ -166,19 +161,7 @@ def run_background_watchdog_once(
             config,
             runner,
         ),
-        run_step(
-            "m15_realtime_status",
-            "M15 长桥实时守护器状态",
-            [
-                sys.executable,
-                "scripts/run_m15_longbridge_realtime_session_supervisor.py",
-                "--status",
-                "--config",
-                project_path(config.m15_realtime_supervisor_config_path),
-            ],
-            config,
-            runner,
-        ),
+        m15_runtime_status_step(config, runner),
         analytics_refresh_step(config, runner, generated_at, previous=previous),
         run_step(
             "m15_opening_readiness",
@@ -211,6 +194,8 @@ def run_background_watchdog_once(
         "refs": {
             "m12_47_config": project_path(config.m12_47_config_path),
             "m15_realtime_supervisor_config": project_path(config.m15_realtime_supervisor_config_path),
+            "m15_runtime_engine": config.m15_runtime_engine,
+            "m15_sdk_runtime_config": project_path(config.m15_sdk_runtime_config_path),
             "m15_account_state_config": project_path(config.m15_account_state_config_path),
             "readiness_config": project_path(config.readiness_config_path),
         },
@@ -254,6 +239,69 @@ def run_step(
     }
 
 
+def m15_runtime_daemon_step(config: BackgroundWatchdogConfig, runner: CommandRunner) -> dict[str, Any]:
+    if config.m15_runtime_engine == "sdk":
+        return run_step(
+            "m15_sdk_runtime_daemon",
+            "M15 长桥 SDK 实时运行层自愈拉起",
+            [
+                sys.executable,
+                "scripts/run_m15_longbridge_sdk_runtime.py",
+                "--daemon",
+                "--dispatch",
+                "--replace-cli-supervisor",
+                "--config",
+                project_path(config.m15_sdk_runtime_config_path),
+            ],
+            config,
+            runner,
+        )
+    return run_step(
+        "m15_realtime_daemon",
+        "M15 长桥实时守护器自愈拉起",
+        [
+            sys.executable,
+            "scripts/run_m15_longbridge_realtime_session_supervisor.py",
+            "--daemon",
+            "--replace-config-drift",
+            "--config",
+            project_path(config.m15_realtime_supervisor_config_path),
+        ],
+        config,
+        runner,
+    )
+
+
+def m15_runtime_status_step(config: BackgroundWatchdogConfig, runner: CommandRunner) -> dict[str, Any]:
+    if config.m15_runtime_engine == "sdk":
+        return run_step(
+            "m15_sdk_runtime_status",
+            "M15 长桥 SDK 实时运行层状态",
+            [
+                sys.executable,
+                "scripts/run_m15_longbridge_sdk_runtime.py",
+                "--status",
+                "--config",
+                project_path(config.m15_sdk_runtime_config_path),
+            ],
+            config,
+            runner,
+        )
+    return run_step(
+        "m15_realtime_status",
+        "M15 长桥实时守护器状态",
+        [
+            sys.executable,
+            "scripts/run_m15_longbridge_realtime_session_supervisor.py",
+            "--status",
+            "--config",
+            project_path(config.m15_realtime_supervisor_config_path),
+        ],
+        config,
+        runner,
+    )
+
+
 def assert_safe_watchdog_command(command: list[str]) -> None:
     joined = " ".join(command)
     forbidden = (
@@ -272,6 +320,7 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
         "scripts/run_m15_longbridge_realtime_session_supervisor.py",
         "scripts/run_m15_longbridge_realtime_account_state.py",
         "scripts/run_m15_opening_trade_readiness.py",
+        "scripts/run_m15_longbridge_sdk_runtime.py",
     }
     script_tokens = [token for token in command if token.startswith("scripts/")]
     if not script_tokens or script_tokens[0] not in allowed_scripts:
