@@ -22,8 +22,8 @@ if (
 
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events,
-    build_status, compact_market_events, configured_symbols, load_config, read_client_id,
-    fresh_market_events, sdk_object_to_dict,
+    build_status, compact_market_events, configured_symbols, load_config, read_client_id, sdk_config_from_oauth,
+    subscribe_private_trade_updates, subscribe_quote_and_trades, fresh_market_events, sdk_object_to_dict,
 )
 
 
@@ -88,7 +88,7 @@ def main() -> int:
     last_compaction = 0.0
     try:
         oauth = lb.OAuthBuilder(client_id).build(lambda url: print(f"OAuth authorization required: {url}", flush=True))
-        quote = lb.QuoteContext(lb.Config.from_oauth(oauth))
+        quote = lb.QuoteContext(sdk_config_from_oauth(lb, oauth, config.quote_region))
         from scripts.m15_longbridge_realtime_signal_router_lib import load_config as load_router_config, read_jsonl_tail, run_realtime_signal_router
         router_config = load_router_config(config.router_config_path)
         market_event_context = MarketEventContext(
@@ -99,8 +99,8 @@ def main() -> int:
         paper_client = None
         execution_config = None
         if args.dispatch:
-            trade = lb.TradeContext(lb.Config.from_oauth(oauth))
-            trade.subscribe([lb.TopicType.Private])
+            trade = lb.TradeContext(sdk_config_from_oauth(lb, oauth, config.trade_region))
+            subscribe_private_trade_updates(trade, lb, enabled=config.enable_trade_private_push)
             paper_client = SdkRealtimePaperClient(trade, lb)
             from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config
             execution_config = load_execution_config(config.execution_config_path)
@@ -135,7 +135,7 @@ def main() -> int:
             emit(rows)
         quote.set_on_quote(on_quote)
         quote.set_on_trades(on_trades)
-        quote.subscribe(list(configured_symbols(config)), [lb.SubType.Quote, lb.SubType.Trade], is_first_push=True)
+        subscribe_quote_and_trades(quote, list(configured_symbols(config)), [lb.SubType.Quote, lb.SubType.Trade])
         build_status(config, status="running", connected=True, sdk_installed=True, oauth_client_id_present=True)
         while args.watch:
             rows = builder.flush(datetime.now(UTC))

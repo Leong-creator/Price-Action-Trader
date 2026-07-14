@@ -213,6 +213,7 @@ class RealtimeExecutionConfig:
     latency_target_ms: int
     latency_acceptable_ms: int
     max_delayed_signal_age_seconds: int
+    max_account_state_age_seconds: int
     allowed_runtime_ids: tuple[str, ...]
     paper_short_testing_enabled: bool
     paper_short_runtime_ids: tuple[str, ...]
@@ -420,6 +421,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
         latency_target_ms=int(realtime.get("latency_target_ms", 1000)),
         latency_acceptable_ms=int(realtime.get("latency_acceptable_ms", 5000)),
         max_delayed_signal_age_seconds=int(realtime.get("max_delayed_signal_age_seconds", 60)),
+        max_account_state_age_seconds=int(realtime.get("max_account_state_age_seconds", 0)),
         allowed_runtime_ids=tuple(
             str(item)
             for item in realtime.get("allowed_runtime_ids", list(DEFAULT_REALTIME_RUNTIME_IDS))
@@ -555,6 +557,8 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
         raise ValueError("M15 realtime execution acceptable latency must be >= target")
     if config.max_delayed_signal_age_seconds <= 0:
         raise ValueError("M15 realtime execution max delayed signal age must be positive")
+    if config.max_account_state_age_seconds < 0:
+        raise ValueError("M15 realtime execution max account-state age cannot be negative")
     if config.normal_minimum_net_profit_after_fees < config.minimum_net_profit_after_fees:
         raise ValueError("M15 realtime execution normal profit threshold must be >= minimum threshold")
     if config.minimum_reward_r < ZERO:
@@ -1093,6 +1097,14 @@ def evaluate_signal_event(
         blockers.append("blocked_replay_signal_before_session_start")
     if not paper_account_verified(config, account_state):
         blockers.append("blocked_non_paper_account")
+    account_state_at = parse_signal_time(account_state.get("generated_at"))
+    account_state_age_seconds = (
+        max(0, int((generated_at - account_state_at).total_seconds())) if account_state_at else None
+    )
+    if config.max_account_state_age_seconds > 0 and (
+        account_state_age_seconds is None or account_state_age_seconds > config.max_account_state_age_seconds
+    ):
+        blockers.append("blocked_account_state_stale")
     if not (side == "sell" and exit_only_position_signal):
         blockers.extend(strategy_isolation_blockers(runtime_id, strategy_id, config.allowed_runtime_ids))
     held_quantities = held_symbol_quantities(account_state)
@@ -1441,6 +1453,8 @@ def evaluate_signal_event(
         "created_at": to_iso(created_at) if created_at else "",
         "processed_at": to_iso(generated_at),
         "market_event_time": str(signal.get("market_event_time") or ""),
+        "account_state_at": to_iso(account_state_at) if account_state_at else "",
+        "account_state_age_seconds": account_state_age_seconds,
         "risk_check_started_at": to_iso(risk_check_started_at),
         "risk_check_finished_at": to_iso(risk_check_finished_at),
         "risk_check_elapsed_ms": max(0, int((risk_check_finished_at - risk_check_started_at).total_seconds() * 1000)),

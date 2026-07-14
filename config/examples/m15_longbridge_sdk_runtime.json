@@ -9,7 +9,7 @@
   "oauth": {
     "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
     "quote_region": "cn",
-    "trade_region": "global"
+    "trade_region": "cn"
   },
   "market_data": {
     "market": "US",
@@ -29,6 +29,7 @@
     "reconnect_backoff_seconds": 5,
     "paper_trading_only": true,
     "live_execution": false,
-    "real_money_actions": false
+    "real_money_actions": false,
+    "enable_trade_private_push": false
   }
 }

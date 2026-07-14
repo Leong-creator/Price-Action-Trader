@@ -49,6 +49,7 @@ class SdkRuntimeConfig:
     paper_trading_only: bool
     live_execution: bool
     real_money_actions: bool
+    enable_trade_private_push: bool
 
 
 def resolve_path(value: str | Path) -> Path:
@@ -71,7 +72,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         runtime_status_path=resolve_path(outputs["runtime_status"]),
         client_id_file=Path(str(oauth["client_id_file"])).expanduser(),
         quote_region=str(oauth.get("quote_region", "cn")),
-        trade_region=str(oauth.get("trade_region", "global")),
+        trade_region=str(oauth.get("trade_region", "cn")),
         market=str(market_data.get("market", "US")).upper(),
         use_seed_universe=bool(market_data.get("use_seed_universe", True)),
         symbol_limit=int(market_data.get("symbol_limit", 147)),
@@ -88,6 +89,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         paper_trading_only=bool(runtime.get("paper_trading_only", True)),
         live_execution=bool(runtime.get("live_execution", False)),
         real_money_actions=bool(runtime.get("real_money_actions", False)),
+        enable_trade_private_push=bool(runtime.get("enable_trade_private_push", False)),
     )
     if not config.paper_trading_only or config.live_execution or config.real_money_actions:
         raise ValueError("M15 SDK runtime must remain paper-only")
@@ -293,6 +295,9 @@ def build_status(
         "router_config": str(config.router_config_path),
         "execution_config": str(config.execution_config_path),
         "paper_order_dispatch_enabled": config.paper_order_dispatch_enabled,
+        "quote_region": config.quote_region,
+        "trade_region": config.trade_region,
+        "trade_private_push_enabled": config.enable_trade_private_push,
     }
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
     config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -306,6 +311,39 @@ def read_client_id(config: SdkRuntimeConfig) -> str:
     if not value:
         raise RuntimeError("sdk_oauth_client_id_empty")
     return value
+
+
+def sdk_endpoint_overrides(region: str) -> dict[str, str]:
+    """Return an explicit OpenAPI endpoint set for the configured region."""
+    normalized = region.strip().lower()
+    if normalized == "cn":
+        suffix = "cn"
+    elif normalized in {"global", "hk"}:
+        suffix = "com"
+    else:
+        raise ValueError(f"unsupported_longbridge_sdk_region:{region}")
+    return {
+        "http_url": f"https://openapi.longbridge.{suffix}",
+        "quote_ws_url": f"wss://openapi-quote.longbridge.{suffix}/v2",
+        "trade_ws_url": f"wss://openapi-trade.longbridge.{suffix}/v2",
+    }
+
+
+def sdk_config_from_oauth(sdk: Any, oauth: Any, region: str) -> Any:
+    return sdk.Config.from_oauth(oauth, **sdk_endpoint_overrides(region))
+
+
+def subscribe_quote_and_trades(quote_context: Any, symbols: list[str], subscription_types: list[Any]) -> None:
+    """Subscribe using the installed SDK's stable two-argument API."""
+    quote_context.subscribe(symbols, subscription_types)
+
+
+def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bool) -> bool:
+    """Keep the order hot path independent from an optional trade WebSocket."""
+    if not enabled:
+        return False
+    trade_context.subscribe([sdk.TopicType.Private])
+    return True
 
 
 class SdkRealtimePaperClient:

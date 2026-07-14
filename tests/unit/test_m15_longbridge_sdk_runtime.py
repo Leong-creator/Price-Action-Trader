@@ -9,7 +9,8 @@ import unittest
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
-    fresh_market_events,
+    fresh_market_events, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
+    subscribe_quote_and_trades,
 )
 
 
@@ -45,6 +46,61 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_delayed_sdk_push_does_not_enter_realtime_event_stream(self) -> None:
         rows = [{"event_id": "fresh", "source_delivery_age_ms": 1999}, {"event_id": "late", "source_delivery_age_ms": 2001}]
         self.assertEqual([row["event_id"] for row in fresh_market_events(rows, 2000)], ["fresh"])
+
+    def test_subscribe_uses_the_installed_sdk_two_argument_contract(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, subscription_types) -> None:
+                self.calls.append((symbols, subscription_types))
+
+        quote = QuoteContext()
+        subscribe_quote_and_trades(quote, ["AAPL.US"], ["Quote", "Trade"])
+        self.assertEqual(quote.calls, [(["AAPL.US"], ["Quote", "Trade"])])
+
+    def test_sdk_region_endpoints_are_explicit(self) -> None:
+        self.assertEqual(
+            sdk_endpoint_overrides("cn"),
+            {
+                "http_url": "https://openapi.longbridge.cn",
+                "quote_ws_url": "wss://openapi-quote.longbridge.cn/v2",
+                "trade_ws_url": "wss://openapi-trade.longbridge.cn/v2",
+            },
+        )
+        self.assertEqual(sdk_endpoint_overrides("global")["http_url"], "https://openapi.longbridge.com")
+        with self.assertRaisesRegex(ValueError, "unsupported_longbridge_sdk_region"):
+            sdk_endpoint_overrides("invalid")
+
+    def test_sdk_config_and_private_push_keep_trade_websocket_optional(self) -> None:
+        class Config:
+            @staticmethod
+            def from_oauth(oauth, **kwargs):
+                return {"oauth": oauth, **kwargs}
+
+        class Sdk:
+            class TopicType:
+                Private = "Private"
+
+        Sdk.Config = Config
+
+        self.assertEqual(
+            sdk_config_from_oauth(Sdk, "token", "cn")["quote_ws_url"],
+            "wss://openapi-quote.longbridge.cn/v2",
+        )
+
+        class Trade:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, topics) -> None:
+                self.calls.append(topics)
+
+        trade = Trade()
+        self.assertFalse(subscribe_private_trade_updates(trade, Sdk, enabled=False))
+        self.assertEqual(trade.calls, [])
+        self.assertTrue(subscribe_private_trade_updates(trade, Sdk, enabled=True))
+        self.assertEqual(trade.calls, [["Private"]])
 
     def test_market_event_context_is_bounded_and_deduplicated(self) -> None:
         context = MarketEventContext(maximum_rows=2)

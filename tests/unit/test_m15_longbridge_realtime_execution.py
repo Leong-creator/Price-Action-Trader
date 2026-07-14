@@ -1713,6 +1713,27 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertTrue(row["execution_run_id"])
             self.assertEqual(row["longbridge_order_id"], "LB-IDENT-1")
 
+    def test_stale_account_state_blocks_new_order_on_hot_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                account_state={
+                    "generated_at": "2026-06-04T13:50:00Z",
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "buying_power": "10000",
+                },
+                max_account_state_age_seconds=30,
+            )
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="stale-account")])
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            row = next(row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL) if row["signal_id"] == "stale-account")
+
+            self.assertIn("blocked_account_state_stale", row["blockers"])
+            self.assertEqual(row["account_state_age_seconds"], 600)
+
     def make_config(
         self,
         root: Path,
@@ -1724,6 +1745,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
         allowed_runtime_ids: list[str] | None = None,
         test_epoch: dict | None = None,
         virtual_capital_buckets: dict[str, dict] | None = None,
+        max_account_state_age_seconds: int = 0,
     ):
         state = account_state or {
             "account_channel": "lb_papertrading",
@@ -1755,6 +1777,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 "latency_target_ms": 1000,
                 "latency_acceptable_ms": 5000,
                 "max_delayed_signal_age_seconds": 60,
+                "max_account_state_age_seconds": max_account_state_age_seconds,
                 "daily_new_symbol_limit_by_strategy": {"M10-PA-001": 1},
                 "allowed_runtime_ids": allowed_runtime_ids or ["M10-PA-004-long-1d", "M10-PA-013-1d"],
             },
