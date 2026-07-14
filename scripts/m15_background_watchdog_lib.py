@@ -190,7 +190,7 @@ def run_background_watchdog_once(
         "live_execution": False,
         "real_money_actions": False,
         "manual_m12_37_once_used": False,
-        "plain_language_result": plain_language_result(failed_steps),
+        "plain_language_result": plain_language_result(failed_steps, config.m15_runtime_engine),
         "refs": {
             "m12_47_config": project_path(config.m12_47_config_path),
             "m15_realtime_supervisor_config": project_path(config.m15_realtime_supervisor_config_path),
@@ -335,9 +335,10 @@ def clean_text(value: str) -> str:
     return value.replace("\r", "").strip()
 
 
-def plain_language_result(failed_steps: list[dict[str, Any]]) -> str:
+def plain_language_result(failed_steps: list[dict[str, Any]], runtime_engine: str) -> str:
+    runtime_label = "M15 SDK 实时运行层" if runtime_engine == "sdk" else "M15 实时守护器"
     if not failed_steps:
-        return "后台看护已完成：M12.47、M15 实时守护器、只读账户慢路径和 opening readiness 已检查；没有手动运行 M12.37 once。"
+        return f"后台看护已完成：M12.47、{runtime_label}、只读账户慢路径和开盘验收已检查；没有手动运行 M12.37 once。"
     failed_labels = "、".join(str(step["label"]) for step in failed_steps)
     return f"后台看护发现异常：{failed_labels} 未通过；不会手动跑 M12.37 once，也不会直接提交订单。"
 
