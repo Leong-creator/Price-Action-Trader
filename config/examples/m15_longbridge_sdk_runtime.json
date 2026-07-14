@@ -19,6 +19,11 @@
     "maximum_source_delivery_age_ms": 2000,
     "event_keep_lines": 20000
   },
+  "routing": {
+    "router_config": "config/examples/m15_longbridge_realtime_signal_router.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
+    "paper_order_dispatch_enabled": false
+  },
   "runtime": {
     "heartbeat_interval_seconds": 5,
     "reconnect_backoff_seconds": 5,

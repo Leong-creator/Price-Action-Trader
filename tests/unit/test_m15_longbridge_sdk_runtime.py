@@ -8,7 +8,7 @@ import unittest
 
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
-    FiveMinuteBarBuilder, SdkRealtimePaperClient, append_market_events, compact_market_events,
+    FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
     fresh_market_events,
 )
 
@@ -46,6 +46,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         rows = [{"event_id": "fresh", "source_delivery_age_ms": 1999}, {"event_id": "late", "source_delivery_age_ms": 2001}]
         self.assertEqual([row["event_id"] for row in fresh_market_events(rows, 2000)], ["fresh"])
 
+    def test_market_event_context_is_bounded_and_deduplicated(self) -> None:
+        context = MarketEventContext(maximum_rows=2)
+        self.assertEqual(
+            [row["event_id"] for row in context.append([{"event_id": "one"}, {"event_id": "two"}])],
+            ["one", "two"],
+        )
+        self.assertEqual(context.append([{"event_id": "two"}]), [])
+        context.append([{"event_id": "three"}])
+        self.assertEqual([row["event_id"] for row in context.rows()], ["two", "three"])
+
     def test_sdk_client_submits_limit_if_touched_with_idempotent_signal_remark(self) -> None:
         class Enum:
             Buy = "Buy"
@@ -53,11 +63,13 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             LO = "LO"
             LIT = "LIT"
             Day = "Day"
+            RTHOnly = "RTHOnly"
 
         class Sdk:
             OrderSide = Enum
             OrderType = Enum
             TimeInForceType = Enum
+            OutsideRTH = Enum
 
         class Response:
             order_id = "SDK-1"
@@ -79,3 +91,4 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(result["order_id"], "SDK-1")
         self.assertEqual(trade.kwargs["order_type"], "LIT")
         self.assertEqual(trade.kwargs["trigger_price"], Decimal("200"))
+        self.assertEqual(trade.kwargs["outside_rth"], "RTHOnly")

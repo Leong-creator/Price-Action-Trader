@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -42,6 +43,9 @@ class SdkRuntimeConfig:
     event_keep_lines: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
+    router_config_path: Path
+    execution_config_path: Path
+    paper_order_dispatch_enabled: bool
     paper_trading_only: bool
     live_execution: bool
     real_money_actions: bool
@@ -59,6 +63,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     oauth = payload.get("oauth", {})
     market_data = payload.get("market_data", {})
     runtime = payload.get("runtime", {})
+    routing = payload.get("routing", {})
     config = SdkRuntimeConfig(
         config_path=config_path,
         output_dir=resolve_path(outputs["output_dir"]),
@@ -75,6 +80,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         event_keep_lines=int(market_data.get("event_keep_lines", 20000)),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
+        router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
+        execution_config_path=resolve_path(
+            routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json")
+        ),
+        paper_order_dispatch_enabled=bool(routing.get("paper_order_dispatch_enabled", False)),
         paper_trading_only=bool(runtime.get("paper_trading_only", True)),
         live_execution=bool(runtime.get("live_execution", False)),
         real_money_actions=bool(runtime.get("real_money_actions", False)),
@@ -177,6 +187,33 @@ class FiveMinuteBarBuilder:
         }
 
 
+class MarketEventContext:
+    """Bounded in-memory context for SDK-driven strategy evaluation."""
+
+    def __init__(self, rows: list[dict[str, Any]] | None = None, *, maximum_rows: int = 4096) -> None:
+        self.maximum_rows = maximum_rows
+        self._rows: deque[dict[str, Any]] = deque()
+        self._event_ids: set[str] = set()
+        self.append(rows or [])
+
+    def append(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        appended: list[dict[str, Any]] = []
+        for row in rows:
+            event_id = str(row.get("event_id") or "")
+            if not event_id or event_id in self._event_ids:
+                continue
+            self._rows.append(row)
+            self._event_ids.add(event_id)
+            appended.append(row)
+            while len(self._rows) > self.maximum_rows:
+                removed = self._rows.popleft()
+                self._event_ids.discard(str(removed.get("event_id") or ""))
+        return appended
+
+    def rows(self) -> list[dict[str, Any]]:
+        return list(self._rows)
+
+
 def append_market_events(path: Path, rows: list[dict[str, Any]], keep_lines: int) -> None:
     """Append finalized SDK bars without rereading the audit stream.
 
@@ -234,7 +271,16 @@ def tail_lines(path: Path, count: int, *, block_size: int = 65536) -> list[str]:
     return [line for line in data.splitlines() if line.strip()][-count:]
 
 
-def build_status(config: SdkRuntimeConfig, *, status: str, reason: str = "", connected: bool = False, last_event_at: str = "") -> dict[str, Any]:
+def build_status(
+    config: SdkRuntimeConfig,
+    *,
+    status: str,
+    reason: str = "",
+    connected: bool = False,
+    last_event_at: str = "",
+    sdk_installed: bool | None = None,
+    oauth_client_id_present: bool | None = None,
+) -> dict[str, Any]:
     now = datetime.now(UTC)
     payload = {
         "stage": "M15.longbridge_sdk_runtime", "generated_at": to_iso(now), "status": status,
@@ -242,6 +288,11 @@ def build_status(config: SdkRuntimeConfig, *, status: str, reason: str = "", con
         "source_mode": "longbridge_sdk_push", "configured_symbol_count": len(configured_symbols(config)),
         "paper_simulated_only": True, "live_execution": False, "real_money_actions": False,
         "local_simulation_isolated": True,
+        "sdk_installed": sdk_installed,
+        "oauth_client_id_present": oauth_client_id_present,
+        "router_config": str(config.router_config_path),
+        "execution_config": str(config.execution_config_path),
+        "paper_order_dispatch_enabled": config.paper_order_dispatch_enabled,
     }
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
     config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -269,6 +320,9 @@ class SdkRealtimePaperClient:
         order_type_name = "LIT" if str(order_payload.get("order_type") or "") == "trigger_limit" else "LO"
         side = getattr(self.sdk.OrderSide, side_name)
         order_type = getattr(self.sdk.OrderType, order_type_name)
+        outside_rth = getattr(getattr(self.sdk, "OutsideRTH", None), "RTHOnly", None)
+        if outside_rth is None:
+            raise RuntimeError("sdk_outside_rth_rth_only_unavailable")
         kwargs: dict[str, Any] = {
             "side": side,
             "symbol": str(order_payload["symbol"]),
@@ -276,6 +330,7 @@ class SdkRealtimePaperClient:
             "submitted_price": decimal(order_payload.get("limit_price")),
             "submitted_quantity": decimal(order_payload.get("quantity")),
             "time_in_force": self.sdk.TimeInForceType.Day,
+            "outside_rth": outside_rth,
             "remark": str(order_payload.get("signal_id") or "m15-paper")[:64],
         }
         if order_type_name == "LIT":

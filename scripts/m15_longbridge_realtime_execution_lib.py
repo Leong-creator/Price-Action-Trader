@@ -621,6 +621,7 @@ def run_realtime_execution(
     *,
     generated_at: str | None = None,
     broker_client: Any | None = None,
+    signal_events_override: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
@@ -630,7 +631,11 @@ def run_realtime_execution(
     session_run_id = build_session_run_id(config, session_started_at)
     account_state = read_json(config.paper_account_state_path)
     epoch_state = load_or_update_test_epoch_state(config, account_state, now)
-    signal_events = read_jsonl(config.realtime_signal_events_path)
+    signal_events = (
+        list(signal_events_override)
+        if signal_events_override is not None
+        else read_jsonl(config.realtime_signal_events_path)
+    )
     ledger_retention = compact_execution_ledger_if_needed(
         config.output_dir / LEDGER_JSONL,
         current_epoch_id=str(epoch_state.get("test_epoch_id") or ""),
@@ -831,6 +836,7 @@ def run_realtime_execution(
         "title": config.title,
         "generated_at": generated_at_iso,
         "source_mode": "longbridge_realtime_signal_events",
+        "signal_event_input_mode": "direct_runtime_events" if signal_events_override is not None else "jsonl_audit_stream",
         "local_simulation_isolated": True,
         "local_ledger_input_ref": "",
         "legacy_fast_queue_status": "audit_only_not_order_source",

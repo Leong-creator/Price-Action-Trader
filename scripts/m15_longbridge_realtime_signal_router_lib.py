@@ -406,12 +406,19 @@ def run_realtime_signal_router(
     config: RealtimeSignalRouterConfig | None = None,
     *,
     generated_at: str | None = None,
+    market_events_override: list[dict[str, Any]] | None = None,
+    active_market_event_ids: set[str] | None = None,
+    emitted_signal_events: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
     session_started_at = resolve_session_started_at(config.session_started_at, now)
-    raw_market_events = read_jsonl_tail(config.market_events_path, config.max_market_event_rows_per_hot_run)
+    raw_market_events = (
+        list(market_events_override)
+        if market_events_override is not None
+        else read_jsonl_tail(config.market_events_path, config.max_market_event_rows_per_hot_run)
+    )
     market_events = realtime_relevant_market_events(raw_market_events, session_started_at)
     existing_signal_events = read_jsonl(config.signal_events_path)
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
@@ -423,6 +430,13 @@ def run_realtime_signal_router(
 
     raw_intents = embedded_signal_intents(config, market_events)
     raw_intents.extend(detector_signal_candidates(config, market_events, generated_at=now))
+    if active_market_event_ids is not None:
+        raw_intents = [
+            intent
+            for intent in raw_intents
+            if str(intent.get("source_market_event_id") or intent.get("market_event_id") or "")
+            in active_market_event_ids
+        ]
     raw_intents = expand_additional_bucket_routes(config, raw_intents)
     routed_intents, merged_support_intents = merge_confluence_intents(config, raw_intents)
     routed_intents = sorted(routed_intents, key=realtime_intent_sort_key)
@@ -467,6 +481,8 @@ def run_realtime_signal_router(
     config.signal_events_path.parent.mkdir(parents=True, exist_ok=True)
     write_jsonl(config.signal_events_path, existing_signal_events + new_signal_events)
     write_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
+    if emitted_signal_events is not None:
+        emitted_signal_events.extend(new_signal_events)
     summary = {
         "stage": config.stage,
         "title": config.title,
@@ -477,6 +493,8 @@ def run_realtime_signal_router(
         "legacy_fast_queue_used": False,
         "raw_market_event_count": len(raw_market_events),
         "market_event_read_mode": "tail_window",
+        "market_event_input_mode": "direct_event_window" if market_events_override is not None else "jsonl_tail",
+        "active_market_event_count": len(active_market_event_ids or ()),
         "market_event_hot_window_limit": config.max_market_event_rows_per_hot_run,
         "current_session_market_event_count": current_session_market_event_count(raw_market_events, session_started_at),
         "relevant_market_event_count": len(market_events),
