@@ -3182,6 +3182,13 @@ def response_order_id(response: Any) -> str:
             order_id = response_order_id(nested)
             if order_id:
                 return order_id
+        # Longbridge CLI occasionally emits table rows even with --format json.
+        # Accept only the explicit Order ID row, never an arbitrary display value.
+        field = " ".join(str(response.get("field") or "").lower().replace("_", " ").split())
+        if field in {"order id", "order_id", "orderid"}:
+            value = str(response.get("value") or "").strip()
+            if value:
+                return value
     if isinstance(response, list):
         for item in response:
             order_id = response_order_id(item)

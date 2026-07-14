@@ -1,0 +1,29 @@
+{
+  "stage": "M15.longbridge_sdk_runtime",
+  "title": "长桥 SDK 实时行情与纸面交易运行层",
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
+    "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
+    "runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json"
+  },
+  "oauth": {
+    "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
+    "quote_region": "cn",
+    "trade_region": "global"
+  },
+  "market_data": {
+    "market": "US",
+    "use_seed_universe": true,
+    "symbol_limit": 147,
+    "bar_minutes": 5,
+    "maximum_source_delivery_age_ms": 2000,
+    "event_keep_lines": 20000
+  },
+  "runtime": {
+    "heartbeat_interval_seconds": 5,
+    "reconnect_backoff_seconds": 5,
+    "paper_trading_only": true,
+    "live_execution": false,
+    "real_money_actions": false
+  }
+}

@@ -217,6 +217,7 @@ class RealtimeSignalRouterConfig:
     allowed_runtime_ids: tuple[str, ...]
     enabled_detectors: tuple[str, ...]
     max_signal_events_per_run: int
+    max_market_event_rows_per_hot_run: int
     paper_short_testing_enabled: bool
     paper_short_runtime_ids: tuple[str, ...]
     short_test_epoch_id: str
@@ -286,6 +287,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
             )
         ),
         max_signal_events_per_run=int(router.get("max_signal_events_per_run", 50)),
+        max_market_event_rows_per_hot_run=int(router.get("max_market_event_rows_per_hot_run", 4096)),
         paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
         paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
         short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
@@ -355,6 +357,8 @@ def validate_config(config: RealtimeSignalRouterConfig) -> None:
                 raise ValueError(f"M15 realtime signal router additional bucket route missing bucket: {bucket_id}")
     if config.max_signal_events_per_run <= 0:
         raise ValueError("M15 realtime signal router max_signal_events_per_run must be positive")
+    if config.max_market_event_rows_per_hot_run <= 0:
+        raise ValueError("M15 realtime signal router market event hot window must be positive")
     if config.normal_minimum_net_profit_after_fees < config.minimum_net_profit_after_fees:
         raise ValueError("M15 realtime signal router normal profit threshold must be >= minimum threshold")
     if config.minimum_reward_r < ZERO:
@@ -407,7 +411,7 @@ def run_realtime_signal_router(
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
     session_started_at = resolve_session_started_at(config.session_started_at, now)
-    raw_market_events = read_jsonl(config.market_events_path)
+    raw_market_events = read_jsonl_tail(config.market_events_path, config.max_market_event_rows_per_hot_run)
     market_events = realtime_relevant_market_events(raw_market_events, session_started_at)
     existing_signal_events = read_jsonl(config.signal_events_path)
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
@@ -472,6 +476,8 @@ def run_realtime_signal_router(
         "local_ledger_input_ref": "",
         "legacy_fast_queue_used": False,
         "raw_market_event_count": len(raw_market_events),
+        "market_event_read_mode": "tail_window",
+        "market_event_hot_window_limit": config.max_market_event_rows_per_hot_run,
         "current_session_market_event_count": current_session_market_event_count(raw_market_events, session_started_at),
         "relevant_market_event_count": len(market_events),
         "stale_market_event_ignored_count": max(0, len(raw_market_events) - len(market_events)),
@@ -2222,6 +2228,26 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def read_jsonl_tail(path: Path, count: int, *, block_size: int = 65536) -> list[dict[str, Any]]:
+    """Parse only the newest JSONL rows used by the realtime router."""
+    if not path.exists() or count <= 0:
+        return []
+    with path.open("rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        position = handle.tell()
+        chunks: list[bytes] = []
+        newline_count = 0
+        while position > 0 and newline_count <= count:
+            read_size = min(block_size, position)
+            position -= read_size
+            handle.seek(position)
+            chunk = handle.read(read_size)
+            chunks.append(chunk)
+            newline_count += chunk.count(b"\n")
+    lines = b"".join(reversed(chunks)).decode("utf-8", errors="replace").splitlines()
+    return [json.loads(line) for line in lines[-count:] if line.strip()]
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:

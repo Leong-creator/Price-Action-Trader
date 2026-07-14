@@ -17,6 +17,7 @@
       "price_action_realtime_v1"
     ],
     "max_signal_events_per_run": 50,
+    "max_market_event_rows_per_hot_run": 4096,
     "allowed_runtime_ids": [
       "M10-PA-004-long-1d",
       "M10-PA-002-5m",

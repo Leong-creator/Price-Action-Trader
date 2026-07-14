@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from scripts.m15_longbridge_realtime_execution_lib import response_order_id
+from scripts.m15_longbridge_sdk_runtime_lib import (
+    FiveMinuteBarBuilder, SdkRealtimePaperClient, append_market_events, compact_market_events,
+    fresh_market_events,
+)
+
+
+class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_sdk_quote_push_builds_final_five_minute_bar(self) -> None:
+        builder = FiveMinuteBarBuilder()
+        first = datetime(2026, 7, 14, 13, 31, tzinfo=UTC)
+        self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(first.timestamp()), "last_done": "200", "current_volume": 10}, received_at=first), [])
+        last = datetime(2026, 7, 14, 13, 34, 59, tzinfo=UTC)
+        self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(last.timestamp()), "last_done": "202", "current_volume": 20}, received_at=last), [])
+        rows = builder.flush(datetime(2026, 7, 14, 13, 35, 1, tzinfo=UTC))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_push")
+        self.assertTrue(rows[0]["bar_final"])
+        self.assertEqual(rows[0]["open"], "200")
+        self.assertEqual(rows[0]["close"], "202")
+        self.assertEqual(rows[0]["volume"], "30")
+
+    def test_cli_table_order_id_is_recognised(self) -> None:
+        self.assertEqual(response_order_id([{"field": "Order ID", "value": "701234"}]), "701234")
+
+    def test_sdk_event_append_does_not_rewrite_and_heartbeat_compacts(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "events.jsonl"
+            rows = [{"event_id": f"event-{index}", "value": index} for index in range(5)]
+            append_market_events(path, rows, keep_lines=3)
+            self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 5)
+            compact_market_events(path, 3)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 3)
+            self.assertIn('"event-4"', lines[-1])
+
+    def test_delayed_sdk_push_does_not_enter_realtime_event_stream(self) -> None:
+        rows = [{"event_id": "fresh", "source_delivery_age_ms": 1999}, {"event_id": "late", "source_delivery_age_ms": 2001}]
+        self.assertEqual([row["event_id"] for row in fresh_market_events(rows, 2000)], ["fresh"])
+
+    def test_sdk_client_submits_limit_if_touched_with_idempotent_signal_remark(self) -> None:
+        class Enum:
+            Buy = "Buy"
+            Sell = "Sell"
+            LO = "LO"
+            LIT = "LIT"
+            Day = "Day"
+
+        class Sdk:
+            OrderSide = Enum
+            OrderType = Enum
+            TimeInForceType = Enum
+
+        class Response:
+            order_id = "SDK-1"
+
+        class Trade:
+            def __init__(self) -> None:
+                self.kwargs = {}
+
+            def submit_order(self, **kwargs):
+                self.kwargs = kwargs
+                return Response()
+
+        trade = Trade()
+        result = SdkRealtimePaperClient(trade, Sdk()).submit_order({
+            "side": "buy", "symbol": "AAPL.US", "order_type": "trigger_limit", "limit_price": "200.1",
+            "trigger_price": "200", "quantity": "2", "signal_id": "signal-1",
+        })
+        self.assertTrue(result["submitted"])
+        self.assertEqual(result["order_id"], "SDK-1")
+        self.assertEqual(trade.kwargs["order_type"], "LIT")
+        self.assertEqual(trade.kwargs["trigger_price"], Decimal("200"))
