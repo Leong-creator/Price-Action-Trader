@@ -28,6 +28,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(rows[0]["open"], "200")
         self.assertEqual(rows[0]["close"], "202")
         self.assertEqual(rows[0]["volume"], "30")
+        self.assertEqual(rows[0]["received_at"], "2026-07-14T13:35:01Z")
+        self.assertEqual(rows[0]["source_delivery_age_ms"], 2000)
 
     def test_cli_table_order_id_is_recognised(self) -> None:
         self.assertEqual(response_order_id([{"field": "Order ID", "value": "701234"}]), "701234")
@@ -70,6 +72,27 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         quote = QuoteContext()
         subscribe_quote_and_trades(quote, ["AAPL.US", "MSFT.US", "NVDA.US"], ["Quote"], batch_size=2)
         self.assertEqual(quote.calls, [(["AAPL.US", "MSFT.US"], ["Quote"]), (["NVDA.US"], ["Quote"])])
+
+    def test_failed_batch_falls_back_to_single_symbols_without_stopping_healthy_symbols(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, _subscription_types) -> None:
+                self.calls.append(symbols)
+                if symbols == ["AAPL.US", "BAD.US"] or symbols == ["BAD.US"]:
+                    raise RuntimeError("symbol unavailable")
+
+        quote = QuoteContext()
+        failures = subscribe_quote_and_trades(
+            quote,
+            ["AAPL.US", "BAD.US"],
+            ["Quote"],
+            batch_size=2,
+            retry_count=0,
+        )
+        self.assertEqual(failures, ["BAD.US"])
+        self.assertIn(["AAPL.US"], quote.calls)
 
     def test_sdk_region_endpoints_are_explicit(self) -> None:
         self.assertEqual(

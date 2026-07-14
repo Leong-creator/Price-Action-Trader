@@ -44,6 +44,7 @@ class SdkRuntimeConfig:
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
     subscription_batch_size: int
+    subscription_retry_count: int
     router_config_path: Path
     execution_config_path: Path
     account_state_config_path: Path
@@ -87,6 +88,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
         subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
+        subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
         router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
         execution_config_path=resolve_path(
             routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json")
@@ -117,6 +119,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK account maintenance interval must be positive")
     if config.subscription_batch_size <= 0 or config.subscription_batch_size > 50:
         raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
+    if config.subscription_retry_count < 0 or config.subscription_retry_count > 5:
+        raise ValueError("M15 SDK subscription retry count must be between 0 and 5")
     return config
 
 
@@ -159,7 +163,7 @@ class FiveMinuteBarBuilder:
         completed: list[dict[str, Any]] = []
         for key, bar in list(self._bars.items()):
             if bar["bar_close_at"] <= now.astimezone(NEW_YORK):
-                completed.append(self._finalize(key, bar))
+                completed.append(self._finalize(key, bar, emitted_at=now))
         return completed
 
     def _append(self, symbol: str, source_at: datetime, received_at: datetime, price: Decimal, volume: int) -> list[dict[str, Any]]:
@@ -185,10 +189,12 @@ class FiveMinuteBarBuilder:
         bar["volume"] += max(0, volume)
         return self.flush(received_at)
 
-    def _finalize(self, key: tuple[str, datetime], bar: dict[str, Any]) -> dict[str, Any]:
+    def _finalize(self, key: tuple[str, datetime], bar: dict[str, Any], *, emitted_at: datetime) -> dict[str, Any]:
         self._bars.pop(key, None)
         source_at = bar["source_event_at"]
-        received_at = bar["received_at"]
+        # A final bar is executable only once its interval has actually
+        # closed. The last quote timestamp is source evidence, not delivery.
+        received_at = emitted_at.astimezone(UTC)
         event_id = f"sdk-5m|{bar['symbol']}|{to_iso(bar['bar_close_at'].astimezone(UTC))}"
         return {
             "schema_version": "m15.realtime-market-event.v2",
@@ -303,6 +309,7 @@ def build_status(
     sdk_installed: bool | None = None,
     oauth_client_id_present: bool | None = None,
     pipeline_metrics: dict[str, Any] | None = None,
+    subscription_failed_symbols: list[str] | None = None,
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
     payload = {
@@ -323,6 +330,7 @@ def build_status(
         "trade_region": config.trade_region,
         "trade_private_push_enabled": config.enable_trade_private_push,
         "pipeline_latency": pipeline_metrics or {},
+        "subscription_failed_symbols": subscription_failed_symbols or [],
     }
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
     config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -364,12 +372,29 @@ def subscribe_quote_and_trades(
     subscription_types: list[Any],
     *,
     batch_size: int = 10,
-) -> None:
-    """Subscribe in bounded requests so a large universe cannot time out startup."""
+    retry_count: int = 2,
+) -> list[str]:
+    """Subscribe in bounded requests and preserve healthy symbols on failures."""
     if batch_size <= 0:
         raise ValueError("subscription batch size must be positive")
+    if retry_count < 0:
+        raise ValueError("subscription retry count cannot be negative")
+    failed_symbols: list[str] = []
     for offset in range(0, len(symbols), batch_size):
-        quote_context.subscribe(symbols[offset : offset + batch_size], subscription_types)
+        batch = symbols[offset : offset + batch_size]
+        for attempt in range(retry_count + 1):
+            try:
+                quote_context.subscribe(batch, subscription_types)
+                break
+            except Exception:
+                if attempt == retry_count:
+                    for symbol in batch:
+                        try:
+                            quote_context.subscribe([symbol], subscription_types)
+                        except Exception:
+                            failed_symbols.append(symbol)
+                continue
+    return failed_symbols
 
 
 def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bool) -> bool:

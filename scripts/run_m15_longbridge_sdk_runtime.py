@@ -139,6 +139,7 @@ def main() -> int:
         args.watch = True
     builder = FiveMinuteBarBuilder(config.bar_minutes)
     pipeline_metrics = PipelineLatencyMetrics()
+    subscription_failed_symbols: list[str] = []
     last_compaction = 0.0
     maintenance = None
     try:
@@ -199,13 +200,22 @@ def main() -> int:
             emit(rows)
         quote.set_on_quote(on_quote)
         quote.set_on_trades(on_trades)
-        subscribe_quote_and_trades(
+        subscription_failed_symbols = subscribe_quote_and_trades(
             quote,
             list(configured_symbols(config)),
             [lb.SubType.Quote, lb.SubType.Trade],
             batch_size=config.subscription_batch_size,
+            retry_count=config.subscription_retry_count,
         )
-        build_status(config, status="running", connected=True, sdk_installed=True, oauth_client_id_present=True)
+        build_status(
+            config,
+            status="running",
+            reason=(f"subscription_failed_symbols={len(subscription_failed_symbols)}" if subscription_failed_symbols else ""),
+            connected=True,
+            sdk_installed=True,
+            oauth_client_id_present=True,
+            subscription_failed_symbols=subscription_failed_symbols,
+        )
         write_pid(config)
         while args.watch:
             rows = builder.flush(datetime.now(UTC))
@@ -221,6 +231,7 @@ def main() -> int:
                 sdk_installed=True,
                 oauth_client_id_present=True,
                 pipeline_metrics=pipeline_metrics.payload(),
+                subscription_failed_symbols=subscription_failed_symbols,
             )
             time.sleep(config.heartbeat_interval_seconds)
     except KeyboardInterrupt:
@@ -229,6 +240,12 @@ def main() -> int:
     except Exception as exc:
         build_status(config, status="connection_failed", reason=str(exc), sdk_installed=True, oauth_client_id_present=True)
         print(f"SDK runtime failed: {exc}")
+        if args.watch:
+            # Keep the daemon process identity stable through transient quote
+            # gateway failures. The external watchdog remains a second layer.
+            build_status(config, status="reconnecting", reason=str(exc), sdk_installed=True, oauth_client_id_present=True)
+            time.sleep(config.reconnect_backoff_seconds)
+            os.execve(sys.executable, [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]], os.environ)
         return 1
     finally:
         if maintenance is not None:

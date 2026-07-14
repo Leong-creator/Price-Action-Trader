@@ -31,6 +31,7 @@
     "heartbeat_interval_seconds": 5,
     "reconnect_backoff_seconds": 5,
     "subscription_batch_size": 10,
+    "subscription_retry_count": 2,
     "paper_trading_only": true,
     "live_execution": false,
     "real_money_actions": false,
