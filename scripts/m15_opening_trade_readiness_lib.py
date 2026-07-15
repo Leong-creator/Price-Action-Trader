@@ -21,6 +21,8 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
 )
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
+from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
+from scripts.m15_longbridge_sdk_runtime_lib import configured_symbols as sdk_configured_symbols
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -147,6 +149,13 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         sdk_config.execution_config_path if sdk_config is not None else realtime_config.execution_config_path
     ).resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
+    runtime_dispatch_enabled = bool(realtime_status.get("dispatch_enabled", False))
+    effective_paper_orders_enabled = runtime_dispatch_enabled if sdk_config is not None else paper_orders_enabled
+    readonly_gate_waiting = bool(
+        sdk_config is not None
+        and sdk_config.two_day_readonly_gate
+        and realtime_status.get("readonly_gate_passed") is not True
+    )
     paper_account_ready = paper_account_verified(account_state)
     realtime_health_issues = (
         sdk_runtime_health_issues(realtime_status, sdk_config, realtime_alive)
@@ -169,7 +178,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     actual_runtime_ids = execution_summary.get("runtime_ids_seen_this_cycle", []) if isinstance(execution_summary, dict) else []
     recent_execution_inputs = build_recent_execution_inputs(execution_summary, execution_config)
     checks = [
-        check_row("m12_47_daemon_alive", "M12.47 自动刷新守护器存活", "pass" if m12_alive else "fail", actual=str(m12_alive)),
+        check_row(
+            "m12_47_daemon_alive",
+            "M12.47 只读看板守护器状态（不作为长桥 SDK 下单前置）",
+            "pass" if m12_alive else "waiting",
+            actual=str(m12_alive),
+        ),
         check_row(
             "m15_realtime_daemon_alive",
             "M15 长桥实时运行层存活",
@@ -185,10 +199,14 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         ),
         check_row(
             "paper_orders_enabled",
-            "已显式启用长桥模拟账户订单提交",
-            "pass" if paper_orders_enabled else "fail",
+            "已武装长桥模拟账户订单提交；两日只读验收完成前必须等待",
+            "waiting" if readonly_gate_waiting else ("pass" if effective_paper_orders_enabled else "fail"),
             actual=execution_config_error
-            or f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}",
+            or (
+                f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}, "
+                f"runtime_dispatch_enabled={runtime_dispatch_enabled}, "
+                f"readonly_sessions={realtime_status.get('readonly_sessions_passed', 0)}/{realtime_status.get('readonly_sessions_required', 2)}"
+            ),
         ),
         check_row(
             "paper_account_verified",
@@ -229,13 +247,13 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         check_row(
             "actual_runtime_ids_seen",
             "值守检查必须展示最近真实执行涉及的 runtime",
-            "pass" if execution_summary else "fail",
+            "pass" if execution_summary else "waiting",
             actual=",".join(str(item) for item in actual_runtime_ids) or "none",
         ),
         check_row(
             "recent_execution_input_seen",
             "值守检查必须展示最近执行输入",
-            "pass" if recent_execution_inputs else "fail",
+            "pass" if recent_execution_inputs else "waiting",
             actual=render_recent_execution_inputs(recent_execution_inputs),
         ),
         check_row(
@@ -264,7 +282,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "generated_at": generated_at,
         "readiness_status": readiness_status,
         "market_window": window,
-        "paper_order_submission_enabled": paper_orders_enabled,
+        "paper_order_submission_enabled": effective_paper_orders_enabled,
         "m12_47_daemon_alive": m12_alive,
         "m15_realtime_daemon_alive": realtime_alive,
         "m15_realtime_daemon_pid": realtime_pid or "",
@@ -396,8 +414,19 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
         issues.append(f"runtime_status={status.get('status') or 'missing'}")
     if status.get("sdk_connected") is not True:
         issues.append("sdk_not_connected")
-    if sdk_config is not None and not sdk_config.paper_order_dispatch_enabled:
-        issues.append("paper_order_dispatch_disabled")
+    if status.get("runtime_engine") not in {"", "sdk"}:
+        issues.append("runtime_engine_not_sdk")
+    expected_fingerprint = sdk_config_fingerprint(sdk_config) if sdk_config is not None else ""
+    if expected_fingerprint and str(status.get("config_fingerprint") or "") != expected_fingerprint:
+        issues.append("sdk_config_fingerprint_drift")
+    expected_count = len(sdk_configured_symbols(sdk_config)) if sdk_config is not None else 0
+    expected_coverage = f"{expected_count}/{expected_count}" if expected_count else ""
+    if expected_coverage and str(status.get("subscription_coverage") or "") != expected_coverage:
+        issues.append("sdk_subscription_coverage_incomplete")
+    if int(status.get("daily_context_row_count", 0) or 0) <= 0:
+        issues.append("sdk_daily_context_missing")
+    if status.get("account_snapshot_healthy") is not True:
+        issues.append("sdk_account_snapshot_stale")
     return issues
 
 

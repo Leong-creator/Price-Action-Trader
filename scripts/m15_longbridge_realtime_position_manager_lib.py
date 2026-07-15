@@ -139,12 +139,14 @@ def run_realtime_position_manager(
     config: RealtimePositionManagerConfig | None = None,
     *,
     generated_at: str | None = None,
+    account_state_override: dict[str, Any] | None = None,
+    market_events_override: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
-    account_state = read_json(config.account_state_path)
-    market_events = read_jsonl(config.market_events_path)
+    account_state = dict(account_state_override) if account_state_override is not None else read_json(config.account_state_path)
+    market_events = list(market_events_override) if market_events_override is not None else read_jsonl(config.market_events_path)
     execution_rows = hydrate_unconfirmed_execution_rows(
         read_jsonl(config.realtime_execution_ledger_path),
         account_state,

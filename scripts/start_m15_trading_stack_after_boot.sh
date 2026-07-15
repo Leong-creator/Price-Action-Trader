@@ -38,11 +38,11 @@ run_step "start M12.47 session supervisor" \
   --daemon \
   --config config/examples/m12_47_session_supervisor.json
 
-run_step "start M15 Longbridge realtime supervisor" \
-  "$PYTHON_BIN" scripts/run_m15_longbridge_realtime_session_supervisor.py \
+run_step "start M15 Longbridge SDK realtime runtime" \
+  "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
   --daemon \
-  --replace-config-drift \
-  --config config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json
+  --dispatch \
+  --config config/examples/m15_longbridge_sdk_runtime.json
 
 run_step "start M15 background watchdog" \
   "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
@@ -54,10 +54,10 @@ run_step "check M12.47 status" \
   --status \
   --config config/examples/m12_47_session_supervisor.json
 
-run_step "check M15 Longbridge realtime status" \
-  "$PYTHON_BIN" scripts/run_m15_longbridge_realtime_session_supervisor.py \
+run_step "check M15 Longbridge SDK realtime status" \
+  "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
   --status \
-  --config config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json
+  --config config/examples/m15_longbridge_sdk_runtime.json
 
 run_step "check M15 background watchdog status" \
   "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \

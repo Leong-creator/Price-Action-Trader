@@ -22,7 +22,7 @@
     "latency_target_ms": 1000,
     "latency_acceptable_ms": 5000,
     "max_delayed_signal_age_seconds": 60,
-    "max_account_state_age_seconds": 90,
+    "max_account_state_age_seconds": 45,
     "daily_new_symbol_limit_by_strategy": {
       "M10-PA-001": 1
     },

@@ -249,7 +249,6 @@ def m15_runtime_daemon_step(config: BackgroundWatchdogConfig, runner: CommandRun
                 "scripts/run_m15_longbridge_sdk_runtime.py",
                 "--daemon",
                 "--dispatch",
-                "--replace-cli-supervisor",
                 "--config",
                 project_path(config.m15_sdk_runtime_config_path),
             ],
@@ -398,6 +397,20 @@ def analytics_refresh_step(
     *,
     previous: dict[str, Any],
 ) -> dict[str, Any]:
+    if config.m15_runtime_engine == "sdk":
+        # SDK runtime owns snapshots and portfolio reads in-process.  Calling
+        # the legacy CLI analytics command here would reintroduce the exact
+        # slow path the SDK cutover removes.
+        return {
+            "step_id": "m15_account_state_full_refresh",
+            "label": "M15 SDK 账户慢路径由运行层维护",
+            "returncode": 0,
+            "elapsed_ms": 0,
+            "command": "",
+            "stdout_tail": "sdk_runtime_owns_account_and_portfolio_refresh",
+            "stderr_tail": "",
+            "skipped_due_to_sdk_runtime": True,
+        }
     previous_success_at = latest_step_generated_at(previous, "m15_account_state_full_refresh")
     if not analytics_refresh_due(generated_at, previous_success_at, config.analytics_refresh_interval_seconds):
         return {

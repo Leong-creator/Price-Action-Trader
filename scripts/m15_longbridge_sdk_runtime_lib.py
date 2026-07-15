@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -32,6 +33,7 @@ class SdkRuntimeConfig:
     output_dir: Path
     market_events_path: Path
     runtime_status_path: Path
+    readonly_gate_path: Path
     client_id_file: Path
     quote_region: str
     trade_region: str
@@ -41,10 +43,20 @@ class SdkRuntimeConfig:
     bar_minutes: int
     maximum_source_delivery_age_ms: int
     event_keep_lines: int
+    daily_context_path: Path
+    daily_context_bars: int
+    daily_context_deadline_seconds: int
+    daily_context_parallel_workers: int
+    daily_context_batch_size: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
     subscription_batch_size: int
     subscription_retry_count: int
+    subscription_deadline_seconds: int
+    maximum_consecutive_subscription_failures: int
+    account_snapshot_interval_seconds: int
+    maximum_account_snapshot_age_seconds: int
+    two_day_readonly_gate: bool
     router_config_path: Path
     execution_config_path: Path
     account_state_config_path: Path
@@ -76,6 +88,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         output_dir=resolve_path(outputs["output_dir"]),
         market_events_path=resolve_path(outputs["market_events"]),
         runtime_status_path=resolve_path(outputs["runtime_status"]),
+        readonly_gate_path=resolve_path(outputs.get("readonly_gate", "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_readonly_gate.json")),
         client_id_file=Path(str(oauth["client_id_file"])).expanduser(),
         quote_region=str(oauth.get("quote_region", "cn")),
         trade_region=str(oauth.get("trade_region", "cn")),
@@ -85,10 +98,20 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         bar_minutes=int(market_data.get("bar_minutes", 5)),
         maximum_source_delivery_age_ms=int(market_data.get("maximum_source_delivery_age_ms", 2000)),
         event_keep_lines=int(market_data.get("event_keep_lines", 20000)),
+        daily_context_path=resolve_path(market_data.get("daily_context", "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl")),
+        daily_context_bars=int(market_data.get("daily_context_bars", 60)),
+        daily_context_deadline_seconds=int(market_data.get("daily_context_deadline_seconds", 180)),
+        daily_context_parallel_workers=int(market_data.get("daily_context_parallel_workers", 3)),
+        daily_context_batch_size=int(market_data.get("daily_context_batch_size", 10)),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
         subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
         subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
+        subscription_deadline_seconds=int(runtime.get("subscription_deadline_seconds", 20)),
+        maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
+        account_snapshot_interval_seconds=int(runtime.get("account_snapshot_interval_seconds", 15)),
+        maximum_account_snapshot_age_seconds=int(runtime.get("maximum_account_snapshot_age_seconds", 45)),
+        two_day_readonly_gate=bool(runtime.get("two_day_readonly_gate", True)),
         router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
         execution_config_path=resolve_path(
             routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json")
@@ -121,6 +144,20 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
     if config.subscription_retry_count < 0 or config.subscription_retry_count > 5:
         raise ValueError("M15 SDK subscription retry count must be between 0 and 5")
+    if config.subscription_deadline_seconds <= 0:
+        raise ValueError("M15 SDK subscription deadline must be positive")
+    if config.maximum_consecutive_subscription_failures <= 0:
+        raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
+    if config.daily_context_bars < 2:
+        raise ValueError("M15 SDK daily context needs at least two bars")
+    if config.daily_context_deadline_seconds <= 0:
+        raise ValueError("M15 SDK daily context deadline must be positive")
+    if config.daily_context_parallel_workers <= 0 or config.daily_context_parallel_workers > 4:
+        raise ValueError("M15 SDK daily context parallel workers must be between 1 and 4")
+    if config.daily_context_batch_size <= 0 or config.daily_context_batch_size > 25:
+        raise ValueError("M15 SDK daily context batch size must be between 1 and 25")
+    if config.account_snapshot_interval_seconds <= 0 or config.maximum_account_snapshot_age_seconds < config.account_snapshot_interval_seconds:
+        raise ValueError("M15 SDK account snapshot timing is invalid")
     return config
 
 
@@ -128,6 +165,51 @@ def configured_symbols(config: SdkRuntimeConfig) -> tuple[str, ...]:
     if not config.use_seed_universe:
         return ()
     return tuple(f"{symbol}.{config.market}" for symbol in US_LIQUID_SEED_V1[: config.symbol_limit])
+
+
+def config_fingerprint(config: SdkRuntimeConfig) -> str:
+    """Stable identity used by watchdog/readiness to reject config drift."""
+    payload = {
+        "config": str(config.config_path.resolve()), "symbols": configured_symbols(config),
+        "quote_region": config.quote_region, "trade_region": config.trade_region,
+        "dispatch": config.paper_order_dispatch_enabled, "daily_bars": config.daily_context_bars,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:16]
+
+
+def load_readonly_gate(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+    completed = payload.get("completed_sessions", [])
+    return {
+        "schema_version": "m15.sdk-readonly-gate.v1",
+        "required_sessions": 2,
+        "completed_sessions": [item for item in completed if isinstance(item, dict)],
+    }
+
+
+def record_readonly_session(path: Path, session_date: str, evidence: dict[str, Any]) -> dict[str, Any]:
+    """Persist one completed regular-session SDK validation, once per date."""
+    gate = load_readonly_gate(path)
+    sessions = [item for item in gate["completed_sessions"] if item.get("session_date") != session_date]
+    sessions.append({"session_date": session_date, **evidence})
+    sessions.sort(key=lambda item: str(item.get("session_date") or ""))
+    gate["completed_sessions"] = sessions[-10:]
+    gate["passed"] = len(gate["completed_sessions"]) >= int(gate["required_sessions"])
+    gate["generated_at"] = to_iso(datetime.now(UTC))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(gate, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return gate
+
+
+def readonly_gate_passed(path: Path) -> tuple[bool, int, int]:
+    gate = load_readonly_gate(path)
+    completed = len(gate["completed_sessions"])
+    required = int(gate["required_sessions"])
+    return completed >= required, completed, required
 
 
 def floor_bar_open(value: datetime, minutes: int) -> datetime:
@@ -310,6 +392,7 @@ def build_status(
     oauth_client_id_present: bool | None = None,
     pipeline_metrics: dict[str, Any] | None = None,
     subscription_failed_symbols: list[str] | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
     payload = {
@@ -329,9 +412,12 @@ def build_status(
         "quote_region": config.quote_region,
         "trade_region": config.trade_region,
         "trade_private_push_enabled": config.enable_trade_private_push,
+        "runtime_engine": "sdk",
+        "config_fingerprint": config_fingerprint(config),
         "pipeline_latency": pipeline_metrics or {},
         "subscription_failed_symbols": subscription_failed_symbols or [],
     }
+    payload.update(extra or {})
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
     config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return payload
@@ -374,7 +460,7 @@ def subscribe_quote_and_trades(
     batch_size: int = 10,
     retry_count: int = 2,
 ) -> list[str]:
-    """Subscribe in bounded requests and preserve healthy symbols on failures."""
+    """Subscribe in bounded requests and identify every failed symbol."""
     if batch_size <= 0:
         raise ValueError("subscription batch size must be positive")
     if retry_count < 0:
@@ -408,9 +494,11 @@ def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bo
 class SdkRealtimePaperClient:
     """Small adapter used by the event loop; no subprocess is started per order."""
 
-    def __init__(self, trade_context: Any, sdk: Any) -> None:
+    def __init__(self, trade_context: Any, sdk: Any, *, request_gate: Any = None, on_submission: Callable[[dict[str, Any], dict[str, Any]], None] | None = None) -> None:
         self.trade_context = trade_context
         self.sdk = sdk
+        self.request_gate = request_gate
+        self.on_submission = on_submission
 
     def submit_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
         side_name = "Buy" if str(order_payload.get("side") or "").lower() == "buy" else "Sell"
@@ -432,14 +520,18 @@ class SdkRealtimePaperClient:
         }
         if order_type_name == "LIT":
             kwargs["trigger_price"] = decimal(order_payload.get("trigger_price"))
-        response = self.trade_context.submit_order(**kwargs)
+        callback = lambda: self.trade_context.submit_order(**kwargs)
+        response = self.request_gate.call(callback) if self.request_gate is not None else callback()
         order_id = str(getattr(response, "order_id", "") or "")
-        return {
+        result = {
             "submitted": bool(order_id),
             "status": "submitted" if order_id else "submit_unconfirmed_missing_order_id",
             "order_id": order_id,
             "response": {"order_id": order_id},
         }
+        if result["submitted"] and self.on_submission is not None:
+            self.on_submission(order_payload, result)
+        return result
 
     def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
         # SDK method signatures have changed across releases.  Until the
@@ -449,7 +541,8 @@ class SdkRealtimePaperClient:
         if not callable(method):
             return {"ok": False, "status": "short_capacity_sdk_method_unavailable", "max_quantity": Decimal("0"), "elapsed_ms": 0}
         try:
-            response = method(symbol, self.sdk.OrderType.LO, price=limit_price, side=self.sdk.OrderSide.Sell)
+            callback = lambda: method(symbol, self.sdk.OrderType.LO, price=limit_price, side=self.sdk.OrderSide.Sell)
+            response = self.request_gate.call(callback) if self.request_gate is not None else callback()
             quantity = decimal(getattr(response, "cash_max_qty", "0"))
             return {"ok": quantity > 0, "status": "sdk_short_capacity", "max_quantity": quantity, "elapsed_ms": 0}
         except Exception as exc:
@@ -487,8 +580,8 @@ def sdk_object_to_dict(value: Any) -> dict[str, Any]:
         return value
     result: dict[str, Any] = {}
     for key in (
-        "timestamp", "last_done", "current_volume", "volume", "trades", "price",
-        "trade_session", "sequence",
+        "symbol", "sub_types", "timestamp", "last_done", "current_volume", "volume", "trades", "price", "open",
+        "high", "low", "close", "turnover", "trade_session", "sequence",
     ):
         if hasattr(value, key):
             item = getattr(value, key)

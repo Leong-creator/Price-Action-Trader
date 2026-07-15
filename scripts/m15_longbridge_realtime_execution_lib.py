@@ -626,6 +626,7 @@ def run_realtime_execution(
     generated_at: str | None = None,
     broker_client: Any | None = None,
     signal_events_override: list[dict[str, Any]] | None = None,
+    account_state_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
@@ -633,7 +634,9 @@ def run_realtime_execution(
     session_started_at = resolve_session_started_at(config.session_started_at, now)
     execution_run_id = build_execution_run_id(config, now)
     session_run_id = build_session_run_id(config, session_started_at)
-    account_state = read_json(config.paper_account_state_path)
+    # The SDK runtime owns a fresh in-memory account snapshot.  JSON remains
+    # an audit/dashboard projection and must not delay a real-time order.
+    account_state = dict(account_state_override) if account_state_override is not None else read_json(config.paper_account_state_path)
     epoch_state = load_or_update_test_epoch_state(config, account_state, now)
     signal_events = (
         list(signal_events_override)
