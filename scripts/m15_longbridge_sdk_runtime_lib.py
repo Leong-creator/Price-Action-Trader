@@ -178,6 +178,54 @@ def daily_context_is_complete(
     return state == "complete" and not failed_symbols and row_count >= expected_rows
 
 
+def required_daily_context_date(now: datetime) -> str:
+    """Return the latest completed US session date needed by daily strategies."""
+    local = now.astimezone(NEW_YORK)
+    candidate = local.date()
+    if local.weekday() < 5 and (local.hour, local.minute) >= (16, 10):
+        return candidate.isoformat()
+    candidate -= timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate -= timedelta(days=1)
+    return candidate.isoformat()
+
+
+def load_valid_daily_context_cache(path: Path, config: SdkRuntimeConfig, now: datetime) -> list[dict[str, Any]]:
+    """Reuse only a complete cache containing the latest completed daily bar."""
+    try:
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except (OSError, json.JSONDecodeError):
+        return []
+    expected_symbols = {symbol.removesuffix(f".{config.market}") for symbol in configured_symbols(config)}
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or row.get("timeframe") != "1d":
+            return []
+        symbol = str(row.get("symbol") or "")
+        grouped.setdefault(symbol, []).append(row)
+    if set(grouped) != expected_symbols:
+        return []
+    if any(len(symbol_rows) != config.daily_context_bars for symbol_rows in grouped.values()):
+        return []
+    required_date = required_daily_context_date(now)
+    for symbol_rows in grouped.values():
+        latest = max(str(row.get("event_time") or "") for row in symbol_rows)
+        try:
+            latest_date = datetime.fromisoformat(latest.replace("Z", "+00:00")).astimezone(NEW_YORK).date().isoformat()
+        except ValueError:
+            return []
+        if latest_date < required_date:
+            return []
+    return rows
+
+
+def write_daily_context_cache(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
 def config_fingerprint(config: SdkRuntimeConfig) -> str:
     """Stable identity used by watchdog/readiness to reject config drift."""
     payload = {

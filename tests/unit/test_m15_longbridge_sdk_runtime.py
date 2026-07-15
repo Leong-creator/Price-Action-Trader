@@ -10,7 +10,9 @@ import unittest
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
-    config_fingerprint, configured_symbols, daily_context_is_complete, fresh_market_events, load_config, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
+    config_fingerprint, configured_symbols, daily_context_is_complete, fresh_market_events, load_config,
+    load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
+    write_daily_context_cache,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
 )
 from scripts.m15_longbridge_sdk_account_lib import SdkAccountStateProvider, SdkTradeRequestGate
@@ -303,6 +305,20 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertFalse(daily_context_is_complete(config, "complete", expected - 1, []))
         self.assertFalse(daily_context_is_complete(config, "complete", expected, ["AAPL.US"]))
         self.assertTrue(daily_context_is_complete(config, "complete", expected, []))
+
+    def test_only_a_complete_current_daily_cache_is_reused(self) -> None:
+        config = replace(load_config(), symbol_limit=1, daily_context_bars=2)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "daily.jsonl"
+            rows = [
+                {"symbol": "SPY", "timeframe": "1d", "event_time": "2026-07-14T19:00:00Z"},
+                {"symbol": "SPY", "timeframe": "1d", "event_time": "2026-07-14T20:00:00Z"},
+            ]
+            write_daily_context_cache(path, rows)
+            before_open = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
+            self.assertEqual(load_valid_daily_context_cache(path, config, before_open), rows)
+            next_session = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
+            self.assertEqual(load_valid_daily_context_cache(path, config, next_session), [])
 
     def test_sdk_preflight_requires_all_read_only_endpoints(self) -> None:
         # The live preflight is exercised by the command-line integration

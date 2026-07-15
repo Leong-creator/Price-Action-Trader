@@ -36,8 +36,8 @@ from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAcc
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
     append_market_events, build_status, compact_market_events, config_fingerprint, configured_symbols,
-    daily_context_is_complete, fresh_market_events, load_config, read_client_id, readonly_gate_passed, record_readonly_session,
-    sdk_config_from_oauth, sdk_object_to_dict,
+    daily_context_is_complete, fresh_market_events, load_config, load_valid_daily_context_cache, read_client_id,
+    readonly_gate_passed, record_readonly_session, sdk_config_from_oauth, sdk_object_to_dict, write_daily_context_cache,
     subscribe_quote_and_trades, to_iso,
 )
 
@@ -363,9 +363,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     # Keep the full 60-day cache for all subscribed symbols plus a bounded
     # intraday tail.  The old 4096-row cap silently discarded daily context
     # before the daily strategies could consume it.
+    cached_daily_rows = load_valid_daily_context_cache(config.daily_context_path, config, datetime.now(UTC))
     context = MarketEventContext(
         maximum_rows=(len(configured_symbols(config)) * config.daily_context_bars) + 4096
     )
+    context.append(cached_daily_rows)
     # PyO3 SDK contexts must not be inherited through fork.  A fresh spawned
     # interpreter gives the quote WebSocket its own native runtime and makes
     # a blocked subscribe call safely terminable by the parent.
@@ -380,7 +382,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     last_compaction = 0.0
     last_result: dict[str, Any] = {}
     daily_triggered_dates: set[str] = set()
-    daily_rows: list[dict[str, Any]] = []
+    daily_rows: list[dict[str, Any]] = list(cached_daily_rows)
     subscription_failed: list[str] = []
     daily_failed: list[str] = []
     daily_workers: dict[str, tuple[mp.Process, float, list[str]]] = {}
@@ -388,8 +390,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     daily_completed: set[str] = set()
     daily_retry_counts: dict[str, int] = {}
     daily_task_failures: dict[str, list[str]] = {}
-    daily_context_state = "waiting_for_subscription"
+    daily_context_state = "complete" if cached_daily_rows else "waiting_for_subscription"
+    daily_context_cache_reused = bool(cached_daily_rows)
+    daily_context_persisted = bool(cached_daily_rows)
     observed_regular_sessions: set[str] = set()
+    postclose_daily_refresh_dates: set[str] = set()
     deferred_messages: deque[dict[str, Any]] = deque()
     try:
         while True:
@@ -442,6 +447,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                                 daily_failed.append(symbol)
                 if not daily_pending and not daily_workers and daily_context_state == "loading":
                     daily_context_state = "complete" if daily_rows and not daily_failed else "failed"
+                if daily_context_is_complete(config, daily_context_state, len(daily_rows), daily_failed) and not daily_context_persisted:
+                    write_daily_context_cache(config.daily_context_path, daily_rows)
+                    daily_context_persisted = True
             try:
                 message = deferred_messages.popleft() if deferred_messages else message_queue.get(timeout=config.heartbeat_interval_seconds)
             except queue.Empty:
@@ -462,9 +470,6 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 task_id = str(message.get("task_id") or "")
                 daily_task_failures[task_id] = [str(value) for value in (message.get("failures") or [])]
                 context.append(rows)
-                if rows:
-                    config.daily_context_path.parent.mkdir(parents=True, exist_ok=True)
-                    config.daily_context_path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in daily_rows) + "\n", encoding="utf-8")
             elif kind == "daily_context_task_complete":
                 task_id = str(message.get("task_id") or "")
                 if task_id in daily_workers:
@@ -535,6 +540,30 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             )
             now_ny = datetime.now(NEW_YORK)
             session_date = now_ny.date().isoformat()
+            if (
+                worker_ready
+                and daily_context_ready
+                and now_ny.weekday() < 5
+                and (now_ny.hour, now_ny.minute) >= (16, 10)
+                and session_date not in postclose_daily_refresh_dates
+            ):
+                # Refresh the completed daily bar after close so tomorrow's
+                # session never starts with yesterday's stale context.
+                postclose_daily_refresh_dates.add(session_date)
+                context = MarketEventContext(
+                    maximum_rows=(len(configured_symbols(config)) * config.daily_context_bars) + 4096
+                )
+                daily_rows = []
+                daily_failed = []
+                daily_workers = {}
+                daily_pending = deque()
+                daily_completed = set()
+                daily_retry_counts = {}
+                daily_task_failures = {}
+                daily_context_state = "waiting_for_subscription"
+                daily_context_cache_reused = False
+                daily_context_persisted = False
+                daily_context_ready = False
             is_after_regular_session = now_ny.weekday() < 5 and (now_ny.hour >= 16)
             if (
                 config.two_day_readonly_gate
@@ -574,6 +603,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "subscription_coverage": f"{len(configured_symbols(config)) - len(subscription_failed) if worker_ready else 0}/{len(configured_symbols(config))}",
                     "daily_context_row_count": len(daily_rows), "daily_context_failed_symbols": daily_failed,
                     "daily_context_state": daily_context_state,
+                    "daily_context_cache_reused": daily_context_cache_reused,
                     "daily_context_worker_pids": [worker.pid for worker, _started_at, _symbols in daily_workers.values()],
                     "account_snapshot_age_seconds": age, "account_snapshot_healthy": age is not None and age <= config.maximum_account_snapshot_age_seconds,
                     "dispatch_enabled": bool(dispatch_enabled and daily_context_ready),
