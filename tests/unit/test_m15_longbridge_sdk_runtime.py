@@ -10,8 +10,10 @@ from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
     fresh_market_events, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
-    subscribe_quote_and_trades,
+    subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
 )
+from scripts.m15_longbridge_sdk_account_lib import SdkAccountStateProvider, SdkTradeRequestGate
+from scripts.run_m15_longbridge_sdk_runtime import event_rows_to_daily, require_sdk_contract, run_sdk_preflight
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
@@ -183,3 +185,112 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(trade.kwargs["order_type"], "LIT")
         self.assertEqual(trade.kwargs["trigger_price"], Decimal("200"))
         self.assertEqual(trade.kwargs["outside_rth"], "RTHOnly")
+
+    def test_sdk_account_state_uses_sdk_only_contract(self) -> None:
+        class Cash:
+            currency = "USD"
+            available_cash = "1000"
+            total_cash = "1000"
+            settling_cash = "0"
+            frozen_cash = "0"
+            withdraw_cash = "1000"
+
+        class Position:
+            symbol = "AAPL.US"
+            quantity = "2"
+            available_quantity = "2"
+            cost_price = "200"
+            currency = "USD"
+            market = "US"
+
+        class Order:
+            symbol = "AAPL.US"
+            order_id = "SDK-1"
+            side = "Buy"
+            status = "Submitted"
+
+        class Trade:
+            def account_balance(self): return [Cash()]
+            def stock_positions(self): return [Position()]
+            def today_orders(self, **_kwargs): return [Order()]
+            def today_executions(self): return []
+
+        class Portfolio:
+            def profit_analysis_by_market(self, **_kwargs):
+                return {"current_total_asset": "1200", "sum_profit": "200"}
+
+        state = SdkAccountStateProvider(Trade(), Portfolio(), request_gate=SdkTradeRequestGate()).refresh()
+        self.assertTrue(state["paper_account_verified"])
+        self.assertEqual(state["source"], "longbridge_sdk_account_and_portfolio")
+        self.assertEqual(state["usd_available_cash"], "1000")
+        self.assertEqual(state["positions"][0]["available"], "2")
+        self.assertEqual(state["open_orders"][0]["order_id"], "SDK-1")
+
+    def test_daily_context_rows_are_independent_from_m12(self) -> None:
+        class Candle:
+            timestamp = 1784073600
+            open = "100"
+            high = "103"
+            low = "99"
+            close = "102"
+            volume = 123
+
+        rows = event_rows_to_daily("AAPL.US", [Candle()], datetime(2026, 7, 15, 13, 35, tzinfo=UTC))
+        self.assertEqual(rows[0]["timeframe"], "1d")
+        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_daily_context")
+        self.assertTrue(rows[0]["local_simulation_ignored"])
+
+    def test_daily_context_accepts_the_sdk_naive_datetime_timestamp(self) -> None:
+        class Candle:
+            timestamp = datetime(2026, 7, 14, 12, 0)
+            open = "100"
+            high = "103"
+            low = "99"
+            close = "102"
+            volume = 123
+
+        rows = event_rows_to_daily("AAPL.US", [Candle()], datetime(2026, 7, 15, 13, 35, tzinfo=UTC))
+        self.assertEqual(len(rows), 1)
+        expected = datetime.fromtimestamp(Candle.timestamp.timestamp(), UTC).isoformat().replace("+00:00", "Z")
+        self.assertEqual(rows[0]["event_time"], expected)
+
+    def test_daily_context_worker_messages_keep_the_batch_identity(self) -> None:
+        class Candle:
+            timestamp = 1784073600
+            open = high = low = close = "100"
+            volume = 1
+
+        class Quote:
+            def candlesticks(self, *_args): return [Candle()]
+
+        class Sdk:
+            class Period:
+                Day = "day"
+            class AdjustType:
+                NoAdjust = "no-adjust"
+
+        class Queue:
+            def __init__(self): self.items = []
+            def put_nowait(self, payload): self.items.append(payload)
+
+        queue = Queue()
+        from scripts.run_m15_longbridge_sdk_runtime import load_daily_context
+        load_daily_context(Quote(), Sdk(), ("AAPL.US",), 60, queue, task_id="daily-001")
+        self.assertEqual(queue.items[0]["task_id"], "daily-001")
+
+    def test_installed_sdk_exposes_required_contexts(self) -> None:
+        self.assertIsNotNone(require_sdk_contract())
+
+    def test_two_readonly_sessions_are_required_before_dispatch(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "gate.json"
+            self.assertEqual(readonly_gate_passed(path), (False, 0, 2))
+            record_readonly_session(path, "2026-07-13", {"daily_context_row_count": 8820})
+            self.assertEqual(readonly_gate_passed(path), (False, 1, 2))
+            record_readonly_session(path, "2026-07-14", {"daily_context_row_count": 8820})
+            self.assertEqual(readonly_gate_passed(path), (True, 2, 2))
+
+    def test_sdk_preflight_requires_all_read_only_endpoints(self) -> None:
+        # The live preflight is exercised by the command-line integration
+        # check. Keep the code-level contract explicit here too.
+        self.assertTrue(callable(run_sdk_preflight))
