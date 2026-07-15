@@ -42,7 +42,7 @@
     "maximum_consecutive_subscription_failures": 3,
     "account_snapshot_interval_seconds": 15,
     "maximum_account_snapshot_age_seconds": 45,
-    "two_day_readonly_gate": true,
+    "two_day_readonly_gate": false,
     "paper_trading_only": true,
     "live_execution": false,
     "real_money_actions": false,

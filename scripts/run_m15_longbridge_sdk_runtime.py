@@ -36,7 +36,7 @@ from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAcc
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
     append_market_events, build_status, compact_market_events, config_fingerprint, configured_symbols,
-    fresh_market_events, load_config, read_client_id, readonly_gate_passed, record_readonly_session,
+    daily_context_is_complete, fresh_market_events, load_config, read_client_id, readonly_gate_passed, record_readonly_session,
     sdk_config_from_oauth, sdk_object_to_dict,
     subscribe_quote_and_trades, to_iso,
 )
@@ -510,7 +510,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     else:
                         deferred_messages.append(queued)
                 started = time.perf_counter()
-                active_client = paper_client if daily_rows and not daily_failed else None
+                daily_context_ready = daily_context_is_complete(
+                    config, daily_context_state, len(daily_rows), daily_failed
+                )
+                active_client = paper_client if daily_context_ready else None
                 last_result = dispatch_completed_rows(config, rows, context, account, active_client, daily_triggered_dates)
                 elapsed = int((time.perf_counter() - started) * 1000)
                 last_result["pipeline_elapsed_ms"] = elapsed
@@ -527,6 +530,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_compaction = time.monotonic()
             snapshot = account.snapshot()
             age = account_age_seconds(snapshot)
+            daily_context_ready = daily_context_is_complete(
+                config, daily_context_state, len(daily_rows), daily_failed
+            )
             now_ny = datetime.now(NEW_YORK)
             session_date = now_ny.date().isoformat()
             is_after_regular_session = now_ny.weekday() < 5 and (now_ny.hour >= 16)
@@ -570,12 +576,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "daily_context_state": daily_context_state,
                     "daily_context_worker_pids": [worker.pid for worker, _started_at, _symbols in daily_workers.values()],
                     "account_snapshot_age_seconds": age, "account_snapshot_healthy": age is not None and age <= config.maximum_account_snapshot_age_seconds,
-                    "dispatch_enabled": bool(dispatch_enabled and daily_rows and not daily_failed),
+                    "dispatch_enabled": bool(dispatch_enabled and daily_context_ready),
                     "dispatch_requested": dispatch_requested,
                     "dispatch_block_reason": (
                         "two_day_readonly_gate"
                         if config.two_day_readonly_gate and not readonly_gate_passed_now
-                        else ("paper_order_dispatch_disabled" if not config.paper_order_dispatch_enabled else ("daily_context_incomplete" if not daily_rows or daily_failed else ""))
+                        else (
+                            "paper_order_dispatch_disabled"
+                            if not config.paper_order_dispatch_enabled
+                            else ("daily_context_incomplete" if not daily_context_ready else "")
+                        )
                     ),
                     "two_day_readonly_gate": config.two_day_readonly_gate,
                     "readonly_gate_path": str(config.readonly_gate_path),

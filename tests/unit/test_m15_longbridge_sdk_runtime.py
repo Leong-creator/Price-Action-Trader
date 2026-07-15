@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -9,7 +10,7 @@ import unittest
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
-    fresh_market_events, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
+    config_fingerprint, configured_symbols, daily_context_is_complete, fresh_market_events, load_config, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
 )
 from scripts.m15_longbridge_sdk_account_lib import SdkAccountStateProvider, SdkTradeRequestGate
@@ -289,6 +290,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             self.assertEqual(readonly_gate_passed(path), (False, 1, 2))
             record_readonly_session(path, "2026-07-14", {"daily_context_row_count": 8820})
             self.assertEqual(readonly_gate_passed(path), (True, 2, 2))
+
+    def test_runtime_fingerprint_changes_when_dispatch_gate_changes(self) -> None:
+        config = load_config()
+        changed = replace(config, two_day_readonly_gate=not config.two_day_readonly_gate)
+        self.assertNotEqual(config_fingerprint(config), config_fingerprint(changed))
+
+    def test_daily_context_must_cover_every_symbol_before_dispatch(self) -> None:
+        config = load_config()
+        expected = len(configured_symbols(config)) * config.daily_context_bars
+        self.assertFalse(daily_context_is_complete(config, "loading", expected, []))
+        self.assertFalse(daily_context_is_complete(config, "complete", expected - 1, []))
+        self.assertFalse(daily_context_is_complete(config, "complete", expected, ["AAPL.US"]))
+        self.assertTrue(daily_context_is_complete(config, "complete", expected, []))
 
     def test_sdk_preflight_requires_all_read_only_endpoints(self) -> None:
         # The live preflight is exercised by the command-line integration

@@ -6,7 +6,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.m15_opening_trade_readiness_lib import load_config, run_m15_opening_trade_readiness
+from scripts.m15_opening_trade_readiness_lib import load_config, run_m15_opening_trade_readiness, sdk_runtime_health_issues
+from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
+from scripts.m15_longbridge_sdk_runtime_lib import configured_symbols as sdk_configured_symbols
+from scripts.m15_longbridge_sdk_runtime_lib import load_config as load_sdk_runtime_config
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     build_window_state,
     config_digest,
@@ -75,6 +78,24 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertEqual(checks["m15_realtime_daemon_alive"]["status"], "fail")
             self.assertIn("process=dead", checks["m15_realtime_daemon_alive"]["actual"])
             self.assertIn("status_age_seconds=3600", checks["m15_realtime_daemon_alive"]["actual"])
+
+    def test_sdk_readiness_requires_complete_daily_context(self) -> None:
+        sdk_config = load_sdk_runtime_config()
+        expected_rows = len(sdk_configured_symbols(sdk_config)) * sdk_config.daily_context_bars
+        status = {
+            "status": "running",
+            "sdk_connected": True,
+            "runtime_engine": "sdk",
+            "config_fingerprint": sdk_config_fingerprint(sdk_config),
+            "subscription_coverage": f"{len(sdk_configured_symbols(sdk_config))}/{len(sdk_configured_symbols(sdk_config))}",
+            "daily_context_state": "complete",
+            "daily_context_row_count": expected_rows,
+            "daily_context_failed_symbols": [],
+            "account_snapshot_healthy": True,
+        }
+        self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
+        status["daily_context_state"] = "loading"
+        self.assertIn("sdk_daily_context_incomplete", sdk_runtime_health_issues(status, sdk_config, True))
 
     def write_fixture(self, root: Path, *, paper_enabled: bool, live_execution: bool) -> Path:
         output_dir = root / "realtime"

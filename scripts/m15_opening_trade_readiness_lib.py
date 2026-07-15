@@ -22,6 +22,7 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
 from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
+from scripts.m15_longbridge_sdk_runtime_lib import daily_context_is_complete as sdk_daily_context_is_complete
 from scripts.m15_longbridge_sdk_runtime_lib import configured_symbols as sdk_configured_symbols
 
 
@@ -199,7 +200,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         ),
         check_row(
             "paper_orders_enabled",
-            "已武装长桥模拟账户订单提交；两日只读验收完成前必须等待",
+            (
+                "已武装长桥模拟账户订单提交；当前 SDK 运行配置不启用额外只读门禁"
+                if sdk_config is not None and not sdk_config.two_day_readonly_gate
+                else "已武装长桥模拟账户订单提交；两日只读验收完成前必须等待"
+            ),
             "waiting" if readonly_gate_waiting else ("pass" if effective_paper_orders_enabled else "fail"),
             actual=execution_config_error
             or (
@@ -423,8 +428,13 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
     expected_coverage = f"{expected_count}/{expected_count}" if expected_count else ""
     if expected_coverage and str(status.get("subscription_coverage") or "") != expected_coverage:
         issues.append("sdk_subscription_coverage_incomplete")
-    if int(status.get("daily_context_row_count", 0) or 0) <= 0:
-        issues.append("sdk_daily_context_missing")
+    if sdk_config is not None and not sdk_daily_context_is_complete(
+        sdk_config,
+        str(status.get("daily_context_state") or ""),
+        int(status.get("daily_context_row_count", 0) or 0),
+        [str(value) for value in (status.get("daily_context_failed_symbols") or [])],
+    ):
+        issues.append("sdk_daily_context_incomplete")
     if status.get("account_snapshot_healthy") is not True:
         issues.append("sdk_account_snapshot_stale")
     return issues

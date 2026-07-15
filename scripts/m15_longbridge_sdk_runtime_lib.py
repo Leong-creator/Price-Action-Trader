@@ -167,12 +167,24 @@ def configured_symbols(config: SdkRuntimeConfig) -> tuple[str, ...]:
     return tuple(f"{symbol}.{config.market}" for symbol in US_LIQUID_SEED_V1[: config.symbol_limit])
 
 
+def daily_context_is_complete(
+    config: SdkRuntimeConfig,
+    state: str,
+    row_count: int,
+    failed_symbols: list[str] | tuple[str, ...],
+) -> bool:
+    """Require the full daily input before allowing SDK order dispatch."""
+    expected_rows = len(configured_symbols(config)) * config.daily_context_bars
+    return state == "complete" and not failed_symbols and row_count >= expected_rows
+
+
 def config_fingerprint(config: SdkRuntimeConfig) -> str:
     """Stable identity used by watchdog/readiness to reject config drift."""
     payload = {
         "config": str(config.config_path.resolve()), "symbols": configured_symbols(config),
         "quote_region": config.quote_region, "trade_region": config.trade_region,
         "dispatch": config.paper_order_dispatch_enabled, "daily_bars": config.daily_context_bars,
+        "two_day_readonly_gate": config.two_day_readonly_gate,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:16]
