@@ -1825,6 +1825,16 @@ def load_or_update_test_epoch_state(
                 has_pending_confirmations=has_pending_confirmations,
             )
             current["last_flatten_check_at"] = to_iso(now)
+    elif current.get("status") in {"active", "activated"}:
+        if not current.get("test_started_at"):
+            # SDK flatten activation historically wrote activated_at without
+            # copying it into the execution epoch. Recover only from that
+            # durable timestamp so pre-activation signals remain excluded.
+            activated_at = str(current.get("activated_at") or "")
+            if parse_signal_time(activated_at):
+                current["test_started_at"] = activated_at
+        if current.get("status") == "activated" and current.get("test_started_at"):
+            current["status"] = "active"
     config.test_epoch_state_path.parent.mkdir(parents=True, exist_ok=True)
     write_json(config.test_epoch_state_path, current)
     return current

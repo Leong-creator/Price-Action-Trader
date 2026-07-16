@@ -422,7 +422,7 @@ def run_realtime_signal_router(
     market_events = realtime_relevant_market_events(raw_market_events, session_started_at)
     existing_signal_events = read_jsonl(config.signal_events_path)
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
-    test_epoch_state = read_json(config.test_epoch_state_path)
+    test_epoch_state = normalize_active_epoch_state(read_json(config.test_epoch_state_path))
     ledger_rows: list[dict[str, Any]] = []
     new_signal_events: list[dict[str, Any]] = []
     selected_bucket_exposure: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -1901,7 +1901,7 @@ def build_signal_from_intent(
     original_created_dt = parse_optional_utc_datetime(original_created_at)
     if (
         epoch_id
-        and str(effective_epoch_state.get("status") or "") == "active"
+        and str(effective_epoch_state.get("status") or "") in {"active", "activated"}
         and epoch_started_at is not None
         and original_created_dt is not None
         and original_created_dt < epoch_started_at
@@ -2205,9 +2205,20 @@ def parse_optional_utc_datetime(value: str) -> datetime | None:
 def parse_epoch_started_at(epoch_state: dict[str, Any]) -> datetime | None:
     if not isinstance(epoch_state, dict):
         return None
-    if str(epoch_state.get("status") or "") != "active":
+    if str(epoch_state.get("status") or "") not in {"active", "activated"}:
         return None
     return parse_optional_utc_datetime(str(epoch_state.get("test_started_at") or epoch_state.get("activated_at") or ""))
+
+
+def normalize_active_epoch_state(epoch_state: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(epoch_state) if isinstance(epoch_state, dict) else {}
+    if str(normalized.get("status") or "") == "activated":
+        normalized["status"] = "active"
+    if str(normalized.get("status") or "") == "active" and not normalized.get("test_started_at"):
+        activated_at = str(normalized.get("activated_at") or "")
+        if parse_optional_utc_datetime(activated_at):
+            normalized["test_started_at"] = activated_at
+    return normalized
 
 
 def short_test_epoch_state(config: RealtimeSignalRouterConfig) -> dict[str, Any]:

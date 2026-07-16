@@ -962,6 +962,29 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(signals[-1]["original_signal_created_at"], "2026-06-04T14:00:00Z")
             self.assertEqual(signals[-1]["created_at"], "2026-06-04T14:06:00Z")
 
+    def test_router_accepts_legacy_activated_epoch_with_activation_time(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            epoch = {
+                "enabled": True,
+                "test_epoch_id": "legacy-epoch",
+                "status": "activated",
+                "test_started_at": "",
+                "activated_at": "2026-06-04T14:05:00Z",
+            }
+            config = self.make_config(root, epoch_state=epoch)
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(received_at="2026-06-04T14:00:00Z")])
+
+            run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:06:00Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["epoch_rebuilt_signal_count"], 1)
+            self.assertEqual(payload["test_epoch_status"], "active")
+            self.assertEqual(payload["test_started_at"], "2026-06-04T14:05:00Z")
+            self.assertEqual(signals[-1]["test_started_at"], "2026-06-04T14:05:00Z")
+            self.assertTrue(signals[-1]["signal_id"].endswith("-legacy-epoch"))
+
     def test_replay_before_session_start_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

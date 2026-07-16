@@ -231,11 +231,90 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             )
             marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(state["status"], "activated")
+        self.assertEqual(state["status"], "active")
         self.assertFalse(state["blocks_new_entries"])
+        self.assertEqual(state["test_started_at"], "2026-07-16T14:00:16Z")
         self.assertEqual(marker["status"], "active")
+        self.assertEqual(marker["test_started_at"], state["test_started_at"])
         self.assertEqual(marker["activation_condition_met"], "positions_open_orders_pending_confirmations_zero")
         self.assertEqual(len(client.submissions), 1)
+
+    def test_active_marker_repairs_execution_epoch_missing_start_time(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, _snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            marker.update(
+                {
+                    "status": "active",
+                    "test_started_at": "2026-07-16T14:00:00Z",
+                    "activated_at": "2026-07-16T14:00:00Z",
+                }
+            )
+            config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            config.formal_test_epoch_state_path.write_text(
+                json.dumps(
+                    {
+                        "test_epoch_id": marker["test_epoch_id"],
+                        "status": "activated",
+                        "test_started_at": "",
+                        "activated_at": marker["activated_at"],
+                        "blocks_new_entries": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 7, 16, 14, 5, tzinfo=UTC),
+            )
+            state = json.loads(config.formal_test_epoch_state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "inactive")
+        self.assertFalse(result["blocks_new_entries"])
+        self.assertEqual(state["status"], "active")
+        self.assertEqual(state["test_started_at"], "2026-07-16T14:00:00Z")
+
+    def test_active_marker_repairs_execution_epoch_id_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, _snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            marker.update(
+                {
+                    "status": "active",
+                    "test_started_at": "2026-07-16T14:00:00Z",
+                    "activated_at": "2026-07-16T14:00:00Z",
+                }
+            )
+            config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            config.formal_test_epoch_state_path.write_text(
+                json.dumps(
+                    {
+                        "test_epoch_id": "wrong-epoch",
+                        "status": "active",
+                        "test_started_at": "2026-07-16T14:03:00Z",
+                        "blocks_new_entries": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 7, 16, 14, 5, tzinfo=UTC),
+            )
+            state = json.loads(config.formal_test_epoch_state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "inactive")
+        self.assertEqual(state["test_epoch_id"], marker["test_epoch_id"])
+        self.assertEqual(state["short_test_epoch_id"], marker["short_test_epoch_id"])
+        self.assertEqual(state["test_started_at"], marker["test_started_at"])
 
     def test_default_runtime_config_declares_seed_147_contract(self) -> None:
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))

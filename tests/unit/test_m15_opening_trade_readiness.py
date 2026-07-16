@@ -78,6 +78,40 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             checks = {row["check"]: row for row in payload["checks"]}
             self.assertEqual(checks["formal_test_flatten_transition"]["status"], "waiting")
 
+    def test_active_formal_epoch_blocks_when_execution_start_time_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(root, paper_enabled=True, live_execution=False)
+            status_path = root / "realtime" / "m15_longbridge_realtime_session_supervisor.json"
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            status_payload["formal_test_transition"] = {
+                "status": "active",
+                "test_epoch_id": "formal-epoch",
+                "test_started_at": "2026-06-04T13:30:00Z",
+            }
+            status_path.write_text(json.dumps(status_payload), encoding="utf-8")
+            epoch_state_path = root / "realtime" / "m15_longbridge_virtual_account_epoch.json"
+            epoch_state_path.write_text(
+                json.dumps(
+                    {
+                        "status": "activated",
+                        "test_epoch_id": "formal-epoch",
+                        "test_started_at": "",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            payload = run_m15_opening_trade_readiness(
+                load_config(config_path),
+                generated_at="2026-06-04T14:00:00Z",
+            )
+
+            self.assertEqual(payload["readiness_status"], "blocked_opening_trade_watch")
+            self.assertFalse(payload["new_position_submission_enabled"])
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["formal_test_execution_epoch"]["status"], "fail")
+
     def test_blocks_when_execution_config_enables_live_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

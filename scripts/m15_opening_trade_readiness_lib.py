@@ -168,6 +168,26 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     formal_transition = realtime_status.get("formal_test_transition", {})
     formal_transition = formal_transition if isinstance(formal_transition, dict) else {}
     pending_formal_flatten = str(formal_transition.get("status") or "") == "pending_flatten"
+    formal_test_active = str(formal_transition.get("status") or "") == "active"
+    execution_epoch = (
+        read_json(execution_config.test_epoch_state_path)
+        if execution_config is not None
+        else {}
+    )
+    execution_epoch = execution_epoch if isinstance(execution_epoch, dict) else {}
+    expected_epoch_start = str(
+        formal_transition.get("test_started_at") or formal_transition.get("activated_at") or ""
+    )
+    execution_epoch_start = str(execution_epoch.get("test_started_at") or "")
+    execution_epoch_consistent = (
+        not formal_test_active
+        or (
+            bool(expected_epoch_start)
+            and execution_epoch_start == expected_epoch_start
+            and str(execution_epoch.get("test_epoch_id") or "")
+            == str(formal_transition.get("test_epoch_id") or "")
+        )
+    )
     runtime_dispatch_requested = bool(realtime_status.get("dispatch_requested", False))
     sdk_paper_channel_armed = bool(
         sdk_config is not None
@@ -181,7 +201,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         )
     else:
         effective_paper_orders_enabled = paper_orders_enabled
-    new_position_submission_enabled = effective_paper_orders_enabled and not pending_formal_flatten
+    new_position_submission_enabled = (
+        effective_paper_orders_enabled
+        and not pending_formal_flatten
+        and execution_epoch_consistent
+    )
     readonly_gate_waiting = bool(
         sdk_config is not None
         and sdk_config.two_day_readonly_gate
@@ -326,6 +350,17 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             actual=(
                 f"status={formal_transition.get('status', 'not_configured')}, "
                 f"blocker={formal_transition.get('activation_blocker', '')}"
+            ),
+        ),
+        check_row(
+            "formal_test_execution_epoch",
+            "正式测试标记与实时执行器必须使用同一测试编号和开始时间",
+            "fail" if not execution_epoch_consistent else "pass",
+            actual=(
+                f"formal_epoch={formal_transition.get('test_epoch_id', '')}, "
+                f"formal_started_at={expected_epoch_start}, "
+                f"execution_epoch={execution_epoch.get('test_epoch_id', '')}, "
+                f"execution_started_at={execution_epoch_start}"
             ),
         ),
     ]
