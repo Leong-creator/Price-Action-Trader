@@ -339,7 +339,25 @@ def run_pending_flatten_cycle(
 ) -> dict[str, Any]:
     """Advance the persisted SDK-only account flatten state machine once."""
     marker = load_formal_test_marker(config)
-    if str(marker.get("status") or "") != "pending_flatten":
+    marker_status = str(marker.get("status") or "")
+    if marker_status == "active":
+        state = read_json_object(config.formal_test_epoch_state_path)
+        canonical = {
+            "test_epoch_id": str(marker.get("test_epoch_id") or ""),
+            "short_test_epoch_id": str(marker.get("short_test_epoch_id") or ""),
+            "status": "active",
+            "test_started_at": str(marker.get("test_started_at") or ""),
+            "activated_at": str(marker.get("activated_at") or marker.get("test_started_at") or ""),
+            "blocks_new_entries": False,
+        }
+        if canonical["test_started_at"] and any(state.get(key) != value for key, value in canonical.items()):
+            state.update(canonical)
+            state.setdefault("schema_version", "m15.sdk-runtime-auto-flatten.v1")
+            state.setdefault("stage", "M15.sdk_runtime_auto_flatten")
+            state["updated_at"] = to_iso(now)
+            write_json_atomic(config.formal_test_epoch_state_path, state)
+        return {"status": "inactive", "blocks_new_entries": False}
+    if marker_status != "pending_flatten":
         return {"status": "inactive", "blocks_new_entries": False}
 
     epoch_id = str(marker.get("test_epoch_id") or "")
@@ -405,7 +423,8 @@ def run_pending_flatten_cycle(
     if confirmation["complete"]:
         active_marker = activate_formal_epoch_payload(marker, activated_at=now)
         write_json_atomic(config.formal_test_marker_path, active_marker)
-        state["status"] = "activated"
+        state["status"] = active_marker["status"]
+        state["test_started_at"] = active_marker["test_started_at"]
         state["activated_at"] = active_marker["activated_at"]
         state["blocks_new_entries"] = False
         write_json_atomic(config.formal_test_epoch_state_path, state)

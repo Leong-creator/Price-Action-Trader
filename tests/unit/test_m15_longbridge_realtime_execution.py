@@ -1993,6 +1993,42 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(cleared["status"], "active")
             self.assertEqual(cleared["activation_blocker"], "")
 
+    def test_active_sdk_epoch_recovers_missing_start_time_from_activation_time(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_path = root / "epoch.json"
+            config = self.make_config(
+                root,
+                test_epoch={
+                    "enabled": True,
+                    "test_epoch_id": "epoch-sdk-active",
+                    "state_path": str(state_path),
+                    "flatten_existing_positions_before_activation": True,
+                },
+            )
+            self.write_json(
+                state_path,
+                {
+                    "enabled": True,
+                    "test_epoch_id": "epoch-sdk-active",
+                    "status": "activated",
+                    "test_started_at": "",
+                    "activated_at": "2026-06-04T14:00:00Z",
+                    "blocks_new_entries": False,
+                },
+            )
+
+            epoch = load_or_update_test_epoch_state(
+                config,
+                {"positions": [], "open_orders": [], "orders": [], "historical_orders": []},
+                datetime.fromisoformat("2026-06-04T14:05:00+00:00"),
+            )
+
+            self.assertEqual(epoch["test_started_at"], "2026-06-04T14:00:00Z")
+            self.assertEqual(epoch["status"], "active")
+            persisted = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["test_started_at"], "2026-06-04T14:00:00Z")
+
     def make_config(
         self,
         root: Path,
