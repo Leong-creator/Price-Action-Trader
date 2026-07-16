@@ -68,6 +68,8 @@ class LocalRepairConfig:
 
 @dataclass(frozen=True, slots=True)
 class ClassificationConfig:
+    longbridge_nightly_reference_runtime_ids: tuple[str, ...]
+    local_full_repair_runtime_ids: tuple[str, ...]
     longbridge_nightly_reference_lanes: tuple[str, ...]
     local_repair_lanes: tuple[str, ...]
     auxiliary_module_roles: tuple[str, ...]
@@ -133,6 +135,8 @@ def load_local_postclose_batch_config(path: str | Path = DEFAULT_CONFIG_PATH) ->
             repaired_universe_snapshot_path=resolve_repo_path(payload["local_repair"]["repaired_universe_snapshot_path"]),
         ),
         classification=ClassificationConfig(
+            longbridge_nightly_reference_runtime_ids=tuple(payload["classification"].get("longbridge_nightly_reference_runtime_ids", [])),
+            local_full_repair_runtime_ids=tuple(payload["classification"].get("local_full_repair_runtime_ids", [])),
             longbridge_nightly_reference_lanes=tuple(payload["classification"]["longbridge_nightly_reference_lanes"]),
             local_repair_lanes=tuple(payload["classification"]["local_repair_lanes"]),
             auxiliary_module_roles=tuple(payload["classification"]["auxiliary_module_roles"]),
@@ -170,6 +174,8 @@ def validate_local_postclose_batch_config(config: LocalPostcloseBatchConfig) -> 
         raise ValueError("Classification lanes must not overlap")
     if set(config.classification.auxiliary_module_roles) & set(config.classification.source_only_roles):
         raise ValueError("Auxiliary/source-only roles must not overlap")
+    if set(config.classification.longbridge_nightly_reference_runtime_ids) & set(config.classification.local_full_repair_runtime_ids):
+        raise ValueError("Longbridge nightly reference and local full repair runtime ids must not overlap")
 
 
 def read_universe_symbols(path: Path) -> list[str]:
@@ -223,27 +229,38 @@ def build_classification_summary(
     classification: ClassificationConfig,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
-    longbridge_nightly_reference: list[str] = []
-    local_repair: list[str] = []
+    declared_runtime_ids = {
+        str(account.get("runtime_id") or "")
+        for strategy in registry["strategies"]
+        for account in strategy.get("runtime_accounts", [])
+    }
+    configured_longbridge = set(classification.longbridge_nightly_reference_runtime_ids)
+    configured_repair = set(classification.local_full_repair_runtime_ids)
+    # Short runtimes are generated only by M15 and intentionally do not exist
+    # in the local registry. They remain valid nightly reference identities.
+    unknown_longbridge = sorted(
+        runtime_id for runtime_id in configured_longbridge
+        if runtime_id not in declared_runtime_ids and not runtime_id.endswith("-short")
+    )
+    unknown_repair = sorted(configured_repair - declared_runtime_ids)
     auxiliary: list[str] = []
     source_only: list[str] = []
     for strategy in registry["strategies"]:
         strategy_id = str(strategy["strategy_id"])
         role = str(strategy["module_role"])
-        lanes = {str(account.get("lane") or "") for account in strategy.get("runtime_accounts", [])}
-        if lanes & set(classification.longbridge_nightly_reference_lanes):
-            longbridge_nightly_reference.append(strategy_id)
-        if lanes & set(classification.local_repair_lanes):
-            local_repair.append(strategy_id)
         if role in classification.auxiliary_module_roles:
             auxiliary.append(strategy_id)
         if role in classification.source_only_roles:
             source_only.append(strategy_id)
     return {
-        "longbridge_nightly_reference_strategy_ids": sorted(longbridge_nightly_reference),
-        "local_repair_strategy_ids": sorted(local_repair),
+        "longbridge_nightly_reference_runtime_ids": sorted(configured_longbridge),
+        "local_full_repair_runtime_ids": sorted(configured_repair),
+        "longbridge_nightly_reference_strategy_ids": sorted({runtime_id.rsplit("-", 1)[0] for runtime_id in configured_longbridge}),
+        "local_repair_strategy_ids": sorted({runtime_id.rsplit("-", 1)[0] for runtime_id in configured_repair}),
         "auxiliary_strategy_ids": sorted(auxiliary),
         "source_only_strategy_ids": sorted(source_only),
+        "unknown_longbridge_runtime_ids": unknown_longbridge,
+        "unknown_local_repair_runtime_ids": unknown_repair,
     }
 
 
@@ -340,10 +357,10 @@ def build_local_batch_summary(
             "order_match": bool(diff_counts["order_match"]),
         },
         "plain_language_result": (
-            f"盘后本地 batch 第 {last_attempt['attempt']} 次完成："
-            f"M12 scan_date={m12_summary.get('scan_date', '')}，"
-            f"M13 goal_complete={bool(m13_result['goal_status']['goal_complete'])}，"
-            f"M14 goal_complete={bool(m14_result['goal_status']['goal_complete'])}；"
+            f"本地研究与修复系统第 {last_attempt['attempt']} 次完成："
+            f"交易日期={m12_summary.get('scan_date', '')}，"
+            f"本地账本完成={bool(m13_result['goal_status']['goal_complete'])}，"
+            f"策略修复评估完成={bool(m14_result['goal_status']['goal_complete'])}；"
             f"本地 147 修复快照相对参考池新增 {len(diff_counts['added_symbols'])}、"
             f"移除 {len(diff_counts['removed_symbols'])}、顺序差异 {len(diff_counts['order_mismatches'])}。"
         ),
@@ -360,19 +377,19 @@ def build_summary_md(summary: dict[str, Any]) -> str:
     classification = summary["classification"]
     return "\n".join(
         [
-            "# M12/M13/M14 Local Postclose Batch",
+            "# 本地研究与修复系统",
             "",
             f"- Generated at: `{summary['generated_at']}`",
             f"- Market status: `{summary['market_status']}`",
             f"- Attempts: `{summary['attempt_count']}/{summary['max_attempts']}`",
-            f"- M12 quote source: `{summary['m12']['quote_source']}`",
-            f"- M13 goal complete: `{summary['m13']['goal_complete']}`",
-            f"- M14 goal complete: `{summary['m14']['goal_complete']}`",
+            f"- 本地行情来源: `{summary['m12']['quote_source']}`",
+            f"- 本地模拟账本完成: `{summary['m13']['goal_complete']}`",
+            f"- 策略修复评估完成: `{summary['m14']['goal_complete']}`",
             f"- Local universe diff: `+{len(repair['added_symbols'])} / -{len(repair['removed_symbols'])} / order {repair['order_mismatch_count']}`",
-            f"- Longbridge nightly reference strategies: `{len(classification['longbridge_nightly_reference_strategy_ids'])}`",
-            f"- Local repair strategies: `{len(classification['local_repair_strategy_ids'])}`",
-            f"- Auxiliary strategies: `{len(classification['auxiliary_strategy_ids'])}`",
-            f"- Source-only strategies: `{len(classification['source_only_strategy_ids'])}`",
+            f"- 长桥策略盘后轻量对照运行单元: `{len(classification['longbridge_nightly_reference_runtime_ids'])}`",
+            f"- 本地完整修复运行单元: `{len(classification['local_full_repair_runtime_ids'])}`",
+            f"- 按需辅助模块: `{len(classification['auxiliary_strategy_ids'])}`",
+            f"- 资料来源模块: `{len(classification['source_only_strategy_ids'])}`",
             "",
             summary["plain_language_result"],
             "",

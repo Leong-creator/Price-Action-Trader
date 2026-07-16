@@ -40,10 +40,10 @@ class BackgroundWatchdogConfig:
     command_timeout_seconds: int
     analytics_refresh_interval_seconds: int
     analytics_command_timeout_seconds: int
-    m12_47_config_path: Path
     m15_realtime_supervisor_config_path: Path
     m15_runtime_engine: str
     m15_sdk_runtime_config_path: Path
+    m15_dashboard_config_path: Path
     m15_account_state_config_path: Path
     readiness_config_path: Path
     hard_boundaries: dict[str, bool]
@@ -74,9 +74,6 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         command_timeout_seconds=int(watchdog.get("command_timeout_seconds", 30)),
         analytics_refresh_interval_seconds=int(watchdog.get("analytics_refresh_interval_seconds", 300)),
         analytics_command_timeout_seconds=int(watchdog.get("analytics_command_timeout_seconds", 90)),
-        m12_47_config_path=resolve_repo_path(
-            inputs.get("m12_47_config", ROOT / "config" / "examples" / "m12_47_session_supervisor.json")
-        ),
         m15_realtime_supervisor_config_path=resolve_repo_path(
             inputs.get(
                 "m15_realtime_supervisor_config",
@@ -86,6 +83,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         m15_runtime_engine=str(inputs.get("m15_runtime_engine", "cli")).strip().lower(),
         m15_sdk_runtime_config_path=resolve_repo_path(
             inputs.get("m15_sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+        ),
+        m15_dashboard_config_path=resolve_repo_path(
+            inputs.get("m15_dashboard_config", "config/examples/m15_longbridge_dashboard.json")
         ),
         m15_account_state_config_path=resolve_repo_path(
             inputs.get(
@@ -134,35 +134,21 @@ def run_background_watchdog_once(
     runner = command_runner or run_command
     previous = read_json(config.output_dir / SUMMARY_JSON)
     steps = [
-        run_step(
-            "m12_47_daemon",
-            "M12.47 守护器自愈拉起",
-            [
-                sys.executable,
-                "scripts/run_m12_47_session_supervisor.py",
-                "--daemon",
-                "--config",
-                project_path(config.m12_47_config_path),
-            ],
-            config,
-            runner,
-        ),
         m15_runtime_daemon_step(config, runner),
-        run_step(
-            "m12_47_status",
-            "M12.47 守护器状态",
-            [
-                sys.executable,
-                "scripts/run_m12_47_session_supervisor.py",
-                "--status",
-                "--config",
-                project_path(config.m12_47_config_path),
-            ],
-            config,
-            runner,
-        ),
         m15_runtime_status_step(config, runner),
         analytics_refresh_step(config, runner, generated_at, previous=previous),
+        run_step(
+            "m15_longbridge_dashboard",
+            "M15 独立长桥看板刷新",
+            [
+                sys.executable,
+                "scripts/run_m15_longbridge_dashboard.py",
+                "--config",
+                project_path(config.m15_dashboard_config_path),
+            ],
+            config,
+            runner,
+        ),
         run_step(
             "m15_opening_readiness",
             "M15 开盘值守验收",
@@ -190,9 +176,11 @@ def run_background_watchdog_once(
         "live_execution": False,
         "real_money_actions": False,
         "manual_m12_37_once_used": False,
+        "local_research_non_blocking": {
+            "m12_47_managed_elsewhere": True,
+        },
         "plain_language_result": plain_language_result(failed_steps, config.m15_runtime_engine),
         "refs": {
-            "m12_47_config": project_path(config.m12_47_config_path),
             "m15_realtime_supervisor_config": project_path(config.m15_realtime_supervisor_config_path),
             "m15_runtime_engine": config.m15_runtime_engine,
             "m15_sdk_runtime_config": project_path(config.m15_sdk_runtime_config_path),
@@ -315,11 +303,11 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
     if any(token in joined for token in forbidden):
         raise ValueError(f"unsafe watchdog command blocked: {joined}")
     allowed_scripts = {
-        "scripts/run_m12_47_session_supervisor.py",
         "scripts/run_m15_longbridge_realtime_session_supervisor.py",
         "scripts/run_m15_longbridge_realtime_account_state.py",
         "scripts/run_m15_opening_trade_readiness.py",
         "scripts/run_m15_longbridge_sdk_runtime.py",
+        "scripts/run_m15_longbridge_dashboard.py",
     }
     script_tokens = [token for token in command if token.startswith("scripts/")]
     if not script_tokens or script_tokens[0] not in allowed_scripts:
@@ -337,7 +325,7 @@ def clean_text(value: str) -> str:
 def plain_language_result(failed_steps: list[dict[str, Any]], runtime_engine: str) -> str:
     runtime_label = "M15 SDK 实时运行层" if runtime_engine == "sdk" else "M15 实时守护器"
     if not failed_steps:
-        return f"后台看护已完成：M12.47、{runtime_label}、只读账户慢路径和开盘验收已检查；没有手动运行 M12.37 once。"
+        return f"后台看护已完成：{runtime_label}、账户快照慢路径和开盘验收已检查；M12.47 仅保留本地 research 状态，不作为看护前置。"
     failed_labels = "、".join(str(step["label"]) for step in failed_steps)
     return f"后台看护发现异常：{failed_labels} 未通过；不会手动跑 M12.37 once，也不会直接提交订单。"
 
@@ -365,7 +353,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
             "",
             "## 边界",
             "",
-            "- 只维护 M12.47 / M15 守护器。",
+            "- 只维护 M15 运行层与 readiness；M12.47 仅作本地 research 非阻断信息。",
             "- 只通过只读账户脚本做慢路径 analytics 刷新。",
             "- 不手动运行 M12.37 once。",
             "- 不提交、撤销或修改订单。",
@@ -536,12 +524,17 @@ def status(config: BackgroundWatchdogConfig) -> dict[str, Any]:
     existing_pid = read_pid(pid_file)
     alive = bool(existing_pid and process_alive(existing_pid))
     payload = read_json(config.output_dir / SUMMARY_JSON)
+    reported_status = str(payload.get("watchdog_status") or "missing")
+    reported_result = str(payload.get("plain_language_result") or "尚未生成看护状态。")
+    if not alive:
+        reported_status = "stopped"
+        reported_result = "M15 后台看护未运行；历史健康结果已失效。"
     return {
         "pid": existing_pid or "",
         "process_alive": alive,
-        "watchdog_status": payload.get("watchdog_status", "missing"),
+        "watchdog_status": reported_status,
         "generated_at": payload.get("generated_at", ""),
-        "plain_language_result": payload.get("plain_language_result", "尚未生成看护状态。"),
+        "plain_language_result": reported_result,
     }
 
 

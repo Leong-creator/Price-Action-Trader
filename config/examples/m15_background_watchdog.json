@@ -2,12 +2,15 @@
   "stage": "M15.background_watchdog",
   "title": "M15 后台看护器",
   "inputs": {
-    "m12_47_config": "config/examples/m12_47_session_supervisor.json",
     "m15_runtime_engine": "sdk",
     "m15_sdk_runtime_config": "config/examples/m15_longbridge_sdk_runtime.json",
     "m15_realtime_supervisor_config": "config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
     "m15_account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
+    "m15_dashboard_config": "config/examples/m15_longbridge_dashboard.json",
     "readiness_config": "config/examples/m15_opening_trade_readiness.paper_orders_enabled.json"
+  },
+  "compatibility_notes": {
+    "m12_47": "managed outside watchdog; local research non-blocking"
   },
   "outputs": {
     "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_background_watchdog"

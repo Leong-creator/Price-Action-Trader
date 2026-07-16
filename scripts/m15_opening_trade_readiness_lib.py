@@ -37,7 +37,10 @@ DEFAULT_DAILY_DIR = (
 DEFAULT_M12_DIR = DEFAULT_DAILY_DIR / "m12_29_current_day_scan_dashboard"
 DEFAULT_M15_REALTIME_DIR = DEFAULT_DAILY_DIR / "m15_longbridge_realtime_execution"
 DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_opening_trade_readiness"
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_opening_trade_readiness.json"
+# M15 now runs only through the SDK paper runtime.  Keeping the retired CLI
+# readiness config as the implicit default lets an otherwise healthy runtime be
+# reported as dead whenever callers omit --config.
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_opening_trade_readiness.paper_orders_enabled.json"
 READINESS_JSON = "m15_opening_trade_readiness.json"
 READINESS_MD = "m15_opening_trade_readiness.md"
 
@@ -102,6 +105,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
     )
 
 
+def informational_check_row(check: str, required_result: str, **extra: Any) -> dict[str, Any]:
+    row = check_row(check, required_result, "informational", **extra)
+    row["non_blocking"] = True
+    return row
+
+
 def run_m15_opening_trade_readiness(
     config: OpeningTradeReadinessConfig | None = None,
     *,
@@ -151,7 +160,23 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     ).resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     runtime_dispatch_enabled = bool(realtime_status.get("dispatch_enabled", False))
-    effective_paper_orders_enabled = runtime_dispatch_enabled if sdk_config is not None else paper_orders_enabled
+    formal_transition = realtime_status.get("formal_test_transition", {})
+    formal_transition = formal_transition if isinstance(formal_transition, dict) else {}
+    pending_formal_flatten = str(formal_transition.get("status") or "") == "pending_flatten"
+    runtime_dispatch_requested = bool(realtime_status.get("dispatch_requested", False))
+    sdk_paper_channel_armed = bool(
+        sdk_config is not None
+        and sdk_config.paper_order_dispatch_enabled
+        and runtime_dispatch_requested
+        and paper_orders_enabled
+    )
+    if sdk_config is not None:
+        effective_paper_orders_enabled = (
+            sdk_paper_channel_armed if pending_formal_flatten else runtime_dispatch_enabled
+        )
+    else:
+        effective_paper_orders_enabled = paper_orders_enabled
+    new_position_submission_enabled = effective_paper_orders_enabled and not pending_formal_flatten
     readonly_gate_waiting = bool(
         sdk_config is not None
         and sdk_config.two_day_readonly_gate
@@ -175,14 +200,32 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         parse_utc_datetime(generated_at),
     )
     cleanup_enabled = bool(sdk_config is not None or getattr(realtime_config, "run_stale_order_cleanup", False))
-    cleanup_failed = int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
+    sdk_order_maintenance = realtime_status.get("order_maintenance", {}) if sdk_config is not None else {}
+    sdk_order_maintenance = sdk_order_maintenance if isinstance(sdk_order_maintenance, dict) else {}
+    cleanup_status = (
+        str(sdk_order_maintenance.get("status") or "not_yet_run")
+        if sdk_config is not None
+        else str(realtime_status.get("stale_order_cleanup_status") or "")
+    )
+    cleanup_failed = (
+        cleanup_status in {"failed", "blocked"}
+        if sdk_config is not None
+        else int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
+    )
     actual_runtime_ids = execution_summary.get("runtime_ids_seen_this_cycle", []) if isinstance(execution_summary, dict) else []
     recent_execution_inputs = build_recent_execution_inputs(execution_summary, execution_config)
+    if not actual_runtime_ids:
+        actual_runtime_ids = sorted(
+            {
+                str(row.get("runtime_id") or "")
+                for row in recent_execution_inputs
+                if isinstance(row, dict) and str(row.get("runtime_id") or "")
+            }
+        )
     checks = [
-        check_row(
+        informational_check_row(
             "m12_47_daemon_alive",
-            "M12.47 只读看板守护器状态（不作为长桥 SDK 下单前置）",
-            "pass" if m12_alive else "waiting",
+            "M12.47 只作为本地 research/watch 面信息展示，不影响 readiness",
             actual=str(m12_alive),
         ),
         check_row(
@@ -209,7 +252,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             actual=execution_config_error
             or (
                 f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}, "
-                f"runtime_dispatch_enabled={runtime_dispatch_enabled}, "
+                f"runtime_dispatch_enabled={runtime_dispatch_enabled}, runtime_dispatch_requested={runtime_dispatch_requested}, "
                 f"readonly_sessions={realtime_status.get('readonly_sessions_passed', 0)}/{realtime_status.get('readonly_sessions_required', 2)}"
             ),
         ),
@@ -267,16 +310,28 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "fail" if stale_buy_orders and (not cleanup_enabled or cleanup_failed) else "pass",
             actual=(
                 f"stale_buy_orders={len(stale_buy_orders)}, cleanup_enabled={cleanup_enabled}, "
-                f"last_cleanup_status={realtime_status.get('stale_order_cleanup_status', '')}, "
+                f"last_cleanup_status={cleanup_status}, "
                 f"cleanup_failed={cleanup_failed}"
+            ),
+        ),
+        check_row(
+            "formal_test_flatten_transition",
+            "验收持仓清空前只允许平仓，不允许新开仓",
+            "waiting" if pending_formal_flatten else "pass",
+            actual=(
+                f"status={formal_transition.get('status', 'not_configured')}, "
+                f"blocker={formal_transition.get('activation_blocker', '')}"
             ),
         ),
     ]
     fail_count = sum(1 for row in checks if row["status"] == "fail")
     waiting_count = sum(1 for row in checks if row["status"] == "waiting")
     pass_count = sum(1 for row in checks if row["status"] == "pass")
+    informational_count = sum(1 for row in checks if row["status"] == "informational")
     if fail_count:
         readiness_status = "blocked_opening_trade_watch"
+    elif pending_formal_flatten:
+        readiness_status = "ready_for_paper_exit_only" if window["market_phase"] == "regular_session" else "armed_waiting_flatten_session"
     elif window["market_phase"] == "regular_session":
         readiness_status = "ready_for_longbridge_paper_orders"
     else:
@@ -288,6 +343,8 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "readiness_status": readiness_status,
         "market_window": window,
         "paper_order_submission_enabled": effective_paper_orders_enabled,
+        "new_position_submission_enabled": new_position_submission_enabled,
+        "formal_test_transition": formal_transition,
         "m12_47_daemon_alive": m12_alive,
         "m15_realtime_daemon_alive": realtime_alive,
         "m15_realtime_daemon_pid": realtime_pid or "",
@@ -300,6 +357,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "pass_count": pass_count,
         "waiting_count": waiting_count,
         "fail_count": fail_count,
+        "informational_count": informational_count,
         "checks": checks,
         "runtime_whitelist": list(execution_config.allowed_runtime_ids) if execution_config else [],
         "boundaries": {
@@ -323,6 +381,9 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "realtime_account_state": project_path(config.realtime_account_state_path),
             "realtime_supervisor_status": project_path(config.realtime_supervisor_status_path),
             "sdk_runtime_status": project_path(config.sdk_runtime_status_path),
+        },
+        "local_research_non_blocking": {
+            "m12_47_status_only": True,
         },
         "plain_language_result": plain_result(readiness_status, fail_count, waiting_count, window),
     }
@@ -465,6 +526,10 @@ def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[
         return "开盘值守已就绪：长桥模拟账户订单提交已启用，实时链路会在常规交易时段按风控提交模拟订单。"
     if status == "armed_waiting_regular_session":
         return f"开盘值守已武装：当前是{window.get('market_status')}，等待美股常规交易时段；到点后只走长桥模拟账户。"
+    if status == "ready_for_paper_exit_only":
+        return "长桥模拟账户仅允许平仓：先清除 SDK 验收持仓，清仓确认完成后才启用新开仓。"
+    if status == "armed_waiting_flatten_session":
+        return f"清仓链路已武装：当前是{window.get('market_status')}，下个常规交易时段只处理验收持仓退出。"
     return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"
 
 
@@ -478,7 +543,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"- M15 realtime daemon alive: `{payload['m15_realtime_daemon_alive']}`",
         f"- Paper account verified: `{payload['paper_account_verified']}`",
         f"- Actual runtimes seen: `{','.join(payload.get('actual_runtime_ids_seen', [])) or 'none'}`",
-        f"- Pass / waiting / fail: `{payload['pass_count']}/{payload['waiting_count']}/{payload['fail_count']}`",
+        f"- Pass / waiting / fail / informational: `{payload['pass_count']}/{payload['waiting_count']}/{payload['fail_count']}/{payload.get('informational_count', 0)}`",
         f"- Result: {payload['plain_language_result']}",
         "",
         "| Check | Status | Actual |",

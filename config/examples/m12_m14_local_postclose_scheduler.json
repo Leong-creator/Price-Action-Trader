@@ -1,0 +1,19 @@
+{
+  "title": "本地研究与修复系统盘后调度器",
+  "run_id": "m12_m14_local_postclose_scheduler",
+  "stage": "M12-M14.local_postclose_scheduler",
+  "output_dir": "local_runtime/m12_m14_local_postclose_scheduler",
+  "batch_config_path": "config/examples/m12_m14_local_postclose_batch.json",
+  "retention_config_path": "config/examples/m15_artifact_retention.json",
+  "check_interval_seconds": 300,
+  "market_timezone": "America/New_York",
+  "regular_close_time": "16:00",
+  "trigger_delay_minutes": 15,
+  "boundary": {
+    "paper_simulated_only": true,
+    "trading_connection": false,
+    "real_money_actions": false,
+    "live_execution": false,
+    "paper_trading_approval": false
+  }
+}

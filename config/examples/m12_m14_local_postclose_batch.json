@@ -1,5 +1,5 @@
 {
-  "title": "M12/M13/M14 本地盘后一次性批处理",
+  "title": "本地研究与修复系统",
   "run_id": "m12_m14_local_postclose_batch",
   "stage": "M12-M14.local_postclose_batch",
   "market_timezone": "America/New_York",
@@ -24,6 +24,23 @@
     "repaired_universe_snapshot_path": "config/examples/m12_local_repaired_universe_snapshot_147.json"
   },
   "classification": {
+    "longbridge_nightly_reference_runtime_ids": [
+      "M10-PA-004-long-1d", "M10-PA-002-5m", "M12-FTD-001-baseline-1d",
+      "M12-FTD-001-loss-streak-guard-1d", "M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d",
+      "M10-PA-013-5m", "M10-PA-011-ORB-R1-5m", "M10-PA-002-1d", "M10-PA-013-1d",
+      "M10-PA-008-1d", "M10-PA-005-1d", "M10-PA-005-5m", "M10-PA-012-5m",
+      "M10-PA-001-1d", "M10-PA-002-5m-short", "M10-PA-013-5m-short", "M10-PA-011-ORB-R1-5m-short"
+    ],
+    "local_full_repair_runtime_ids": [
+      "M10-PA-001-5m", "M10-PA-007-1d", "M10-PA-009-1d", "M10-PA-011-5m",
+      "M10-PA-001-m14-modify-20260522-1d", "M10-PA-002-m14-modify-20260522-1d",
+      "M10-PA-004-MBF-QC-m14-modify-20260522-1d", "M10-PA-007-m14-modify-20260522-1d",
+      "M10-PA-009-m14-modify-20260522-1d", "M10-PA-008-broker-risk-cap-shadow-1d",
+      "M10-PA-012-m14-modify-20260522-5m",
+      "M10-PA-012-m14-modify-20260522-target-stop-risk_normalized_1_0r-shadow-5m",
+      "M10-PA-013-m14-modify-20260522-1d", "M10-PA-013-m14-modify-20260522-5m",
+      "M12-FTD-001-m14-modify-20260522-1d"
+    ],
     "longbridge_nightly_reference_lanes": [
       "mainline"
     ],

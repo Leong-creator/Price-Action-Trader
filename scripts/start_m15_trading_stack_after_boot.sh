@@ -24,7 +24,11 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
-PYTHON_BIN="${PYTHON_BIN:-python}"
+PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
+if [[ ! -x "$PYTHON_BIN" ]]; then
+  echo "Project virtualenv Python is unavailable: $PYTHON_BIN"
+  exit 1
+fi
 
 run_step() {
   local label="$1"
@@ -32,11 +36,6 @@ run_step() {
   echo "-- $label"
   "$@"
 }
-
-run_step "start M12.47 session supervisor" \
-  "$PYTHON_BIN" scripts/run_m12_47_session_supervisor.py \
-  --daemon \
-  --config config/examples/m12_47_session_supervisor.json
 
 run_step "start M15 Longbridge SDK realtime runtime" \
   "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
@@ -49,10 +48,10 @@ run_step "start M15 background watchdog" \
   --daemon \
   --config config/examples/m15_background_watchdog.json
 
-run_step "check M12.47 status" \
-  "$PYTHON_BIN" scripts/run_m12_47_session_supervisor.py \
-  --status \
-  --config config/examples/m12_47_session_supervisor.json
+run_step "start local postclose scheduler" \
+  "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
+  --daemon \
+  --config config/examples/m12_m14_local_postclose_scheduler.json
 
 run_step "check M15 Longbridge SDK realtime status" \
   "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
@@ -64,8 +63,9 @@ run_step "check M15 background watchdog status" \
   --status \
   --config config/examples/m15_background_watchdog.json
 
-run_step "check opening trade readiness" \
-  "$PYTHON_BIN" scripts/run_m15_opening_trade_readiness.py \
-  --config config/examples/m15_opening_trade_readiness.paper_orders_enabled.json
+run_step "check local postclose scheduler status" \
+  "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
+  --status \
+  --config config/examples/m12_m14_local_postclose_scheduler.json
 
 echo "==== $(date -u +%Y-%m-%dT%H:%M:%SZ) M15 startup bootstrap done ===="
