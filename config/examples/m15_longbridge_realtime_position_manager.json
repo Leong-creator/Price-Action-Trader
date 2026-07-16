@@ -16,9 +16,11 @@
     "manage_untracked_positions_for_exit": true,
     "untracked_stop_loss_percent": "3",
     "untracked_take_profit_percent": "3",
+    "long_exit_limit_discount_percent": "0.5",
+    "short_cover_limit_premium_percent": "0.5",
     "paper_short_testing": {
       "enabled": true,
-      "test_epoch_id": "m15-short-single-strategy-20260713",
+      "test_epoch_id": "m15-sdk-formal-short-strategy-20260716",
       "runtime_ids": [
         "M10-PA-002-5m-short",
         "M10-PA-013-5m-short",

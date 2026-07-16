@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 import unittest
+from dataclasses import replace
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -10,6 +13,7 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     LEDGER_JSONL,
     LongbridgeCliRealtimePaperClient,
     SUMMARY_JSON,
+    load_or_update_test_epoch_state,
     longbridge_order_command,
     load_config,
     run_realtime_execution,
@@ -25,7 +29,50 @@ class FakeRealtimePaperClient:
         return {"submitted": True, "order_id": f"PAPER-{len(self.orders)}"}
 
 
+class SlowRealtimePaperClient(FakeRealtimePaperClient):
+    def submit_order(self, order_payload: dict) -> dict:
+        result = super().submit_order(order_payload)
+        time.sleep(0.02)
+        return result
+
+
 class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
+    def test_live_submission_latency_includes_sequential_broker_queue_time(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = replace(
+                self.make_config(root, execute_orders=True, paper_trading_approval=True),
+                latency_target_ms=1,
+                latency_acceptable_ms=5000,
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(signal_id="first", symbol="AAPL", created_at="2026-06-04T14:00:00Z"),
+                    self.signal(signal_id="second", symbol="MSFT", created_at="2026-06-04T14:00:00Z"),
+                ],
+            )
+
+            payload = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=SlowRealtimePaperClient(),
+            )
+            rows = {
+                row["signal_id"]: row
+                for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            }
+
+            self.assertEqual(rows["first"]["latency_band"], "acceptable")
+            self.assertEqual(rows["second"]["latency_band"], "acceptable")
+            self.assertGreater(rows["second"]["signal_to_request_ms"], rows["first"]["signal_to_request_ms"])
+            self.assertGreaterEqual(rows["second"]["execution_queue_delay_ms"], 20)
+            self.assertEqual(payload["latency_counts"], {
+                "target_met": 0,
+                "acceptable": 2,
+                "delayed_revalidated": 0,
+            })
+
     def test_realtime_execution_does_not_reference_local_simulation_ledger(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -637,6 +684,28 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(payload["unconfirmed_submission_count"], 1)
             self.assertEqual(rows[0]["submission_status"], "submit_unconfirmed_missing_order_id")
             self.assertEqual(rows[0]["longbridge_order_id"], "")
+
+    def test_broker_exception_is_recorded_without_aborting_the_execution_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
+
+            class FailingClient:
+                def submit_order(self, order_payload: dict) -> dict:
+                    raise RuntimeError("symbol not found")
+
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="sig-broker-error")])
+            payload = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=FailingClient(),
+            )
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["attempted_order_count"], 1)
+            self.assertEqual(payload["submitted_count"], 0)
+            self.assertEqual(rows[0]["submission_status"], "broker_submit_failed:RuntimeError")
+            self.assertIn("symbol not found", rows[0]["submission_response"]["error"])
 
     def test_unconfirmed_submission_waits_for_reconciliation_without_retry(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1271,7 +1340,9 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(payload["ready_order_count"], 1)
             self.assertEqual(rows[0]["side"], "sell")
             self.assertEqual(rows[0]["runtime_id"], "M15-LONGBRIDGE-EPOCH-FLATTEN")
-            self.assertEqual(rows[0]["limit_price"], "99.50")
+            self.assertEqual(rows[0]["order_type"], "market")
+            self.assertEqual(rows[0]["limit_price"], "0.00")
+            self.assertEqual(rows[0]["current_price"], "99.50")
             self.assertEqual(epoch["status"], "pending_flatten")
 
     def test_pending_new_epoch_uses_discounted_cost_when_position_has_no_market_price(self) -> None:
@@ -1302,8 +1373,49 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
 
             self.assertEqual(payload["ready_order_count"], 1)
             self.assertEqual(rows[0]["side"], "sell")
-            self.assertEqual(rows[0]["limit_price"], "52.94")
-            self.assertEqual(rows[0]["order_payload"]["limit_price"], "52.94")
+            self.assertEqual(rows[0]["order_type"], "market")
+            self.assertEqual(rows[0]["current_price"], "52.94")
+            self.assertNotIn("limit_price", rows[0]["order_payload"])
+
+    def test_pending_new_epoch_covers_a_confirmed_short_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                account_state={
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "buying_power": "10000",
+                    "positions": [
+                        {
+                            "symbol": "TSLA.US",
+                            "quantity": "3",
+                            "available": "3",
+                            "market_price": "100",
+                            "side": "short",
+                        }
+                    ],
+                    "open_orders": [],
+                    "live_execution": False,
+                    "real_money_actions": False,
+                },
+                test_epoch={
+                    "enabled": True,
+                    "test_epoch_id": "unit-short-reset",
+                    "state_path": str(root / "epoch.json"),
+                    "flatten_existing_positions_before_activation": True,
+                    "archive_previous_records": True,
+                },
+            )
+
+            payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["ready_order_count"], 1)
+            self.assertEqual(rows[0]["side"], "buy")
+            self.assertEqual(rows[0]["position_action"], "close_short")
+            self.assertEqual(rows[0]["order_type"], "market")
+            self.assertEqual(rows[0]["current_price"], "100.50")
 
     def test_close_long_can_sell_existing_position_without_becoming_short(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1389,6 +1501,119 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(rows["exit-only-aapl"]["realtime_decision_status"], "latency_target_met_ready")
             self.assertTrue(rows["exit-only-aapl"]["exit_only_position_signal"])
             self.assertNotIn("blocked_not_whitelisted_runtime", rows["exit-only-aapl"]["blockers"])
+
+    def test_market_entry_stays_blocked_but_exit_only_market_is_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [{"symbol": "AAPL.US", "quantity": "1", "available": "1", "market_price": "100"}],
+                "open_orders": [],
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(root, account_state=account_state)
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(signal_id="entry-market", order_type="market"),
+                    self.signal(
+                        signal_id="exit-market",
+                        runtime_id="M15-LONGBRIDGE-EXIT-ONLY",
+                        strategy_id="M15-LONGBRIDGE-EXIT-ONLY",
+                        side="sell",
+                        order_type="market",
+                        position_action="close_long",
+                        quantity="1",
+                        stop_price="",
+                        target_price="",
+                        risk_amount="0",
+                        net_profit_after_fees_at_target="0.01",
+                        longbridge_position_exit_source=True,
+                        fallback_quote_age_ms=500,
+                    ),
+                ],
+            )
+
+            payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(payload["ready_order_count"], 1)
+            self.assertIn("blocked_market_order_entry_only_exit_supported", rows["entry-market"]["blockers"])
+            self.assertEqual(rows["exit-market"]["order_type"], "market")
+            self.assertEqual(rows["exit-market"]["client_request_id"][:6], "m15rt-")
+
+    def test_market_exit_rejection_falls_back_once_to_marketable_limit_with_fresh_quote(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [{"symbol": "AAPL.US", "quantity": "1", "available": "1", "market_price": "100"}],
+                "open_orders": [],
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(root, account_state=account_state, execute_orders=True, paper_trading_approval=True)
+
+            class FallbackClient:
+                def __init__(self) -> None:
+                    self.orders: list[dict] = []
+
+                def submit_order(self, order_payload: dict) -> dict:
+                    self.orders.append(dict(order_payload))
+                    if len(self.orders) == 1:
+                        return {
+                            "submitted": False,
+                            "status": "submit_rejected_without_order_id",
+                            "order_id": "",
+                            "explicit_reject": True,
+                        }
+                    return {"submitted": True, "status": "submitted", "order_id": "LB-FALLBACK-1"}
+
+            client = FallbackClient()
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="exit-market-fallback",
+                        runtime_id="M15-LONGBRIDGE-EXIT-ONLY",
+                        strategy_id="M15-LONGBRIDGE-EXIT-ONLY",
+                        side="sell",
+                        order_type="market",
+                        position_action="close_long",
+                        quantity="1",
+                        current_price="100.00",
+                        stop_price="",
+                        target_price="",
+                        risk_amount="0",
+                        net_profit_after_fees_at_target="0.01",
+                        longbridge_position_exit_source=True,
+                        fallback_quote_age_ms=500,
+                    )
+                ],
+            )
+
+            payload = run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=client,
+            )
+            row = next(row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL) if row["signal_id"] == "exit-market-fallback")
+
+            self.assertEqual(payload["submitted_count"], 1)
+            self.assertEqual(len(client.orders), 2)
+            self.assertEqual(client.orders[0]["order_type"], "market")
+            self.assertEqual(client.orders[1]["order_type"], "limit")
+            self.assertEqual(client.orders[1]["limit_price"], "99.50")
+            self.assertTrue(row["fallback_attempted"])
+            self.assertTrue(row["submission_fallback_used"])
+            self.assertEqual(row["submission_status"], "submitted")
+            self.assertEqual(row["order_type"], "limit")
+            self.assertEqual(row["longbridge_order_id"], "LB-FALLBACK-1")
 
     def test_close_long_blocks_existing_sell_open_order_same_symbol(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1712,6 +1937,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(row["execution_config_digest"], config.config_digest)
             self.assertTrue(row["execution_run_id"])
             self.assertEqual(row["longbridge_order_id"], "LB-IDENT-1")
+            self.assertEqual(row["client_request_id"], row["order_payload"]["client_request_id"])
 
     def test_stale_account_state_blocks_new_order_on_hot_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1733,6 +1959,39 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
 
             self.assertIn("blocked_account_state_stale", row["blockers"])
             self.assertEqual(row["account_state_age_seconds"], 600)
+
+    def test_epoch_activation_waits_for_positions_open_orders_and_pending_confirmations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                test_epoch={
+                    "enabled": True,
+                    "test_epoch_id": "epoch-1",
+                    "state_path": str(root / "epoch.json"),
+                    "flatten_existing_positions_before_activation": True,
+                },
+            )
+            pending_state = {
+                "positions": [],
+                "open_orders": [{"order_id": "OPEN-1", "status": "Submitted"}],
+                "orders": [{"sdk_pending_confirmation": True}],
+            }
+            epoch = load_or_update_test_epoch_state(
+                config,
+                pending_state,
+                datetime.fromisoformat("2026-06-04T14:00:00+00:00"),
+            )
+            self.assertEqual(epoch["status"], "pending_flatten")
+            self.assertEqual(epoch["activation_blocker"], "waiting_for_flatten_exit_orders_to_finish")
+
+            cleared = load_or_update_test_epoch_state(
+                config,
+                {"positions": [], "open_orders": [], "orders": [], "historical_orders": []},
+                datetime.fromisoformat("2026-06-04T14:01:00+00:00"),
+            )
+            self.assertEqual(cleared["status"], "active")
+            self.assertEqual(cleared["activation_blocker"], "")
 
     def make_config(
         self,

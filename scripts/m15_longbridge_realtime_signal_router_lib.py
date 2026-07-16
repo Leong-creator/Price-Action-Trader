@@ -871,6 +871,44 @@ def detector_signal_candidates(
                 signal["strategy_id"] = "M10-PA-004"
                 signal["timeframe"] = timeframe
                 candidates.append(signal)
+        pa004_variants = {
+            "M10-PA-004-MBF-1d": {
+                "strategy_id": "M10-PA-004-MBF",
+                "min_close_to_close_percent": Decimal("3.00"),
+                "min_gap_percent": Decimal("2.50"),
+                "min_gap_close_to_close_percent": Decimal("1.50"),
+                "min_close_position": Decimal("0.25"),
+                "max_risk_percent": ZERO,
+                "target_r": Decimal("2.00"),
+            },
+            "M10-PA-004-MBF-QC-1d": {
+                "strategy_id": "M10-PA-004-MBF-QC",
+                "min_close_to_close_percent": Decimal("4.00"),
+                "min_gap_percent": Decimal("3.00"),
+                "min_gap_close_to_close_percent": Decimal("2.50"),
+                "min_close_position": Decimal("0.60"),
+                "max_risk_percent": Decimal("5.50"),
+                "target_r": Decimal("1.50"),
+            },
+        }
+        for runtime_id, thresholds in pa004_variants.items():
+            if runtime_id not in set(config.allowed_runtime_ids):
+                continue
+            for (symbol, timeframe), rows in grouped.items():
+                if timeframe != "1d" or len(rows) < 2:
+                    continue
+                signal = pa004_momentum_variant_signal(
+                    symbol,
+                    rows[-2],
+                    rows[-1],
+                    thresholds=thresholds,
+                    generated_at=generated_at,
+                )
+                if signal:
+                    signal["runtime_id"] = runtime_id
+                    signal["strategy_id"] = str(thresholds["strategy_id"])
+                    signal["timeframe"] = timeframe
+                    candidates.append(signal)
     if PRICE_ACTION_REALTIME_DETECTOR in set(config.enabled_detectors):
         candidates.extend(price_action_realtime_candidates(config, grouped, generated_at=generated_at))
     return candidates
@@ -1750,6 +1788,83 @@ def pa004_followthrough_long_signal(
             "minimum_close_position": fmt_decimal(min_close_position),
         },
         "high_quality_signal": quality_score >= Decimal("80"),
+    }
+
+
+def pa004_momentum_variant_signal(
+    symbol: str,
+    previous: dict[str, Any],
+    latest: dict[str, Any],
+    *,
+    thresholds: dict[str, Any],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    if symbol in {"SQQQ", "TQQQ"}:
+        return None
+    previous_close = decimal(previous.get("close", "0"))
+    open_price = decimal(latest.get("open", "0"))
+    high = decimal(latest.get("high", "0"))
+    low = decimal(latest.get("low", "0"))
+    close = decimal(latest.get("close", "0"))
+    if min(previous_close, open_price, high, low, close) <= ZERO or high <= low:
+        return None
+    close_to_close_percent = (close - previous_close) / previous_close * HUNDRED
+    gap_percent = (open_price - previous_close) / previous_close * HUNDRED
+    close_position_value = (close - low) / (high - low)
+    strong_followthrough = close_to_close_percent >= decimal(thresholds["min_close_to_close_percent"])
+    strong_gap_hold = (
+        gap_percent >= decimal(thresholds["min_gap_percent"])
+        and close_to_close_percent >= decimal(thresholds["min_gap_close_to_close_percent"])
+    )
+    if not (strong_followthrough or strong_gap_hold):
+        return None
+    if close_position_value < decimal(thresholds["min_close_position"]):
+        return None
+    risk = max(close - low, close * Decimal("0.025"))
+    if risk <= ZERO:
+        return None
+    risk_percent = risk / close * HUNDRED
+    max_risk_percent = decimal(thresholds.get("max_risk_percent", "0"))
+    if max_risk_percent > ZERO and risk_percent > max_risk_percent:
+        return None
+    target_r = decimal(thresholds["target_r"])
+    volume_ratio = row_volume_ratio(previous, latest)
+    quality_score = base_quality_score(
+        close_position_value=close_position_value,
+        close_to_close_percent=close_to_close_percent,
+        volume_ratio=volume_ratio,
+        reward_r=target_r,
+        net_profit=risk * target_r,
+        risk_percent=risk_percent,
+        market_confirmed=False,
+    )
+    strategy_id = str(thresholds["strategy_id"])
+    return {
+        "detector_id": (
+            "pa004_momentum_breakout_quality_confirmed_realtime"
+            if strategy_id.endswith("-QC")
+            else "pa004_momentum_breakout_followthrough_realtime"
+        ),
+        "symbol": symbol,
+        "direction": "long",
+        "side": "buy",
+        "order_type": "limit",
+        "limit_price": fmt_money(close),
+        "stop_price": fmt_money(close - risk),
+        "target_price": fmt_money(close + risk * target_r),
+        "current_price": fmt_money(close),
+        "source_market_event_id": str(latest.get("event_id") or latest.get("market_event_id") or ""),
+        "market_event_time": str(latest.get("event_time") or latest.get("bar_time") or latest.get("timestamp") or ""),
+        "created_at": str(latest.get("received_at") or to_iso(generated_at)),
+        "close_position": fmt_decimal(close_position_value),
+        "close_to_close_percent": fmt_decimal(close_to_close_percent),
+        "gap_percent": fmt_decimal(gap_percent),
+        "volume_ratio": fmt_decimal(volume_ratio),
+        "quality_score": fmt_decimal(quality_score),
+        "signal_quality_score": fmt_decimal(quality_score),
+        "high_quality_signal": quality_score >= Decimal("80"),
+        "market_confirmation_status": "not_required",
+        "pre_gate_blockers": [],
     }
 
 

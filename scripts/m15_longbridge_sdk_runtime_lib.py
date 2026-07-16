@@ -11,20 +11,32 @@ import json
 import os
 import hashlib
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-from scripts.m15_longbridge_realtime_execution_lib import DEFAULT_DAILY_DIR, parse_utc_datetime, to_iso
+from scripts.m15_longbridge_realtime_execution_lib import DEFAULT_DAILY_DIR, longbridge_symbol, parse_utc_datetime, to_iso
 from scripts.m15_longbridge_realtime_market_event_ingestor_lib import US_LIQUID_SEED_V1
+from scripts.m15_universe_lib import load_m15_universe
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json"
 SUMMARY_JSON = "m15_longbridge_sdk_runtime.json"
 NEW_YORK = ZoneInfo("America/New_York")
+RUNTIME_CODE_PATHS = (
+    ROOT / "scripts" / "m15_longbridge_sdk_runtime_lib.py",
+    ROOT / "scripts" / "run_m15_longbridge_sdk_runtime.py",
+    ROOT / "scripts" / "m15_longbridge_sdk_account_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_signal_router_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_execution_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_position_manager_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_market_event_ingestor_lib.py",
+    ROOT / "scripts" / "m12_liquid_universe_scanner_lib.py",
+    ROOT / "scripts" / "m15_universe_lib.py",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +51,7 @@ class SdkRuntimeConfig:
     trade_region: str
     market: str
     use_seed_universe: bool
+    universe_path: Path | None
     symbol_limit: int
     bar_minutes: int
     maximum_source_delivery_age_ms: int
@@ -68,6 +81,13 @@ class SdkRuntimeConfig:
     real_money_actions: bool
     enable_trade_private_push: bool
     account_maintenance_interval_seconds: int
+    stale_entry_order_ttl_seconds: int
+    exit_order_reprice_seconds: int
+    formal_test_transition_enabled: bool
+    formal_test_epoch_id: str
+    formal_short_test_epoch_id: str
+    formal_test_marker_path: Path
+    formal_test_epoch_state_path: Path
 
 
 def resolve_path(value: str | Path) -> Path:
@@ -83,6 +103,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     market_data = payload.get("market_data", {})
     runtime = payload.get("runtime", {})
     routing = payload.get("routing", {})
+    transition = payload.get("formal_test_transition", {})
     config = SdkRuntimeConfig(
         config_path=config_path,
         output_dir=resolve_path(outputs["output_dir"]),
@@ -94,6 +115,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         trade_region=str(oauth.get("trade_region", "cn")),
         market=str(market_data.get("market", "US")).upper(),
         use_seed_universe=bool(market_data.get("use_seed_universe", True)),
+        universe_path=(
+            resolve_path(market_data["universe_path"])
+            if market_data.get("universe_path")
+            else None
+        ),
         symbol_limit=int(market_data.get("symbol_limit", 147)),
         bar_minutes=int(market_data.get("bar_minutes", 5)),
         maximum_source_delivery_age_ms=int(market_data.get("maximum_source_delivery_age_ms", 2000)),
@@ -131,15 +157,42 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         real_money_actions=bool(runtime.get("real_money_actions", False)),
         enable_trade_private_push=bool(runtime.get("enable_trade_private_push", False)),
         account_maintenance_interval_seconds=int(runtime.get("account_maintenance_interval_seconds", 60)),
+        stale_entry_order_ttl_seconds=int(runtime.get("stale_entry_order_ttl_seconds", 900)),
+        exit_order_reprice_seconds=int(runtime.get("exit_order_reprice_seconds", 60)),
+        formal_test_transition_enabled=bool(transition.get("enabled", False)),
+        formal_test_epoch_id=str(transition.get("test_epoch_id") or ""),
+        formal_short_test_epoch_id=str(transition.get("short_test_epoch_id") or ""),
+        formal_test_marker_path=resolve_path(
+            transition.get(
+                "marker_path",
+                "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/"
+                "m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
+            )
+        ),
+        formal_test_epoch_state_path=resolve_path(
+            transition.get(
+                "epoch_state_path",
+                "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/"
+                "m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
+            )
+        ),
     )
     if not config.paper_trading_only or config.live_execution or config.real_money_actions:
         raise ValueError("M15 SDK runtime must remain paper-only")
     if config.symbol_limit <= 0 or config.symbol_limit > 500:
         raise ValueError("M15 SDK runtime symbol_limit must be between 1 and 500")
+    if config.universe_path is not None:
+        universe_symbols = load_m15_universe(config.universe_path)
+        if config.symbol_limit > len(universe_symbols):
+            raise ValueError("M15 SDK runtime symbol_limit exceeds universe file length")
     if config.bar_minutes != 5:
         raise ValueError("M15 SDK runtime currently supports only 5-minute bars")
     if config.account_maintenance_interval_seconds <= 0:
         raise ValueError("M15 SDK account maintenance interval must be positive")
+    if config.stale_entry_order_ttl_seconds <= 0:
+        raise ValueError("M15 SDK stale entry order TTL must be positive")
+    if config.exit_order_reprice_seconds <= 0:
+        raise ValueError("M15 SDK exit order reprice interval must be positive")
     if config.subscription_batch_size <= 0 or config.subscription_batch_size > 50:
         raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
     if config.subscription_retry_count < 0 or config.subscription_retry_count > 5:
@@ -158,10 +211,37 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK daily context batch size must be between 1 and 25")
     if config.account_snapshot_interval_seconds <= 0 or config.maximum_account_snapshot_age_seconds < config.account_snapshot_interval_seconds:
         raise ValueError("M15 SDK account snapshot timing is invalid")
+    if config.formal_test_transition_enabled and (
+        not config.formal_test_epoch_id or not config.formal_short_test_epoch_id
+    ):
+        raise ValueError("M15 SDK formal test transition requires both epoch ids")
+    validate_formal_epoch_alignment(config)
     return config
 
 
+def validate_formal_epoch_alignment(config: SdkRuntimeConfig) -> None:
+    if not config.formal_test_transition_enabled:
+        return
+    try:
+        execution = json.loads(config.execution_config_path.read_text(encoding="utf-8"))
+        router = json.loads(config.router_config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"M15 SDK formal epoch linked config unreadable:{exc}") from exc
+    execution_epoch = str((execution.get("test_epoch") or {}).get("test_epoch_id") or "")
+    execution_short_epoch = str((execution.get("paper_short_testing") or {}).get("test_epoch_id") or "")
+    router_short_epoch = str((router.get("paper_short_testing") or {}).get("test_epoch_id") or "")
+    if execution_epoch != config.formal_test_epoch_id:
+        raise ValueError("M15 SDK formal long epoch does not match execution config")
+    if execution_short_epoch != config.formal_short_test_epoch_id:
+        raise ValueError("M15 SDK formal short epoch does not match execution config")
+    if router_short_epoch != config.formal_short_test_epoch_id:
+        raise ValueError("M15 SDK formal short epoch does not match router config")
+
+
 def configured_symbols(config: SdkRuntimeConfig) -> tuple[str, ...]:
+    if config.universe_path is not None:
+        symbols = load_m15_universe(config.universe_path)
+        return tuple(f"{symbol}.{config.market}" for symbol in symbols[: config.symbol_limit])
     if not config.use_seed_universe:
         return ()
     return tuple(f"{symbol}.{config.market}" for symbol in US_LIQUID_SEED_V1[: config.symbol_limit])
@@ -227,12 +307,42 @@ def write_daily_context_cache(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def config_fingerprint(config: SdkRuntimeConfig) -> str:
-    """Stable identity used by watchdog/readiness to reject config drift."""
+    """Stable identity used by watchdog/readiness to reject runtime drift."""
+    loaded_values: dict[str, Any] = {}
+    for field in fields(config):
+        value = getattr(config, field.name)
+        if isinstance(value, Path):
+            loaded_values[field.name] = str(value.resolve())
+        elif isinstance(value, tuple):
+            loaded_values[field.name] = list(value)
+        else:
+            loaded_values[field.name] = value
+    linked_files = {}
+    linked_paths = [
+        config.config_path,
+        config.router_config_path,
+        config.execution_config_path,
+        config.account_state_config_path,
+        config.position_manager_config_path,
+        config.stale_order_cleanup_config_path,
+    ]
+    if config.universe_path is not None:
+        linked_paths.append(config.universe_path)
+    for path in linked_paths:
+        try:
+            linked_files[str(path.resolve())] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            linked_files[str(path.resolve())] = "missing"
+    runtime_code_files = {}
+    for path in RUNTIME_CODE_PATHS:
+        try:
+            runtime_code_files[str(path.resolve())] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            runtime_code_files[str(path.resolve())] = "missing"
     payload = {
-        "config": str(config.config_path.resolve()), "symbols": configured_symbols(config),
-        "quote_region": config.quote_region, "trade_region": config.trade_region,
-        "dispatch": config.paper_order_dispatch_enabled, "daily_bars": config.daily_context_bars,
-        "two_day_readonly_gate": config.two_day_readonly_gate,
+        "loaded_values": loaded_values,
+        "linked_files": linked_files,
+        "runtime_code_files": runtime_code_files,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:16]
@@ -281,16 +391,36 @@ def floor_bar_open(value: datetime, minutes: int) -> datetime:
 class FiveMinuteBarBuilder:
     """Build final regular-session bars from SDK quote/trade pushes."""
 
-    def __init__(self, minutes: int = 5) -> None:
+    def __init__(
+        self,
+        minutes: int = 5,
+        *,
+        complete_bar_open_not_before: datetime | None = None,
+    ) -> None:
         self.minutes = minutes
+        self.complete_bar_open_not_before = (
+            complete_bar_open_not_before.astimezone(NEW_YORK)
+            if complete_bar_open_not_before is not None
+            else None
+        )
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
+        self._quote_volume_initialized_symbols: set[str] = set()
 
     def on_quote(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         source_at = unix_to_utc(payload.get("timestamp"), received_at)
         price = decimal(payload.get("last_done"))
         if price <= Decimal("0"):
             return []
-        return self._append(symbol, source_at, received_at, price, int_like(payload.get("current_volume")))
+        normalized_symbol = symbol.upper()
+        volume = int_like(payload.get("current_volume"))
+        if normalized_symbol not in self._quote_volume_initialized_symbols:
+            # Longbridge defines current_volume as the increment between quote
+            # pushes.  The first snapshot on a new subscription has no local
+            # predecessor and may carry the accumulated session volume, so it
+            # is price evidence only.  Later pushes are safe to accumulate.
+            self._quote_volume_initialized_symbols.add(normalized_symbol)
+            volume = 0
+        return self._append(symbol, source_at, received_at, price, volume)
 
     def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
@@ -313,6 +443,8 @@ class FiveMinuteBarBuilder:
         if source_ny.weekday() >= 5 or not (source_ny.hour > 9 or (source_ny.hour == 9 and source_ny.minute >= 30)) or source_ny.hour >= 16:
             return []
         bar_open = floor_bar_open(source_ny, self.minutes)
+        if self.complete_bar_open_not_before is not None and bar_open < self.complete_bar_open_not_before:
+            return self.flush(received_at)
         key = (symbol.upper(), bar_open)
         bar = self._bars.get(key)
         if bar is None:
@@ -400,13 +532,84 @@ def append_market_events(path: Path, rows: list[dict[str, Any]], keep_lines: int
             handle.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
-def fresh_market_events(rows: list[dict[str, Any]], maximum_age_ms: int) -> list[dict[str, Any]]:
-    """Reject delayed pushes before they can create a current order intent."""
-    return [
-        row
-        for row in rows
-        if int_like(row.get("source_delivery_age_ms")) <= maximum_age_ms
-    ]
+def load_current_sdk_intraday_context(
+    path: Path,
+    session_started_at: datetime,
+    *,
+    bars_per_symbol: int = 20,
+) -> list[dict[str, Any]]:
+    """Restore a bounded same-session SDK bar history after a runtime restart.
+
+    These rows are context only: the dispatcher receives only bars delivered
+    after startup, so no historical signal or order can be replayed.
+    """
+    if bars_per_symbol <= 0 or not path.exists():
+        return []
+    session_start = session_started_at.astimezone(UTC)
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    for line in lines:
+        try:
+            row = json.loads(line)
+            received_at = datetime.fromisoformat(str(row.get("received_at") or "").replace("Z", "+00:00"))
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if received_at.astimezone(UTC) < session_start:
+            continue
+        if (
+            str(row.get("source_mode") or "") != "longbridge_sdk_push"
+            or str(row.get("timeframe") or "") != "5m"
+            or not bool(row.get("bar_final"))
+        ):
+            continue
+        symbol = str(row.get("symbol") or "").upper()
+        if not symbol:
+            continue
+        grouped.setdefault((symbol, "5m"), []).append(row)
+    restored: list[dict[str, Any]] = []
+    for rows in grouped.values():
+        rows.sort(key=lambda row: str(row.get("event_time") or row.get("received_at") or ""))
+        restored.extend(rows[-bars_per_symbol:])
+    return sorted(restored, key=lambda row: (str(row.get("event_time") or ""), str(row.get("symbol") or "")))
+
+
+def fresh_market_events(
+    rows: list[dict[str, Any]],
+    maximum_age_ms: int,
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Reject delayed pushes without discarding a freshly finalized bar.
+
+    A quote timestamp is evidence for the price within a five-minute bar, not
+    the time at which the completed bar is delivered.  Liquid symbols can
+    legitimately have no new quote in the final seconds of an interval.  SDK
+    bars are therefore checked against their finalization time, while raw and
+    non-SDK events retain the source-delivery-age guard.
+    """
+    checked_at = (now or datetime.now(UTC)).astimezone(UTC)
+    fresh: list[dict[str, Any]] = []
+    for row in rows:
+        is_final_sdk_bar = (
+            bool(row.get("bar_final"))
+            and str(row.get("source_mode") or "") == "longbridge_sdk_push"
+            and str(row.get("timeframe") or "") == "5m"
+        )
+        if is_final_sdk_bar:
+            try:
+                finalized_at = datetime.fromisoformat(str(row.get("received_at") or "").replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            finalization_age_ms = max(0, int((checked_at - finalized_at.astimezone(UTC)).total_seconds() * 1000))
+            if finalization_age_ms <= maximum_age_ms:
+                fresh.append(row)
+            continue
+        if int_like(row.get("source_delivery_age_ms")) <= maximum_age_ms:
+            fresh.append(row)
+    return fresh
 
 
 def compact_market_events(path: Path, keep_lines: int) -> None:
@@ -481,6 +684,44 @@ def build_status(
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
     config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return payload
+
+
+def summarize_latency_samples(samples: list[int] | tuple[int, ...]) -> dict[str, Any]:
+    """Return stable rolling latency metrics without external dependencies."""
+    values = sorted(max(0, int(value)) for value in samples)
+    if not values:
+        return {}
+
+    def percentile(percent: int) -> int:
+        index = max(0, min(len(values) - 1, ((len(values) * percent + 99) // 100) - 1))
+        return values[index]
+
+    return {
+        "sample_count": len(values),
+        "latest_ms": int(samples[-1]),
+        "p50_ms": percentile(50),
+        "p95_ms": percentile(95),
+        "maximum_ms": values[-1],
+        "within_1s_count": sum(value <= 1000 for value in values),
+        "within_5s_count": sum(value <= 5000 for value in values),
+        "over_5s_count": sum(value > 5000 for value in values),
+    }
+
+
+def load_formal_test_marker(config: SdkRuntimeConfig) -> dict[str, Any]:
+    if not config.formal_test_transition_enabled or not config.formal_test_marker_path.exists():
+        return {}
+    try:
+        marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if str(marker.get("status") or "") not in {"pending_flatten", "scheduled", "active"}:
+        return {}
+    if str(marker.get("test_epoch_id") or "") != config.formal_test_epoch_id:
+        return {}
+    if str(marker.get("short_test_epoch_id") or "") != config.formal_short_test_epoch_id:
+        return {}
+    return marker
 
 
 def read_client_id(config: SdkRuntimeConfig) -> str:
@@ -562,7 +803,13 @@ class SdkRealtimePaperClient:
 
     def submit_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
         side_name = "Buy" if str(order_payload.get("side") or "").lower() == "buy" else "Sell"
-        order_type_name = "LIT" if str(order_payload.get("order_type") or "") == "trigger_limit" else "LO"
+        normalized_order_type = str(order_payload.get("order_type") or "")
+        if normalized_order_type == "trigger_limit":
+            order_type_name = "LIT"
+        elif normalized_order_type == "market":
+            order_type_name = "MO"
+        else:
+            order_type_name = "LO"
         side = getattr(self.sdk.OrderSide, side_name)
         order_type = getattr(self.sdk.OrderType, order_type_name)
         outside_rth = getattr(getattr(self.sdk, "OutsideRTH", None), "RTHOnly", None)
@@ -570,18 +817,32 @@ class SdkRealtimePaperClient:
             raise RuntimeError("sdk_outside_rth_rth_only_unavailable")
         kwargs: dict[str, Any] = {
             "side": side,
-            "symbol": str(order_payload["symbol"]),
+            "symbol": longbridge_symbol(str(order_payload["symbol"])),
             "order_type": order_type,
-            "submitted_price": decimal(order_payload.get("limit_price")),
             "submitted_quantity": decimal(order_payload.get("quantity")),
             "time_in_force": self.sdk.TimeInForceType.Day,
             "outside_rth": outside_rth,
-            "remark": str(order_payload.get("signal_id") or "m15-paper")[:64],
+            "remark": (
+                f"PAT-RT {order_payload.get('signal_id') or 'm15-paper'} "
+                f"{order_payload.get('client_request_id') or ''}"
+            )[:64],
         }
+        if order_type_name != "MO":
+            kwargs["submitted_price"] = decimal(order_payload.get("limit_price"))
         if order_type_name == "LIT":
             kwargs["trigger_price"] = decimal(order_payload.get("trigger_price"))
         callback = lambda: self.trade_context.submit_order(**kwargs)
-        response = self.request_gate.call(callback) if self.request_gate is not None else callback()
+        try:
+            response = self.request_gate.call(callback) if self.request_gate is not None else callback()
+        except Exception as exc:
+            return {
+                "submitted": False,
+                "status": "submit_rejected_without_order_id",
+                "order_id": "",
+                "explicit_reject": True,
+                "error": str(exc)[:500],
+                "response": {"error": str(exc)[:500]},
+            }
         order_id = str(getattr(response, "order_id", "") or "")
         result = {
             "submitted": bool(order_id),
@@ -593,6 +854,26 @@ class SdkRealtimePaperClient:
             self.on_submission(order_payload, result)
         return result
 
+    def cancel_order(self, order_id: str) -> dict[str, Any]:
+        callback = lambda: self.trade_context.cancel_order(str(order_id))
+        self.request_gate.call(callback) if self.request_gate is not None else callback()
+        return {"canceled": True, "status": "cancel_requested", "order_id": str(order_id)}
+
+    def replace_order(self, order_id: str, quantity: Decimal, price: Decimal) -> dict[str, Any]:
+        callback = lambda: self.trade_context.replace_order(
+            str(order_id),
+            decimal(quantity),
+            price=decimal(price),
+        )
+        self.request_gate.call(callback) if self.request_gate is not None else callback()
+        return {
+            "replaced": True,
+            "status": "replace_requested",
+            "order_id": str(order_id),
+            "quantity": fmt(decimal(quantity)),
+            "price": fmt(decimal(price)),
+        }
+
     def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
         # SDK method signatures have changed across releases.  Until the
         # installed SDK exposes a sell-capacity method, keep the short gate
@@ -601,7 +882,7 @@ class SdkRealtimePaperClient:
         if not callable(method):
             return {"ok": False, "status": "short_capacity_sdk_method_unavailable", "max_quantity": Decimal("0"), "elapsed_ms": 0}
         try:
-            callback = lambda: method(symbol, self.sdk.OrderType.LO, price=limit_price, side=self.sdk.OrderSide.Sell)
+            callback = lambda: method(longbridge_symbol(symbol), self.sdk.OrderType.LO, price=limit_price, side=self.sdk.OrderSide.Sell)
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
             quantity = decimal(getattr(response, "cash_max_qty", "0"))
             return {"ok": quantity > 0, "status": "sdk_short_capacity", "max_quantity": quantity, "elapsed_ms": 0}
@@ -614,6 +895,117 @@ def decimal(value: Any) -> Decimal:
         return Decimal(str(value or "0"))
     except Exception:
         return Decimal("0")
+
+
+def sdk_order_maintenance_actions(
+    account_state: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+    market_events: list[dict[str, Any]],
+    *,
+    now: datetime,
+    stale_entry_order_ttl_seconds: int,
+    exit_order_reprice_seconds: int,
+) -> list[dict[str, Any]]:
+    """Plan SDK-native maintenance only for orders attributable to M15 signals."""
+    execution_by_signal = {
+        str(row.get("signal_id") or ""): row
+        for row in execution_rows
+        if isinstance(row, dict) and str(row.get("signal_id") or "")
+    }
+    latest_prices: dict[str, tuple[str, Decimal]] = {}
+    for row in market_events:
+        if str(row.get("timeframe") or "") != "5m":
+            continue
+        symbol = str(row.get("symbol") or "").upper().replace(".US", "")
+        price = decimal(row.get("close"))
+        event_time = str(row.get("event_time") or row.get("received_at") or "")
+        if symbol and price > 0 and (symbol not in latest_prices or event_time >= latest_prices[symbol][0]):
+            latest_prices[symbol] = (event_time, price)
+
+    actions: list[dict[str, Any]] = []
+    for order in account_state.get("open_orders", []):
+        if not isinstance(order, dict) or order.get("sdk_pending_confirmation"):
+            continue
+        order_id = str(order.get("order_id") or "")
+        signal_id = str(order.get("remark") or "")
+        metadata = execution_by_signal.get(signal_id)
+        if not order_id or metadata is None:
+            continue
+        submitted_at = _sdk_order_datetime(order.get("updated_at") or order.get("submitted_at"))
+        if submitted_at is None:
+            continue
+        age_seconds = max(0, int((now.astimezone(UTC) - submitted_at).total_seconds()))
+        side = _sdk_order_side(order.get("side"))
+        position_action = str(metadata.get("position_action") or metadata.get("exit_reason") or "").lower()
+        is_exit = position_action in {"stop_loss", "take_profit", "close_long", "exit_long", "close_short"}
+        quantity = decimal(order.get("quantity"))
+        executed_quantity = decimal(order.get("executed_quantity"))
+        symbol = str(order.get("symbol") or metadata.get("symbol") or "").upper().replace(".US", "")
+
+        if not is_exit:
+            if age_seconds >= stale_entry_order_ttl_seconds:
+                actions.append({
+                    "action": "cancel",
+                    "reason": "stale_entry_order_ttl_expired",
+                    "order_id": order_id,
+                    "signal_id": signal_id,
+                    "symbol": symbol,
+                    "side": side,
+                    "age_seconds": age_seconds,
+                })
+            continue
+
+        if age_seconds < exit_order_reprice_seconds or executed_quantity > 0 or quantity <= 0:
+            continue
+        if str(metadata.get("original_order_type") or metadata.get("order_type") or "") == "market":
+            continue
+        if bool(metadata.get("market_exit_no_reprice")):
+            continue
+        latest_price = latest_prices.get(symbol, ("", Decimal("0")))[1]
+        current_price = decimal(order.get("price"))
+        if latest_price <= 0 or current_price <= 0:
+            continue
+        if position_action == "close_short" and side == "buy":
+            replacement_price = (latest_price * Decimal("1.005")).quantize(Decimal("0.01"), rounding=ROUND_UP)
+            improves_execution = replacement_price > current_price
+            price_source = "current_sdk_price_plus_short_cover_buffer"
+        elif side == "sell":
+            replacement_price = (latest_price * Decimal("0.995")).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+            improves_execution = replacement_price < current_price
+            price_source = "current_sdk_price_minus_long_exit_buffer"
+        else:
+            continue
+        if not improves_execution:
+            continue
+        actions.append({
+            "action": "replace",
+            "reason": "stale_exit_order_repriced",
+            "order_id": order_id,
+            "signal_id": signal_id,
+            "symbol": symbol,
+            "side": side,
+            "position_action": position_action,
+            "quantity": fmt(quantity),
+            "old_price": fmt(current_price),
+            "new_price": fmt(replacement_price),
+            "price_source": price_source,
+            "age_seconds": age_seconds,
+        })
+    return actions
+
+
+def _sdk_order_side(value: Any) -> str:
+    return str(value or "").strip().split(".")[-1].lower().replace("_", "")
+
+
+def _sdk_order_datetime(value: Any) -> datetime | None:
+    raw = str(value or "")
+    if not raw:
+        return None
+    try:
+        return parse_utc_datetime(raw)
+    except ValueError:
+        return None
 
 
 def int_like(value: Any) -> int:

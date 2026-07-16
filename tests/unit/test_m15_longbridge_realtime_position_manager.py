@@ -30,6 +30,8 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             self.assertEqual(signals[0]["side"], "sell")
             self.assertEqual(signals[0]["position_action"], "take_profit")
             self.assertEqual(signals[0]["quantity"], "2")
+            self.assertEqual(signals[0]["limit_price"], "110.44")
+            self.assertEqual(signals[0]["exit_limit_price_source"], "current_price_minus_long_exit_buffer")
             self.assertFalse(signals[0]["local_simulation_source"])
             self.assertTrue(signals[0]["longbridge_position_exit_source"])
             self.assertEqual(rows[0]["manager_status"], "exit_signal_created")
@@ -81,6 +83,36 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             self.assertEqual(second["new_exit_signal_event_count"], 0)
             self.assertEqual(rows[0]["manager_status"], "duplicate_exit_signal_event")
             self.assertEqual(len(signals), 1)
+
+    def test_broker_failed_long_exit_can_issue_a_new_retry_intent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_json(root / "account_state.json", self.account_state())
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event(close="106")])
+            self.write_jsonl(root / "execution_ledger.jsonl", [self.open_row(target_price="105")])
+
+            first = run_realtime_position_manager(config, generated_at="2026-06-04T14:00:00Z")
+            first_signal = self.read_jsonl(root / "signals.jsonl")[0]
+            self.write_jsonl(
+                root / "execution_ledger.jsonl",
+                [self.open_row(target_price="105"), {
+                    "signal_id": first_signal["signal_id"],
+                    "symbol": "AAPL",
+                    "side": "sell",
+                    "position_action": "take_profit",
+                    "exit_reason": "take_profit",
+                    "submission_status": "broker_submit_failed:OpenApiException",
+                    "processed_at": "2026-06-04T14:00:01Z",
+                }],
+            )
+
+            second = run_realtime_position_manager(config, generated_at="2026-06-04T14:01:00Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(first["new_exit_signal_event_count"], 1)
+            self.assertEqual(second["new_exit_signal_event_count"], 1)
+            self.assertEqual(signals[-1]["signal_id"], f"{first_signal['signal_id']}-retry-2")
 
     def test_untracked_position_is_exit_only_takeover_not_local_migration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

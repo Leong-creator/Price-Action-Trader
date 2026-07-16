@@ -63,6 +63,8 @@ class RealtimePositionManagerConfig:
     manage_untracked_positions_for_exit: bool
     untracked_stop_loss_percent: Decimal
     untracked_take_profit_percent: Decimal
+    long_exit_limit_discount_percent: Decimal
+    short_cover_limit_premium_percent: Decimal
     paper_short_testing_enabled: bool
     short_test_epoch_id: str
     paper_short_runtime_ids: tuple[str, ...]
@@ -97,6 +99,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
         manage_untracked_positions_for_exit=bool(manager.get("manage_untracked_positions_for_exit", True)),
         untracked_stop_loss_percent=decimal(manager.get("untracked_stop_loss_percent", "3")),
         untracked_take_profit_percent=decimal(manager.get("untracked_take_profit_percent", "3")),
+        long_exit_limit_discount_percent=decimal(manager.get("long_exit_limit_discount_percent", "0.5")),
+        short_cover_limit_premium_percent=decimal(manager.get("short_cover_limit_premium_percent", "0.5")),
         paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
         short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
         paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
@@ -115,6 +119,10 @@ def validate_config(config: RealtimePositionManagerConfig) -> None:
         config.untracked_stop_loss_percent <= ZERO or config.untracked_take_profit_percent <= ZERO
     ):
         raise ValueError("M15 realtime position manager untracked exit percents must be positive")
+    if not (ZERO < config.long_exit_limit_discount_percent <= Decimal("5")):
+        raise ValueError("M15 realtime position manager long exit limit discount is invalid")
+    if not (ZERO < config.short_cover_limit_premium_percent <= Decimal("5")):
+        raise ValueError("M15 realtime position manager short cover limit premium is invalid")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime position manager must stay paper/simulated only")
     if config.hard_boundaries.get("live_execution", False):
@@ -159,11 +167,12 @@ def run_realtime_position_manager(
     position_slices = account_position_slices(account_state, execution_rows, config.manage_untracked_positions_for_exit)
     position_slices.extend(confirmed_short_position_slices(account_state, execution_rows, config))
     retriable_short_exit_signal_ids = terminal_retriable_short_exit_signal_ids(execution_rows, account_state)
+    retriable_exit_signal_ids = retriable_short_exit_signal_ids | broker_failed_long_exit_signal_ids(execution_rows)
     recent_exit_attempts = recent_exit_attempt_keys(
         execution_rows,
         now,
         config.exit_attempt_cooldown_seconds,
-        retriable_short_exit_signal_ids,
+        retriable_exit_signal_ids,
     )
     ledger_rows: list[dict[str, Any]] = []
     exit_events: list[dict[str, Any]] = []
@@ -178,7 +187,7 @@ def run_realtime_position_manager(
             generated_at_iso,
             existing_signal_ids,
             recent_exit_attempts,
-            retriable_short_exit_signal_ids,
+            retriable_exit_signal_ids,
         )
         ledger_rows.append(row)
         if event and len(exit_events) < config.max_exit_events_per_run:
@@ -252,7 +261,7 @@ def evaluate_position(
     generated_at: str,
     existing_signal_ids: set[str],
     recent_exit_attempts: set[tuple[str, str, str, str]],
-    retriable_short_exit_signal_ids: set[str],
+    retriable_exit_signal_ids: set[str],
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     symbol = str(position["symbol"])
     quantity = decimal(position.get("quantity", "0"))
@@ -342,11 +351,10 @@ def evaluate_position(
         elif exit_attempt_key in recent_exit_attempts:
             status = "recent_exit_attempt_cooldown"
         else:
-            retry_signal_id, retry_attempt = next_short_exit_retry_signal_id(
+            retry_signal_id, retry_attempt = next_exit_retry_signal_id(
                 base_signal_id,
                 existing_signal_ids,
-                retriable_short_exit_signal_ids,
-                position_direction,
+                retriable_exit_signal_ids,
             )
             if retry_signal_id:
                 signal_id = retry_signal_id
@@ -356,6 +364,16 @@ def evaluate_position(
                 status = "duplicate_exit_signal_event"
             if status == "exit_signal_created":
                 exit_quantity = min(quantity, available_quantity)
+                if position_direction == "short":
+                    exit_limit_price = latest_price * (
+                        Decimal("1") + config.short_cover_limit_premium_percent / Decimal("100")
+                    )
+                    exit_limit_price_source = "current_price_plus_short_cover_buffer"
+                else:
+                    exit_limit_price = latest_price * (
+                        Decimal("1") - config.long_exit_limit_discount_percent / Decimal("100")
+                    )
+                    exit_limit_price_source = "current_price_minus_long_exit_buffer"
                 event = {
                     "signal_id": signal_id,
                     "created_at": generated_at,
@@ -368,7 +386,7 @@ def evaluate_position(
                     "position_action": "close_short" if position_direction == "short" else exit_reason,
                     "exit_reason": exit_reason,
                     "order_type": "limit",
-                    "limit_price": fmt_money(latest_price),
+                    "limit_price": fmt_money(exit_limit_price),
                     "current_price": fmt_money(latest_price),
                     "quantity": fmt_decimal(exit_quantity),
                     "notional": fmt_money(exit_quantity * latest_price),
@@ -383,6 +401,7 @@ def evaluate_position(
                     "local_simulation_source": False,
                     "longbridge_position_exit_source": True,
                     "longbridge_untracked_exit_only": management_scope == "longbridge_account_exit_only",
+                    "exit_limit_price_source": exit_limit_price_source,
                 }
     row = {
         "stage": config.stage,
@@ -693,14 +712,23 @@ def terminal_retriable_short_exit_signal_ids(
     return retriable
 
 
-def next_short_exit_retry_signal_id(
+def broker_failed_long_exit_signal_ids(execution_rows: list[dict[str, Any]]) -> set[str]:
+    """Permit a new exit intent after a broker request failed before any order existed."""
+    retriable: set[str] = set()
+    for row in execution_rows:
+        signal_id = str(row.get("signal_id") or "")
+        action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        status = str(row.get("submission_status") or "")
+        if signal_id and action in {"close_long", "exit_long", "stop_loss", "take_profit"} and status.startswith("broker_submit_failed:"):
+            retriable.add(signal_id)
+    return retriable
+
+
+def next_exit_retry_signal_id(
     base_signal_id: str,
     existing_signal_ids: set[str],
-    retriable_short_exit_signal_ids: set[str],
-    position_direction: str,
+    retriable_exit_signal_ids: set[str],
 ) -> tuple[str, int]:
-    if position_direction != "short":
-        return "", 1
     previous_ids: list[tuple[int, str]] = []
     for signal_id in existing_signal_ids:
         if signal_id == base_signal_id:
@@ -715,7 +743,7 @@ def next_short_exit_retry_signal_id(
         return "", 1
     previous_ids.sort()
     last_attempt, last_signal_id = previous_ids[-1]
-    if last_signal_id not in retriable_short_exit_signal_ids:
+    if last_signal_id not in retriable_exit_signal_ids:
         return "", last_attempt
     next_attempt = last_attempt + 1
     return f"{base_signal_id}-retry-{next_attempt}", next_attempt
@@ -725,9 +753,9 @@ def recent_exit_attempt_keys(
     execution_rows: list[dict[str, Any]],
     now: datetime,
     cooldown_seconds: int,
-    retriable_short_exit_signal_ids: set[str] | None = None,
+    retriable_exit_signal_ids: set[str] | None = None,
 ) -> set[tuple[str, str, str, str]]:
-    retriable_short_exit_signal_ids = retriable_short_exit_signal_ids or set()
+    retriable_exit_signal_ids = retriable_exit_signal_ids or set()
     attempts: set[tuple[str, str, str, str]] = set()
     for row in execution_rows:
         position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
@@ -743,7 +771,7 @@ def recent_exit_attempt_keys(
         status = str(row.get("submission_status") or "")
         if not status or status == "blocked_not_submitted":
             continue
-        if position_action == "close_short" and str(row.get("signal_id") or "") in retriable_short_exit_signal_ids:
+        if str(row.get("signal_id") or "") in retriable_exit_signal_ids:
             continue
         attempted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
         if attempted_at and (now - attempted_at).total_seconds() > cooldown_seconds:

@@ -231,8 +231,8 @@
   },
   "paper_short_testing": {
     "enabled": true,
-    "test_epoch_id": "m15-short-single-strategy-20260713",
-    "test_started_at": "2026-07-13T00:00:00Z",
+    "test_epoch_id": "m15-sdk-formal-short-strategy-20260716",
+    "test_started_at": "2026-07-16T13:30:00Z",
     "runtime_ids": [
       "M10-PA-002-5m-short",
       "M10-PA-013-5m-short",

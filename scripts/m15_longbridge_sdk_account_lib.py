@@ -38,6 +38,7 @@ def sdk_plain(value: Any) -> Any:
         "name", "market", "quantity", "available_quantity", "available", "cost_price", "side",
         "status", "order_id", "submitted_quantity", "executed_quantity", "submitted_price", "price",
         "executed_price", "submitted_at", "updated_at", "executed_at", "remark", "order_type",
+        "last_done", "last_price", "market_price", "current_price", "close", "pre_close",
         "sum_profit", "sum_profit_rate", "current_total_asset", "profits", "items", "sublist", "profit", "stock_items",
     ):
         if hasattr(value, key):
@@ -68,6 +69,14 @@ def decimal_text(value: Any) -> str:
 def symbol_text(row: dict[str, Any]) -> str:
     symbol = str(row.get("symbol") or "").upper()
     return symbol if "." in symbol or not symbol else f"{symbol}.US"
+
+
+def order_status_token(value: Any) -> str:
+    return str(value or "").strip().split(".")[-1].lower().replace("_", "")
+
+
+def terminal_order_status(value: Any) -> bool:
+    return order_status_token(value) in {"filled", "cancelled", "canceled", "rejected", "expired"}
 
 
 class SdkTradeRequestGate:
@@ -143,6 +152,8 @@ class SdkAccountStateProvider:
         except Exception as exc:
             errors.append(f"sdk_today_executions_failed:{type(exc).__name__}:{exc}")
         try:
+            # Portfolio analytics uses a separate SDK context and must never
+            # hold the trade request gate needed by a time-sensitive order.
             pnl = sdk_plain(self.portfolio_context.profit_analysis_by_market(market="US"))
         except Exception as exc:
             errors.append(f"sdk_profit_analysis_failed:{type(exc).__name__}:{exc}")
@@ -176,6 +187,12 @@ class SdkAccountStateProvider:
             if symbol_text(row)
         ]
         normalized_orders = [{**row, "symbol": symbol_text(row)} for row in orders if symbol_text(row)]
+        critical_errors = [
+            item
+            for item in errors
+            if item.startswith(("sdk_account_balance", "sdk_stock_positions", "sdk_today_orders"))
+        ]
+        analytics_errors = [item for item in errors if item not in critical_errors]
         usd = currency_cash.get("USD", {})
         total_asset = decimal_text(first_value(pnl, "current_total_asset", "ending_asset_value", default="0"))
         state = {
@@ -185,7 +202,7 @@ class SdkAccountStateProvider:
             "source": "longbridge_sdk_account_and_portfolio",
             "account_channel": self.account_channel,
             "paper_account_detected": self.account_channel == "lb_papertrading",
-            "paper_account_verified": self.account_channel == "lb_papertrading" and not errors,
+            "paper_account_verified": self.account_channel == "lb_papertrading" and not critical_errors,
             "live_execution": False,
             "real_money_actions": False,
             "local_simulation_isolated": True,
@@ -195,6 +212,8 @@ class SdkAccountStateProvider:
             "executions_ok": not any(item.startswith("sdk_today_executions") for item in errors),
             "portfolio_ok": not any(item.startswith("sdk_profit_analysis") for item in errors),
             "errors": errors,
+            "critical_errors": critical_errors,
+            "analytics_errors": analytics_errors,
             "currency_cash": currency_cash,
             "cash": usd.get("available_cash", "0"),
             "usd_available_cash": usd.get("available_cash", "0"),
@@ -207,7 +226,7 @@ class SdkAccountStateProvider:
             "held_symbols": [symbol_text(row).replace(".US", "") for row in normalized_positions],
             "position_row_count": len(normalized_positions),
             "orders": normalized_orders,
-            "open_orders": [row for row in normalized_orders if str(row.get("status") or "").lower() not in {"filled", "cancelled", "canceled", "rejected", "expired"}],
+            "open_orders": [row for row in normalized_orders if not terminal_order_status(row.get("status"))],
             "order_row_count": len(normalized_orders),
             "executions": executions,
             "execution_row_count": len(executions),
