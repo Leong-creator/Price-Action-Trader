@@ -11,9 +11,8 @@ if (-not (Test-Path $wslPath)) {
     throw "wsl.exe not found at $wslPath"
 }
 
-$scriptPath = "./scripts/start_m15_trading_stack_after_boot.sh"
-$bashCommand = "cd $RepoPath && $scriptPath"
-$argument = "-d `"$Distro`" -- bash -lc `"$bashCommand`""
+$scriptPath = "$RepoPath/scripts/start_m15_trading_stack_after_boot.sh"
+$argument = "-d `"$Distro`" --exec bash `"$scriptPath`""
 
 function Install-StartupFolderFallback {
     $startupDir = [Environment]::GetFolderPath("Startup")
@@ -26,7 +25,9 @@ function Install-StartupFolderFallback {
     $vbsPath = Join-Path $startupDir "$TaskName.vbs"
     $launcherPath = Join-Path $startupDir "$TaskName-Launcher.ps1"
     Remove-Item -Force -ErrorAction SilentlyContinue $legacyCmdPath, $legacyWatchdogPath, $launcherPath
-    $wslCommand = "`"$wslPath`" -d `"$Distro`" -- bash -lc `"cd $RepoPath && $scriptPath`""
+    # Avoid nested shell quoting. The bootstrap resolves and enters its own
+    # repository root, so WSL can execute it directly and invisibly.
+    $wslCommand = "$wslPath -d $Distro --exec bash $scriptPath"
     $escapedWslCommand = $wslCommand.Replace('"', '""')
     $vbs = @"
 Set shell = CreateObject("WScript.Shell")

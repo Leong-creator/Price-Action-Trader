@@ -10,8 +10,7 @@
     "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_order_reconciliation.json",
     "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_unfilled_order_diagnostics.json",
     "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl",
-    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json",
-    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state_ledger.jsonl"
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json"
   ],
   "jsonl_rules": [
     {
@@ -32,6 +31,38 @@
       ],
       "row_trading_date_fields": [
         "trading_date"
+      ],
+      "row_test_id_fields": [
+        "test_epoch_id",
+        "test_id"
+      ],
+      "group_priority": [
+        "trading_date",
+        "test_id"
+      ],
+      "min_bytes": 1048576,
+      "keep_active_file": true
+    },
+    {
+      "name": "m15_retired_cli_state_ledgers",
+      "paths": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_session_supervisor_ledger.jsonl",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_equity_curve.jsonl",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state_ledger.jsonl"
+      ],
+      "archive_dir_name": "archive",
+      "active_trading_dates": [],
+      "active_test_ids": [
+        "m15-sdk-formal-single-strategy-20260716",
+        "m15-sdk-formal-short-strategy-20260716"
+      ],
+      "row_time_fields": [
+        "generated_at",
+        "updated_at"
+      ],
+      "row_trading_date_fields": [
+        "trading_date",
+        "market_date"
       ],
       "row_test_id_fields": [
         "test_epoch_id",
