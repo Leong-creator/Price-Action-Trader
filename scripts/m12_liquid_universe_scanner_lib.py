@@ -111,7 +111,7 @@ US_LIQUID_SEED_V1 = (
     "DIS",
     "CMCSA",
     "WBD",
-    "PARA",
+    "PSKY",
     "T",
     "VZ",
     "TMUS",
@@ -366,6 +366,70 @@ def build_universe(config: ScannerConfig) -> list[str]:
     if not 100 <= len(universe) <= 200:
         raise ValueError(f"M12.5 universe must contain 100-200 symbols, got {len(universe)}")
     return universe
+
+
+def build_universe_snapshot(
+    symbols: Iterable[str],
+    *,
+    snapshot_id: str,
+    generated_at: str,
+    source_label: str,
+) -> dict[str, Any]:
+    ordered = [str(symbol) for symbol in symbols]
+    if not ordered:
+        raise ValueError("Universe snapshot cannot be empty")
+    if len(set(ordered)) != len(ordered):
+        raise ValueError("Universe snapshot symbols must be unique")
+    return {
+        "schema_version": "m12.local-universe-snapshot.v1",
+        "snapshot_id": snapshot_id,
+        "generated_at": generated_at,
+        "source_label": source_label,
+        "symbol_count": len(ordered),
+        "symbols": ordered,
+        "positions": [
+            {
+                "symbol": symbol,
+                "position": index + 1,
+            }
+            for index, symbol in enumerate(ordered)
+        ],
+    }
+
+
+def diff_universe_membership_and_order(
+    reference_symbols: Iterable[str],
+    candidate_symbols: Iterable[str],
+) -> dict[str, Any]:
+    reference = [str(symbol) for symbol in reference_symbols]
+    candidate = [str(symbol) for symbol in candidate_symbols]
+    if len(set(reference)) != len(reference):
+        raise ValueError("Reference universe symbols must be unique")
+    if len(set(candidate)) != len(candidate):
+        raise ValueError("Candidate universe symbols must be unique")
+
+    reference_positions = {symbol: index + 1 for index, symbol in enumerate(reference)}
+    candidate_positions = {symbol: index + 1 for index, symbol in enumerate(candidate)}
+    added_symbols = [symbol for symbol in candidate if symbol not in reference_positions]
+    removed_symbols = [symbol for symbol in reference if symbol not in candidate_positions]
+    order_mismatches = [
+        {
+            "symbol": symbol,
+            "reference_position": reference_positions[symbol],
+            "candidate_position": candidate_positions[symbol],
+        }
+        for symbol in reference
+        if symbol in candidate_positions and reference_positions[symbol] != candidate_positions[symbol]
+    ]
+    return {
+        "reference_symbol_count": len(reference),
+        "candidate_symbol_count": len(candidate),
+        "added_symbols": added_symbols,
+        "removed_symbols": removed_symbols,
+        "order_mismatches": order_mismatches,
+        "membership_match": not added_symbols and not removed_symbols,
+        "order_match": not order_mismatches,
+    }
 
 
 def resolve_symbol_data(config: ScannerConfig, symbol: str) -> dict[str, Any]:

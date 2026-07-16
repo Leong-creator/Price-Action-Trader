@@ -22,6 +22,7 @@
     "latency_target_ms": 1000,
     "latency_acceptable_ms": 5000,
     "max_delayed_signal_age_seconds": 60,
+    "max_account_state_age_seconds": 45,
     "daily_new_symbol_limit_by_strategy": {
       "M10-PA-001": 1
     },
@@ -48,7 +49,7 @@
   },
   "test_epoch": {
     "enabled": true,
-    "test_epoch_id": "m15-single-strategy-buckets-20260702",
+    "test_epoch_id": "m15-sdk-formal-single-strategy-20260716",
     "state_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
     "flatten_existing_positions_before_activation": true,
     "archive_previous_records": true
@@ -226,8 +227,8 @@
   },
   "paper_short_testing": {
     "enabled": true,
-    "test_epoch_id": "m15-short-single-strategy-20260713",
-    "test_started_at": "2026-07-13T00:00:00Z",
+    "test_epoch_id": "m15-sdk-formal-short-strategy-20260716",
+    "test_started_at": "2026-07-16T13:30:00Z",
     "runtime_ids": [
       "M10-PA-002-5m-short",
       "M10-PA-013-5m-short",

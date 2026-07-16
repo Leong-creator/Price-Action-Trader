@@ -1,0 +1,62 @@
+{
+  "stage": "M15.longbridge_sdk_runtime",
+  "title": "长桥 SDK 实时行情与纸面交易运行层",
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
+    "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
+    "runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json",
+    "readonly_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_readonly_gate.json"
+  },
+  "oauth": {
+    "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
+    "quote_region": "cn",
+    "trade_region": "cn"
+  },
+  "market_data": {
+    "market": "US",
+    "use_seed_universe": true,
+    "universe_path": null,
+    "symbol_limit": 147,
+    "bar_minutes": 5,
+    "maximum_source_delivery_age_ms": 2000,
+    "event_keep_lines": 0,
+    "daily_context": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl",
+    "daily_context_bars": 60,
+    "daily_context_deadline_seconds": 75,
+    "daily_context_parallel_workers": 1,
+    "daily_context_batch_size": 10
+  },
+  "routing": {
+    "router_config": "config/examples/m15_longbridge_realtime_signal_router.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
+    "account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
+    "position_manager_config": "config/examples/m15_longbridge_realtime_position_manager.json",
+    "stale_order_cleanup_config": "config/examples/m15_longbridge_realtime_stale_order_cleanup.json",
+    "paper_order_dispatch_enabled": true
+  },
+  "runtime": {
+    "heartbeat_interval_seconds": 1,
+    "reconnect_backoff_seconds": 5,
+    "subscription_batch_size": 10,
+    "subscription_retry_count": 2,
+    "subscription_deadline_seconds": 20,
+    "maximum_consecutive_subscription_failures": 3,
+    "account_snapshot_interval_seconds": 15,
+    "maximum_account_snapshot_age_seconds": 45,
+    "two_day_readonly_gate": false,
+    "paper_trading_only": true,
+    "live_execution": false,
+    "real_money_actions": false,
+    "enable_trade_private_push": false,
+    "account_maintenance_interval_seconds": 15,
+    "stale_entry_order_ttl_seconds": 900,
+    "exit_order_reprice_seconds": 60
+  },
+  "formal_test_transition": {
+    "enabled": true,
+    "test_epoch_id": "m15-sdk-formal-single-strategy-20260716",
+    "short_test_epoch_id": "m15-sdk-formal-short-strategy-20260716",
+    "marker_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
+    "epoch_state_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json"
+  }
+}

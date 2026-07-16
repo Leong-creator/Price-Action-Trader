@@ -217,6 +217,7 @@ class RealtimeSignalRouterConfig:
     allowed_runtime_ids: tuple[str, ...]
     enabled_detectors: tuple[str, ...]
     max_signal_events_per_run: int
+    max_market_event_rows_per_hot_run: int
     paper_short_testing_enabled: bool
     paper_short_runtime_ids: tuple[str, ...]
     short_test_epoch_id: str
@@ -286,6 +287,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
             )
         ),
         max_signal_events_per_run=int(router.get("max_signal_events_per_run", 50)),
+        max_market_event_rows_per_hot_run=int(router.get("max_market_event_rows_per_hot_run", 4096)),
         paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
         paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
         short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
@@ -355,6 +357,8 @@ def validate_config(config: RealtimeSignalRouterConfig) -> None:
                 raise ValueError(f"M15 realtime signal router additional bucket route missing bucket: {bucket_id}")
     if config.max_signal_events_per_run <= 0:
         raise ValueError("M15 realtime signal router max_signal_events_per_run must be positive")
+    if config.max_market_event_rows_per_hot_run <= 0:
+        raise ValueError("M15 realtime signal router market event hot window must be positive")
     if config.normal_minimum_net_profit_after_fees < config.minimum_net_profit_after_fees:
         raise ValueError("M15 realtime signal router normal profit threshold must be >= minimum threshold")
     if config.minimum_reward_r < ZERO:
@@ -402,12 +406,19 @@ def run_realtime_signal_router(
     config: RealtimeSignalRouterConfig | None = None,
     *,
     generated_at: str | None = None,
+    market_events_override: list[dict[str, Any]] | None = None,
+    active_market_event_ids: set[str] | None = None,
+    emitted_signal_events: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
     session_started_at = resolve_session_started_at(config.session_started_at, now)
-    raw_market_events = read_jsonl(config.market_events_path)
+    raw_market_events = (
+        list(market_events_override)
+        if market_events_override is not None
+        else read_jsonl_tail(config.market_events_path, config.max_market_event_rows_per_hot_run)
+    )
     market_events = realtime_relevant_market_events(raw_market_events, session_started_at)
     existing_signal_events = read_jsonl(config.signal_events_path)
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
@@ -419,6 +430,13 @@ def run_realtime_signal_router(
 
     raw_intents = embedded_signal_intents(config, market_events)
     raw_intents.extend(detector_signal_candidates(config, market_events, generated_at=now))
+    if active_market_event_ids is not None:
+        raw_intents = [
+            intent
+            for intent in raw_intents
+            if str(intent.get("source_market_event_id") or intent.get("market_event_id") or "")
+            in active_market_event_ids
+        ]
     raw_intents = expand_additional_bucket_routes(config, raw_intents)
     routed_intents, merged_support_intents = merge_confluence_intents(config, raw_intents)
     routed_intents = sorted(routed_intents, key=realtime_intent_sort_key)
@@ -463,6 +481,8 @@ def run_realtime_signal_router(
     config.signal_events_path.parent.mkdir(parents=True, exist_ok=True)
     write_jsonl(config.signal_events_path, existing_signal_events + new_signal_events)
     write_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
+    if emitted_signal_events is not None:
+        emitted_signal_events.extend(new_signal_events)
     summary = {
         "stage": config.stage,
         "title": config.title,
@@ -472,6 +492,10 @@ def run_realtime_signal_router(
         "local_ledger_input_ref": "",
         "legacy_fast_queue_used": False,
         "raw_market_event_count": len(raw_market_events),
+        "market_event_read_mode": "tail_window",
+        "market_event_input_mode": "direct_event_window" if market_events_override is not None else "jsonl_tail",
+        "active_market_event_count": len(active_market_event_ids or ()),
+        "market_event_hot_window_limit": config.max_market_event_rows_per_hot_run,
         "current_session_market_event_count": current_session_market_event_count(raw_market_events, session_started_at),
         "relevant_market_event_count": len(market_events),
         "stale_market_event_ignored_count": max(0, len(raw_market_events) - len(market_events)),
@@ -847,6 +871,44 @@ def detector_signal_candidates(
                 signal["strategy_id"] = "M10-PA-004"
                 signal["timeframe"] = timeframe
                 candidates.append(signal)
+        pa004_variants = {
+            "M10-PA-004-MBF-1d": {
+                "strategy_id": "M10-PA-004-MBF",
+                "min_close_to_close_percent": Decimal("3.00"),
+                "min_gap_percent": Decimal("2.50"),
+                "min_gap_close_to_close_percent": Decimal("1.50"),
+                "min_close_position": Decimal("0.25"),
+                "max_risk_percent": ZERO,
+                "target_r": Decimal("2.00"),
+            },
+            "M10-PA-004-MBF-QC-1d": {
+                "strategy_id": "M10-PA-004-MBF-QC",
+                "min_close_to_close_percent": Decimal("4.00"),
+                "min_gap_percent": Decimal("3.00"),
+                "min_gap_close_to_close_percent": Decimal("2.50"),
+                "min_close_position": Decimal("0.60"),
+                "max_risk_percent": Decimal("5.50"),
+                "target_r": Decimal("1.50"),
+            },
+        }
+        for runtime_id, thresholds in pa004_variants.items():
+            if runtime_id not in set(config.allowed_runtime_ids):
+                continue
+            for (symbol, timeframe), rows in grouped.items():
+                if timeframe != "1d" or len(rows) < 2:
+                    continue
+                signal = pa004_momentum_variant_signal(
+                    symbol,
+                    rows[-2],
+                    rows[-1],
+                    thresholds=thresholds,
+                    generated_at=generated_at,
+                )
+                if signal:
+                    signal["runtime_id"] = runtime_id
+                    signal["strategy_id"] = str(thresholds["strategy_id"])
+                    signal["timeframe"] = timeframe
+                    candidates.append(signal)
     if PRICE_ACTION_REALTIME_DETECTOR in set(config.enabled_detectors):
         candidates.extend(price_action_realtime_candidates(config, grouped, generated_at=generated_at))
     return candidates
@@ -1729,6 +1791,83 @@ def pa004_followthrough_long_signal(
     }
 
 
+def pa004_momentum_variant_signal(
+    symbol: str,
+    previous: dict[str, Any],
+    latest: dict[str, Any],
+    *,
+    thresholds: dict[str, Any],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    if symbol in {"SQQQ", "TQQQ"}:
+        return None
+    previous_close = decimal(previous.get("close", "0"))
+    open_price = decimal(latest.get("open", "0"))
+    high = decimal(latest.get("high", "0"))
+    low = decimal(latest.get("low", "0"))
+    close = decimal(latest.get("close", "0"))
+    if min(previous_close, open_price, high, low, close) <= ZERO or high <= low:
+        return None
+    close_to_close_percent = (close - previous_close) / previous_close * HUNDRED
+    gap_percent = (open_price - previous_close) / previous_close * HUNDRED
+    close_position_value = (close - low) / (high - low)
+    strong_followthrough = close_to_close_percent >= decimal(thresholds["min_close_to_close_percent"])
+    strong_gap_hold = (
+        gap_percent >= decimal(thresholds["min_gap_percent"])
+        and close_to_close_percent >= decimal(thresholds["min_gap_close_to_close_percent"])
+    )
+    if not (strong_followthrough or strong_gap_hold):
+        return None
+    if close_position_value < decimal(thresholds["min_close_position"]):
+        return None
+    risk = max(close - low, close * Decimal("0.025"))
+    if risk <= ZERO:
+        return None
+    risk_percent = risk / close * HUNDRED
+    max_risk_percent = decimal(thresholds.get("max_risk_percent", "0"))
+    if max_risk_percent > ZERO and risk_percent > max_risk_percent:
+        return None
+    target_r = decimal(thresholds["target_r"])
+    volume_ratio = row_volume_ratio(previous, latest)
+    quality_score = base_quality_score(
+        close_position_value=close_position_value,
+        close_to_close_percent=close_to_close_percent,
+        volume_ratio=volume_ratio,
+        reward_r=target_r,
+        net_profit=risk * target_r,
+        risk_percent=risk_percent,
+        market_confirmed=False,
+    )
+    strategy_id = str(thresholds["strategy_id"])
+    return {
+        "detector_id": (
+            "pa004_momentum_breakout_quality_confirmed_realtime"
+            if strategy_id.endswith("-QC")
+            else "pa004_momentum_breakout_followthrough_realtime"
+        ),
+        "symbol": symbol,
+        "direction": "long",
+        "side": "buy",
+        "order_type": "limit",
+        "limit_price": fmt_money(close),
+        "stop_price": fmt_money(close - risk),
+        "target_price": fmt_money(close + risk * target_r),
+        "current_price": fmt_money(close),
+        "source_market_event_id": str(latest.get("event_id") or latest.get("market_event_id") or ""),
+        "market_event_time": str(latest.get("event_time") or latest.get("bar_time") or latest.get("timestamp") or ""),
+        "created_at": str(latest.get("received_at") or to_iso(generated_at)),
+        "close_position": fmt_decimal(close_position_value),
+        "close_to_close_percent": fmt_decimal(close_to_close_percent),
+        "gap_percent": fmt_decimal(gap_percent),
+        "volume_ratio": fmt_decimal(volume_ratio),
+        "quality_score": fmt_decimal(quality_score),
+        "signal_quality_score": fmt_decimal(quality_score),
+        "high_quality_signal": quality_score >= Decimal("80"),
+        "market_confirmation_status": "not_required",
+        "pre_gate_blockers": [],
+    }
+
+
 def build_signal_from_intent(
     *,
     config: RealtimeSignalRouterConfig,
@@ -2222,6 +2361,26 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def read_jsonl_tail(path: Path, count: int, *, block_size: int = 65536) -> list[dict[str, Any]]:
+    """Parse only the newest JSONL rows used by the realtime router."""
+    if not path.exists() or count <= 0:
+        return []
+    with path.open("rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        position = handle.tell()
+        chunks: list[bytes] = []
+        newline_count = 0
+        while position > 0 and newline_count <= count:
+            read_size = min(block_size, position)
+            position -= read_size
+            handle.seek(position)
+            chunk = handle.read(read_size)
+            chunks.append(chunk)
+            newline_count += chunk.count(b"\n")
+    lines = b"".join(reversed(chunks)).decode("utf-8", errors="replace").splitlines()
+    return [json.loads(line) for line in lines[-count:] if line.strip()]
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:

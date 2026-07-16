@@ -17,6 +17,7 @@
       "price_action_realtime_v1"
     ],
     "max_signal_events_per_run": 50,
+    "max_market_event_rows_per_hot_run": 4096,
     "allowed_runtime_ids": [
       "M10-PA-004-long-1d",
       "M10-PA-002-5m",
@@ -230,8 +231,8 @@
   },
   "paper_short_testing": {
     "enabled": true,
-    "test_epoch_id": "m15-short-single-strategy-20260713",
-    "test_started_at": "2026-07-13T00:00:00Z",
+    "test_epoch_id": "m15-sdk-formal-short-strategy-20260716",
+    "test_started_at": "2026-07-16T13:30:00Z",
     "runtime_ids": [
       "M10-PA-002-5m-short",
       "M10-PA-013-5m-short",

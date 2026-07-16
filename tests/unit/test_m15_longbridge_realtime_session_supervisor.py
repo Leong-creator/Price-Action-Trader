@@ -116,6 +116,41 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
             self.assertEqual(payload["account_position_row_count"], 4)
             self.assertEqual(payload["account_open_order_count"], 2)
 
+    def test_hot_path_executes_before_periodic_maintenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "config.json"
+            config_payload = self.config_payload(root)
+            config_payload["realtime_session_supervisor"].update(
+                {"hot_path_execution_first": True, "maintenance_interval_seconds": 60}
+            )
+            self.write_json(path, config_payload)
+            config = load_config(path)
+
+            def runners(calls: list[str]):
+                return {
+                    "ingestor_runner": lambda _ts: calls.append("ingestor") or {},
+                    "router_runner": lambda _ts: calls.append("router") or {},
+                    "account_state_runner": lambda _ts: calls.append("account") or {
+                        "account_status": "paper_account_ready",
+                        "paper_account_verified": True,
+                    },
+                    "stale_order_cleanup_runner": lambda _ts: calls.append("cleanup") or {"canceled_count": 0},
+                    "position_manager_runner": lambda _ts: calls.append("position") or {},
+                    "execution_runner": lambda _ts: calls.append("execution") or {},
+                }
+
+            first_calls: list[str] = []
+            first = run_realtime_session_once(config, generated_at="2026-06-04T14:00:00Z", **runners(first_calls))
+            self.assertEqual(first_calls, ["ingestor", "router", "position", "execution", "account", "cleanup"])
+            self.assertTrue(first["maintenance_due"])
+            self.assertTrue(first["maintenance_last_completed_at"])
+
+            second_calls: list[str] = []
+            second = run_realtime_session_once(config, generated_at="2026-06-04T14:00:01Z", **runners(second_calls))
+            self.assertEqual(second_calls, ["ingestor", "router", "position", "execution"])
+            self.assertFalse(second["maintenance_due"])
+
     def test_waiting_window_falls_back_to_cached_account_state_when_refresh_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

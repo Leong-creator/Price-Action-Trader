@@ -1,0 +1,109 @@
+{
+  "stage": "M15.artifact_retention",
+  "title": "M15/M14 artifact retention",
+  "dry_run_default": true,
+  "archived_file_globs": [
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/archive/*.archived.jsonl",
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/archive/*.archived.log"
+  ],
+  "audit_exempt_paths": [
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_order_reconciliation.json",
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_unfilled_order_diagnostics.json",
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl",
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json",
+    "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state_ledger.jsonl"
+  ],
+  "jsonl_rules": [
+    {
+      "name": "m15_market_events",
+      "paths": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl"
+      ],
+      "archive_dir_name": "archive",
+      "active_trading_dates": [],
+      "active_test_ids": [
+        "m15-sdk-formal-single-strategy-20260716",
+        "m15-sdk-formal-short-strategy-20260716"
+      ],
+      "row_time_fields": [
+        "event_time",
+        "generated_at",
+        "received_at"
+      ],
+      "row_trading_date_fields": [
+        "trading_date"
+      ],
+      "row_test_id_fields": [
+        "test_epoch_id",
+        "test_id"
+      ],
+      "group_priority": [
+        "trading_date",
+        "test_id"
+      ],
+      "min_bytes": 1048576,
+      "keep_active_file": true
+    },
+    {
+      "name": "m14_large_ledgers",
+      "paths": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_challenge_day_ledger.jsonl",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_challenge_day_correction_ledger.jsonl",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_strategy_decision_ledger.jsonl",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_strategy_challenge/m14_internal_paper_execution_ledger.jsonl"
+      ],
+      "archive_dir_name": "archive",
+      "active_trading_dates": [],
+      "active_test_ids": [
+        "m15-sdk-formal-single-strategy-20260716",
+        "m15-sdk-formal-short-strategy-20260716"
+      ],
+      "row_time_fields": [
+        "generated_at",
+        "decision_at"
+      ],
+      "row_trading_date_fields": [
+        "trading_date"
+      ],
+      "row_test_id_fields": [
+        "test_epoch_id",
+        "test_id",
+        "run_id"
+      ],
+      "group_priority": [
+        "trading_date",
+        "test_id"
+      ],
+      "min_bytes": 524288,
+      "keep_active_file": true
+    },
+    {
+      "name": "m15_background_watchdog_log",
+      "paths": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_background_watchdog/m15_background_watchdog.log"
+      ],
+      "archive_dir_name": "archive",
+      "active_trading_dates": [],
+      "active_test_ids": [],
+      "row_time_fields": [],
+      "row_trading_date_fields": [],
+      "row_test_id_fields": [],
+      "group_priority": [
+        "trading_date"
+      ],
+      "min_bytes": 10485760,
+      "keep_active_file": false
+    }
+  ],
+  "snapshot_rules": [
+    {
+      "name": "account_snapshots_keep_latest",
+      "paths": [
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.previous.json",
+        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.previous2.json"
+      ],
+      "keep_latest": 1
+    }
+  ]
+}

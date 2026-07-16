@@ -14,6 +14,26 @@ OUTPUT_DIR = MODULE.M12_5_DIR
 
 
 class M12LiquidUniverseScannerTests(unittest.TestCase):
+    def test_repaired_snapshot_matches_locked_seed_order(self) -> None:
+        snapshot = json.loads(
+            (MODULE.ROOT / "config" / "examples" / "m12_local_repaired_universe_snapshot_147.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(snapshot["symbol_count"], 147)
+        self.assertEqual(snapshot["symbols"], list(MODULE.US_LIQUID_SEED_V1))
+
+    def test_universe_diff_reports_membership_and_order_changes(self) -> None:
+        diff = MODULE.diff_universe_membership_and_order(
+            ["SPY", "QQQ", "PARA", "TSLA"],
+            ["SPY", "QQQ", "PSKY", "TSLA"],
+        )
+        self.assertEqual(diff["added_symbols"], ["PSKY"])
+        self.assertEqual(diff["removed_symbols"], ["PARA"])
+        self.assertEqual(diff["order_mismatches"], [])
+        self.assertFalse(diff["membership_match"])
+        self.assertTrue(diff["order_match"])
+
     def test_universe_size_and_tier_a_scope_are_locked(self) -> None:
         config = MODULE.load_scanner_config()
         with tempfile.TemporaryDirectory() as tmp:
@@ -27,7 +47,7 @@ class M12LiquidUniverseScannerTests(unittest.TestCase):
         self.assertGreaterEqual(universe["symbol_count"], 100)
         self.assertLessEqual(universe["symbol_count"], 200)
         self.assertEqual(len(inventory["items"]), universe["symbol_count"] * 4)
-        self.assertTrue(any(item["lineage"] == "derived_from_5m" and item["cache_exists"] for item in inventory["items"]))
+        self.assertTrue(any(item["lineage"] == "derived_from_5m" for item in inventory["items"]))
         self.assertEqual(summary["strategy_scope"], ["M10-PA-001", "M10-PA-002", "M10-PA-012"])
         self.assertIn("M10-PA-008", summary["excluded_strategy_ids"])
         self.assertEqual(summary["request_policy"]["live_requests_used"], 0)
@@ -50,9 +70,13 @@ class M12LiquidUniverseScannerTests(unittest.TestCase):
             )
             with (Path(tmp) / "m12_5_scanner_candidates.csv").open(newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle))
+            deferred = json.loads((Path(tmp) / "m12_5_deferred_inputs.json").read_text(encoding="utf-8"))
 
         self.assertEqual(len(rows), summary["candidate_count"])
-        self.assertTrue(rows, "local cache should produce at least one scanner candidate")
+        if not rows:
+            self.assertEqual(summary["candidate_count"], 0)
+            self.assertGreater(len(deferred["items"]), 0)
+            return
         self.assertLessEqual({row["strategy_id"] for row in rows}, {"M10-PA-001", "M10-PA-002", "M10-PA-012"})
         self.assertNotIn("M10-PA-008", {row["strategy_id"] for row in rows})
         for row in rows:

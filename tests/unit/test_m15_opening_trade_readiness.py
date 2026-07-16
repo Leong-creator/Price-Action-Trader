@@ -6,7 +6,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.m15_opening_trade_readiness_lib import load_config, run_m15_opening_trade_readiness
+from scripts.m15_opening_trade_readiness_lib import (
+    DEFAULT_CONFIG_PATH,
+    load_config,
+    run_m15_opening_trade_readiness,
+    sdk_runtime_health_issues,
+)
+from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
+from scripts.m15_longbridge_sdk_runtime_lib import configured_symbols as sdk_configured_symbols
+from scripts.m15_longbridge_sdk_runtime_lib import load_config as load_sdk_runtime_config
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     build_window_state,
     config_digest,
@@ -16,6 +24,16 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
 
 
 class M15OpeningTradeReadinessTest(unittest.TestCase):
+    def test_default_readiness_config_targets_active_sdk_paper_runtime(self) -> None:
+        config = load_config()
+
+        self.assertEqual(DEFAULT_CONFIG_PATH.name, "m15_opening_trade_readiness.paper_orders_enabled.json")
+        self.assertEqual(config.realtime_runtime_engine, "sdk")
+        self.assertEqual(
+            config.execution_config_path.name,
+            "m15_longbridge_realtime_execution.paper_orders_enabled.json",
+        )
+
     def test_armed_waiting_regular_session_when_paper_enabled_and_daemons_alive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -31,8 +49,34 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertTrue(payload["paper_account_verified"])
             self.assertEqual(payload["fail_count"], 0)
             self.assertEqual(payload["waiting_count"], 1)
+            self.assertEqual(payload["informational_count"], 1)
             checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["m12_47_daemon_alive"]["status"], "informational")
+            self.assertTrue(checks["m12_47_daemon_alive"]["non_blocking"])
             self.assertIn("process=alive", checks["m15_realtime_daemon_alive"]["actual"])
+
+    def test_pending_flatten_disables_new_positions_without_disabling_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(root, paper_enabled=True, live_execution=False)
+            status_path = root / "realtime" / "m15_longbridge_realtime_session_supervisor.json"
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            status_payload["formal_test_transition"] = {
+                "status": "pending_flatten",
+                "activation_blocker": "validation_flatten_incomplete:connect_timeout",
+            }
+            status_path.write_text(json.dumps(status_payload), encoding="utf-8")
+
+            payload = run_m15_opening_trade_readiness(
+                load_config(config_path),
+                generated_at="2026-06-04T12:20:00Z",
+            )
+
+            self.assertEqual(payload["readiness_status"], "armed_waiting_flatten_session")
+            self.assertTrue(payload["paper_order_submission_enabled"])
+            self.assertFalse(payload["new_position_submission_enabled"])
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["formal_test_flatten_transition"]["status"], "waiting")
 
     def test_blocks_when_execution_config_enables_live_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -75,6 +119,43 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertEqual(checks["m15_realtime_daemon_alive"]["status"], "fail")
             self.assertIn("process=dead", checks["m15_realtime_daemon_alive"]["actual"])
             self.assertIn("status_age_seconds=3600", checks["m15_realtime_daemon_alive"]["actual"])
+
+    def test_sdk_readiness_requires_complete_daily_context(self) -> None:
+        sdk_config = load_sdk_runtime_config()
+        expected_rows = len(sdk_configured_symbols(sdk_config)) * sdk_config.daily_context_bars
+        status = {
+            "status": "running",
+            "sdk_connected": True,
+            "runtime_engine": "sdk",
+            "config_fingerprint": sdk_config_fingerprint(sdk_config),
+            "subscription_coverage": f"{len(sdk_configured_symbols(sdk_config))}/{len(sdk_configured_symbols(sdk_config))}",
+            "daily_context_state": "complete",
+            "daily_context_row_count": expected_rows,
+            "daily_context_failed_symbols": [],
+            "account_snapshot_healthy": True,
+        }
+        self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
+        status["daily_context_state"] = "loading"
+        self.assertIn("sdk_daily_context_incomplete", sdk_runtime_health_issues(status, sdk_config, True))
+
+    def test_m12_47_status_is_informational_only_when_daemon_is_down(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(root, paper_enabled=True, live_execution=False)
+            m12_status = root / "m12_47_status.json"
+            m12_status.write_text(json.dumps({"supervisor_process_alive": False}), encoding="utf-8")
+
+            payload = run_m15_opening_trade_readiness(
+                load_config(config_path),
+                generated_at="2026-06-04T12:20:00Z",
+            )
+
+            self.assertEqual(payload["readiness_status"], "armed_waiting_regular_session")
+            self.assertFalse(payload["m12_47_daemon_alive"])
+            self.assertEqual(payload["fail_count"], 0)
+            self.assertEqual(payload["informational_count"], 1)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["m12_47_daemon_alive"]["status"], "informational")
 
     def write_fixture(self, root: Path, *, paper_enabled: bool, live_execution: bool) -> Path:
         output_dir = root / "realtime"
@@ -241,6 +322,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
                     "stage": "M15.opening_trade_readiness",
                     "inputs": {
                         "m12_47_status": str(m12_status),
+                        "realtime_runtime_engine": "cli",
                         "realtime_supervisor_config": str(supervisor_config),
                         "execution_config": str(execution_config),
                         "realtime_account_state": str(account_state),

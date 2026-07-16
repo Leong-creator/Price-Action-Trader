@@ -80,6 +80,8 @@ class RealtimeSessionSupervisorConfig:
     run_stale_order_cleanup: bool
     run_position_manager: bool
     run_execution: bool
+    hot_path_execution_first: bool
+    maintenance_interval_seconds: int
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -132,6 +134,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSessionSuperv
         run_stale_order_cleanup=bool(session.get("run_stale_order_cleanup", True)),
         run_position_manager=bool(session.get("run_position_manager", True)),
         run_execution=bool(session.get("run_execution", True)),
+        hot_path_execution_first=bool(session.get("hot_path_execution_first", False)),
+        maintenance_interval_seconds=int(session.get("maintenance_interval_seconds", 60)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -143,6 +147,8 @@ def validate_config(config: RealtimeSessionSupervisorConfig) -> None:
         raise ValueError("M15 realtime session supervisor check interval must be positive")
     if config.idle_check_interval_seconds <= 0:
         raise ValueError("M15 realtime session supervisor idle check interval must be positive")
+    if config.maintenance_interval_seconds <= 0:
+        raise ValueError("M15 realtime session supervisor maintenance interval must be positive")
     if config.max_consecutive_failures <= 0:
         raise ValueError("M15 realtime session supervisor max_consecutive_failures must be positive")
     if not (
@@ -265,6 +271,9 @@ def run_realtime_session_once(
     failure_state = ""
     failure_reason = ""
     cycle_ran = False
+    maintenance_due = False
+    maintenance_error = ""
+    maintenance_last_completed_at = str(previous.get("maintenance_last_completed_at") or "")
 
     if not window["session_should_run"]:
         status = "waiting_market_window"
@@ -377,14 +386,25 @@ def run_realtime_session_once(
             execution_runner,
             str(window["session_started_at"]),
         )
-        ordered_step_ids = [
-            "market_event_ingestor",
-            "signal_router",
-            "account_state",
-            "stale_order_cleanup",
-            "position_manager",
-            "paper_execution",
-        ]
+        maintenance_due = maintenance_is_due(config, previous, now)
+        if config.hot_path_execution_first:
+            ordered_step_ids = [
+                "market_event_ingestor",
+                "signal_router",
+                "position_manager",
+                "paper_execution",
+            ]
+            if maintenance_due:
+                ordered_step_ids.extend(["account_state", "stale_order_cleanup"])
+        else:
+            ordered_step_ids = [
+                "market_event_ingestor",
+                "signal_router",
+                "account_state",
+                "stale_order_cleanup",
+                "position_manager",
+                "paper_execution",
+            ]
         for step_id in ordered_step_ids:
             runner = runners.get(step_id)
             if runner is None:
@@ -404,16 +424,20 @@ def run_realtime_session_once(
                 )
             except Exception as exc:  # pragma: no cover - runtime provider path
                 elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
-                failure_state = f"{step_id}_failed"
-                failure_reason = str(exc)[:500]
+                error = str(exc)[:500]
                 step_rows.append(
                     {
                         "step_id": step_id,
                         "status": "failed",
                         "elapsed_ms": elapsed_ms,
-                        "error": failure_reason,
+                        "error": error,
                     }
                 )
+                if config.hot_path_execution_first and step_id in {"account_state", "stale_order_cleanup"}:
+                    maintenance_error = f"{step_id}_failed:{error}"
+                    continue
+                failure_state = f"{step_id}_failed"
+                failure_reason = error
                 status = "cycle_failed"
                 break
             if step_id == "stale_order_cleanup" and cleanup_requires_account_refresh(payload):
@@ -435,18 +459,24 @@ def run_realtime_session_once(
                     )
                 except Exception as exc:  # pragma: no cover - runtime provider path
                     elapsed_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
-                    failure_state = "account_state_after_cleanup_failed"
-                    failure_reason = str(exc)[:500]
+                    error = str(exc)[:500]
                     step_rows.append(
                         {
                             "step_id": "account_state_after_cleanup",
                             "status": "failed",
                             "elapsed_ms": elapsed_ms,
-                            "error": failure_reason,
+                            "error": error,
                         }
                     )
+                    if config.hot_path_execution_first:
+                        maintenance_error = f"account_state_after_cleanup_failed:{error}"
+                        continue
+                    failure_state = "account_state_after_cleanup_failed"
+                    failure_reason = error
                     status = "cycle_failed"
                     break
+        if config.hot_path_execution_first and maintenance_due and not maintenance_error and not failure_state:
+            maintenance_last_completed_at = generated_at_iso
         if not failure_state:
             status = "cycle_completed"
 
@@ -466,6 +496,9 @@ def run_realtime_session_once(
         consecutive_failures=consecutive_failures,
         failure_state=failure_state,
         failure_reason=failure_reason,
+        maintenance_due=maintenance_due,
+        maintenance_last_completed_at=maintenance_last_completed_at,
+        maintenance_error=maintenance_error,
     )
     write_json(status_path(config), summary)
     append_jsonl(ledger_path(config), summary)
@@ -553,6 +586,19 @@ def cleanup_requires_account_refresh(payload: dict[str, Any]) -> bool:
     return int_like(payload.get("canceled_count", 0)) > 0
 
 
+def maintenance_is_due(config: RealtimeSessionSupervisorConfig, previous: dict[str, Any], now: datetime) -> bool:
+    if not config.hot_path_execution_first:
+        return True
+    raw_last_completed_at = str(previous.get("maintenance_last_completed_at") or "")
+    if not raw_last_completed_at:
+        return True
+    try:
+        last_completed_at = parse_utc_datetime(raw_last_completed_at)
+    except (TypeError, ValueError):
+        return True
+    return (now - last_completed_at).total_seconds() >= config.maintenance_interval_seconds
+
+
 def run_account_state_step(account_state_config: Any, *, generated_at: str | None, refresh_analytics: bool) -> dict[str, Any]:
     try:
         return run_realtime_account_state(
@@ -583,6 +629,9 @@ def build_status_payload(
     consecutive_failures: int,
     failure_state: str,
     failure_reason: str,
+    maintenance_due: bool,
+    maintenance_last_completed_at: str,
+    maintenance_error: str,
 ) -> dict[str, Any]:
     ingestor = step_payloads.get("market_event_ingestor", {})
     router = step_payloads.get("signal_router", {})
@@ -605,6 +654,11 @@ def build_status_payload(
         "max_consecutive_failures": config.max_consecutive_failures,
         "failure_state": failure_state,
         "failure_reason": failure_reason,
+        "hot_path_execution_first": config.hot_path_execution_first,
+        "maintenance_due": maintenance_due,
+        "maintenance_interval_seconds": config.maintenance_interval_seconds,
+        "maintenance_last_completed_at": maintenance_last_completed_at,
+        "maintenance_error": maintenance_error,
         "step_rows": step_rows,
         "market_event_count": int_like(router.get("market_event_count", ingestor.get("market_event_total_count", 0))),
         "new_market_event_count": int_like(ingestor.get("new_market_event_count", 0)),

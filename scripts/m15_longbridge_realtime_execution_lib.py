@@ -44,8 +44,11 @@ MAX_EXECUTION_LEDGER_BYTES = 50 * 1024 * 1024
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
+FRESH_FALLBACK_QUOTE_MAX_AGE_MS = 2000
 FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER = Decimal("0.995")
 FLATTEN_FALLBACK_COST_SELL_LIMIT_MULTIPLIER = Decimal("0.95")
+FLATTEN_CURRENT_PRICE_BUY_LIMIT_MULTIPLIER = Decimal("1.005")
+FLATTEN_FALLBACK_COST_BUY_LIMIT_MULTIPLIER = Decimal("1.05")
 OPTION_SYMBOL_RE = re.compile(r"^[A-Z]{1,6}\d{6}[CP]\d{8}$")
 NEW_YORK = ZoneInfo("America/New_York")
 
@@ -213,6 +216,7 @@ class RealtimeExecutionConfig:
     latency_target_ms: int
     latency_acceptable_ms: int
     max_delayed_signal_age_seconds: int
+    max_account_state_age_seconds: int
     allowed_runtime_ids: tuple[str, ...]
     paper_short_testing_enabled: bool
     paper_short_runtime_ids: tuple[str, ...]
@@ -420,6 +424,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
         latency_target_ms=int(realtime.get("latency_target_ms", 1000)),
         latency_acceptable_ms=int(realtime.get("latency_acceptable_ms", 5000)),
         max_delayed_signal_age_seconds=int(realtime.get("max_delayed_signal_age_seconds", 60)),
+        max_account_state_age_seconds=int(realtime.get("max_account_state_age_seconds", 0)),
         allowed_runtime_ids=tuple(
             str(item)
             for item in realtime.get("allowed_runtime_ids", list(DEFAULT_REALTIME_RUNTIME_IDS))
@@ -555,6 +560,8 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
         raise ValueError("M15 realtime execution acceptable latency must be >= target")
     if config.max_delayed_signal_age_seconds <= 0:
         raise ValueError("M15 realtime execution max delayed signal age must be positive")
+    if config.max_account_state_age_seconds < 0:
+        raise ValueError("M15 realtime execution max account-state age cannot be negative")
     if config.normal_minimum_net_profit_after_fees < config.minimum_net_profit_after_fees:
         raise ValueError("M15 realtime execution normal profit threshold must be >= minimum threshold")
     if config.minimum_reward_r < ZERO:
@@ -621,16 +628,25 @@ def run_realtime_execution(
     *,
     generated_at: str | None = None,
     broker_client: Any | None = None,
+    signal_events_override: list[dict[str, Any]] | None = None,
+    account_state_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
+    execution_cycle_started_monotonic = time.monotonic()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
     session_started_at = resolve_session_started_at(config.session_started_at, now)
     execution_run_id = build_execution_run_id(config, now)
     session_run_id = build_session_run_id(config, session_started_at)
-    account_state = read_json(config.paper_account_state_path)
+    # The SDK runtime owns a fresh in-memory account snapshot.  JSON remains
+    # an audit/dashboard projection and must not delay a real-time order.
+    account_state = dict(account_state_override) if account_state_override is not None else read_json(config.paper_account_state_path)
     epoch_state = load_or_update_test_epoch_state(config, account_state, now)
-    signal_events = read_jsonl(config.realtime_signal_events_path)
+    signal_events = (
+        list(signal_events_override)
+        if signal_events_override is not None
+        else read_jsonl(config.realtime_signal_events_path)
+    )
     ledger_retention = compact_execution_ledger_if_needed(
         config.output_dir / LEDGER_JSONL,
         current_epoch_id=str(epoch_state.get("test_epoch_id") or ""),
@@ -749,15 +765,81 @@ def run_realtime_execution(
             broker_client=broker_client,
         )
         row = decision["ledger_row"]
-        if decision["ready"]:
+        ready_for_submission = bool(decision["ready"])
+        broker_request_started_at: datetime | None = None
+        broker_request_started_monotonic = 0.0
+        if ready_for_submission and config.execute_orders:
+            broker_request_started_at = datetime.now(UTC)
+            broker_request_started_monotonic = time.monotonic()
+            execution_queue_delay_ms = max(
+                0,
+                int((broker_request_started_monotonic - execution_cycle_started_monotonic) * 1000),
+            )
+            initial_latency_ms = int_decimal(row.get("latency_ms", 0))
+            signal_to_request_ms = initial_latency_ms + execution_queue_delay_ms
+            row["broker_request_started_at"] = to_iso(broker_request_started_at)
+            row["execution_queue_delay_ms"] = execution_queue_delay_ms
+            row["signal_to_request_ms"] = signal_to_request_ms
+            row["latency_ms"] = signal_to_request_ms
+            row["latency_band"] = latency_band_for(config, signal_to_request_ms)
+            if (
+                initial_latency_ms <= config.latency_acceptable_ms
+                and signal_to_request_ms > config.latency_acceptable_ms
+                and not bool(event.get("realtime_rebuilt_from_delayed_signal"))
+            ):
+                row["blockers"] = list(row.get("blockers", [])) + [
+                    "blocked_delayed_signal_requires_realtime_rebuild"
+                ]
+                row["realtime_decision_status"] = "blocked_execution_queue_latency_requires_rebuild"
+                ready_for_submission = False
+
+        if ready_for_submission:
             ready_count += 1
             order_payload = decision["order_payload"]
             if config.execute_orders:
                 attempted_count += 1
-                broker_request_started_at = datetime.now(UTC)
-                broker_request_started_monotonic = time.monotonic()
-                row["broker_request_started_at"] = to_iso(broker_request_started_at)
-                submission = broker_client.submit_order(order_payload)
+                try:
+                    submission = broker_client.submit_order(order_payload)
+                except Exception as exc:
+                    # A broker-side rejection belongs to this order only.  The
+                    # persistent SDK runtime must remain available for later
+                    # exits and fresh signals.
+                    submission = {
+                        "submitted": False,
+                        "status": f"broker_submit_failed:{type(exc).__name__}",
+                        "order_id": "",
+                        "error": str(exc)[:500],
+                    }
+                if should_retry_market_exit_as_marketable_limit(row, submission, order_payload):
+                    fallback_payload = marketable_limit_fallback_payload(order_payload)
+                    row["fallback_attempted"] = True
+                    row["fallback_order_payload"] = dict(fallback_payload)
+                    try:
+                        fallback_submission = broker_client.submit_order(fallback_payload)
+                    except Exception as exc:
+                        fallback_submission = {
+                            "submitted": False,
+                            "status": f"broker_submit_failed:{type(exc).__name__}",
+                            "order_id": "",
+                            "error": str(exc)[:500],
+                        }
+                    row["fallback_submission_status"] = str(fallback_submission.get("status") or "")
+                    row["submission_response"] = {
+                        "primary": submission,
+                        "fallback": fallback_submission,
+                    }
+                    if fallback_submission.get("submitted") and fallback_submission.get("order_id"):
+                        submission = dict(fallback_submission)
+                        order_payload = fallback_payload
+                        row["order_payload"] = dict(fallback_payload)
+                        row["order_type"] = str(fallback_payload.get("order_type") or row.get("order_type") or "")
+                        row["limit_price"] = str(fallback_payload.get("limit_price") or row.get("limit_price") or "")
+                        row["submission_fallback_used"] = True
+                    else:
+                        submission = {
+                            **submission,
+                            "fallback_submission": fallback_submission,
+                        }
                 broker_response_at = datetime.now(UTC)
                 row["broker_response_at"] = to_iso(broker_response_at)
                 row["broker_request_elapsed_ms"] = max(
@@ -831,6 +913,7 @@ def run_realtime_execution(
         "title": config.title,
         "generated_at": generated_at_iso,
         "source_mode": "longbridge_realtime_signal_events",
+        "signal_event_input_mode": "direct_runtime_events" if signal_events_override is not None else "jsonl_audit_stream",
         "local_simulation_isolated": True,
         "local_ledger_input_ref": "",
         "legacy_fast_queue_status": "audit_only_not_order_source",
@@ -884,6 +967,11 @@ def run_realtime_execution(
         ),
         "delayed_rebuild_required_count": sum(
             1 for row in ledger_rows if "blocked_delayed_signal_requires_realtime_rebuild" in row.get("blockers", [])
+        ),
+        "execution_queue_delay_blocked_count": sum(
+            1
+            for row in ledger_rows
+            if row.get("realtime_decision_status") == "blocked_execution_queue_latency_requires_rebuild"
         ),
         "low_profit_blocked_count": sum(
             1 for row in ledger_rows if "blocked_fee_profit_below_minimum" in row.get("blockers", [])
@@ -1087,7 +1175,15 @@ def evaluate_signal_event(
         blockers.append("blocked_replay_signal_before_session_start")
     if not paper_account_verified(config, account_state):
         blockers.append("blocked_non_paper_account")
-    if not (side == "sell" and exit_only_position_signal):
+    account_state_at = parse_signal_time(account_state.get("generated_at"))
+    account_state_age_seconds = (
+        max(0, int((generated_at - account_state_at).total_seconds())) if account_state_at else None
+    )
+    if config.max_account_state_age_seconds > 0 and (
+        account_state_age_seconds is None or account_state_age_seconds > config.max_account_state_age_seconds
+    ):
+        blockers.append("blocked_account_state_stale")
+    if not exit_only_position_signal:
         blockers.extend(strategy_isolation_blockers(runtime_id, strategy_id, config.allowed_runtime_ids))
     held_quantities = held_symbol_quantities(account_state)
     held_long_quantities = long_held_symbol_quantities(account_state)
@@ -1142,7 +1238,12 @@ def evaluate_signal_event(
         if symbol in existing_submitted_sell_symbols:
             blockers.append("blocked_existing_submitted_sell_same_symbol")
     elif closing_short:
-        if not source_open_order_id:
+        if exit_only_position_signal:
+            if broker_short_quantities.get(symbol, ZERO) <= ZERO:
+                blockers.append("blocked_short_position_state_unverified")
+            elif quantity > broker_short_quantities.get(symbol, ZERO):
+                blockers.append("blocked_close_short_quantity_over_position")
+        elif not source_open_order_id:
             blockers.append("blocked_close_short_missing_source_open_order_id")
         elif tracked_short_quantity <= ZERO:
             blockers.append("blocked_close_short_without_verified_short_position")
@@ -1190,15 +1291,20 @@ def evaluate_signal_event(
                 blockers.append("blocked_strategy_daily_new_symbol_limit")
     if OPTION_SYMBOL_RE.match(symbol):
         blockers.append("blocked_options_disabled")
-    if order_type not in {"limit", "trigger_limit"}:
+    exit_market_allowed = (closing_long or closing_short) and (
+        exit_only_position_signal or runtime_id == "M15-LONGBRIDGE-EPOCH-FLATTEN"
+    )
+    if order_type not in {"limit", "trigger_limit", "market"}:
         blockers.append("blocked_order_type")
+    if order_type == "market" and not exit_market_allowed:
+        blockers.append("blocked_market_order_entry_only_exit_supported")
     if order_type == "trigger_limit" and trigger_price <= ZERO:
         blockers.append("missing_trigger_price")
     if quantity_normalization.blocker:
         blockers.append(quantity_normalization.blocker)
     elif quantity <= ZERO:
         blockers.append("blocked_non_positive_quantity")
-    if limit_price <= ZERO:
+    if order_type != "market" and limit_price <= ZERO:
         blockers.append("missing_limit_price")
     if (opening_long or opening_short) and (stop_price <= ZERO or target_price <= ZERO):
         blockers.append("missing_stop_or_target")
@@ -1354,6 +1460,9 @@ def evaluate_signal_event(
             "source_open_order_id": str(signal.get("source_open_order_id") or ""),
             "short_structure_low": str(signal.get("short_structure_low") or ""),
             "exit_reason": str(signal.get("exit_reason") or ""),
+            "market_exit_no_reprice": bool(order_type == "market" and (closing_long or closing_short)),
+            "fallback_quote_age_ms": fallback_quote_age_ms(signal, generated_at),
+            "current_price": fmt_money(current_price) if current_price > ZERO else "",
         }
     )
     ledger_row = {
@@ -1435,11 +1544,15 @@ def evaluate_signal_event(
         "created_at": to_iso(created_at) if created_at else "",
         "processed_at": to_iso(generated_at),
         "market_event_time": str(signal.get("market_event_time") or ""),
+        "account_state_at": to_iso(account_state_at) if account_state_at else "",
+        "account_state_age_seconds": account_state_age_seconds,
         "risk_check_started_at": to_iso(risk_check_started_at),
         "risk_check_finished_at": to_iso(risk_check_finished_at),
         "risk_check_elapsed_ms": max(0, int((risk_check_finished_at - risk_check_started_at).total_seconds() * 1000)),
         "latency_ms": latency_ms if latency_ms is not None else "",
         "latency_band": latency_band,
+        "signal_to_request_ms": "",
+        "execution_queue_delay_ms": "",
         "signal_age_limit_seconds": age_limit_seconds,
         "signal_age_limit_source": age_limit_source,
         "signal_expires_at": to_iso(signal_expires_at) if signal_expires_at else "",
@@ -1464,6 +1577,11 @@ def evaluate_signal_event(
             else ("blocked" if (closing_long or closing_short) else "")
         ),
         "exit_only_position_signal": exit_only_position_signal,
+        "client_request_id": str(order_payload.get("client_request_id") or ""),
+        "market_exit_no_reprice": bool(order_payload.get("market_exit_no_reprice")),
+        "fallback_quote_age_ms": int_decimal(order_payload.get("fallback_quote_age_ms", -1)),
+        "fallback_attempted": False,
+        "fallback_submission_status": "",
     }
     return {"ready": not blockers, "ledger_row": ledger_row, "order_payload": order_payload}
 
@@ -1502,21 +1620,33 @@ def build_order_payload(
     *,
     position_action: str = "",
 ) -> dict[str, Any]:
+    signal_id = str(signal.get("signal_id") or "")
+    runtime_id = str(signal.get("runtime_id") or "")
+    client_request_id = stable_client_request_id(
+        signal_id=signal_id,
+        runtime_id=runtime_id,
+        symbol=symbol,
+        side=side,
+        position_action=position_action,
+        test_epoch_id=str(signal.get("test_epoch_id") or ""),
+    )
     payload = {
         "source": "longbridge_realtime_signal_event",
-        "signal_id": str(signal.get("signal_id") or ""),
-        "runtime_id": str(signal.get("runtime_id") or ""),
+        "signal_id": signal_id,
+        "runtime_id": runtime_id,
         "strategy_id": str(signal.get("strategy_id") or ""),
         "position_action": position_action
         or str(signal.get("position_action") or signal.get("event_type") or signal.get("action") or ""),
         "symbol": symbol,
         "side": side,
         "order_type": order_type,
+        "client_request_id": client_request_id,
         "quantity": int(quantity),
-        "limit_price": fmt_money(limit_price),
         "time_in_force": str(signal.get("time_in_force") or "day"),
         "outside_rth": "RTH_ONLY",
     }
+    if order_type != "market":
+        payload["limit_price"] = fmt_money(limit_price)
     if order_type == "trigger_limit":
         payload["trigger_price"] = fmt_money(trigger_price)
     return payload
@@ -1543,16 +1673,16 @@ def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, ord
         blockers.append("missing_symbol")
     if quantity <= 0:
         blockers.append("missing_quantity")
-    if not limit_price:
+    if order_type != "market" and not limit_price:
         blockers.append("missing_limit_price")
-    if order_type not in {"limit", "trigger_limit"}:
+    if order_type not in {"limit", "trigger_limit", "market"}:
         blockers.append("unsupported_order_type")
     if order_type == "trigger_limit" and not trigger_price:
         blockers.append("missing_trigger_price")
     if blockers:
         return [], blockers
     remark = (
-        f"PAT-RT {signal_id} {order_payload.get('runtime_id', '')} "
+        f"PAT-RT {signal_id} {order_payload.get('client_request_id', '')} {order_payload.get('runtime_id', '')} "
         f"{position_action or 'open_long'} {order_payload.get('capital_bucket', '')}"
     )[:255]
     command = [
@@ -1561,8 +1691,6 @@ def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, ord
         broker_side,
         symbol,
         str(quantity),
-        "--price",
-        limit_price,
         "--tif",
         config.time_in_force,
         "--outside-rth",
@@ -1573,10 +1701,12 @@ def longbridge_order_command(config: RealtimeExecutionConfig, cli_path: str, ord
         "--format",
         "json",
     ]
-    if order_type == "limit":
-        command.extend(["--order-type", "LO"])
+    if order_type == "market":
+        command.extend(["--order-type", "MO"])
+    elif order_type == "limit":
+        command.extend(["--price", limit_price, "--order-type", "LO"])
     else:
-        command.extend(["--order-type", "LIT", "--trigger-price", trigger_price])
+        command.extend(["--price", limit_price, "--order-type", "LIT", "--trigger-price", trigger_price])
     assert_submit_command(command)
     return command, []
 
@@ -1662,8 +1792,9 @@ def load_or_update_test_epoch_state(
     configured_epoch_id = config.test_epoch_id or f"m15-single-strategy-buckets-{now.astimezone(NEW_YORK).date().isoformat()}"
     current = read_json(config.test_epoch_state_path)
     if str(current.get("test_epoch_id") or "") != configured_epoch_id:
-        has_positions = bool(held_symbol_quantities(account_state))
-        status = "pending_flatten" if config.flatten_existing_positions_before_new_epoch and has_positions else "active"
+        has_positions, has_open_orders, has_pending_confirmations = epoch_activation_state(account_state)
+        needs_flatten = has_positions or has_open_orders or has_pending_confirmations
+        status = "pending_flatten" if config.flatten_existing_positions_before_new_epoch and needs_flatten else "active"
         current = {
             "schema_version": "m15.longbridge-virtual-account-epoch.v1",
             "enabled": True,
@@ -1674,26 +1805,56 @@ def load_or_update_test_epoch_state(
             "archive_before": to_iso(now),
             "archive_previous_records": config.archive_previous_records,
             "flatten_existing_positions_before_activation": config.flatten_existing_positions_before_new_epoch,
-            "activation_blocker": "existing_longbridge_positions_need_flatten" if status == "pending_flatten" else "",
+            "activation_blocker": epoch_activation_blocker(
+                has_positions=has_positions,
+                has_open_orders=has_open_orders,
+                has_pending_confirmations=has_pending_confirmations,
+            ) if status == "pending_flatten" else "",
         }
     elif current.get("status") == "pending_flatten":
-        has_positions = bool(held_symbol_quantities(account_state))
-        has_sell_orders = bool(open_order_quantities_by_side(account_state, "sell"))
-        if not has_positions and not has_sell_orders:
+        has_positions, has_open_orders, has_pending_confirmations = epoch_activation_state(account_state)
+        if not has_positions and not has_open_orders and not has_pending_confirmations:
             current["status"] = "active"
             current["test_started_at"] = to_iso(now)
             current["activated_at"] = to_iso(now)
             current["activation_blocker"] = ""
         else:
-            current["activation_blocker"] = (
-                "waiting_for_flatten_sell_orders_to_finish"
-                if has_sell_orders
-                else "existing_longbridge_positions_need_flatten"
+            current["activation_blocker"] = epoch_activation_blocker(
+                has_positions=has_positions,
+                has_open_orders=has_open_orders,
+                has_pending_confirmations=has_pending_confirmations,
             )
             current["last_flatten_check_at"] = to_iso(now)
     config.test_epoch_state_path.parent.mkdir(parents=True, exist_ok=True)
     write_json(config.test_epoch_state_path, current)
     return current
+
+
+def epoch_activation_state(account_state: dict[str, Any]) -> tuple[bool, bool, bool]:
+    has_positions = bool(held_symbol_quantities(account_state))
+    open_orders = account_state.get("open_orders") if isinstance(account_state.get("open_orders"), list) else []
+    has_open_orders = any(isinstance(row, dict) for row in open_orders)
+    has_pending_confirmations = any(
+        isinstance(row, dict) and bool(row.get("sdk_pending_confirmation"))
+        for key in ("open_orders", "orders", "historical_orders")
+        for row in (account_state.get(key) if isinstance(account_state.get(key), list) else [])
+    )
+    return has_positions, has_open_orders, has_pending_confirmations
+
+
+def epoch_activation_blocker(
+    *,
+    has_positions: bool,
+    has_open_orders: bool,
+    has_pending_confirmations: bool,
+) -> str:
+    if has_positions:
+        return "existing_longbridge_positions_need_flatten"
+    if has_open_orders:
+        return "waiting_for_flatten_exit_orders_to_finish"
+    if has_pending_confirmations:
+        return "waiting_for_flatten_pending_confirmations_to_clear"
+    return ""
 
 
 def test_epoch_state_for_direction(
@@ -1783,15 +1944,24 @@ def build_epoch_flatten_signals(
             row.get("available", row.get("available_quantity", row.get("sellable_quantity", held_quantity)))
         )
         quantity = min(held_quantity, available_quantity) if available_quantity > ZERO else held_quantity
+        short_position = is_short_position_row(row)
         price, price_source = first_positive_decimal_with_key(
             row,
             ("market_price", "last_price", "current_price", "last_done", "price", "cost_price", "average_cost"),
         )
         if price > ZERO:
             if price_source in {"cost_price", "average_cost"}:
-                price *= FLATTEN_FALLBACK_COST_SELL_LIMIT_MULTIPLIER
+                price *= (
+                    FLATTEN_FALLBACK_COST_BUY_LIMIT_MULTIPLIER
+                    if short_position
+                    else FLATTEN_FALLBACK_COST_SELL_LIMIT_MULTIPLIER
+                )
             else:
-                price *= FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER
+                price *= (
+                    FLATTEN_CURRENT_PRICE_BUY_LIMIT_MULTIPLIER
+                    if short_position
+                    else FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER
+                )
         if quantity <= ZERO:
             continue
         signals.append(
@@ -1802,17 +1972,19 @@ def build_epoch_flatten_signals(
                 "strategy_id": "M15-LONGBRIDGE-EPOCH-FLATTEN",
                 "symbol": symbol,
                 "timeframe": "account",
-                "direction": "long",
-                "side": "sell",
-                "position_action": "close_long",
-                "order_type": "limit",
+                "direction": "short" if short_position else "long",
+                "side": "buy" if short_position else "sell",
+                "position_action": "close_short" if short_position else "close_long",
+                "order_type": "market",
                 "quantity": fmt_decimal(quantity.to_integral_value()),
-                "limit_price": fmt_money(price) if price > ZERO else "",
+                "limit_price": "",
                 "current_price": fmt_money(price) if price > ZERO else "",
                 "risk_amount": "0.00",
                 "notional": fmt_money(quantity * price) if price > ZERO else "0.00",
                 "net_profit_after_fees_at_target": "0.00",
                 "flatten_limit_price_source": price_source,
+                "fallback_quote_age_ms": -1,
+                "flatten_position_direction": "short" if short_position else "long",
                 "source_market_event_id": "longbridge_epoch_flatten",
                 "longbridge_position_exit_source": True,
                 "test_epoch_id": str(epoch_state.get("test_epoch_id") or ""),
@@ -2948,9 +3120,34 @@ def normalize_order_type(value: Any) -> str:
     text = str(value or "limit").strip().lower().replace("-", "_")
     if text in {"stop_limit", "trigger_limit", "breakout_limit", "triggered_limit"}:
         return "trigger_limit"
+    if text in {"market", "market_order"}:
+        return "market"
     if text in {"limit", "limit_order"}:
         return "limit"
     return text
+
+
+def stable_client_request_id(
+    *,
+    signal_id: str,
+    runtime_id: str,
+    symbol: str,
+    side: str,
+    position_action: str,
+    test_epoch_id: str,
+) -> str:
+    seed = "|".join(
+        [
+            signal_id.strip(),
+            runtime_id.strip(),
+            symbol.strip().upper(),
+            side.strip().lower(),
+            position_action.strip().lower(),
+            test_epoch_id.strip(),
+        ]
+    )
+    digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:20]
+    return f"m15rt-{digest}"
 
 
 def parent_strategy_id(runtime_id: str) -> str:
@@ -2974,7 +3171,7 @@ def plain_language_result(
 ) -> str:
     epoch_state = epoch_state or {}
     if epoch_state.get("status") == "pending_flatten":
-        return "长桥单策略仓新测试正在等待清空旧持仓；清仓成交确认前，单策略仓和统一实验仓不会接收新的买入信号。"
+        return "长桥单策略仓新测试正在等待清空旧持仓；多头卖出和空头回补成交确认前，单策略仓和统一实验仓不会接收新的开仓信号。"
     if submitted_count:
         return f"长桥实时链路已确认提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
     if attempted_count and unconfirmed_count:
@@ -2986,6 +3183,53 @@ def plain_language_result(
     if blocked_count:
         return "长桥实时链路已隔离本地模拟；当前实时信号都被纸账户风控或策略隔离规则挡住。"
     return "长桥实时链路已就绪；当前没有新的实时信号事件。"
+
+
+def fallback_quote_age_ms(signal: dict[str, Any], generated_at: datetime) -> int:
+    explicit = signal.get("fallback_quote_age_ms")
+    if explicit not in (None, ""):
+        return max(-1, int_decimal(explicit))
+    for key in ("market_event_time", "quote_time", "current_price_time", "source_event_at", "created_at"):
+        quote_time = parse_signal_time(signal.get(key))
+        if quote_time is not None:
+            return max(0, int((generated_at - quote_time).total_seconds() * 1000))
+    return -1
+
+
+def should_retry_market_exit_as_marketable_limit(
+    row: dict[str, Any],
+    submission: dict[str, Any],
+    order_payload: dict[str, Any],
+) -> bool:
+    if not row.get("exit_only_position_signal"):
+        return False
+    if str(order_payload.get("order_type") or "") != "market":
+        return False
+    if row.get("fallback_attempted"):
+        return False
+    if str(submission.get("order_id") or "").strip():
+        return False
+    if not bool(submission.get("explicit_reject")):
+        return False
+    if decimal(order_payload.get("current_price", "0")) <= ZERO:
+        return False
+    quote_age_ms = int_decimal(order_payload.get("fallback_quote_age_ms", row.get("fallback_quote_age_ms", -1)))
+    if quote_age_ms < 0 or quote_age_ms > FRESH_FALLBACK_QUOTE_MAX_AGE_MS:
+        return False
+    return True
+
+
+def marketable_limit_fallback_payload(order_payload: dict[str, Any]) -> dict[str, Any]:
+    side = str(order_payload.get("side") or "").lower()
+    current_price = decimal(order_payload.get("current_price", order_payload.get("fallback_quote_price", "0")))
+    if current_price <= ZERO:
+        return dict(order_payload)
+    multiplier = FLATTEN_CURRENT_PRICE_BUY_LIMIT_MULTIPLIER if side == "buy" else FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER
+    fallback = dict(order_payload)
+    fallback["order_type"] = "limit"
+    fallback["limit_price"] = fmt_money(current_price * multiplier)
+    fallback.pop("trigger_price", None)
+    return fallback
 
 
 def render_report(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
@@ -3182,6 +3426,13 @@ def response_order_id(response: Any) -> str:
             order_id = response_order_id(nested)
             if order_id:
                 return order_id
+        # Longbridge CLI occasionally emits table rows even with --format json.
+        # Accept only the explicit Order ID row, never an arbitrary display value.
+        field = " ".join(str(response.get("field") or "").lower().replace("_", " ").split())
+        if field in {"order id", "order_id", "orderid"}:
+            value = str(response.get("value") or "").strip()
+            if value:
+                return value
     if isinstance(response, list):
         for item in response:
             order_id = response_order_id(item)

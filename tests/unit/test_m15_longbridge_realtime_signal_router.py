@@ -569,6 +569,47 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(signals[0]["market_confirmation_status"], "confirmed")
             self.assertEqual(signals[0]["market_confirmation_symbols"], "SPY")
 
+    def test_pa004_mbf_variants_emit_independent_single_bucket_signals(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                enabled_detectors=["pa004_followthrough_long"],
+                allowed_runtime_ids=["M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"],
+                runtime_position_multipliers={
+                    "M10-PA-004-MBF-1d": "1.0",
+                    "M10-PA-004-MBF-QC-1d": "1.0",
+                },
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="previous-day", symbol="AAPL", event_time="2026-06-03T20:00:00Z",
+                        open="99", high="101", low="98", close="100", volume="1000000",
+                        strategy_signal_intents=[],
+                    ),
+                    self.market_event(
+                        event_id="current-day", symbol="AAPL", event_time="2026-06-04T14:00:00Z",
+                        open="102.5", high="105", low="101", close="104", volume="1200000",
+                        strategy_signal_intents=[],
+                    ),
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 2)
+            self.assertEqual(
+                {row["runtime_id"] for row in signals},
+                {"M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"},
+            )
+            self.assertEqual(
+                {row["capital_bucket"] for row in signals},
+                {"pa004_mbf", "pa004_mbf_qc"},
+            )
+
     def test_quality_sorting_prioritizes_stronger_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

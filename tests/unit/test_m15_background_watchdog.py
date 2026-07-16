@@ -5,10 +5,25 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.m15_background_watchdog_lib import analytics_refresh_due, load_config, run_background_watchdog_once
+from scripts.m15_background_watchdog_lib import analytics_refresh_due, load_config, run_background_watchdog_once, status
 
 
 class M15BackgroundWatchdogTest(unittest.TestCase):
+    def test_status_never_reports_stale_health_when_process_is_dead(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            (config.output_dir / "m15_background_watchdog_status.json").write_text(
+                json.dumps({"watchdog_status": "healthy", "plain_language_result": "old healthy"}),
+                encoding="utf-8",
+            )
+
+            payload = status(config)
+
+            self.assertFalse(payload["process_alive"])
+            self.assertEqual(payload["watchdog_status"], "stopped")
+            self.assertIn("历史健康结果已失效", payload["plain_language_result"])
+
     def test_analytics_refresh_due_honors_interval(self) -> None:
         self.assertFalse(
             analytics_refresh_due("2026-06-04T14:04:59Z", "2026-06-04T14:00:00Z", 300)
@@ -20,7 +35,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
     def test_watchdog_skips_account_analytics_refresh_before_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = self.make_config(root)
+            config = self.make_config(root, runtime_engine="cli")
             config.output_dir.mkdir(parents=True, exist_ok=True)
             (config.output_dir / "m15_background_watchdog_status.json").write_text(
                 json.dumps(
@@ -57,7 +72,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
     def test_watchdog_runs_account_analytics_refresh_after_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = self.make_config(root)
+            config = self.make_config(root, runtime_engine="cli")
             commands: list[list[str]] = []
             timeouts: list[int] = []
 
@@ -77,13 +92,36 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertTrue(any(command[1] == "scripts/run_m15_longbridge_realtime_account_state.py" for command in commands))
             self.assertIn(90, timeouts)
 
-    def make_config(self, root: Path):
+    def test_watchdog_no_longer_runs_or_requires_m12_47_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            commands: list[list[str]] = []
+
+            def runner(command: list[str], _timeout: int):
+                commands.append(command)
+                return type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-06-04T14:05:00Z",
+                command_runner=runner,
+            )
+
+            self.assertTrue(all("run_m12_47_session_supervisor.py" not in " ".join(command) for command in commands))
+            self.assertFalse(any(step["step_id"].startswith("m12_47_") for step in payload["steps"]))
+            self.assertEqual(payload["watchdog_status"], "healthy")
+            self.assertTrue(payload["local_research_non_blocking"]["m12_47_managed_elsewhere"])
+
+    def make_config(self, root: Path, *, runtime_engine: str = "sdk"):
         payload = {
             "stage": "M15.background_watchdog",
             "inputs": {
-                "m12_47_config": str(root / "m12_47.json"),
                 "m15_realtime_supervisor_config": str(root / "supervisor.json"),
+                "m15_runtime_engine": runtime_engine,
+                "m15_sdk_runtime_config": str(root / "sdk_runtime.json"),
                 "m15_account_state_config": str(root / "account_state.json"),
+                "m15_dashboard_config": str(root / "dashboard.json"),
                 "readiness_config": str(root / "readiness.json"),
             },
             "outputs": {
