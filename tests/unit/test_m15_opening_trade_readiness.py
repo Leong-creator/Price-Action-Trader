@@ -157,6 +157,24 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             checks = {row["check"]: row for row in payload["checks"]}
             self.assertEqual(checks["m12_47_daemon_alive"]["status"], "informational")
 
+    def test_m12_47_stale_alive_flag_does_not_override_a_dead_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(root, paper_enabled=True, live_execution=False)
+            m12_status = root / "m12_47_status.json"
+            m12_status.write_text(
+                json.dumps({"supervisor_process_alive": True, "supervisor_pid": 99999999}),
+                encoding="utf-8",
+            )
+
+            payload = run_m15_opening_trade_readiness(
+                load_config(config_path),
+                generated_at="2026-06-04T12:20:00Z",
+            )
+
+            self.assertFalse(payload["m12_47_daemon_alive"])
+            self.assertEqual(payload["fail_count"], 0)
+
     def write_fixture(self, root: Path, *, paper_enabled: bool, live_execution: bool) -> Path:
         output_dir = root / "realtime"
         output_dir.mkdir(parents=True)

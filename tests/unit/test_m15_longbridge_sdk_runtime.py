@@ -786,6 +786,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             currency = "USD"
             available_cash = "1000"
             total_cash = "1000"
+            net_assets = "1100"
+            buy_power = "900"
             settling_cash = "0"
             frozen_cash = "0"
             withdraw_cash = "1000"
@@ -818,8 +820,33 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(state["paper_account_verified"])
         self.assertEqual(state["source"], "longbridge_sdk_account_and_portfolio")
         self.assertEqual(state["usd_available_cash"], "1000")
+        self.assertEqual(state["account_total_equity_estimate"], "1200")
+        self.assertEqual(state["account_total_equity_source"], "longbridge_sdk_portfolio_profit_analysis_by_market")
         self.assertEqual(state["positions"][0]["available"], "2")
         self.assertEqual(state["open_orders"][0]["order_id"], "SDK-1")
+
+    def test_sdk_account_state_falls_back_to_balance_net_assets_with_currency(self) -> None:
+        class Balance:
+            currency = "HKD"
+            cash_infos = []
+            net_assets = "798250.37"
+            buy_power = "764930.79"
+
+        class Trade:
+            def account_balance(self): return [Balance()]
+            def stock_positions(self): return []
+            def today_orders(self): return []
+            def today_executions(self): return []
+
+        class Portfolio:
+            def profit_analysis_by_market(self, **_kwargs): return {"profit": "-305.59"}
+
+        state = SdkAccountStateProvider(Trade(), Portfolio(), request_gate=SdkTradeRequestGate()).refresh()
+
+        self.assertEqual(state["account_total_equity_estimate"], "798250.37")
+        self.assertEqual(state["account_total_equity_currency"], "HKD")
+        self.assertEqual(state["account_total_equity_source"], "longbridge_sdk_account_balance.net_assets")
+        self.assertEqual(state["account_buying_power"], "764930.79")
 
     def test_sdk_account_analytics_failure_does_not_disable_paper_orders(self) -> None:
         class Cash:

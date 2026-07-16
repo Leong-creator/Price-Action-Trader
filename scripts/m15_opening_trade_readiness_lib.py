@@ -154,7 +154,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     realtime_alive = bool(realtime_pid and process_alive(realtime_pid))
     realtime_status_generated_at = str(realtime_status.get("generated_at") or "")
     realtime_status_age_seconds = artifact_age_seconds(realtime_status_generated_at, generated_at)
-    m12_alive = bool(m12_status.get("supervisor_process_alive", False))
+    m12_reported_alive = bool(m12_status.get("supervisor_process_alive", False))
+    try:
+        m12_pid = int(m12_status.get("supervisor_pid") or 0)
+    except (TypeError, ValueError):
+        m12_pid = 0
+    m12_alive = m12_reported_alive and (not m12_pid or process_alive(m12_pid))
     execution_config_linked = config.execution_config_path.resolve() == (
         sdk_config.execution_config_path if sdk_config is not None else realtime_config.execution_config_path
     ).resolve()

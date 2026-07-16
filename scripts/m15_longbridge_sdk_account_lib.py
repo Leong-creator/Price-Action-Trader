@@ -194,7 +194,17 @@ class SdkAccountStateProvider:
         ]
         analytics_errors = [item for item in errors if item not in critical_errors]
         usd = currency_cash.get("USD", {})
-        total_asset = decimal_text(first_value(pnl, "current_total_asset", "ending_asset_value", default="0"))
+        portfolio_total_asset = first_value(pnl, "current_total_asset", "ending_asset_value", default="")
+        balance_total_asset = first_value(balances, "net_assets", default="")
+        if decimal_text(portfolio_total_asset) != "0" or not balance_total_asset:
+            total_asset = decimal_text(portfolio_total_asset)
+            total_asset_source = "longbridge_sdk_portfolio_profit_analysis_by_market"
+            total_asset_currency = "USD" if portfolio_total_asset else ""
+        else:
+            total_asset = decimal_text(balance_total_asset)
+            total_asset_source = "longbridge_sdk_account_balance.net_assets"
+            total_asset_currency = str(first_value(balances, "currency", default=""))
+        buying_power = decimal_text(first_value(balances, "buy_power", "buying_power", default="0"))
         state = {
             "schema_version": "m15.longbridge-sdk-account-state.v1",
             "stage": "M15.longbridge_sdk_account_state",
@@ -221,7 +231,10 @@ class SdkAccountStateProvider:
             "usd_settling_cash": usd.get("settling_cash", "0"),
             "usd_frozen_cash": usd.get("frozen_cash", "0"),
             "account_total_equity_estimate": total_asset,
-            "account_total_equity_source": "longbridge_sdk_portfolio_profit_analysis_by_market",
+            "account_total_equity_source": total_asset_source,
+            "account_total_equity_currency": total_asset_currency,
+            "account_buying_power": buying_power,
+            "account_buying_power_currency": str(first_value(balances, "currency", default="")),
             "positions": normalized_positions,
             "held_symbols": [symbol_text(row).replace(".US", "") for row in normalized_positions],
             "position_row_count": len(normalized_positions),

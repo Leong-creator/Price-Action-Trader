@@ -14,5 +14,10 @@
   "outputs": {
     "json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_dashboard_data.json",
     "html": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_dashboard.html"
+  },
+  "health": {
+    "maximum_runtime_age_seconds": 10,
+    "maximum_account_age_seconds": 45,
+    "maximum_statistics_age_seconds": 300
   }
 }

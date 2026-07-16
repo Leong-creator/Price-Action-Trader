@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,24 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
     return json.loads(_resolve(path).read_text(encoding="utf-8"))
+
+
+def _age_seconds(value: Any, now: datetime) -> float | None:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0.0, (now - parsed.astimezone(timezone.utc)).total_seconds())
+
+
+def _process_alive(pid: Any) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return int(pid) > 0
+    except (OSError, TypeError, ValueError):
+        return False
 
 
 def _inventory(execution_config: dict[str, Any]) -> dict[str, Any]:
@@ -89,6 +108,21 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     pnl = _read_json(_resolve(inputs["pnl_reconciliation"]))
     execution_config = _read_json(_resolve(inputs["execution_config"]))
     local_registry = _read_json(_resolve(inputs["local_runtime_registry"]))
+    timestamp = generated_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(timezone.utc)
+    health = config.get("health") or {}
+    runtime_age = _age_seconds(runtime.get("generated_at"), now)
+    account_age = _age_seconds(account.get("generated_at"), now)
+    summary_age = _age_seconds(account_summary.get("generated_at"), now)
+    orders_age = _age_seconds(reconciliation.get("generated_at"), now)
+    pnl_age = _age_seconds(pnl.get("generated_at"), now)
+    runtime_process_alive = _process_alive(runtime.get("runtime_pid"))
+    runtime_fresh = runtime_age is not None and runtime_age <= float(health.get("maximum_runtime_age_seconds", 10))
+    account_fresh = account_age is not None and account_age <= float(health.get("maximum_account_age_seconds", 45))
+    slow_limit = float(health.get("maximum_statistics_age_seconds", 300))
+    account_summary_fresh = summary_age is not None and summary_age <= slow_limit
+    orders_fresh = orders_age is not None and orders_age <= slow_limit
+    pnl_fresh = pnl_age is not None and pnl_age <= slow_limit
     inventory = _inventory(execution_config)
     coverage = str(runtime.get("subscription_coverage") or "")
     try:
@@ -105,14 +139,28 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         entries_enabled = False
 
     source_checks = {
-        "sdk_runtime": bool(runtime),
-        "account": bool(account),
+        "sdk_runtime": bool(runtime) and runtime_process_alive and runtime_fresh and runtime.get("sdk_connected") is True,
+        "account": bool(account) and account_fresh,
         "execution": bool(execution),
-        "orders": bool(reconciliation),
-        "pnl": bool(pnl),
+        "account_statistics": bool(account_summary) and account_summary_fresh,
+        "orders": bool(reconciliation) and orders_fresh,
+        "pnl": bool(pnl) and pnl_fresh,
     }
-    trustworthy = all(source_checks.values()) and bool(account.get("paper_account_verified"))
-    timestamp = generated_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    trading_sources_trustworthy = (
+        source_checks["sdk_runtime"]
+        and source_checks["account"]
+        and bool(account.get("paper_account_verified"))
+    )
+    statistics_trustworthy = all(
+        source_checks[key] for key in ("account_statistics", "orders", "pnl")
+    )
+    data_status = (
+        "trustworthy"
+        if trading_sources_trustworthy and statistics_trustworthy
+        else "trading_ready_statistics_stale"
+        if trading_sources_trustworthy
+        else "temporarily_unavailable"
+    )
     return {
         "schema_version": "1.0",
         "stage": "M15.longbridge_dashboard",
@@ -122,11 +170,13 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         "local_simulation_isolated": True,
         "legacy_queue_used": False,
         "legacy_cli_used": False,
-        "data_status": "trustworthy" if trustworthy else "temporarily_unavailable",
+        "data_status": data_status,
         "source_checks": source_checks,
         "runtime": {
             "runtime_engine": runtime.get("runtime_engine"),
             "status": runtime.get("status"),
+            "runtime_process_alive": runtime_process_alive,
+            "runtime_status_age_seconds": runtime_age,
             "sdk_connected": runtime.get("sdk_connected"),
             "paper_account_verified": account.get("paper_account_verified"),
             "account_channel": account.get("account_channel"),
@@ -138,6 +188,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             else runtime.get("daily_context_state") == "complete",
             "last_event_at": runtime.get("last_event_at"),
             "account_snapshot_generated_at": account.get("generated_at"),
+            "account_snapshot_age_seconds": account_age,
             "dispatch_enabled": runtime.get("paper_order_dispatch_enabled"),
             "new_position_submission_enabled": entries_enabled,
             "config_fingerprint": runtime.get("config_fingerprint"),
@@ -156,22 +207,27 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "cash": account.get("cash"),
             "usd_available_cash": account.get("usd_available_cash"),
             "total_equity": account.get("account_total_equity_estimate"),
-            "buying_power": account_summary.get("buying_power"),
-            "today_pnl": account_summary.get("account_today_total_pnl"),
-            "today_pnl_source": account_summary.get("account_today_total_pnl_source"),
+            "total_equity_currency": account.get("account_total_equity_currency"),
+            "buying_power": account.get("account_buying_power")
+            or (account_summary.get("buying_power") if account_summary_fresh else None),
+            "buying_power_currency": account.get("account_buying_power_currency"),
+            "today_pnl": account_summary.get("account_today_total_pnl") if account_summary_fresh else None,
+            "today_pnl_source": account_summary.get("account_today_total_pnl_source") if account_summary_fresh else "stale_source_blocked",
             "position_count": position_count,
             "open_order_count": open_order_count,
         },
         "pnl": {
-            "account_pnl": pnl.get("account_pnl"),
-            "today_account_pnl": pnl.get("today_account_pnl"),
-            "trading_pnl": pnl.get("trading_pnl"),
-            "current_holdings": pnl.get("current_holdings"),
-            "source_status": pnl.get("source_status"),
+            "account_pnl": pnl.get("account_pnl") if pnl_fresh else None,
+            "today_account_pnl": pnl.get("today_account_pnl") if pnl_fresh else None,
+            "trading_pnl": pnl.get("trading_pnl") if pnl_fresh else None,
+            "current_holdings": pnl.get("current_holdings") if pnl_fresh else None,
+            "source_status": pnl.get("source_status") if pnl_fresh else {"status": "stale_source_blocked"},
         },
         "orders": {
-            "summary": reconciliation.get("summary") or {},
-            "rows": reconciliation.get("rows") or [],
+            "summary": (reconciliation.get("summary") or {})
+            if orders_fresh
+            else {"status": "stale_source_blocked"},
+            "rows": (reconciliation.get("rows") or []) if orders_fresh else [],
         },
         "strategy_inventory": inventory,
         "inventory_interface": {
@@ -195,7 +251,9 @@ body{{font-family:system-ui,sans-serif;margin:0;background:#f5f6f8;color:#17202a
 <body><header><h1>长桥模拟账户</h1></header><main><div id=\"app\"></div><script>
 const d={data}; const v=x=>x===null||x===undefined||x===''?'暂不可计算':x;
 const cls=d.data_status==='trustworthy'?'ok':'bad';
-const cards=[['数据状态',d.data_status],['SDK连接',d.runtime.sdk_connected],['订阅标的',`${{v(d.runtime.subscribed_symbol_count)}}/${{v(d.runtime.configured_symbol_count)}}`],['正式测试',d.formal_test.status],['当日盈亏',d.account.today_pnl],['账户净值',d.account.total_equity],['持仓',d.account.position_count],['挂单',d.account.open_order_count],['父级策略',d.inventory_interface.parent_strategy_count],['本地运行单元',d.inventory_interface.local_runtime_count],['长桥运行单元',d.inventory_interface.longbridge_tradable_runtime_count],['辅助模块',d.inventory_interface.auxiliary_module_count]];
+const statusText={{trustworthy:'全部数据正常',trading_ready_statistics_stale:'交易核心正常，统计待刷新',temporarily_unavailable:'数据暂不可用',pending_flatten:'等待清理旧持仓',active:'正式测试运行中'}};
+const money=(value,currency)=>value===null||value===undefined||value===''?'暂不可计算':`${{value}} ${{currency||''}}`.trim();
+const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['订阅标的',`${{v(d.runtime.subscribed_symbol_count)}}/${{v(d.runtime.configured_symbol_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['当日盈亏',d.account.today_pnl],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['持仓',d.account.position_count],['挂单',d.account.open_order_count],['父级策略',d.inventory_interface.parent_strategy_count],['本地运行单元',d.inventory_interface.local_runtime_count],['长桥运行单元',d.inventory_interface.longbridge_tradable_runtime_count],['辅助模块',d.inventory_interface.auxiliary_module_count]];
 document.getElementById('app').innerHTML=`<section class=\"grid\">${{cards.map(x=>`<div class=\"card\"><div>${{x[0]}}</div><div class=\"v ${{x[0]==='数据状态'?cls:''}}\">${{v(x[1])}}</div></div>`).join('')}}</section><h2>策略与虚拟仓</h2><table><thead><tr><th>仓位</th><th>方向</th><th>运行单元</th><th>资金</th><th>敞口上限</th></tr></thead><tbody>${{d.strategy_inventory.buckets.map(x=>`<tr><td>${{x.label}}</td><td>${{x.direction==='short'?'做空':'做多'}}</td><td>${{x.runtime_ids.join(', ')}}</td><td>${{v(x.equity)}}</td><td>${{v(x.max_total_exposure)}}</td></tr>`).join('')}}</tbody></table>`;
 </script></main></body></html>"""
 
