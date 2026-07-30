@@ -17,6 +17,8 @@
     "use_seed_universe": false,
     "universe_path": "config/m15_us_liquid_universe_300.json",
     "symbol_limit": 300,
+    "trading_symbol_limit": 147,
+    "trading_universe_path": "config/examples/m12_local_repaired_universe_snapshot_147.json",
     "bar_minutes": 5,
     "maximum_source_delivery_age_ms": 2000,
     "event_keep_lines": 0,

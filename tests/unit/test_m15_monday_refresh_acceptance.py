@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
 
 from scripts.m15_monday_refresh_acceptance_lib import (
@@ -13,124 +13,191 @@ from scripts.m15_monday_refresh_acceptance_lib import (
 
 
 class M15MondayRefreshAcceptanceTest(unittest.TestCase):
-    def test_non_trading_window_waits_for_monday_without_failing_fallback_snapshot(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            config = self._write_fixture(root, session_should_run=False, child_running=False, quote_source="fallback_quotes_only")
-            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-05-31T02:00:00Z")
+    def test_sdk_chain_is_armed_while_waiting_for_regular_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
 
-            self.assertEqual(payload["acceptance_status"], "pretrade_preparation_ready_waiting_for_monday")
-            self.assertFalse(payload["session_should_run"])
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-18T09:00:00Z")
+
+            self.assertEqual(payload["acceptance_status"], "armed_waiting_regular_session")
             self.assertEqual(payload["fail_count"], 0)
-            checks = {row["check"]: row for row in payload["checks"]}
-            self.assertEqual(checks["quote_source_longbridge"]["status"], "waiting_for_monday_refresh")
-            self.assertFalse(payload["broker_connection"])
-            self.assertFalse(payload["real_order"])
-            self.assertFalse(payload["manual_m12_37_once"])
+            self.assertEqual(payload["waiting_count"], 1)
+            self.assertEqual(payload["runtime_whitelist_count"], 18)
+            self.assertTrue(payload["paper_account_verified"])
+            self.assertTrue(payload["local_simulation_isolated"])
 
-    def test_trading_window_passes_when_longbridge_data_and_ledgers_are_current(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            config = self._write_fixture(root, session_should_run=True, child_running=True, quote_source="longbridge_quote_readonly")
-            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-06-01T15:00:00Z")
+    def test_sdk_chain_is_ready_during_regular_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
 
-            self.assertEqual(payload["acceptance_status"], "ready_after_fresh_refresh")
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-20T13:31:00Z")
+
+            self.assertEqual(payload["acceptance_status"], "ready_regular_session")
             self.assertEqual(payload["fail_count"], 0)
             self.assertEqual(payload["waiting_count"], 0)
-            self.assertEqual(payload["quote_source"], "longbridge_quote_readonly")
 
-    def test_trading_window_without_child_is_runtime_abnormal(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            config = self._write_fixture(
-                root,
-                session_should_run=True,
-                child_running=False,
-                quote_source="longbridge_quote_readonly",
-                failure_state="child_not_running",
-                failure_reason="fixture",
+    def test_sdk_chain_accepts_canonical_paper_order_ready_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness["readiness_status"] = "ready_for_longbridge_paper_orders"
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-20T13:31:00Z")
+
+            self.assertEqual(payload["acceptance_status"], "ready_regular_session")
+            self.assertEqual(payload["fail_count"], 0)
+
+    def test_watchdog_previous_result_does_not_create_acceptance_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
+            config.watchdog_status_path.write_text(
+                json.dumps({"watchdog_status": "needs_attention"}),
+                encoding="utf-8",
             )
-            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-06-01T15:00:00Z")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-07-20T13:31:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "ready_regular_session")
+            self.assertNotIn(
+                "watchdog_single_healthy",
+                {row["check"] for row in payload["checks"]},
+            )
+
+    def test_stale_account_snapshot_blocks_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False, account_snapshot_healthy=False)
+
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-18T09:00:00Z")
 
             self.assertEqual(payload["acceptance_status"], "blocked_monday_acceptance")
-            self.assertEqual(payload["failure_state"], "child_not_running")
             checks = {row["check"]: row for row in payload["checks"]}
-            self.assertEqual(checks["m12_37_child_running_when_required"]["status"], "fail")
+            self.assertEqual(checks["account_snapshot_fresh"]["status"], "fail")
 
-    def _write_fixture(
+    def test_zero_second_account_snapshot_is_fresh(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime["account_snapshot_age_seconds"] = 0
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-22T13:20:00Z")
+
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["account_snapshot_fresh"]["status"], "pass")
+            self.assertEqual(payload["fail_count"], 0)
+
+    def test_negative_account_snapshot_age_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime["account_snapshot_age_seconds"] = -1
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-22T13:20:00Z")
+
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["account_snapshot_fresh"]["status"], "fail")
+
+    def test_unverified_account_blocks_and_clears_broker_connection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(
+                Path(tmp),
+                session_should_run=False,
+                paper_account_verified=False,
+            )
+
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-18T09:00:00Z")
+
+            self.assertEqual(payload["acceptance_status"], "blocked_monday_acceptance")
+            self.assertFalse(payload["paper_account_verified"])
+            self.assertFalse(payload["broker_connection"])
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["paper_account_verified"]["status"], "fail")
+
+    def make_fixture(
         self,
         root: Path,
         *,
         session_should_run: bool,
-        child_running: bool,
-        quote_source: str,
-        failure_state: str = "",
-        failure_reason: str = "",
+        account_snapshot_healthy: bool = True,
+        paper_account_verified: bool = True,
     ) -> MondayRefreshAcceptanceConfig:
-        supervisor_path = root / "supervisor.json"
-        dashboard_path = root / "dashboard.json"
-        manifest_path = root / "manifest.json"
-        m13_path = root / "m13.json"
-        m14_goal_path = root / "m14_goal.json"
-        m14_summary_path = root / "m14_summary.json"
-        preflight_path = root / "preflight.json"
-        output_dir = root / "out"
-        scan_date = "2026-06-01"
-
-        supervisor_path.write_text(
+        runtime = root / "runtime.json"
+        readiness = root / "readiness.json"
+        watchdog = root / "watchdog.json"
+        account = root / "account.json"
+        dashboard = root / "dashboard.json"
+        formal = root / "formal.json"
+        epoch = "m15-sdk-formal-single-strategy-20260716"
+        runtime.write_text(
             json.dumps(
                 {
-                    "supervisor_process_alive": True,
-                    "session_should_run": session_should_run,
-                    "child_running": child_running,
-                    "market_status": "regular" if session_should_run else "closed",
-                    "failure_state": failure_state,
-                    "failure_reason": failure_reason,
-                },
-                ensure_ascii=False,
+                    "runtime_pid": os.getpid(),
+                    "runtime_process_alive": True,
+                    "status": "running",
+                    "runtime_engine": "sdk",
+                    "sdk_connected": True,
+                    "configured_symbol_count": 147,
+                    "subscription_coverage": "147/147",
+                    "daily_context_row_count": 8820,
+                    "daily_context_state": "complete",
+                    "account_snapshot_healthy": account_snapshot_healthy,
+                    "account_snapshot_age_seconds": 1 if account_snapshot_healthy else 90,
+                    "dispatch_enabled": True,
+                    "dispatch_requested": True,
+                }
             ),
             encoding="utf-8",
         )
-        dashboard_path.write_text(
+        readiness.write_text(
             json.dumps(
                 {
-                    "summary": {
-                        "scan_date": scan_date,
-                        "quote_source": quote_source,
-                        "first50_daily_ready_symbols": 50,
-                        "first50_current_5m_ready_symbols": 50,
-                        "data_freshness_warning": "fallback snapshot" if "fallback" in quote_source else "",
-                    }
-                },
-                ensure_ascii=False,
+                    "fail_count": 0,
+                    "readiness_status": "ready_for_regular_session" if session_should_run else "armed_waiting_regular_session",
+                    "runtime_whitelist": [f"R{index}" for index in range(18)],
+                    "formal_test_transition": {"test_epoch_id": epoch},
+                    "market_window": {
+                        "session_should_run": session_should_run,
+                        "market_status": "regular_session" if session_should_run else "非交易日等待",
+                    },
+                    "boundaries": {
+                        "paper_simulated_only": True,
+                        "live_execution": False,
+                        "real_money_actions": False,
+                        "local_simulation_as_order_source": False,
+                    },
+                }
             ),
             encoding="utf-8",
         )
-        manifest_path.write_text(json.dumps({"stage": "M12.37"}, ensure_ascii=False), encoding="utf-8")
-        m13_path.write_text(json.dumps({"trading_date": scan_date}, ensure_ascii=False), encoding="utf-8")
-        m14_goal_path.write_text(json.dumps({"trading_date": scan_date}, ensure_ascii=False), encoding="utf-8")
-        m14_summary_path.write_text(json.dumps({"data_freshness_warning": ""}, ensure_ascii=False), encoding="utf-8")
-        preflight_path.write_text(
+        watchdog.write_text(json.dumps({"watchdog_status": "healthy"}), encoding="utf-8")
+        account.write_text(
             json.dumps(
                 {
-                    "paper_preflight_status": "ready_for_user_paper_credential_approval",
-                    "broker_connection_attempted": False,
-                    "order_submitted": False,
-                },
-                ensure_ascii=False,
+                    "paper_account_verified": paper_account_verified,
+                    "account_channel": "lb_papertrading" if paper_account_verified else "unverified",
+                }
             ),
             encoding="utf-8",
         )
+        dashboard.write_text(
+            json.dumps({"source_of_truth": "longbridge_sdk_paper_account", "data_status": "trustworthy"}),
+            encoding="utf-8",
+        )
+        formal.write_text(json.dumps({"status": "active", "test_epoch_id": epoch}), encoding="utf-8")
         return MondayRefreshAcceptanceConfig(
             stage="M15.monday_refresh_acceptance",
-            supervisor_status_path=supervisor_path,
-            dashboard_path=dashboard_path,
-            auto_runner_manifest_path=manifest_path,
-            m13_goal_status_path=m13_path,
-            m14_goal_status_path=m14_goal_path,
-            m14_summary_path=m14_summary_path,
-            m15_preflight_path=preflight_path,
-            output_dir=output_dir,
+            sdk_runtime_status_path=runtime,
+            opening_readiness_path=readiness,
+            watchdog_status_path=watchdog,
+            account_state_path=account,
+            dashboard_path=dashboard,
+            formal_epoch_path=formal,
+            output_dir=root / "out",
         )
 
 

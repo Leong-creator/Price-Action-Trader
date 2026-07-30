@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -267,7 +268,7 @@ def build_quotes(
 
 
 def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) -> dict[str, dict[str, str]]:
-    cli_path = shutil.which("longbridge")
+    cli_path = resolve_longbridge_cli_path()
     if cli_path is None:
         raise RuntimeError("longbridge_cli_missing")
     quotes: dict[str, dict[str, str]] = {}
@@ -302,6 +303,19 @@ def fetch_longbridge_quotes(symbols: list[str], market: str, generated_at: str) 
             apply_extended_session_quote(quote_row, row, "overnight", "overnight_quote")
             quotes[symbol] = quote_row
     return quotes
+
+
+def resolve_longbridge_cli_path() -> str | None:
+    configured = os.environ.get("LONGBRIDGE_CLI_PATH", "").strip()
+    candidates = [
+        configured,
+        shutil.which("longbridge") or "",
+        str(Path.home() / ".local" / "bin" / "longbridge"),
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def run_longbridge_quote_with_retries(cli_path: str, command: list[str]) -> subprocess.CompletedProcess[str]:

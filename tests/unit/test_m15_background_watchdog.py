@@ -4,8 +4,16 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from scripts.m15_background_watchdog_lib import analytics_refresh_due, load_config, run_background_watchdog_once, status
+from scripts.m15_background_watchdog_lib import (
+    analytics_refresh_due,
+    load_config,
+    run_background_watchdog_once,
+    should_append_watchdog_ledger,
+    start_daemon,
+    status,
+)
 
 
 class M15BackgroundWatchdogTest(unittest.TestCase):
@@ -24,6 +32,26 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(payload["watchdog_status"], "stopped")
             self.assertIn("历史健康结果已失效", payload["plain_language_result"])
 
+    def test_start_daemon_reuses_live_run_lock_owner_without_spawning_duplicate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            (config.output_dir / "m15_background_watchdog.run.lock").write_text(
+                str(__import__("os").getpid()) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("scripts.m15_background_watchdog_lib.subprocess.Popen") as popen:
+                result = start_daemon(root / "config.json", config)
+
+            self.assertEqual(result, 0)
+            popen.assert_not_called()
+            self.assertEqual(
+                (config.output_dir / "m15_background_watchdog.pid").read_text(encoding="utf-8").strip(),
+                str(__import__("os").getpid()),
+            )
+
     def test_analytics_refresh_due_honors_interval(self) -> None:
         self.assertFalse(
             analytics_refresh_due("2026-06-04T14:04:59Z", "2026-06-04T14:00:00Z", 300)
@@ -31,6 +59,24 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
         self.assertTrue(
             analytics_refresh_due("2026-06-04T14:05:00Z", "2026-06-04T14:00:00Z", 300)
         )
+
+    def test_watchdog_ledger_is_throttled_until_five_minutes_or_status_change(self) -> None:
+        previous = {
+            "generated_at": "2026-07-18T05:00:00Z",
+            "watchdog_status": "healthy",
+            "steps": [],
+        }
+        current = {
+            "generated_at": "2026-07-18T05:04:59Z",
+            "watchdog_status": "healthy",
+            "steps": [],
+        }
+        self.assertFalse(should_append_watchdog_ledger(previous, current))
+        current["generated_at"] = "2026-07-18T05:05:00Z"
+        self.assertTrue(should_append_watchdog_ledger(previous, current))
+        current["generated_at"] = "2026-07-18T05:01:00Z"
+        current["watchdog_status"] = "needs_attention"
+        self.assertTrue(should_append_watchdog_ledger(previous, current))
 
     def test_watchdog_skips_account_analytics_refresh_before_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -69,6 +115,45 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertTrue(analytics_step["skipped_due_to_throttle"])
             self.assertFalse(any(command[1] == "scripts/run_m15_longbridge_realtime_account_state.py" for command in commands))
 
+    def test_watchdog_preserves_analytics_throttle_across_consecutive_skips(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, runtime_engine="cli")
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            (config.output_dir / "m15_background_watchdog_status.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-06-04T14:00:00Z",
+                        "steps": [{"step_id": "m15_account_state_full_refresh", "returncode": 0}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            analytics_commands: list[list[str]] = []
+
+            def runner(command: list[str], _timeout: int):
+                if "run_m15_longbridge_realtime_account_state.py" in command:
+                    analytics_commands.append(command)
+                return type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
+
+            first = run_background_watchdog_once(
+                config,
+                generated_at="2026-06-04T14:01:00Z",
+                command_runner=runner,
+            )
+            second = run_background_watchdog_once(
+                config,
+                generated_at="2026-06-04T14:02:00Z",
+                command_runner=runner,
+            )
+
+            first_step = next(row for row in first["steps"] if row["step_id"] == "m15_account_state_full_refresh")
+            second_step = next(row for row in second["steps"] if row["step_id"] == "m15_account_state_full_refresh")
+            self.assertTrue(first_step["skipped_due_to_throttle"])
+            self.assertTrue(second_step["skipped_due_to_throttle"])
+            self.assertEqual(second_step["last_success_generated_at"], "2026-06-04T14:00:00Z")
+            self.assertEqual(analytics_commands, [])
+
     def test_watchdog_runs_account_analytics_refresh_after_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -92,6 +177,25 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertTrue(any(command[1] == "scripts/run_m15_longbridge_realtime_account_state.py" for command in commands))
             self.assertIn(90, timeouts)
 
+    def test_sdk_watchdog_refreshes_analytics_without_legacy_cli_script(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            commands: list[list[str]] = []
+
+            def runner(command: list[str], _timeout: int):
+                commands.append(command)
+                return type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
+
+            run_background_watchdog_once(
+                config,
+                generated_at="2026-07-18T05:00:00Z",
+                command_runner=runner,
+            )
+
+            joined = [" ".join(command) for command in commands]
+            self.assertTrue(any("run_m15_longbridge_sdk_analytics.py" in command for command in joined))
+            self.assertFalse(any("run_m15_longbridge_realtime_account_state.py" in command for command in joined))
+
     def test_watchdog_no_longer_runs_or_requires_m12_47_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -113,6 +217,77 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(payload["watchdog_status"], "healthy")
             self.assertTrue(payload["local_research_non_blocking"]["m12_47_managed_elsewhere"])
 
+    def test_watchdog_reports_connecting_sdk_runtime_as_needs_attention(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+
+            def runner(command: list[str], _timeout: int):
+                if "--status" in command and any(
+                    token.endswith("run_m15_longbridge_sdk_runtime.py") for token in command
+                ):
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "connecting",
+                            "sdk_connected": False,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-07-28T16:00:00Z",
+                command_runner=runner,
+            )
+
+            status_step = next(
+                step for step in payload["steps"] if step["step_id"] == "m15_sdk_runtime_status"
+            )
+            self.assertEqual(payload["watchdog_status"], "needs_attention")
+            self.assertEqual(status_step["returncode"], 3)
+            self.assertIn("sdk_runtime_not_ready:connecting", status_step["stderr_tail"])
+
+    def test_watchdog_reports_logically_blocked_acceptance_as_needs_attention(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+
+            def runner(command: list[str], _timeout: int):
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                elif script.endswith("run_m15_opening_trade_readiness.py"):
+                    stdout = json.dumps({"readiness_status": "blocked_opening_trade_watch"})
+                elif script.endswith("run_m15_monday_refresh_acceptance.py"):
+                    stdout = json.dumps({"acceptance_status": "blocked_monday_acceptance"})
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-07-28T16:00:00Z",
+                command_runner=runner,
+            )
+
+            self.assertEqual(payload["watchdog_status"], "needs_attention")
+            failed = {
+                step["step_id"]: step["stderr_tail"]
+                for step in payload["steps"]
+                if step["returncode"] != 0
+            }
+            self.assertIn("opening_readiness_blocked", failed["m15_opening_readiness"])
+            self.assertIn("monday_acceptance_blocked", failed["m15_monday_acceptance"])
+
     def make_config(self, root: Path, *, runtime_engine: str = "sdk"):
         payload = {
             "stage": "M15.background_watchdog",
@@ -123,6 +298,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
                 "m15_account_state_config": str(root / "account_state.json"),
                 "m15_dashboard_config": str(root / "dashboard.json"),
                 "readiness_config": str(root / "readiness.json"),
+                "monday_acceptance_config": str(root / "monday_acceptance.json"),
             },
             "outputs": {
                 "output_dir": str(root / "out"),

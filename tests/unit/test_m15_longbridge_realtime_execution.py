@@ -16,7 +16,9 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     load_or_update_test_epoch_state,
     longbridge_order_command,
     load_config,
+    realtime_execution_signal_sort_key,
     run_realtime_execution,
+    submitted_ledger_open_exposure_by_bucket,
 )
 
 
@@ -37,6 +39,108 @@ class SlowRealtimePaperClient(FakeRealtimePaperClient):
 
 
 class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
+    def test_stop_loss_executes_before_take_profit_and_new_entries(self) -> None:
+        signals = [
+            self.signal(
+                signal_id="open-short",
+                side="sell",
+                position_action="open_short",
+            ),
+            self.signal(
+                signal_id="take-profit",
+                side="sell",
+                position_action="take_profit",
+            ),
+            self.signal(
+                signal_id="stop-loss",
+                side="sell",
+                position_action="stop_loss",
+            ),
+            self.signal(signal_id="open-long"),
+        ]
+
+        ordered = sorted(signals, key=realtime_execution_signal_sort_key)
+
+        self.assertEqual(
+            [row["signal_id"] for row in ordered],
+            ["stop-loss", "take-profit", "open-short", "open-long"],
+        )
+
+    def test_new_stop_loss_reserves_available_quantity_before_old_take_profit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [
+                    {
+                        "symbol": "AAPL.US",
+                        "quantity": "2",
+                        "available": "2",
+                        "market_price": "100",
+                    }
+                ],
+                "open_orders": [],
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(root, account_state=account_state)
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="old-take-profit",
+                        side="sell",
+                        position_action="take_profit",
+                        quantity="2",
+                        net_profit_after_fees_at_target="0",
+                    ),
+                    self.signal(
+                        signal_id="new-stop-loss",
+                        side="sell",
+                        position_action="stop_loss",
+                        quantity="2",
+                        net_profit_after_fees_at_target="0",
+                    ),
+                ],
+            )
+
+            run_realtime_execution(
+                config, generated_at="2026-06-04T14:00:00Z"
+            )
+            rows = {
+                row["signal_id"]: row
+                for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            }
+
+        self.assertEqual(
+            rows["new-stop-loss"]["realtime_decision_status"],
+            "latency_target_met_ready",
+        )
+        self.assertIn(
+            "blocked_close_quantity_over_available_after_reservations",
+            rows["old-take-profit"]["blockers"],
+        )
+
+    def test_open_is_blocked_when_exact_fill_attribution_for_symbol_is_frozen(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, account_state={
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "fill_attribution_frozen_symbols": ["AAPL"],
+                "live_execution": False,
+                "real_money_actions": False,
+            })
+            self.write_jsonl(root / "signals.jsonl", [self.signal(signal_id="frozen-aapl")])
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            row = self.read_jsonl(config.output_dir / LEDGER_JSONL)[0]
+
+        self.assertIn("blocked_fill_attribution_mismatch_symbol_frozen", row["blockers"])
+
     def test_live_submission_latency_includes_sequential_broker_queue_time(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1460,6 +1564,93 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(rows["close-aapl"]["exit_state"], "ready_to_submit")
             self.assertIn("blocked_short_disabled", rows["short-aapl"]["blockers"])
 
+    def test_formal_close_long_requires_exact_open_fill_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [{"symbol": "AAPL.US", "quantity": "2", "available": "2", "market_price": "100"}],
+                "open_orders": [],
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(
+                root,
+                account_state=account_state,
+                test_epoch={
+                    "enabled": True,
+                    "test_epoch_id": "m15-sdk-formal-single-strategy-test",
+                    "state_path": str(root / "epoch.json"),
+                    "flatten_existing_positions_before_activation": False,
+                    "archive_previous_records": True,
+                },
+            )
+            self.write_jsonl(root / "signals.jsonl", [self.signal(
+                signal_id="close-missing-fill-id",
+                side="sell",
+                position_action="close_long",
+                quantity="1",
+                created_at="2026-06-04T14:00:00Z",
+                stop_price="",
+                target_price="",
+                risk_amount="0",
+                net_profit_after_fees_at_target="0.01",
+            )])
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            row = self.read_jsonl(config.output_dir / LEDGER_JSONL)[0]
+
+        self.assertIn("blocked_close_long_missing_exact_open_fill_identity", row["blockers"])
+
+    def test_formal_close_long_reserves_available_quantity_across_exact_batches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [{"symbol": "AAPL.US", "quantity": "3", "available": "3", "market_price": "100"}],
+                "open_orders": [],
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(
+                root,
+                account_state=account_state,
+                test_epoch={
+                    "enabled": True,
+                    "test_epoch_id": "m15-sdk-formal-single-strategy-test",
+                    "state_path": str(root / "epoch.json"),
+                    "flatten_existing_positions_before_activation": False,
+                    "archive_previous_records": True,
+                },
+            )
+            common = {
+                "side": "sell",
+                "position_action": "close_long",
+                "quantity": "2",
+                "stop_price": "",
+                "target_price": "",
+                "risk_amount": "0",
+                "net_profit_after_fees_at_target": "0.01",
+                "source_open_remaining_quantity": "2",
+                "created_at": "2026-06-04T14:00:00Z",
+            }
+            self.write_jsonl(root / "signals.jsonl", [
+                self.signal(signal_id="close-batch-a", source_open_order_id="order-a", source_open_trade_id="trade-a", **common),
+                self.signal(signal_id="close-batch-b", source_open_order_id="order-b", source_open_trade_id="trade-b", **common),
+            ])
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+        ready = [row for row in rows.values() if row["submission_status"] == "dry_run_ready_not_submitted"]
+        blocked = [row for row in rows.values() if "blocked_close_quantity_over_available_after_reservations" in row["blockers"]]
+        self.assertEqual(len(ready), 1)
+        self.assertEqual(len(blocked), 1)
+
     def test_exit_only_position_sell_skips_runtime_whitelist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1781,6 +1972,117 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
 
             self.assertIn("blocked_bucket_remaining_exposure_below_one_share", rows["over-total"]["blockers"])
+
+    def test_exact_fill_attribution_is_authoritative_across_trading_days(self) -> None:
+        account_state = {
+            "positions": [{"symbol": "SPY.US", "quantity": "2"}],
+            "orders": [],
+            "fill_attributed_open_exposure_by_bucket_symbol": {
+                "pa004_long": {"SPY": "6100.00"}
+            },
+        }
+        rows = [
+            {
+                "signal_id": "old-fill",
+                "submission_status": "submitted",
+                "submitted_at": "2026-06-03T14:00:00Z",
+                "side": "buy",
+                "symbol": "SPY",
+                "capital_bucket": "pa004_long",
+                "quantity": "2",
+                "notional": "6100.00",
+                "order_id": "OLD-FILLED-ORDER",
+            }
+        ]
+
+        exposure = submitted_ledger_open_exposure_by_bucket(
+            rows,
+            "2026-06-04T13:30:00Z",
+            account_state,
+        )
+
+        self.assertEqual(exposure, {("pa004_long", "SPY"): Decimal("6100.00")})
+
+    def test_exact_fill_attribution_adds_only_unfilled_broker_order_remainder(self) -> None:
+        account_state = {
+            "positions": [{"symbol": "SPY.US", "quantity": "1"}],
+            "orders": [
+                {
+                    "order_id": "LIVE-PENDING",
+                    "symbol": "MSFT.US",
+                    "side": "Buy",
+                    "status": "Submitted",
+                    "quantity": "3",
+                    "executed_quantity": "1",
+                    "price": "100",
+                }
+            ],
+            "fill_attributed_open_exposure_by_bucket_symbol": {
+                "pa004_long": {"SPY": "100.00"}
+            },
+        }
+        rows = [
+            {
+                "signal_id": "pending-msft",
+                "submission_status": "submitted",
+                "submitted_at": "2026-06-04T13:31:00Z",
+                "side": "buy",
+                "symbol": "MSFT",
+                "capital_bucket": "pa004_long",
+                "quantity": "3",
+                "notional": "300.00",
+                "order_id": "LIVE-PENDING",
+            }
+        ]
+
+        exposure = submitted_ledger_open_exposure_by_bucket(
+            rows,
+            "2026-06-04T13:30:00Z",
+            account_state,
+        )
+
+        self.assertEqual(exposure[("pa004_long", "SPY")], Decimal("100.00"))
+        self.assertEqual(exposure[("pa004_long", "MSFT")], Decimal("200"))
+
+    def test_over_cap_exact_fill_attribution_blocks_new_open_and_is_visible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [{"symbol": "SPY.US", "quantity": "2"}],
+                "orders": [],
+                "fill_attributed_open_exposure_by_bucket_symbol": {
+                    "pa004_long": {"SPY": "6100.00"}
+                },
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(root, account_state=account_state)
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [self.signal(signal_id="blocked-over-cap", symbol="MSFT")],
+            )
+
+            payload = run_realtime_execution(
+                config, generated_at="2026-06-04T14:00:00Z"
+            )
+            ledger = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            bucket = next(
+                row
+                for row in payload["virtual_capital_buckets"]
+                if row["capital_bucket"] == "pa004_long"
+            )
+
+        self.assertIn("blocked_total_exposure_over_cap", ledger[0]["blockers"])
+        self.assertEqual(bucket["used_exposure"], "6100.00")
+        self.assertEqual(bucket["remaining_exposure"], "0.00")
+        self.assertTrue(bucket["over_exposure_cap"])
+        self.assertEqual(
+            bucket["exposure_source"],
+            "longbridge_filled_batches_plus_pending_orders",
+        )
 
     def test_buy_quantity_is_reduced_to_remaining_bucket_exposure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import time as time_module
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -167,7 +169,7 @@ def _fetch_longbridge_history_bars(
     if start > end:
         raise RuntimeError(f"Longbridge history requires start <= end, got {start} > {end}")
 
-    binary = shutil.which("longbridge")
+    binary = resolve_longbridge_cli_path()
     if binary is None:
         raise RuntimeError(LONGBRIDGE_INSTALL_HINT)
 
@@ -202,6 +204,19 @@ def _fetch_longbridge_history_bars(
         for bar in _parse_history_payload(payload):
             deduped[(bar.time_text, bar.session)] = bar
     return sorted(deduped.values(), key=lambda item: (item.time_text, item.session or ""))
+
+
+def resolve_longbridge_cli_path() -> str | None:
+    configured = os.environ.get("LONGBRIDGE_CLI_PATH", "").strip()
+    candidates = [
+        configured,
+        shutil.which("longbridge") or "",
+        str(Path.home() / ".local" / "bin" / "longbridge"),
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def _run_longbridge_command(

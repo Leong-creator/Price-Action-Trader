@@ -119,7 +119,11 @@ class LongbridgeHistoryLibTests(unittest.TestCase):
         self.assertEqual(rows[0]["volume"], "500000")
 
     def test_missing_binary_raises_install_hint(self) -> None:
-        with mock.patch.object(MODULE.shutil, "which", return_value=None):
+        with (
+            mock.patch.object(MODULE.shutil, "which", return_value=None),
+            mock.patch.object(MODULE.Path, "home", return_value=Path("/missing-home")),
+            mock.patch.dict(MODULE.os.environ, {}, clear=True),
+        ):
             with self.assertRaisesRegex(RuntimeError, "not installed"):
                 MODULE.fetch_longbridge_daily_history_rows(
                     ticker="SPY",
@@ -130,6 +134,19 @@ class LongbridgeHistoryLibTests(unittest.TestCase):
                     end=date.fromisoformat("2026-01-05"),
                     interval="1d",
                 )
+
+    def test_resolve_binary_uses_explicit_path_with_minimal_daemon_path(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cli_path = Path(tmp) / "longbridge"
+            cli_path.write_text("#!/bin/sh\n", encoding="utf-8")
+            cli_path.chmod(0o755)
+            with (
+                mock.patch.dict(MODULE.os.environ, {"LONGBRIDGE_CLI_PATH": str(cli_path)}, clear=True),
+                mock.patch.object(MODULE.shutil, "which", return_value=None),
+            ):
+                self.assertEqual(MODULE.resolve_longbridge_cli_path(), str(cli_path))
 
     def test_auth_error_raises_clear_hint(self) -> None:
         with (

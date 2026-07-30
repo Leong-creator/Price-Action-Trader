@@ -10,6 +10,12 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from scripts.m15_longbridge_fill_attribution_lib import (
+    apply_account_reconciliation_adjustments,
+    broker_fill_rows_from_orders_and_executions,
+    rebuild_fill_attribution,
+)
+
 from scripts.m15_longbridge_realtime_execution_lib import (
     DEFAULT_DAILY_DIR,
     DEFAULT_OUTPUT_DIR,
@@ -43,6 +49,9 @@ DEFAULT_ACCOUNT_STATE = DEFAULT_OUTPUT_DIR / "m15_longbridge_realtime_account_st
 DEFAULT_MARKET_EVENTS = DEFAULT_OUTPUT_DIR / "m15_realtime_market_events.jsonl"
 DEFAULT_SIGNAL_EVENTS = DEFAULT_OUTPUT_DIR / "m15_realtime_signal_events.jsonl"
 DEFAULT_EXECUTION_LEDGER = DEFAULT_OUTPUT_DIR / EXECUTION_LEDGER_JSONL
+DEFAULT_FILL_ATTRIBUTION = DEFAULT_OUTPUT_DIR / "m15_longbridge_fill_attribution_runtime.json"
+DEFAULT_CANONICAL_FILL_ATTRIBUTION = DEFAULT_OUTPUT_DIR / "m15_longbridge_fill_attribution_v2.json"
+ACCOUNT_RECONCILIATION_ADJUSTMENTS = "m15_account_reconciliation_adjustments.json"
 SUMMARY_JSON = "m15_longbridge_realtime_position_manager.json"
 LEDGER_JSONL = "m15_longbridge_realtime_position_manager_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_position_manager.md"
@@ -57,14 +66,19 @@ class RealtimePositionManagerConfig:
     market_events_path: Path
     realtime_signal_events_path: Path
     realtime_execution_ledger_path: Path
+    fill_attribution_path: Path
+    canonical_fill_attribution_path: Path
     output_dir: Path
     max_exit_events_per_run: int
+    stop_loss_events_bypass_run_cap: bool
     exit_attempt_cooldown_seconds: int
     manage_untracked_positions_for_exit: bool
     untracked_stop_loss_percent: Decimal
     untracked_take_profit_percent: Decimal
     long_exit_limit_discount_percent: Decimal
     short_cover_limit_premium_percent: Decimal
+    test_epoch_id: str
+    test_started_at: str
     paper_short_testing_enabled: bool
     short_test_epoch_id: str
     paper_short_runtime_ids: tuple[str, ...]
@@ -86,6 +100,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
     outputs = payload.get("outputs", {})
     manager = payload.get("longbridge_position_manager", {})
     short_testing = manager.get("paper_short_testing", {}) if isinstance(manager.get("paper_short_testing"), dict) else {}
+    output_dir = resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR))
     return RealtimePositionManagerConfig(
         stage=str(payload.get("stage", "M15.longbridge_realtime_position_manager")),
         title=str(payload.get("title", "长桥模拟账户实时持仓退出管理")),
@@ -93,14 +108,25 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
         market_events_path=resolve_repo_path(inputs.get("market_events", DEFAULT_MARKET_EVENTS)),
         realtime_signal_events_path=resolve_repo_path(inputs.get("realtime_signal_events", DEFAULT_SIGNAL_EVENTS)),
         realtime_execution_ledger_path=resolve_repo_path(inputs.get("realtime_execution_ledger", DEFAULT_EXECUTION_LEDGER)),
-        output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
+        fill_attribution_path=resolve_repo_path(
+            inputs.get("fill_attribution")
+            or (output_dir / "m15_longbridge_fill_attribution_runtime.json")
+        ),
+        canonical_fill_attribution_path=resolve_repo_path(
+            inputs.get("canonical_fill_attribution")
+            or (output_dir / "m15_longbridge_fill_attribution_v2.json")
+        ),
+        output_dir=output_dir,
         max_exit_events_per_run=int(manager.get("max_exit_events_per_run", 10)),
+        stop_loss_events_bypass_run_cap=bool(manager.get("stop_loss_events_bypass_run_cap", True)),
         exit_attempt_cooldown_seconds=int(manager.get("exit_attempt_cooldown_seconds", 900)),
         manage_untracked_positions_for_exit=bool(manager.get("manage_untracked_positions_for_exit", True)),
         untracked_stop_loss_percent=decimal(manager.get("untracked_stop_loss_percent", "3")),
         untracked_take_profit_percent=decimal(manager.get("untracked_take_profit_percent", "3")),
         long_exit_limit_discount_percent=decimal(manager.get("long_exit_limit_discount_percent", "0.5")),
         short_cover_limit_premium_percent=decimal(manager.get("short_cover_limit_premium_percent", "0.5")),
+        test_epoch_id=str(manager.get("test_epoch_id") or ""),
+        test_started_at=str(manager.get("test_started_at") or ""),
         paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
         short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
         paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
@@ -149,33 +175,98 @@ def run_realtime_position_manager(
     generated_at: str | None = None,
     account_state_override: dict[str, Any] | None = None,
     market_events_override: list[dict[str, Any]] | None = None,
+    execution_rows_override: list[dict[str, Any]] | None = None,
+    signal_events_override: list[dict[str, Any]] | None = None,
+    fill_attribution_state_cache: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
     generated_at_iso = to_iso(now)
     account_state = dict(account_state_override) if account_state_override is not None else read_json(config.account_state_path)
     market_events = list(market_events_override) if market_events_override is not None else read_jsonl(config.market_events_path)
-    execution_rows = hydrate_unconfirmed_execution_rows(
-        read_jsonl(config.realtime_execution_ledger_path),
+    raw_execution_rows = (
+        list(execution_rows_override)
+        if execution_rows_override is not None
+        else read_jsonl(config.realtime_execution_ledger_path)
+    )
+    hydrated_execution_rows = hydrate_unconfirmed_execution_rows(
+        raw_execution_rows,
         account_state,
         read_json(config.output_dir / ORDER_RECONCILIATION_JSON),
     )
-    existing_signal_events = read_jsonl(config.realtime_signal_events_path)
+    long_execution_rows = rows_for_current_test_epoch(
+        hydrated_execution_rows,
+        config.test_epoch_id,
+        config.test_started_at,
+    )
+    short_execution_rows = (
+        rows_for_current_test_epoch(hydrated_execution_rows, config.short_test_epoch_id, "")
+        if config.paper_short_testing_enabled
+        else []
+    )
+    execution_rows = merge_active_epoch_rows(long_execution_rows, short_execution_rows)
+    all_signal_events = (
+        list(signal_events_override)
+        if signal_events_override is not None
+        else read_jsonl(config.realtime_signal_events_path)
+    )
+    long_signal_events = rows_for_current_test_epoch(
+        all_signal_events,
+        config.test_epoch_id,
+        config.test_started_at,
+    )
+    short_signal_events = (
+        rows_for_current_test_epoch(all_signal_events, config.short_test_epoch_id, "")
+        if config.paper_short_testing_enabled
+        else []
+    )
+    existing_signal_events = merge_active_epoch_rows(long_signal_events, short_signal_events)
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
 
     latest_prices = latest_price_by_symbol(market_events)
-    position_slices = account_position_slices(account_state, execution_rows, config.manage_untracked_positions_for_exit)
-    position_slices.extend(confirmed_short_position_slices(account_state, execution_rows, config))
-    retriable_short_exit_signal_ids = terminal_retriable_short_exit_signal_ids(execution_rows, account_state)
-    retriable_exit_signal_ids = retriable_short_exit_signal_ids | broker_failed_long_exit_signal_ids(execution_rows)
+    exact_attribution_required = config.test_epoch_id.startswith("m15-sdk-formal-")
+    fill_attribution = (
+        cached_or_refreshed_fill_attribution(
+            config,
+            account_state,
+            execution_rows,
+            fill_attribution_state_cache,
+        )
+        if exact_attribution_required
+        else {}
+    )
+    if exact_attribution_required:
+        position_slices = fill_attributed_long_position_slices(
+            account_state,
+            fill_attribution,
+            config.test_epoch_id,
+            config.manage_untracked_positions_for_exit,
+        )
+    else:
+        position_slices = account_position_slices(
+            account_state,
+            long_execution_rows,
+            config.manage_untracked_positions_for_exit,
+        )
+    bucket_open_exposure = fill_attributed_open_exposure_by_bucket_symbol(
+        fill_attribution
+    )
+    position_slices.extend(confirmed_short_position_slices(account_state, short_execution_rows, config))
+    retriable_short_exit_signal_ids = terminal_retriable_short_exit_signal_ids(short_execution_rows, account_state)
+    retriable_exit_signal_ids = (
+        retriable_short_exit_signal_ids
+        | broker_failed_long_exit_signal_ids(
+            long_execution_rows, account_state
+        )
+        | unprocessed_exit_signal_ids(existing_signal_events, execution_rows)
+    )
     recent_exit_attempts = recent_exit_attempt_keys(
-        execution_rows,
+        execution_rows + existing_signal_events,
         now,
         config.exit_attempt_cooldown_seconds,
-        retriable_exit_signal_ids,
     )
     ledger_rows: list[dict[str, Any]] = []
-    exit_events: list[dict[str, Any]] = []
+    exit_candidates: list[dict[str, Any]] = []
     for position, metadata in position_slices:
         symbol = str(position["symbol"])
         latest = latest_prices.get(symbol, ZERO)
@@ -190,13 +281,18 @@ def run_realtime_position_manager(
             retriable_exit_signal_ids,
         )
         ledger_rows.append(row)
-        if event and len(exit_events) < config.max_exit_events_per_run:
-            exit_events.append(event)
+        if event:
+            exit_candidates.append(event)
             existing_signal_ids.add(event["signal_id"])
+    exit_events, deferred_exit_events = select_exit_events(
+        exit_candidates,
+        max_non_stop_events=config.max_exit_events_per_run,
+        stop_loss_events_bypass_run_cap=config.stop_loss_events_bypass_run_cap,
+    )
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
     config.realtime_signal_events_path.parent.mkdir(parents=True, exist_ok=True)
-    write_jsonl(config.realtime_signal_events_path, existing_signal_events + exit_events)
+    append_jsonl(config.realtime_signal_events_path, exit_events)
     write_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
     summary = {
         "schema_version": "m15.longbridge-realtime-position-manager.v1",
@@ -204,12 +300,34 @@ def run_realtime_position_manager(
         "title": config.title,
         "generated_at": generated_at_iso,
         "source_mode": "longbridge_account_positions_plus_realtime_market_events",
+        "execution_input_mode": (
+            "runtime_memory"
+            if execution_rows_override is not None
+            else "jsonl_audit_stream"
+        ),
+        "signal_input_mode": (
+            "runtime_memory"
+            if signal_events_override is not None
+            else "jsonl_audit_stream"
+        ),
         "local_simulation_isolated": True,
         "local_close_signal_used": False,
         "position_count": len(position_slices),
         "managed_short_position_count": sum(
             1 for _position, metadata in position_slices if str(metadata.get("position_direction") or "") == "short"
         ),
+        "exact_fill_attribution_required": exact_attribution_required,
+        "fill_attribution_summary": fill_attribution.get("summary", {}),
+        "fill_attribution_mismatch_count": sum(
+            1 for row in fill_attribution.get("symbol_checks", [])
+            if isinstance(row, dict) and not bool(row.get("matches_broker_net"))
+        ),
+        "fill_attribution_mismatch_symbols": sorted(
+            str(row.get("symbol") or "")
+            for row in fill_attribution.get("symbol_checks", [])
+            if isinstance(row, dict) and not bool(row.get("matches_broker_net")) and row.get("symbol")
+        ),
+        "fill_attributed_open_exposure_by_bucket_symbol": bucket_open_exposure,
         "account_position_count": len(account_positions(account_state)),
         "managed_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "m15_realtime_managed"),
         "unmanaged_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_unmanaged"),
@@ -227,6 +345,8 @@ def run_realtime_position_manager(
             if row.get("position_management_scope") == "longbridge_account_exit_only"
         ],
         "new_exit_signal_event_count": len(exit_events),
+        "deferred_non_stop_exit_event_count": len(deferred_exit_events),
+        "stop_loss_events_bypass_run_cap": config.stop_loss_events_bypass_run_cap,
         # The SDK runtime consumes these in memory so an exit does not wait
         # for another file-scan cycle before reaching the paper executor.
         "emitted_exit_signal_events": exit_events,
@@ -238,6 +358,7 @@ def run_realtime_position_manager(
             "account_state": project_path(config.account_state_path),
             "market_events": project_path(config.market_events_path),
             "realtime_execution_ledger": project_path(config.realtime_execution_ledger_path),
+            "fill_attribution": project_path(config.fill_attribution_path),
             "local_simulation_ledger": "",
         },
         "outputs": {
@@ -251,6 +372,57 @@ def run_realtime_position_manager(
     write_json(config.output_dir / SUMMARY_JSON, summary)
     (config.output_dir / REPORT_MD).write_text(render_report(summary, ledger_rows), encoding="utf-8")
     return summary
+
+
+def fill_attributed_open_exposure_by_bucket_symbol(
+    fill_attribution: dict[str, Any],
+) -> dict[str, dict[str, str]]:
+    """Return actual unclosed fill cost by virtual bucket and symbol."""
+    exposure: dict[str, dict[str, Decimal]] = {}
+    for row in fill_attribution.get("batches", []):
+        if not isinstance(row, dict):
+            continue
+        remaining_quantity = decimal(row.get("remaining_quantity", "0"))
+        open_price = decimal(row.get("open_price", "0"))
+        bucket = str(row.get("capital_bucket") or "")
+        symbol = str(row.get("symbol") or "").upper().replace(".US", "")
+        if not bucket or not symbol or remaining_quantity <= ZERO or open_price <= ZERO:
+            continue
+        bucket_rows = exposure.setdefault(bucket, {})
+        bucket_rows[symbol] = (
+            bucket_rows.get(symbol, ZERO) + (remaining_quantity * open_price)
+        )
+    return {
+        bucket: {
+            symbol: fmt_money(value)
+            for symbol, value in sorted(symbols.items())
+        }
+        for bucket, symbols in sorted(exposure.items())
+    }
+
+
+def exit_event_priority(event: dict[str, Any]) -> tuple[int, str, str]:
+    reason = str(event.get("exit_reason") or event.get("position_action") or "")
+    return (
+        0 if reason == "stop_loss" else 1,
+        str(event.get("created_at") or ""),
+        str(event.get("signal_id") or ""),
+    )
+
+
+def select_exit_events(
+    candidates: list[dict[str, Any]],
+    *,
+    max_non_stop_events: int,
+    stop_loss_events_bypass_run_cap: bool,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Never make a verified stop loss wait behind an arbitrary batch cap."""
+    ordered = sorted(candidates, key=exit_event_priority)
+    if not stop_loss_events_bypass_run_cap:
+        return ordered[:max_non_stop_events], ordered[max_non_stop_events:]
+    stop_losses = [row for row in ordered if str(row.get("exit_reason") or "") == "stop_loss"]
+    non_stops = [row for row in ordered if str(row.get("exit_reason") or "") != "stop_loss"]
+    return stop_losses + non_stops[:max_non_stop_events], non_stops[max_non_stop_events:]
 
 
 def evaluate_position(
@@ -271,7 +443,13 @@ def evaluate_position(
     runtime_id = str(metadata.get("runtime_id", ""))
     strategy_id = str(metadata.get("strategy_id", ""))
     position_direction = str(metadata.get("position_direction") or "long").lower()
-    source_open_order_id = str(metadata.get("short_open_order_id") or metadata.get("order_id") or "")
+    source_open_order_id = str(
+        metadata.get("short_open_order_id")
+        or metadata.get("open_order_id")
+        or metadata.get("order_id")
+        or ""
+    )
+    source_open_trade_id = str(metadata.get("source_open_trade_id") or metadata.get("trade_id") or "")
     cost_price = position_cost_price(position)
     latest_for_pnl = latest_price if latest_price > ZERO else decimal(position.get("current_price", position.get("last_price", "0")))
     unrealized_pnl = (
@@ -283,7 +461,11 @@ def evaluate_position(
     management_scope = "m15_realtime_managed"
     management_note = "本轮 M15 实时链路管理的长桥模拟账户持仓。"
     exit_reason = ""
-    if not metadata:
+    if metadata.get("attribution_mismatch"):
+        status = "fill_attribution_mismatch_frozen"
+        management_scope = "longbridge_account_attribution_frozen"
+        management_note = "长桥净持仓与精确成交批次数量不一致；已冻结自动策略退出和新开仓，等待成交对账修复。"
+    elif not metadata:
         if config.manage_untracked_positions_for_exit:
             runtime_id = "M15-LONGBRIDGE-EXIT-ONLY"
             strategy_id = "M15-LONGBRIDGE-EXIT-ONLY"
@@ -308,6 +490,12 @@ def evaluate_position(
             status = "legacy_unmanaged_longbridge_position"
             management_scope = "longbridge_account_unmanaged"
             management_note = "长桥模拟账户已有持仓，但只接管退出配置关闭；不参与新开仓或加仓，需人工复核退出计划。"
+    elif (
+        position_direction == "long"
+        and config.test_epoch_id.startswith("m15-sdk-formal-")
+        and (not source_open_order_id or not source_open_trade_id)
+    ):
+        status = "missing_exact_open_fill_identity"
     elif position_direction == "short" and not source_open_order_id:
         status = "missing_short_open_order_identity"
     elif latest_price <= ZERO:
@@ -337,14 +525,15 @@ def evaluate_position(
             runtime_id=runtime_id,
             exit_reason=exit_reason,
             source_open_signal_id=str(metadata.get("signal_id", "")),
-            source_open_order_id=source_open_order_id if position_direction == "short" else "",
+            source_open_order_id=source_open_order_id,
+            source_open_trade_id=source_open_trade_id,
         )
         signal_id = base_signal_id
         exit_attempt_key = (
             symbol,
             position_direction,
             exit_reason,
-            source_open_order_id if position_direction == "short" else "",
+            f"{source_open_order_id}:{source_open_trade_id}",
         )
         if available_quantity <= ZERO:
             status = "position_not_available_for_exit"
@@ -395,12 +584,15 @@ def evaluate_position(
                     "source_market_event_id": str(metadata.get("source_market_event_id", "")),
                     "source_open_signal_id": str(metadata.get("signal_id", "")),
                     "source_open_order_id": source_open_order_id,
+                    "source_open_trade_id": source_open_trade_id,
+                    "source_open_remaining_quantity": fmt_decimal(quantity),
                     "exit_retry_attempt": exit_retry_attempt,
                     "exit_retry_of_signal_id": exit_retry_of_signal_id,
                     "short_structure_low": str(metadata.get("short_structure_low") or ""),
                     "local_simulation_source": False,
                     "longbridge_position_exit_source": True,
                     "longbridge_untracked_exit_only": management_scope == "longbridge_account_exit_only",
+                    "test_epoch_id": config.test_epoch_id,
                     "exit_limit_price_source": exit_limit_price_source,
                 }
     row = {
@@ -431,9 +623,49 @@ def evaluate_position(
         "exit_retry_of_signal_id": exit_retry_of_signal_id,
         "exit_allowed": management_scope in {"m15_realtime_managed", "longbridge_account_exit_only"},
         "exit_only_takeover": management_scope == "longbridge_account_exit_only",
+        "source_open_order_id": source_open_order_id,
+        "source_open_trade_id": source_open_trade_id,
         "local_simulation_ignored": True,
     }
     return row, event
+
+
+def rows_for_current_test_epoch(
+    rows: list[dict[str, Any]],
+    test_epoch_id: str,
+    test_started_at: str,
+) -> list[dict[str, Any]]:
+    """Exclude prior-test attribution while preserving legacy standalone use."""
+    if not test_epoch_id:
+        return rows
+    started_at = parse_signal_time(test_started_at)
+    current: list[dict[str, Any]] = []
+    for row in rows:
+        row_epoch = str(row.get("test_epoch_id") or "")
+        if row_epoch:
+            if row_epoch == test_epoch_id:
+                current.append(row)
+            continue
+        row_at = parse_signal_time(
+            row.get("submitted_at") or row.get("processed_at") or row.get("created_at")
+        )
+        if started_at is not None and row_at is not None and row_at >= started_at:
+            current.append(row)
+    return current
+
+
+def merge_active_epoch_rows(*row_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Combine active long/short epoch rows without duplicating shared rows."""
+    merged: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for rows in row_groups:
+        for row in rows:
+            identity = id(row)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            merged.append(row)
+    return merged
 
 
 def account_positions(account_state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -483,6 +715,340 @@ def latest_price_by_symbol(market_events: list[dict[str, Any]]) -> dict[str, Dec
         if symbol not in latest or event_time >= latest[symbol][0]:
             latest[symbol] = (event_time, price)
     return {symbol: value[1] for symbol, value in latest.items()}
+
+
+def refresh_fill_attribution_state(
+    config: RealtimePositionManagerConfig,
+    account_state: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Increment the exact-fill lot ledger from current broker facts.
+
+    The local execution ledger supplies identity metadata only. Quantity and
+    price facts always come from Longbridge executions.
+    """
+    runtime_existing = read_json(config.fill_attribution_path)
+    canonical_existing = read_json(config.canonical_fill_attribution_path)
+    existing, baseline_source = preferred_fill_attribution_baseline(
+        runtime_existing,
+        canonical_existing,
+    )
+    orders: list[dict[str, Any]] = []
+    seen_orders: set[str] = set()
+    for key in ("historical_orders", "orders"):
+        for row in account_state.get(key, []) if isinstance(account_state.get(key), list) else []:
+            if not isinstance(row, dict):
+                continue
+            order_id = str(row.get("order_id") or row.get("id") or "")
+            if order_id and order_id not in seen_orders:
+                orders.append(dict(row))
+                seen_orders.add(order_id)
+    executions: list[dict[str, Any]] = []
+    seen_trades: set[tuple[str, str]] = set()
+    for key in ("historical_executions", "executions"):
+        for row in account_state.get(key, []) if isinstance(account_state.get(key), list) else []:
+            if not isinstance(row, dict):
+                continue
+            identity = (str(row.get("order_id") or ""), str(row.get("trade_id") or ""))
+            if all(identity) and identity not in seen_trades:
+                executions.append(dict(row))
+                seen_trades.add(identity)
+    broker_positions: dict[str, Decimal] = {}
+    for row in account_state.get("positions", []) if isinstance(account_state.get("positions"), list) else []:
+        if not isinstance(row, dict):
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        quantity = decimal(row.get("quantity", row.get("qty", "0")))
+        if is_short_position_row(row):
+            quantity = -quantity
+        if symbol:
+            broker_positions[symbol] = broker_positions.get(symbol, ZERO) + quantity
+    exact_local_rows = [
+        dict(row)
+        for row in execution_rows
+        if ledger_row_order_id(row)
+        and str(row.get("test_epoch_id") or "").startswith(
+            ("m15-sdk-formal-", "m15-short-single-strategy-")
+        )
+    ]
+    eligible_order_ids = {
+        ledger_row_order_id(row)
+        for row in exact_local_rows
+        if ledger_row_order_id(row)
+    }
+    broker_fills = broker_fill_rows_from_orders_and_executions(orders, executions)
+    broker_fills = [
+        row
+        for row in broker_fills
+        if str(row.get("order_id") or "") in eligible_order_ids
+    ]
+    payload = rebuild_fill_attribution(
+        exact_local_rows,
+        broker_fills,
+        broker_net_positions=broker_positions,
+        existing_state=existing,
+    )
+    payload = apply_account_reconciliation_adjustments(
+        payload,
+        read_json(config.output_dir / ACCOUNT_RECONCILIATION_ADJUSTMENTS),
+        broker_net_positions=broker_positions,
+    )
+    enrich_fill_attribution_batch_metadata(payload, exact_local_rows)
+    payload.update(
+        {
+            "generated_at": str(account_state.get("generated_at") or ""),
+            "paper_simulated_only": True,
+            "live_execution": False,
+            "real_money_actions": False,
+            "baseline_source": baseline_source,
+        }
+    )
+    write_json(config.fill_attribution_path, payload)
+    return payload
+
+
+def cached_or_refreshed_fill_attribution(
+    config: RealtimePositionManagerConfig,
+    account_state: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+    state_cache: dict[str, Any] | None,
+) -> dict[str, Any]:
+    signature = fill_attribution_account_signature(account_state, execution_rows)
+    if (
+        state_cache is not None
+        and state_cache.get("signature") == signature
+        and isinstance(state_cache.get("payload"), dict)
+    ):
+        return dict(state_cache["payload"])
+    payload = refresh_fill_attribution_state(config, account_state, execution_rows)
+    if state_cache is not None:
+        state_cache.clear()
+        state_cache.update({"signature": signature, "payload": payload})
+    return payload
+
+
+def fill_attribution_account_signature(
+    account_state: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+) -> str:
+    broker_facts: list[tuple[str, ...]] = []
+    for key in ("historical_orders", "orders"):
+        for row in account_state.get(key, []) if isinstance(account_state.get(key), list) else []:
+            if not isinstance(row, dict):
+                continue
+            broker_facts.append(
+                (
+                    "order",
+                    str(row.get("order_id") or row.get("id") or ""),
+                    str(row.get("status") or row.get("order_status") or ""),
+                    str(row.get("executed_quantity") or row.get("filled_quantity") or ""),
+                    str(row.get("executed_price") or row.get("average_price") or ""),
+                )
+            )
+    for key in ("historical_executions", "executions"):
+        for row in account_state.get(key, []) if isinstance(account_state.get(key), list) else []:
+            if not isinstance(row, dict):
+                continue
+            broker_facts.append(
+                (
+                    "execution",
+                    str(row.get("order_id") or ""),
+                    str(row.get("trade_id") or ""),
+                    str(row.get("quantity") or row.get("filled_quantity") or ""),
+                    str(row.get("price") or row.get("filled_price") or ""),
+                )
+            )
+    for row in account_state.get("positions", []) if isinstance(account_state.get("positions"), list) else []:
+        if not isinstance(row, dict):
+            continue
+        broker_facts.append(
+            (
+                "position",
+                base_symbol(str(row.get("symbol") or "")),
+                str(row.get("quantity") or row.get("qty") or ""),
+                str(
+                    row.get("available_quantity")
+                    or row.get("available_qty")
+                    or row.get("available")
+                    or ""
+                ),
+            )
+        )
+    local_order_facts = sorted(
+        (
+            ledger_row_order_id(row),
+            str(row.get("test_epoch_id") or ""),
+            str(row.get("capital_bucket") or ""),
+            str(row.get("runtime_id") or ""),
+            str(row.get("strategy_id") or ""),
+            str(row.get("signal_id") or ""),
+            str(row.get("stop_price") or ""),
+            str(row.get("target_price") or ""),
+        )
+        for row in execution_rows
+        if ledger_row_order_id(row)
+    )
+    encoded = json.dumps(
+        {
+            "broker_facts": sorted(broker_facts),
+            "local_order_facts": local_order_facts,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
+
+def preferred_fill_attribution_baseline(
+    runtime_state: dict[str, Any],
+    canonical_state: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    """Use the most complete exact-fill state before applying live increments."""
+
+    def score(state: dict[str, Any]) -> tuple[int, int, int]:
+        summary = state.get("summary") if isinstance(state.get("summary"), dict) else {}
+        return (
+            int(summary.get("matched_event_count") or 0),
+            -int(summary.get("anomaly_count") or 0),
+            int(summary.get("open_batch_count") or 0),
+        )
+
+    if canonical_state and score(canonical_state) > score(runtime_state):
+        return canonical_state, "canonical_full_history"
+    return runtime_state, "runtime_incremental"
+
+
+def enrich_fill_attribution_batch_metadata(
+    attribution: dict[str, Any],
+    local_rows: list[dict[str, Any]],
+) -> None:
+    """Restore stop/target facts omitted by the slow reconciliation view."""
+    local_by_order_id = {
+        ledger_row_order_id(row): row
+        for row in local_rows
+        if ledger_row_order_id(row)
+    }
+    metadata_keys = (
+        "strategy_id",
+        "signal_id",
+        "timeframe",
+        "stop_price",
+        "target_price",
+        "source_market_event_id",
+        "created_at",
+        "submitted_at",
+        "position_action",
+    )
+    for batch in attribution.get("batches", []):
+        if not isinstance(batch, dict):
+            continue
+        local = local_by_order_id.get(str(batch.get("open_order_id") or ""))
+        if not local:
+            continue
+        metadata = dict(batch.get("metadata") or {})
+        for key in metadata_keys:
+            value = local.get(key)
+            if value not in (None, ""):
+                metadata[key] = value
+        batch["metadata"] = metadata
+
+
+def fill_attributed_long_position_slices(
+    account_state: dict[str, Any],
+    fill_attribution: dict[str, Any],
+    test_epoch_id: str,
+    include_untracked_exit_only: bool,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Create strategy slices only from exact Longbridge fill batches."""
+    checks = {
+        base_symbol(str(row.get("symbol") or "")): bool(row.get("matches_broker_net"))
+        for row in fill_attribution.get("symbol_checks", [])
+        if isinstance(row, dict)
+    }
+    batches_by_symbol: dict[str, list[dict[str, Any]]] = {}
+    for row in fill_attribution.get("batches", []):
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("test_epoch_id") or "") != test_epoch_id or str(row.get("direction") or "") != "long":
+            continue
+        if decimal(row.get("remaining_quantity", "0")) <= ZERO:
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        if symbol:
+            batches_by_symbol.setdefault(symbol, []).append(dict(row))
+    slices: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for account_position in account_positions(account_state):
+        symbol = str(account_position["symbol"])
+        account_quantity = decimal(account_position.get("quantity", "0"))
+        account_available = decimal(account_position.get("available", account_quantity))
+        symbol_batches = sorted(
+            batches_by_symbol.get(symbol, []),
+            key=lambda row: (str(row.get("open_order_id") or ""), str(row.get("trade_id") or "")),
+        )
+        if checks.get(symbol) is False:
+            slices.append(
+                (
+                    {
+                        **account_position,
+                        "account_symbol_quantity": fmt_decimal(account_quantity),
+                        "account_symbol_available_quantity": fmt_decimal(account_available),
+                    },
+                    {"attribution_mismatch": True, "position_direction": "long"},
+                )
+            )
+            continue
+        remaining_available = account_available
+        attributed_quantity = ZERO
+        for batch in symbol_batches:
+            quantity = decimal(batch.get("remaining_quantity", "0"))
+            if quantity <= ZERO:
+                continue
+            available = min(quantity, remaining_available)
+            metadata = dict(batch.get("metadata") or {})
+            metadata.update(
+                {
+                    "capital_bucket": str(batch.get("capital_bucket") or ""),
+                    "runtime_id": str(batch.get("runtime_id") or ""),
+                    "position_direction": "long",
+                    "open_order_id": str(batch.get("open_order_id") or ""),
+                    "source_open_trade_id": str(batch.get("trade_id") or ""),
+                    "virtual_position_quantity": fmt_decimal(quantity),
+                    "virtual_position_slice_quantity": fmt_decimal(quantity),
+                    "virtual_position_slice_available": fmt_decimal(available),
+                }
+            )
+            slices.append(
+                (
+                    {
+                        **account_position,
+                        "quantity": fmt_decimal(quantity),
+                        "available": fmt_decimal(available),
+                        "cost_price": str(batch.get("open_price") or account_position.get("cost_price") or ""),
+                        "account_symbol_quantity": fmt_decimal(account_quantity),
+                        "account_symbol_available_quantity": fmt_decimal(account_available),
+                        "virtual_position_quantity": fmt_decimal(quantity),
+                        "virtual_position_capped_by_account": False,
+                    },
+                    metadata,
+                )
+            )
+            attributed_quantity += quantity
+            remaining_available = max(remaining_available - available, ZERO)
+        if include_untracked_exit_only and account_quantity > attributed_quantity:
+            untracked = account_quantity - attributed_quantity
+            slices.append(
+                (
+                    {
+                        **account_position,
+                        "quantity": fmt_decimal(untracked),
+                        "available": fmt_decimal(min(untracked, remaining_available)),
+                        "account_symbol_quantity": fmt_decimal(account_quantity),
+                        "account_symbol_available_quantity": fmt_decimal(account_available),
+                    },
+                    {},
+                )
+            )
+    return slices
 
 
 def confirmed_short_position_slices(
@@ -712,14 +1278,124 @@ def terminal_retriable_short_exit_signal_ids(
     return retriable
 
 
-def broker_failed_long_exit_signal_ids(execution_rows: list[dict[str, Any]]) -> set[str]:
-    """Permit a new exit intent after a broker request failed before any order existed."""
+def broker_failed_long_exit_signal_ids(
+    execution_rows: list[dict[str, Any]],
+    account_state: dict[str, Any],
+) -> set[str]:
+    """Retry only after a trustworthy broker snapshot proves no active order."""
+    if account_state.get("orders_ok") is not True:
+        return set()
+    broker_orders = broker_order_rows(account_state)
     retriable: set[str] = set()
     for row in execution_rows:
         signal_id = str(row.get("signal_id") or "")
         action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
         status = str(row.get("submission_status") or "")
-        if signal_id and action in {"close_long", "exit_long", "stop_loss", "take_profit"} and status.startswith("broker_submit_failed:"):
+        if not (
+            signal_id
+            and action in {"close_long", "exit_long", "stop_loss", "take_profit"}
+            and status.startswith("broker_submit_failed:")
+        ):
+            continue
+        client_request_id = str(row.get("client_request_id") or "")
+        matching_orders = [
+            order
+            for order in broker_orders
+            if broker_order_matches_request(
+                order,
+                signal_id=signal_id,
+                client_request_id=client_request_id,
+            )
+        ]
+        if matching_orders and any(
+            not broker_order_is_terminal_without_fill(order)
+            for order in matching_orders
+        ):
+            continue
+        retriable.add(signal_id)
+    return retriable
+
+
+def broker_order_rows(account_state: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in ("open_orders", "orders", "historical_orders"):
+        values = account_state.get(key)
+        if not isinstance(values, list):
+            continue
+        for row in values:
+            if not isinstance(row, dict):
+                continue
+            order_id = str(row.get("order_id") or "")
+            identity = order_id or json.dumps(row, sort_keys=True, default=str)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            rows.append(row)
+    return rows
+
+
+def broker_order_matches_request(
+    order: dict[str, Any],
+    *,
+    signal_id: str,
+    client_request_id: str,
+) -> bool:
+    text = " ".join(
+        str(order.get(key) or "")
+        for key in ("remark", "note", "message", "client_request_id")
+    )
+    tokens = set(text.replace("|", " ").split())
+    return bool(
+        signal_id in tokens
+        or (client_request_id and client_request_id in tokens)
+    )
+
+
+def broker_order_is_terminal_without_fill(order: dict[str, Any]) -> bool:
+    status = (
+        str(order.get("status") or "")
+        .strip()
+        .lower()
+        .replace("orderstatus.", "")
+        .replace(" ", "_")
+    )
+    executed_quantity = decimal(
+        order.get("executed_quantity", order.get("filled_quantity", "0"))
+    )
+    return (
+        status
+        in {
+            "canceled",
+            "cancelled",
+            "rejected",
+            "expired",
+            "withdrawn",
+            "failed",
+        }
+        and executed_quantity <= ZERO
+    )
+
+
+def unprocessed_exit_signal_ids(
+    signal_events: list[dict[str, Any]],
+    execution_rows: list[dict[str, Any]],
+) -> set[str]:
+    """Allow a fresh intent when an exit event never reached the executor."""
+    processed_ids = {
+        str(row.get("signal_id") or "")
+        for row in execution_rows
+        if str(row.get("signal_id") or "")
+    }
+    retriable: set[str] = set()
+    for row in signal_events:
+        signal_id = str(row.get("signal_id") or "")
+        action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
+        if (
+            signal_id
+            and signal_id not in processed_ids
+            and action in {"close_long", "exit_long", "close_short", "stop_loss", "take_profit"}
+        ):
             retriable.add(signal_id)
     return retriable
 
@@ -755,7 +1431,7 @@ def recent_exit_attempt_keys(
     cooldown_seconds: int,
     retriable_exit_signal_ids: set[str] | None = None,
 ) -> set[tuple[str, str, str, str]]:
-    retriable_exit_signal_ids = retriable_exit_signal_ids or set()
+    del retriable_exit_signal_ids
     attempts: set[tuple[str, str, str, str]] = set()
     for row in execution_rows:
         position_action = normalize_position_action(row.get("position_action") or row.get("exit_reason"))
@@ -769,9 +1445,9 @@ def recent_exit_attempt_keys(
         }:
             continue
         status = str(row.get("submission_status") or "")
-        if not status or status == "blocked_not_submitted":
+        if status == "blocked_not_submitted":
             continue
-        if str(row.get("signal_id") or "") in retriable_exit_signal_ids:
+        if not status and not str(row.get("created_at") or ""):
             continue
         attempted_at = parse_signal_time(row.get("submitted_at") or row.get("processed_at") or row.get("created_at"))
         if attempted_at and (now - attempted_at).total_seconds() > cooldown_seconds:
@@ -780,8 +1456,16 @@ def recent_exit_attempt_keys(
         exit_reason = str(row.get("exit_reason") or row.get("position_action") or "")
         direction = "short" if position_action == "close_short" else "long"
         if symbol and exit_reason:
-            source_open_order_id = str(row.get("source_open_order_id") or "") if direction == "short" else ""
-            attempts.add((symbol, direction, exit_reason, source_open_order_id))
+            source_open_order_id = str(row.get("source_open_order_id") or "")
+            source_open_trade_id = str(row.get("source_open_trade_id") or "")
+            attempts.add(
+                (
+                    symbol,
+                    direction,
+                    exit_reason,
+                    f"{source_open_order_id}:{source_open_trade_id}",
+                )
+            )
     return attempts
 
 
@@ -792,11 +1476,12 @@ def deterministic_exit_signal_id(
     exit_reason: str,
     source_open_signal_id: str = "",
     source_open_order_id: str = "",
+    source_open_trade_id: str = "",
     generated_at: str = "",
 ) -> str:
     del generated_at
     digest = sha256(
-        f"{symbol}|{runtime_id}|{exit_reason}|{source_open_signal_id}|{source_open_order_id}".encode("utf-8")
+        f"{symbol}|{runtime_id}|{exit_reason}|{source_open_signal_id}|{source_open_order_id}|{source_open_trade_id}".encode("utf-8")
     ).hexdigest()[:16]
     return f"m15exit-{digest}"
 
@@ -900,6 +1585,19 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         encoding="utf-8",
     )
     tmp_path.replace(path)
+
+
+def append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.touch(exist_ok=True)
+        return
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(
+                json.dumps(json_ready(row), ensure_ascii=False, sort_keys=True)
+                + "\n"
+            )
 
 
 def json_ready(value: Any) -> Any:

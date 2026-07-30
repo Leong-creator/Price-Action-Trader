@@ -12,7 +12,7 @@ if (-not (Test-Path $wslPath)) {
 }
 
 $scriptPath = "$RepoPath/scripts/start_m15_trading_stack_after_boot.sh"
-$argument = "-d `"$Distro`" --exec bash `"$scriptPath`""
+$argument = "-d `"$Distro`" --exec bash `"$scriptPath`" --keep-alive"
 
 function Install-StartupFolderFallback {
     $startupDir = [Environment]::GetFolderPath("Startup")
@@ -27,7 +27,7 @@ function Install-StartupFolderFallback {
     Remove-Item -Force -ErrorAction SilentlyContinue $legacyCmdPath, $legacyWatchdogPath, $launcherPath
     # Avoid nested shell quoting. The bootstrap resolves and enters its own
     # repository root, so WSL can execute it directly and invisibly.
-    $wslCommand = "$wslPath -d $Distro --exec bash $scriptPath"
+    $wslCommand = "$wslPath -d $Distro --exec bash $scriptPath --keep-alive"
     $escapedWslCommand = $wslCommand.Replace('"', '""')
     $vbs = @"
 Set shell = CreateObject("WScript.Shell")
@@ -35,7 +35,46 @@ shell.Run "$escapedWslCommand", 0, False
 "@
     Set-Content -Path $vbsPath -Value $vbs -Encoding ASCII
     Write-Output "Installed direct hidden startup-folder launcher: $vbsPath"
-    Write-Output "Fallback runs the paper-trading startup script once per Windows logon without a PowerShell or console window."
+    Write-Output "Fallback keeps one hidden WSL process attached after logon so the paper-trading stack remains alive without periodic windows."
+}
+
+function Install-WeekdayWakeFallback {
+    $startupDir = [Environment]::GetFolderPath("Startup")
+    $vbsPath = Join-Path $startupDir "$TaskName.vbs"
+    $taskAction = "wscript.exe `"$vbsPath`""
+    $schtasksPath = Join-Path $env:WINDIR "System32\schtasks.exe"
+
+    if (-not (Test-Path $schtasksPath)) {
+        throw "schtasks.exe not found at $schtasksPath"
+    }
+
+    $arguments = @(
+        "/Create",
+        "/TN", $TaskName,
+        "/TR", $taskAction,
+        "/SC", "WEEKLY",
+        "/D", "MON,TUE,WED,THU,FRI",
+        "/ST", "20:45",
+        "/RL", "LIMITED",
+        "/IT",
+        "/F"
+    )
+    $output = & $schtasksPath @arguments 2>&1
+    $exitCode = $LASTEXITCODE
+    Write-Output $output
+    if ($exitCode -ne 0) {
+        throw "schtasks.exe failed with exit code $exitCode"
+    }
+
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+    $task.Settings.DisallowStartIfOnBatteries = $false
+    $task.Settings.StopIfGoingOnBatteries = $false
+    $task.Settings.Hidden = $true
+    $task.Settings.StartWhenAvailable = $true
+    $task.Settings.ExecutionTimeLimit = "PT0S"
+    Set-ScheduledTask -InputObject $task | Out-Null
+
+    Write-Output "Installed hidden weekday 20:45 wake task through schtasks.exe: $TaskName"
 }
 
 try {
@@ -45,17 +84,17 @@ try {
         -Weekly `
         -WeeksInterval 1 `
         -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday `
-        -At "21:10"
+        -At "20:45"
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
         -DontStopIfGoingOnBatteries `
         -Hidden `
         -MultipleInstances IgnoreNew `
-        -ExecutionTimeLimit (New-TimeSpan -Minutes 10) `
+        -ExecutionTimeLimit (New-TimeSpan -Seconds 0) `
         -StartWhenAvailable
 
-    $description = "Hidden user-level task for Price-Action-Trader startup at Windows logon and weekdays 21:10."
+    $description = "Hidden user-level task for Price-Action-Trader startup at Windows logon and weekdays 20:45."
 
     Register-ScheduledTask `
         -TaskName $TaskName `
@@ -72,8 +111,13 @@ try {
     $message = $_.Exception.Message
     $errorId = [string]$_.FullyQualifiedErrorId
     if ($message -match "Access is denied|拒绝访问|0x80070005|权限" -or $errorId -match "PermissionDenied|AccessDenied|0x80070005") {
-        Write-Warning "Scheduled task install denied by current Windows permissions, falling back to hidden logon-only Startup launcher: $message"
+        Write-Warning "PowerShell scheduled-task registration was denied; installing the hidden logon launcher first: $message"
         Install-StartupFolderFallback
+        try {
+            Install-WeekdayWakeFallback
+        } catch {
+            Write-Warning "Weekday 20:45 wake task could not be installed; hidden logon startup remains active: $($_.Exception.Message)"
+        }
     } else {
         throw
     }

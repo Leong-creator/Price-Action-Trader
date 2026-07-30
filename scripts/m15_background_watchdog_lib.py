@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import os
 import signal
 import subprocess
@@ -28,6 +29,9 @@ REPORT_MD = "m15_background_watchdog_status.md"
 LEDGER_JSONL = "m15_background_watchdog_ledger.jsonl"
 PID_FILE = "m15_background_watchdog.pid"
 LOG_FILE = "m15_background_watchdog.log"
+START_LOCK_FILE = "m15_background_watchdog.start.lock"
+RUN_LOCK_FILE = "m15_background_watchdog.run.lock"
+HEALTH_LEDGER_INTERVAL_SECONDS = 300
 
 CommandRunner = Callable[[list[str], int], subprocess.CompletedProcess[str]]
 
@@ -46,6 +50,7 @@ class BackgroundWatchdogConfig:
     m15_dashboard_config_path: Path
     m15_account_state_config_path: Path
     readiness_config_path: Path
+    monday_acceptance_config_path: Path
     hard_boundaries: dict[str, bool]
 
 
@@ -95,6 +100,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         ),
         readiness_config_path=resolve_repo_path(
             inputs.get("readiness_config", ROOT / "config" / "examples" / "m15_opening_trade_readiness.json")
+        ),
+        monday_acceptance_config_path=resolve_repo_path(
+            inputs.get(
+                "monday_acceptance_config",
+                ROOT / "config" / "examples" / "m15_monday_refresh_acceptance.json",
+            )
         ),
         hard_boundaries={str(k): bool(v) for k, v in payload.get("hard_boundaries", {}).items()},
     )
@@ -161,6 +172,18 @@ def run_background_watchdog_once(
             config,
             runner,
         ),
+        run_step(
+            "m15_monday_acceptance",
+            "M15 SDK 周一综合验收",
+            [
+                sys.executable,
+                "scripts/run_m15_monday_refresh_acceptance.py",
+                "--config",
+                project_path(config.monday_acceptance_config_path),
+            ],
+            config,
+            runner,
+        ),
     ]
     failed_steps = [step for step in steps if step["returncode"] != 0]
     payload = {
@@ -186,10 +209,16 @@ def run_background_watchdog_once(
             "m15_sdk_runtime_config": project_path(config.m15_sdk_runtime_config_path),
             "m15_account_state_config": project_path(config.m15_account_state_config_path),
             "readiness_config": project_path(config.readiness_config_path),
+            "monday_acceptance_config": project_path(config.monday_acceptance_config_path),
         },
     }
+    append_ledger = should_append_watchdog_ledger(previous, payload)
+    payload["last_ledger_at"] = generated_at if append_ledger else str(
+        previous.get("last_ledger_at") or previous.get("generated_at") or ""
+    )
     write_json(config.output_dir / SUMMARY_JSON, payload)
-    append_jsonl(config.output_dir / LEDGER_JSONL, [payload])
+    if append_ledger:
+        append_jsonl(config.output_dir / LEDGER_JSONL, [payload])
     (config.output_dir / REPORT_MD).write_text(render_markdown(payload), encoding="utf-8")
     return payload
 
@@ -211,6 +240,10 @@ def run_step(
         returncode = int(completed.returncode)
         stdout = str(completed.stdout or "")
         stderr = str(completed.stderr or "")
+        semantic_failure = semantic_watchdog_failure(step_id, stdout) if returncode == 0 else ""
+        if semantic_failure:
+            returncode = 3
+            stderr = semantic_failure
     except subprocess.TimeoutExpired as exc:
         returncode = 124
         stdout = str(exc.stdout or "")
@@ -225,6 +258,32 @@ def run_step(
         "stdout_tail": clean_text(stdout)[-800:],
         "stderr_tail": clean_text(stderr)[-800:],
     }
+
+
+def semantic_watchdog_failure(step_id: str, stdout: str) -> str:
+    """Treat blocked JSON results as failures even when the CLI exits zero."""
+    try:
+        payload = json.loads(stdout)
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    if step_id == "m15_sdk_runtime_status":
+        if payload.get("runtime_process_alive") is not True:
+            return "sdk_runtime_process_not_alive"
+        if payload.get("status") != "running" or payload.get("sdk_connected") is not True:
+            return f"sdk_runtime_not_ready:{payload.get('status') or 'unknown'}"
+        if payload.get("account_snapshot_healthy") is not True:
+            return "sdk_account_snapshot_not_healthy"
+    if step_id == "m15_opening_readiness":
+        status_value = str(payload.get("readiness_status") or "")
+        if status_value.startswith("blocked"):
+            return f"opening_readiness_blocked:{status_value}"
+    if step_id == "m15_monday_acceptance":
+        status_value = str(payload.get("acceptance_status") or "")
+        if status_value.startswith("blocked"):
+            return f"monday_acceptance_blocked:{status_value}"
+    return ""
 
 
 def m15_runtime_daemon_step(config: BackgroundWatchdogConfig, runner: CommandRunner) -> dict[str, Any]:
@@ -307,7 +366,9 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
         "scripts/run_m15_longbridge_realtime_account_state.py",
         "scripts/run_m15_opening_trade_readiness.py",
         "scripts/run_m15_longbridge_sdk_runtime.py",
+        "scripts/run_m15_longbridge_sdk_analytics.py",
         "scripts/run_m15_longbridge_dashboard.py",
+        "scripts/run_m15_monday_refresh_acceptance.py",
     }
     script_tokens = [token for token in command if token.startswith("scripts/")]
     if not script_tokens or script_tokens[0] not in allowed_scripts:
@@ -385,20 +446,6 @@ def analytics_refresh_step(
     *,
     previous: dict[str, Any],
 ) -> dict[str, Any]:
-    if config.m15_runtime_engine == "sdk":
-        # SDK runtime owns snapshots and portfolio reads in-process.  Calling
-        # the legacy CLI analytics command here would reintroduce the exact
-        # slow path the SDK cutover removes.
-        return {
-            "step_id": "m15_account_state_full_refresh",
-            "label": "M15 SDK 账户慢路径由运行层维护",
-            "returncode": 0,
-            "elapsed_ms": 0,
-            "command": "",
-            "stdout_tail": "sdk_runtime_owns_account_and_portfolio_refresh",
-            "stderr_tail": "",
-            "skipped_due_to_sdk_runtime": True,
-        }
     previous_success_at = latest_step_generated_at(previous, "m15_account_state_full_refresh")
     if not analytics_refresh_due(generated_at, previous_success_at, config.analytics_refresh_interval_seconds):
         return {
@@ -412,23 +459,40 @@ def analytics_refresh_step(
             "skipped_due_to_throttle": True,
             "last_success_generated_at": previous_success_at,
         }
-    command = [
-        sys.executable,
-        "scripts/run_m15_longbridge_realtime_account_state.py",
-        "--config",
-        project_path(config.m15_account_state_config_path),
-        "--generated-at",
-        generated_at,
-    ]
+    if config.m15_runtime_engine == "sdk":
+        command = [
+            sys.executable,
+            "scripts/run_m15_longbridge_sdk_analytics.py",
+            "--sdk-config",
+            project_path(config.m15_sdk_runtime_config_path),
+            "--account-config",
+            project_path(config.m15_account_state_config_path),
+            "--generated-at",
+            generated_at,
+        ]
+        label = "M15 SDK 只读账户慢路径 analytics 刷新"
+    else:
+        command = [
+            sys.executable,
+            "scripts/run_m15_longbridge_realtime_account_state.py",
+            "--config",
+            project_path(config.m15_account_state_config_path),
+            "--generated-at",
+            generated_at,
+        ]
+        label = "M15 只读账户慢路径 analytics 刷新"
     step = run_step(
         "m15_account_state_full_refresh",
-        "M15 只读账户慢路径 analytics 刷新",
+        label,
         command,
         config,
         runner,
         timeout_seconds=config.analytics_command_timeout_seconds,
     )
     step["skipped_due_to_throttle"] = False
+    step["last_success_generated_at"] = (
+        generated_at if int(step.get("returncode", 1)) == 0 else previous_success_at
+    )
     return step
 
 
@@ -449,7 +513,12 @@ def latest_step_generated_at(payload: dict[str, Any], step_id: str) -> str:
     for step in payload.get("steps", []):
         if not isinstance(step, dict):
             continue
-        if step.get("step_id") == step_id and int(step.get("returncode", 1)) == 0 and not step.get("skipped_due_to_throttle"):
+        if step.get("step_id") != step_id:
+            continue
+        persisted = str(step.get("last_success_generated_at") or "")
+        if persisted:
+            return persisted
+        if int(step.get("returncode", 1)) == 0 and not step.get("skipped_due_to_throttle"):
             return str(payload.get("generated_at") or "")
     return ""
 
@@ -457,6 +526,21 @@ def latest_step_generated_at(payload: dict[str, Any], step_id: str) -> str:
 def watch_loop(config: BackgroundWatchdogConfig) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     pid_file = config.output_dir / PID_FILE
+    run_lock = (config.output_dir / RUN_LOCK_FILE).open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(run_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        run_lock.seek(0)
+        owner_pid = parse_pid(run_lock.read())
+        if owner_pid and process_alive(owner_pid):
+            pid_file.write_text(str(owner_pid) + "\n", encoding="utf-8")
+        run_lock.close()
+        print(f"M15 后台看护器已有实例持有运行锁，PID={owner_pid or 'unknown'}；本进程退出。", flush=True)
+        return 0
+    run_lock.seek(0)
+    run_lock.truncate()
+    run_lock.write(str(os.getpid()) + "\n")
+    run_lock.flush()
     pid_file.write_text(str(os.getpid()) + "\n", encoding="utf-8")
     try:
         while True:
@@ -470,33 +554,69 @@ def watch_loop(config: BackgroundWatchdogConfig) -> int:
                 pid_file.unlink()
         except OSError:
             pass
+        fcntl.flock(run_lock.fileno(), fcntl.LOCK_UN)
+        run_lock.close()
 
 
 def start_daemon(config_path: str | Path, config: BackgroundWatchdogConfig) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
-    pid_file = config.output_dir / PID_FILE
-    existing_pid = read_pid(pid_file)
-    if existing_pid and process_alive(existing_pid):
-        print(f"M15 后台看护器已在运行，PID={existing_pid}")
-        return 0
-    command = [
-        sys.executable,
-        str(ROOT / "scripts" / "run_m15_background_watchdog.py"),
-        "--watch",
-        "--config",
-        str(config_path),
-    ]
-    with (config.output_dir / LOG_FILE).open("a", encoding="utf-8") as log_handle:
-        process = subprocess.Popen(
-            command,
-            cwd=str(ROOT),
-            stdout=log_handle,
-            stderr=log_handle,
-            start_new_session=True,
-        )
-    pid_file.write_text(str(process.pid) + "\n", encoding="utf-8")
-    print(f"M15 后台看护器已启动，PID={process.pid}")
+    with (config.output_dir / START_LOCK_FILE).open("a+", encoding="utf-8") as start_lock:
+        fcntl.flock(start_lock.fileno(), fcntl.LOCK_EX)
+        pid_file = config.output_dir / PID_FILE
+        existing_pid = read_pid(pid_file)
+        if existing_pid and process_alive(existing_pid):
+            print(f"M15 后台看护器已在运行，PID={existing_pid}")
+            return 0
+        lock_owner_pid = read_pid(config.output_dir / RUN_LOCK_FILE)
+        if lock_owner_pid and process_alive(lock_owner_pid):
+            pid_file.write_text(str(lock_owner_pid) + "\n", encoding="utf-8")
+            print(f"M15 后台看护器已在运行，PID={lock_owner_pid}")
+            return 0
+        command = [
+            sys.executable,
+            str(ROOT / "scripts" / "run_m15_background_watchdog.py"),
+            "--watch",
+            "--config",
+            str(config_path),
+        ]
+        with (config.output_dir / LOG_FILE).open("a", encoding="utf-8") as log_handle:
+            process = subprocess.Popen(
+                command,
+                cwd=str(ROOT),
+                stdout=log_handle,
+                stderr=log_handle,
+                start_new_session=True,
+            )
+        pid_file.write_text(str(process.pid) + "\n", encoding="utf-8")
+        print(f"M15 后台看护器已启动，PID={process.pid}")
     return 0
+
+
+def should_append_watchdog_ledger(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    if not previous:
+        return True
+    if previous.get("watchdog_status") != current.get("watchdog_status"):
+        return True
+    previous_failed = sorted(
+        str(step.get("step_id") or "")
+        for step in previous.get("steps", [])
+        if isinstance(step, dict) and int(step.get("returncode", 0) or 0) != 0
+    )
+    current_failed = sorted(
+        str(step.get("step_id") or "")
+        for step in current.get("steps", [])
+        if isinstance(step, dict) and int(step.get("returncode", 0) or 0) != 0
+    )
+    if previous_failed != current_failed:
+        return True
+    try:
+        previous_at = datetime.fromisoformat(
+            str(previous.get("last_ledger_at") or previous.get("generated_at") or "").replace("Z", "+00:00")
+        )
+        current_at = datetime.fromisoformat(str(current.get("generated_at") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    return (current_at - previous_at).total_seconds() >= HEALTH_LEDGER_INTERVAL_SECONDS
 
 
 def stop_daemon(config: BackgroundWatchdogConfig) -> int:
@@ -540,9 +660,16 @@ def status(config: BackgroundWatchdogConfig) -> dict[str, Any]:
 
 def read_pid(path: Path) -> int | None:
     try:
-        raw = path.read_text(encoding="utf-8").strip()
-        return int(raw) if raw else None
+        return parse_pid(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return None
+
+
+def parse_pid(raw: str) -> int | None:
+    value = raw.strip()
+    try:
+        return int(value) if value else None
+    except ValueError:
         return None
 
 

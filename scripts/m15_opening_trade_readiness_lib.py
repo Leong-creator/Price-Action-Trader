@@ -22,8 +22,9 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
 from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
+from scripts.m15_longbridge_sdk_runtime_lib import configured_trading_symbols as sdk_configured_trading_symbols
 from scripts.m15_longbridge_sdk_runtime_lib import daily_context_is_complete as sdk_daily_context_is_complete
-from scripts.m15_longbridge_sdk_runtime_lib import configured_symbols as sdk_configured_symbols
+from scripts.m15_longbridge_sdk_runtime_lib import trading_universe_fingerprint as sdk_trading_universe_fingerprint
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,6 +123,24 @@ def run_m15_opening_trade_readiness(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(config.output_dir / READINESS_JSON, payload)
     (config.output_dir / READINESS_MD).write_text(render_markdown(payload), encoding="utf-8")
+    if config.realtime_runtime_engine == "sdk" and config.output_dir.resolve() == DEFAULT_OUTPUT_DIR.resolve():
+        legacy_path = DEFAULT_M15_REALTIME_DIR / READINESS_JSON
+        write_json(
+            legacy_path,
+            {
+                "schema_version": "m15.opening-trade-readiness.legacy-pointer.v1",
+                "generated_at": generated_at,
+                "readiness_status": "superseded_use_canonical_sdk_readiness",
+                "canonical_path": project_path(config.output_dir / READINESS_JSON),
+                "trading_decision_allowed": False,
+                "plain_language_result": "此旧路径已停用；请读取 canonical_path 指向的 SDK 开盘验收。",
+            },
+        )
+        (DEFAULT_M15_REALTIME_DIR / READINESS_MD).write_text(
+            "# Superseded readiness path\n\n"
+            f"Use `{project_path(config.output_dir / READINESS_JSON)}`.\n",
+            encoding="utf-8",
+        )
     return payload
 
 
@@ -419,7 +438,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "execution_config": project_path(config.execution_config_path),
             "execution_summary": project_path(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else "",
             "realtime_account_state": project_path(config.realtime_account_state_path),
-            "realtime_supervisor_status": project_path(config.realtime_supervisor_status_path),
+            "realtime_supervisor_status": (
+                "legacy_cli_not_used_by_sdk"
+                if sdk_config is not None
+                else project_path(config.realtime_supervisor_status_path)
+            ),
             "sdk_runtime_status": project_path(config.sdk_runtime_status_path),
         },
         "local_research_non_blocking": {
@@ -525,19 +548,42 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
     expected_fingerprint = sdk_config_fingerprint(sdk_config) if sdk_config is not None else ""
     if expected_fingerprint and str(status.get("config_fingerprint") or "") != expected_fingerprint:
         issues.append("sdk_config_fingerprint_drift")
-    expected_count = len(sdk_configured_symbols(sdk_config)) if sdk_config is not None else 0
+    expected_trading_fingerprint = (
+        sdk_trading_universe_fingerprint(sdk_config)
+        if sdk_config is not None
+        else ""
+    )
+    if expected_trading_fingerprint and str(
+        status.get("trading_universe_fingerprint") or ""
+    ) != expected_trading_fingerprint:
+        issues.append("sdk_trading_universe_fingerprint_drift")
+    expected_count = len(sdk_configured_trading_symbols(sdk_config)) if sdk_config is not None else 0
     expected_coverage = f"{expected_count}/{expected_count}" if expected_count else ""
-    if expected_coverage and str(status.get("subscription_coverage") or "") != expected_coverage:
-        issues.append("sdk_subscription_coverage_incomplete")
-    if sdk_config is not None and not sdk_daily_context_is_complete(
-        sdk_config,
-        str(status.get("daily_context_state") or ""),
-        int(status.get("daily_context_row_count", 0) or 0),
-        [str(value) for value in (status.get("daily_context_failed_symbols") or [])],
-    ):
+    actual_trading_coverage = str(
+        status.get("trading_market_data_coverage")
+        or status.get("trading_subscription_coverage")
+        or status.get("subscription_coverage")
+        or ""
+    )
+    if expected_coverage and actual_trading_coverage != expected_coverage:
+        issues.append("sdk_trading_market_data_coverage_incomplete")
+    trading_daily_ready = status.get("trading_daily_context_ready")
+    if trading_daily_ready is None and sdk_config is not None:
+        trading_daily_ready = sdk_daily_context_is_complete(
+            sdk_config,
+            str(status.get("daily_context_state") or ""),
+            int(status.get("daily_context_row_count", 0) or 0),
+            [str(value) for value in (status.get("daily_context_failed_symbols") or [])],
+        )
+    if sdk_config is not None and trading_daily_ready is not True:
         issues.append("sdk_daily_context_incomplete")
     if status.get("account_snapshot_healthy") is not True:
         issues.append("sdk_account_snapshot_stale")
+    if status.get("account_snapshot_circuit_open") is True:
+        issues.append("sdk_account_snapshot_circuit_open")
+    worker_status = str(status.get("account_snapshot_worker_status") or "")
+    if worker_status and worker_status not in {"healthy", "healthy_circuit_probe", "healthy_circuit_recovered"}:
+        issues.append(f"sdk_account_worker_status={worker_status}")
     return issues
 
 

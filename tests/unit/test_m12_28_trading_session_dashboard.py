@@ -100,6 +100,15 @@ class M1228TradingSessionDashboardTests(unittest.TestCase):
         self.assertEqual(run_mock.call_args.kwargs["env"]["LONGBRIDGE_HTTP_URL"], "https://openapi.longbridge.cn")
         self.assertEqual(run_mock.call_count, MODULE.LONGRIDGE_QUOTE_RETRY_ATTEMPTS)
 
+    def test_resolve_longbridge_cli_path_uses_explicit_path_when_daemon_path_is_minimal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cli_path = Path(tmp) / "longbridge"
+            cli_path.write_text("#!/bin/sh\n", encoding="utf-8")
+            cli_path.chmod(0o755)
+            with patch.dict("os.environ", {"LONGBRIDGE_CLI_PATH": str(cli_path)}, clear=False):
+                with patch("scripts.m12_28_trading_session_dashboard_lib.shutil.which", return_value=None):
+                    self.assertEqual(MODULE.resolve_longbridge_cli_path(), str(cli_path))
+
     def test_quote_timeout_retries_before_success_without_yahoo_fallback(self) -> None:
         payload = json.dumps(
             [

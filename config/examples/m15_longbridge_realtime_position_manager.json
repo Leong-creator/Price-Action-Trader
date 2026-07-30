@@ -5,19 +5,24 @@
     "account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
     "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
     "realtime_signal_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_signal_events.jsonl",
-    "realtime_execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl"
+    "realtime_execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl",
+    "fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_runtime.json",
+    "canonical_fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json"
   },
   "outputs": {
     "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
   },
   "longbridge_position_manager": {
     "max_exit_events_per_run": 10,
+    "stop_loss_events_bypass_run_cap": true,
     "exit_attempt_cooldown_seconds": 900,
     "manage_untracked_positions_for_exit": true,
     "untracked_stop_loss_percent": "3",
     "untracked_take_profit_percent": "3",
     "long_exit_limit_discount_percent": "0.5",
     "short_cover_limit_premium_percent": "0.5",
+    "test_epoch_id": "m15-sdk-formal-single-strategy-20260716",
+    "test_started_at": "2026-07-16T13:31:40.564065Z",
     "paper_short_testing": {
       "enabled": true,
       "test_epoch_id": "m15-sdk-formal-short-strategy-20260716",

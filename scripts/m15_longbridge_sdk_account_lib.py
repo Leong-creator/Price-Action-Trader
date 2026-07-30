@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from scripts.m15_longbridge_realtime_execution_lib import to_iso
+from scripts.m15_longbridge_sdk_account_worker_lib import AccountWorkerConfig, SpawnAccountSnapshotWorker
 
 
 def sdk_plain(value: Any) -> Any:
@@ -37,7 +38,7 @@ def sdk_plain(value: Any) -> Any:
         "frozen_cash", "settling_cash", "total_cash", "net_assets", "buying_power", "buy_power", "channels", "positions", "symbol",
         "name", "market", "quantity", "available_quantity", "available", "cost_price", "side",
         "status", "order_id", "submitted_quantity", "executed_quantity", "submitted_price", "price",
-        "executed_price", "submitted_at", "updated_at", "executed_at", "remark", "order_type",
+        "executed_price", "submitted_at", "updated_at", "executed_at", "trade_done_at", "trade_id", "remark", "order_type",
         "last_done", "last_price", "market_price", "current_price", "close", "pre_close",
         "sum_profit", "sum_profit_rate", "current_total_asset", "profits", "items", "sublist", "profit", "stock_items",
     ):
@@ -112,13 +113,15 @@ class SdkAccountStateProvider:
         trade_context: Any,
         portfolio_context: Any,
         *,
-        account_channel: str = "lb_papertrading",
+        account_channel: str = "",
         request_gate: SdkTradeRequestGate | None = None,
+        include_portfolio_analytics: bool = True,
     ) -> None:
         self.trade_context = trade_context
         self.portfolio_context = portfolio_context
         self.account_channel = account_channel
         self.request_gate = request_gate or SdkTradeRequestGate()
+        self.include_portfolio_analytics = include_portfolio_analytics
 
     def refresh(self, *, now: datetime | None = None) -> dict[str, Any]:
         now = now or datetime.now(UTC)
@@ -127,6 +130,7 @@ class SdkAccountStateProvider:
         positions: list[dict[str, Any]] = []
         orders: list[dict[str, Any]] = []
         executions: list[dict[str, Any]] = []
+        account_channel_verified_from_sdk = False
         pnl: Any = {}
         try:
             balances = [sdk_plain(item) for item in self.request_gate.call(lambda: self.trade_context.account_balance())]
@@ -138,9 +142,10 @@ class SdkAccountStateProvider:
             positions = [item for channel in channels if isinstance(channel, dict) for item in channel.get("positions", []) if isinstance(item, dict)]
             if not positions:
                 positions = rows(position_response)
-            account_channel = next((str(channel.get("account_channel") or "") for channel in channels if isinstance(channel, dict)), self.account_channel)
+            account_channel = next((str(channel.get("account_channel") or "") for channel in channels if isinstance(channel, dict) and channel.get("account_channel")), "")
             if account_channel:
                 self.account_channel = account_channel
+                account_channel_verified_from_sdk = True
         except Exception as exc:
             errors.append(f"sdk_stock_positions_failed:{type(exc).__name__}:{exc}")
         try:
@@ -151,12 +156,13 @@ class SdkAccountStateProvider:
             executions = rows(self.request_gate.call(lambda: self.trade_context.today_executions()))
         except Exception as exc:
             errors.append(f"sdk_today_executions_failed:{type(exc).__name__}:{exc}")
-        try:
-            # Portfolio analytics uses a separate SDK context and must never
-            # hold the trade request gate needed by a time-sensitive order.
-            pnl = sdk_plain(self.portfolio_context.profit_analysis_by_market(market="US"))
-        except Exception as exc:
-            errors.append(f"sdk_profit_analysis_failed:{type(exc).__name__}:{exc}")
+        if self.include_portfolio_analytics:
+            try:
+                # Portfolio analytics uses a separate SDK context and must never
+                # hold the trade request gate needed by a time-sensitive order.
+                pnl = sdk_plain(self.portfolio_context.profit_analysis_by_market(market="US"))
+            except Exception as exc:
+                errors.append(f"sdk_profit_analysis_failed:{type(exc).__name__}:{exc}")
 
         currency_cash: dict[str, dict[str, str]] = {}
         for balance in balances:
@@ -209,10 +215,19 @@ class SdkAccountStateProvider:
             "schema_version": "m15.longbridge-sdk-account-state.v1",
             "stage": "M15.longbridge_sdk_account_state",
             "generated_at": to_iso(now),
-            "source": "longbridge_sdk_account_and_portfolio",
+            "source": (
+                "longbridge_sdk_account_and_portfolio"
+                if self.include_portfolio_analytics
+                else "longbridge_sdk_trade_account_fast_snapshot"
+            ),
             "account_channel": self.account_channel,
-            "paper_account_detected": self.account_channel == "lb_papertrading",
-            "paper_account_verified": self.account_channel == "lb_papertrading" and not critical_errors,
+            "account_channel_verified_from_sdk": account_channel_verified_from_sdk,
+            "paper_account_detected": account_channel_verified_from_sdk and self.account_channel == "lb_papertrading",
+            "paper_account_verified": (
+                account_channel_verified_from_sdk
+                and self.account_channel == "lb_papertrading"
+                and not critical_errors
+            ),
             "live_execution": False,
             "real_money_actions": False,
             "local_simulation_isolated": True,
@@ -220,7 +235,12 @@ class SdkAccountStateProvider:
             "positions_ok": not any(item.startswith("sdk_stock_positions") for item in errors),
             "orders_ok": not any(item.startswith("sdk_today_orders") for item in errors),
             "executions_ok": not any(item.startswith("sdk_today_executions") for item in errors),
-            "portfolio_ok": not any(item.startswith("sdk_profit_analysis") for item in errors),
+            "portfolio_ok": (
+                not any(item.startswith("sdk_profit_analysis") for item in errors)
+                if self.include_portfolio_analytics
+                else None
+            ),
+            "portfolio_deferred_to_slow_path": not self.include_portfolio_analytics,
             "errors": errors,
             "critical_errors": critical_errors,
             "analytics_errors": analytics_errors,
@@ -253,11 +273,23 @@ class SdkAccountStateProvider:
 class SdkAccountCoordinator:
     """Own the latest SDK account snapshot without blocking quote callbacks."""
 
-    def __init__(self, provider: SdkAccountStateProvider, output_path: Path, *, interval_seconds: int = 15) -> None:
+    def __init__(
+        self,
+        provider: SdkAccountStateProvider,
+        output_path: Path,
+        *,
+        interval_seconds: int = 15,
+        provider_factory: Callable[[], SdkAccountStateProvider] | None = None,
+        provider_rebuild_cooldown_seconds: int = 60,
+    ) -> None:
         self.provider = provider
         self.output_path = output_path
         self.interval_seconds = interval_seconds
+        self.provider_factory = provider_factory
+        self.provider_rebuild_cooldown_seconds = provider_rebuild_cooldown_seconds
+        self._last_provider_rebuild = float("-inf")
         self._lock = threading.RLock()
+        self._refresh_lock = threading.Lock()
         self._snapshot: dict[str, Any] = {}
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="m15-sdk-account-snapshot", daemon=True)
@@ -271,15 +303,53 @@ class SdkAccountCoordinator:
         self._thread.join(timeout=2)
 
     def refresh(self) -> dict[str, Any]:
-        snapshot = self.provider.refresh()
+        with self._refresh_lock:
+            candidate = self.provider.refresh()
+            now_monotonic = time.monotonic()
+            if (
+                candidate.get("critical_errors")
+                and self.provider_factory is not None
+                and now_monotonic - self._last_provider_rebuild >= self.provider_rebuild_cooldown_seconds
+            ):
+                self._last_provider_rebuild = now_monotonic
+                failed_errors = list(candidate.get("critical_errors") or [])
+                self.provider = self.provider_factory()
+                candidate = self.provider.refresh()
+                candidate["provider_rebuild_attempted"] = True
+                candidate["provider_rebuild_trigger_errors"] = failed_errors
         with self._lock:
-            pending = [row for row in self._snapshot.get("open_orders", []) if row.get("sdk_pending_confirmation")]
+            previous = self._snapshot
+            preserve_last_good = (
+                bool(previous)
+                and previous.get("paper_account_verified") is True
+                and previous.get("assets_ok") is True
+                and previous.get("positions_ok") is True
+                and previous.get("orders_ok") is True
+                and bool(candidate.get("critical_errors"))
+                and str(candidate.get("account_channel") or "")
+                == str(previous.get("account_channel") or "")
+            )
+            if preserve_last_good:
+                # Keep the original generated_at so the executor's 45-second
+                # freshness gate still stops entries if SDK failures persist.
+                snapshot = json.loads(json.dumps(previous, ensure_ascii=False))
+                snapshot["last_refresh_status"] = "critical_error_preserved_last_good"
+                snapshot["last_failed_refresh_at"] = candidate.get("generated_at")
+                snapshot["last_refresh_errors"] = list(candidate.get("critical_errors") or [])
+            else:
+                snapshot = candidate
+                snapshot["last_refresh_status"] = "healthy" if not candidate.get("critical_errors") else "critical_error"
+                snapshot.pop("last_failed_refresh_at", None)
+                snapshot.pop("last_refresh_errors", None)
+            pending = [row for row in previous.get("open_orders", []) if row.get("sdk_pending_confirmation")]
             known_ids = {str(row.get("order_id") or "") for row in snapshot.get("orders", [])}
             snapshot["open_orders"].extend(row for row in pending if str(row.get("order_id") or "") not in known_ids)
             snapshot["open_order_count"] = len(snapshot["open_orders"])
             self._snapshot = snapshot
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
-        self.output_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary = self.output_path.with_name(f".{self.output_path.name}.{id(self)}.tmp")
+        temporary.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(self.output_path)
         return snapshot
 
     def snapshot(self) -> dict[str, Any]:
@@ -311,6 +381,111 @@ class SdkAccountCoordinator:
             except Exception:
                 # The previous snapshot remains available. The executor applies
                 # the configured maximum age before considering a new entry.
+                continue
+
+
+class SdkAccountProcessCoordinator:
+    """Publish account snapshots from a killable spawned SDK worker."""
+
+    def __init__(
+        self,
+        provider_factory: Callable[[], SdkAccountStateProvider],
+        output_path: Path,
+        *,
+        interval_seconds: int = 15,
+        refresh_deadline_seconds: float = 8.0,
+        circuit_retry_cooldown_seconds: float = 15.0,
+    ) -> None:
+        self.output_path = output_path
+        self.interval_seconds = interval_seconds
+        self.refresh_deadline_seconds = refresh_deadline_seconds
+        self._lock = threading.RLock()
+        self._refresh_lock = threading.Lock()
+        self._snapshot: dict[str, Any] = {}
+        self._pending_open_orders: dict[str, dict[str, Any]] = {}
+        self._stop = threading.Event()
+        self._worker = SpawnAccountSnapshotWorker(
+            provider_factory,
+            config=AccountWorkerConfig(
+                refresh_total_deadline_seconds=refresh_deadline_seconds,
+                startup_total_deadline_seconds=max(30.0, refresh_deadline_seconds),
+                circuit_breaker_consecutive_timeouts=2,
+                circuit_recovery_consecutive_successes=2,
+                circuit_retry_cooldown_seconds=circuit_retry_cooldown_seconds,
+            ),
+        )
+        self._thread = threading.Thread(target=self._run, name="m15-sdk-account-process-coordinator", daemon=True)
+
+    def start(self) -> None:
+        self._worker.start()
+        self.refresh()
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=self.refresh_deadline_seconds + 1.0)
+        self._worker.stop()
+
+    def refresh(self) -> dict[str, Any]:
+        with self._refresh_lock:
+            candidate = self._worker.refresh(total_deadline_seconds=self.refresh_deadline_seconds)
+        with self._lock:
+            known_ids = {
+                str(row.get("order_id") or "")
+                for row in candidate.get("orders", [])
+                if isinstance(row, dict)
+            }
+            for order_id in tuple(self._pending_open_orders):
+                if order_id in known_ids:
+                    self._pending_open_orders.pop(order_id, None)
+            open_orders = [row for row in candidate.get("open_orders", []) if isinstance(row, dict)]
+            open_ids = {str(row.get("order_id") or "") for row in open_orders}
+            open_orders.extend(
+                row
+                for order_id, row in self._pending_open_orders.items()
+                if order_id not in open_ids
+            )
+            candidate["open_orders"] = open_orders
+            candidate["open_order_count"] = len(open_orders)
+            self._snapshot = json.loads(json.dumps(candidate, ensure_ascii=False))
+            snapshot = json.loads(json.dumps(self._snapshot, ensure_ascii=False))
+        self._write_snapshot(snapshot)
+        return snapshot
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return json.loads(json.dumps(self._snapshot, ensure_ascii=False))
+
+    def note_submission(self, order_payload: dict[str, Any], response: dict[str, Any]) -> None:
+        order_id = str(response.get("order_id") or "")
+        if not order_id:
+            return
+        pending = {
+            "order_id": order_id,
+            "symbol": str(order_payload.get("symbol") or ""),
+            "side": str(order_payload.get("side") or ""),
+            "status": "Submitted",
+            "sdk_pending_confirmation": True,
+        }
+        with self._lock:
+            self._pending_open_orders[order_id] = pending
+            if self._snapshot:
+                open_orders = self._snapshot.setdefault("open_orders", [])
+                if not any(str(row.get("order_id") or "") == order_id for row in open_orders):
+                    open_orders.append(dict(pending))
+                self._snapshot["open_order_count"] = len(open_orders)
+
+    def _write_snapshot(self, snapshot: dict[str, Any]) -> None:
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.output_path.with_name(f".{self.output_path.name}.{id(self)}.tmp")
+        temporary.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(self.output_path)
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.interval_seconds):
+            try:
+                self.refresh()
+            except Exception:
                 continue
 
 

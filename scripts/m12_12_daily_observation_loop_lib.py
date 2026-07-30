@@ -168,6 +168,11 @@ def cached_load_bars(path: Path) -> list[Any]:
     return list(_cached_load_bars(str(path), stat.st_mtime_ns, stat.st_size))
 
 
+def load_bars(path: Path) -> list[Any]:
+    """Compatibility entry point for older local post-close stages."""
+    return cached_load_bars(path)
+
+
 def decimal(value: Any) -> Decimal:
     return Decimal(str(value))
 
@@ -471,7 +476,7 @@ def run_fetch_plan(
             results.append(fetch_result(fetch_target, "deferred", existing, generated_at, skipped_reason="fetch_budget_exhausted"))
             continue
         try:
-            rows = fetch_target_rows(config, fetch_target)
+            rows = fetch_target_rows_with_existing_cache(config, fetch_target, existing)
             rows, anomalies = sanitize_vendor_rows(rows)
             if not rows:
                 raise RuntimeError("provider returned no usable rows")
@@ -653,6 +658,43 @@ def fetch_target_rows(config: M1212Config, target: FetchTarget) -> list[dict[str
             allow_extended_hours=False,
         )
     raise ValueError(f"Unsupported fetch target: {target.timeframe}")
+
+
+def fetch_target_rows_with_existing_cache(
+    config: M1212Config,
+    target: FetchTarget,
+    existing: Path | None,
+) -> list[dict[str, str]]:
+    if target.timeframe != "1d" or existing is None or not existing.exists():
+        return fetch_target_rows(config, target)
+
+    stats = csv_stats(existing)
+    if not stats["end_date"]:
+        return fetch_target_rows(config, target)
+    existing_end = date.fromisoformat(stats["end_date"])
+    incremental_start = max(target.target_start, existing_end + timedelta(days=1))
+    if incremental_start > target.target_end:
+        with existing.open(newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    incremental_target = FetchTarget(
+        symbol=target.symbol,
+        timeframe=target.timeframe,
+        target_start=incremental_start,
+        target_end=target.target_end,
+        fetch_mode=target.fetch_mode,
+        destination=target.destination,
+    )
+    with existing.open(newline="", encoding="utf-8") as handle:
+        existing_rows = list(csv.DictReader(handle))
+    new_rows = fetch_target_rows(config, incremental_target)
+    merged = {
+        str(row.get("timestamp") or ""): row
+        for row in [*existing_rows, *new_rows]
+        if row.get("timestamp")
+        and target.target_start <= date.fromisoformat(str(row["timestamp"])[:10]) <= target.target_end
+    }
+    return [merged[key] for key in sorted(merged)]
 
 
 def fetch_public_fallback_rows(config: M1212Config, target: FetchTarget, existing: Path | None) -> list[dict[str, str]]:

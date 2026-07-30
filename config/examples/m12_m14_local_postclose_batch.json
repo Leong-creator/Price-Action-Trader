@@ -6,7 +6,7 @@
   "fetch_replay": {
     "execute_fetch": true,
     "refresh_quotes": true,
-    "max_native_fetches": 147
+    "max_native_fetches": 294
   },
   "retry": {
     "max_attempts": 3

@@ -98,6 +98,10 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         script = Path("scripts/start_m15_trading_stack_after_boot.sh").read_text(encoding="utf-8")
 
         self.assertIn("run_m12_m14_local_postclose_scheduler.py", script)
+        self.assertIn('if [[ "${1:-}" == "--keep-alive" ]]', script)
+        self.assertIn("m15_windows_hidden_keeper.heartbeat", script)
+        self.assertIn("sleep 60", script)
+        self.assertIn("Removing stale startup lock", script)
         self.assertNotIn("run_m12_47_session_supervisor.py", script)
         self.assertNotIn("run_m12_37_intraday_auto_loop.py", script)
 
@@ -105,6 +109,12 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         script = Path("scripts/install_m15_windows_startup_task.ps1").read_text(encoding="utf-8")
 
         self.assertIn("--exec bash", script)
+        self.assertIn("--keep-alive", script)
+        self.assertIn("Install-WeekdayWakeFallback", script)
+        self.assertIn("schtasks.exe", script)
+        self.assertIn('"20:45"', script)
+        self.assertIn("DisallowStartIfOnBatteries = $false", script)
+        self.assertIn("StartWhenAvailable = $true", script)
         self.assertNotIn("bash -lc", script)
         self.assertNotIn("300", script)
 

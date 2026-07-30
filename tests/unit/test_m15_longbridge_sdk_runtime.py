@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import ast
+import inspect
 import json
+import textwrap
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -9,32 +12,473 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
-    config_fingerprint, configured_symbols, daily_context_is_complete, fresh_market_events, load_config,
+    config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
+    daily_context_is_complete, fresh_market_events, load_config,
     load_current_sdk_intraday_context,
     load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
+    market_event_is_tradable, trading_market_events,
     validate_formal_epoch_alignment,
 )
-from scripts.m15_longbridge_sdk_account_lib import SdkAccountStateProvider, SdkTradeRequestGate
+from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAccountStateProvider, SdkTradeRequestGate
 from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
+    acquire_runtime_run_lock,
     build_live_daily_confirmation_rows,
     close_spawn_queue,
+    completed_postclose_refresh_dates,
+    compact_hot_execution_rows,
+    compact_hot_signal_rows,
+    dispatch_completed_rows,
     event_rows_to_daily,
+    effective_runtime_dispatch_enabled,
+    is_orphaned_sdk_runtime_child,
+    market_data_mode_qualifies_for_subscription_gate,
+    market_data_heartbeat_grace_elapsed,
+    market_data_heartbeat_is_stale,
     preserve_last_order_maintenance_action,
+    quote_worker,
+    quote_subscription_targets,
     require_sdk_contract,
     request_runtime_shutdown,
+    restore_pipeline_observability,
+    runtime_requires_health_replacement,
+    runtime_owns_quote_connection,
     run_pending_flatten_cycle,
+    run_authorized_account_exit_cycle,
     run_sdk_preflight,
+    runtime_dispatch_block_reason,
+    should_use_snapshot_fallback,
+    snapshot_poll_cycle_is_healthy,
+    start_runtime_daemon,
+    trade_context_health_requires_rebuild,
 )
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_only_oauth_or_missing_trade_context_triggers_rebuild(self) -> None:
+        self.assertTrue(
+            trade_context_health_requires_rebuild(
+                {
+                    "status": "trade_context_refresh_required",
+                    "trade_context_refresh_required": True,
+                }
+            )
+        )
+        self.assertTrue(
+            trade_context_health_requires_rebuild(
+                {"status": "trade_context_missing"}
+            )
+        )
+        self.assertFalse(
+            trade_context_health_requires_rebuild(
+                {
+                    "status": "trade_context_healthcheck_failed",
+                    "trade_context_refresh_required": False,
+                    "error": "api request is limited",
+                }
+            )
+        )
+
+    def test_runtime_dispatch_waits_for_complete_market_data_connection(self) -> None:
+        self.assertFalse(
+            effective_runtime_dispatch_enabled(
+                dispatch_requested=True,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=False,
+                trading_daily_context_ready=True,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+            )
+        )
+        self.assertEqual(
+            runtime_dispatch_block_reason(
+                paper_order_dispatch_enabled=True,
+                readonly_gate_blocked=False,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=False,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+                trading_daily_context_ready=True,
+            ),
+            "market_data_recovering",
+        )
+
+    def test_quote_worker_does_not_requery_subscriptions_after_acknowledged_batches(self) -> None:
+        tree = ast.parse(textwrap.dedent(inspect.getsource(quote_worker)))
+        called_methods = [
+            node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        ]
+
+        self.assertNotIn("subscriptions", called_methods)
+        self.assertEqual(called_methods.count("set_on_quote"), 1)
+
+    def test_snapshot_fallback_requires_configured_subscription_failures(self) -> None:
+        self.assertFalse(should_use_snapshot_fallback(0, 1))
+        self.assertTrue(should_use_snapshot_fallback(1, 1))
+
+    def test_snapshot_poll_requires_complete_fast_cycles(self) -> None:
+        self.assertTrue(snapshot_poll_cycle_is_healthy(147, 147, 999, 1000))
+        self.assertFalse(snapshot_poll_cycle_is_healthy(146, 147, 100, 1000))
+        self.assertFalse(snapshot_poll_cycle_is_healthy(147, 147, 1001, 1000))
+
+    def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
+        config = load_config()
+
+        self.assertEqual(config.snapshot_poll_interval_seconds, 3)
+        self.assertLess(
+            config.snapshot_poll_interval_seconds,
+            config.market_data_heartbeat_deadline_seconds,
+        )
+
+    def test_runtime_initializes_snapshot_builder_before_any_fallback_worker_start(self) -> None:
+        source = inspect.getsource(
+            __import__(
+                "scripts.run_m15_longbridge_sdk_runtime",
+                fromlist=["run_watch"],
+            ).run_watch
+        )
+
+        self.assertIn(
+            "if snapshot_fallback_active and snapshot_bar_builder is None:",
+            source,
+        )
+        self.assertLess(
+            source.index("if snapshot_fallback_active and snapshot_bar_builder is None:"),
+            source.index("worker_target = ("),
+        )
+
+    def test_snapshot_poll_never_counts_as_subscription_gate_evidence(self) -> None:
+        self.assertTrue(
+            market_data_mode_qualifies_for_subscription_gate(
+                "sdk_subscription"
+            )
+        )
+        self.assertFalse(
+            market_data_mode_qualifies_for_subscription_gate(
+                "sdk_snapshot_poll"
+            )
+        )
+
+    def test_ready_market_data_worker_is_stale_after_heartbeat_deadline(self) -> None:
+        self.assertFalse(market_data_heartbeat_is_stale(10.0, 15.0, 5.0))
+        self.assertTrue(market_data_heartbeat_is_stale(10.0, 15.001, 5.0))
+
+    def test_market_data_heartbeat_starts_after_subscription_startup_grace(self) -> None:
+        self.assertFalse(market_data_heartbeat_grace_elapsed(10.0, 30.0, 20.0))
+        self.assertTrue(market_data_heartbeat_grace_elapsed(10.0, 30.001, 20.0))
+        self.assertFalse(market_data_heartbeat_grace_elapsed(0.0, 100.0, 20.0))
+
+    def test_orphan_cleanup_only_targets_detached_children_from_the_sdk_log(self) -> None:
+        runtime_log = Path("/tmp/m15_longbridge_sdk_runtime.log")
+        self.assertTrue(
+            is_orphaned_sdk_runtime_child(
+                "python -c from multiprocessing.spawn import spawn_main",
+                str(runtime_log),
+                "/init",
+                runtime_log,
+            )
+        )
+        self.assertFalse(
+            is_orphaned_sdk_runtime_child(
+                "python -c from multiprocessing.spawn import spawn_main",
+                str(runtime_log),
+                "python run_m15_longbridge_sdk_runtime.py --watch",
+                runtime_log,
+            )
+        )
+        self.assertFalse(
+            is_orphaned_sdk_runtime_child(
+                "python run_m12_m14_local_postclose_scheduler.py --watch",
+                str(runtime_log),
+                "/init",
+                runtime_log,
+            )
+        )
+
+    def test_connecting_runtime_still_owns_the_only_quote_connection(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        status = {
+            "runtime_pid": __import__("os").getpid(),
+            "config_fingerprint": config_fingerprint(config),
+            "sdk_connected": False,
+            "status": "connecting",
+        }
+
+        self.assertTrue(runtime_owns_quote_connection(config, status))
+
+    def test_regular_session_recovery_prioritizes_the_frozen_trading_universe(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+
+        regular_session_targets = quote_subscription_targets(
+            config,
+            datetime(2026, 7, 28, 14, 0, tzinfo=UTC),
+        )
+        premarket_targets = quote_subscription_targets(
+            config,
+            datetime(2026, 7, 28, 12, 0, tzinfo=UTC),
+        )
+
+        self.assertEqual(regular_session_targets, configured_trading_symbols(config))
+        self.assertEqual(premarket_targets, configured_symbols(config))
+
+    def test_pipeline_observability_restores_only_same_new_york_session(self) -> None:
+        with TemporaryDirectory() as directory:
+            status_path = Path(directory) / "runtime_status.json"
+            status_path.write_text(json.dumps({
+                "last_event_at": "2026-07-27T19:55:01Z",
+                "pipeline_latency_samples_ms": [345, "1297", -4, "bad"],
+                "last_hot_pipeline": {"pipeline_elapsed_ms": 1297},
+            }), encoding="utf-8")
+
+            samples, last_result, last_event_at = restore_pipeline_observability(
+                status_path,
+                now=datetime(2026, 7, 27, 20, 10, tzinfo=UTC),
+            )
+            self.assertEqual(samples, [345, 1297, 0])
+            self.assertEqual(last_result, {"pipeline_elapsed_ms": 1297})
+            self.assertEqual(last_event_at, "2026-07-27T19:55:01Z")
+
+            samples, last_result, last_event_at = restore_pipeline_observability(
+                status_path,
+                now=datetime(2026, 7, 28, 14, 0, tzinfo=UTC),
+            )
+            self.assertEqual(samples, [])
+            self.assertEqual(last_result, {})
+            self.assertEqual(last_event_at, "")
+
+    def test_production_daily_context_allows_transient_symbol_retries(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+
+        self.assertEqual(config.daily_context_retry_count, 5)
+
+    def test_authorized_account_exit_waits_for_rth_then_submits_once(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            request_path = root / "m15_authorized_account_exit.json"
+            request_path.write_text(json.dumps({
+                "authorized": True,
+                "paper_simulated_only": True,
+                "status": "authorized",
+                "symbol": "LCID",
+                "maximum_quantity": "56",
+            }), encoding="utf-8")
+            snapshot = {
+                "generated_at": "2026-07-23T14:00:00Z",
+                "paper_account_verified": True,
+                "positions_ok": True,
+                "orders_ok": True,
+                "positions": [{"symbol": "LCID.US", "quantity": "56", "available": "56"}],
+                "open_orders": [],
+            }
+
+            class Account:
+                @staticmethod
+                def snapshot():
+                    return json.loads(json.dumps(snapshot))
+
+            class Client:
+                def __init__(self) -> None:
+                    self.submissions = []
+
+                def submit_order(self, payload):
+                    self.submissions.append(dict(payload))
+                    return {"submitted": True, "status": "submitted", "order_id": "LCID-EXIT-1"}
+
+            config = SimpleNamespace(
+                output_dir=root,
+                maximum_account_snapshot_age_seconds=45,
+                formal_test_epoch_id="formal-main",
+            )
+            client = Client()
+            waiting = run_authorized_account_exit_cycle(
+                config, Account(), client, now=datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
+            )
+            submitted = run_authorized_account_exit_cycle(
+                config, Account(), client, now=datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+            )
+            repeated = run_authorized_account_exit_cycle(
+                config, Account(), client, now=datetime(2026, 7, 23, 14, 0, 1, tzinfo=UTC)
+            )
+
+        self.assertEqual(waiting["status"], "authorized_waiting_regular_session")
+        self.assertEqual(submitted["order_id"], "LCID-EXIT-1")
+        self.assertEqual(repeated["status"], "submitted_waiting_broker_fill")
+        self.assertEqual(len(client.submissions), 1)
+        self.assertEqual(client.submissions[0]["order_type"], "market")
+        self.assertEqual(client.submissions[0]["quantity"], "56")
+        self.assertTrue(client.submissions[0]["exclude_from_strategy_performance"])
+
+    def test_sdk_runtime_singleton_lock_rejects_a_second_owner(self) -> None:
+        with TemporaryDirectory() as directory:
+            with patch(
+                "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_QUOTE_SUBSCRIPTION_LOCK",
+                Path(directory) / "global-sdk-quote.lock",
+            ):
+                first = acquire_runtime_run_lock(Path(directory) / "primary")
+                self.assertIsNotNone(first)
+                try:
+                    self.assertIsNone(acquire_runtime_run_lock(Path(directory) / "expanded"))
+                finally:
+                    first.close()
+
+    def test_daemon_does_not_spawn_when_another_config_holds_global_runtime_lock(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = SimpleNamespace(
+                output_dir=root / "alternate-output",
+                runtime_status_path=root / "alternate-status.json",
+                config_path=root / "alternate-config.json",
+            )
+            config.output_dir.mkdir(parents=True)
+            global_lock = root / "global-sdk-quote.lock"
+            global_lock.write_text(str(__import__("os").getpid()) + "\n", encoding="utf-8")
+            args = SimpleNamespace(dispatch=True, config=str(config.config_path))
+            with (
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_QUOTE_SUBSCRIPTION_LOCK",
+                    global_lock,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_RUNTIME_START_LOCK",
+                    root / "global-start.lock",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.is_expected_sdk_runtime_process",
+                    return_value=True,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
+                ) as popen,
+            ):
+                result = start_runtime_daemon(args, config)
+
+            self.assertEqual(result, 0)
+            popen.assert_not_called()
+
+    def test_live_runtime_with_very_stale_account_snapshot_requires_replacement(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertTrue(
+            runtime_requires_health_replacement(
+                {
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "account_snapshot_age_seconds": 181,
+                },
+                config,
+            )
+        )
+
+    def test_live_runtime_with_fresh_account_snapshot_does_not_require_replacement(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertFalse(
+            runtime_requires_health_replacement(
+                {
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "account_snapshot_age_seconds": 8,
+                },
+                config,
+            )
+        )
+
+    def test_postclose_restart_keeps_a_valid_current_session_daily_cache(self) -> None:
+        self.assertEqual(
+            completed_postclose_refresh_dates(
+                [{"symbol": "AAPL", "timeframe": "1d"}],
+                datetime(2026, 7, 20, 16, 10, tzinfo=ZoneInfo("America/New_York")),
+            ),
+            {"2026-07-20"},
+        )
+
+    def test_sdk_hot_path_does_not_dispatch_at_regular_session_close(self) -> None:
+        class Account:
+            @staticmethod
+            def snapshot():
+                return {
+                    "generated_at": "2026-07-16T20:00:00Z",
+                    "paper_account_verified": True,
+                    "positions_ok": True,
+                    "orders_ok": True,
+                    "positions": [],
+                    "orders": [],
+                    "open_orders": [],
+                }
+
+        class Client:
+            def submit_order(self, _payload):
+                raise AssertionError("16:00 ET must never submit a day order")
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = SimpleNamespace(
+                market="US",
+                universe_path=None,
+                use_seed_universe=True,
+                symbol_limit=147,
+                trading_symbol_limit=147,
+                maximum_source_delivery_age_ms=2000,
+                market_events_path=root / "market.jsonl",
+                event_keep_lines=0,
+                router_config_path=Path("config/examples/m15_longbridge_realtime_signal_router.json"),
+                position_manager_config_path=Path("config/examples/m15_longbridge_realtime_position_manager.json"),
+                execution_config_path=Path("config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json"),
+                formal_test_marker_path=root / "formal.json",
+                formal_test_transition_enabled=False,
+                formal_test_epoch_id="formal-main",
+                formal_short_test_epoch_id="formal-short",
+            )
+            config.formal_test_marker_path.write_text(json.dumps({
+                "status": "active",
+                "test_epoch_id": "formal-main",
+                "short_test_epoch_id": "formal-short",
+                "test_started_at": "2026-07-16T13:31:40Z",
+            }), encoding="utf-8")
+            row = {
+                "schema_version": "m15.realtime-market-event.v2",
+                "event_id": "sdk-5m|AAPL|2026-07-16T20:00:00Z",
+                "symbol": "AAPL",
+                "timeframe": "5m",
+                "event_time": "2026-07-16T20:00:00Z",
+                "received_at": "2026-07-16T20:00:00Z",
+                "source_event_at": "2026-07-16T20:00:00Z",
+                "source_delivery_age_ms": 0,
+                "bar_final": True,
+                "open": "200",
+                "high": "201",
+                "low": "199",
+                "close": "200.5",
+                "volume": "1000",
+            }
+            with (
+                patch(
+                    "scripts.m15_longbridge_realtime_signal_router_lib.run_realtime_signal_router",
+                    return_value={"signal_event_count": 0},
+                ),
+                patch(
+                    "scripts.m15_longbridge_realtime_position_manager_lib.run_realtime_position_manager",
+                    return_value={"emitted_exit_signal_events": []},
+                ),
+            ):
+                result = dispatch_completed_rows(
+                    config,
+                    [row],
+                    MarketEventContext(maximum_rows=100),
+                    Account(),
+                    Client(),
+                )
+
+        self.assertEqual(result["execution"]["status"], "blocked_outside_regular_session")
+        self.assertEqual(result["execution"]["submitted_count"], 0)
+
     def pending_flatten_fixture(self, root: Path) -> tuple[SimpleNamespace, dict, object, object]:
         marker_path = root / "marker.json"
         state_path = root / "state.json"
@@ -316,12 +760,25 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["short_test_epoch_id"], marker["short_test_epoch_id"])
         self.assertEqual(state["test_started_at"], marker["test_started_at"])
 
-    def test_default_runtime_config_declares_seed_147_contract(self) -> None:
+    def test_default_runtime_config_declares_300_subscription_and_147_trading_contract(self) -> None:
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
+        universe = load_m15_universe("config/m15_us_liquid_universe_300.json")
 
-        self.assertTrue(payload["market_data"]["use_seed_universe"])
-        self.assertIsNone(payload["market_data"]["universe_path"])
-        self.assertEqual(payload["market_data"]["symbol_limit"], 147)
+        self.assertFalse(payload["market_data"]["use_seed_universe"])
+        self.assertEqual(
+            payload["market_data"]["universe_path"],
+            "config/m15_us_liquid_universe_300.json",
+        )
+        self.assertEqual(payload["market_data"]["symbol_limit"], 300)
+        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 147)
+        self.assertEqual(
+            payload["market_data"]["trading_universe_path"],
+            "config/examples/m12_local_repaired_universe_snapshot_147.json",
+        )
+        self.assertIn("BNY", universe)
+        self.assertIn("MRSH", universe)
+        self.assertNotIn("BK", universe)
+        self.assertNotIn("MMC", universe)
 
     def test_formal_epoch_alignment_rejects_linked_config_drift(self) -> None:
         config = load_config()
@@ -501,6 +958,78 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["volume"], "125")
 
+    def test_sdk_snapshot_poll_builds_bar_from_cumulative_volume_deltas(self) -> None:
+        builder = FiveMinuteBarBuilder(minutes=5)
+        first = datetime(2026, 7, 28, 14, 31, tzinfo=UTC)
+        second = datetime(2026, 7, 28, 14, 32, tzinfo=UTC)
+
+        builder.on_snapshot(
+            "AAPL.US",
+            {
+                "timestamp": first,
+                "last_done": "200",
+                "volume": 1_000_000,
+            },
+            received_at=first,
+        )
+        builder.on_snapshot(
+            "AAPL.US",
+            {
+                "timestamp": second,
+                "last_done": "202",
+                "volume": 1_000_125,
+            },
+            received_at=second,
+        )
+        rows = builder.flush(datetime(2026, 7, 28, 14, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_snapshot_poll")
+        self.assertEqual(rows[0]["open"], "200")
+        self.assertEqual(rows[0]["close"], "202")
+        self.assertEqual(rows[0]["volume"], "125")
+        self.assertEqual(builder.open_bar_count, 0)
+
+    def test_snapshot_poll_uses_poll_time_for_bar_bucket_when_last_trade_is_stale(self) -> None:
+        builder = FiveMinuteBarBuilder(minutes=5)
+        stale_trade_at = datetime(2026, 7, 28, 14, 10, tzinfo=UTC)
+        first_poll = datetime(2026, 7, 28, 14, 31, tzinfo=UTC)
+        second_poll = datetime(2026, 7, 28, 14, 32, tzinfo=UTC)
+
+        builder.on_snapshot(
+            "AAPL.US",
+            {"timestamp": stale_trade_at, "last_done": "200", "volume": 1_000_000},
+            received_at=first_poll,
+        )
+        builder.on_snapshot(
+            "AAPL.US",
+            {"timestamp": stale_trade_at, "last_done": "200", "volume": 1_000_000},
+            received_at=second_poll,
+        )
+        rows = builder.flush(datetime(2026, 7, 28, 14, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["bar_open_at"], "2026-07-28T14:30:00Z")
+        self.assertEqual(rows[0]["volume"], "0")
+
+    def test_snapshot_poll_final_bar_uses_finalization_age_for_freshness(self) -> None:
+        row = {
+            "bar_final": True,
+            "source_mode": "longbridge_sdk_snapshot_poll",
+            "timeframe": "5m",
+            "received_at": "2026-07-28T14:35:01Z",
+            "source_delivery_age_ms": 120_000,
+        }
+
+        self.assertEqual(
+            fresh_market_events(
+                [row],
+                2_000,
+                now=datetime(2026, 7, 28, 14, 35, 2, tzinfo=UTC),
+            ),
+            [row],
+        )
+
     def test_sdk_restart_suppresses_the_first_partial_five_minute_bar(self) -> None:
         builder = FiveMinuteBarBuilder(
             complete_bar_open_not_before=datetime(2026, 7, 15, 13, 35, tzinfo=UTC),
@@ -620,8 +1149,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 self.calls.append((symbols, subscription_types))
 
         quote = QuoteContext()
-        subscribe_quote_and_trades(quote, ["AAPL.US", "MSFT.US", "NVDA.US"], ["Quote"], batch_size=2)
+        progress = []
+        subscribe_quote_and_trades(
+            quote,
+            ["AAPL.US", "MSFT.US", "NVDA.US"],
+            ["Quote"],
+            batch_size=2,
+            progress_callback=lambda completed, total: progress.append((completed, total)),
+        )
         self.assertEqual(quote.calls, [(["AAPL.US", "MSFT.US"], ["Quote"]), (["NVDA.US"], ["Quote"])])
+        self.assertEqual(progress, [(2, 3), (3, 3)])
 
     def test_failed_batch_falls_back_to_single_symbols_without_stopping_healthy_symbols(self) -> None:
         class QuoteContext:
@@ -778,6 +1315,51 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertIn("signal-market-exit", trade.kwargs["remark"])
         self.assertIn("m15rt-123", trade.kwargs["remark"])
 
+    def test_sdk_client_stops_using_stale_trade_context_after_oauth_refresh_failure(self) -> None:
+        class Enum:
+            Buy = "Buy"
+            Sell = "Sell"
+            LO = "LO"
+            Day = "Day"
+            RTHOnly = "RTHOnly"
+
+        class Sdk:
+            OrderSide = Enum
+            OrderType = Enum
+            TimeInForceType = Enum
+            OutsideRTH = Enum
+
+        class Trade:
+            def __init__(self) -> None:
+                self.call_count = 0
+
+            def submit_order(self, **_kwargs):
+                self.call_count += 1
+                raise RuntimeError(
+                    "OpenApiException: oauth error: failed to refresh token: "
+                    "Server returned error response"
+                )
+
+        trade = Trade()
+        client = SdkRealtimePaperClient(trade, Sdk())
+        payload = {
+            "side": "buy",
+            "symbol": "AAPL",
+            "order_type": "limit",
+            "limit_price": "200",
+            "quantity": "1",
+            "signal_id": "signal-oauth-refresh",
+        }
+
+        first = client.submit_order(payload)
+        second = client.submit_order(payload)
+
+        self.assertEqual(first["status"], "submit_blocked_trade_context_refresh_required")
+        self.assertFalse(first["explicit_reject"])
+        self.assertTrue(first["trade_context_refresh_required"])
+        self.assertEqual(second["status"], "submit_blocked_trade_context_refresh_required")
+        self.assertEqual(trade.call_count, 1)
+
     def test_sdk_client_cancels_and_replaces_without_cli(self) -> None:
         class Trade:
             def __init__(self) -> None:
@@ -799,12 +1381,118 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             ("replace", "ORDER-2", Decimal("3"), {"price": Decimal("99.50")}),
         ])
 
+    def test_sdk_client_caches_broker_short_capacity_with_ttl(self) -> None:
+        class Enum:
+            LO = "LO"
+            Sell = "Sell"
+
+        class Sdk:
+            OrderType = Enum
+            OrderSide = Enum
+
+        class Response:
+            cash_max_qty = Decimal("0")
+            margin_max_qty = Decimal("12")
+
+        class Trade:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def estimate_max_purchase_quantity(self, symbol, order_type, **kwargs):
+                self.calls += 1
+                self.last_call = (symbol, order_type, kwargs)
+                return Response()
+
+        clock = [100.0]
+        trade = Trade()
+        client = SdkRealtimePaperClient(
+            trade,
+            Sdk(),
+            short_capacity_cache_ttl_seconds=900,
+            monotonic_clock=lambda: clock[0],
+        )
+
+        live = client.max_short_quantity("AAPL", Decimal("200"))
+        clock[0] += 30
+        cached = client.max_short_quantity("AAPL", Decimal("201"))
+        clock[0] += 901
+        refreshed = client.max_short_quantity("AAPL", Decimal("201"))
+
+        self.assertEqual(trade.calls, 2)
+        self.assertEqual(live["capacity_source"], "broker_sdk_live")
+        self.assertEqual(cached["status"], "sdk_short_capacity_cached")
+        self.assertEqual(cached["capacity_source"], "broker_sdk_cache")
+        self.assertEqual(cached["max_quantity"], Decimal("12"))
+        self.assertEqual(cached["cash_max_quantity"], Decimal("0"))
+        self.assertEqual(cached["margin_max_quantity"], Decimal("12"))
+        self.assertEqual(cached["capacity_basis"], "margin_max_qty_for_sell_short")
+        self.assertEqual(cached["cache_age_seconds"], 30.0)
+        self.assertEqual(refreshed["capacity_source"], "broker_sdk_live")
+
+    def test_sdk_short_capacity_does_not_treat_owned_cash_quantity_as_borrow_capacity(self) -> None:
+        class Enum:
+            LO = "LO"
+            Sell = "Sell"
+
+        class Sdk:
+            OrderType = Enum
+            OrderSide = Enum
+
+        class Response:
+            cash_max_qty = Decimal("999")
+            margin_max_qty = Decimal("7")
+
+        class Trade:
+            @staticmethod
+            def estimate_max_purchase_quantity(_symbol, _order_type, **_kwargs):
+                return Response()
+
+        result = SdkRealtimePaperClient(Trade(), Sdk()).max_short_quantity(
+            "LCID", Decimal("6.50")
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["max_quantity"], Decimal("7"))
+        self.assertEqual(result["cash_max_quantity"], Decimal("999"))
+        self.assertEqual(result["margin_max_quantity"], Decimal("7"))
+
+    def test_sdk_trade_context_healthcheck_marks_oauth_refresh_failure(self) -> None:
+        class Trade:
+            @staticmethod
+            def today_orders():
+                raise RuntimeError("OAuth token refresh failed: invalid_grant")
+
+        client = SdkRealtimePaperClient(Trade(), object())
+        first = client.healthcheck()
+        second = client.healthcheck()
+
+        self.assertFalse(first["ok"])
+        self.assertEqual(first["status"], "trade_context_refresh_required")
+        self.assertTrue(first["trade_context_refresh_required"])
+        self.assertEqual(second["status"], "trade_context_refresh_required")
+
+    def test_sdk_trade_context_healthcheck_uses_harmless_order_read(self) -> None:
+        class Trade:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def today_orders(self):
+                self.calls += 1
+                return []
+
+        trade = Trade()
+        result = SdkRealtimePaperClient(trade, object()).healthcheck()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "trade_context_healthy")
+        self.assertEqual(trade.calls, 1)
+
     def test_sdk_order_maintenance_cancels_stale_entries_and_reprices_exits(self) -> None:
         now = datetime(2026, 7, 15, 15, 47, tzinfo=UTC)
         account_state = {
             "open_orders": [
                 {
-                    "order_id": "ENTRY-1", "remark": "entry-signal", "symbol": "AAPL.US",
+                    "order_id": "ENTRY-1", "remark": "PAT-RT entry-signal request-1", "symbol": "AAPL.US",
                     "side": "OrderSide.Buy", "quantity": "2", "executed_quantity": "0",
                     "price": "200", "updated_at": "2026-07-15T15:30:00Z",
                 },
@@ -887,7 +1575,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         class Trade:
             def account_balance(self): return [Cash()]
-            def stock_positions(self): return [Position()]
+            def stock_positions(self): return {"channels": [{"account_channel": "lb_papertrading", "positions": [Position()]}]}
             def today_orders(self, **_kwargs): return [Order()]
             def today_executions(self): return []
 
@@ -913,7 +1601,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         class Trade:
             def account_balance(self): return [Balance()]
-            def stock_positions(self): return []
+            def stock_positions(self): return {"channels": [{"account_channel": "lb_papertrading", "positions": []}]}
             def today_orders(self): return []
             def today_executions(self): return []
 
@@ -936,7 +1624,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         class Trade:
             def account_balance(self): return [Cash()]
-            def stock_positions(self): return []
+            def stock_positions(self): return {"channels": [{"account_channel": "lb_papertrading", "positions": []}]}
             def today_orders(self): return []
             def today_executions(self): return []
 
@@ -948,6 +1636,183 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(state["paper_account_verified"])
         self.assertEqual(state["critical_errors"], [])
         self.assertIn("sdk_profit_analysis_failed:TimeoutError:analytics slow", state["analytics_errors"])
+
+    def test_sdk_fast_account_snapshot_does_not_call_portfolio_analytics(self) -> None:
+        class Balance:
+            currency = "USD"
+            cash_infos = []
+            net_assets = "1200"
+            buy_power = "900"
+
+        class Trade:
+            def account_balance(self): return [Balance()]
+            def stock_positions(self): return {"channels": [{"account_channel": "lb_papertrading", "positions": []}]}
+            def today_orders(self): return []
+            def today_executions(self): return []
+
+        class Portfolio:
+            def profit_analysis_by_market(self, **_kwargs):
+                raise AssertionError("slow portfolio analytics entered the fast snapshot")
+
+        state = SdkAccountStateProvider(
+            Trade(),
+            Portfolio(),
+            request_gate=SdkTradeRequestGate(),
+            include_portfolio_analytics=False,
+        ).refresh()
+
+        self.assertTrue(state["paper_account_verified"])
+        self.assertEqual(state["source"], "longbridge_sdk_trade_account_fast_snapshot")
+        self.assertTrue(state["portfolio_deferred_to_slow_path"])
+        self.assertIsNone(state["portfolio_ok"])
+        self.assertEqual(state["account_total_equity_estimate"], "1200")
+        self.assertEqual(state["analytics_errors"], [])
+
+    def test_sdk_account_snapshot_fails_closed_when_broker_channel_is_not_returned(self) -> None:
+        class Trade:
+            def account_balance(self): return []
+            def stock_positions(self): return []
+            def today_orders(self): return []
+            def today_executions(self): return []
+
+        class Portfolio:
+            pass
+
+        state = SdkAccountStateProvider(
+            Trade(),
+            Portfolio(),
+            request_gate=SdkTradeRequestGate(),
+            include_portfolio_analytics=False,
+        ).refresh()
+
+        self.assertFalse(state["account_channel_verified_from_sdk"])
+        self.assertFalse(state["paper_account_verified"])
+
+    def test_account_coordinator_preserves_fresh_paper_snapshot_on_transient_critical_error(self) -> None:
+        class Provider:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def refresh(self):
+                self.calls += 1
+                if self.calls == 1:
+                    return {
+                        "generated_at": "2026-07-20T14:50:00Z",
+                        "account_channel": "lb_papertrading",
+                        "paper_account_verified": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "critical_errors": [],
+                        "orders": [],
+                        "open_orders": [],
+                    }
+                return {
+                    "generated_at": "2026-07-20T14:50:15Z",
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": False,
+                    "assets_ok": False,
+                    "positions_ok": True,
+                    "orders_ok": True,
+                    "critical_errors": ["sdk_account_balance_failed:TimeoutError:temporary"],
+                    "orders": [],
+                    "open_orders": [],
+                }
+
+        with TemporaryDirectory() as directory:
+            coordinator = SdkAccountCoordinator(Provider(), Path(directory) / "account.json")
+            healthy = coordinator.refresh()
+            preserved = coordinator.refresh()
+
+        self.assertTrue(healthy["paper_account_verified"])
+        self.assertTrue(preserved["paper_account_verified"])
+        self.assertEqual(preserved["generated_at"], healthy["generated_at"])
+        self.assertEqual(preserved["last_refresh_status"], "critical_error_preserved_last_good")
+        self.assertEqual(preserved["last_failed_refresh_at"], "2026-07-20T14:50:15Z")
+
+    def test_account_coordinator_does_not_preserve_snapshot_across_account_channel_change(self) -> None:
+        class Provider:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def refresh(self):
+                self.calls += 1
+                if self.calls == 1:
+                    return {
+                        "generated_at": "2026-07-20T14:50:00Z",
+                        "account_channel": "lb_papertrading",
+                        "paper_account_verified": True,
+                        "assets_ok": True,
+                        "positions_ok": True,
+                        "orders_ok": True,
+                        "critical_errors": [],
+                        "orders": [],
+                        "open_orders": [],
+                    }
+                return {
+                    "generated_at": "2026-07-20T14:50:15Z",
+                    "account_channel": "lb_live",
+                    "paper_account_verified": False,
+                    "assets_ok": False,
+                    "positions_ok": False,
+                    "orders_ok": False,
+                    "critical_errors": ["sdk_account_balance_failed:RuntimeError:wrong account"],
+                    "orders": [],
+                    "open_orders": [],
+                }
+
+        with TemporaryDirectory() as directory:
+            coordinator = SdkAccountCoordinator(Provider(), Path(directory) / "account.json")
+            coordinator.refresh()
+            rejected = coordinator.refresh()
+
+        self.assertFalse(rejected["paper_account_verified"])
+        self.assertEqual(rejected["account_channel"], "lb_live")
+        self.assertEqual(rejected["last_refresh_status"], "critical_error")
+
+    def test_account_coordinator_rebuilds_failed_provider_before_publishing_snapshot(self) -> None:
+        healthy = {
+            "generated_at": "2026-07-21T01:00:01Z",
+            "account_channel": "lb_papertrading",
+            "paper_account_verified": True,
+            "assets_ok": True,
+            "positions_ok": True,
+            "orders_ok": True,
+            "critical_errors": [],
+            "orders": [],
+            "open_orders": [],
+        }
+
+        class FailedProvider:
+            @staticmethod
+            def refresh():
+                return {
+                    **healthy,
+                    "generated_at": "2026-07-21T01:00:00Z",
+                    "paper_account_verified": False,
+                    "positions_ok": False,
+                    "critical_errors": ["sdk_stock_positions_failed:request timeout"],
+                }
+
+        class HealthyProvider:
+            @staticmethod
+            def refresh():
+                return dict(healthy)
+
+        with TemporaryDirectory() as directory:
+            coordinator = SdkAccountCoordinator(
+                FailedProvider(),
+                Path(directory) / "account.json",
+                provider_factory=HealthyProvider,
+            )
+            snapshot = coordinator.refresh()
+
+        self.assertTrue(snapshot["paper_account_verified"])
+        self.assertTrue(snapshot["provider_rebuild_attempted"])
+        self.assertEqual(
+            snapshot["provider_rebuild_trigger_errors"],
+            ["sdk_stock_positions_failed:request timeout"],
+        )
 
     def test_daily_context_rows_are_independent_from_m12(self) -> None:
         class Candle:
@@ -1005,11 +1870,15 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertIsNotNone(require_sdk_contract())
 
     def test_sdk_seed_universe_uses_active_paramount_symbol(self) -> None:
-        symbols = configured_symbols(load_config())
+        config = load_config()
+        symbols = configured_symbols(config)
+        trading_symbols = configured_trading_symbols(config)
 
         self.assertIn("PSKY.US", symbols)
         self.assertNotIn("PARA.US", symbols)
-        self.assertEqual(len(symbols), 147)
+        self.assertEqual(len(symbols), 300)
+        self.assertEqual(len(trading_symbols), 147)
+        self.assertIn("PSKY.US", trading_symbols)
 
     def test_expanded_readonly_config_is_isolated_and_dispatch_disabled(self) -> None:
         default = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
@@ -1030,6 +1899,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertFalse(expanded["market_data"]["use_seed_universe"])
         self.assertEqual(expanded["market_data"]["universe_path"], "config/m15_us_liquid_universe_300.json")
         self.assertEqual(expanded["market_data"]["symbol_limit"], 300)
+        self.assertEqual(expanded["market_data"]["trading_symbol_limit"], 147)
+        self.assertEqual(len(configured_trading_symbols(runtime_config)), 147)
         self.assertNotEqual(expanded["outputs"]["output_dir"], default["outputs"]["output_dir"])
         self.assertNotEqual(expanded["outputs"]["market_events"], default["outputs"]["market_events"])
         self.assertNotEqual(expanded["outputs"]["runtime_status"], default["outputs"]["runtime_status"])
@@ -1055,10 +1926,78 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_runtime_configured_symbols_will_follow_file_order_after_integration(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
         symbols = configured_symbols(config)
+        trading_symbols = configured_trading_symbols(config)
+        seed_symbols = configured_trading_symbols(load_config())
 
         self.assertEqual(len(symbols), 300)
+        self.assertEqual(trading_symbols, seed_symbols)
         self.assertEqual(symbols[0], "SPY.US")
         self.assertEqual(symbols[-1], "SHW.US")
+
+    def test_reordering_subscription_universe_cannot_change_frozen_trading_universe(self) -> None:
+        source = json.loads(
+            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        original_subscription = json.loads(
+            Path("config/m15_us_liquid_universe_300.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        expected_trading = configured_trading_symbols(load_config())
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reordered_universe = root / "reordered-300.json"
+            reordered = list(original_subscription["symbols"])
+            reordered = reordered[147:] + reordered[:147]
+            reordered_universe.write_text(
+                json.dumps({"symbols": reordered}),
+                encoding="utf-8",
+            )
+            source["market_data"]["universe_path"] = str(reordered_universe)
+            config_path = root / "runtime.json"
+            config_path.write_text(json.dumps(source), encoding="utf-8")
+
+            reordered_config = load_config(config_path)
+
+        self.assertEqual(
+            configured_trading_symbols(reordered_config),
+            expected_trading,
+        )
+
+    def test_expansion_symbols_are_audited_but_never_routed_to_strategies(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
+        trading_symbol = configured_trading_symbols(config)[0]
+        readonly_symbol = configured_symbols(config)[-1]
+        rows = [
+            {"symbol": trading_symbol, "timeframe": "5m"},
+            {"symbol": readonly_symbol, "timeframe": "5m"},
+        ]
+
+        self.assertEqual(trading_market_events(config, rows), [rows[0]])
+        self.assertTrue(market_event_is_tradable(config, rows[0]))
+        self.assertFalse(market_event_is_tradable(config, rows[1]))
+
+    def test_expansion_daily_failures_do_not_block_complete_trading_context(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
+        trading_symbols = configured_trading_symbols(config)
+        rows = [
+            {
+                "symbol": symbol.removesuffix(".US"),
+                "timeframe": "1d",
+                "event_time": f"2026-07-{(index % 28) + 1:02d}T20:00:00Z",
+            }
+            for symbol in trading_symbols
+            for index in range(config.daily_context_bars)
+        ]
+
+        self.assertTrue(
+            daily_context_covers_symbols(config, rows, trading_symbols, ["SHW.US"])
+        )
+        self.assertFalse(
+            daily_context_covers_symbols(config, rows, trading_symbols, [trading_symbols[0]])
+        )
 
     def test_runtime_rejects_symbol_limit_larger_than_universe_file(self) -> None:
         source = json.loads(
@@ -1080,6 +2019,24 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             self.assertEqual(readonly_gate_passed(path), (False, 1, 2))
             record_readonly_session(path, "2026-07-14", {"daily_context_row_count": 8820})
             self.assertEqual(readonly_gate_passed(path), (True, 2, 2))
+
+    def test_expansion_readonly_gate_can_require_one_complete_session(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "expansion-gate.json"
+            self.assertEqual(
+                readonly_gate_passed(path, required_sessions=1),
+                (False, 0, 1),
+            )
+            record_readonly_session(
+                path,
+                "2026-07-28",
+                {"subscription_coverage": "300/300"},
+                required_sessions=1,
+            )
+            self.assertEqual(
+                readonly_gate_passed(path, required_sessions=1),
+                (True, 1, 1),
+            )
 
     def test_runtime_fingerprint_changes_when_dispatch_gate_changes(self) -> None:
         config = load_config()
@@ -1107,6 +2064,49 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             self.assertEqual(load_valid_daily_context_cache(path, config, before_open), rows)
             next_session = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
             self.assertEqual(load_valid_daily_context_cache(path, config, next_session), [])
+
+    def test_hot_state_compaction_keeps_current_decisions_and_broker_orders(self) -> None:
+        execution_rows = [
+            {
+                "signal_id": "old-blocked",
+                "submission_status": "blocked_not_submitted",
+                "processed_at": "2026-07-28T15:00:00Z",
+            },
+            {
+                "signal_id": "today-blocked",
+                "submission_status": "blocked_not_submitted",
+                "processed_at": "2026-07-29T15:00:00Z",
+            },
+            {
+                "signal_id": "old-submitted",
+                "submission_status": "submitted",
+                "order_id": "broker-order-1",
+                "processed_at": "2026-07-28T15:00:00Z",
+            },
+        ]
+        compacted_execution = compact_hot_execution_rows(
+            execution_rows,
+            market_date="2026-07-29",
+        )
+        self.assertEqual(
+            {row["signal_id"] for row in compacted_execution},
+            {"today-blocked", "old-submitted"},
+        )
+
+        signal_rows = [
+            {"signal_id": "old-blocked", "created_at": "2026-07-28T15:00:00Z"},
+            {"signal_id": "today-blocked", "created_at": "2026-07-29T15:00:00Z"},
+            {"signal_id": "old-submitted", "created_at": "2026-07-28T15:00:00Z"},
+        ]
+        compacted_signals = compact_hot_signal_rows(
+            signal_rows,
+            compacted_execution,
+            market_date="2026-07-29",
+        )
+        self.assertEqual(
+            {row["signal_id"] for row in compacted_signals},
+            {"today-blocked", "old-submitted"},
+        )
 
     def test_sdk_preflight_requires_all_read_only_endpoints(self) -> None:
         # The live preflight is exercised by the command-line integration
