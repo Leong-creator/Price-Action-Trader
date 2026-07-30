@@ -287,6 +287,66 @@ class M1212DailyObservationLoopTests(unittest.TestCase):
         self.assertEqual(cache["daily_ready_symbols"], 1)
         self.assertEqual(cache["current_5m_ready_symbols"], 1)
 
+    def test_daily_refresh_extends_existing_cache_instead_of_refetching_full_history(self) -> None:
+        config = MODULE.load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            history_dir = root / "longbridge_history"
+            history_dir.mkdir(parents=True)
+            existing = history_dir / "us_SPY_1d_2010-06-29_2026-07-22_longbridge.csv"
+            MODULE.write_cache_csv(
+                existing,
+                [
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-07-22T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "100",
+                        "high": "101",
+                        "low": "99",
+                        "close": "100.5",
+                        "volume": "1000",
+                    }
+                ],
+            )
+            target = MODULE.FetchTarget(
+                symbol="SPY",
+                timeframe="1d",
+                target_start=date(2010, 6, 29),
+                target_end=date(2026, 7, 23),
+                fetch_mode="full_daily",
+                destination=history_dir / "us_SPY_1d_2010-06-29_2026-07-23_longbridge.csv",
+            )
+
+            def fake_fetch(_config, incremental_target):
+                self.assertEqual(incremental_target.target_start, date(2026, 7, 23))
+                self.assertEqual(incremental_target.target_end, date(2026, 7, 23))
+                return [
+                    {
+                        "symbol": "SPY",
+                        "market": "US",
+                        "timeframe": "1d",
+                        "timestamp": "2026-07-23T16:00:00",
+                        "timezone": "America/New_York",
+                        "open": "101",
+                        "high": "102",
+                        "low": "100",
+                        "close": "101.5",
+                        "volume": "1100",
+                    }
+                ]
+
+            with patch("scripts.m12_12_daily_observation_loop_lib.fetch_target_rows", side_effect=fake_fetch):
+                rows = MODULE.fetch_target_rows_with_existing_cache(
+                    replace(config, local_data_roots=(root,)),
+                    target,
+                    existing,
+                )
+
+        self.assertEqual([row["timestamp"] for row in rows], ["2026-07-22T16:00:00", "2026-07-23T16:00:00"])
+
     def test_intraday_prior_daily_accepts_later_ipo_start(self) -> None:
         config = MODULE.load_config()
         with tempfile.TemporaryDirectory() as tmp:
