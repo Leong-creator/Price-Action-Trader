@@ -31,7 +31,10 @@ from scripts.m15_longbridge_realtime_position_manager_lib import (
 )
 from scripts.m15_longbridge_realtime_signal_router_lib import (
     PRICE_ACTION_RUNTIME_SPECS,
+    SHORT_DIAGNOSTICS_JSON,
+    load_config as load_router_config,
     price_action_signal_for_runtime,
+    update_short_signal_diagnostics,
 )
 
 
@@ -60,6 +63,59 @@ class FakeShortPaperClient:
 
 
 class M15PaperShortBucketsTest(unittest.TestCase):
+    def test_production_short_bucket_caps_can_reach_the_configured_net_profit_floor(self) -> None:
+        config = load_router_config()
+        fees = config.commission_per_order_side * Decimal("2") + config.regulatory_fee_per_sell_order
+        for runtime_id in config.paper_short_runtime_ids:
+            spec = PRICE_ACTION_RUNTIME_SPECS[runtime_id]
+            bucket = config.virtual_capital_buckets[config.runtime_capital_bucket_map[runtime_id]]
+            maximum_risk_from_notional = (
+                bucket.max_symbol_exposure * Decimal(str(spec["max_risk_percent"])) / Decimal("100")
+            )
+            effective_maximum_risk = min(bucket.max_risk_per_order, maximum_risk_from_notional)
+            theoretical_net_profit = effective_maximum_risk * Decimal(str(spec["target_r"])) - fees
+            self.assertGreaterEqual(
+                theoretical_net_profit,
+                Decimal(str(spec["minimum_net_profit_after_fees"])),
+                runtime_id,
+            )
+
+    def test_short_router_diagnostics_accumulate_unique_candidates_and_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = replace(
+                load_router_config(),
+                output_dir=root,
+                paper_short_runtime_ids=(SHORT_RUNTIME,),
+                short_test_epoch_id=SHORT_EPOCH,
+                short_test_started_at="2026-07-13T14:30:00Z",
+            )
+            blocked_row = {
+                "signal_id": "short-candidate-1",
+                "created_at": "2026-07-13T15:05:00Z",
+                "processed_at": "2026-07-13T15:05:01Z",
+                "runtime_id": SHORT_RUNTIME,
+                "symbol": "AAPL",
+                "direction": "short",
+                "router_decision_status": "blocked_fee_profit_below_minimum",
+                "blockers": ["blocked_fee_profit_below_minimum"],
+                "submitted_quantity": "4",
+                "net_profit_after_fees_at_target": "6.50",
+                "minimum_net_profit_after_fees": "12.00",
+            }
+
+            first = update_short_signal_diagnostics(config, [blocked_row], "2026-07-13T15:05:01Z")
+            second = update_short_signal_diagnostics(config, [blocked_row], "2026-07-13T15:05:02Z")
+
+            self.assertEqual(first["summary"]["candidate_count"], 1)
+            self.assertEqual(second["summary"]["candidate_count"], 1)
+            self.assertEqual(second["summary"]["blocked_count"], 1)
+            self.assertEqual(
+                second["runtime_summaries"][0]["blockers"],
+                {"blocked_fee_profit_below_minimum": 1},
+            )
+            self.assertTrue((root / SHORT_DIAGNOSTICS_JSON).exists())
+
     def test_three_short_detectors_require_bearish_structure_and_market_confirmation(self) -> None:
         generated_at = datetime(2026, 7, 13, 15, 5, tzinfo=UTC)
         market = {
@@ -146,6 +202,26 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             self.assertEqual(payload["submitted_count"], 0)
             self.assertIn("blocked_short_conflicts_with_existing_long_position", row["blockers"])
             self.assertNotIn("blocked_short_broker_capacity_unavailable", row["blockers"])
+
+    def test_short_open_is_blocked_when_broker_capacity_is_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_execution_config(root)
+            self.write_jsonl(root / "signals.jsonl", [self.short_signal()])
+
+            payload = run_realtime_execution(
+                config,
+                generated_at="2026-07-13T15:05:01Z",
+                broker_client=FakeShortPaperClient(max_quantity="0"),
+            )
+            row = self.read_jsonl(
+                config.output_dir / "m15_longbridge_realtime_execution_ledger.jsonl"
+            )[0]
+
+            self.assertEqual(payload["submitted_count"], 0)
+            self.assertIn("blocked_short_broker_capacity_unavailable", row["blockers"])
+            self.assertEqual(row["short_capacity_check_status"], "short_capacity_zero_or_permission_denied")
+            self.assertEqual(row["short_capacity_max_quantity"], "0")
 
     def test_short_reconciliation_requires_exact_order_identity_and_calculates_cover_pnl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -275,7 +351,7 @@ class M15PaperShortBucketsTest(unittest.TestCase):
                 position_direction="short",
                 equity=config.paper_account_equity,
                 max_total_exposure=Decimal("2000"),
-                max_symbol_exposure=Decimal("500"),
+                max_symbol_exposure=Decimal("750"),
                 max_risk_per_order=Decimal("10"),
                 min_cash_reserve=Decimal("8000"),
                 daily_new_symbol_limit=0,
@@ -342,7 +418,7 @@ class M15PaperShortBucketsTest(unittest.TestCase):
                 position_direction="short",
                 equity=config.paper_account_equity,
                 max_total_exposure=Decimal("2000"),
-                max_symbol_exposure=Decimal("500"),
+                max_symbol_exposure=Decimal("750"),
                 max_risk_per_order=Decimal("10"),
                 min_cash_reserve=Decimal("8000"),
                 daily_new_symbol_limit=0,
@@ -506,7 +582,7 @@ class M15PaperShortBucketsTest(unittest.TestCase):
                 position_direction="short",
                 equity=config.paper_account_equity,
                 max_total_exposure=Decimal("2000"),
-                max_symbol_exposure=Decimal("500"),
+                max_symbol_exposure=Decimal("750"),
                 max_risk_per_order=Decimal("10"),
                 min_cash_reserve=Decimal("8000"),
                 daily_new_symbol_limit=0,
@@ -859,6 +935,40 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             self.assertEqual(blockers, [])
             self.assertEqual(command[2], "buy")
 
+    def test_distinct_long_epoch_does_not_hide_confirmed_short_cover(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manager_config = replace(
+                self.make_position_manager_config(root),
+                test_epoch_id="m15-long-epoch",
+                test_started_at="2026-07-16T13:30:00Z",
+            )
+            self.write_json(
+                root / "account_state.json",
+                {
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "positions": [{"symbol": "AAPL.US", "quantity": "2", "position_side": "short", "cost_price": "100"}],
+                    "orders": [{"order_id": "short-open-order", "symbol": "AAPL.US", "side": "Sell", "status": "Filled", "executed_quantity": "2", "executed_price": "100"}],
+                    "open_orders": [],
+                },
+            )
+            self.write_jsonl(
+                root / "execution_ledger.jsonl",
+                [{**self.short_ledger_row("short-open", "short-open-order", "open_short", "sell_short", "2026-07-16T14:00:00Z"), "stop_price": "101", "target_price": "98"}],
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [{"event_id": "short-stop", "symbol": "AAPL", "event_time": "2026-07-16T14:05:00Z", "close": "101.20"}],
+            )
+
+            payload = run_realtime_position_manager(manager_config, generated_at="2026-07-16T14:05:01Z")
+            events = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["managed_short_position_count"], 1)
+            self.assertEqual(events[0]["position_action"], "close_short")
+            self.assertEqual(events[0]["source_open_order_id"], "short-open-order")
+
     def test_short_position_manager_preserves_exact_open_lot_when_a_cover_is_confirmed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -993,11 +1103,11 @@ class M15PaperShortBucketsTest(unittest.TestCase):
                         },
                     )
 
-                    retry_manager = run_realtime_position_manager(manager_config, generated_at="2026-07-13T15:11:00Z")
+                    retry_manager = run_realtime_position_manager(manager_config, generated_at="2026-07-13T15:26:02Z")
                     events = self.read_jsonl(root / "signals.jsonl")
                     retry_execution = run_realtime_execution(
                         execution_config,
-                        generated_at="2026-07-13T15:11:01Z",
+                        generated_at="2026-07-13T15:26:03Z",
                         broker_client=client,
                     )
 
@@ -1113,7 +1223,7 @@ class M15PaperShortBucketsTest(unittest.TestCase):
                     "position_direction": "short",
                     "equity": "10000",
                     "max_total_exposure": "2000",
-                    "max_symbol_exposure": "500",
+                    "max_symbol_exposure": "750",
                     "max_risk_per_order": "10",
                     "min_cash_reserve": "8000",
                     "runtime_ids": [SHORT_RUNTIME],

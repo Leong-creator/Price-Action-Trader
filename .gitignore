@@ -38,3 +38,4 @@ reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m14_str
 reports/strategy_lab/**/archive/
 reports/strategy_lab/**/m15_startup/
 reports/strategy_lab/**/m12_37_postclose_final_daily_refresh_147.json
+reports/runtime/

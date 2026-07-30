@@ -17,6 +17,14 @@ from zoneinfo import ZoneInfo
 from scripts.longbridge_cli_env import build_longbridge_cli_env
 from scripts.m12_readonly_auth_preflight_lib import clean_cli_text
 from scripts.m15_longbridge_realtime_execution_lib import DEFAULT_DAILY_DIR, project_path, to_iso
+from scripts.m15_longbridge_fill_attribution_lib import (
+    DEFAULT_COMMISSION_PER_ORDER_SIDE,
+    DEFAULT_REGULATORY_FEE_PER_SELL_ORDER,
+    add_completed_trade_performance,
+    apply_account_reconciliation_adjustments,
+    broker_fill_rows_from_orders_and_executions,
+    rebuild_fill_attribution_from_history,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +38,7 @@ TRUSTED_ORDER_HISTORY_JSON = "m15_longbridge_last_trustworthy_order_history.json
 PNL_RECONCILIATION_MD = "m15_longbridge_account_pnl_reconciliation.md"
 ORDER_RECONCILIATION_JSON = "m15_longbridge_order_reconciliation.json"
 UNFILLED_ORDER_DIAGNOSTICS_JSON = "m15_longbridge_unfilled_order_diagnostics.json"
+FILL_ATTRIBUTION_JSON = "m15_longbridge_fill_attribution_v2.json"
 ORDER_DETAIL_CACHE_JSON = "m15_longbridge_order_detail_cache.json"
 LEDGER_JSONL = "m15_longbridge_realtime_account_state_ledger.jsonl"
 EQUITY_CURVE_JSONL = "m15_longbridge_realtime_equity_curve.jsonl"
@@ -39,6 +48,12 @@ STALE_ORDER_CLEANUP_LEDGER_JSONL = "m15_longbridge_realtime_stale_order_cleanup_
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
 NEW_YORK_TZ = ZoneInfo("America/New_York")
+SYSTEM_FAULT_BLOCKERS = {
+    "blocked_account_state_stale",
+    "blocked_non_paper_account",
+    "blocked_delayed_signal_age_over_limit",
+    "blocked_delayed_signal_missing_revalidation_price",
+}
 
 CommandRunner = Callable[[list[str]], Any]
 
@@ -64,6 +79,8 @@ class RealtimeAccountStateConfig:
     hard_boundaries: dict[str, bool]
     historical_cli_timeout_seconds: int = 30
     historical_refresh_interval_seconds: int = 300
+    commission_per_order_side: Decimal = DEFAULT_COMMISSION_PER_ORDER_SIDE
+    regulatory_fee_per_sell_order: Decimal = DEFAULT_REGULATORY_FEE_PER_SELL_ORDER
 
     def __post_init__(self) -> None:
         validate_config(self)
@@ -79,6 +96,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeAccountStateC
     payload = read_json(config_path) if config_path.exists() else {}
     outputs = payload.get("outputs", {})
     account = payload.get("longbridge_account_state", {})
+    fee_model = payload.get("fee_model", {})
     output_dir = resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR))
     return RealtimeAccountStateConfig(
         stage=str(payload.get("stage", "M15.longbridge_realtime_account_state")),
@@ -93,6 +111,22 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeAccountStateC
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
         historical_cli_timeout_seconds=int(account.get("historical_cli_timeout_seconds", 30)),
         historical_refresh_interval_seconds=int(account.get("historical_refresh_interval_seconds", 300)),
+        commission_per_order_side=Decimal(
+            str(
+                fee_model.get(
+                    "commission_per_order_side",
+                    DEFAULT_COMMISSION_PER_ORDER_SIDE,
+                )
+            )
+        ),
+        regulatory_fee_per_sell_order=Decimal(
+            str(
+                fee_model.get(
+                    "regulatory_fee_per_sell_order",
+                    DEFAULT_REGULATORY_FEE_PER_SELL_ORDER,
+                )
+            )
+        ),
     )
 
 
@@ -111,6 +145,10 @@ def validate_config(config: RealtimeAccountStateConfig) -> None:
         raise ValueError("M15 realtime account state historical CLI timeout must be positive")
     if config.historical_refresh_interval_seconds <= 0:
         raise ValueError("M15 realtime account state historical refresh interval must be positive")
+    if config.commission_per_order_side < ZERO:
+        raise ValueError("M15 realtime account state commission cannot be negative")
+    if config.regulatory_fee_per_sell_order < ZERO:
+        raise ValueError("M15 realtime account state regulatory fee cannot be negative")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime account state must stay paper/simulated only")
     if config.hard_boundaries.get("live_execution", False):
@@ -317,6 +355,16 @@ def run_realtime_account_state(
         stale_order_cleanup_ledger,
     )
     unfilled_order_diagnostics = build_unfilled_order_diagnostics(generated_at_iso, order_reconciliation)
+    fill_attribution = build_fill_attribution_v2(
+        account_state,
+        order_reconciliation,
+        account_reconciliation_adjustments=read_json(
+            config.output_dir / "m15_account_reconciliation_adjustments.json"
+        ),
+        commission_per_order_side=config.commission_per_order_side,
+        regulatory_fee_per_sell_order=config.regulatory_fee_per_sell_order,
+        execution_rows_for_fault_days=realtime_execution_ledger,
+    )
     summary = build_summary(
         config,
         generated_at_iso,
@@ -333,8 +381,10 @@ def run_realtime_account_state(
     )
     summary["order_reconciliation_summary"] = order_reconciliation.get("summary", {})
     summary["unfilled_order_diagnostics_summary"] = unfilled_order_diagnostics.get("summary", {})
+    summary["fill_attribution_summary"] = fill_attribution.get("summary", {})
     summary["outputs"]["order_reconciliation"] = project_path(config.output_dir / ORDER_RECONCILIATION_JSON)
     summary["outputs"]["unfilled_order_diagnostics"] = project_path(config.output_dir / UNFILLED_ORDER_DIAGNOSTICS_JSON)
+    summary["outputs"]["fill_attribution"] = project_path(config.output_dir / FILL_ATTRIBUTION_JSON)
     ledger_row = {
         "stage": config.stage,
         "generated_at": generated_at_iso,
@@ -358,6 +408,7 @@ def run_realtime_account_state(
         write_json(config.output_dir / TRUSTED_PNL_RECONCILIATION_JSON, pnl_reconciliation)
     write_json(config.output_dir / ORDER_RECONCILIATION_JSON, order_reconciliation)
     write_json(config.output_dir / UNFILLED_ORDER_DIAGNOSTICS_JSON, unfilled_order_diagnostics)
+    write_json(config.output_dir / FILL_ATTRIBUTION_JSON, fill_attribution)
     append_jsonl(config.output_dir / LEDGER_JSONL, [ledger_row])
     append_jsonl(config.output_dir / EQUITY_CURVE_JSONL, [equity_curve_row])
     (config.output_dir / REPORT_MD).write_text(render_report(summary, account_state), encoding="utf-8")
@@ -937,7 +988,14 @@ def build_order_reconciliation(
                 match_method = "symbol_side_quantity_price"
         if local_row is not None:
             used_local_ids.add(id(local_row))
-        rows.append(reconciled_longbridge_order_row(order, local_row, match_method))
+        reconciled = reconciled_longbridge_order_row(order, local_row, match_method)
+        apply_cross_epoch_exit_attribution_guard(
+            reconciled,
+            local_row,
+            local_by_signal_id=local_by_signal_id,
+            local_by_order_id=local_by_order_id,
+        )
+        rows.append(reconciled)
 
     for local_row in sorted(local_submissions, key=order_time_sort_key):
         if id(local_row) in used_local_ids:
@@ -973,6 +1031,122 @@ def build_order_reconciliation(
             *( ["长桥历史订单接口本轮不可用，已使用上一份可信历史订单缓存；当前对账不应被解释为实时新增成交。"]
                if account_state.get("historical_orders_cache_used") or account_state.get("historical_executions_cache_used") else [] ),
         ],
+    }
+
+
+def build_fill_attribution_v2(
+    account_state: dict[str, Any],
+    order_reconciliation: dict[str, Any],
+    *,
+    account_reconciliation_adjustments: dict[str, Any] | None = None,
+    commission_per_order_side: Decimal = DEFAULT_COMMISSION_PER_ORDER_SIDE,
+    regulatory_fee_per_sell_order: Decimal = DEFAULT_REGULATORY_FEE_PER_SELL_ORDER,
+    execution_rows_for_fault_days: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Rebuild exact virtual lots from broker executions and exact order identity."""
+    reconciled_rows = order_reconciliation.get("rows") if isinstance(order_reconciliation.get("rows"), list) else []
+    formal_rows = [
+        dict(row)
+        for row in reconciled_rows
+        if isinstance(row, dict)
+        and str(row.get("test_epoch_id") or "").startswith(("m15-sdk-formal-", "m15-short-single-strategy-"))
+    ]
+    local_rows = [
+        row for row in formal_rows if row.get("attribution_status") == "matched_m15_realtime_ledger"
+    ]
+    eligible_order_ids = {str(row.get("order_id") or "") for row in local_rows if row.get("order_id")}
+    order_rows = merged_longbridge_order_rows(account_state)
+    execution_rows: list[dict[str, Any]] = []
+    seen_trades: set[tuple[str, str]] = set()
+    for key in ("historical_executions", "executions"):
+        source_rows = account_state.get(key) if isinstance(account_state.get(key), list) else []
+        for row in source_rows:
+            if not isinstance(row, dict):
+                continue
+            identity = (str(row.get("order_id") or ""), str(row.get("trade_id") or ""))
+            if not all(identity) or identity in seen_trades:
+                continue
+            seen_trades.add(identity)
+            execution_rows.append(dict(row))
+    broker_positions: dict[str, Decimal] = {}
+    positions = account_state.get("positions") if isinstance(account_state.get("positions"), list) else []
+    for row in positions:
+        if not isinstance(row, dict):
+            continue
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        quantity = first_decimal(row, ("quantity", "qty"))
+        side = str(row.get("side") or "").lower()
+        if "short" in side and quantity > ZERO:
+            quantity = -quantity
+        if symbol:
+            broker_positions[symbol] = broker_positions.get(symbol, ZERO) + quantity
+    broker_fill_rows = broker_fill_rows_from_orders_and_executions(order_rows, execution_rows)
+    # Account history includes pre-epoch and manual broker activity. Those rows
+    # remain in account reconciliation, but cannot be assigned to a strategy
+    # batch without an explicit formal-epoch identity.
+    broker_fill_rows = [
+        row for row in broker_fill_rows if str(row.get("order_id") or "") in eligible_order_ids
+    ]
+    payload = rebuild_fill_attribution_from_history(
+        local_rows,
+        broker_fill_rows,
+        broker_net_positions=broker_positions,
+    )
+    payload = apply_account_reconciliation_adjustments(
+        payload,
+        account_reconciliation_adjustments or {},
+        broker_net_positions=broker_positions,
+    )
+    payload = add_completed_trade_performance(
+        payload,
+        commission_per_order_side=commission_per_order_side,
+        regulatory_fee_per_sell_order=regulatory_fee_per_sell_order,
+        fault_days=fault_days_from_execution_rows(
+            execution_rows_for_fault_days
+            if execution_rows_for_fault_days is not None
+            else formal_rows
+        ),
+    )
+    payload["generated_at"] = str(account_state.get("generated_at") or order_reconciliation.get("generated_at") or "")
+    payload["paper_simulated_only"] = True
+    payload["live_execution"] = False
+    payload["real_money_actions"] = False
+    return payload
+
+
+def fault_days_from_execution_rows(
+    rows: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    fault_days: dict[str, set[str]] = {}
+    for row in rows:
+        if not str(row.get("test_epoch_id") or "").startswith(
+            "m15-sdk-formal-"
+        ):
+            continue
+        if str(row.get("position_action") or "") not in {
+            "open_long",
+            "open_short",
+        }:
+            continue
+        blockers = {
+            str(blocker)
+            for blocker in (row.get("blockers") or [])
+            if str(blocker) in SYSTEM_FAULT_BLOCKERS
+        }
+        if not blockers:
+            continue
+        raw_timestamp = str(row.get("processed_at") or row.get("created_at") or "")
+        try:
+            parsed = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            continue
+        market_date = parsed.astimezone(NEW_YORK_TZ).date().isoformat()
+        fault_days.setdefault(market_date, set()).update(blockers)
+    return {
+        market_date: sorted(reasons)
+        for market_date, reasons in sorted(fault_days.items())
     }
 
 
@@ -1308,6 +1482,7 @@ def reconciled_longbridge_order_row(
     direction = local_position_direction(local_row) if local_row else ""
     position_action = str(local_row.get("position_action") or "") if local_row else ""
     source_open_order_id = str(local_row.get("source_open_order_id") or "") if local_row else ""
+    source_open_trade_id = str(local_row.get("source_open_trade_id") or "") if local_row else ""
     order_id = str(order.get("order_id") or order.get("id") or "")
     if runtime_id and not strategy_id:
         strategy_id = runtime_id_parent(runtime_id)
@@ -1333,6 +1508,8 @@ def reconciled_longbridge_order_row(
         "direction": direction,
         "position_action": position_action,
         "source_open_order_id": source_open_order_id,
+        "source_open_trade_id": source_open_trade_id,
+        "source_open_signal_id": str(local_row.get("source_open_signal_id") or "") if local_row else "",
         "attribution_key": attribution_key(
             capital_bucket=capital_bucket,
             runtime_id=runtime_id,
@@ -1349,6 +1526,46 @@ def reconciled_longbridge_order_row(
         "include_in_strategy_performance": counts_for_performance and attribution_status == "matched_m15_realtime_ledger",
         **diagnostic,
     }
+
+
+def apply_cross_epoch_exit_attribution_guard(
+    reconciled: dict[str, Any],
+    local_row: dict[str, Any] | None,
+    *,
+    local_by_signal_id: dict[str, list[dict[str, Any]]],
+    local_by_order_id: dict[str, list[dict[str, Any]]],
+) -> None:
+    if local_row is None or not bool(reconciled.get("counts_for_performance")):
+        return
+    current_epoch = str(local_row.get("test_epoch_id") or "")
+    source_signal_id = str(local_row.get("source_open_signal_id") or "")
+    source_order_id = str(local_row.get("source_open_order_id") or "")
+    if not current_epoch or (not source_signal_id and not source_order_id):
+        return
+    source_rows = list(local_by_signal_id.get(source_signal_id, [])) if source_signal_id else []
+    if not source_rows and source_order_id:
+        source_rows = list(local_by_order_id.get(source_order_id, []))
+    source_epochs = {
+        str(row.get("test_epoch_id") or "")
+        for row in source_rows
+        if str(row.get("test_epoch_id") or "")
+    }
+    if not source_epochs or current_epoch in source_epochs:
+        return
+    reconciled.update(
+        {
+            "attribution_status": "cross_epoch_exit_attribution_rejected",
+            "include_in_bucket_performance": False,
+            "include_in_strategy_performance": False,
+            "diagnostic_category": "cross_epoch_exit_attribution_rejected",
+            "diagnostic_evidence": (
+                f"平仓请求测试编号 {current_epoch} 与来源开仓测试编号 "
+                f"{','.join(sorted(source_epochs))} 不一致；保留长桥真实成交，但不计入具体分仓或策略。"
+            ),
+            "repair_action": "只允许当前测试编号内的开仓批次生成对应策略平仓归因。",
+            "requires_future_tracking": False,
+        }
+    )
 
 
 def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> dict[str, Any]:
@@ -1381,6 +1598,7 @@ def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> 
         "direction": direction,
         "position_action": position_action,
         "source_open_order_id": str(local_row.get("source_open_order_id") or ""),
+        "source_open_trade_id": str(local_row.get("source_open_trade_id") or ""),
         "attribution_key": attribution_key(
             capital_bucket=capital_bucket,
             runtime_id=runtime_id,
@@ -1481,10 +1699,14 @@ def order_match_key(row: dict[str, Any]) -> tuple[str, str, str, str]:
 
 
 def requires_exact_realtime_attribution(row: dict[str, Any]) -> bool:
-    """New short test rows must never be paired by an approximate order shape."""
+    """Formal SDK rows must never be paired by symbol/price/quantity guesses."""
     direction = local_position_direction(row)
     epoch_id = str(row.get("test_epoch_id") or "")
-    return direction == "short" or epoch_id.startswith("m15-short-single-strategy-")
+    return (
+        direction == "short"
+        or epoch_id.startswith("m15-short-single-strategy-")
+        or epoch_id.startswith("m15-sdk-formal-")
+    )
 
 
 def local_position_direction(row: dict[str, Any] | None) -> str:
@@ -1524,6 +1746,11 @@ def order_time_sort_key(row: dict[str, Any]) -> str:
 
 def canonical_order_status(row: dict[str, Any]) -> str:
     status = str(row.get("status") or "").strip().lower().replace(" ", "_")
+    # SDK objects stringify enums as e.g. ``OrderStatus.Canceled``. Treat the
+    # enum member exactly like the plain API status so canceled orders do not
+    # remain in the unknown/open diagnostic bucket.
+    if "." in status:
+        status = status.rsplit(".", 1)[-1]
     aliases = {
         "executed": "filled",
         "filled": "filled",

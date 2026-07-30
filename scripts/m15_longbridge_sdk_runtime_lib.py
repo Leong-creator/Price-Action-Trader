@@ -10,11 +10,12 @@ from __future__ import annotations
 import json
 import os
 import hashlib
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from pathlib import Path
+from time import monotonic, perf_counter, sleep
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
@@ -30,6 +31,8 @@ RUNTIME_CODE_PATHS = (
     ROOT / "scripts" / "m15_longbridge_sdk_runtime_lib.py",
     ROOT / "scripts" / "run_m15_longbridge_sdk_runtime.py",
     ROOT / "scripts" / "m15_longbridge_sdk_account_lib.py",
+    ROOT / "scripts" / "m15_longbridge_sdk_account_worker_lib.py",
+    ROOT / "scripts" / "m15_longbridge_fill_attribution_lib.py",
     ROOT / "scripts" / "m15_longbridge_realtime_signal_router_lib.py",
     ROOT / "scripts" / "m15_longbridge_realtime_execution_lib.py",
     ROOT / "scripts" / "m15_longbridge_realtime_position_manager_lib.py",
@@ -53,6 +56,7 @@ class SdkRuntimeConfig:
     use_seed_universe: bool
     universe_path: Path | None
     symbol_limit: int
+    trading_symbol_limit: int
     bar_minutes: int
     maximum_source_delivery_age_ms: int
     event_keep_lines: int
@@ -61,13 +65,23 @@ class SdkRuntimeConfig:
     daily_context_deadline_seconds: int
     daily_context_parallel_workers: int
     daily_context_batch_size: int
+    daily_context_retry_count: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
     subscription_batch_size: int
     subscription_retry_count: int
+    subscription_request_interval_seconds: float
+    subscription_retry_backoff_seconds: float
     subscription_deadline_seconds: int
     maximum_consecutive_subscription_failures: int
+    snapshot_poll_interval_seconds: float
+    subscription_failures_before_snapshot_fallback: int
+    snapshot_poll_dispatch_max_elapsed_ms: int
+    snapshot_poll_min_successful_cycles: int
+    market_data_heartbeat_deadline_seconds: int
     account_snapshot_interval_seconds: int
+    account_snapshot_refresh_deadline_seconds: int
+    account_snapshot_circuit_retry_seconds: int
     maximum_account_snapshot_age_seconds: int
     two_day_readonly_gate: bool
     router_config_path: Path
@@ -88,6 +102,7 @@ class SdkRuntimeConfig:
     formal_short_test_epoch_id: str
     formal_test_marker_path: Path
     formal_test_epoch_state_path: Path
+    trading_universe_path: Path | None = None
 
 
 def resolve_path(value: str | Path) -> Path:
@@ -121,6 +136,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             else None
         ),
         symbol_limit=int(market_data.get("symbol_limit", 147)),
+        trading_symbol_limit=int(market_data.get("trading_symbol_limit", market_data.get("symbol_limit", 147))),
         bar_minutes=int(market_data.get("bar_minutes", 5)),
         maximum_source_delivery_age_ms=int(market_data.get("maximum_source_delivery_age_ms", 2000)),
         event_keep_lines=int(market_data.get("event_keep_lines", 20000)),
@@ -129,13 +145,37 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         daily_context_deadline_seconds=int(market_data.get("daily_context_deadline_seconds", 180)),
         daily_context_parallel_workers=int(market_data.get("daily_context_parallel_workers", 3)),
         daily_context_batch_size=int(market_data.get("daily_context_batch_size", 10)),
+        daily_context_retry_count=int(market_data.get("daily_context_retry_count", 5)),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
         subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
         subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
+        subscription_request_interval_seconds=float(
+            runtime.get("subscription_request_interval_seconds", 0.5)
+        ),
+        subscription_retry_backoff_seconds=float(
+            runtime.get("subscription_retry_backoff_seconds", 2)
+        ),
         subscription_deadline_seconds=int(runtime.get("subscription_deadline_seconds", 20)),
         maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
+        snapshot_poll_interval_seconds=float(
+            runtime.get("snapshot_poll_interval_seconds", 1)
+        ),
+        subscription_failures_before_snapshot_fallback=int(
+            runtime.get("subscription_failures_before_snapshot_fallback", 1)
+        ),
+        snapshot_poll_dispatch_max_elapsed_ms=int(
+            runtime.get("snapshot_poll_dispatch_max_elapsed_ms", 1000)
+        ),
+        snapshot_poll_min_successful_cycles=int(
+            runtime.get("snapshot_poll_min_successful_cycles", 5)
+        ),
+        market_data_heartbeat_deadline_seconds=int(
+            runtime.get("market_data_heartbeat_deadline_seconds", 5)
+        ),
         account_snapshot_interval_seconds=int(runtime.get("account_snapshot_interval_seconds", 15)),
+        account_snapshot_refresh_deadline_seconds=int(runtime.get("account_snapshot_refresh_deadline_seconds", 8)),
+        account_snapshot_circuit_retry_seconds=int(runtime.get("account_snapshot_circuit_retry_seconds", 15)),
         maximum_account_snapshot_age_seconds=int(runtime.get("maximum_account_snapshot_age_seconds", 45)),
         two_day_readonly_gate=bool(runtime.get("two_day_readonly_gate", True)),
         router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
@@ -176,15 +216,38 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
                 "m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
             )
         ),
+        trading_universe_path=(
+            resolve_path(market_data["trading_universe_path"])
+            if market_data.get("trading_universe_path")
+            else None
+        ),
     )
     if not config.paper_trading_only or config.live_execution or config.real_money_actions:
         raise ValueError("M15 SDK runtime must remain paper-only")
     if config.symbol_limit <= 0 or config.symbol_limit > 500:
         raise ValueError("M15 SDK runtime symbol_limit must be between 1 and 500")
+    if config.trading_symbol_limit <= 0 or config.trading_symbol_limit > config.symbol_limit:
+        raise ValueError("M15 SDK runtime trading_symbol_limit must be between 1 and symbol_limit")
     if config.universe_path is not None:
         universe_symbols = load_m15_universe(config.universe_path)
         if config.symbol_limit > len(universe_symbols):
             raise ValueError("M15 SDK runtime symbol_limit exceeds universe file length")
+    if config.trading_universe_path is not None:
+        trading_symbols = load_m15_universe(config.trading_universe_path)
+        if len(trading_symbols) != config.trading_symbol_limit:
+            raise ValueError(
+                "M15 SDK frozen trading universe size must equal trading_symbol_limit"
+            )
+        subscribed_symbols = {
+            symbol.removesuffix(f".{config.market}")
+            for symbol in configured_symbols(config)
+        }
+        missing = sorted(set(trading_symbols) - subscribed_symbols)
+        if missing:
+            raise ValueError(
+                "M15 SDK frozen trading universe contains unsubscribed symbols:"
+                + ",".join(missing)
+            )
     if config.bar_minutes != 5:
         raise ValueError("M15 SDK runtime currently supports only 5-minute bars")
     if config.account_maintenance_interval_seconds <= 0:
@@ -195,12 +258,39 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK exit order reprice interval must be positive")
     if config.subscription_batch_size <= 0 or config.subscription_batch_size > 50:
         raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
+    if not 0 <= config.subscription_request_interval_seconds <= 5:
+        raise ValueError("M15 SDK subscription request interval must be between 0 and 5 seconds")
+    if not 0 <= config.subscription_retry_backoff_seconds <= 10:
+        raise ValueError("M15 SDK subscription retry backoff must be between 0 and 10 seconds")
     if config.subscription_retry_count < 0 or config.subscription_retry_count > 5:
         raise ValueError("M15 SDK subscription retry count must be between 0 and 5")
     if config.subscription_deadline_seconds <= 0:
         raise ValueError("M15 SDK subscription deadline must be positive")
     if config.maximum_consecutive_subscription_failures <= 0:
         raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
+    if not 0.5 <= config.snapshot_poll_interval_seconds <= 5:
+        raise ValueError("M15 SDK snapshot poll interval must be between 0.5 and 5 seconds")
+    if (
+        config.subscription_failures_before_snapshot_fallback <= 0
+        or config.subscription_failures_before_snapshot_fallback
+        > config.maximum_consecutive_subscription_failures
+    ):
+        raise ValueError(
+            "M15 SDK snapshot fallback threshold must be within the subscription failure limit"
+        )
+    if config.snapshot_poll_dispatch_max_elapsed_ms <= 0:
+        raise ValueError("M15 SDK snapshot poll dispatch latency limit must be positive")
+    if not 1 <= config.snapshot_poll_min_successful_cycles <= 30:
+        raise ValueError(
+            "M15 SDK snapshot poll validation cycles must be between 1 and 30"
+        )
+    if (
+        config.market_data_heartbeat_deadline_seconds
+        <= config.snapshot_poll_interval_seconds
+    ):
+        raise ValueError(
+            "M15 SDK market data heartbeat deadline must exceed the snapshot interval"
+        )
     if config.daily_context_bars < 2:
         raise ValueError("M15 SDK daily context needs at least two bars")
     if config.daily_context_deadline_seconds <= 0:
@@ -209,8 +299,16 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK daily context parallel workers must be between 1 and 4")
     if config.daily_context_batch_size <= 0 or config.daily_context_batch_size > 25:
         raise ValueError("M15 SDK daily context batch size must be between 1 and 25")
+    if config.daily_context_retry_count < 0 or config.daily_context_retry_count > 10:
+        raise ValueError("M15 SDK daily context retry count must be between 0 and 10")
     if config.account_snapshot_interval_seconds <= 0 or config.maximum_account_snapshot_age_seconds < config.account_snapshot_interval_seconds:
         raise ValueError("M15 SDK account snapshot timing is invalid")
+    if config.account_snapshot_refresh_deadline_seconds <= 0:
+        raise ValueError("M15 SDK account snapshot refresh deadline must be positive")
+    if config.account_snapshot_refresh_deadline_seconds >= config.maximum_account_snapshot_age_seconds:
+        raise ValueError("M15 SDK account snapshot refresh deadline must stay below the maximum snapshot age")
+    if config.account_snapshot_circuit_retry_seconds <= 0:
+        raise ValueError("M15 SDK account snapshot circuit retry interval must be positive")
     if config.formal_test_transition_enabled and (
         not config.formal_test_epoch_id or not config.formal_short_test_epoch_id
     ):
@@ -245,6 +343,81 @@ def configured_symbols(config: SdkRuntimeConfig) -> tuple[str, ...]:
     if not config.use_seed_universe:
         return ()
     return tuple(f"{symbol}.{config.market}" for symbol in US_LIQUID_SEED_V1[: config.symbol_limit])
+
+
+def configured_trading_symbols(config: SdkRuntimeConfig) -> tuple[str, ...]:
+    """Return the independently frozen symbols allowed to reach strategy routing."""
+    trading_universe_path = getattr(config, "trading_universe_path", None)
+    if trading_universe_path is not None:
+        return tuple(
+            f"{symbol}.{config.market}"
+            for symbol in load_m15_universe(trading_universe_path)
+        )
+    return configured_symbols(config)[: config.trading_symbol_limit]
+
+
+def trading_universe_fingerprint(config: SdkRuntimeConfig) -> str:
+    payload = "\n".join(configured_trading_symbols(config)).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def trading_market_events(
+    config: SdkRuntimeConfig,
+    rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+) -> list[dict[str, Any]]:
+    """Keep only events that are explicitly allowed to reach strategy routing."""
+    allowed = {symbol.upper() for symbol in configured_trading_symbols(config)}
+    return [
+        row
+        for row in rows
+        if f"{str(row.get('symbol') or '').upper().removesuffix(f'.{config.market}')}.{config.market}" in allowed
+    ]
+
+
+def market_event_is_tradable(config: SdkRuntimeConfig, row: dict[str, Any]) -> bool:
+    return bool(trading_market_events(config, [row]))
+
+
+def daily_context_row_count_for_symbols(
+    config: SdkRuntimeConfig,
+    rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    symbols: tuple[str, ...] | list[str],
+) -> int:
+    expected = {
+        str(symbol).upper().removesuffix(f".{config.market}")
+        for symbol in symbols
+    }
+    return sum(
+        1
+        for row in rows
+        if str(row.get("timeframe") or "") == "1d"
+        and str(row.get("symbol") or "").upper().removesuffix(f".{config.market}") in expected
+    )
+
+
+def daily_context_covers_symbols(
+    config: SdkRuntimeConfig,
+    rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    symbols: tuple[str, ...] | list[str],
+    failed_symbols: list[str] | tuple[str, ...],
+) -> bool:
+    """Check a symbol subset without requiring readonly expansion rows."""
+    expected = {
+        str(symbol).upper().removesuffix(f".{config.market}")
+        for symbol in symbols
+    }
+    failed = {
+        str(symbol).upper().removesuffix(f".{config.market}")
+        for symbol in failed_symbols
+    }
+    if not expected or expected & failed:
+        return False
+    counts = Counter(
+        str(row.get("symbol") or "").upper().removesuffix(f".{config.market}")
+        for row in rows
+        if str(row.get("timeframe") or "") == "1d"
+    )
+    return all(counts[symbol] >= config.daily_context_bars for symbol in expected)
 
 
 def daily_context_is_complete(
@@ -348,7 +521,7 @@ def config_fingerprint(config: SdkRuntimeConfig) -> str:
     return hashlib.sha256(encoded).hexdigest()[:16]
 
 
-def load_readonly_gate(path: Path) -> dict[str, Any]:
+def load_readonly_gate(path: Path, *, required_sessions: int = 2) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -356,14 +529,20 @@ def load_readonly_gate(path: Path) -> dict[str, Any]:
     completed = payload.get("completed_sessions", [])
     return {
         "schema_version": "m15.sdk-readonly-gate.v1",
-        "required_sessions": 2,
+        "required_sessions": required_sessions,
         "completed_sessions": [item for item in completed if isinstance(item, dict)],
     }
 
 
-def record_readonly_session(path: Path, session_date: str, evidence: dict[str, Any]) -> dict[str, Any]:
+def record_readonly_session(
+    path: Path,
+    session_date: str,
+    evidence: dict[str, Any],
+    *,
+    required_sessions: int = 2,
+) -> dict[str, Any]:
     """Persist one completed regular-session SDK validation, once per date."""
-    gate = load_readonly_gate(path)
+    gate = load_readonly_gate(path, required_sessions=required_sessions)
     sessions = [item for item in gate["completed_sessions"] if item.get("session_date") != session_date]
     sessions.append({"session_date": session_date, **evidence})
     sessions.sort(key=lambda item: str(item.get("session_date") or ""))
@@ -375,8 +554,8 @@ def record_readonly_session(path: Path, session_date: str, evidence: dict[str, A
     return gate
 
 
-def readonly_gate_passed(path: Path) -> tuple[bool, int, int]:
-    gate = load_readonly_gate(path)
+def readonly_gate_passed(path: Path, *, required_sessions: int = 2) -> tuple[bool, int, int]:
+    gate = load_readonly_gate(path, required_sessions=required_sessions)
     completed = len(gate["completed_sessions"])
     required = int(gate["required_sessions"])
     return completed >= required, completed, required
@@ -405,6 +584,11 @@ class FiveMinuteBarBuilder:
         )
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
         self._quote_volume_initialized_symbols: set[str] = set()
+        self._snapshot_total_volume: dict[str, int] = {}
+
+    @property
+    def open_bar_count(self) -> int:
+        return len(self._bars)
 
     def on_quote(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         source_at = unix_to_utc(payload.get("timestamp"), received_at)
@@ -420,7 +604,45 @@ class FiveMinuteBarBuilder:
             # is price evidence only.  Later pushes are safe to accumulate.
             self._quote_volume_initialized_symbols.add(normalized_symbol)
             volume = 0
-        return self._append(symbol, source_at, received_at, price, volume)
+        return self._append(
+            symbol,
+            source_at,
+            received_at,
+            price,
+            volume,
+            source_mode="longbridge_sdk_push",
+        )
+
+    def on_snapshot(
+        self,
+        symbol: str,
+        payload: dict[str, Any],
+        *,
+        received_at: datetime,
+    ) -> list[dict[str, Any]]:
+        """Aggregate one SDK quote snapshot without treating total volume as an increment."""
+        source_at = unix_to_utc(payload.get("timestamp"), received_at)
+        price = decimal(payload.get("last_done"))
+        if price <= Decimal("0"):
+            return []
+        normalized_symbol = symbol.upper()
+        total_volume = max(0, int_like(payload.get("volume")))
+        previous_total = self._snapshot_total_volume.get(normalized_symbol)
+        self._snapshot_total_volume[normalized_symbol] = total_volume
+        volume_delta = (
+            max(0, total_volume - previous_total)
+            if previous_total is not None
+            else 0
+        )
+        return self._append(
+            symbol,
+            source_at,
+            received_at,
+            price,
+            volume_delta,
+            source_mode="longbridge_sdk_snapshot_poll",
+            bar_at=received_at,
+        )
 
     def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
@@ -428,7 +650,16 @@ class FiveMinuteBarBuilder:
             source_at = unix_to_utc(trade.get("timestamp"), received_at)
             price = decimal(trade.get("price"))
             if price > Decimal("0"):
-                finished.extend(self._append(symbol, source_at, received_at, price, int_like(trade.get("volume"))))
+                finished.extend(
+                    self._append(
+                        symbol,
+                        source_at,
+                        received_at,
+                        price,
+                        int_like(trade.get("volume")),
+                        source_mode="longbridge_sdk_push",
+                    )
+                )
         return finished
 
     def flush(self, now: datetime) -> list[dict[str, Any]]:
@@ -438,11 +669,21 @@ class FiveMinuteBarBuilder:
                 completed.append(self._finalize(key, bar, emitted_at=now))
         return completed
 
-    def _append(self, symbol: str, source_at: datetime, received_at: datetime, price: Decimal, volume: int) -> list[dict[str, Any]]:
-        source_ny = source_at.astimezone(NEW_YORK)
-        if source_ny.weekday() >= 5 or not (source_ny.hour > 9 or (source_ny.hour == 9 and source_ny.minute >= 30)) or source_ny.hour >= 16:
+    def _append(
+        self,
+        symbol: str,
+        source_at: datetime,
+        received_at: datetime,
+        price: Decimal,
+        volume: int,
+        *,
+        source_mode: str,
+        bar_at: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        bar_clock_ny = (bar_at or source_at).astimezone(NEW_YORK)
+        if bar_clock_ny.weekday() >= 5 or not (bar_clock_ny.hour > 9 or (bar_clock_ny.hour == 9 and bar_clock_ny.minute >= 30)) or bar_clock_ny.hour >= 16:
             return []
-        bar_open = floor_bar_open(source_ny, self.minutes)
+        bar_open = floor_bar_open(bar_clock_ny, self.minutes)
         if self.complete_bar_open_not_before is not None and bar_open < self.complete_bar_open_not_before:
             return self.flush(received_at)
         key = (symbol.upper(), bar_open)
@@ -452,6 +693,7 @@ class FiveMinuteBarBuilder:
                 "symbol": symbol.upper(), "bar_open_at": bar_open, "bar_close_at": bar_open + timedelta(minutes=self.minutes),
                 "open": price, "high": price, "low": price, "close": price, "volume": 0,
                 "source_event_at": source_at, "received_at": received_at,
+                "source_mode": source_mode,
             }
             self._bars[key] = bar
         else:
@@ -482,7 +724,7 @@ class FiveMinuteBarBuilder:
             "received_at": to_iso(received_at),
             "source_delivery_age_ms": max(0, int((received_at - source_at).total_seconds() * 1000)),
             "bar_final": True,
-            "source_mode": "longbridge_sdk_push",
+            "source_mode": str(bar.get("source_mode") or "longbridge_sdk_push"),
             "open": fmt(bar["open"]), "high": fmt(bar["high"]), "low": fmt(bar["low"]),
             "close": fmt(bar["close"]), "volume": str(bar["volume"]),
             "local_simulation_ignored": True,
@@ -560,7 +802,8 @@ def load_current_sdk_intraday_context(
         if received_at.astimezone(UTC) < session_start:
             continue
         if (
-            str(row.get("source_mode") or "") != "longbridge_sdk_push"
+            str(row.get("source_mode") or "")
+            not in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
             or str(row.get("timeframe") or "") != "5m"
             or not bool(row.get("bar_final"))
         ):
@@ -595,7 +838,8 @@ def fresh_market_events(
     for row in rows:
         is_final_sdk_bar = (
             bool(row.get("bar_final"))
-            and str(row.get("source_mode") or "") == "longbridge_sdk_push"
+            and str(row.get("source_mode") or "")
+            in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
             and str(row.get("timeframe") or "") == "5m"
         )
         if is_final_sdk_bar:
@@ -662,6 +906,13 @@ def build_status(
         "stage": "M15.longbridge_sdk_runtime", "generated_at": to_iso(now), "status": status,
         "reason": reason, "sdk_connected": connected, "last_event_at": last_event_at,
         "source_mode": "longbridge_sdk_push", "configured_symbol_count": len(configured_symbols(config)),
+        "trading_symbol_count": len(configured_trading_symbols(config)),
+        "trading_universe_path": (
+            str(config.trading_universe_path)
+            if config.trading_universe_path is not None
+            else ""
+        ),
+        "trading_universe_fingerprint": trading_universe_fingerprint(config),
         "paper_simulated_only": True, "live_execution": False, "real_money_actions": False,
         "local_simulation_isolated": True,
         "local_ledger_input_ref": "",
@@ -760,13 +1011,19 @@ def subscribe_quote_and_trades(
     *,
     batch_size: int = 10,
     retry_count: int = 2,
+    progress_callback: Callable[[int, int], None] | None = None,
+    request_interval_seconds: float = 0,
+    retry_backoff_seconds: float = 0,
 ) -> list[str]:
     """Subscribe in bounded requests and identify every failed symbol."""
     if batch_size <= 0:
         raise ValueError("subscription batch size must be positive")
     if retry_count < 0:
         raise ValueError("subscription retry count cannot be negative")
+    if request_interval_seconds < 0 or retry_backoff_seconds < 0:
+        raise ValueError("subscription delays cannot be negative")
     failed_symbols: list[str] = []
+    total_symbols = len(symbols)
     for offset in range(0, len(symbols), batch_size):
         batch = symbols[offset : offset + batch_size]
         for attempt in range(retry_count + 1):
@@ -780,7 +1037,13 @@ def subscribe_quote_and_trades(
                             quote_context.subscribe([symbol], subscription_types)
                         except Exception:
                             failed_symbols.append(symbol)
+                elif retry_backoff_seconds:
+                    sleep(retry_backoff_seconds)
                 continue
+        if progress_callback is not None:
+            progress_callback(min(offset + len(batch), total_symbols), total_symbols)
+        if request_interval_seconds and offset + len(batch) < total_symbols:
+            sleep(request_interval_seconds)
     return failed_symbols
 
 
@@ -792,16 +1055,103 @@ def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bo
     return True
 
 
+def is_oauth_refresh_failure(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    return (
+        ("oauth error" in text and "failed to refresh token" in text)
+        or "oauth token refresh failed" in text
+        or "invalid_grant" in text
+    )
+
+
 class SdkRealtimePaperClient:
     """Small adapter used by the event loop; no subprocess is started per order."""
 
-    def __init__(self, trade_context: Any, sdk: Any, *, request_gate: Any = None, on_submission: Callable[[dict[str, Any], dict[str, Any]], None] | None = None) -> None:
+    def __init__(
+        self,
+        trade_context: Any,
+        sdk: Any,
+        *,
+        request_gate: Any = None,
+        on_submission: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
+        short_capacity_cache_ttl_seconds: int = 900,
+        short_capacity_failure_cache_ttl_seconds: int = 30,
+        short_capacity_price_tolerance_pct: Decimal = Decimal("2"),
+        monotonic_clock: Callable[[], float] = monotonic,
+    ) -> None:
         self.trade_context = trade_context
         self.sdk = sdk
         self.request_gate = request_gate
         self.on_submission = on_submission
+        self.short_capacity_cache_ttl_seconds = max(0, int(short_capacity_cache_ttl_seconds))
+        self.short_capacity_failure_cache_ttl_seconds = max(
+            0, int(short_capacity_failure_cache_ttl_seconds)
+        )
+        self.short_capacity_price_tolerance_pct = max(
+            Decimal("0"), decimal(short_capacity_price_tolerance_pct)
+        )
+        self.monotonic_clock = monotonic_clock
+        self._short_capacity_cache: dict[str, dict[str, Any]] = {}
+        self.trade_context_refresh_required = False
+        self.trade_context_refresh_reason = ""
+
+    def healthcheck(self) -> dict[str, Any]:
+        """Refresh OAuth on a harmless read before the next order is needed."""
+        if self.trade_context_refresh_required:
+            return {
+                "ok": False,
+                "status": "trade_context_refresh_required",
+                "trade_context_refresh_required": True,
+                "error": self.trade_context_refresh_reason,
+            }
+        method = getattr(self.trade_context, "today_orders", None)
+        if not callable(method):
+            return {
+                "ok": False,
+                "status": "trade_context_healthcheck_unavailable",
+                "trade_context_refresh_required": False,
+                "error": "sdk_trade_context_today_orders_unavailable",
+            }
+        started_at = perf_counter()
+        try:
+            callback = lambda: method()
+            self.request_gate.call(callback) if self.request_gate is not None else callback()
+        except Exception as exc:
+            error = str(exc)[:500]
+            refresh_required = is_oauth_refresh_failure(error)
+            if refresh_required:
+                self.trade_context_refresh_required = True
+                self.trade_context_refresh_reason = error
+            return {
+                "ok": False,
+                "status": (
+                    "trade_context_refresh_required"
+                    if refresh_required
+                    else "trade_context_healthcheck_failed"
+                ),
+                "trade_context_refresh_required": refresh_required,
+                "error": error,
+                "elapsed_ms": max(0, int((perf_counter() - started_at) * 1000)),
+            }
+        return {
+            "ok": True,
+            "status": "trade_context_healthy",
+            "trade_context_refresh_required": False,
+            "error": "",
+            "elapsed_ms": max(0, int((perf_counter() - started_at) * 1000)),
+        }
 
     def submit_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
+        if self.trade_context_refresh_required:
+            return {
+                "submitted": False,
+                "status": "submit_blocked_trade_context_refresh_required",
+                "order_id": "",
+                "explicit_reject": False,
+                "trade_context_refresh_required": True,
+                "error": self.trade_context_refresh_reason,
+                "response": {"error": self.trade_context_refresh_reason},
+            }
         side_name = "Buy" if str(order_payload.get("side") or "").lower() == "buy" else "Sell"
         normalized_order_type = str(order_payload.get("order_type") or "")
         if normalized_order_type == "trigger_limit":
@@ -835,13 +1185,23 @@ class SdkRealtimePaperClient:
         try:
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
         except Exception as exc:
+            error = str(exc)[:500]
+            refresh_required = is_oauth_refresh_failure(error)
+            if refresh_required:
+                self.trade_context_refresh_required = True
+                self.trade_context_refresh_reason = error
             return {
                 "submitted": False,
-                "status": "submit_rejected_without_order_id",
+                "status": (
+                    "submit_blocked_trade_context_refresh_required"
+                    if refresh_required
+                    else "submit_rejected_without_order_id"
+                ),
                 "order_id": "",
-                "explicit_reject": True,
-                "error": str(exc)[:500],
-                "response": {"error": str(exc)[:500]},
+                "explicit_reject": not refresh_required,
+                "trade_context_refresh_required": refresh_required,
+                "error": error,
+                "response": {"error": error},
             }
         order_id = str(getattr(response, "order_id", "") or "")
         result = {
@@ -875,19 +1235,102 @@ class SdkRealtimePaperClient:
         }
 
     def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
-        # SDK method signatures have changed across releases.  Until the
-        # installed SDK exposes a sell-capacity method, keep the short gate
-        # closed instead of guessing capacity or using margin.
+        # The SDK reports borrowed-stock capacity for a Sell open-short request
+        # in margin_max_qty. cash_max_qty can instead describe owned shares.
+        normalized_symbol = longbridge_symbol(symbol)
+        now = self.monotonic_clock()
+        cached = self._short_capacity_cache.get(normalized_symbol)
+        if cached is not None:
+            age_seconds = max(0.0, now - float(cached["cached_at"]))
+            cached_price = decimal(cached.get("limit_price"))
+            price_change_pct = (
+                abs(decimal(limit_price) - cached_price) * Decimal("100") / cached_price
+                if cached_price > 0
+                else Decimal("0")
+            )
+            cache_ttl = (
+                self.short_capacity_cache_ttl_seconds
+                if bool(cached.get("ok"))
+                else self.short_capacity_failure_cache_ttl_seconds
+            )
+            if age_seconds <= cache_ttl and price_change_pct <= self.short_capacity_price_tolerance_pct:
+                return {
+                    "ok": bool(cached.get("ok")),
+                    "status": "sdk_short_capacity_cached",
+                    "underlying_status": str(cached.get("status") or ""),
+                    "max_quantity": decimal(cached.get("max_quantity")),
+                    "cash_max_quantity": decimal(
+                        cached.get("cash_max_quantity")
+                    ),
+                    "margin_max_quantity": decimal(
+                        cached.get("margin_max_quantity")
+                    ),
+                    "capacity_basis": str(cached.get("capacity_basis") or ""),
+                    "elapsed_ms": 0,
+                    "cache_age_seconds": round(age_seconds, 3),
+                    "capacity_source": "broker_sdk_cache",
+                }
         method = getattr(self.trade_context, "estimate_max_purchase_quantity", None)
         if not callable(method):
-            return {"ok": False, "status": "short_capacity_sdk_method_unavailable", "max_quantity": Decimal("0"), "elapsed_ms": 0}
+            return {
+                "ok": False,
+                "status": "short_capacity_sdk_method_unavailable",
+                "max_quantity": Decimal("0"),
+                "elapsed_ms": 0,
+                "cache_age_seconds": None,
+                "capacity_source": "broker_sdk_unavailable",
+            }
+        started_at = perf_counter()
         try:
-            callback = lambda: method(longbridge_symbol(symbol), self.sdk.OrderType.LO, price=limit_price, side=self.sdk.OrderSide.Sell)
+            callback = lambda: method(
+                normalized_symbol,
+                self.sdk.OrderType.LO,
+                price=limit_price,
+                side=self.sdk.OrderSide.Sell,
+            )
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
-            quantity = decimal(getattr(response, "cash_max_qty", "0"))
-            return {"ok": quantity > 0, "status": "sdk_short_capacity", "max_quantity": quantity, "elapsed_ms": 0}
+            cash_quantity = decimal(getattr(response, "cash_max_qty", "0"))
+            margin_quantity = decimal(getattr(response, "margin_max_qty", "0"))
+            # For an open-short Sell request Longbridge reports borrowed-stock
+            # capacity in margin_max_qty. cash_max_qty can represent shares
+            # already owned, so using it here would confuse closing a long with
+            # opening a new short. Normal buys still enforce USD cash only.
+            quantity = margin_quantity
+            result = {
+                "ok": quantity > 0,
+                "status": "sdk_short_capacity",
+                "max_quantity": quantity,
+                "cash_max_quantity": cash_quantity,
+                "margin_max_quantity": margin_quantity,
+                "capacity_basis": "margin_max_qty_for_sell_short",
+                "elapsed_ms": max(0, int((perf_counter() - started_at) * 1000)),
+                "cache_age_seconds": 0,
+                "capacity_source": "broker_sdk_live",
+            }
+            self._short_capacity_cache[normalized_symbol] = {
+                **result,
+                "cached_at": now,
+                "limit_price": decimal(limit_price),
+            }
+            return result
         except Exception as exc:
-            return {"ok": False, "status": f"short_capacity_sdk_failed:{exc}", "max_quantity": Decimal("0"), "elapsed_ms": 0}
+            result = {
+                "ok": False,
+                "status": f"short_capacity_sdk_failed:{exc}",
+                "max_quantity": Decimal("0"),
+                "cash_max_quantity": Decimal("0"),
+                "margin_max_quantity": Decimal("0"),
+                "capacity_basis": "margin_max_qty_for_sell_short",
+                "elapsed_ms": max(0, int((perf_counter() - started_at) * 1000)),
+                "cache_age_seconds": None,
+                "capacity_source": "broker_sdk_error",
+            }
+            self._short_capacity_cache[normalized_symbol] = {
+                **result,
+                "cached_at": now,
+                "limit_price": decimal(limit_price),
+            }
+            return result
 
 
 def decimal(value: Any) -> Decimal:
@@ -927,7 +1370,11 @@ def sdk_order_maintenance_actions(
         if not isinstance(order, dict) or order.get("sdk_pending_confirmation"):
             continue
         order_id = str(order.get("order_id") or "")
-        signal_id = str(order.get("remark") or "")
+        remark = str(order.get("remark") or "").strip()
+        signal_id = remark if remark in execution_by_signal else next(
+            (token for token in remark.split() if token in execution_by_signal),
+            "",
+        )
         metadata = execution_by_signal.get(signal_id)
         if not order_id or metadata is None:
             continue
@@ -1016,6 +1463,11 @@ def int_like(value: Any) -> int:
 
 
 def unix_to_utc(value: Any, fallback: datetime) -> datetime:
+    if isinstance(value, datetime):
+        try:
+            return datetime.fromtimestamp(value.timestamp(), UTC)
+        except (ValueError, OSError):
+            return fallback.astimezone(UTC)
     try:
         return datetime.fromtimestamp(int(str(value)), UTC)
     except Exception:

@@ -4,7 +4,9 @@ import json
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.m15_opening_trade_readiness_lib import (
     DEFAULT_CONFIG_PATH,
@@ -14,7 +16,9 @@ from scripts.m15_opening_trade_readiness_lib import (
 )
 from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
 from scripts.m15_longbridge_sdk_runtime_lib import configured_symbols as sdk_configured_symbols
+from scripts.m15_longbridge_sdk_runtime_lib import configured_trading_symbols as sdk_configured_trading_symbols
 from scripts.m15_longbridge_sdk_runtime_lib import load_config as load_sdk_runtime_config
+from scripts.m15_longbridge_sdk_runtime_lib import trading_universe_fingerprint
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
     build_window_state,
     config_digest,
@@ -33,6 +37,26 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             config.execution_config_path.name,
             "m15_longbridge_realtime_execution.paper_orders_enabled.json",
         )
+
+    def test_sdk_run_overwrites_legacy_readiness_with_canonical_pointer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = load_config(self.write_fixture(root, paper_enabled=True, live_execution=False))
+            canonical_dir = root / "canonical"
+            legacy_dir = root / "legacy"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            config = replace(config, realtime_runtime_engine="sdk", output_dir=canonical_dir)
+
+            with (
+                patch("scripts.m15_opening_trade_readiness_lib.DEFAULT_OUTPUT_DIR", canonical_dir),
+                patch("scripts.m15_opening_trade_readiness_lib.DEFAULT_M15_REALTIME_DIR", legacy_dir),
+            ):
+                run_m15_opening_trade_readiness(config, generated_at="2026-06-04T12:20:00Z")
+
+            pointer = json.loads((legacy_dir / "m15_opening_trade_readiness.json").read_text(encoding="utf-8"))
+            self.assertEqual(pointer["readiness_status"], "superseded_use_canonical_sdk_readiness")
+            self.assertFalse(pointer["trading_decision_allowed"])
+            self.assertEqual(pointer["canonical_path"], str(canonical_dir / "m15_opening_trade_readiness.json"))
 
     def test_armed_waiting_regular_session_when_paper_enabled_and_daemons_alive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -156,21 +180,46 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
 
     def test_sdk_readiness_requires_complete_daily_context(self) -> None:
         sdk_config = load_sdk_runtime_config()
-        expected_rows = len(sdk_configured_symbols(sdk_config)) * sdk_config.daily_context_bars
+        trading_count = len(sdk_configured_trading_symbols(sdk_config))
+        expected_rows = trading_count * sdk_config.daily_context_bars
         status = {
             "status": "running",
             "sdk_connected": True,
             "runtime_engine": "sdk",
             "config_fingerprint": sdk_config_fingerprint(sdk_config),
+            "trading_universe_fingerprint": trading_universe_fingerprint(
+                sdk_config
+            ),
             "subscription_coverage": f"{len(sdk_configured_symbols(sdk_config))}/{len(sdk_configured_symbols(sdk_config))}",
+            "trading_subscription_coverage": f"{trading_count}/{trading_count}",
             "daily_context_state": "complete",
-            "daily_context_row_count": expected_rows,
+            "daily_context_row_count": len(sdk_configured_symbols(sdk_config)) * sdk_config.daily_context_bars,
+            "trading_daily_context_ready": True,
+            "trading_daily_context_row_count": expected_rows,
             "daily_context_failed_symbols": [],
             "account_snapshot_healthy": True,
         }
         self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
+        status["trading_market_data_coverage"] = f"{trading_count}/{trading_count}"
+        status["trading_subscription_coverage"] = f"0/{trading_count}"
+        self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
         status["daily_context_state"] = "loading"
+        status["trading_daily_context_ready"] = False
         self.assertIn("sdk_daily_context_incomplete", sdk_runtime_health_issues(status, sdk_config, True))
+        status["daily_context_state"] = "complete"
+        status["trading_daily_context_ready"] = True
+        status["account_snapshot_circuit_open"] = True
+        status["account_snapshot_worker_status"] = "timeout_circuit_open"
+        issues = sdk_runtime_health_issues(status, sdk_config, True)
+        self.assertIn("sdk_account_snapshot_circuit_open", issues)
+        self.assertIn("sdk_account_worker_status=timeout_circuit_open", issues)
+        status["account_snapshot_circuit_open"] = False
+        status["account_snapshot_worker_status"] = "healthy"
+        status["trading_universe_fingerprint"] = "drift"
+        self.assertIn(
+            "sdk_trading_universe_fingerprint_drift",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
 
     def test_m12_47_status_is_informational_only_when_daemon_is_down(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

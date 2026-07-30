@@ -383,10 +383,11 @@ def resolve_repo_path(value: str | Path) -> Path:
 
 
 def project_path(path: Path) -> str:
+    absolute = path if path.is_absolute() else ROOT / path
     try:
-        return path.resolve().relative_to(ROOT).as_posix()
+        return absolute.relative_to(ROOT).as_posix()
     except ValueError:
-        return str(path.resolve())
+        return str(absolute)
 
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConfig:
@@ -601,7 +602,7 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
             if (
                 bucket.equity != Decimal("10000")
                 or bucket.max_total_exposure != Decimal("2000")
-                or bucket.max_symbol_exposure != Decimal("500")
+                or bucket.max_symbol_exposure != Decimal("750")
                 or bucket.max_risk_per_order != Decimal("10")
             ):
                 raise ValueError(f"M15 realtime execution short bucket risk limits drifted: {bucket_id}")
@@ -630,6 +631,8 @@ def run_realtime_execution(
     broker_client: Any | None = None,
     signal_events_override: list[dict[str, Any]] | None = None,
     account_state_override: dict[str, Any] | None = None,
+    existing_ledger_override: list[dict[str, Any]] | None = None,
+    emitted_ledger_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     execution_cycle_started_monotonic = time.monotonic()
@@ -647,13 +650,25 @@ def run_realtime_execution(
         if signal_events_override is not None
         else read_jsonl(config.realtime_signal_events_path)
     )
-    ledger_retention = compact_execution_ledger_if_needed(
-        config.output_dir / LEDGER_JSONL,
-        current_epoch_id=str(epoch_state.get("test_epoch_id") or ""),
-        additional_current_epoch_ids=current_test_epoch_ids(config, epoch_state),
+    ledger_retention = (
+        {
+            "status": "runtime_memory_no_hot_path_compaction",
+            "row_count": len(existing_ledger_override),
+        }
+        if existing_ledger_override is not None
+        else compact_execution_ledger_if_needed(
+            config.output_dir / LEDGER_JSONL,
+            current_epoch_id=str(epoch_state.get("test_epoch_id") or ""),
+            additional_current_epoch_ids=current_test_epoch_ids(config, epoch_state),
+        )
+    )
+    raw_existing_ledger = (
+        list(existing_ledger_override)
+        if existing_ledger_override is not None
+        else read_jsonl(config.output_dir / LEDGER_JSONL)
     )
     existing_ledger = hydrate_unconfirmed_execution_rows(
-        read_jsonl(config.output_dir / LEDGER_JSONL),
+        raw_existing_ledger,
         account_state,
         read_json(config.output_dir / ORDER_RECONCILIATION_JSON),
     )
@@ -736,6 +751,7 @@ def run_realtime_execution(
     acceptable_count = 0
     submitted_signal_ids = set(existing_submitted_ids)
     selected_strategy_symbols: dict[str, set[str]] = {}
+    selected_close_quantity_by_symbol: dict[str, Decimal] = {}
 
     for event in signal_events_to_process:
         decision = evaluate_signal_event(
@@ -762,10 +778,17 @@ def run_realtime_execution(
             existing_submitted_short_cover_symbols=existing_submitted_short_cover_symbols,
             tracked_short_positions_by_open_order=tracked_short_positions_by_open_order,
             short_reentry_low_by_key=short_reentry_low_by_key,
+            selected_close_quantity_by_symbol=selected_close_quantity_by_symbol,
             broker_client=broker_client,
         )
         row = decision["ledger_row"]
         ready_for_submission = bool(decision["ready"])
+        if ready_for_submission and ledger_row_closes_position(row):
+            close_symbol = base_symbol(str(row.get("symbol") or ""))
+            selected_close_quantity_by_symbol[close_symbol] = (
+                selected_close_quantity_by_symbol.get(close_symbol, ZERO)
+                + decimal(row.get("submitted_quantity", row.get("quantity", "0")))
+            )
         broker_request_started_at: datetime | None = None
         broker_request_started_monotonic = 0.0
         if ready_for_submission and config.execute_orders:
@@ -1057,6 +1080,8 @@ def run_realtime_execution(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(config.output_dir / SUMMARY_JSON, summary)
     append_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
+    if emitted_ledger_rows is not None:
+        emitted_ledger_rows.extend(ledger_rows)
     (config.output_dir / REPORT_MD).write_text(render_report(summary, ledger_rows), encoding="utf-8")
     return summary
 
@@ -1086,6 +1111,7 @@ def evaluate_signal_event(
     existing_submitted_short_cover_symbols: set[str],
     tracked_short_positions_by_open_order: dict[tuple[str, str, str, str], Decimal],
     short_reentry_low_by_key: dict[tuple[str, str, str], Decimal],
+    selected_close_quantity_by_symbol: dict[str, Decimal],
     broker_client: Any,
 ) -> dict[str, Any]:
     risk_check_started_at = datetime.now(UTC)
@@ -1193,6 +1219,8 @@ def evaluate_signal_event(
     broker_short_quantities = account_short_position_quantities(account_state)
     short_position_key = (capital_bucket, runtime_id, symbol)
     source_open_order_id = str(signal.get("source_open_order_id") or "")
+    source_open_trade_id = str(signal.get("source_open_trade_id") or "")
+    source_open_remaining_quantity = decimal(signal.get("source_open_remaining_quantity", "0"))
     short_lot_key = (capital_bucket, runtime_id, symbol, source_open_order_id)
     tracked_short_quantity = tracked_short_positions_by_open_order.get(short_lot_key, ZERO)
     short_capacity_check: dict[str, Any] = {
@@ -1227,12 +1255,25 @@ def evaluate_signal_event(
         elif previous_cover_low > ZERO and current_structure_low >= previous_cover_low:
             blockers.append("blocked_short_reentry_requires_new_structure_low")
     elif closing_long:
+        exact_fill_identity_required = str(effective_epoch_state.get("test_epoch_id") or "").startswith(
+            "m15-sdk-formal-"
+        ) and not exit_only_position_signal
+        if exact_fill_identity_required and (not source_open_order_id or not source_open_trade_id):
+            blockers.append("blocked_close_long_missing_exact_open_fill_identity")
+        elif exact_fill_identity_required and source_open_remaining_quantity <= ZERO:
+            blockers.append("blocked_close_long_missing_open_batch_remaining_quantity")
+        elif exact_fill_identity_required and quantity > source_open_remaining_quantity:
+            blockers.append("blocked_close_long_quantity_over_open_fill_batch")
         if held_quantities.get(symbol, ZERO) <= ZERO:
             blockers.append("blocked_close_without_long_position")
         elif quantity > held_quantities.get(symbol, ZERO):
             blockers.append("blocked_close_quantity_over_position")
         elif quantity > available_quantities.get(symbol, held_quantities.get(symbol, ZERO)):
             blockers.append("blocked_close_quantity_not_available")
+        elif quantity + selected_close_quantity_by_symbol.get(symbol, ZERO) > available_quantities.get(
+            symbol, held_quantities.get(symbol, ZERO)
+        ):
+            blockers.append("blocked_close_quantity_over_available_after_reservations")
         if open_sell_order_quantities.get(symbol, ZERO) > ZERO:
             blockers.append("blocked_existing_sell_open_order_same_symbol")
         if symbol in existing_submitted_sell_symbols:
@@ -1263,6 +1304,13 @@ def evaluate_signal_event(
     elif not opening_long:
         blockers.append("blocked_unknown_side")
     if opening_long or opening_short:
+        frozen_symbols = {
+            base_symbol(str(item))
+            for item in account_state.get("fill_attribution_frozen_symbols", [])
+            if str(item)
+        }
+        if symbol in frozen_symbols:
+            blockers.append("blocked_fill_attribution_mismatch_symbol_frozen")
         if not bucket:
             blockers.append("blocked_missing_capital_bucket")
         bucket_symbol = (capital_bucket, symbol)
@@ -1458,6 +1506,8 @@ def evaluate_signal_event(
             "bucket_pressure_quality_status": bucket_pressure_quality_status,
             "short_capacity_check": short_capacity_check,
             "source_open_order_id": str(signal.get("source_open_order_id") or ""),
+            "source_open_trade_id": source_open_trade_id,
+            "source_open_remaining_quantity": fmt_decimal(source_open_remaining_quantity),
             "short_structure_low": str(signal.get("short_structure_low") or ""),
             "exit_reason": str(signal.get("exit_reason") or ""),
             "market_exit_no_reprice": bool(order_type == "market" and (closing_long or closing_short)),
@@ -1518,7 +1568,23 @@ def evaluate_signal_event(
         "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
         "bucket_pressure_quality_status": bucket_pressure_quality_status,
         "short_capacity_check_status": str(short_capacity_check.get("status") or ""),
+        "short_capacity_check_underlying_status": str(
+            short_capacity_check.get("underlying_status") or ""
+        ),
+        "short_capacity_source": str(short_capacity_check.get("capacity_source") or ""),
+        "short_capacity_cache_age_seconds": short_capacity_check.get(
+            "cache_age_seconds"
+        ),
         "short_capacity_max_quantity": fmt_decimal(decimal(short_capacity_check.get("max_quantity", "0"))),
+        "short_capacity_cash_max_quantity": fmt_decimal(
+            decimal(short_capacity_check.get("cash_max_quantity", "0"))
+        ),
+        "short_capacity_margin_max_quantity": fmt_decimal(
+            decimal(short_capacity_check.get("margin_max_quantity", "0"))
+        ),
+        "short_capacity_basis": str(
+            short_capacity_check.get("capacity_basis") or ""
+        ),
         "short_capacity_query_ms": int_decimal(short_capacity_check.get("elapsed_ms", 0)),
         "short_position_verified_quantity": fmt_decimal(tracked_short_quantity),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
@@ -1537,6 +1603,8 @@ def evaluate_signal_event(
         "source_market_event_id": str(signal.get("source_market_event_id") or signal.get("market_event_id") or ""),
         "source_open_signal_id": str(signal.get("source_open_signal_id") or ""),
         "source_open_order_id": str(signal.get("source_open_order_id") or ""),
+        "source_open_trade_id": source_open_trade_id,
+        "source_open_remaining_quantity": fmt_decimal(source_open_remaining_quantity),
         "short_structure_low": str(signal.get("short_structure_low") or ""),
         "exit_reason": str(signal.get("exit_reason") or ""),
         "execute_orders": config.execute_orders,
@@ -2032,6 +2100,8 @@ def virtual_bucket_summary(
     for bucket_id, bucket in config.virtual_capital_buckets.items():
         submitted_exposure = sum(value for (row_bucket, _symbol), value in submitted.items() if row_bucket == bucket_id)
         selected_exposure = selected_bucket_exposure.get(bucket_id, ZERO)
+        used_exposure = submitted_exposure + selected_exposure
+        remaining_exposure = max(bucket.max_total_exposure - used_exposure, ZERO)
         rows.append(
             {
                 "capital_bucket": bucket_id,
@@ -2039,7 +2109,17 @@ def virtual_bucket_summary(
                 "equity": fmt_money(bucket.equity),
                 "max_total_exposure": fmt_money(bucket.max_total_exposure),
                 "max_symbol_exposure": fmt_money(bucket.max_symbol_exposure),
-                "used_exposure": fmt_money(submitted_exposure + selected_exposure),
+                "used_exposure": fmt_money(used_exposure),
+                "remaining_exposure": fmt_money(remaining_exposure),
+                "over_exposure_cap": used_exposure > bucket.max_total_exposure,
+                "exposure_source": (
+                    "longbridge_filled_batches_plus_pending_orders"
+                    if fill_attributed_open_exposure_by_bucket_symbol(
+                        account_state or {}
+                    )
+                    is not None
+                    else "legacy_submission_ledger"
+                ),
                 "runtime_ids": list(bucket.runtime_ids),
                 "daily_new_symbol_limit": bucket.daily_new_symbol_limit,
                 "runtime_daily_new_symbol_limits": bucket.runtime_daily_new_symbol_limits,
@@ -2327,9 +2407,19 @@ def bucket_pressure_minimum_quality(bucket_remaining_total_exposure: Decimal) ->
 def realtime_execution_signal_sort_key(signal: dict[str, Any]) -> tuple[int, str, Decimal, Decimal, Decimal, str]:
     position_action = normalize_position_action(signal.get("position_action") or signal.get("event_type") or signal.get("action"))
     side = normalize_side(signal.get("side") or signal.get("direction"), position_action=position_action)
-    sell_priority = 0 if side == "sell" else 1
+    if position_action == "stop_loss":
+        execution_priority = 0
+    elif (
+        is_close_long(side, position_action)
+        or is_close_short(side, position_action)
+    ):
+        execution_priority = 1
+    elif is_open_short(side, position_action):
+        execution_priority = 2
+    else:
+        execution_priority = 3
     return (
-        sell_priority,
+        execution_priority,
         str(signal.get("capital_bucket") or ""),
         -normalized_signal_quality_score(signal),
         -decimal(signal.get("net_profit_after_fees_at_target", "0")),
@@ -2381,6 +2471,16 @@ def submitted_ledger_open_exposure_by_bucket(
 ) -> dict[tuple[str, str], Decimal]:
     session_start = parse_utc_datetime(session_started_at)
     account_state = account_state or {}
+    attributed_exposure = fill_attributed_open_exposure_by_bucket_symbol(
+        account_state
+    )
+    if attributed_exposure is not None:
+        return add_pending_open_order_exposure(
+            attributed_exposure,
+            rows,
+            session_start,
+            account_state,
+        )
     order_by_id = latest_account_orders_by_id(account_state)
     materialized_symbols = set(held_symbol_quantities(account_state)) | open_order_symbol_set(account_state)
     quantities: dict[tuple[str, str], Decimal] = {}
@@ -2427,6 +2527,103 @@ def submitted_ledger_open_exposure_by_bucket(
                 quantities[key] = remaining_quantity
                 notionals[key] = old_notional * (remaining_quantity / old_quantity)
     return {key: notional for key, notional in notionals.items() if quantities.get(key, ZERO) > ZERO and notional > ZERO}
+
+
+def fill_attributed_open_exposure_by_bucket_symbol(
+    account_state: dict[str, Any],
+) -> dict[tuple[str, str], Decimal] | None:
+    payload = account_state.get(
+        "fill_attributed_open_exposure_by_bucket_symbol"
+    )
+    if not isinstance(payload, dict):
+        return None
+    exposure: dict[tuple[str, str], Decimal] = {}
+    for bucket, symbol_rows in payload.items():
+        if not isinstance(symbol_rows, dict):
+            continue
+        for symbol, value in symbol_rows.items():
+            notional = decimal(value)
+            key = (str(bucket), base_symbol(str(symbol)))
+            if key[0] and key[1] and notional > ZERO:
+                exposure[key] = exposure.get(key, ZERO) + notional
+    return exposure
+
+
+def add_pending_open_order_exposure(
+    attributed_exposure: dict[tuple[str, str], Decimal],
+    rows: list[dict[str, Any]],
+    session_start: datetime,
+    account_state: dict[str, Any],
+) -> dict[tuple[str, str], Decimal]:
+    """Add only the unfilled part of broker orders to actual fill exposure."""
+    exposure = dict(attributed_exposure)
+    order_by_id = latest_account_orders_by_id(account_state)
+    materialized_symbols = (
+        set(held_symbol_quantities(account_state))
+        | open_order_symbol_set(account_state)
+    )
+    seen_order_ids: set[str] = set()
+    for row in rows:
+        if row.get("submission_status") != "submitted":
+            continue
+        submitted_at = parse_signal_time(
+            row.get("submitted_at")
+            or row.get("processed_at")
+            or row.get("created_at")
+        )
+        if submitted_at and submitted_at < session_start:
+            continue
+        position_action = normalize_position_action(
+            row.get("position_action") or row.get("exit_reason")
+        )
+        side = normalize_side(row.get("side"), position_action=position_action)
+        if not (is_open_long(side, position_action) or is_open_short(side, position_action)):
+            continue
+        bucket = str(row.get("capital_bucket") or "legacy")
+        symbol = base_symbol(str(row.get("symbol") or ""))
+        if not bucket or not symbol:
+            continue
+        order_id = ledger_row_order_id(row)
+        if order_id and order_id in seen_order_ids:
+            continue
+        if order_id:
+            seen_order_ids.add(order_id)
+        account_order = broker_order_for_ledger_row(row, order_by_id)
+        if account_order is None:
+            # Confirmed historical orders are already represented by the
+            # fill-attribution baseline. Only an unconfirmed request without
+            # a broker id may still need a temporary reservation.
+            if order_id or symbol in materialized_symbols:
+                continue
+            pending_notional = decimal(row.get("notional", "0"))
+        else:
+            status = str(account_order.get("status") or "").strip().lower().replace(" ", "_")
+            if status in {"filled", "done", "completed", "canceled", "cancelled", "rejected", "expired", "withdrawn", "failed"}:
+                continue
+            order_quantity = decimal(
+                account_order.get(
+                    "quantity",
+                    account_order.get("qty", row.get("quantity", "0")),
+                )
+            )
+            executed_quantity = decimal(
+                account_order.get(
+                    "executed_quantity",
+                    account_order.get("filled_quantity", "0"),
+                )
+            )
+            remaining_quantity = max(order_quantity - executed_quantity, ZERO)
+            order_price = decimal(
+                account_order.get(
+                    "price",
+                    row.get("limit_price", row.get("current_price", "0")),
+                )
+            )
+            pending_notional = remaining_quantity * order_price
+        if pending_notional > ZERO:
+            key = (bucket, symbol)
+            exposure[key] = exposure.get(key, ZERO) + pending_notional
+    return exposure
 
 
 def ledger_row_order_id(row: dict[str, Any]) -> str:

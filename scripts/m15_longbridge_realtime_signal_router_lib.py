@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation, ROUND_FLOOR
@@ -46,6 +46,8 @@ DEFAULT_EPOCH_STATE = DEFAULT_OUTPUT_DIR / "m15_longbridge_virtual_account_epoch
 SUMMARY_JSON = "m15_longbridge_realtime_signal_router.json"
 LEDGER_JSONL = "m15_longbridge_realtime_signal_router_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_signal_router.md"
+SHORT_DIAGNOSTICS_JSON = "m15_longbridge_short_signal_diagnostics.json"
+SHORT_DIAGNOSTIC_ROW_LIMIT = 2000
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 CONFLUENCE_MAX_MULTIPLIER = Decimal("1.75")
@@ -254,10 +256,11 @@ def resolve_repo_path(value: str | Path) -> Path:
 
 
 def project_path(path: Path) -> str:
+    absolute = path if path.is_absolute() else ROOT / path
     try:
-        return path.resolve().relative_to(ROOT).as_posix()
+        return absolute.relative_to(ROOT).as_posix()
     except ValueError:
-        return str(path.resolve())
+        return str(absolute)
 
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterConfig:
@@ -409,6 +412,7 @@ def run_realtime_signal_router(
     market_events_override: list[dict[str, Any]] | None = None,
     active_market_event_ids: set[str] | None = None,
     emitted_signal_events: list[dict[str, Any]] | None = None,
+    existing_signal_ids_override: set[str] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
@@ -420,8 +424,21 @@ def run_realtime_signal_router(
         else read_jsonl_tail(config.market_events_path, config.max_market_event_rows_per_hot_run)
     )
     market_events = realtime_relevant_market_events(raw_market_events, session_started_at)
-    existing_signal_events = read_jsonl(config.signal_events_path)
-    existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
+    existing_signal_events = (
+        []
+        if existing_signal_ids_override is not None
+        else read_jsonl(config.signal_events_path)
+    )
+    existing_signal_ids = (
+        set(existing_signal_ids_override)
+        if existing_signal_ids_override is not None
+        else {
+            str(row.get("signal_id"))
+            for row in existing_signal_events
+            if row.get("signal_id")
+        }
+    )
+    existing_signal_event_count = len(existing_signal_ids)
     test_epoch_state = normalize_active_epoch_state(read_json(config.test_epoch_state_path))
     ledger_rows: list[dict[str, Any]] = []
     new_signal_events: list[dict[str, Any]] = []
@@ -479,8 +496,9 @@ def run_realtime_signal_router(
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
     config.signal_events_path.parent.mkdir(parents=True, exist_ok=True)
-    write_jsonl(config.signal_events_path, existing_signal_events + new_signal_events)
+    append_jsonl(config.signal_events_path, new_signal_events)
     write_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
+    short_diagnostics = update_short_signal_diagnostics(config, ledger_rows, generated_at_iso)
     if emitted_signal_events is not None:
         emitted_signal_events.extend(new_signal_events)
     summary = {
@@ -503,8 +521,8 @@ def run_realtime_signal_router(
         "embedded_intent_count": sum(len(event_intents(row)) for row in market_events),
         "router_decision_count": len(ledger_rows),
         "new_signal_event_count": len(new_signal_events),
-        "existing_signal_event_count": len(existing_signal_events),
-        "signal_event_total_count": len(existing_signal_events) + len(new_signal_events),
+        "existing_signal_event_count": existing_signal_event_count,
+        "signal_event_total_count": existing_signal_event_count + len(new_signal_events),
         "test_epoch_id": str(test_epoch_state.get("test_epoch_id") or ""),
         "test_epoch_status": str(test_epoch_state.get("status") or ""),
         "test_started_at": str(test_epoch_state.get("test_started_at") or ""),
@@ -545,6 +563,7 @@ def run_realtime_signal_router(
         "short_disabled_count": sum(
             1 for row in ledger_rows if "blocked_short_disabled" in row.get("blockers", [])
         ),
+        "paper_short_diagnostics": short_diagnostics.get("summary", {}),
         "quantity_normalized_risk_or_profit_blocked_count": sum(
             1
             for row in ledger_rows
@@ -590,6 +609,7 @@ def run_realtime_signal_router(
             "signal_events": project_path(config.signal_events_path),
             "router_summary": project_path(config.output_dir / SUMMARY_JSON),
             "router_ledger": project_path(config.output_dir / LEDGER_JSONL),
+            "paper_short_diagnostics": project_path(config.output_dir / SHORT_DIAGNOSTICS_JSON),
             "router_report": project_path(config.output_dir / REPORT_MD),
         },
         "plain_language_result": plain_language_result(len(market_events), len(new_signal_events), ledger_rows),
@@ -600,6 +620,107 @@ def run_realtime_signal_router(
     write_json(config.output_dir / SUMMARY_JSON, summary)
     (config.output_dir / REPORT_MD).write_text(render_report(summary, ledger_rows, new_signal_events), encoding="utf-8")
     return summary
+
+
+def update_short_signal_diagnostics(
+    config: RealtimeSignalRouterConfig,
+    ledger_rows: list[dict[str, Any]],
+    generated_at: str,
+) -> dict[str, Any]:
+    """Persist unique short candidates so a later empty cycle cannot hide them."""
+    path = config.output_dir / SHORT_DIAGNOSTICS_JSON
+    previous = read_json(path)
+    if str(previous.get("test_epoch_id") or "") != config.short_test_epoch_id:
+        previous = {}
+
+    existing_rows = previous.get("decision_rows")
+    decisions_by_id = {
+        str(row.get("signal_id")): row
+        for row in existing_rows
+        if isinstance(existing_rows, list)
+        and isinstance(row, dict)
+        and str(row.get("signal_id") or "")
+    } if isinstance(existing_rows, list) else {}
+
+    short_runtime_ids = set(config.paper_short_runtime_ids)
+    for row in ledger_rows:
+        runtime_id = str(row.get("runtime_id") or "")
+        if runtime_id not in short_runtime_ids and str(row.get("direction") or "").lower() != "short":
+            continue
+        signal_id = str(row.get("signal_id") or "")
+        if not signal_id:
+            continue
+        decisions_by_id[signal_id] = {
+            "signal_id": signal_id,
+            "created_at": str(row.get("created_at") or ""),
+            "processed_at": str(row.get("processed_at") or generated_at),
+            "runtime_id": runtime_id,
+            "symbol": str(row.get("symbol") or ""),
+            "router_decision_status": str(row.get("router_decision_status") or ""),
+            "blockers": list(row.get("blockers") or []),
+            "submitted_quantity": str(row.get("submitted_quantity") or "0"),
+            "notional": str(row.get("notional") or "0"),
+            "risk_amount": str(row.get("risk_amount") or "0"),
+            "net_profit_after_fees_at_target": str(row.get("net_profit_after_fees_at_target") or "0"),
+            "minimum_net_profit_after_fees": str(row.get("minimum_net_profit_after_fees") or "0"),
+            "reward_r": str(row.get("reward_r") or "0"),
+            "minimum_reward_r": str(row.get("minimum_reward_r") or "0"),
+            "quality_score": str(row.get("quality_score") or "0"),
+            "minimum_quality_score": str(row.get("minimum_quality_score") or "0"),
+            "source_market_event_id": str(row.get("source_market_event_id") or ""),
+        }
+
+    decision_rows = sorted(
+        decisions_by_id.values(),
+        key=lambda row: (str(row.get("created_at") or ""), str(row.get("signal_id") or "")),
+    )[-SHORT_DIAGNOSTIC_ROW_LIMIT:]
+    runtime_summaries: list[dict[str, Any]] = []
+    total_blockers: Counter[str] = Counter()
+    for runtime_id in config.paper_short_runtime_ids:
+        runtime_rows = [row for row in decision_rows if row.get("runtime_id") == runtime_id]
+        blockers: Counter[str] = Counter()
+        for row in runtime_rows:
+            blockers.update(str(item) for item in row.get("blockers", []) if str(item))
+        total_blockers.update(blockers)
+        runtime_summaries.append(
+            {
+                "runtime_id": runtime_id,
+                "candidate_count": len(runtime_rows),
+                "signal_ready_count": sum(
+                    1 for row in runtime_rows if row.get("router_decision_status") == "signal_event_ready"
+                ),
+                "blocked_count": sum(1 for row in runtime_rows if row.get("blockers")),
+                "blockers": dict(blockers.most_common()),
+                "last_candidate_at": max(
+                    (str(row.get("created_at") or "") for row in runtime_rows),
+                    default="",
+                ),
+            }
+        )
+
+    payload = {
+        "schema_version": "m15.longbridge-short-signal-diagnostics.v1",
+        "stage": "M15.longbridge_short_signal_diagnostics",
+        "generated_at": generated_at,
+        "test_epoch_id": config.short_test_epoch_id,
+        "test_started_at": config.short_test_started_at,
+        "paper_simulated_only": True,
+        "live_execution": False,
+        "real_money_actions": False,
+        "summary": {
+            "runtime_count": len(config.paper_short_runtime_ids),
+            "candidate_count": len(decision_rows),
+            "signal_ready_count": sum(
+                1 for row in decision_rows if row.get("router_decision_status") == "signal_event_ready"
+            ),
+            "blocked_count": sum(1 for row in decision_rows if row.get("blockers")),
+            "top_blockers": dict(total_blockers.most_common(10)),
+        },
+        "runtime_summaries": runtime_summaries,
+        "decision_rows": decision_rows,
+    }
+    write_json(path, payload)
+    return payload
 
 
 def realtime_relevant_market_events(rows: list[dict[str, Any]], session_started_at: str) -> list[dict[str, Any]]:
@@ -2409,6 +2530,19 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         encoding="utf-8",
     )
     tmp_path.replace(path)
+
+
+def append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.touch(exist_ok=True)
+        return
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(
+                json.dumps(json_ready(row), ensure_ascii=False, sort_keys=True)
+                + "\n"
+            )
 
 
 def json_ready(value: Any) -> Any:

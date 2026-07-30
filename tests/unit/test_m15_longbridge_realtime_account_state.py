@@ -19,7 +19,10 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
     UNFILLED_ORDER_DIAGNOSTICS_JSON,
     assert_account_state_command,
     build_order_reconciliation,
+    build_fill_attribution_v2,
+    canonical_order_status,
     enrich_order_reconciliation_with_stale_cleanup,
+    fault_days_from_execution_rows,
     load_config,
     longbridge_account_pnl_market_date,
     parse_json,
@@ -32,6 +35,70 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
 
 
 class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
+    def test_fault_days_use_only_formal_entry_system_blockers(self) -> None:
+        rows = [
+            {
+                "test_epoch_id": "m15-sdk-formal-test",
+                "position_action": "open_long",
+                "processed_at": "2026-07-21T14:00:00Z",
+                "blockers": ["blocked_account_state_stale", "blocked_risk_over_cap"],
+            },
+            {
+                "test_epoch_id": "old-test",
+                "position_action": "open_long",
+                "processed_at": "2026-07-22T14:00:00Z",
+                "blockers": ["blocked_non_paper_account"],
+            },
+            {
+                "test_epoch_id": "m15-sdk-formal-test",
+                "position_action": "close_long",
+                "processed_at": "2026-07-23T14:00:00Z",
+                "blockers": ["blocked_account_state_stale"],
+            },
+        ]
+
+        self.assertEqual(
+            fault_days_from_execution_rows(rows),
+            {"2026-07-21": ["blocked_account_state_stale"]},
+        )
+
+    def test_canonical_order_status_strips_sdk_enum_prefix(self) -> None:
+        self.assertEqual(canonical_order_status({"status": "OrderStatus.Canceled"}), "canceled")
+        self.assertEqual(canonical_order_status({"status": "OrderStatus.New"}), "submitted")
+
+    def test_reconciliation_preserves_source_trade_id_for_exact_exit_fill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            account_state = {
+                "orders": [],
+                "historical_orders": [
+                    {"order_id": "old-manual", "symbol": "MSFT.US", "side": "Buy", "status": "Filled", "quantity": "1", "executed_quantity": "1", "executed_price": "200"},
+                    {"order_id": "open-1", "symbol": "AAPL.US", "side": "Buy", "status": "Filled", "quantity": "2", "executed_quantity": "2", "executed_price": "100"},
+                    {"order_id": "exit-1", "symbol": "AAPL.US", "side": "Sell", "status": "Filled", "quantity": "2", "executed_quantity": "2", "executed_price": "105"},
+                ],
+                "historical_executions": [
+                    {"order_id": "old-manual", "trade_id": "old-trade", "quantity": "1", "price": "200"},
+                    {"order_id": "open-1", "trade_id": "open-trade-1", "quantity": "2", "price": "100"},
+                    {"order_id": "exit-1", "trade_id": "exit-trade-1", "quantity": "2", "price": "105"},
+                ],
+                "positions": [],
+            }
+            ledger = [
+                {"submission_status": "submitted", "order_id": "open-1", "signal_id": "open-sig", "symbol": "AAPL", "side": "buy", "quantity": "2", "runtime_id": "M10-PA-004-long-1d", "strategy_id": "M10-PA-004", "capital_bucket": "pa004", "position_action": "open_long", "test_epoch_id": "m15-sdk-formal-test"},
+                {"submission_status": "submitted", "order_id": "exit-1", "signal_id": "exit-sig", "symbol": "AAPL", "side": "sell", "quantity": "2", "runtime_id": "M10-PA-004-long-1d", "strategy_id": "M10-PA-004", "capital_bucket": "pa004", "position_action": "close_long", "source_open_order_id": "open-1", "source_open_trade_id": "open-trade-1", "test_epoch_id": "m15-sdk-formal-test"},
+            ]
+
+            reconciliation = build_order_reconciliation(config, "2026-07-22T14:00:00Z", account_state, ledger)
+            attribution = build_fill_attribution_v2(account_state, reconciliation)
+
+        reconciled_exit = next(row for row in reconciliation["rows"] if row["order_id"] == "exit-1")
+        exit_event = next(row for row in attribution["events"] if row["order_id"] == "exit-1")
+        self.assertEqual(reconciled_exit["source_open_trade_id"], "open-trade-1")
+        self.assertEqual(exit_event["attribution_status"], "matched_fill_batch")
+        self.assertEqual(exit_event["realized_pnl"], "10.00")
+        self.assertEqual(len(attribution["events"]), 2)
+        self.assertEqual(attribution["summary"]["anomaly_count"], 0)
+
     def test_account_pnl_market_date_uses_new_york_trading_date_after_utc_midnight(self) -> None:
         self.assertEqual(
             longbridge_account_pnl_market_date(datetime(2026, 7, 7, 2, 15, tzinfo=UTC)),
@@ -423,6 +490,111 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
             self.assertEqual(reconciliation["summary"]["local_submitted_no_longbridge_order_count"], 0)
             self.assertEqual(reconciliation["rows"][0]["attribution_status"], "matched_m15_realtime_ledger")
             self.assertTrue(reconciliation["rows"][0]["include_in_bucket_performance"])
+
+    def test_formal_long_order_is_not_attributed_by_matching_symbol_quantity_and_price(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            reconciliation = build_order_reconciliation(
+                config,
+                "2026-07-22T02:00:00Z",
+                {
+                    "historical_orders": [{
+                        "order_id": "broker-order-without-identity",
+                        "symbol": "LCID.US",
+                        "side": "Buy",
+                        "quantity": "28",
+                        "price": "6.67",
+                        "status": "Filled",
+                        "executed_quantity": "28",
+                        "executed_price": "6.67",
+                    }],
+                    "orders": [],
+                },
+                [{
+                    "submission_status": "submitted",
+                    "signal_id": "local-signal-only",
+                    "symbol": "LCID",
+                    "side": "buy",
+                    "quantity": "28",
+                    "limit_price": "6.67",
+                    "capital_bucket": "pa002_5m",
+                    "runtime_id": "M10-PA-002-5m",
+                    "test_epoch_id": "m15-sdk-formal-single-strategy-20260716",
+                }],
+            )
+
+        broker_row = next(row for row in reconciliation["rows"] if row["order_id"])
+        self.assertEqual(broker_row["attribution_status"], "legacy_or_unattributed_longbridge_order")
+        self.assertFalse(broker_row["include_in_strategy_performance"])
+        self.assertEqual(reconciliation["summary"]["local_submitted_no_longbridge_order_count"], 1)
+
+    def test_cross_epoch_exit_is_not_attributed_to_strategy_performance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            account_state = {
+                "historical_orders": [
+                    {
+                        "order_id": "old-open-order",
+                        "symbol": "GILD.US",
+                        "side": "Buy",
+                        "quantity": "3",
+                        "status": "Filled",
+                        "executed_quantity": "3",
+                        "executed_price": "130",
+                        "created_at": "2026-07-02T14:30:00Z",
+                    },
+                    {
+                        "order_id": "new-exit-order",
+                        "symbol": "GILD.US",
+                        "side": "Sell",
+                        "quantity": "3",
+                        "status": "Filled",
+                        "executed_quantity": "3",
+                        "executed_price": "136",
+                        "created_at": "2026-07-16T20:00:00Z",
+                    },
+                ],
+                "orders": [],
+            }
+            ledger = [
+                {
+                    "submission_status": "submitted",
+                    "order_id": "old-open-order",
+                    "signal_id": "old-open-signal",
+                    "symbol": "GILD",
+                    "side": "buy",
+                    "quantity": "3",
+                    "runtime_id": "M12-FTD-001-baseline-1d",
+                    "capital_bucket": "ftd_baseline",
+                    "test_epoch_id": "old-epoch",
+                },
+                {
+                    "submission_status": "submitted",
+                    "order_id": "new-exit-order",
+                    "signal_id": "bad-exit-signal",
+                    "source_open_signal_id": "old-open-signal",
+                    "symbol": "GILD",
+                    "side": "sell",
+                    "quantity": "3",
+                    "runtime_id": "M12-FTD-001-baseline-1d",
+                    "capital_bucket": "ftd_baseline",
+                    "position_action": "take_profit",
+                    "test_epoch_id": "formal-epoch",
+                },
+            ]
+
+            reconciliation = build_order_reconciliation(
+                config,
+                "2026-07-18T00:00:00Z",
+                account_state,
+                ledger,
+            )
+
+            exit_row = next(row for row in reconciliation["rows"] if row["order_id"] == "new-exit-order")
+            self.assertTrue(exit_row["counts_for_performance"])
+            self.assertFalse(exit_row["include_in_bucket_performance"])
+            self.assertFalse(exit_row["include_in_strategy_performance"])
+            self.assertEqual(exit_row["attribution_status"], "cross_epoch_exit_attribution_rejected")
 
     def test_stale_cleanup_ledger_explains_system_canceled_buy_orders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

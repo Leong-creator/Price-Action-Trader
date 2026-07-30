@@ -147,7 +147,7 @@
       "position_direction": "short",
       "equity": "10000",
       "max_total_exposure": "2000",
-      "max_symbol_exposure": "500",
+      "max_symbol_exposure": "750",
       "max_risk_per_order": "10",
       "min_cash_reserve": "8000",
       "runtime_ids": [
@@ -159,7 +159,7 @@
       "position_direction": "short",
       "equity": "10000",
       "max_total_exposure": "2000",
-      "max_symbol_exposure": "500",
+      "max_symbol_exposure": "750",
       "max_risk_per_order": "10",
       "min_cash_reserve": "8000",
       "runtime_ids": [
@@ -171,7 +171,7 @@
       "position_direction": "short",
       "equity": "10000",
       "max_total_exposure": "2000",
-      "max_symbol_exposure": "500",
+      "max_symbol_exposure": "750",
       "max_risk_per_order": "10",
       "min_cash_reserve": "8000",
       "runtime_ids": [

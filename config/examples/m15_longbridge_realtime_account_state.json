@@ -14,6 +14,11 @@
     "historical_order_start_date": "2026-06-01",
     "unfilled_order_detail_lookup_limit": 30
   },
+  "fee_model": {
+    "commission_per_order_side": "1.99",
+    "regulatory_fee_per_sell_order": "0.02",
+    "source": "configured_conservative_estimate"
+  },
   "hard_boundaries": {
     "paper_simulated_only": true,
     "live_execution": false,
