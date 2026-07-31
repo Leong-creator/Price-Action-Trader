@@ -26,7 +26,16 @@
     "daily_context_bars": 60,
     "daily_context_deadline_seconds": 75,
     "daily_context_parallel_workers": 1,
-    "daily_context_batch_size": 10
+    "daily_context_batch_size": 10,
+    "expansion_trade_pool_upgrade_gate": {
+      "enabled": true,
+      "required_readonly_gate_passed": true,
+      "required_complete_trading_daily_context": true,
+      "required_complete_subscribed_daily_context": true,
+      "required_subscription_coverage": "300/300",
+      "maximum_source_delivery_age_ms": 2000,
+      "target_trading_symbol_limit": 300
+    }
   },
   "routing": {
     "router_config": "config/examples/m15_longbridge_realtime_signal_router.json",

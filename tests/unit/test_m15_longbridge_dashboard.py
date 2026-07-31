@@ -43,7 +43,17 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "trading_daily_context_expected_row_count": 8820,
             "new_position_submission_enabled": True,
         })
-        account = _write(tmp_path / "account.json", {"generated_at": now, "paper_account_verified": True, "account_channel": "lb_papertrading", "position_row_count": 0, "open_order_count": 0})
+        account = _write(tmp_path / "account.json", {
+            "generated_at": now,
+            "paper_account_verified": True,
+            "account_channel": "lb_papertrading",
+            "position_row_count": 2,
+            "open_order_count": 0,
+            "positions": [
+                {"symbol": "AAPL.US", "quantity": "5", "cost_price": "100", "market_price": "110", "unrealized_pnl": "50.00"},
+                {"symbol": "TSLA.US", "quantity": "1", "cost_price": "250", "market_price": "260", "unrealized_pnl": "10.00"},
+            ],
+        })
         summary = _write(tmp_path / "summary.json", {"generated_at": now, "account_today_total_pnl": "12.3", "account_today_total_pnl_source": "longbridge"})
         execution = _write(tmp_path / "execution.json", {"pending_confirmation_count": 0})
         epoch = _write(tmp_path / "epoch.json", {"status": "active", "test_epoch_id": "formal"})
@@ -53,7 +63,16 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "summary": {"filled": 2},
             "rows": [{"order_id": "SHORT-1", "status": "Filled"}],
         })
-        pnl = _write(tmp_path / "pnl.json", {"generated_at": now, "account_pnl": {"sum_profit": "5"}, "market_day_profit_analysis": {"sum_profit": "-3"}, "source_status": {"ok": True}})
+        pnl = _write(tmp_path / "pnl.json", {
+            "generated_at": now,
+            "account_pnl": {"sum_profit": "5"},
+            "market_day_profit_analysis": {"sum_profit": "-3"},
+            "source_status": {"ok": True},
+            "current_holdings": [
+                {"symbol": "AAPL.US", "quantity": "5", "cost_price": "100", "market_price": "110", "unrealized_pnl": "50.00"},
+                {"symbol": "TSLA.US", "quantity": "1", "cost_price": "250", "market_price": "260", "unrealized_pnl": "10.00"},
+            ],
+        })
         fills = _write(tmp_path / "fills.json", {
             "generated_at": now,
             "summary": {
@@ -85,7 +104,42 @@ class LongbridgeDashboardTest(unittest.TestCase):
                 "profit_factor_after_estimated_fees": "1.5000",
                 "maximum_drawdown_after_estimated_fees": "4.00",
             }],
-            "completed_trades": [{"batch_id": "b1"}, {"batch_id": "b2"}],
+            "completed_trades": [
+                {
+                    "batch_id": "b1",
+                    "runtime_id": "R1",
+                    "capital_bucket": "bucket-r1",
+                    "estimated_net_pnl": "12.00",
+                    "gross_realized_pnl": "20.00",
+                    "estimated_fees": "8.00",
+                    "open_market_date": "2026-07-15",
+                    "opened_at": "2026-07-15T14:00:00Z",
+                    "exit_fill_event_count": 1,
+                },
+                {
+                    "batch_id": "b2",
+                    "runtime_id": "R1",
+                    "capital_bucket": "bucket-r1",
+                    "estimated_net_pnl": "0.00",
+                    "gross_realized_pnl": "0.00",
+                    "estimated_fees": "0.00",
+                    "open_market_date": "2026-07-15",
+                    "opened_at": "2026-07-15T15:00:00Z",
+                    "exit_fill_event_count": 2,
+                },
+            ],
+            "batches": [
+                {
+                    "batch_id": "open-a",
+                    "runtime_id": "R1",
+                    "capital_bucket": "bucket-r1",
+                    "symbol": "AAPL",
+                    "direction": "long",
+                    "remaining_quantity": "5.0000",
+                    "open_price": "100.00",
+                    "metadata": {"submitted_at": "2026-07-15T14:00:00Z"},
+                }
+            ],
             "symbol_checks": [],
             "anomalies": [],
         })
@@ -115,8 +169,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "longbridge_order_id": "SHORT-1",
         }) + "\n", encoding="utf-8")
         config_file = _write(tmp_path / "execution_config.json", {"virtual_capital_buckets": {"one": {"runtime_ids": ["R1"], "equity": "10000"}}})
-        registry = _write(tmp_path / "registry.json", {"strategies": [{"module_role": "independent_runtime", "runtime_accounts": [{"runtime_id": "R1"}]}, {"module_role": "plugin_filter"}]})
-        config = {"inputs": {"sdk_runtime_status": runtime, "account_state": account, "account_state_summary": summary, "execution_status": execution, "execution_ledger": str(execution_ledger), "epoch_state": epoch, "formal_epoch_marker": formal, "order_reconciliation": orders, "fill_attribution": fills, "short_signal_diagnostics": short_diagnostics, "pnl_reconciliation": pnl, "execution_config": config_file, "local_runtime_registry": registry}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+        config = {"inputs": {"sdk_runtime_status": runtime, "account_state": account, "account_state_summary": summary, "execution_status": execution, "execution_ledger": str(execution_ledger), "epoch_state": epoch, "formal_epoch_marker": formal, "order_reconciliation": orders, "fill_attribution": fills, "short_signal_diagnostics": short_diagnostics, "pnl_reconciliation": pnl, "execution_config": config_file}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
         payload = run_dashboard(config, generated_at="2026-07-16T00:00:00Z")
         self.assertEqual(payload["data_status"], "trustworthy")
         self.assertEqual(payload["source_of_truth"], "longbridge_sdk_paper_account")
@@ -130,16 +183,19 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_order_id_count"], 1)
         self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_filled_order_count"], 1)
         self.assertEqual(payload["fill_attribution"]["summary"]["completed_trade_count"], 2)
+        self.assertEqual(payload["fill_attribution"]["position_layers"]["actual_account_total"]["gross_market_value"], "810.00")
+        self.assertEqual(payload["fill_attribution"]["position_layers"]["attributed_virtual_total"]["gross_market_value"], "550.00")
+        self.assertEqual(payload["fill_attribution"]["position_layers"]["unreconciled_delta"]["gross_market_value"], "260.00")
         self.assertEqual(payload["fill_attribution"]["summary"]["exit_fill_event_count"], 3)
         self.assertEqual(payload["fill_attribution"]["strategy_performance"][0]["runtime_id"], "R1")
         self.assertTrue(payload["runtime"]["daily_context_complete"])
         self.assertEqual(payload["runtime"]["trading_subscription_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["readonly_expansion_subscription_coverage"], "153/153")
-        self.assertEqual(payload["inventory_interface"], {"parent_strategy_count": 1, "local_runtime_count": 1, "auxiliary_module_count": 1, "longbridge_tradable_runtime_count": 1})
+        self.assertFalse(payload["pa004_migration"]["enabled"])
         html = (tmp_path / "out.html").read_text(encoding="utf-8")
         self.assertIn("交易核心正常，统计待刷新", html)
         self.assertIn("账户净资产", html)
-        self.assertIn("完整交易", html)
+        self.assertIn("当前持仓三层口径", html)
         self.assertIn("策略实际成交成绩", html)
         self.assertIn("分仓实际成交成绩", html)
         self.assertIn("扣费后盈利因子", html)
@@ -159,8 +215,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "config": {"virtual_capital_buckets": {}},
         }.items():
             files[name] = _write(tmp_path / f"{name}.json", payload)
-        registry = _write(tmp_path / "registry.json", {"strategies": []})
-        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"], "local_runtime_registry": registry}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"]}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
 
         payload = build_dashboard(config, generated_at="2026-07-16T00:00:00Z")
 
@@ -185,8 +240,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "config": {"virtual_capital_buckets": {}},
         }.items():
             files[name] = _write(tmp_path / f"{name}.json", payload)
-        registry = _write(tmp_path / "registry.json", {"strategies": []})
-        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"], "local_runtime_registry": registry}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"]}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
 
         payload = build_dashboard(config, generated_at=now)
 
@@ -219,7 +273,6 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "config": {"virtual_capital_buckets": {}},
         }.items():
             files[name] = _write(tmp_path / f"{name}.json", payload)
-        registry = _write(tmp_path / "registry.json", {"strategies": []})
         config = {
             "inputs": {
                 "sdk_runtime_status": files["runtime"],
@@ -231,7 +284,6 @@ class LongbridgeDashboardTest(unittest.TestCase):
                 "order_reconciliation": files["orders"],
                 "pnl_reconciliation": files["pnl"],
                 "execution_config": files["config"],
-                "local_runtime_registry": registry,
             },
             "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")},
         }
@@ -267,7 +319,6 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "config": {"virtual_capital_buckets": {}},
         }.items():
             files[name] = _write(tmp_path / f"{name}.json", payload)
-        registry = _write(tmp_path / "registry.json", {"strategies": []})
         config = {
             "inputs": {
                 "sdk_runtime_status": files["runtime"],
@@ -279,7 +330,6 @@ class LongbridgeDashboardTest(unittest.TestCase):
                 "order_reconciliation": files["orders"],
                 "pnl_reconciliation": files["pnl"],
                 "execution_config": files["config"],
-                "local_runtime_registry": registry,
             },
             "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")},
         }
@@ -303,11 +353,94 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "formal": {"status": "pending_flatten"}, "orders": {}, "pnl": {}, "config": {"virtual_capital_buckets": {}},
         }.items():
             files[name] = _write(tmp_path / f"{name}.json", payload)
-        registry = _write(tmp_path / "registry.json", {"strategies": []})
-        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"], "local_runtime_registry": registry}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"]}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
         payload = build_dashboard(config)
         self.assertEqual(payload["formal_test"]["positions"], 16)
         self.assertFalse(payload["runtime"]["new_position_submission_enabled"])
+
+    def test_dashboard_uses_pa004_migration_baseline_for_default_performance_view(self) -> None:
+        tmp_path = self.tmp_path
+        now = "2026-07-31T20:00:00Z"
+        runtime = _write(tmp_path / "runtime.json", {
+            "generated_at": now,
+            "runtime_pid": os.getpid(),
+            "runtime_engine": "sdk",
+            "sdk_connected": True,
+        })
+        account = _write(tmp_path / "account.json", {
+            "generated_at": now,
+            "paper_account_verified": True,
+            "positions": [{"symbol": "AAPL.US", "quantity": "1", "cost_price": "100", "market_price": "110", "unrealized_pnl": "10.00"}],
+        })
+        summary = _write(tmp_path / "summary.json", {"generated_at": now})
+        execution = _write(tmp_path / "execution.json", {})
+        epoch = _write(tmp_path / "epoch.json", {"status": "active"})
+        formal = _write(tmp_path / "formal.json", {"status": "active"})
+        orders = _write(tmp_path / "orders.json", {"generated_at": now})
+        pnl = _write(tmp_path / "pnl.json", {
+            "generated_at": now,
+            "current_holdings": [{"symbol": "AAPL.US", "quantity": "1", "cost_price": "100", "market_price": "110", "unrealized_pnl": "10.00"}],
+        })
+        fills = _write(tmp_path / "fills.json", {
+            "generated_at": now,
+            "summary": {"completed_trade_count": 2, "estimated_net_realized_pnl": "7.00"},
+            "completed_trades": [
+                {
+                    "batch_id": "old",
+                    "runtime_id": "M10-PA-004-MBF-1d",
+                    "capital_bucket": "pa004_mbf",
+                    "estimated_net_pnl": "5.00",
+                    "gross_realized_pnl": "8.00",
+                    "estimated_fees": "3.00",
+                    "opened_at": "2026-07-20T14:00:00Z",
+                    "exit_fill_event_count": 1,
+                },
+                {
+                    "batch_id": "new",
+                    "runtime_id": "M10-PA-004-MBF-1d",
+                    "capital_bucket": "pa004_mbf",
+                    "estimated_net_pnl": "2.00",
+                    "gross_realized_pnl": "4.00",
+                    "estimated_fees": "2.00",
+                    "opened_at": "2026-07-30T14:00:00Z",
+                    "exit_fill_event_count": 1,
+                },
+            ],
+            "batches": [],
+            "symbol_checks": [],
+            "anomalies": [],
+        })
+        migration = _write(tmp_path / "m15_pa004_bucket_migration_status.json", {
+            "bucket_baselines": {
+                "pa004_mbf": {"started_at": "2026-07-25T00:00:00Z"},
+            }
+        })
+        config_file = _write(tmp_path / "execution_config.json", {"virtual_capital_buckets": {"pa004_mbf": {"runtime_ids": ["M10-PA-004-MBF-1d"]}}})
+        config = {
+            "inputs": {
+                "sdk_runtime_status": runtime,
+                "account_state": account,
+                "account_state_summary": summary,
+                "execution_status": execution,
+                "epoch_state": epoch,
+                "formal_epoch_marker": formal,
+                "order_reconciliation": orders,
+                "fill_attribution": fills,
+                "pnl_reconciliation": pnl,
+                "execution_config": config_file,
+                "pa004_migration_status": migration,
+            },
+            "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")},
+        }
+
+        payload = build_dashboard(config, generated_at=now)
+
+        self.assertTrue(payload["pa004_migration"]["enabled"])
+        self.assertEqual(payload["fill_attribution"]["display_summary"]["completed_trade_count"], 1)
+        self.assertEqual(payload["fill_attribution"]["display_summary"]["estimated_net_realized_pnl"], "2.00")
+        self.assertEqual(payload["fill_attribution"]["archived_summary"]["completed_trade_count"], 1)
+        self.assertEqual(payload["fill_attribution"]["archived_summary"]["estimated_net_realized_pnl"], "5.00")
+        self.assertEqual(payload["fill_attribution"]["strategy_performance"][0]["runtime_id"], "M10-PA-004-MBF-1d")
 
 
 if __name__ == "__main__":

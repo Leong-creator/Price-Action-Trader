@@ -3,6 +3,14 @@
   "universe_id": "m15-us-liquid-300-v1",
   "activation_mode": "readonly_acceptance_first",
   "base_universe_count": 147,
+  "trade_pool_upgrade_gate": {
+    "required_readonly_gate_passed": true,
+    "required_complete_trading_daily_context": true,
+    "required_complete_subscribed_daily_context": true,
+    "required_subscription_coverage": "300/300",
+    "maximum_source_delivery_age_ms": 2000,
+    "target_trading_symbol_limit": 300
+  },
   "symbols": [
     "SPY", "QQQ", "IWM", "DIA", "VTI", "VOO", "IVV", "XLK", "XLF", "XLE",
     "XLV", "XLY", "XLI", "XLP", "XLU", "XLC", "XLB", "SMH", "SOXX", "TQQQ",
