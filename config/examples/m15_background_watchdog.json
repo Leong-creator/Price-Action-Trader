@@ -20,7 +20,8 @@
     "check_interval_seconds": 60,
     "command_timeout_seconds": 30,
     "analytics_refresh_interval_seconds": 300,
-    "analytics_command_timeout_seconds": 90
+    "analytics_command_timeout_seconds": 90,
+    "runtime_recovery_grace_seconds": 20
   },
   "hard_boundaries": {
     "paper_simulated_only": true,

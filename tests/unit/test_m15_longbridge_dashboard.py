@@ -30,6 +30,9 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "runtime_pid": os.getpid(),
             "runtime_engine": "sdk",
             "sdk_connected": True,
+            "market_data_mode": "sdk_snapshot_poll",
+            "market_data_coverage": "300/300",
+            "trading_market_data_coverage": "147/147",
             "configured_symbol_count": 300,
             "subscription_coverage": "300/300",
             "trading_symbol_count": 147,
@@ -190,6 +193,8 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["fill_attribution"]["strategy_performance"][0]["runtime_id"], "R1")
         self.assertTrue(payload["runtime"]["daily_context_complete"])
         self.assertEqual(payload["runtime"]["trading_subscription_coverage"], "147/147")
+        self.assertEqual(payload["runtime"]["market_data_coverage"], "300/300")
+        self.assertEqual(payload["runtime"]["trading_market_data_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["readonly_expansion_subscription_coverage"], "153/153")
         self.assertFalse(payload["pa004_migration"]["enabled"])
         html = (tmp_path / "out.html").read_text(encoding="utf-8")

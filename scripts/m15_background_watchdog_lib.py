@@ -44,6 +44,7 @@ class BackgroundWatchdogConfig:
     command_timeout_seconds: int
     analytics_refresh_interval_seconds: int
     analytics_command_timeout_seconds: int
+    runtime_recovery_grace_seconds: int
     m15_realtime_supervisor_config_path: Path
     m15_runtime_engine: str
     m15_sdk_runtime_config_path: Path
@@ -79,6 +80,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         command_timeout_seconds=int(watchdog.get("command_timeout_seconds", 30)),
         analytics_refresh_interval_seconds=int(watchdog.get("analytics_refresh_interval_seconds", 300)),
         analytics_command_timeout_seconds=int(watchdog.get("analytics_command_timeout_seconds", 90)),
+        runtime_recovery_grace_seconds=int(watchdog.get("runtime_recovery_grace_seconds", 20)),
         m15_realtime_supervisor_config_path=resolve_repo_path(
             inputs.get(
                 "m15_realtime_supervisor_config",
@@ -124,6 +126,8 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog analytics refresh interval must be positive")
     if config.analytics_command_timeout_seconds <= 0:
         raise ValueError("M15 background watchdog analytics command timeout must be positive")
+    if config.runtime_recovery_grace_seconds < 0:
+        raise ValueError("M15 background watchdog runtime recovery grace cannot be negative")
     if config.m15_runtime_engine not in {"cli", "sdk"}:
         raise ValueError("M15 background watchdog runtime engine must be cli or sdk")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
@@ -318,21 +322,43 @@ def m15_runtime_daemon_step(config: BackgroundWatchdogConfig, runner: CommandRun
     )
 
 
-def m15_runtime_status_step(config: BackgroundWatchdogConfig, runner: CommandRunner) -> dict[str, Any]:
+def m15_runtime_status_step(
+    config: BackgroundWatchdogConfig,
+    runner: CommandRunner,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> dict[str, Any]:
     if config.m15_runtime_engine == "sdk":
-        return run_step(
-            "m15_sdk_runtime_status",
-            "M15 长桥 SDK 实时运行层状态",
-            [
-                sys.executable,
-                "scripts/run_m15_longbridge_sdk_runtime.py",
-                "--status",
-                "--config",
-                project_path(config.m15_sdk_runtime_config_path),
-            ],
-            config,
-            runner,
-        )
+        command = [
+            sys.executable,
+            "scripts/run_m15_longbridge_sdk_runtime.py",
+            "--status",
+            "--config",
+            project_path(config.m15_sdk_runtime_config_path),
+        ]
+        started_at = monotonic()
+        attempts = 0
+        while True:
+            step = run_step(
+                "m15_sdk_runtime_status",
+                "M15 长桥 SDK 实时运行层状态",
+                command,
+                config,
+                runner,
+            )
+            attempts += 1
+            if not sdk_runtime_step_is_transient_recovery(step):
+                step["recovery_check_attempts"] = attempts
+                step["recovered_within_grace"] = attempts > 1 and step["returncode"] == 0
+                return step
+            elapsed = monotonic() - started_at
+            if elapsed >= config.runtime_recovery_grace_seconds:
+                step["recovery_check_attempts"] = attempts
+                step["recovered_within_grace"] = False
+                step["recovery_grace_exhausted"] = True
+                return step
+            sleep(min(1.0, config.runtime_recovery_grace_seconds - elapsed))
     return run_step(
         "m15_realtime_status",
         "M15 长桥实时守护器状态",
@@ -346,6 +372,16 @@ def m15_runtime_status_step(config: BackgroundWatchdogConfig, runner: CommandRun
         config,
         runner,
     )
+
+
+def sdk_runtime_step_is_transient_recovery(step: dict[str, Any]) -> bool:
+    if int(step.get("returncode", 0) or 0) != 3:
+        return False
+    reason = str(step.get("stderr_tail") or "")
+    return reason.startswith("sdk_runtime_not_ready:") and reason.split(":", 1)[1] in {
+        "connecting",
+        "reconnecting_market_data_circuit",
+    }
 
 
 def assert_safe_watchdog_command(command: list[str]) -> None:

@@ -10,6 +10,7 @@ from scripts.m15_background_watchdog_lib import (
     analytics_refresh_due,
     load_config,
     run_background_watchdog_once,
+    m15_runtime_status_step,
     should_append_watchdog_ledger,
     start_daemon,
     status,
@@ -250,6 +251,46 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(status_step["returncode"], 3)
             self.assertIn("sdk_runtime_not_ready:connecting", status_step["stderr_tail"])
 
+    def test_sdk_runtime_status_waits_for_transient_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(
+                Path(tmp), runtime_engine="sdk", runtime_recovery_grace_seconds=20
+            )
+            responses = iter(
+                [
+                    {"runtime_process_alive": True, "status": "connecting", "sdk_connected": False},
+                    {"runtime_process_alive": True, "status": "connecting", "sdk_connected": False},
+                    {
+                        "runtime_process_alive": True,
+                        "status": "running",
+                        "sdk_connected": True,
+                        "account_snapshot_healthy": True,
+                    },
+                ]
+            )
+            clock = [0.0]
+
+            def runner(_command: list[str], _timeout: int):
+                return type(
+                    "Result",
+                    (),
+                    {"returncode": 0, "stdout": json.dumps(next(responses)), "stderr": ""},
+                )()
+
+            def sleep(seconds: float) -> None:
+                clock[0] += seconds
+
+            step = m15_runtime_status_step(
+                config,
+                runner,
+                sleep=sleep,
+                monotonic=lambda: clock[0],
+            )
+
+            self.assertEqual(step["returncode"], 0)
+            self.assertEqual(step["recovery_check_attempts"], 3)
+            self.assertTrue(step["recovered_within_grace"])
+
     def test_watchdog_reports_logically_blocked_acceptance_as_needs_attention(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp), runtime_engine="sdk")
@@ -288,7 +329,13 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertIn("opening_readiness_blocked", failed["m15_opening_readiness"])
             self.assertIn("monday_acceptance_blocked", failed["m15_monday_acceptance"])
 
-    def make_config(self, root: Path, *, runtime_engine: str = "sdk"):
+    def make_config(
+        self,
+        root: Path,
+        *,
+        runtime_engine: str = "sdk",
+        runtime_recovery_grace_seconds: int = 0,
+    ):
         payload = {
             "stage": "M15.background_watchdog",
             "inputs": {
@@ -307,6 +354,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
                 "check_interval_seconds": 60,
                 "command_timeout_seconds": 30,
                 "analytics_refresh_interval_seconds": 300,
+                "runtime_recovery_grace_seconds": runtime_recovery_grace_seconds,
             },
             "hard_boundaries": {
                 "paper_simulated_only": True,
