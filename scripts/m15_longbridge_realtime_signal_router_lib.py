@@ -53,6 +53,28 @@ HUNDRED = Decimal("100")
 CONFLUENCE_MAX_MULTIPLIER = Decimal("1.75")
 NEW_YORK = ZoneInfo("America/New_York")
 PRICE_ACTION_REALTIME_DETECTOR = "price_action_realtime_v1"
+SEMICONDUCTOR_RELATIVE_STRENGTH_SYMBOLS = {
+    "AMD",
+    "AMAT",
+    "ARM",
+    "ASML",
+    "AVGO",
+    "INTC",
+    "KLAC",
+    "LRCX",
+    "MCHP",
+    "MPWR",
+    "MRVL",
+    "MU",
+    "NVDA",
+    "NXPI",
+    "ON",
+    "QCOM",
+    "SMH",
+    "SOXX",
+    "TSM",
+    "TXN",
+}
 PRICE_ACTION_RUNTIME_SPECS = {
     "M10-PA-001-1d": {
         "strategy_id": "M10-PA-001",
@@ -214,6 +236,7 @@ class RealtimeSignalRouterConfig:
     market_events_path: Path
     signal_events_path: Path
     test_epoch_state_path: Path
+    capital_bucket_migration_state_path: Path | None
     output_dir: Path
     session_started_at: str
     allowed_runtime_ids: tuple[str, ...]
@@ -279,6 +302,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
         market_events_path=resolve_repo_path(inputs.get("market_events", DEFAULT_MARKET_EVENTS)),
         signal_events_path=resolve_repo_path(inputs.get("signal_events", DEFAULT_SIGNAL_EVENTS)),
         test_epoch_state_path=resolve_repo_path(inputs.get("test_epoch_state", DEFAULT_EPOCH_STATE)),
+        capital_bucket_migration_state_path=(
+            resolve_repo_path(inputs["capital_bucket_migration_state"])
+            if inputs.get("capital_bucket_migration_state")
+            else None
+        ),
         output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
         session_started_at=str(router.get("session_started_at", "")),
         allowed_runtime_ids=tuple(str(item) for item in router.get("allowed_runtime_ids", list(DEFAULT_REALTIME_RUNTIME_IDS))),
@@ -405,6 +433,153 @@ def validate_config(config: RealtimeSignalRouterConfig) -> None:
         raise ValueError("M15 realtime signal router cannot use local simulation as signal source")
 
 
+def load_capital_bucket_migration_state(path: Path | None) -> dict[str, str]:
+    if path is None or not path.exists():
+        return {}
+    payload = read_json(path)
+    states: dict[str, str] = {}
+    candidates: list[dict[str, Any]] = []
+    if isinstance(payload.get("capital_bucket_states"), dict):
+        for bucket_id, row in dict(payload["capital_bucket_states"]).items():
+            if isinstance(row, dict):
+                candidates.append({"capital_bucket": bucket_id, **row})
+            else:
+                candidates.append({"capital_bucket": bucket_id, "status": row})
+    if isinstance(payload.get("capital_buckets"), dict):
+        for bucket_id, row in dict(payload["capital_buckets"]).items():
+            if isinstance(row, dict):
+                candidates.append({"capital_bucket": bucket_id, **row})
+            else:
+                candidates.append({"capital_bucket": bucket_id, "status": row})
+    rows = payload.get("rows") if isinstance(payload.get("rows"), list) else payload.get("items")
+    if isinstance(rows, list):
+        candidates.extend(row for row in rows if isinstance(row, dict))
+    for row in candidates:
+        bucket_id = str(row.get("capital_bucket") or row.get("bucket_id") or "").strip()
+        status = str(row.get("migration_status") or row.get("status") or row.get("state") or "").strip()
+        if bucket_id and status:
+            states[bucket_id] = status
+    return states
+
+
+def annotate_relative_strengths(
+    market_events: list[dict[str, Any]],
+    intents: list[dict[str, Any]],
+) -> None:
+    if not intents or not market_events:
+        return
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    event_index: dict[str, dict[str, Any]] = {}
+    for row in market_events:
+        symbol = str(row.get("symbol") or "").upper()
+        timeframe = str(row.get("timeframe") or "")
+        event_id = str(row.get("event_id") or row.get("market_event_id") or "")
+        if symbol and timeframe:
+            grouped[(symbol, timeframe)].append(row)
+        if event_id:
+            event_index[event_id] = row
+    for rows in grouped.values():
+        rows.sort(key=market_event_sort_key)
+    for intent in intents:
+        metrics = relative_strength_metrics(intent, grouped, event_index)
+        intent.update(metrics)
+
+
+def relative_strength_metrics(
+    intent: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    event_index: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    symbol = str(intent.get("symbol") or "").upper()
+    timeframe = str(intent.get("timeframe") or "")
+    source_event_id = str(intent.get("source_market_event_id") or intent.get("market_event_id") or "")
+    symbol_rows = grouped_events.get((symbol, timeframe), [])
+    latest = event_index.get(source_event_id) if source_event_id else None
+    if latest is None and symbol_rows:
+        latest = symbol_rows[-1]
+    candidate_return = relative_strength_return(symbol_rows, latest)
+    market_returns = [
+        benchmark_return(grouped_events, benchmark, timeframe, latest)
+        for benchmark in ("SPY", "QQQ")
+    ]
+    market_values = [value for value in market_returns if value is not None]
+    market_strength = average_decimal(market_values)
+    sector_applicable = symbol in SEMICONDUCTOR_RELATIVE_STRENGTH_SYMBOLS
+    sector_returns = [
+        benchmark_return(grouped_events, benchmark, timeframe, latest)
+        for benchmark in ("SMH", "SOXX")
+    ] if sector_applicable else []
+    sector_values = [value for value in sector_returns if value is not None]
+    sector_strength = average_decimal(sector_values)
+    stock_vs_market = candidate_return - market_strength if candidate_return is not None and market_strength is not None else None
+    stock_vs_sector = candidate_return - sector_strength if candidate_return is not None and sector_strength is not None else None
+    rank_score = ZERO
+    if stock_vs_market is not None:
+        rank_score += stock_vs_market
+    if sector_strength is not None:
+        rank_score += sector_strength / Decimal("2")
+    if stock_vs_sector is not None:
+        rank_score += stock_vs_sector / Decimal("2")
+    audit_state = "complete" if stock_vs_market is not None and (sector_applicable is False or stock_vs_sector is not None) else "partial"
+    return {
+        "market_relative_strength_percent": fmt_decimal(stock_vs_market) if stock_vs_market is not None else "",
+        "market_strength_percent": fmt_decimal(market_strength) if market_strength is not None else "",
+        "sector_relative_strength_percent": fmt_decimal(stock_vs_sector) if stock_vs_sector is not None else "",
+        "sector_strength_percent": fmt_decimal(sector_strength) if sector_strength is not None else "",
+        "candidate_return_percent": fmt_decimal(candidate_return) if candidate_return is not None else "",
+        "relative_strength_rank_score": fmt_decimal(rank_score),
+        "relative_strength_audit_state": audit_state,
+        "industry_strength_scope": "semiconductor" if sector_applicable else "market_only",
+    }
+
+
+def benchmark_return(
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    symbol: str,
+    timeframe: str,
+    target_row: dict[str, Any] | None,
+) -> Decimal | None:
+    rows = grouped_events.get((symbol, timeframe), [])
+    return relative_strength_return(rows, target_row)
+
+
+def relative_strength_return(
+    rows: list[dict[str, Any]],
+    target_row: dict[str, Any] | None,
+) -> Decimal | None:
+    if len(rows) < 2:
+        return None
+    latest_index = len(rows) - 1
+    if target_row is not None:
+        target_date = ny_event_date(target_row)
+        target_time = parse_optional_utc_datetime(
+            str(target_row.get("event_time") or target_row.get("bar_time") or target_row.get("timestamp") or "")
+        )
+        matched_index: int | None = None
+        for index in range(len(rows) - 1, -1, -1):
+            row = rows[index]
+            if target_date and ny_event_date(row) != target_date:
+                continue
+            row_time = parse_optional_utc_datetime(
+                str(row.get("event_time") or row.get("bar_time") or row.get("timestamp") or "")
+            )
+            if target_time and row_time and abs((row_time - target_time).total_seconds()) > 600:
+                continue
+            matched_index = index
+            break
+        if matched_index is not None:
+            latest_index = matched_index
+    if latest_index <= 0:
+        return None
+    return row_close_to_close_percent(rows[latest_index - 1], rows[latest_index])
+
+
+def average_decimal(values: list[Decimal]) -> Decimal | None:
+    if not values:
+        return None
+    return sum(values, ZERO) / Decimal(len(values))
+
+
 def run_realtime_signal_router(
     config: RealtimeSignalRouterConfig | None = None,
     *,
@@ -440,6 +615,9 @@ def run_realtime_signal_router(
     )
     existing_signal_event_count = len(existing_signal_ids)
     test_epoch_state = normalize_active_epoch_state(read_json(config.test_epoch_state_path))
+    capital_bucket_migration_state = load_capital_bucket_migration_state(
+        config.capital_bucket_migration_state_path
+    )
     ledger_rows: list[dict[str, Any]] = []
     new_signal_events: list[dict[str, Any]] = []
     selected_bucket_exposure: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -456,6 +634,8 @@ def run_realtime_signal_router(
         ]
     raw_intents = expand_additional_bucket_routes(config, raw_intents)
     routed_intents, merged_support_intents = merge_confluence_intents(config, raw_intents)
+    annotate_relative_strengths(market_events, routed_intents)
+    annotate_relative_strengths(market_events, merged_support_intents)
     routed_intents = sorted(routed_intents, key=realtime_intent_sort_key)
     for support_intent in merged_support_intents:
         row, _signal = build_signal_from_intent(
@@ -464,6 +644,7 @@ def run_realtime_signal_router(
             generated_at=now,
             session_started_at=session_started_at,
             test_epoch_state=test_epoch_state,
+            capital_bucket_migration_state=capital_bucket_migration_state,
             existing_signal_ids=existing_signal_ids,
             selected_bucket_exposure=selected_bucket_exposure,
             selected_bucket_symbol_exposure=selected_bucket_symbol_exposure,
@@ -481,6 +662,7 @@ def run_realtime_signal_router(
             generated_at=now,
             session_started_at=session_started_at,
             test_epoch_state=test_epoch_state,
+            capital_bucket_migration_state=capital_bucket_migration_state,
             existing_signal_ids=existing_signal_ids,
             selected_bucket_exposure=selected_bucket_exposure,
             selected_bucket_symbol_exposure=selected_bucket_symbol_exposure,
@@ -602,6 +784,11 @@ def run_realtime_signal_router(
         "inputs": {
             "market_events": project_path(config.market_events_path),
             "test_epoch_state": project_path(config.test_epoch_state_path),
+            "capital_bucket_migration_state": (
+                project_path(config.capital_bucket_migration_state_path)
+                if config.capital_bucket_migration_state_path is not None
+                else ""
+            ),
             "local_simulation_ledger": "",
             "fast_signal_queue": "",
         },
@@ -1817,12 +2004,13 @@ def base_quality_score(
     return min(score, Decimal("100"))
 
 
-def realtime_intent_sort_key(intent: dict[str, Any]) -> tuple[int, str, Decimal, Decimal, Decimal, str]:
+def realtime_intent_sort_key(intent: dict[str, Any]) -> tuple[int, str, Decimal, Decimal, Decimal, Decimal, str]:
     side = str(intent.get("side") or intent.get("direction") or "").lower()
     sell_priority = 0 if side in {"sell", "close", "exit_long", "stop_loss", "take_profit"} else 1
     return (
         sell_priority,
         str(intent.get("capital_bucket") or ""),
+        -decimal(intent.get("relative_strength_rank_score", "0")),
         -decimal(intent.get("quality_score", intent.get("signal_quality_score", "0"))),
         -decimal(intent.get("net_profit_after_fees_at_target", "0")),
         -decimal(intent.get("reward_r", "0")),
@@ -1996,6 +2184,7 @@ def build_signal_from_intent(
     generated_at: datetime,
     session_started_at: str,
     test_epoch_state: dict[str, Any],
+    capital_bucket_migration_state: dict[str, str],
     existing_signal_ids: set[str],
     selected_bucket_exposure: dict[str, Decimal],
     selected_bucket_symbol_exposure: dict[tuple[str, str], Decimal],
@@ -2104,10 +2293,12 @@ def build_signal_from_intent(
     net_profit = gross_profit - fees
     reward_r = short_reward_r_ratio(entry, stop, target) if is_short else reward_r_ratio(entry, stop, target)
     intent_quality_score = decimal(intent.get("quality_score", intent.get("signal_quality_score", "0")))
+    relative_strength_rank_score = decimal(intent.get("relative_strength_rank_score", "0"))
     minimum_reward_r = runtime_minimum_reward_r(config, runtime_id, strategy_id)
     minimum_net_profit = runtime_minimum_net_profit(config, runtime_id, strategy_id)
     minimum_quality_score = decimal(intent.get("minimum_quality_score", "0")) if is_short else ZERO
     profit_gate_status = profit_quality_gate(config, intent, net_profit, runtime_id, strategy_id)
+    capital_bucket_migration_status = capital_bucket_migration_state.get(capital_bucket, "")
     if risk_amount > runtime_max_risk:
         blockers.append("blocked_risk_over_cap")
     bucket_symbol_key = (capital_bucket, symbol)
@@ -2123,6 +2314,12 @@ def build_signal_from_intent(
         blockers.append("blocked_reward_r_below_minimum")
     if is_short and intent_quality_score < minimum_quality_score:
         blockers.append("blocked_short_quality_score_below_minimum")
+    if (
+        capital_bucket_migration_status == "pending_cleanup"
+        and capital_bucket in {"pa004_mbf", "pa004_mbf_qc"}
+        and intent_is_open_entry(intent)
+    ):
+        blockers.append("blocked_capital_bucket_pending_cleanup")
     status = "signal_event_ready" if not blockers else blockers[0]
     row = {
         "stage": config.stage,
@@ -2155,6 +2352,14 @@ def build_signal_from_intent(
         "reward_r": fmt_decimal(reward_r),
         "quality_score": fmt_decimal(intent_quality_score),
         "signal_quality_score": fmt_decimal(intent_quality_score),
+        "relative_strength_rank_score": fmt_decimal(relative_strength_rank_score),
+        "market_relative_strength_percent": str(intent.get("market_relative_strength_percent") or ""),
+        "market_strength_percent": str(intent.get("market_strength_percent") or ""),
+        "sector_relative_strength_percent": str(intent.get("sector_relative_strength_percent") or ""),
+        "sector_strength_percent": str(intent.get("sector_strength_percent") or ""),
+        "candidate_return_percent": str(intent.get("candidate_return_percent") or ""),
+        "relative_strength_audit_state": str(intent.get("relative_strength_audit_state") or ""),
+        "industry_strength_scope": str(intent.get("industry_strength_scope") or ""),
         "quality_score_components": intent.get("quality_score_components", {})
         if isinstance(intent.get("quality_score_components"), dict)
         else {},
@@ -2177,6 +2382,7 @@ def build_signal_from_intent(
         "confluence_support_runtime_ids": list(intent.get("confluence_support_runtime_ids", []))
         if isinstance(intent.get("confluence_support_runtime_ids"), list)
         else [],
+        "capital_bucket_migration_status": capital_bucket_migration_status,
         "additional_bucket_route": bool(intent.get("additional_bucket_route", False)),
         "primary_capital_bucket": str(intent.get("primary_capital_bucket") or ""),
         "test_epoch_id": epoch_id,
@@ -2231,6 +2437,14 @@ def build_signal_from_intent(
         "reward_r": fmt_decimal(reward_r),
         "quality_score": fmt_decimal(intent_quality_score),
         "signal_quality_score": fmt_decimal(intent_quality_score),
+        "relative_strength_rank_score": fmt_decimal(relative_strength_rank_score),
+        "market_relative_strength_percent": str(intent.get("market_relative_strength_percent") or ""),
+        "market_strength_percent": str(intent.get("market_strength_percent") or ""),
+        "sector_relative_strength_percent": str(intent.get("sector_relative_strength_percent") or ""),
+        "sector_strength_percent": str(intent.get("sector_strength_percent") or ""),
+        "candidate_return_percent": str(intent.get("candidate_return_percent") or ""),
+        "relative_strength_audit_state": str(intent.get("relative_strength_audit_state") or ""),
+        "industry_strength_scope": str(intent.get("industry_strength_scope") or ""),
         "quality_score_components": intent.get("quality_score_components", {})
         if isinstance(intent.get("quality_score_components"), dict)
         else {},
@@ -2256,6 +2470,7 @@ def build_signal_from_intent(
         "confluence_support_strategy_ids": list(intent.get("confluence_support_strategy_ids", []))
         if isinstance(intent.get("confluence_support_strategy_ids"), list)
         else [],
+        "capital_bucket_migration_status": capital_bucket_migration_status,
         "additional_bucket_route": bool(intent.get("additional_bucket_route", False)),
         "primary_capital_bucket": str(intent.get("primary_capital_bucket") or ""),
         "source_market_event_id": source_event_id,
@@ -2428,6 +2643,16 @@ def intent_is_high_quality(intent: dict[str, Any]) -> bool:
     if ZERO < score <= Decimal("1"):
         return score >= Decimal("0.8")
     return score >= Decimal("80")
+
+
+def intent_is_open_entry(intent: dict[str, Any]) -> bool:
+    position_action = str(intent.get("position_action") or "").strip().lower()
+    if position_action:
+        return position_action.startswith("open")
+    side = str(intent.get("side") or "").strip().lower()
+    if side in {"sell", "close", "exit_long", "stop_loss", "take_profit"}:
+        return False
+    return True
 
 
 def int_decimal(value: Any) -> int:

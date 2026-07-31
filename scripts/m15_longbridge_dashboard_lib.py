@@ -6,6 +6,13 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
+
+from scripts.m15_longbridge_fill_attribution_lib import (
+    build_virtual_position_layers,
+    group_completed_trade_performance_rows,
+    summarize_completed_trade_rows,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +22,9 @@ DEFAULT_FILL_ATTRIBUTION_PATH = (
     / "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/"
     "m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json"
 )
+DEFAULT_PA004_MIGRATION_STATUS_NAME = "m15_capital_bucket_migration_state.json"
+PA004_MIGRATION_BUCKETS = {"pa004_mbf", "pa004_mbf_qc"}
+NEW_YORK = ZoneInfo("America/New_York")
 
 
 def _resolve(path: str | Path) -> Path:
@@ -28,6 +38,12 @@ def _read_json(path: Path) -> dict[str, Any]:
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _read_optional_json(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
+    return _read_json(path)
 
 
 def _read_recent_jsonl(path: Path, maximum_rows: int = 5000) -> list[dict[str, Any]]:
@@ -228,6 +244,99 @@ def _local_inventory(registry: dict[str, Any]) -> dict[str, int]:
     }
 
 
+def _derive_migration_status_path(config: dict[str, Any], fill_attribution_path: Path) -> Path:
+    configured = (config.get("inputs") or {}).get("pa004_migration_status")
+    if configured:
+        return _resolve(configured)
+    return fill_attribution_path.parent / DEFAULT_PA004_MIGRATION_STATUS_NAME
+
+
+def _holding_rows(account: dict[str, Any], pnl: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = account.get("positions") if isinstance(account.get("positions"), list) else []
+    if rows:
+        return [dict(row) for row in rows if isinstance(row, dict)]
+    rows = pnl.get("current_holdings") if isinstance(pnl.get("current_holdings"), list) else []
+    return [dict(row) for row in rows if isinstance(row, dict)]
+
+
+def _parse_iso_utc(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _trade_baseline_timestamp(row: dict[str, Any]) -> datetime | None:
+    return _parse_iso_utc(row.get("opened_at")) or _parse_iso_utc(row.get("closed_at"))
+
+
+def _apply_pa004_migration_views(
+    fill_attribution: dict[str, Any],
+    migration_status: dict[str, Any],
+) -> dict[str, Any]:
+    completed_trades = [
+        dict(row) for row in fill_attribution.get("completed_trades", []) if isinstance(row, dict)
+    ]
+    bucket_baselines = migration_status.get("bucket_baselines") if isinstance(migration_status.get("bucket_baselines"), dict) else {}
+    active_baselines = {
+        bucket: started_at
+        for bucket, payload in bucket_baselines.items()
+        if bucket in PA004_MIGRATION_BUCKETS
+        and isinstance(payload, dict)
+        and str(payload.get("started_at") or "")
+        for started_at in [str(payload.get("started_at") or "")]
+    }
+    if not active_baselines or not completed_trades:
+        return {
+            "display_summary": dict(fill_attribution.get("summary") or {}),
+            "display_strategy_performance": list(fill_attribution.get("strategy_performance") or []),
+            "display_bucket_performance": list(fill_attribution.get("bucket_performance") or []),
+            "display_recent_completed_trades": list(fill_attribution.get("completed_trades") or [])[-50:],
+            "archived_summary": summarize_completed_trade_rows([]),
+            "archived_strategy_performance": [],
+            "archived_bucket_performance": [],
+            "archived_recent_completed_trades": [],
+            "active_bucket_baselines": active_baselines,
+        }
+
+    display_rows: list[dict[str, Any]] = []
+    archived_rows: list[dict[str, Any]] = []
+    for row in completed_trades:
+        bucket = str(row.get("capital_bucket") or "")
+        started_at = active_baselines.get(bucket)
+        if not started_at:
+            display_rows.append(row)
+            continue
+        baseline = _parse_iso_utc(started_at)
+        trade_timestamp = _trade_baseline_timestamp(row)
+        if baseline is not None and trade_timestamp is not None and trade_timestamp >= baseline:
+            display_rows.append(row)
+        else:
+            archived_rows.append(row)
+    display_normal = [row for row in display_rows if not bool(row.get("fault_day"))]
+    archived_normal = [row for row in archived_rows if not bool(row.get("fault_day"))]
+    return {
+        "display_summary": {
+            **summarize_completed_trade_rows(display_rows),
+            "exit_fill_event_count": sum(int(row.get("exit_fill_event_count") or 0) for row in display_rows),
+        },
+        "display_strategy_performance": group_completed_trade_performance_rows(display_normal, "runtime_id"),
+        "display_bucket_performance": group_completed_trade_performance_rows(display_normal, "capital_bucket"),
+        "display_recent_completed_trades": display_rows[-50:],
+        "archived_summary": {
+            **summarize_completed_trade_rows(archived_rows),
+            "exit_fill_event_count": sum(int(row.get("exit_fill_event_count") or 0) for row in archived_rows),
+        },
+        "archived_strategy_performance": group_completed_trade_performance_rows(archived_normal, "runtime_id"),
+        "archived_bucket_performance": group_completed_trade_performance_rows(archived_normal, "capital_bucket"),
+        "archived_recent_completed_trades": archived_rows[-50:],
+        "active_bucket_baselines": active_baselines,
+    }
+
+
 def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> dict[str, Any]:
     inputs = config["inputs"]
     runtime = _read_json(_resolve(inputs["sdk_runtime_status"]))
@@ -246,7 +355,8 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     short_diagnostics = _read_json(_resolve(inputs["short_signal_diagnostics"])) if inputs.get("short_signal_diagnostics") else {}
     pnl = _read_json(_resolve(inputs["pnl_reconciliation"]))
     execution_config = _read_json(_resolve(inputs["execution_config"]))
-    local_registry = _read_json(_resolve(inputs["local_runtime_registry"]))
+    fill_attribution_path = _resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH)
+    migration_status = _read_optional_json(_derive_migration_status_path(config, fill_attribution_path))
     short_diagnostics = _merge_short_execution_funnel(
         short_diagnostics,
         execution_ledger,
@@ -330,6 +440,28 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         if trading_sources_trustworthy
         else "temporarily_unavailable"
     )
+    market_date = now.astimezone(NEW_YORK).date().isoformat()
+    holding_rows = _holding_rows(account, pnl)
+    if fill_attribution_fresh:
+        fill_attribution = {
+            **fill_attribution,
+            "position_layers": build_virtual_position_layers(
+                fill_attribution,
+                holding_rows,
+                market_date=market_date,
+            ),
+        }
+    migration_views = _apply_pa004_migration_views(fill_attribution, migration_status) if fill_attribution_fresh else {
+        "display_summary": {"status": "stale_source_blocked"},
+        "display_strategy_performance": [],
+        "display_bucket_performance": [],
+        "display_recent_completed_trades": [],
+        "archived_summary": {"status": "stale_source_blocked"},
+        "archived_strategy_performance": [],
+        "archived_bucket_performance": [],
+        "archived_recent_completed_trades": [],
+        "active_bucket_baselines": {},
+    }
     return {
         "schema_version": "1.0",
         "stage": "M15.longbridge_dashboard",
@@ -418,20 +550,32 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "generated_at": fill_attribution.get("generated_at"),
             "age_seconds": fill_attribution_age,
             "summary": fill_attribution.get("summary") if fill_attribution_fresh else {"status": "stale_source_blocked"},
+            "display_summary": migration_views["display_summary"],
+            "archived_summary": migration_views["archived_summary"],
             "fee_model": fill_attribution.get("fee_model") if fill_attribution_fresh else None,
             "strategy_performance": (
-                fill_attribution.get("strategy_performance") or []
+                migration_views["display_strategy_performance"]
             ) if fill_attribution_fresh else [],
             "bucket_performance": (
-                fill_attribution.get("bucket_performance") or []
+                migration_views["display_bucket_performance"]
+            ) if fill_attribution_fresh else [],
+            "archived_strategy_performance": (
+                migration_views["archived_strategy_performance"]
+            ) if fill_attribution_fresh else [],
+            "archived_bucket_performance": (
+                migration_views["archived_bucket_performance"]
             ) if fill_attribution_fresh else [],
             "recent_completed_trades": (
-                list(fill_attribution.get("completed_trades") or [])[-50:]
+                migration_views["display_recent_completed_trades"]
+            ) if fill_attribution_fresh else [],
+            "archived_recent_completed_trades": (
+                migration_views["archived_recent_completed_trades"]
             ) if fill_attribution_fresh else [],
             "symbol_mismatch_count": sum(
                 1 for row in fill_attribution.get("symbol_checks", [])
                 if isinstance(row, dict) and not bool(row.get("matches_broker_net"))
             ) if fill_attribution_fresh else None,
+            "position_layers": fill_attribution.get("position_layers") if fill_attribution_fresh else None,
             "strategy_metrics_trustworthy": bool(
                 fill_attribution_fresh
                 and not fill_attribution.get("anomalies")
@@ -456,13 +600,15 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "recent_decisions": list(short_diagnostics.get("decision_rows") or [])[-20:],
         },
         "strategy_inventory": inventory,
-        "inventory_interface": {
-            **_local_inventory(local_registry),
-            "longbridge_tradable_runtime_count": inventory["runtime_count"],
+        "pa004_migration": {
+            "status_file": str(_derive_migration_status_path(config, fill_attribution_path)),
+            "active_bucket_baselines": migration_views["active_bucket_baselines"],
+            "raw": migration_status if migration_status else {},
+            "enabled": bool(migration_views["active_bucket_baselines"]),
         },
         "notes": [
             "所有长桥成绩只统计长桥实际订单、成交和持仓。",
-            "本地研究与修复系统不参与长桥启动、风控、下单或盈亏。",
+            "看板不读取本地模拟账本或本地策略 registry，只展示长桥事实源与归因层。",
             "正式测试未激活时，配置中的运行单元全部禁止新开仓。",
         ],
     }
@@ -479,11 +625,19 @@ const d={data}; const v=x=>x===null||x===undefined||x===''?'暂不可计算':x;
 const cls=d.data_status==='trustworthy'?'ok':'bad';
 const statusText={{trustworthy:'全部数据正常',sdk_starting_daily_context:'日线装载中，暂不允许新开仓',trading_ready_statistics_stale:'交易核心正常，统计待刷新',temporarily_unavailable:'数据暂不可用',pending_flatten:'等待清理旧持仓',active:'正式测试运行中'}};
 const money=(value,currency)=>value===null||value===undefined||value===''?'暂不可计算':`${{value}} ${{currency||''}}`.trim();
-const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['总订阅标的',`${{v(d.runtime.subscribed_symbol_count)}}/${{v(d.runtime.configured_symbol_count)}}`],['交易股票池',v(d.runtime.trading_subscription_coverage)],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['持仓',d.account.position_count],['挂单',d.account.open_order_count],['完整交易（全部）',d.fill_attribution.summary?.completed_trade_count],['正常日完整交易',d.fill_attribution.summary?.normal_completed_trade_count],['故障日完整交易',d.fill_attribution.summary?.fault_day_completed_trade_count],['平仓成交事件',d.fill_attribution.summary?.exit_fill_event_count],['全部扣费后已实现',d.fill_attribution.summary?.estimated_net_realized_pnl],['正常日扣费后已实现',d.fill_attribution.summary?.normal_estimated_net_realized_pnl],['故障日扣费后已实现',d.fill_attribution.summary?.fault_day_estimated_net_realized_pnl],['估算交易费用',d.fill_attribution.summary?.estimated_fees],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['父级策略',d.inventory_interface.parent_strategy_count],['本地运行单元',d.inventory_interface.local_runtime_count],['长桥运行单元',d.inventory_interface.longbridge_tradable_runtime_count],['辅助模块',d.inventory_interface.auxiliary_module_count]];
+const positionLayers=d.fill_attribution.position_layers||{{}};
+const displaySummary=d.fill_attribution.display_summary||{{}};
+const archivedSummary=d.fill_attribution.archived_summary||{{}};
+const migrationSummary=Object.entries(d.pa004_migration.active_bucket_baselines||{{}}).map(([bucket,startedAt])=>`${{bucket}}: ${{startedAt}}`).join('；')||'未启用';
+const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['总订阅标的',`${{v(d.runtime.subscribed_symbol_count)}}/${{v(d.runtime.configured_symbol_count)}}`],['交易股票池',v(d.runtime.trading_subscription_coverage)],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
 const shortRows=d.paper_short_diagnostics.runtime_summaries||[];
 const performanceRows=d.fill_attribution.strategy_performance||[];
 const bucketPerformanceRows=d.fill_attribution.bucket_performance||[];
-document.getElementById('app').innerHTML=`<section class=\"grid\">${{cards.map(x=>`<div class=\"card\"><div>${{x[0]}}</div><div class=\"v ${{x[0]==='数据状态'?cls:''}}\">${{v(x[1])}}</div></div>`).join('')}}</section><h2>策略实际成交成绩（排除故障日）</h2><table><thead><tr><th>运行单元</th><th>完整交易</th><th>扣费后胜率</th><th>毛盈亏</th><th>估算费用</th><th>扣费后盈亏</th><th>扣费后盈利因子</th><th>最大回撤</th></tr></thead><tbody>${{performanceRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.completed_trade_count)}}</td><td>${{v(x.win_rate_after_estimated_fees_pct)}}%</td><td>${{v(x.gross_realized_pnl)}}</td><td>${{v(x.estimated_fees)}}</td><td>${{v(x.estimated_net_realized_pnl)}}</td><td>${{v(x.profit_factor_after_estimated_fees)}}</td><td>${{v(x.maximum_drawdown_after_estimated_fees)}}</td></tr>`).join('')}}</tbody></table><h2>分仓实际成交成绩（排除故障日）</h2><table><thead><tr><th>资金池</th><th>完整交易</th><th>扣费后胜率</th><th>毛盈亏</th><th>估算费用</th><th>扣费后盈亏</th><th>扣费后盈利因子</th><th>最大回撤</th></tr></thead><tbody>${{bucketPerformanceRows.map(x=>`<tr><td>${{v(x.capital_bucket)}}</td><td>${{v(x.completed_trade_count)}}</td><td>${{v(x.win_rate_after_estimated_fees_pct)}}%</td><td>${{v(x.gross_realized_pnl)}}</td><td>${{v(x.estimated_fees)}}</td><td>${{v(x.estimated_net_realized_pnl)}}</td><td>${{v(x.profit_factor_after_estimated_fees)}}</td><td>${{v(x.maximum_drawdown_after_estimated_fees)}}</td></tr>`).join('')}}</tbody></table><p>费用为配置中的保守估算；长桥未提供可直接核对的实际费用字段时，不把估算冒充券商实际费用。故障日成交保留在全部成绩和审计记录中，但不进入当前策略评价。</p><h2>策略与虚拟仓</h2><table><thead><tr><th>仓位</th><th>方向</th><th>运行单元</th><th>资金</th><th>敞口上限</th></tr></thead><tbody>${{d.strategy_inventory.buckets.map(x=>`<tr><td>${{x.label}}</td><td>${{x.direction==='short'?'做空':'做多'}}</td><td>${{x.runtime_ids.join(', ')}}</td><td>${{v(x.equity)}}</td><td>${{v(x.max_total_exposure)}}</td></tr>`).join('')}}</tbody></table><h2>做空信号诊断</h2><table><thead><tr><th>策略运行单元</th><th>结构候选</th><th>路由通过</th><th>容量检查</th><th>容量阻断</th><th>订单号</th><th>实际成交</th><th>主要原因</th></tr></thead><tbody>${{shortRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.broker_capacity_checked_count)}}</td><td>${{v(x.broker_capacity_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.blockers||{{}}),...(x.broker_capacity_blockers||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table>`;
+const runtimeOpenRows=positionLayers.runtime_rows||[];
+const bucketOpenRows=positionLayers.bucket_rows||[];
+const concentrationRows=(positionLayers.cross_bucket_concentration||[]).filter(x=>Number(x.bucket_count||0)>1);
+const symbolRows=(positionLayers.symbol_rows||[]).filter(x=>x.unreconciled_net_quantity!=='0.0000'||x.unreconciled_gross_market_value!=='0.00');
+document.getElementById('app').innerHTML=`<section class=\"grid\">${{cards.map(x=>`<div class=\"card\"><div>${{x[0]}}</div><div class=\"v ${{x[0]==='数据状态'?cls:''}}\">${{v(x[1])}}</div></div>`).join('')}}</section><h2>策略实际成交成绩（默认按新基线展示，排除故障日）</h2><table><thead><tr><th>运行单元</th><th>完整交易</th><th>扣费后胜率</th><th>毛盈亏</th><th>估算费用</th><th>扣费后盈亏</th><th>扣费后盈利因子</th><th>最大回撤</th></tr></thead><tbody>${{performanceRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.completed_trade_count)}}</td><td>${{v(x.win_rate_after_estimated_fees_pct)}}%</td><td>${{v(x.gross_realized_pnl)}}</td><td>${{v(x.estimated_fees)}}</td><td>${{v(x.estimated_net_realized_pnl)}}</td><td>${{v(x.profit_factor_after_estimated_fees)}}</td><td>${{v(x.maximum_drawdown_after_estimated_fees)}}</td></tr>`).join('')}}</tbody></table><h2>分仓实际成交成绩（默认按新基线展示，排除故障日）</h2><table><thead><tr><th>资金池</th><th>完整交易</th><th>扣费后胜率</th><th>毛盈亏</th><th>估算费用</th><th>扣费后盈亏</th><th>扣费后盈利因子</th><th>最大回撤</th></tr></thead><tbody>${{bucketPerformanceRows.map(x=>`<tr><td>${{v(x.capital_bucket)}}</td><td>${{v(x.completed_trade_count)}}</td><td>${{v(x.win_rate_after_estimated_fees_pct)}}%</td><td>${{v(x.gross_realized_pnl)}}</td><td>${{v(x.estimated_fees)}}</td><td>${{v(x.estimated_net_realized_pnl)}}</td><td>${{v(x.profit_factor_after_estimated_fees)}}</td><td>${{v(x.maximum_drawdown_after_estimated_fees)}}</td></tr>`).join('')}}</tbody></table><h2>当前持仓三层口径</h2><table><thead><tr><th>层级</th><th>净数量</th><th>市值</th><th>持仓浮盈</th><th>说明</th></tr></thead><tbody><tr><td>真实账户总口径</td><td>${{v(positionLayers.actual_account_total?.net_quantity)}}</td><td>${{v(positionLayers.actual_account_total?.gross_market_value)}}</td><td>${{v(positionLayers.actual_account_total?.unrealized_pnl)}}</td><td>只用长桥实际持仓价格</td></tr><tr><td>策略虚拟归因汇总</td><td>${{v(positionLayers.attributed_virtual_total?.net_quantity)}}</td><td>${{v(positionLayers.attributed_virtual_total?.gross_market_value)}}</td><td>${{v(positionLayers.attributed_virtual_total?.unrealized_pnl)}}</td><td>按虚拟批次乘长桥实际持仓价格</td></tr><tr><td>无法归因/对账差额</td><td>${{v(positionLayers.unreconciled_delta?.net_quantity)}}</td><td>${{v(positionLayers.unreconciled_delta?.gross_market_value)}}</td><td>${{v(positionLayers.unreconciled_delta?.unrealized_pnl)}}</td><td>真实账户减虚拟归因</td></tr></tbody></table><h2>分仓当前持仓浮盈</h2><table><thead><tr><th>资金池</th><th>批次数</th><th>净数量</th><th>当前市值</th><th>当前浮盈</th></tr></thead><tbody>${{bucketOpenRows.map(x=>`<tr><td>${{v(x.capital_bucket)}}</td><td>${{v(x.batch_count)}}</td><td>${{v(x.net_quantity)}}</td><td>${{v(x.gross_market_value)}}</td><td>${{v(x.unrealized_pnl)}}</td></tr>`).join('')}}</tbody></table><h2>策略当前持仓浮盈</h2><table><thead><tr><th>运行单元</th><th>批次数</th><th>净数量</th><th>当前市值</th><th>当前浮盈</th></tr></thead><tbody>${{runtimeOpenRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.batch_count)}}</td><td>${{v(x.net_quantity)}}</td><td>${{v(x.gross_market_value)}}</td><td>${{v(x.unrealized_pnl)}}</td></tr>`).join('')}}</tbody></table><h2>同标的跨仓集中度</h2><table><thead><tr><th>标的</th><th>涉及分仓</th><th>涉及运行单元</th><th>虚拟归因市值</th><th>占全部虚拟持仓</th><th>分仓拆分</th></tr></thead><tbody>${{concentrationRows.map(x=>`<tr><td>${{v(x.symbol)}}</td><td>${{v(x.bucket_count)}}</td><td>${{v(x.runtime_count)}}</td><td>${{v(x.gross_market_value)}}</td><td>${{v(x.share_of_virtual_gross_exposure_pct)}}%</td><td>${{(x.bucket_breakdown||[]).map(y=>`${{y.capital_bucket}} ${{y.gross_market_value}}`).join('；')}}</td></tr>`).join('')}}</tbody></table><h2>无法归因/对账差额明细</h2><table><thead><tr><th>标的</th><th>真实净数量</th><th>虚拟净数量</th><th>净数量差额</th><th>市值差额</th><th>浮盈差额</th></tr></thead><tbody>${{symbolRows.map(x=>`<tr><td>${{v(x.symbol)}}</td><td>${{v(x.actual_net_quantity)}}</td><td>${{v(x.attributed_net_quantity)}}</td><td>${{v(x.unreconciled_net_quantity)}}</td><td>${{v(x.unreconciled_gross_market_value)}}</td><td>${{v(x.unreconciled_unrealized_pnl)}}</td></tr>`).join('')}}</tbody></table><p>费用为配置中的保守估算；长桥未提供可直接核对的实际费用字段时，不把估算冒充券商实际费用。未成交、取消、拒绝订单不进入成绩。PA004 若存在迁移状态文件，则默认展示新基线之后的成绩，旧成绩保留为归档。</p><h2>策略与虚拟仓</h2><table><thead><tr><th>仓位</th><th>方向</th><th>运行单元</th><th>资金</th><th>敞口上限</th></tr></thead><tbody>${{d.strategy_inventory.buckets.map(x=>`<tr><td>${{x.label}}</td><td>${{x.direction==='short'?'做空':'做多'}}</td><td>${{x.runtime_ids.join(', ')}}</td><td>${{v(x.equity)}}</td><td>${{v(x.max_total_exposure)}}</td></tr>`).join('')}}</tbody></table><h2>做空信号诊断</h2><table><thead><tr><th>策略运行单元</th><th>结构候选</th><th>路由通过</th><th>容量检查</th><th>容量阻断</th><th>订单号</th><th>实际成交</th><th>主要原因</th></tr></thead><tbody>${{shortRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.broker_capacity_checked_count)}}</td><td>${{v(x.broker_capacity_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.blockers||{{}}),...(x.broker_capacity_blockers||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table>`;
 </script></main></body></html>"""
 
 

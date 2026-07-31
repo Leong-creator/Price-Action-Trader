@@ -6,6 +6,7 @@ from decimal import Decimal
 from scripts.m15_longbridge_fill_attribution_lib import (
     add_completed_trade_performance,
     apply_account_reconciliation_adjustments,
+    build_virtual_position_layers,
     rebuild_fill_attribution,
     rebuild_fill_attribution_from_history,
 )
@@ -533,6 +534,162 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
         self.assertFalse(exit_event["include_in_strategy_performance"])
         self.assertEqual(result["anomalies"][0]["code"], "exit_quantity_exceeds_open_batch")
         self.assertEqual(batch["remaining_quantity"], "2.0000")
+
+    def test_virtual_position_layers_use_actual_holding_prices_and_show_reconciliation_delta(self) -> None:
+        payload = add_completed_trade_performance(
+            rebuild_fill_attribution(
+                [
+                    self.local_row(
+                        order_id="aapl-open-a",
+                        signal_id="aapl-open-a",
+                        symbol="AAPL",
+                        side="buy",
+                        quantity="2",
+                        runtime_id="R1",
+                        capital_bucket="bucket-a",
+                        test_epoch_id="formal-epoch",
+                        position_action="open_long",
+                    ),
+                    self.local_row(
+                        order_id="aapl-open-b",
+                        signal_id="aapl-open-b",
+                        symbol="AAPL",
+                        side="buy",
+                        quantity="3",
+                        runtime_id="R2",
+                        capital_bucket="bucket-b",
+                        test_epoch_id="formal-epoch",
+                        position_action="open_long",
+                    ),
+                    self.local_row(
+                        order_id="msft-open",
+                        signal_id="msft-open",
+                        symbol="MSFT",
+                        side="buy",
+                        quantity="1",
+                        runtime_id="R3",
+                        capital_bucket="bucket-c",
+                        test_epoch_id="formal-epoch",
+                        position_action="open_long",
+                    ),
+                    self.local_row(
+                        order_id="msft-exit",
+                        signal_id="msft-exit",
+                        symbol="MSFT",
+                        side="sell",
+                        quantity="1",
+                        runtime_id="R3",
+                        capital_bucket="bucket-c",
+                        test_epoch_id="formal-epoch",
+                        position_action="take_profit",
+                        source_open_order_id="msft-open",
+                        source_open_trade_id="msft-trade",
+                    ),
+                ],
+                [
+                    self.broker_row(
+                        order_id="aapl-open-a",
+                        trade_id="aapl-trade-a",
+                        symbol="AAPL.US",
+                        side="Buy",
+                        status="Filled",
+                        executed_quantity="2",
+                        executed_price="100",
+                        created_at="2026-07-31T14:30:00Z",
+                    ),
+                    self.broker_row(
+                        order_id="aapl-open-b",
+                        trade_id="aapl-trade-b",
+                        symbol="AAPL.US",
+                        side="Buy",
+                        status="Filled",
+                        executed_quantity="3",
+                        executed_price="101",
+                        created_at="2026-07-31T14:35:00Z",
+                    ),
+                    self.broker_row(
+                        order_id="msft-open",
+                        trade_id="msft-trade",
+                        symbol="MSFT.US",
+                        side="Buy",
+                        status="Filled",
+                        executed_quantity="1",
+                        executed_price="200",
+                        created_at="2026-07-31T14:40:00Z",
+                    ),
+                    self.broker_row(
+                        order_id="msft-exit",
+                        trade_id="msft-exit-trade",
+                        symbol="MSFT.US",
+                        side="Sell",
+                        status="Filled",
+                        executed_quantity="1",
+                        executed_price="210",
+                        created_at="2026-07-31T15:00:00Z",
+                    ),
+                ],
+                broker_net_positions={"AAPL": "6"},
+            ),
+            commission_per_order_side=Decimal("1.99"),
+            regulatory_fee_per_sell_order=Decimal("0.02"),
+        )
+        payload["completed_trades"][0]["open_market_date"] = "2026-07-31"
+        payload["completed_trades"][0]["opened_at"] = "2026-07-31T14:40:00Z"
+        for batch in payload["batches"]:
+            batch.setdefault("metadata", {})
+            batch["metadata"]["submitted_at"] = "2026-07-31T14:30:00Z"
+
+        layers = build_virtual_position_layers(
+            payload,
+            [
+                {"symbol": "AAPL.US", "quantity": "6", "cost_price": "99", "market_price": "110", "unrealized_pnl": "66.00"},
+                {"symbol": "TSLA.US", "quantity": "1", "cost_price": "250", "market_price": "260", "unrealized_pnl": "10.00"},
+            ],
+            market_date="2026-07-31",
+        )
+
+        self.assertEqual(layers["actual_account_total"]["gross_market_value"], "920.00")
+        self.assertEqual(layers["attributed_virtual_total"]["gross_market_value"], "550.00")
+        self.assertEqual(layers["attributed_virtual_total"]["unrealized_pnl"], "47.00")
+        self.assertEqual(layers["unreconciled_delta"]["gross_market_value"], "370.00")
+        self.assertEqual(layers["today_buy_flow"]["bought_then_sold_count"], 1)
+        self.assertEqual(layers["today_buy_flow"]["still_held_batch_count"], 2)
+        self.assertEqual(layers["today_buy_flow"]["still_held_unrealized_pnl"], "47.00")
+        self.assertEqual(layers["cross_bucket_concentration"][0]["symbol"], "AAPL")
+        self.assertEqual(layers["cross_bucket_concentration"][0]["bucket_count"], 2)
+        aapl_row = next(row for row in layers["symbol_rows"] if row["symbol"] == "AAPL")
+        self.assertEqual(aapl_row["actual_net_quantity"], "6.0000")
+        self.assertEqual(aapl_row["attributed_net_quantity"], "5.0000")
+        self.assertEqual(aapl_row["unreconciled_net_quantity"], "1.0000")
+        tsla_row = next(row for row in layers["symbol_rows"] if row["symbol"] == "TSLA")
+        self.assertEqual(tsla_row["attributed_net_quantity"], "0.0000")
+        self.assertEqual(tsla_row["unreconciled_gross_market_value"], "260.00")
+
+    def test_virtual_position_layers_do_not_fake_valuation_when_broker_price_missing(self) -> None:
+        payload = {
+            "batches": [
+                {
+                    "batch_id": "epoch|bucket-a|R1|long|AAPL|open-1|trade-1",
+                    "capital_bucket": "bucket-a",
+                    "runtime_id": "R1",
+                    "direction": "long",
+                    "symbol": "AAPL",
+                    "remaining_quantity": "2",
+                    "open_price": "100",
+                }
+            ],
+            "completed_trades": [],
+        }
+        layers = build_virtual_position_layers(
+            payload,
+            [{"symbol": "AAPL.US", "quantity": "2", "cost_price": "100"}],
+        )
+
+        self.assertFalse(layers["actual_account_total"]["valuation_available"])
+        self.assertEqual(layers["actual_account_total"]["gross_market_value"], "")
+        self.assertEqual(layers["actual_account_total"]["unrealized_pnl"], "")
+        self.assertEqual(layers["unreconciled_delta"]["net_quantity"], "0.0000")
+        self.assertEqual(layers["unreconciled_delta"]["gross_market_value"], "")
 
     @staticmethod
     def local_row(

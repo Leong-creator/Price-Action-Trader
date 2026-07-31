@@ -370,6 +370,7 @@ def trading_market_events(
     return [
         row
         for row in rows
+        if not str(row.get("market_data_blocked_reason") or "")
         if f"{str(row.get('symbol') or '').upper().removesuffix(f'.{config.market}')}.{config.market}" in allowed
     ]
 
@@ -583,7 +584,8 @@ class FiveMinuteBarBuilder:
             else None
         )
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
-        self._quote_volume_initialized_symbols: set[str] = set()
+        self._quote_total_volume: dict[str, int] = {}
+        self._quote_last_source_at: dict[str, datetime] = {}
         self._snapshot_total_volume: dict[str, int] = {}
 
     @property
@@ -596,14 +598,11 @@ class FiveMinuteBarBuilder:
         if price <= Decimal("0"):
             return []
         normalized_symbol = symbol.upper()
-        volume = int_like(payload.get("current_volume"))
-        if normalized_symbol not in self._quote_volume_initialized_symbols:
-            # Longbridge defines current_volume as the increment between quote
-            # pushes.  The first snapshot on a new subscription has no local
-            # predecessor and may carry the accumulated session volume, so it
-            # is price evidence only.  Later pushes are safe to accumulate.
-            self._quote_volume_initialized_symbols.add(normalized_symbol)
-            volume = 0
+        volume, blocked_reason = self._quote_volume_delta(
+            normalized_symbol,
+            payload,
+            source_at=source_at,
+        )
         return self._append(
             symbol,
             source_at,
@@ -611,6 +610,7 @@ class FiveMinuteBarBuilder:
             price,
             volume,
             source_mode="longbridge_sdk_push",
+            blocked_reason=blocked_reason,
         )
 
     def on_snapshot(
@@ -679,6 +679,7 @@ class FiveMinuteBarBuilder:
         *,
         source_mode: str,
         bar_at: datetime | None = None,
+        blocked_reason: str = "",
     ) -> list[dict[str, Any]]:
         bar_clock_ny = (bar_at or source_at).astimezone(NEW_YORK)
         if bar_clock_ny.weekday() >= 5 or not (bar_clock_ny.hour > 9 or (bar_clock_ny.hour == 9 and bar_clock_ny.minute >= 30)) or bar_clock_ny.hour >= 16:
@@ -694,6 +695,7 @@ class FiveMinuteBarBuilder:
                 "open": price, "high": price, "low": price, "close": price, "volume": 0,
                 "source_event_at": source_at, "received_at": received_at,
                 "source_mode": source_mode,
+                "market_data_blocked_reasons": set(),
             }
             self._bars[key] = bar
         else:
@@ -703,6 +705,8 @@ class FiveMinuteBarBuilder:
             bar["source_event_at"] = max(bar["source_event_at"], source_at)
             bar["received_at"] = max(bar["received_at"], received_at)
         bar["volume"] += max(0, volume)
+        if blocked_reason:
+            bar["market_data_blocked_reasons"].add(blocked_reason)
         return self.flush(received_at)
 
     def _finalize(self, key: tuple[str, datetime], bar: dict[str, Any], *, emitted_at: datetime) -> dict[str, Any]:
@@ -727,8 +731,32 @@ class FiveMinuteBarBuilder:
             "source_mode": str(bar.get("source_mode") or "longbridge_sdk_push"),
             "open": fmt(bar["open"]), "high": fmt(bar["high"]), "low": fmt(bar["low"]),
             "close": fmt(bar["close"]), "volume": str(bar["volume"]),
+            "market_data_blocked_reason": ",".join(sorted(bar.get("market_data_blocked_reasons") or ())),
             "local_simulation_ignored": True,
         }
+
+    def _quote_volume_delta(
+        self,
+        symbol: str,
+        payload: dict[str, Any],
+        *,
+        source_at: datetime,
+    ) -> tuple[int, str]:
+        raw_total = payload.get("volume")
+        if raw_total in (None, ""):
+            return 0, "quote_total_volume_missing"
+        total_volume = max(0, int_like(raw_total))
+        previous_total = self._quote_total_volume.get(symbol)
+        previous_source_at = self._quote_last_source_at.get(symbol)
+        self._quote_last_source_at[symbol] = source_at
+        if previous_source_at is not None and source_at < previous_source_at:
+            return 0, "quote_timestamp_regressed"
+        self._quote_total_volume[symbol] = total_volume
+        if previous_total is None:
+            return 0, ""
+        if total_volume < previous_total:
+            return 0, "quote_total_volume_regressed"
+        return total_volume - previous_total, ""
 
 
 class MarketEventContext:
@@ -806,6 +834,7 @@ def load_current_sdk_intraday_context(
             not in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
             or str(row.get("timeframe") or "") != "5m"
             or not bool(row.get("bar_final"))
+            or str(row.get("market_data_blocked_reason") or "")
         ):
             continue
         symbol = str(row.get("symbol") or "").upper()

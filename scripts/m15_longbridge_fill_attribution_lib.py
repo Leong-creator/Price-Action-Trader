@@ -608,6 +608,394 @@ def add_completed_trade_performance(
     return payload
 
 
+def group_completed_trade_performance_rows(
+    rows: list[dict[str, Any]],
+    group_field: str,
+) -> list[dict[str, Any]]:
+    """Expose completed-trade grouping for read-only dashboard filtering."""
+    return _group_completed_trade_performance(rows, group_field)
+
+
+def summarize_completed_trade_rows(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    completed_trades = [dict(row) for row in rows if isinstance(row, Mapping)]
+    normal_trades = [row for row in completed_trades if not bool(row.get("fault_day"))]
+    fault_day_trades = [row for row in completed_trades if bool(row.get("fault_day"))]
+    return {
+        "completed_trade_count": len(completed_trades),
+        "normal_completed_trade_count": len(normal_trades),
+        "fault_day_completed_trade_count": len(fault_day_trades),
+        "gross_realized_pnl": _fmt_money(
+            sum((_decimal(row.get("gross_realized_pnl")) for row in completed_trades), ZERO)
+        ),
+        "estimated_fees": _fmt_money(
+            sum((_decimal(row.get("estimated_fees")) for row in completed_trades), ZERO)
+        ),
+        "estimated_net_realized_pnl": _fmt_money(
+            sum((_decimal(row.get("estimated_net_pnl")) for row in completed_trades), ZERO)
+        ),
+        "normal_estimated_net_realized_pnl": _fmt_money(
+            sum((_decimal(row.get("estimated_net_pnl")) for row in normal_trades), ZERO)
+        ),
+        "fault_day_estimated_net_realized_pnl": _fmt_money(
+            sum((_decimal(row.get("estimated_net_pnl")) for row in fault_day_trades), ZERO)
+        ),
+    }
+
+
+def build_virtual_position_layers(
+    payload: Mapping[str, Any],
+    holding_rows: Iterable[Mapping[str, Any]],
+    *,
+    market_date: str | None = None,
+) -> dict[str, Any]:
+    holdings = _normalize_holdings(holding_rows)
+    batches = [
+        dict(row)
+        for row in payload.get("batches", [])
+        if isinstance(row, Mapping)
+        and row.get("include_in_strategy_performance") is not False
+        and _decimal(row.get("remaining_quantity")) > ZERO
+    ]
+    completed_trades = [
+        dict(row) for row in payload.get("completed_trades", []) if isinstance(row, Mapping)
+    ]
+
+    actual_gross_market_value = ZERO
+    actual_signed_market_value = ZERO
+    actual_unrealized = ZERO
+    actual_net_quantity = ZERO
+    actual_valuation_complete = bool(holdings) and all(
+        bool(row.get("valuation_available")) for row in holdings.values()
+    )
+    for row in holdings.values():
+        actual_gross_market_value += row["gross_market_value"]
+        actual_signed_market_value += row["signed_market_value"]
+        actual_unrealized += row["unrealized_pnl"]
+        actual_net_quantity += row["signed_quantity"]
+
+    symbol_rows: dict[str, dict[str, Any]] = {}
+    runtime_rows: dict[str, dict[str, Any]] = {}
+    bucket_rows: dict[str, dict[str, Any]] = {}
+    concentration_rows: dict[str, dict[str, Any]] = {}
+    attributed_gross_market_value = ZERO
+    attributed_signed_market_value = ZERO
+    attributed_unrealized = ZERO
+    attributed_net_quantity = ZERO
+    attributed_batch_count = 0
+    total_virtual_gross_exposure = ZERO
+
+    today_open_batches: list[dict[str, Any]] = []
+    active_market_date = market_date or ""
+    for batch in batches:
+        symbol = _normalize_symbol(str(batch.get("symbol") or ""))
+        holding = holdings.get(symbol)
+        remaining_quantity = _decimal(batch.get("remaining_quantity"))
+        open_price = _decimal(batch.get("open_price"))
+        direction = str(batch.get("direction") or "long")
+        signed_quantity = -remaining_quantity if direction == "short" else remaining_quantity
+        market_price = (
+            holding["market_price"]
+            if holding is not None and holding["market_price"] > ZERO
+            else open_price
+        )
+        price_source = (
+            "longbridge_holding_market_price"
+            if holding is not None and holding["market_price"] > ZERO
+            else "virtual_open_price_fallback"
+        )
+        gross_market_value = remaining_quantity * market_price
+        signed_market_value = -gross_market_value if direction == "short" else gross_market_value
+        unrealized = (market_price - open_price) * remaining_quantity
+        if direction == "short":
+            unrealized = -unrealized
+
+        attributed_gross_market_value += gross_market_value
+        attributed_signed_market_value += signed_market_value
+        attributed_unrealized += unrealized
+        attributed_net_quantity += signed_quantity
+        attributed_batch_count += 1
+        total_virtual_gross_exposure += gross_market_value
+
+        symbol_entry = symbol_rows.setdefault(
+            symbol,
+            {
+                "symbol": symbol,
+                "actual_net_quantity": "0.0000",
+                "actual_gross_market_value": "0.00",
+                "actual_signed_market_value": "0.00",
+                "actual_unrealized_pnl": "0.00",
+                "attributed_net_quantity": "0.0000",
+                "attributed_gross_market_value": "0.00",
+                "attributed_signed_market_value": "0.00",
+                "attributed_unrealized_pnl": "0.00",
+                "unreconciled_net_quantity": "0.0000",
+                "unreconciled_gross_market_value": "0.00",
+                "unreconciled_unrealized_pnl": "0.00",
+                "bucket_count": 0,
+                "runtime_count": 0,
+                "batch_count": 0,
+                "buckets": [],
+                "runtimes": [],
+            },
+        )
+        symbol_entry["attributed_net_quantity"] = _fmt_quantity(
+            _decimal(symbol_entry["attributed_net_quantity"]) + signed_quantity
+        )
+        symbol_entry["attributed_gross_market_value"] = _fmt_money(
+            _decimal(symbol_entry["attributed_gross_market_value"]) + gross_market_value
+        )
+        symbol_entry["attributed_signed_market_value"] = _fmt_money(
+            _decimal(symbol_entry["attributed_signed_market_value"]) + signed_market_value
+        )
+        symbol_entry["attributed_unrealized_pnl"] = _fmt_money(
+            _decimal(symbol_entry["attributed_unrealized_pnl"]) + unrealized
+        )
+        symbol_entry["batch_count"] += 1
+        bucket = str(batch.get("capital_bucket") or "")
+        runtime_id = str(batch.get("runtime_id") or "")
+        if bucket and bucket not in symbol_entry["buckets"]:
+            symbol_entry["buckets"].append(bucket)
+            symbol_entry["bucket_count"] += 1
+        if runtime_id and runtime_id not in symbol_entry["runtimes"]:
+            symbol_entry["runtimes"].append(runtime_id)
+            symbol_entry["runtime_count"] += 1
+
+        concentration_entry = concentration_rows.setdefault(
+            symbol,
+            {
+                "symbol": symbol,
+                "gross_market_value": ZERO,
+                "net_quantity": ZERO,
+                "bucket_values": {},
+                "runtime_ids": set(),
+            },
+        )
+        concentration_entry["gross_market_value"] += gross_market_value
+        concentration_entry["net_quantity"] += signed_quantity
+        concentration_entry["runtime_ids"].add(runtime_id)
+        if bucket:
+            concentration_entry["bucket_values"][bucket] = (
+                concentration_entry["bucket_values"].get(bucket, ZERO) + gross_market_value
+            )
+
+        _accumulate_open_position_group(
+            runtime_rows,
+            runtime_id,
+            signed_quantity=signed_quantity,
+            gross_market_value=gross_market_value,
+            unrealized=unrealized,
+        )
+        _accumulate_open_position_group(
+            bucket_rows,
+            bucket,
+            signed_quantity=signed_quantity,
+            gross_market_value=gross_market_value,
+            unrealized=unrealized,
+        )
+
+        metadata = batch.get("metadata") if isinstance(batch.get("metadata"), Mapping) else {}
+        opened_at = str(metadata.get("submitted_at") or metadata.get("created_at") or "")
+        if active_market_date and _new_york_date(opened_at) == active_market_date:
+            today_open_batches.append(
+                {
+                    "batch_id": str(batch.get("batch_id") or ""),
+                    "symbol": symbol,
+                    "runtime_id": runtime_id,
+                    "capital_bucket": bucket,
+                    "remaining_quantity": _fmt_quantity(remaining_quantity),
+                    "market_value": _fmt_money(gross_market_value),
+                    "unrealized_pnl": _fmt_money(unrealized),
+                }
+            )
+
+    for symbol, holding in holdings.items():
+        symbol_entry = symbol_rows.setdefault(
+            symbol,
+            {
+                "symbol": symbol,
+                "actual_net_quantity": "0.0000",
+                "actual_gross_market_value": "0.00",
+                "actual_signed_market_value": "0.00",
+                "actual_unrealized_pnl": "0.00",
+                "attributed_net_quantity": "0.0000",
+                "attributed_gross_market_value": "0.00",
+                "attributed_signed_market_value": "0.00",
+                "attributed_unrealized_pnl": "0.00",
+                "unreconciled_net_quantity": "0.0000",
+                "unreconciled_gross_market_value": "0.00",
+                "unreconciled_unrealized_pnl": "0.00",
+                "bucket_count": 0,
+                "runtime_count": 0,
+                "batch_count": 0,
+                "buckets": [],
+                "runtimes": [],
+            },
+        )
+        symbol_entry["actual_net_quantity"] = _fmt_quantity(holding["signed_quantity"])
+        valuation_available = bool(holding.get("valuation_available"))
+        symbol_entry["actual_valuation_available"] = valuation_available
+        symbol_entry["actual_gross_market_value"] = (
+            _fmt_money(holding["gross_market_value"]) if valuation_available else ""
+        )
+        symbol_entry["actual_signed_market_value"] = (
+            _fmt_money(holding["signed_market_value"]) if valuation_available else ""
+        )
+        symbol_entry["actual_unrealized_pnl"] = (
+            _fmt_money(holding["unrealized_pnl"]) if valuation_available else ""
+        )
+        actual_qty = holding["signed_quantity"]
+        attributed_qty = _decimal(symbol_entry["attributed_net_quantity"])
+        actual_gross = holding["gross_market_value"]
+        attributed_gross = _decimal(symbol_entry["attributed_gross_market_value"])
+        actual_u = holding["unrealized_pnl"]
+        attributed_u = _decimal(symbol_entry["attributed_unrealized_pnl"])
+        symbol_entry["unreconciled_net_quantity"] = _fmt_quantity(actual_qty - attributed_qty)
+        symbol_entry["unreconciled_gross_market_value"] = (
+            _fmt_money(actual_gross - attributed_gross) if valuation_available else ""
+        )
+        symbol_entry["unreconciled_unrealized_pnl"] = (
+            _fmt_money(actual_u - attributed_u) if valuation_available else ""
+        )
+
+    for symbol, symbol_entry in symbol_rows.items():
+        if symbol not in holdings:
+            symbol_entry["unreconciled_net_quantity"] = _fmt_quantity(
+                ZERO - _decimal(symbol_entry["attributed_net_quantity"])
+            )
+            symbol_entry["unreconciled_gross_market_value"] = _fmt_money(
+                ZERO - _decimal(symbol_entry["attributed_gross_market_value"])
+            )
+            symbol_entry["unreconciled_unrealized_pnl"] = _fmt_money(
+                ZERO - _decimal(symbol_entry["attributed_unrealized_pnl"])
+            )
+        symbol_entry["buckets"] = sorted(symbol_entry["buckets"])
+        symbol_entry["runtimes"] = sorted(symbol_entry["runtimes"])
+
+    concentration = []
+    for symbol, row in sorted(concentration_rows.items()):
+        bucket_values = row["bucket_values"]
+        gross_market_value = row["gross_market_value"]
+        concentration.append(
+            {
+                "symbol": symbol,
+                "bucket_count": len(bucket_values),
+                "runtime_count": len(row["runtime_ids"]),
+                "gross_market_value": _fmt_money(gross_market_value),
+                "share_of_virtual_gross_exposure_pct": _fmt_ratio(
+                    gross_market_value * Decimal("100") / total_virtual_gross_exposure
+                    if total_virtual_gross_exposure > ZERO
+                    else ZERO
+                ),
+                "net_quantity": _fmt_quantity(row["net_quantity"]),
+                "bucket_breakdown": [
+                    {
+                        "capital_bucket": bucket,
+                        "gross_market_value": _fmt_money(value),
+                    }
+                    for bucket, value in sorted(
+                        bucket_values.items(),
+                        key=lambda item: (-item[1], item[0]),
+                    )
+                ],
+            }
+        )
+
+    completed_today_rows = [
+        row for row in completed_trades
+        if active_market_date
+        and (
+            str(row.get("open_market_date") or "") == active_market_date
+            or _new_york_date(str(row.get("opened_at") or "")) == active_market_date
+        )
+    ]
+
+    return {
+        "market_date": active_market_date,
+        "actual_account_total": {
+            "symbol_count": len(holdings),
+            "valuation_available": actual_valuation_complete,
+            "valuation_status": (
+                "longbridge_position_valuation_available"
+                if actual_valuation_complete
+                else "waiting_for_longbridge_position_market_price"
+            ),
+            "gross_market_value": (
+                _fmt_money(actual_gross_market_value)
+                if actual_valuation_complete
+                else ""
+            ),
+            "signed_market_value": (
+                _fmt_money(actual_signed_market_value)
+                if actual_valuation_complete
+                else ""
+            ),
+            "unrealized_pnl": (
+                _fmt_money(actual_unrealized) if actual_valuation_complete else ""
+            ),
+            "net_quantity": _fmt_quantity(actual_net_quantity),
+        },
+        "attributed_virtual_total": {
+            "symbol_count": sum(
+                1 for row in symbol_rows.values()
+                if _decimal(row.get("attributed_gross_market_value")) > ZERO
+            ),
+            "batch_count": attributed_batch_count,
+            "gross_market_value": _fmt_money(attributed_gross_market_value),
+            "signed_market_value": _fmt_money(attributed_signed_market_value),
+            "unrealized_pnl": _fmt_money(attributed_unrealized),
+            "net_quantity": _fmt_quantity(attributed_net_quantity),
+        },
+        "unreconciled_delta": {
+            "symbol_count": sum(
+                1 for row in symbol_rows.values()
+                if _decimal(row.get("unreconciled_net_quantity")) != ZERO
+            ),
+            "valuation_available": actual_valuation_complete,
+            "gross_market_value": (
+                _fmt_money(actual_gross_market_value - attributed_gross_market_value)
+                if actual_valuation_complete
+                else ""
+            ),
+            "signed_market_value": (
+                _fmt_money(actual_signed_market_value - attributed_signed_market_value)
+                if actual_valuation_complete
+                else ""
+            ),
+            "unrealized_pnl": (
+                _fmt_money(actual_unrealized - attributed_unrealized)
+                if actual_valuation_complete
+                else ""
+            ),
+            "net_quantity": _fmt_quantity(actual_net_quantity - attributed_net_quantity),
+        },
+        "symbol_rows": sorted(symbol_rows.values(), key=lambda row: row["symbol"]),
+        "cross_bucket_concentration": sorted(
+            concentration,
+            key=lambda row: (
+                -_decimal(row.get("gross_market_value")),
+                row["symbol"],
+            ),
+        ),
+        "runtime_rows": _finalize_open_position_groups(runtime_rows, "runtime_id"),
+        "bucket_rows": _finalize_open_position_groups(bucket_rows, "capital_bucket"),
+        "today_buy_flow": {
+            "bought_then_sold_count": len(completed_today_rows),
+            "bought_then_sold_estimated_net_pnl": _fmt_money(
+                sum((_decimal(row.get("estimated_net_pnl")) for row in completed_today_rows), ZERO)
+            ),
+            "still_held_batch_count": len(today_open_batches),
+            "still_held_unrealized_pnl": _fmt_money(
+                sum((_decimal(row.get("unrealized_pnl")) for row in today_open_batches), ZERO)
+            ),
+            "still_held_market_value": _fmt_money(
+                sum((_decimal(row.get("market_value")) for row in today_open_batches), ZERO)
+            ),
+            "bought_then_sold_rows": completed_today_rows[-20:],
+            "still_held_rows": today_open_batches[-20:],
+        },
+    }
+
+
 def _group_completed_trade_performance(
     rows: list[dict[str, Any]],
     group_field: str,
@@ -665,6 +1053,96 @@ def _group_completed_trade_performance(
             }
         )
     return summaries
+
+
+def _accumulate_open_position_group(
+    groups: dict[str, dict[str, Any]],
+    group_id: str,
+    *,
+    signed_quantity: Decimal,
+    gross_market_value: Decimal,
+    unrealized: Decimal,
+) -> None:
+    if not group_id:
+        return
+    row = groups.setdefault(
+        group_id,
+        {
+            "signed_quantity": ZERO,
+            "gross_market_value": ZERO,
+            "unrealized_pnl": ZERO,
+            "batch_count": 0,
+        },
+    )
+    row["signed_quantity"] += signed_quantity
+    row["gross_market_value"] += gross_market_value
+    row["unrealized_pnl"] += unrealized
+    row["batch_count"] += 1
+
+
+def _finalize_open_position_groups(
+    groups: Mapping[str, dict[str, Any]],
+    key_name: str,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            key_name: group_id,
+            "batch_count": row["batch_count"],
+            "net_quantity": _fmt_quantity(row["signed_quantity"]),
+            "gross_market_value": _fmt_money(row["gross_market_value"]),
+            "unrealized_pnl": _fmt_money(row["unrealized_pnl"]),
+        }
+        for group_id, row in sorted(
+            groups.items(),
+            key=lambda item: (-item[1]["gross_market_value"], item[0]),
+        )
+    ]
+
+
+def _normalize_holdings(
+    holding_rows: Iterable[Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for row in holding_rows:
+        if not isinstance(row, Mapping):
+            continue
+        symbol = _normalize_symbol(str(row.get("symbol") or row.get("ticker") or ""))
+        quantity = _decimal(row.get("quantity") or row.get("qty"))
+        side = str(row.get("side") or row.get("position_side") or "").strip().lower()
+        signed_quantity = -quantity if "short" in side and quantity > ZERO else quantity
+        market_price = _decimal(
+            row.get("market_price")
+            or row.get("current_price")
+            or row.get("last_price")
+            or row.get("price")
+        )
+        cost_price = _decimal(
+            row.get("cost_price")
+            or row.get("average_cost")
+            or row.get("avg_cost")
+            or row.get("cost")
+        )
+        gross_market_value = _decimal(row.get("market_value"))
+        valuation_available = gross_market_value > ZERO or market_price > ZERO
+        if gross_market_value <= ZERO and market_price > ZERO and quantity > ZERO:
+            gross_market_value = market_price * quantity
+        signed_market_value = -gross_market_value if signed_quantity < ZERO else gross_market_value
+        unrealized_pnl = _decimal(row.get("unrealized_pnl") or row.get("position_pnl"))
+        if unrealized_pnl == ZERO and market_price > ZERO and cost_price > ZERO and quantity > ZERO:
+            unrealized_pnl = (market_price - cost_price) * quantity
+            if signed_quantity < ZERO:
+                unrealized_pnl = -unrealized_pnl
+        if symbol:
+            normalized[symbol] = {
+                "signed_quantity": signed_quantity,
+                "market_price": market_price,
+                "cost_price": cost_price,
+                "gross_market_value": gross_market_value,
+                "signed_market_value": signed_market_value,
+                "unrealized_pnl": unrealized_pnl,
+                "valuation_available": valuation_available,
+            }
+    return normalized
 
 
 def _fmt_factor(profit: Decimal, loss: Decimal) -> str:

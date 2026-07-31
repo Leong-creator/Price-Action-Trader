@@ -760,7 +760,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["short_test_epoch_id"], marker["short_test_epoch_id"])
         self.assertEqual(state["test_started_at"], marker["test_started_at"])
 
-    def test_default_runtime_config_declares_300_subscription_and_147_trading_contract(self) -> None:
+    def test_default_runtime_config_promotes_verified_300_subscription_pool_to_trading(self) -> None:
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
         universe = load_m15_universe("config/m15_us_liquid_universe_300.json")
 
@@ -770,10 +770,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "config/m15_us_liquid_universe_300.json",
         )
         self.assertEqual(payload["market_data"]["symbol_limit"], 300)
-        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 147)
+        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 300)
         self.assertEqual(
             payload["market_data"]["trading_universe_path"],
-            "config/examples/m12_local_repaired_universe_snapshot_147.json",
+            "config/m15_us_liquid_universe_300.json",
         )
         self.assertIn("BNY", universe)
         self.assertIn("MRSH", universe)
@@ -847,42 +847,56 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         rows = [
             {
                 "event_id": "bar-1", "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
-                "event_time": "2026-07-15T13:35:00Z", "received_at": "2026-07-15T13:35:00.1Z",
+                "event_time": "2026-07-15T13:35:00Z", "bar_open_at": "2026-07-15T13:30:00Z", "received_at": "2026-07-15T13:35:00.1Z",
                 "open": "100", "high": "102", "low": "99", "close": "101", "volume": "10",
             },
             {
                 "event_id": "bar-2", "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
-                "event_time": "2026-07-15T13:40:00Z", "received_at": "2026-07-15T13:40:00.1Z",
+                "event_time": "2026-07-15T13:40:00Z", "bar_open_at": "2026-07-15T13:35:00Z", "received_at": "2026-07-15T13:40:00.1Z",
                 "open": "101", "high": "103", "low": "100", "close": "102", "volume": "20",
             },
         ]
         daily = build_live_daily_confirmation_rows(
             rows,
             generated_at=datetime(2026, 7, 15, 13, 40, tzinfo=UTC),
+            live_quote_session_state={
+                "AAPL": {
+                    "symbol": "AAPL",
+                    "session_date": "2026-07-15",
+                    "source_event_at": "2026-07-15T13:39:30Z",
+                    "received_at": "2026-07-15T13:39:30.1Z",
+                    "open": "99",
+                    "high": "104",
+                    "low": "98",
+                    "close": "102.5",
+                    "volume": "300",
+                    "market_data_blocked_reason": "",
+                }
+            },
         )
         self.assertEqual(len(daily), 1)
         self.assertEqual(daily[0]["source_mode"], "longbridge_sdk_live_daily_confirmation")
         self.assertTrue(daily[0]["current_session_confirmation"])
         self.assertEqual(
             {key: daily[0][key] for key in ("open", "high", "low", "close", "volume")},
-            {"open": "100", "high": "103", "low": "99", "close": "102", "volume": "30"},
+            {"open": "99", "high": "104", "low": "98", "close": "102.5", "volume": "300"},
         )
 
     def test_live_daily_confirmation_requires_a_fresh_symbol_bar_this_dispatch(self) -> None:
         rows = [
             {
                 "event_id": "aapl-old", "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
-                "event_time": "2026-07-15T15:35:00Z", "received_at": "2026-07-15T15:35:00.1Z",
+                "event_time": "2026-07-15T15:35:00Z", "bar_open_at": "2026-07-15T15:30:00Z", "received_at": "2026-07-15T15:35:00.1Z",
                 "open": "209", "high": "210", "low": "208", "close": "210", "volume": "10",
             },
             {
                 "event_id": "msft-old", "symbol": "MSFT", "timeframe": "5m", "bar_final": True,
-                "event_time": "2026-07-15T15:35:00Z", "received_at": "2026-07-15T15:35:00.1Z",
+                "event_time": "2026-07-15T15:35:00Z", "bar_open_at": "2026-07-15T15:30:00Z", "received_at": "2026-07-15T15:35:00.1Z",
                 "open": "499", "high": "501", "low": "498", "close": "500", "volume": "10",
             },
             {
                 "event_id": "aapl-new", "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
-                "event_time": "2026-07-15T15:40:00Z", "received_at": "2026-07-15T15:40:00.1Z",
+                "event_time": "2026-07-15T15:40:00Z", "bar_open_at": "2026-07-15T15:35:00Z", "received_at": "2026-07-15T15:40:00.1Z",
                 "open": "210", "high": "212", "low": "209", "close": "211", "volume": "20",
             },
         ]
@@ -890,11 +904,37 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         daily = build_live_daily_confirmation_rows(
             rows,
             generated_at=datetime(2026, 7, 15, 15, 40, tzinfo=UTC),
+            live_quote_session_state={
+                "AAPL": {
+                    "symbol": "AAPL",
+                    "session_date": "2026-07-15",
+                    "source_event_at": "2026-07-15T15:38:00Z",
+                    "received_at": "2026-07-15T15:38:00.1Z",
+                    "open": "208",
+                    "high": "213",
+                    "low": "207",
+                    "close": "211.5",
+                    "volume": "220",
+                    "market_data_blocked_reason": "",
+                },
+                "MSFT": {
+                    "symbol": "MSFT",
+                    "session_date": "2026-07-15",
+                    "source_event_at": "2026-07-15T15:34:00Z",
+                    "received_at": "2026-07-15T15:34:00.1Z",
+                    "open": "498",
+                    "high": "502",
+                    "low": "497",
+                    "close": "500",
+                    "volume": "120",
+                    "market_data_blocked_reason": "",
+                },
+            },
             active_five_minute_event_ids={"aapl-new"},
         )
 
         self.assertEqual([row["symbol"] for row in daily], ["AAPL"])
-        self.assertEqual(daily[0]["close"], "211")
+        self.assertEqual(daily[0]["close"], "211.5")
 
     def test_close_spawn_queue_releases_queue_handles(self) -> None:
         calls: list[str] = []
@@ -925,9 +965,9 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_sdk_quote_push_builds_final_five_minute_bar(self) -> None:
         builder = FiveMinuteBarBuilder()
         first = datetime(2026, 7, 14, 13, 31, tzinfo=UTC)
-        self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(first.timestamp()), "last_done": "200", "current_volume": 10}, received_at=first), [])
+        self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(first.timestamp()), "last_done": "200", "current_volume": 10, "volume": 1000}, received_at=first), [])
         last = datetime(2026, 7, 14, 13, 34, 59, tzinfo=UTC)
-        self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(last.timestamp()), "last_done": "202", "current_volume": 20}, received_at=last), [])
+        self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(last.timestamp()), "last_done": "202", "current_volume": 20, "volume": 1020}, received_at=last), [])
         rows = builder.flush(datetime(2026, 7, 14, 13, 35, 1, tzinfo=UTC))
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_push")
@@ -935,6 +975,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(rows[0]["open"], "200")
         self.assertEqual(rows[0]["close"], "202")
         self.assertEqual(rows[0]["volume"], "20")
+        self.assertEqual(rows[0]["market_data_blocked_reason"], "")
         self.assertEqual(rows[0]["received_at"], "2026-07-14T13:35:01Z")
         self.assertEqual(rows[0]["source_delivery_age_ms"], 2000)
 
@@ -945,18 +986,58 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         builder.on_quote(
             "PSKY.US",
-            {"timestamp": int(first.timestamp()), "last_done": "9.10", "current_volume": 17_000_000},
+            {"timestamp": int(first.timestamp()), "last_done": "9.10", "current_volume": 17_000_000, "volume": 17_000_000},
             received_at=first,
         )
         builder.on_quote(
             "PSKY.US",
-            {"timestamp": int(second.timestamp()), "last_done": "9.11", "current_volume": 125},
+            {"timestamp": int(second.timestamp()), "last_done": "9.11", "current_volume": 125, "volume": 17_000_125},
             received_at=second,
         )
         rows = builder.flush(datetime(2026, 7, 15, 13, 35, 1, tzinfo=UTC))
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["volume"], "125")
+
+    def test_quote_push_blocks_bar_when_cumulative_volume_is_missing(self) -> None:
+        builder = FiveMinuteBarBuilder(minutes=5)
+        first = datetime(2026, 7, 15, 13, 31, tzinfo=UTC)
+        second = datetime(2026, 7, 15, 13, 32, tzinfo=UTC)
+
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(first.timestamp()), "last_done": "200"},
+            received_at=first,
+        )
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(second.timestamp()), "last_done": "201"},
+            received_at=second,
+        )
+        rows = builder.flush(datetime(2026, 7, 15, 13, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_data_blocked_reason"], "quote_total_volume_missing")
+
+    def test_quote_push_blocks_bar_when_cumulative_volume_regresses(self) -> None:
+        builder = FiveMinuteBarBuilder(minutes=5)
+        first = datetime(2026, 7, 15, 13, 31, tzinfo=UTC)
+        second = datetime(2026, 7, 15, 13, 32, tzinfo=UTC)
+
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(first.timestamp()), "last_done": "200", "volume": 1000},
+            received_at=first,
+        )
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(second.timestamp()), "last_done": "201", "volume": 999},
+            received_at=second,
+        )
+        rows = builder.flush(datetime(2026, 7, 15, 13, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_data_blocked_reason"], "quote_total_volume_regressed")
 
     def test_sdk_snapshot_poll_builds_bar_from_cumulative_volume_deltas(self) -> None:
         builder = FiveMinuteBarBuilder(minutes=5)
@@ -1877,13 +1958,14 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertIn("PSKY.US", symbols)
         self.assertNotIn("PARA.US", symbols)
         self.assertEqual(len(symbols), 300)
-        self.assertEqual(len(trading_symbols), 147)
+        self.assertEqual(len(trading_symbols), 300)
         self.assertIn("PSKY.US", trading_symbols)
 
     def test_expanded_readonly_config_is_isolated_and_dispatch_disabled(self) -> None:
         default = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
         expanded = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(encoding="utf-8"))
         runtime_config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
+        upgrade_gate = expanded["market_data"]["expansion_trade_pool_upgrade_gate"]
 
         self.assertFalse(expanded["routing"]["paper_order_dispatch_enabled"])
         self.assertTrue(expanded["runtime"]["two_day_readonly_gate"])
@@ -1900,6 +1982,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(expanded["market_data"]["universe_path"], "config/m15_us_liquid_universe_300.json")
         self.assertEqual(expanded["market_data"]["symbol_limit"], 300)
         self.assertEqual(expanded["market_data"]["trading_symbol_limit"], 147)
+        self.assertTrue(upgrade_gate["required_readonly_gate_passed"])
+        self.assertTrue(upgrade_gate["required_complete_trading_daily_context"])
+        self.assertTrue(upgrade_gate["required_complete_subscribed_daily_context"])
+        self.assertEqual(upgrade_gate["required_subscription_coverage"], "300/300")
+        self.assertEqual(upgrade_gate["maximum_source_delivery_age_ms"], 2000)
+        self.assertEqual(upgrade_gate["target_trading_symbol_limit"], 300)
         self.assertEqual(len(configured_trading_symbols(runtime_config)), 147)
         self.assertNotEqual(expanded["outputs"]["output_dir"], default["outputs"]["output_dir"])
         self.assertNotEqual(expanded["outputs"]["market_events"], default["outputs"]["market_events"])
@@ -1916,21 +2004,26 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(encoding="utf-8"))
         symbols = load_m15_universe(payload["market_data"]["universe_path"])
         raw_symbols = json.loads(Path(payload["market_data"]["universe_path"]).read_text(encoding="utf-8"))["symbols"]
+        upgrade_gate = json.loads(Path(payload["market_data"]["universe_path"]).read_text(encoding="utf-8"))["trade_pool_upgrade_gate"]
 
         self.assertEqual(len(symbols), 300)
         self.assertEqual(payload["market_data"]["symbol_limit"], 300)
         self.assertLessEqual(payload["market_data"]["symbol_limit"], len(symbols))
         self.assertEqual(symbols[:5], tuple(raw_symbols[:5]))
         self.assertEqual(symbols[-5:], tuple(raw_symbols[-5:]))
+        self.assertTrue(upgrade_gate["required_readonly_gate_passed"])
+        self.assertEqual(upgrade_gate["required_subscription_coverage"], "300/300")
+        self.assertEqual(upgrade_gate["target_trading_symbol_limit"], 300)
 
-    def test_runtime_configured_symbols_will_follow_file_order_after_integration(self) -> None:
+    def test_expanded_readonly_staging_keeps_original_147_trading_snapshot(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
         symbols = configured_symbols(config)
         trading_symbols = configured_trading_symbols(config)
-        seed_symbols = configured_trading_symbols(load_config())
 
         self.assertEqual(len(symbols), 300)
-        self.assertEqual(trading_symbols, seed_symbols)
+        self.assertEqual(len(trading_symbols), 147)
+        self.assertEqual(trading_symbols[0], "SPY.US")
+        self.assertEqual(trading_symbols[-1], "TSM.US")
         self.assertEqual(symbols[0], "SPY.US")
         self.assertEqual(symbols[-1], "SHW.US")
 

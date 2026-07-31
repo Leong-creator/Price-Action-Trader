@@ -49,6 +49,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     market_event_is_tradable, trading_market_events,
     sdk_config_from_oauth, sdk_object_to_dict, sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, to_iso,
+    unix_to_utc,
 )
 from scripts.m15_sdk_validation_flatten_lib import (
     activate_formal_epoch_payload,
@@ -77,6 +78,7 @@ LEGACY_CLI_PID_FILE = "m15_longbridge_realtime_session_supervisor.pid"
 EXECUTION_LEDGER_FILE = "m15_longbridge_realtime_execution_ledger.jsonl"
 ORDER_MAINTENANCE_FILE = "m15_sdk_order_maintenance.json"
 AUTHORIZED_ACCOUNT_EXIT_FILE = "m15_authorized_account_exit.json"
+CAPITAL_BUCKET_MIGRATION_FILE = "m15_capital_bucket_migration_state.json"
 TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
 TRADE_CONTEXT_RETRY_SECONDS = 5
 
@@ -336,6 +338,63 @@ def event_rows_to_daily(symbol: str, candles: Any, received_at: datetime) -> lis
     return result
 
 
+def update_live_quote_session_state(
+    state_by_symbol: dict[str, dict[str, Any]],
+    symbol: str,
+    payload: dict[str, Any],
+    *,
+    received_at: datetime,
+    source_mode: str,
+) -> dict[str, Any] | None:
+    normalized_symbol = str(symbol or "").upper().removesuffix(".US")
+    if not normalized_symbol:
+        return None
+    source_at = unix_to_utc(payload.get("timestamp"), received_at)
+    previous = state_by_symbol.get(normalized_symbol)
+    blocked_reason = ""
+    if previous is not None:
+        try:
+            previous_source_at = datetime.fromisoformat(
+                str(previous.get("source_event_at") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except ValueError:
+            previous_source_at = None
+        if previous_source_at is not None and source_at < previous_source_at:
+            blocked_reason = "quote_timestamp_regressed"
+    open_price = str(payload.get("open") or "")
+    high = str(payload.get("high") or "")
+    low = str(payload.get("low") or "")
+    close = str(payload.get("last_done") or payload.get("close") or "")
+    raw_volume = payload.get("volume")
+    if not blocked_reason and raw_volume in (None, ""):
+        blocked_reason = "quote_total_volume_missing"
+    volume = "0" if raw_volume in (None, "") else str(max(0, int(Decimal(str(raw_volume)))))
+    if previous is not None and not blocked_reason:
+        previous_volume = int(previous.get("volume") or 0)
+        if int(volume) < previous_volume:
+            blocked_reason = "quote_total_volume_regressed"
+    values = [Decimal(value) for value in (open_price, high, low, close) if value not in {"", "None"}]
+    if len(values) != 4 or min(values) <= 0:
+        blocked_reason = blocked_reason or "quote_ohlc_missing"
+    elif not (Decimal(low) <= Decimal(open_price) <= Decimal(high) and Decimal(low) <= Decimal(close) <= Decimal(high)):
+        blocked_reason = blocked_reason or "quote_ohlc_invalid"
+    state = {
+        "symbol": normalized_symbol,
+        "source_mode": source_mode,
+        "source_event_at": to_iso(source_at),
+        "received_at": to_iso(received_at),
+        "session_date": source_at.astimezone(NEW_YORK).date().isoformat(),
+        "open": open_price,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": volume,
+        "market_data_blocked_reason": blocked_reason,
+    }
+    state_by_symbol[normalized_symbol] = state
+    return state
+
+
 def load_daily_context(
     quote: Any,
     sdk: Any,
@@ -444,7 +503,19 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         def on_quote(symbol: str, event: Any) -> None:
             if not aggregation_enabled:
                 return
-            completed = builder.on_quote(symbol, sdk_object_to_dict(event), received_at=datetime.now(UTC))
+            received_at = datetime.now(UTC)
+            payload = sdk_object_to_dict(event)
+            emit_worker(
+                queue_out,
+                {
+                    "kind": "quote_state",
+                    "symbol": symbol,
+                    "payload": payload,
+                    "received_at": to_iso(received_at),
+                    "source_mode": "longbridge_sdk_push",
+                },
+            )
+            completed = builder.on_quote(symbol, payload, received_at=received_at)
             if completed:
                 emit_worker(queue_out, {"kind": "bars", "rows": completed})
 
@@ -1107,6 +1178,7 @@ def build_live_daily_confirmation_rows(
     market_events: list[dict[str, Any]],
     *,
     generated_at: datetime,
+    live_quote_session_state: dict[str, dict[str, Any]] | None = None,
     active_five_minute_event_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Aggregate current-session SDK bars without promoting stale symbols.
@@ -1135,6 +1207,7 @@ def build_live_daily_confirmation_rows(
             grouped.setdefault(symbol, []).append(row)
 
     daily_rows: list[dict[str, Any]] = []
+    quote_state_by_symbol = live_quote_session_state or {}
     for symbol, rows in grouped.items():
         rows.sort(key=lambda row: str(row.get("event_time") or ""))
         first, latest = rows[0], rows[-1]
@@ -1143,22 +1216,41 @@ def build_live_daily_confirmation_rows(
             and str(latest.get("event_id") or "") not in active_five_minute_event_ids
         ):
             continue
-        open_price = Decimal(str(first.get("open") or "0"))
-        high = max(Decimal(str(row.get("high") or "0")) for row in rows)
-        low = min(Decimal(str(row.get("low") or "0")) for row in rows)
-        close = Decimal(str(latest.get("close") or "0"))
-        volume = sum(max(0, int(Decimal(str(row.get("volume") or "0")))) for row in rows)
-        if min(open_price, high, low, close) <= 0:
+        quote_state = quote_state_by_symbol.get(symbol)
+        if not quote_state or str(quote_state.get("market_data_blocked_reason") or ""):
             continue
-        latest_event_time = str(latest.get("event_time") or "")
+        try:
+            latest_event_time = str(latest.get("event_time") or "")
+            latest_bar_close_at = datetime.fromisoformat(
+                latest_event_time.replace("Z", "+00:00")
+            ).astimezone(UTC)
+            latest_bar_open_at = datetime.fromisoformat(
+                str(latest.get("bar_open_at") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+            quote_source_at = datetime.fromisoformat(
+                str(quote_state.get("source_event_at") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except ValueError:
+            continue
+        if str(quote_state.get("session_date") or "") != session_date:
+            continue
+        if quote_source_at < latest_bar_open_at or quote_source_at > latest_bar_close_at:
+            continue
+        open_price = Decimal(str(quote_state.get("open") or "0"))
+        high = Decimal(str(quote_state.get("high") or "0"))
+        low = Decimal(str(quote_state.get("low") or "0"))
+        close = Decimal(str(quote_state.get("close") or "0"))
+        volume = int(str(quote_state.get("volume") or "0"))
+        if min(open_price, high, low, close) <= 0 or volume < 0:
+            continue
         daily_rows.append({
             "schema_version": "m15.realtime-market-event.v2",
             "event_id": f"sdk-1d-live|{symbol}|{session_date}|{latest_event_time}",
             "symbol": symbol,
             "timeframe": "1d",
             "event_time": latest_event_time,
-            "received_at": str(latest.get("received_at") or to_iso(generated_at)),
-            "source_event_at": str(latest.get("source_event_at") or latest_event_time),
+            "received_at": str(quote_state.get("received_at") or latest.get("received_at") or to_iso(generated_at)),
+            "source_event_at": str(quote_state.get("source_event_at") or latest.get("source_event_at") or latest_event_time),
             "bar_final": False,
             "current_session_confirmation": True,
             "source_mode": "longbridge_sdk_live_daily_confirmation",
@@ -1179,6 +1271,7 @@ def dispatch_completed_rows(
     account_coordinator: SdkAccountCoordinator,
     paper_client: SdkRealtimePaperClient | None,
     *,
+    live_quote_session_state: dict[str, dict[str, Any]] | None = None,
     signal_event_cache: list[dict[str, Any]] | None = None,
     signal_id_cache: set[str] | None = None,
     execution_ledger_cache: list[dict[str, Any]] | None = None,
@@ -1202,6 +1295,7 @@ def dispatch_completed_rows(
     live_daily_rows = build_live_daily_confirmation_rows(
         trading_market_rows,
         generated_at=now_dt,
+        live_quote_session_state=live_quote_session_state,
         active_five_minute_event_ids={
             str(row.get("event_id") or "")
             for row in new_rows
@@ -1756,6 +1850,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     )
     context.append(trading_market_events(config, cached_daily_rows))
     context.append(trading_market_events(config, cached_intraday_rows))
+    live_quote_session_state: dict[str, dict[str, Any]] = {}
     # PyO3 SDK contexts must not be inherited through fork.  A fresh spawned
     # interpreter gives the quote WebSocket its own native runtime and makes
     # a blocked subscribe call safely terminable by the parent.
@@ -1787,6 +1882,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     order_maintenance: dict[str, Any] = {}
     flatten_transition: dict[str, Any] = {}
     authorized_account_exit: dict[str, Any] = {}
+    capital_bucket_migration: dict[str, Any] = {}
     pipeline_latency_samples: deque[int] = deque(restored_latency_samples, maxlen=200)
     daily_rows: list[dict[str, Any]] = list(cached_daily_rows)
     subscription_failed: list[str] = []
@@ -2019,6 +2115,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 snapshot_rows = list(message.get("rows") or [])
                 snapshot_row_count += len(snapshot_rows)
                 for snapshot_row in snapshot_rows:
+                    update_live_quote_session_state(
+                        live_quote_session_state,
+                        str(snapshot_row.get("symbol") or ""),
+                        dict(snapshot_row.get("payload") or {}),
+                        received_at=snapshot_received_at,
+                        source_mode="longbridge_sdk_snapshot_poll",
+                    )
                     completed_snapshot_bars.extend(
                         snapshot_bar_builder.on_snapshot(
                             str(snapshot_row.get("symbol") or ""),
@@ -2043,6 +2146,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 subscription_progress_completed = int(message.get("completed") or 0)
                 subscription_progress_total = int(
                     message.get("total") or subscription_progress_total
+                )
+            elif kind == "quote_state":
+                try:
+                    quote_received_at = datetime.fromisoformat(
+                        str(message.get("received_at") or "").replace("Z", "+00:00")
+                    ).astimezone(UTC)
+                except ValueError:
+                    quote_received_at = datetime.now(UTC)
+                update_live_quote_session_state(
+                    live_quote_session_state,
+                    str(message.get("symbol") or ""),
+                    dict(message.get("payload") or {}),
+                    received_at=quote_received_at,
+                    source_mode=str(message.get("source_mode") or "longbridge_sdk_push"),
                 )
             elif kind == "ready":
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
@@ -2160,6 +2277,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     context,
                     account,
                     active_client,
+                    live_quote_session_state=live_quote_session_state,
                     signal_event_cache=signal_event_cache,
                     signal_id_cache=signal_id_cache,
                     execution_ledger_cache=execution_ledger_cache,
@@ -2391,7 +2509,27 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "blocks_new_entries": True,
                 }
-            if dispatch_enabled and not bool(flatten_transition.get("blocks_new_entries")):
+            if (
+                dispatch_enabled
+                and paper_client is not None
+                and not bool(flatten_transition.get("blocks_new_entries"))
+            ):
+                from scripts.m15_pa004_overcap_cleanup_lib import (
+                    advance_cleanup_state,
+                )
+
+                migration_path = config.output_dir / CAPITAL_BUCKET_MIGRATION_FILE
+                capital_bucket_migration = advance_cleanup_state(
+                    read_json_object(migration_path),
+                    account.snapshot(),
+                    paper_client,
+                    now=maintenance_now,
+                    execution_ledger_path=(
+                        hot_execution_config.output_dir / EXECUTION_LEDGER_FILE
+                    ),
+                )
+                if capital_bucket_migration.get("status") != "inactive":
+                    write_json_atomic(migration_path, capital_bucket_migration)
                 authorized_account_exit = run_authorized_account_exit_cycle(
                     config,
                     account,
@@ -2706,6 +2844,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "order_maintenance": order_maintenance,
                     "sdk_auto_flatten": flatten_transition,
                     "authorized_account_exit": authorized_account_exit,
+                    "capital_bucket_migration": capital_bucket_migration,
                     "formal_test_transition": load_formal_test_marker(config),
                 },
             )

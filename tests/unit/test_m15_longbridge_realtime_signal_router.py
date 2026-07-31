@@ -652,6 +652,183 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(signals[0]["symbol"], "STRONG")
             self.assertEqual(signals[0]["quality_score"], "90")
 
+    def test_relative_strength_sorting_is_applied_within_capital_bucket(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, allowed_runtime_ids=["M10-PA-013-1d"])
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="spy-prev",
+                        symbol="SPY",
+                        strategy_signal_intents=[],
+                        close="100",
+                        event_time="2026-06-03T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="spy-latest",
+                        symbol="SPY",
+                        strategy_signal_intents=[],
+                        close="101",
+                        event_time="2026-06-04T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="qqq-prev",
+                        symbol="QQQ",
+                        strategy_signal_intents=[],
+                        close="100",
+                        event_time="2026-06-03T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="qqq-latest",
+                        symbol="QQQ",
+                        strategy_signal_intents=[],
+                        close="101",
+                        event_time="2026-06-04T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="smh-prev",
+                        symbol="SMH",
+                        strategy_signal_intents=[],
+                        close="200",
+                        event_time="2026-06-03T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="smh-latest",
+                        symbol="SMH",
+                        strategy_signal_intents=[],
+                        close="206",
+                        event_time="2026-06-04T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="soxx-prev",
+                        symbol="SOXX",
+                        strategy_signal_intents=[],
+                        close="250",
+                        event_time="2026-06-03T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="soxx-latest",
+                        symbol="SOXX",
+                        strategy_signal_intents=[],
+                        close="257.5",
+                        event_time="2026-06-04T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="aapl-prev",
+                        symbol="AAPL",
+                        strategy_signal_intents=[],
+                        close="100",
+                        event_time="2026-06-03T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="aapl-latest",
+                        symbol="AAPL",
+                        event_time="2026-06-04T20:00:00Z",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-013-1d",
+                                strategy_id="M10-PA-013",
+                                symbol="AAPL",
+                                quality_score="70",
+                                limit_price="100",
+                                stop_price="95",
+                                target_price="115",
+                            )
+                        ],
+                        close="103",
+                    ),
+                    self.market_event(
+                        event_id="nvda-prev",
+                        symbol="NVDA",
+                        strategy_signal_intents=[],
+                        close="100",
+                        event_time="2026-06-03T20:00:00Z",
+                    ),
+                    self.market_event(
+                        event_id="nvda-latest",
+                        symbol="NVDA",
+                        event_time="2026-06-04T20:00:00Z",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-013-1d",
+                                strategy_id="M10-PA-013",
+                                symbol="NVDA",
+                                quality_score="70",
+                                limit_price="100",
+                                stop_price="95",
+                                target_price="115",
+                            )
+                        ],
+                        close="108",
+                    ),
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T20:00:01Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+            rows = {row["symbol"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(payload["new_signal_event_count"], 2)
+            self.assertEqual(signals[0]["symbol"], "NVDA")
+            self.assertEqual(signals[0]["industry_strength_scope"], "semiconductor")
+            self.assertEqual(signals[0]["relative_strength_audit_state"], "complete")
+            self.assertGreater(
+                float(rows["NVDA"]["relative_strength_rank_score"]),
+                float(rows["AAPL"]["relative_strength_rank_score"]),
+            )
+            self.assertEqual(rows["AAPL"]["industry_strength_scope"], "market_only")
+
+    def test_pending_cleanup_blocks_only_the_target_capital_bucket_new_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=["M10-PA-004-MBF-1d", "M10-PA-004-MBF-QC-1d"],
+                runtime_position_multipliers={
+                    "M10-PA-004-MBF-1d": "1.0",
+                    "M10-PA-004-MBF-QC-1d": "1.0",
+                },
+                migration_state={
+                    "capital_bucket_states": {
+                        "pa004_mbf": {"migration_status": "pending_cleanup"},
+                    }
+                },
+            )
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="mbf-pending",
+                        strategy_signal_intents=[
+                            self.intent(runtime_id="M10-PA-004-MBF-1d", strategy_id="M10-PA-004")
+                        ],
+                    ),
+                    self.market_event(
+                        event_id="mbf-qc-open",
+                        symbol="MSFT",
+                        strategy_signal_intents=[
+                            self.intent(
+                                runtime_id="M10-PA-004-MBF-QC-1d",
+                                strategy_id="M10-PA-004",
+                                symbol="MSFT",
+                            )
+                        ],
+                    ),
+                ],
+            )
+
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            rows = {row["source_market_event_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+            signals = self.read_jsonl(root / "signals.jsonl")
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertIn("blocked_capital_bucket_pending_cleanup", rows["mbf-pending"]["blockers"])
+            self.assertEqual(rows["mbf-pending"]["capital_bucket_migration_status"], "pending_cleanup")
+            self.assertEqual(rows["mbf-qc-open"]["capital_bucket_migration_status"], "")
+            self.assertEqual(signals[0]["runtime_id"], "M10-PA-004-MBF-QC-1d")
+
     def test_price_action_realtime_detector_generates_daily_and_5m_signals(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1046,6 +1223,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
         additional_runtime_bucket_routes: dict[str, list[str]] | None = None,
         virtual_capital_buckets: dict[str, dict] | None = None,
         epoch_state: dict | None = None,
+        migration_state: dict | None = None,
     ):
         allowed_runtime_ids = allowed_runtime_ids or ["M10-PA-004-long-1d", "M10-PA-013-1d"]
         runtime_position_multipliers = runtime_position_multipliers or {
@@ -1097,6 +1275,9 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
         if epoch_state is not None:
             self.write_json(root / "epoch.json", epoch_state)
             payload["inputs"]["test_epoch_state"] = str(root / "epoch.json")
+        if migration_state is not None:
+            self.write_json(root / "migration.json", migration_state)
+            payload["inputs"]["capital_bucket_migration_state"] = str(root / "migration.json")
         config_path = root / "router_config.json"
         self.write_json(config_path, payload)
         return load_config(config_path)
