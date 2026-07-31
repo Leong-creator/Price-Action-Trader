@@ -228,6 +228,22 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK runtime symbol_limit must be between 1 and 500")
     if config.trading_symbol_limit <= 0 or config.trading_symbol_limit > config.symbol_limit:
         raise ValueError("M15 SDK runtime trading_symbol_limit must be between 1 and symbol_limit")
+    if config.trading_symbol_limit > 147:
+        upgrade_gate = market_data.get("expansion_trade_pool_upgrade_gate") or {}
+        required_coverage = f"{config.symbol_limit}/{config.symbol_limit}"
+        if (
+            upgrade_gate.get("enabled") is not True
+            or upgrade_gate.get("required_readonly_gate_passed") is not True
+            or upgrade_gate.get("required_complete_trading_daily_context") is not True
+            or upgrade_gate.get("required_complete_subscribed_daily_context") is not True
+            or str(upgrade_gate.get("required_subscription_coverage") or "")
+            != required_coverage
+            or int(upgrade_gate.get("target_trading_symbol_limit") or 0)
+            != config.trading_symbol_limit
+        ):
+            raise ValueError(
+                "M15 SDK expanded trading universe requires a complete upgrade gate"
+            )
     if config.universe_path is not None:
         universe_symbols = load_m15_universe(config.universe_path)
         if config.symbol_limit > len(universe_symbols):
@@ -748,14 +764,14 @@ class FiveMinuteBarBuilder:
         total_volume = max(0, int_like(raw_total))
         previous_total = self._quote_total_volume.get(symbol)
         previous_source_at = self._quote_last_source_at.get(symbol)
-        self._quote_last_source_at[symbol] = source_at
         if previous_source_at is not None and source_at < previous_source_at:
             return 0, "quote_timestamp_regressed"
+        if previous_total is not None and total_volume < previous_total:
+            return 0, "quote_total_volume_regressed"
+        self._quote_last_source_at[symbol] = source_at
         self._quote_total_volume[symbol] = total_volume
         if previous_total is None:
             return 0, ""
-        if total_volume < previous_total:
-            return 0, "quote_total_volume_regressed"
         return total_volume - previous_total, ""
 
 

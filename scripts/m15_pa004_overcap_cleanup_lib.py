@@ -163,6 +163,8 @@ def build_cleanup_plan(
     blockers: list[dict[str, Any]] = []
     if not account_state.get("paper_account_verified"):
         blockers.append({"code": "paper_account_not_verified"})
+    if str(account_state.get("account_channel") or "") != "lb_papertrading":
+        blockers.append({"code": "paper_account_channel_mismatch"})
     critical_errors = list(account_state.get("critical_errors") or [])
     if critical_errors:
         blockers.append(
@@ -185,6 +187,8 @@ def build_cleanup_plan(
         blockers.append({"code": "no_target_open_batches"})
 
     digest = plan_digest(rows)
+    affected_buckets = sorted({str(row["capital_bucket"]) for row in rows})
+    affected_runtimes = sorted({str(row["runtime_id"]) for row in rows})
     return {
         "schema_version": "m15.pa004-overcap-cleanup.v1",
         "stage": "M15.pa004_overcap_cleanup",
@@ -197,10 +201,10 @@ def build_cleanup_plan(
         "paper_simulated_only": True,
         "live_execution": False,
         "real_money_actions": False,
-        "target_buckets": sorted(TARGET_BUCKETS),
-        "target_runtimes": sorted(TARGET_RUNTIMES),
+        "target_buckets": affected_buckets,
+        "target_runtimes": affected_runtimes,
         "capital_bucket_states": {
-            bucket: {"status": "pending_cleanup"} for bucket in sorted(TARGET_BUCKETS)
+            bucket: {"status": "pending_cleanup"} for bucket in affected_buckets
         },
         "plan_digest": digest,
         "planned_batch_count": len(rows),
@@ -321,6 +325,9 @@ def advance_cleanup_state(
     if account_state.get("paper_account_verified") is not True:
         state.update({"status": "waiting_for_fresh_paper_account", "reason": "paper_account_not_verified"})
         return state
+    if str(account_state.get("account_channel") or "") != "lb_papertrading":
+        state.update({"status": "blocked", "reason": "paper_account_channel_mismatch"})
+        return state
     if account_state.get("critical_errors"):
         state.update({"status": "waiting_for_fresh_paper_account", "reason": "account_state_has_critical_errors"})
         return state
@@ -359,12 +366,19 @@ def advance_cleanup_state(
         if str(row.get("client_request_id") or "") not in submissions
     ]
     if not remaining:
+        affected_buckets = sorted(
+            {
+                str(row.get("capital_bucket") or "")
+                for row in orders
+                if str(row.get("capital_bucket") or "")
+            }
+        )
         state.update({
             "status": "complete",
             "completed_at": state["updated_at"],
             "blocks_new_entries": False,
             "capital_bucket_states": {
-                bucket: {"status": "active"} for bucket in sorted(TARGET_BUCKETS)
+                bucket: {"status": "active"} for bucket in affected_buckets
             },
             "bucket_baselines": {
                 bucket: {
@@ -373,7 +387,7 @@ def advance_cleanup_state(
                     "exclude_prior_batches": True,
                     "cleanup_epoch_id": str(state.get("cleanup_epoch_id") or ""),
                 }
-                for bucket in sorted(TARGET_BUCKETS)
+                for bucket in affected_buckets
             },
         })
         return state

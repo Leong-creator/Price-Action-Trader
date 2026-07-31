@@ -1039,6 +1039,36 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["market_data_blocked_reason"], "quote_total_volume_regressed")
 
+    def test_regressed_cumulative_volume_does_not_replace_last_good_baseline(self) -> None:
+        builder = FiveMinuteBarBuilder(minutes=5)
+        first = datetime(2026, 7, 15, 13, 31, tzinfo=UTC)
+        regressed = datetime(2026, 7, 15, 13, 32, tzinfo=UTC)
+        recovered = datetime(2026, 7, 15, 13, 33, tzinfo=UTC)
+
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(first.timestamp()), "last_done": "200", "volume": 1000},
+            received_at=first,
+        )
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(regressed.timestamp()), "last_done": "199", "volume": 999},
+            received_at=regressed,
+        )
+        builder.on_quote(
+            "AAPL.US",
+            {"timestamp": int(recovered.timestamp()), "last_done": "202", "volume": 1010},
+            received_at=recovered,
+        )
+        rows = builder.flush(datetime(2026, 7, 15, 13, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["volume"], "10")
+        self.assertEqual(
+            rows[0]["market_data_blocked_reason"],
+            "quote_total_volume_regressed",
+        )
+
     def test_sdk_snapshot_poll_builds_bar_from_cumulative_volume_deltas(self) -> None:
         builder = FiveMinuteBarBuilder(minutes=5)
         first = datetime(2026, 7, 28, 14, 31, tzinfo=UTC)
@@ -1960,6 +1990,22 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(len(symbols), 300)
         self.assertEqual(len(trading_symbols), 300)
         self.assertIn("PSKY.US", trading_symbols)
+
+    def test_expanded_trading_pool_requires_runtime_upgrade_gate(self) -> None:
+        payload = json.loads(
+            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        payload["market_data"]["expansion_trade_pool_upgrade_gate"]["enabled"] = False
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "runtime.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(
+                ValueError,
+                "expanded trading universe requires a complete upgrade gate",
+            ):
+                load_config(path)
 
     def test_expanded_readonly_config_is_isolated_and_dispatch_disabled(self) -> None:
         default = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))

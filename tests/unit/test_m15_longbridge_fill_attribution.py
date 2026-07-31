@@ -688,6 +688,17 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
         self.assertFalse(layers["actual_account_total"]["valuation_available"])
         self.assertEqual(layers["actual_account_total"]["gross_market_value"], "")
         self.assertEqual(layers["actual_account_total"]["unrealized_pnl"], "")
+        self.assertFalse(layers["attributed_virtual_total"]["valuation_available"])
+        self.assertEqual(layers["attributed_virtual_total"]["gross_market_value"], "")
+        self.assertEqual(layers["attributed_virtual_total"]["unrealized_pnl"], "")
+        self.assertFalse(layers["runtime_rows"][0]["valuation_available"])
+        self.assertEqual(layers["runtime_rows"][0]["gross_market_value"], "")
+        self.assertEqual(layers["bucket_rows"][0]["unrealized_pnl"], "")
+        self.assertFalse(layers["symbol_rows"][0]["attributed_valuation_available"])
+        self.assertEqual(
+            layers["symbol_rows"][0]["attributed_gross_market_value"],
+            "",
+        )
         self.assertEqual(layers["unreconciled_delta"]["net_quantity"], "0.0000")
         self.assertEqual(layers["unreconciled_delta"]["gross_market_value"], "")
 

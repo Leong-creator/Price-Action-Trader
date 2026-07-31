@@ -683,6 +683,7 @@ def build_virtual_position_layers(
     attributed_net_quantity = ZERO
     attributed_batch_count = 0
     total_virtual_gross_exposure = ZERO
+    attributed_valuation_complete = bool(batches)
 
     today_open_batches: list[dict[str, Any]] = []
     active_market_date = market_date or ""
@@ -693,15 +694,17 @@ def build_virtual_position_layers(
         open_price = _decimal(batch.get("open_price"))
         direction = str(batch.get("direction") or "long")
         signed_quantity = -remaining_quantity if direction == "short" else remaining_quantity
-        market_price = (
-            holding["market_price"]
-            if holding is not None and holding["market_price"] > ZERO
-            else open_price
+        valuation_available = bool(
+            holding is not None and holding.get("valuation_available")
         )
+        attributed_valuation_complete = (
+            attributed_valuation_complete and valuation_available
+        )
+        market_price = holding["market_price"] if valuation_available else ZERO
         price_source = (
             "longbridge_holding_market_price"
-            if holding is not None and holding["market_price"] > ZERO
-            else "virtual_open_price_fallback"
+            if valuation_available
+            else "waiting_for_longbridge_position_market_price"
         )
         gross_market_value = remaining_quantity * market_price
         signed_market_value = -gross_market_value if direction == "short" else gross_market_value
@@ -734,9 +737,13 @@ def build_virtual_position_layers(
                 "bucket_count": 0,
                 "runtime_count": 0,
                 "batch_count": 0,
+                "attributed_valuation_available": True,
                 "buckets": [],
                 "runtimes": [],
             },
+        )
+        symbol_entry["attributed_valuation_available"] = bool(
+            symbol_entry["attributed_valuation_available"] and valuation_available
         )
         symbol_entry["attributed_net_quantity"] = _fmt_quantity(
             _decimal(symbol_entry["attributed_net_quantity"]) + signed_quantity
@@ -768,7 +775,11 @@ def build_virtual_position_layers(
                 "net_quantity": ZERO,
                 "bucket_values": {},
                 "runtime_ids": set(),
+                "valuation_available": True,
             },
+        )
+        concentration_entry["valuation_available"] = bool(
+            concentration_entry["valuation_available"] and valuation_available
         )
         concentration_entry["gross_market_value"] += gross_market_value
         concentration_entry["net_quantity"] += signed_quantity
@@ -784,6 +795,7 @@ def build_virtual_position_layers(
             signed_quantity=signed_quantity,
             gross_market_value=gross_market_value,
             unrealized=unrealized,
+            valuation_available=valuation_available,
         )
         _accumulate_open_position_group(
             bucket_rows,
@@ -791,6 +803,7 @@ def build_virtual_position_layers(
             signed_quantity=signed_quantity,
             gross_market_value=gross_market_value,
             unrealized=unrealized,
+            valuation_available=valuation_available,
         )
 
         metadata = batch.get("metadata") if isinstance(batch.get("metadata"), Mapping) else {}
@@ -803,8 +816,14 @@ def build_virtual_position_layers(
                     "runtime_id": runtime_id,
                     "capital_bucket": bucket,
                     "remaining_quantity": _fmt_quantity(remaining_quantity),
-                    "market_value": _fmt_money(gross_market_value),
-                    "unrealized_pnl": _fmt_money(unrealized),
+                    "market_value": (
+                        _fmt_money(gross_market_value) if valuation_available else ""
+                    ),
+                    "unrealized_pnl": (
+                        _fmt_money(unrealized) if valuation_available else ""
+                    ),
+                    "valuation_available": valuation_available,
+                    "price_source": price_source,
                 }
             )
 
@@ -827,6 +846,7 @@ def build_virtual_position_layers(
                 "bucket_count": 0,
                 "runtime_count": 0,
                 "batch_count": 0,
+                "attributed_valuation_available": True,
                 "buckets": [],
                 "runtimes": [],
             },
@@ -858,16 +878,19 @@ def build_virtual_position_layers(
         )
 
     for symbol, symbol_entry in symbol_rows.items():
+        attributed_symbol_valuation_available = bool(
+            symbol_entry.get("attributed_valuation_available")
+        )
+        if not attributed_symbol_valuation_available:
+            symbol_entry["attributed_gross_market_value"] = ""
+            symbol_entry["attributed_signed_market_value"] = ""
+            symbol_entry["attributed_unrealized_pnl"] = ""
         if symbol not in holdings:
             symbol_entry["unreconciled_net_quantity"] = _fmt_quantity(
                 ZERO - _decimal(symbol_entry["attributed_net_quantity"])
             )
-            symbol_entry["unreconciled_gross_market_value"] = _fmt_money(
-                ZERO - _decimal(symbol_entry["attributed_gross_market_value"])
-            )
-            symbol_entry["unreconciled_unrealized_pnl"] = _fmt_money(
-                ZERO - _decimal(symbol_entry["attributed_unrealized_pnl"])
-            )
+            symbol_entry["unreconciled_gross_market_value"] = ""
+            symbol_entry["unreconciled_unrealized_pnl"] = ""
         symbol_entry["buckets"] = sorted(symbol_entry["buckets"])
         symbol_entry["runtimes"] = sorted(symbol_entry["runtimes"])
 
@@ -880,17 +903,28 @@ def build_virtual_position_layers(
                 "symbol": symbol,
                 "bucket_count": len(bucket_values),
                 "runtime_count": len(row["runtime_ids"]),
-                "gross_market_value": _fmt_money(gross_market_value),
-                "share_of_virtual_gross_exposure_pct": _fmt_ratio(
-                    gross_market_value * Decimal("100") / total_virtual_gross_exposure
-                    if total_virtual_gross_exposure > ZERO
-                    else ZERO
+                "valuation_available": bool(row["valuation_available"]),
+                "gross_market_value": (
+                    _fmt_money(gross_market_value)
+                    if row["valuation_available"]
+                    else ""
+                ),
+                "share_of_virtual_gross_exposure_pct": (
+                    _fmt_ratio(
+                        gross_market_value * Decimal("100") / total_virtual_gross_exposure
+                        if total_virtual_gross_exposure > ZERO
+                        else ZERO
+                    )
+                    if row["valuation_available"]
+                    else ""
                 ),
                 "net_quantity": _fmt_quantity(row["net_quantity"]),
                 "bucket_breakdown": [
                     {
                         "capital_bucket": bucket,
-                        "gross_market_value": _fmt_money(value),
+                        "gross_market_value": (
+                            _fmt_money(value) if row["valuation_available"] else ""
+                        ),
                     }
                     for bucket, value in sorted(
                         bucket_values.items(),
@@ -940,9 +974,27 @@ def build_virtual_position_layers(
                 if _decimal(row.get("attributed_gross_market_value")) > ZERO
             ),
             "batch_count": attributed_batch_count,
-            "gross_market_value": _fmt_money(attributed_gross_market_value),
-            "signed_market_value": _fmt_money(attributed_signed_market_value),
-            "unrealized_pnl": _fmt_money(attributed_unrealized),
+            "valuation_available": attributed_valuation_complete,
+            "valuation_status": (
+                "longbridge_position_valuation_available"
+                if attributed_valuation_complete
+                else "waiting_for_longbridge_position_market_price"
+            ),
+            "gross_market_value": (
+                _fmt_money(attributed_gross_market_value)
+                if attributed_valuation_complete
+                else ""
+            ),
+            "signed_market_value": (
+                _fmt_money(attributed_signed_market_value)
+                if attributed_valuation_complete
+                else ""
+            ),
+            "unrealized_pnl": (
+                _fmt_money(attributed_unrealized)
+                if attributed_valuation_complete
+                else ""
+            ),
             "net_quantity": _fmt_quantity(attributed_net_quantity),
         },
         "unreconciled_delta": {
@@ -984,11 +1036,28 @@ def build_virtual_position_layers(
                 sum((_decimal(row.get("estimated_net_pnl")) for row in completed_today_rows), ZERO)
             ),
             "still_held_batch_count": len(today_open_batches),
-            "still_held_unrealized_pnl": _fmt_money(
-                sum((_decimal(row.get("unrealized_pnl")) for row in today_open_batches), ZERO)
+            "still_held_valuation_available": all(
+                bool(row.get("valuation_available")) for row in today_open_batches
             ),
-            "still_held_market_value": _fmt_money(
-                sum((_decimal(row.get("market_value")) for row in today_open_batches), ZERO)
+            "still_held_unrealized_pnl": (
+                _fmt_money(
+                    sum(
+                        (_decimal(row.get("unrealized_pnl")) for row in today_open_batches),
+                        ZERO,
+                    )
+                )
+                if all(bool(row.get("valuation_available")) for row in today_open_batches)
+                else ""
+            ),
+            "still_held_market_value": (
+                _fmt_money(
+                    sum(
+                        (_decimal(row.get("market_value")) for row in today_open_batches),
+                        ZERO,
+                    )
+                )
+                if all(bool(row.get("valuation_available")) for row in today_open_batches)
+                else ""
             ),
             "bought_then_sold_rows": completed_today_rows[-20:],
             "still_held_rows": today_open_batches[-20:],
@@ -1062,6 +1131,7 @@ def _accumulate_open_position_group(
     signed_quantity: Decimal,
     gross_market_value: Decimal,
     unrealized: Decimal,
+    valuation_available: bool,
 ) -> None:
     if not group_id:
         return
@@ -1072,12 +1142,16 @@ def _accumulate_open_position_group(
             "gross_market_value": ZERO,
             "unrealized_pnl": ZERO,
             "batch_count": 0,
+            "valuation_available": True,
         },
     )
     row["signed_quantity"] += signed_quantity
     row["gross_market_value"] += gross_market_value
     row["unrealized_pnl"] += unrealized
     row["batch_count"] += 1
+    row["valuation_available"] = bool(
+        row["valuation_available"] and valuation_available
+    )
 
 
 def _finalize_open_position_groups(
@@ -1089,8 +1163,17 @@ def _finalize_open_position_groups(
             key_name: group_id,
             "batch_count": row["batch_count"],
             "net_quantity": _fmt_quantity(row["signed_quantity"]),
-            "gross_market_value": _fmt_money(row["gross_market_value"]),
-            "unrealized_pnl": _fmt_money(row["unrealized_pnl"]),
+            "valuation_available": bool(row["valuation_available"]),
+            "gross_market_value": (
+                _fmt_money(row["gross_market_value"])
+                if row["valuation_available"]
+                else ""
+            ),
+            "unrealized_pnl": (
+                _fmt_money(row["unrealized_pnl"])
+                if row["valuation_available"]
+                else ""
+            ),
         }
         for group_id, row in sorted(
             groups.items(),

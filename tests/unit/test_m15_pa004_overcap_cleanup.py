@@ -36,6 +36,7 @@ def _batch(bucket: str = "pa004_mbf") -> dict:
 def _account(available: str = "2") -> dict:
     return {
         "paper_account_verified": True,
+        "account_channel": "lb_papertrading",
         "critical_errors": [],
         "positions": [
             {
@@ -76,6 +77,68 @@ class Pa004OvercapCleanupTest(unittest.TestCase):
             plan["blockers"][0]["code"],
             "planned_quantity_exceeds_broker_available",
         )
+
+    def test_blocks_non_paper_account_channel_before_submission(self) -> None:
+        account = _account()
+        account["account_channel"] = "lb_live"
+        plan = build_cleanup_plan(
+            {"batches": [_batch()]},
+            account,
+            cleanup_epoch_id="cleanup-1",
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertTrue(
+            any(
+                row["code"] == "paper_account_channel_mismatch"
+                for row in plan["blockers"]
+            )
+        )
+
+        class Client:
+            def submit_order(self, payload: dict) -> dict:
+                raise AssertionError("non-paper cleanup must never submit")
+
+        plan["status"] = "pending_cleanup"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = advance_cleanup_state(
+                plan,
+                account,
+                Client(),
+                now=datetime(2026, 7, 31, 14, 0, tzinfo=UTC),
+                execution_ledger_path=Path(temp_dir) / "ledger.jsonl",
+            )
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["reason"], "paper_account_channel_mismatch")
+
+    def test_only_affected_bucket_is_blocked_and_rebaselined(self) -> None:
+        plan = build_cleanup_plan(
+            {"batches": [_batch("pa004_mbf")]},
+            _account(),
+            cleanup_epoch_id="cleanup-1",
+        )
+        self.assertEqual(plan["target_buckets"], ["pa004_mbf"])
+        self.assertEqual(list(plan["capital_bucket_states"]), ["pa004_mbf"])
+
+        request_id = plan["orders"][0]["client_request_id"]
+        plan["status"] = "submitted_waiting_broker_fill"
+        plan["submissions"] = {
+            request_id: {
+                "order_id": "close-1",
+                "status": "submitted_waiting_broker_fill",
+            }
+        }
+        account = _account()
+        account["orders"] = [{"order_id": "close-1", "status": "Filled"}]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = advance_cleanup_state(
+                plan,
+                account,
+                object(),
+                now=datetime(2026, 7, 31, 14, 1, tzinfo=UTC),
+                execution_ledger_path=Path(temp_dir) / "ledger.jsonl",
+            )
+        self.assertEqual(list(state["bucket_baselines"]), ["pa004_mbf"])
+        self.assertNotIn("pa004_mbf_qc", state["capital_bucket_states"])
 
     def test_blocks_existing_sell_order(self) -> None:
         account = _account()
