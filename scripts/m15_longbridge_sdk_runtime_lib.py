@@ -1526,7 +1526,7 @@ def fmt(value: Decimal) -> str:
 def sdk_object_to_dict(value: Any) -> dict[str, Any]:
     """Normalise PyO3 SDK callback objects without depending on internals."""
     if isinstance(value, dict):
-        return value
+        return {str(key): sdk_plain_value(item) for key, item in value.items()}
     result: dict[str, Any] = {}
     for key in (
         "symbol", "sub_types", "timestamp", "last_done", "current_volume", "volume", "trades", "price", "open",
@@ -1537,5 +1537,18 @@ def sdk_object_to_dict(value: Any) -> dict[str, Any]:
             if key == "trades" and item is not None:
                 result[key] = [sdk_object_to_dict(trade) for trade in item]
             else:
-                result[key] = item
+                result[key] = sdk_plain_value(item)
     return result
+
+
+def sdk_plain_value(value: Any) -> Any:
+    """Convert nested PyO3 enum values before crossing process boundaries."""
+    if value is None or type(value) in (str, int, float, bool):
+        return value
+    if isinstance(value, (Decimal, datetime)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): sdk_plain_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [sdk_plain_value(item) for item in value]
+    return str(value)

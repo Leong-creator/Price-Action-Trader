@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import inspect
 import json
+import pickle
 import textwrap
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -20,7 +21,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
     daily_context_is_complete, fresh_market_events, load_config,
     load_current_sdk_intraday_context,
-    load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, subscribe_private_trade_updates,
+    load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, sdk_object_to_dict, subscribe_private_trade_updates,
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
     market_event_is_tradable, trading_market_events,
@@ -62,6 +63,28 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_sdk_quote_payload_converts_unpicklable_trade_session_enum(self) -> None:
+        class UnpicklableTradeSession(int):
+            def __new__(cls):
+                return super().__new__(cls, 0)
+
+            def __str__(self) -> str:
+                return "TradeSession.Normal"
+
+            def __reduce__(self):
+                raise TypeError("cannot pickle TradeSession")
+
+        payload = sdk_object_to_dict(
+            SimpleNamespace(
+                symbol="AAPL.US",
+                last_done=Decimal("210.50"),
+                trade_session=UnpicklableTradeSession(),
+            )
+        )
+
+        self.assertEqual(payload["trade_session"], "TradeSession.Normal")
+        pickle.dumps(payload)
+
     def test_only_oauth_or_missing_trade_context_triggers_rebuild(self) -> None:
         self.assertTrue(
             trade_context_health_requires_rebuild(
