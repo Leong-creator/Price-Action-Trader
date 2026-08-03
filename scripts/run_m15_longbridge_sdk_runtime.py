@@ -2028,11 +2028,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             if (
                 not worker_ready
                 and time.monotonic() - worker_last_progress
-                > config.subscription_deadline_seconds
+                > (
+                    config.market_data_heartbeat_deadline_seconds
+                    if snapshot_fallback_active
+                    else config.subscription_deadline_seconds
+                )
             ):
+                startup_deadline_seconds = (
+                    config.market_data_heartbeat_deadline_seconds
+                    if snapshot_fallback_active
+                    else config.subscription_deadline_seconds
+                )
                 last_subscription_failure_reason = (
                     "sdk_quote_subscription_deadline_exceeded:"
-                    f"{config.subscription_deadline_seconds}s_without_progress:"
+                    f"{startup_deadline_seconds}s_without_progress:"
                     f"{subscription_progress_completed}/{subscription_progress_total}"
                 )
                 attempts += 1

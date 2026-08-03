@@ -182,6 +182,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "config.market_data_heartbeat_deadline_seconds",
             source,
         )
+        self.assertIn(
+            "if snapshot_fallback_active",
+            source,
+        )
 
     def test_runtime_initializes_snapshot_builder_before_any_fallback_worker_start(self) -> None:
         source = inspect.getsource(
