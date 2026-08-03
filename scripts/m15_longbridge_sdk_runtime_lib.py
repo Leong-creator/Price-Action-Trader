@@ -1395,11 +1395,14 @@ def sdk_order_maintenance_actions(
     exit_order_reprice_seconds: int,
 ) -> list[dict[str, Any]]:
     """Plan SDK-native maintenance only for orders attributable to M15 signals."""
-    execution_by_signal = {
-        str(row.get("signal_id") or ""): row
-        for row in execution_rows
-        if isinstance(row, dict) and str(row.get("signal_id") or "")
-    }
+    execution_by_order_id: dict[str, dict[str, Any]] = {}
+    for row in execution_rows:
+        if not isinstance(row, dict):
+            continue
+        for field in ("broker_order_id", "longbridge_order_id", "order_id"):
+            execution_order_id = str(row.get(field) or "").strip()
+            if execution_order_id:
+                execution_by_order_id[execution_order_id] = row
     latest_prices: dict[str, tuple[str, Decimal]] = {}
     for row in market_events:
         if str(row.get("timeframe") or "") != "5m":
@@ -1415,14 +1418,10 @@ def sdk_order_maintenance_actions(
         if not isinstance(order, dict) or order.get("sdk_pending_confirmation"):
             continue
         order_id = str(order.get("order_id") or "")
-        remark = str(order.get("remark") or "").strip()
-        signal_id = remark if remark in execution_by_signal else next(
-            (token for token in remark.split() if token in execution_by_signal),
-            "",
-        )
-        metadata = execution_by_signal.get(signal_id)
+        metadata = execution_by_order_id.get(order_id)
         if not order_id or metadata is None:
             continue
+        signal_id = str(metadata.get("signal_id") or "")
         submitted_at = _sdk_order_datetime(order.get("updated_at") or order.get("submitted_at"))
         if submitted_at is None:
             continue

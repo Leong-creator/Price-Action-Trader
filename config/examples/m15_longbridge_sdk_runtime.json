@@ -58,7 +58,7 @@
     "snapshot_poll_interval_seconds": 3,
     "subscription_failures_before_snapshot_fallback": 1,
     "snapshot_poll_dispatch_max_elapsed_ms": 2500,
-    "snapshot_poll_min_successful_cycles": 5,
+    "snapshot_poll_min_successful_cycles": 1,
     "market_data_heartbeat_deadline_seconds": 5,
     "account_snapshot_interval_seconds": 15,
     "account_snapshot_refresh_deadline_seconds": 8,

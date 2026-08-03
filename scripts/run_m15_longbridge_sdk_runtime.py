@@ -710,6 +710,8 @@ def quote_snapshot_worker(config_path: str, queue_out: Any, stop_event: Any) -> 
                     "market_data_mode": "sdk_snapshot_poll",
                     "poll_elapsed_ms": poll_elapsed_ms,
                     "poll_is_fast_and_complete": poll_is_fast_and_complete,
+                    "poll_covered_count": len(covered),
+                    "poll_missing_count": len(missing),
                     "successful_fast_polls": successful_fast_polls,
                 },
             )
@@ -1914,6 +1916,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_batch_count = 0
     snapshot_row_count = 0
     snapshot_completed_bar_count = 0
+    snapshot_poll_covered_count = 0
+    snapshot_poll_missing_count = 0
+    snapshot_poll_successful_fast_polls = 0
+    snapshot_poll_is_fast_and_complete = False
+    last_market_data_worker_error = ""
     previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
 
     def stop_requested(_signum: int, _frame: Any) -> None:
@@ -1952,6 +1959,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                                 "run_id": run_id,
                                 "runtime_pid": os.getpid(),
                                 "dispatch_enabled": False,
+                                "dispatch_requested": dispatch_requested,
+                                "config_fingerprint": loaded_config_fingerprint,
                                 "worker_attempts": attempts,
                                 "last_subscription_failure_reason": last_subscription_failure_reason,
                                 "market_data_mode": "sdk_snapshot_poll",
@@ -1974,7 +1983,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         oauth_client_id_present=True,
                         extra={
                             "run_id": run_id,
+                            "runtime_pid": os.getpid(),
                             "dispatch_enabled": False,
+                            "dispatch_requested": dispatch_requested,
+                            "config_fingerprint": loaded_config_fingerprint,
                             "worker_attempts": attempts,
                             "last_subscription_failure_reason": last_subscription_failure_reason,
                         },
@@ -2042,7 +2054,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and market_data_heartbeat_grace_elapsed(
                     worker_ready_since,
                     time.monotonic(),
-                    config.subscription_deadline_seconds,
+                    (
+                        config.market_data_heartbeat_deadline_seconds
+                        if market_data_mode == "sdk_snapshot_poll"
+                        else config.subscription_deadline_seconds
+                    ),
                 )
                 and market_data_heartbeat_is_stale(
                     worker_last_progress,
@@ -2372,6 +2388,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 snapshot_poll_elapsed_ms = int(
                     message.get("poll_elapsed_ms") or snapshot_poll_elapsed_ms
                 )
+                snapshot_poll_covered_count = int(
+                    message.get("poll_covered_count") or snapshot_poll_covered_count
+                )
+                snapshot_poll_missing_count = int(
+                    message.get("poll_missing_count") or 0
+                )
+                snapshot_poll_successful_fast_polls = int(
+                    message.get("successful_fast_polls") or 0
+                )
+                snapshot_poll_is_fast_and_complete = bool(
+                    message.get("poll_is_fast_and_complete")
+                )
                 if (
                     market_data_mode == "sdk_snapshot_poll"
                     and message.get("poll_is_fast_and_complete") is True
@@ -2390,6 +2418,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_subscription_failure_reason = str(
                     message.get("reason") or "sdk_quote_worker_failed"
                 )
+                last_market_data_worker_error = last_subscription_failure_reason
                 subscription_failed = [last_subscription_failure_reason]
                 attempts += 1
                 if worker is not None:
@@ -2737,6 +2766,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         else 0
                     ),
                     "snapshot_poll_elapsed_ms": snapshot_poll_elapsed_ms,
+                    "snapshot_poll_covered_count": snapshot_poll_covered_count,
+                    "snapshot_poll_missing_count": snapshot_poll_missing_count,
+                    "snapshot_poll_successful_fast_polls": snapshot_poll_successful_fast_polls,
+                    "snapshot_poll_is_fast_and_complete": snapshot_poll_is_fast_and_complete,
+                    "last_market_data_worker_error": last_market_data_worker_error,
                     "snapshot_batch_count": snapshot_batch_count,
                     "snapshot_row_count": snapshot_row_count,
                     "snapshot_open_bar_count": (

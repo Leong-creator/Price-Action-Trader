@@ -51,6 +51,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     restore_pipeline_observability,
     runtime_requires_health_replacement,
     runtime_owns_quote_connection,
+    run_sdk_order_maintenance,
     run_pending_flatten_cycle,
     run_authorized_account_exit_cycle,
     run_sdk_preflight,
@@ -159,9 +160,27 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         config = load_config()
 
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
+        self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
         self.assertLess(
             config.snapshot_poll_interval_seconds,
             config.market_data_heartbeat_deadline_seconds,
+        )
+
+    def test_snapshot_recovery_uses_short_heartbeat_grace(self) -> None:
+        source = inspect.getsource(
+            __import__(
+                "scripts.run_m15_longbridge_sdk_runtime",
+                fromlist=["run_watch"],
+            ).run_watch
+        )
+
+        self.assertIn(
+            'if market_data_mode == "sdk_snapshot_poll"',
+            source,
+        )
+        self.assertIn(
+            "config.market_data_heartbeat_deadline_seconds",
+            source,
         )
 
     def test_runtime_initializes_snapshot_builder_before_any_fallback_worker_start(self) -> None:
@@ -387,6 +406,59 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 result = start_runtime_daemon(args, config)
 
             self.assertEqual(result, 0)
+            popen.assert_not_called()
+
+    def test_daemon_keeps_matching_dispatch_runtime_during_market_recovery(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            current_pid = __import__("os").getpid()
+            config = SimpleNamespace(
+                output_dir=root,
+                runtime_status_path=root / "runtime-status.json",
+                config_path=root / "runtime-config.json",
+                maximum_account_snapshot_age_seconds=45,
+            )
+            config.runtime_status_path.write_text(
+                json.dumps({
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "status": "reconnecting_market_data_circuit",
+                    "runtime_pid": current_pid,
+                    "config_fingerprint": "expected-fingerprint",
+                    "dispatch_requested": True,
+                }),
+                encoding="utf-8",
+            )
+            global_lock = root / "global-sdk-quote.lock"
+            global_lock.write_text(f"{current_pid}\n", encoding="utf-8")
+            args = SimpleNamespace(dispatch=True, config=str(config.config_path))
+            with (
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_QUOTE_SUBSCRIPTION_LOCK",
+                    global_lock,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_RUNTIME_START_LOCK",
+                    root / "global-start.lock",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.is_expected_sdk_runtime_process",
+                    return_value=True,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.config_fingerprint",
+                    return_value="expected-fingerprint",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
+                ) as shutdown,
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
+                ) as popen,
+            ):
+                result = start_runtime_daemon(args, config)
+
+            self.assertEqual(result, 0)
+            shutdown.assert_not_called()
             popen.assert_not_called()
 
     def test_live_runtime_with_very_stale_account_snapshot_requires_replacement(self) -> None:
@@ -1640,24 +1712,140 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "side": "OrderSide.Buy", "quantity": "1", "executed_quantity": "0",
                     "price": "500", "updated_at": "2026-07-15T15:30:00Z",
                 },
+                {
+                    "order_id": "ENTRY-BY-ID", "remark": "", "symbol": "RDDT.US",
+                    "side": "OrderSide.Buy", "quantity": "2", "executed_quantity": "0",
+                    "price": "148.42", "updated_at": "2026-07-15T15:30:00Z",
+                },
+                {
+                    "order_id": "MANUAL-BLANK", "remark": "", "symbol": "NVDA.US",
+                    "side": "OrderSide.Buy", "quantity": "1", "executed_quantity": "0",
+                    "price": "160", "updated_at": "2026-07-15T15:30:00Z",
+                },
             ]
         }
         actions = sdk_order_maintenance_actions(
             account_state,
             [
-                {"signal_id": "entry-signal", "position_action": "open_long"},
-                {"signal_id": "exit-signal", "position_action": "take_profit"},
+                {
+                    "signal_id": "entry-signal",
+                    "broker_order_id": "ENTRY-1",
+                    "position_action": "open_long",
+                },
+                {
+                    "signal_id": "exit-signal",
+                    "broker_order_id": "EXIT-1",
+                    "position_action": "take_profit",
+                },
+                {
+                    "signal_id": "entry-by-order-id",
+                    "broker_order_id": "ENTRY-BY-ID",
+                    "position_action": "open_long",
+                },
             ],
             [{"symbol": "LI", "timeframe": "5m", "event_time": "2026-07-15T15:45:00Z", "close": "12.80"}],
             now=now,
             stale_entry_order_ttl_seconds=900,
             exit_order_reprice_seconds=60,
         )
-        self.assertEqual([row["action"] for row in actions], ["cancel", "replace"])
+        self.assertEqual([row["action"] for row in actions], ["cancel", "replace", "cancel"])
         self.assertEqual(actions[0]["order_id"], "ENTRY-1")
         self.assertEqual(actions[1]["order_id"], "EXIT-1")
         self.assertEqual(actions[1]["new_price"], "12.73")
         self.assertEqual(actions[1]["price_source"], "current_sdk_price_minus_long_exit_buffer")
+        self.assertEqual(actions[2]["order_id"], "ENTRY-BY-ID")
+        self.assertEqual(actions[2]["signal_id"], "entry-by-order-id")
+
+    def test_sdk_order_maintenance_entrypoint_requires_exact_broker_order_id(self) -> None:
+        now = datetime(2026, 8, 3, 16, 25, tzinfo=UTC)
+
+        class Account:
+            def __init__(self) -> None:
+                self.refresh_count = 0
+
+            def snapshot(self):
+                return {
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "open_orders": [
+                        {
+                            "order_id": "1268941385491324928",
+                            "remark": "",
+                            "symbol": "RDDT.US",
+                            "side": "OrderSide.Buy",
+                            "quantity": "2",
+                            "executed_quantity": "0",
+                            "price": "148.42",
+                            "updated_at": "2026-08-03T14:40:05Z",
+                        },
+                        {
+                            "order_id": "MANUAL-BLANK",
+                            "remark": "",
+                            "symbol": "NVDA.US",
+                            "side": "OrderSide.Buy",
+                            "quantity": "1",
+                            "executed_quantity": "0",
+                            "price": "160",
+                            "updated_at": "2026-08-03T14:40:05Z",
+                        },
+                        {
+                            "order_id": "REMARK-ONLY",
+                            "remark": "m15rt-e656ddd22cac8334",
+                            "symbol": "AAPL.US",
+                            "side": "OrderSide.Buy",
+                            "quantity": "1",
+                            "executed_quantity": "0",
+                            "price": "200",
+                            "updated_at": "2026-08-03T14:40:05Z",
+                        },
+                    ],
+                }
+
+            def refresh(self):
+                self.refresh_count += 1
+
+        class Client:
+            def __init__(self) -> None:
+                self.canceled: list[str] = []
+
+            def cancel_order(self, order_id: str):
+                self.canceled.append(order_id)
+                return {"status": "cancel_requested", "order_id": order_id}
+
+        with TemporaryDirectory() as tmp_dir:
+            config = SimpleNamespace(
+                output_dir=Path(tmp_dir),
+                stale_entry_order_ttl_seconds=900,
+                exit_order_reprice_seconds=60,
+            )
+            account = Account()
+            client = Client()
+            ledger_rows = [
+                {
+                    "signal_id": "m15rt-e656ddd22cac8334",
+                    "broker_order_id": "1268941385491324928",
+                    "longbridge_order_id": "1268941385491324928",
+                    "order_id": "1268941385491324928",
+                    "position_action": "open_long",
+                }
+            ]
+            with patch(
+                "scripts.run_m15_longbridge_sdk_runtime.read_jsonl_tail_rows",
+                return_value=ledger_rows,
+            ):
+                result = run_sdk_order_maintenance(
+                    config,
+                    client,
+                    account,
+                    [],
+                    now=now,
+                )
+
+        self.assertEqual(client.canceled, ["1268941385491324928"])
+        self.assertEqual(result["planned_action_count"], 1)
+        self.assertEqual(result["completed_action_count"], 1)
+        self.assertEqual(result["actions"][0]["signal_id"], "m15rt-e656ddd22cac8334")
+        self.assertEqual(account.refresh_count, 1)
 
     def test_sdk_order_maintenance_does_not_reprice_market_exit(self) -> None:
         now = datetime(2026, 7, 15, 15, 47, tzinfo=UTC)
