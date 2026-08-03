@@ -4,12 +4,14 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
 from scripts.m15_longbridge_realtime_position_manager_lib import (
     LEDGER_JSONL,
     SUMMARY_JSON,
     broker_failed_long_exit_signal_ids,
+    evaluate_position,
     exit_event_priority,
     fill_attributed_open_exposure_by_bucket_symbol,
     load_config,
@@ -19,6 +21,37 @@ from scripts.m15_longbridge_realtime_position_manager_lib import (
 
 
 class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
+    def test_pa002_repaired_five_minute_position_exits_next_market_day(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            row, event = evaluate_position(
+                config,
+                {"symbol": "AAPL", "quantity": "2", "available": "2", "cost_price": "100"},
+                {
+                    "runtime_id": "M10-PA-002-5m-repaired-v1",
+                    "strategy_id": "M10-PA-002",
+                    "position_direction": "long",
+                    "open_order_id": "open-order",
+                    "source_open_trade_id": "open-trade",
+                    "signal_id": "open-signal",
+                    "stop_price": "98",
+                    "target_price": "103",
+                    "open_market_date": "2026-08-03",
+                },
+                latest_price=Decimal("101"),
+                generated_at="2026-08-04T14:00:00Z",
+                existing_signal_ids=set(),
+                recent_exit_attempts=set(),
+                retriable_exit_signal_ids=set(),
+            )
+
+            self.assertEqual(row["exit_reason"], "next_market_day_timeout")
+            self.assertIsNotNone(event)
+            assert event is not None
+            self.assertEqual(event["position_action"], "close_long")
+            self.assertEqual(event["source_open_order_id"], "open-order")
+            self.assertEqual(event["source_open_trade_id"], "open-trade")
+
     def test_filled_historical_broker_exit_is_never_retried(self) -> None:
         rows = [
             {

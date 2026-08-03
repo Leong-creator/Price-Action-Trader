@@ -148,10 +148,18 @@ def run_background_watchdog_once(
     generated_at = generated_at or now_utc_iso()
     runner = command_runner or run_command
     previous = read_json(config.output_dir / SUMMARY_JSON)
+    analytics_step = analytics_refresh_step(config, runner, generated_at, previous=previous)
     steps = [
         m15_runtime_daemon_step(config, runner),
         m15_runtime_status_step(config, runner),
-        analytics_refresh_step(config, runner, generated_at, previous=previous),
+        analytics_step,
+        pa002_milestone_refresh_step(
+            config,
+            runner,
+            generated_at,
+            previous=previous,
+            analytics_step=analytics_step,
+        ),
         run_step(
             "m15_longbridge_dashboard",
             "M15 独立长桥看板刷新",
@@ -405,6 +413,7 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
         "scripts/run_m15_longbridge_sdk_analytics.py",
         "scripts/run_m15_longbridge_dashboard.py",
         "scripts/run_m15_monday_refresh_acceptance.py",
+        "scripts/run_m15_pa002_dual_version_milestone.py",
     }
     script_tokens = [token for token in command if token.startswith("scripts/")]
     if not script_tokens or script_tokens[0] not in allowed_scripts:
@@ -541,6 +550,60 @@ def analytics_refresh_due(generated_at: str, previous_success_at: str, interval_
     except ValueError:
         return True
     return (current - previous).total_seconds() >= interval_seconds
+
+
+def pa002_milestone_refresh_step(
+    config: BackgroundWatchdogConfig,
+    runner: CommandRunner,
+    generated_at: str,
+    *,
+    previous: dict[str, Any],
+    analytics_step: dict[str, Any],
+) -> dict[str, Any]:
+    previous_success_at = latest_step_generated_at(previous, "m15_pa002_dual_version_milestone")
+    if analytics_step.get("skipped_due_to_throttle") is True:
+        return {
+            "step_id": "m15_pa002_dual_version_milestone",
+            "label": "PA002 双版本盘后里程碑评估",
+            "returncode": 0,
+            "elapsed_ms": 0,
+            "command": "",
+            "stdout_tail": f"skipped_until_due interval={config.analytics_refresh_interval_seconds}s",
+            "stderr_tail": "",
+            "skipped_due_to_throttle": True,
+            "last_success_generated_at": previous_success_at,
+        }
+    if int(analytics_step.get("returncode", 1)) != 0:
+        return {
+            "step_id": "m15_pa002_dual_version_milestone",
+            "label": "PA002 双版本盘后里程碑评估",
+            "returncode": 0,
+            "elapsed_ms": 0,
+            "command": "",
+            "stdout_tail": "skipped_because_fill_attribution_refresh_failed",
+            "stderr_tail": "",
+            "skipped_due_to_throttle": False,
+            "skipped_due_to_analytics_failure": True,
+            "last_success_generated_at": previous_success_at,
+        }
+    step = run_step(
+        "m15_pa002_dual_version_milestone",
+        "PA002 双版本盘后里程碑评估",
+        [
+            sys.executable,
+            "scripts/run_m15_pa002_dual_version_milestone.py",
+            "--account-config",
+            project_path(config.m15_account_state_config_path),
+            "--generated-at",
+            generated_at,
+        ],
+        config,
+        runner,
+    )
+    step["skipped_due_to_throttle"] = False
+    step["skipped_due_to_analytics_failure"] = False
+    step["last_success_generated_at"] = generated_at if step.get("returncode") == 0 else previous_success_at
+    return step
 
 
 def latest_step_generated_at(payload: dict[str, Any], step_id: str) -> str:

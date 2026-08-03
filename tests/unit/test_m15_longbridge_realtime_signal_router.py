@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts.m15_longbridge_realtime_execution_lib import LEDGER_JSONL as EXECUTION_LEDGER_JSONL
@@ -11,12 +12,37 @@ from scripts.m15_longbridge_realtime_execution_lib import run_realtime_execution
 from scripts.m15_longbridge_realtime_signal_router_lib import (
     LEDGER_JSONL,
     SUMMARY_JSON,
+    PRICE_ACTION_RUNTIME_SPECS,
+    breakout_followthrough_repair_signal,
     load_config,
     run_realtime_signal_router,
 )
 
 
 class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
+    def test_pa002_repaired_requires_followthrough_and_builds_1_3r_target(self) -> None:
+        rows = [
+            {"open": "99", "high": "100", "low": "98", "close": "99", "event_id": "one"},
+            {"open": "99", "high": "101", "low": "99", "close": "100", "event_id": "two"},
+            {"open": "101", "high": "104", "low": "102", "close": "103.5", "event_id": "breakout"},
+            {"open": "103.5", "high": "105", "low": "103", "close": "104", "event_id": "followthrough"},
+        ]
+
+        signal = breakout_followthrough_repair_signal(
+            "AAPL",
+            rows,
+            spec=PRICE_ACTION_RUNTIME_SPECS["M10-PA-002-5m-repaired-v1"],
+            generated_at=datetime(2026, 8, 3, 15, 0, tzinfo=UTC),
+        )
+
+        self.assertIsNotNone(signal)
+        assert signal is not None
+        risk = float(signal["limit_price"]) - float(signal["stop_price"])
+        reward = float(signal["target_price"]) - float(signal["limit_price"])
+        self.assertAlmostEqual(reward / risk, 1.3, places=2)
+        self.assertTrue(signal["latest_confirms_entry"])
+        self.assertTrue(signal["next_market_day_timeout"])
+
     def test_router_does_not_read_local_simulation_ledger(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

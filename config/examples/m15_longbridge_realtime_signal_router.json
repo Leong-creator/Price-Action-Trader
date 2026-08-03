@@ -22,6 +22,7 @@
     "allowed_runtime_ids": [
       "M10-PA-004-long-1d",
       "M10-PA-002-5m",
+      "M10-PA-002-5m-repaired-v1",
       "M12-FTD-001-baseline-1d",
       "M12-FTD-001-loss-streak-guard-1d",
       "M10-PA-004-MBF-1d",
@@ -42,6 +43,7 @@
     "runtime_position_multipliers": {
       "M10-PA-004-long-1d": "1.0",
       "M10-PA-002-5m": "1.0",
+      "M10-PA-002-5m-repaired-v1": "1.0",
       "M12-FTD-001-baseline-1d": "1.0",
       "M12-FTD-001-loss-streak-guard-1d": "1.0",
       "M10-PA-004-MBF-1d": "1.0",
@@ -73,7 +75,7 @@
       ]
     },
     "pa002_5m": {
-      "label": "PA002-5m单仓（M10-PA-002-5m）",
+      "label": "PA002-5m现行版单仓（M10-PA-002-5m）",
       "equity": "10000",
       "max_total_exposure": "6000",
       "max_symbol_exposure": "1500",
@@ -81,6 +83,17 @@
       "min_cash_reserve": "4000",
       "runtime_ids": [
         "M10-PA-002-5m"
+      ]
+    },
+    "pa002_5m_repaired_v1": {
+      "label": "PA002-5m原规则复刻版单仓（M10-PA-002-5m-repaired-v1）",
+      "equity": "10000",
+      "max_total_exposure": "6000",
+      "max_symbol_exposure": "1500",
+      "max_risk_per_order": "20",
+      "min_cash_reserve": "4000",
+      "runtime_ids": [
+        "M10-PA-002-5m-repaired-v1"
       ]
     },
     "ftd_baseline": {
@@ -224,6 +237,7 @@
     },
     "runtime_minimum_reward_r": {
       "M10-PA-001": "2.0",
+      "M10-PA-002-5m-repaired-v1": "1.3",
       "M10-PA-002-5m-short": "2.0",
       "M10-PA-013-5m-short": "2.0",
       "M10-PA-011-ORB-R1-5m-short": "2.25"

@@ -9,6 +9,7 @@ from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from scripts.m15_longbridge_fill_attribution_lib import (
     apply_account_reconciliation_adjustments,
@@ -56,6 +57,8 @@ SUMMARY_JSON = "m15_longbridge_realtime_position_manager.json"
 LEDGER_JSONL = "m15_longbridge_realtime_position_manager_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_position_manager.md"
 ZERO = Decimal("0")
+NEW_YORK = ZoneInfo("America/New_York")
+PA002_REPAIRED_RUNTIME_ID = "M10-PA-002-5m-repaired-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -461,6 +464,13 @@ def evaluate_position(
     management_scope = "m15_realtime_managed"
     management_note = "本轮 M15 实时链路管理的长桥模拟账户持仓。"
     exit_reason = ""
+    current_market_date = parse_signal_time(generated_at)
+    current_market_date_text = (
+        current_market_date.astimezone(NEW_YORK).date().isoformat()
+        if current_market_date is not None
+        else ""
+    )
+    open_market_date = str(metadata.get("open_market_date") or "")
     if metadata.get("attribution_mismatch"):
         status = "fill_attribution_mismatch_frozen"
         management_scope = "longbridge_account_attribution_frozen"
@@ -502,6 +512,14 @@ def evaluate_position(
         status = "missing_latest_price"
     elif stop_price <= ZERO or target_price <= ZERO:
         status = "missing_stop_or_target_metadata"
+    elif (
+        runtime_id == PA002_REPAIRED_RUNTIME_ID
+        and position_direction == "long"
+        and open_market_date
+        and current_market_date_text > open_market_date
+    ):
+        status = "exit_signal_created"
+        exit_reason = "next_market_day_timeout"
     elif position_direction == "short":
         if latest_price >= stop_price:
             status = "exit_signal_created"
@@ -572,7 +590,11 @@ def evaluate_position(
                     "timeframe": str(metadata.get("timeframe", "")),
                     "direction": position_direction,
                     "side": "buy" if position_direction == "short" else "sell",
-                    "position_action": "close_short" if position_direction == "short" else exit_reason,
+                    "position_action": (
+                        "close_short"
+                        if position_direction == "short"
+                        else ("close_long" if exit_reason == "next_market_day_timeout" else exit_reason)
+                    ),
                     "exit_reason": exit_reason,
                     "order_type": "limit",
                     "limit_price": fmt_money(exit_limit_price),
@@ -593,6 +615,7 @@ def evaluate_position(
                     "longbridge_position_exit_source": True,
                     "longbridge_untracked_exit_only": management_scope == "longbridge_account_exit_only",
                     "test_epoch_id": config.test_epoch_id,
+                    "open_market_date": open_market_date,
                     "exit_limit_price_source": exit_limit_price_source,
                 }
     row = {
@@ -938,6 +961,14 @@ def enrich_fill_attribution_batch_metadata(
         "created_at",
         "submitted_at",
         "position_action",
+        "repair_rule_id",
+        "source_breakout_entry_price",
+        "latest_confirms_entry",
+        "next_market_day_timeout",
+        "close_position",
+        "volume_ratio",
+        "market_confirmation_status",
+        "quality_score",
     )
     for batch in attribution.get("batches", []):
         if not isinstance(batch, dict):
@@ -1012,6 +1043,7 @@ def fill_attributed_long_position_slices(
                     "position_direction": "long",
                     "open_order_id": str(batch.get("open_order_id") or ""),
                     "source_open_trade_id": str(batch.get("trade_id") or ""),
+                    "open_market_date": str(batch.get("open_market_date") or ""),
                     "virtual_position_quantity": fmt_decimal(quantity),
                     "virtual_position_slice_quantity": fmt_decimal(quantity),
                     "virtual_position_slice_available": fmt_decimal(available),

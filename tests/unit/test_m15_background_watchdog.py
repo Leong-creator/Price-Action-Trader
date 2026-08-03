@@ -11,6 +11,7 @@ from scripts.m15_background_watchdog_lib import (
     load_config,
     run_background_watchdog_once,
     m15_runtime_status_step,
+    pa002_milestone_refresh_step,
     should_append_watchdog_ledger,
     start_daemon,
     status,
@@ -18,6 +19,25 @@ from scripts.m15_background_watchdog_lib import (
 
 
 class M15BackgroundWatchdogTest(unittest.TestCase):
+    def test_pa002_milestone_skips_when_fill_attribution_refresh_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+
+            def unexpected_runner(_command: list[str], _timeout: int):
+                self.fail("milestone evaluator must not read stale attribution after refresh failure")
+
+            step = pa002_milestone_refresh_step(
+                config,
+                unexpected_runner,
+                "2026-08-03T20:30:00Z",
+                previous={},
+                analytics_step={"returncode": 1, "skipped_due_to_throttle": False},
+            )
+
+            self.assertEqual(step["returncode"], 0)
+            self.assertTrue(step["skipped_due_to_analytics_failure"])
+            self.assertIn("refresh_failed", step["stdout_tail"])
+
     def test_status_never_reports_stale_health_when_process_is_dead(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp))
@@ -217,6 +237,53 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertFalse(any(step["step_id"].startswith("m12_47_") for step in payload["steps"]))
             self.assertEqual(payload["watchdog_status"], "healthy")
             self.assertTrue(payload["local_research_non_blocking"]["m12_47_managed_elsewhere"])
+
+    def test_watchdog_runs_pa002_postmarket_milestone_evaluator_as_non_blocking_step(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root, runtime_engine="sdk")
+            commands: list[list[str]] = []
+
+            def runner(command: list[str], _timeout: int):
+                commands.append(command)
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                elif script.endswith("run_m15_pa002_dual_version_milestone.py"):
+                    stdout = json.dumps(
+                        {
+                            "evaluation_status": "waiting_for_postmarket_cutoff",
+                            "notification": {"notification_dedup_key": "pa002:dedup"},
+                        }
+                    )
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-07-28T16:00:00Z",
+                command_runner=runner,
+            )
+
+            self.assertEqual(payload["watchdog_status"], "healthy")
+            self.assertTrue(
+                any(
+                    len(command) > 1 and command[1] == "scripts/run_m15_pa002_dual_version_milestone.py"
+                    for command in commands
+                )
+            )
+            milestone_step = next(
+                step for step in payload["steps"] if step["step_id"] == "m15_pa002_dual_version_milestone"
+            )
+            self.assertEqual(milestone_step["returncode"], 0)
 
     def test_watchdog_reports_connecting_sdk_runtime_as_needs_attention(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

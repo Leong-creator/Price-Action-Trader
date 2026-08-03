@@ -20,6 +20,7 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     REPAIR_RUNTIME_IDS,
     SHADOW_RUNTIME_MARKERS,
     LONG_BRIDGE_ALLOWED_LOSS_STREAK_RUNTIME_IDS,
+    LONG_BRIDGE_ALLOWED_REPAIR_RUNTIME_IDS,
     LONG_BRIDGE_ALLOWED_SHADOW_RUNTIME_IDS,
     PAPER_SHORT_RUNTIME_IDS,
     VirtualCapitalBucket,
@@ -107,6 +108,17 @@ PRICE_ACTION_RUNTIME_SPECS = {
         "target_r": Decimal("1.60"),
         "min_close_position": Decimal("0.60"),
         "max_risk_percent": Decimal("2.50"),
+    },
+    "M10-PA-002-5m-repaired-v1": {
+        "strategy_id": "M10-PA-002",
+        "timeframe": "5m",
+        "rule": "breakout_followthrough_repair",
+        "target_r": Decimal("1.30"),
+        "min_close_position": Decimal("0.60"),
+        "max_risk_percent": Decimal("2.50"),
+        "require_latest_confirms_entry": True,
+        "cooldown_after_losses": 2,
+        "next_market_day_timeout": True,
     },
     "M10-PA-005-1d": {
         "strategy_id": "M10-PA-005",
@@ -1267,6 +1279,8 @@ def price_action_signal_for_runtime(
         signal = trend_continuation_signal(symbol, rows, spec=spec, generated_at=generated_at)
     elif rule == "breakout_confirmation":
         signal = breakout_confirmation_signal(symbol, rows, spec=spec, generated_at=generated_at)
+    elif rule == "breakout_followthrough_repair":
+        signal = breakout_followthrough_repair_signal(symbol, rows, spec=spec, generated_at=generated_at)
     elif rule == "failed_breakdown_reclaim":
         signal = failed_breakdown_reclaim_signal(symbol, rows, spec=spec, generated_at=generated_at)
     elif rule == "reversal_followthrough":
@@ -1386,6 +1400,51 @@ def breakout_confirmation_signal(
         trigger_price=entry,
         generated_at=generated_at,
     )
+
+
+def breakout_followthrough_repair_signal(
+    symbol: str,
+    rows: list[dict[str, Any]],
+    *,
+    spec: dict[str, Any],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    """Replicate the old PA002 follow-through filter using only live SDK bars."""
+    if len(rows) < 4:
+        return None
+    prior_rows = rows[-4:-2]
+    breakout, latest = rows[-2], rows[-1]
+    prior_high = max(decimal(row.get("high", "0")) for row in prior_rows)
+    breakout_close = decimal(breakout.get("close", "0"))
+    breakout_low = decimal(breakout.get("low", "0"))
+    latest_close = decimal(latest.get("close", "0"))
+    latest_low = decimal(latest.get("low", "0"))
+    if min(prior_high, breakout_close, breakout_low, latest_close, latest_low) <= ZERO:
+        return None
+    if breakout_close <= prior_high or latest_close < breakout_close:
+        return None
+    if close_position(breakout) < decimal(spec.get("min_close_position", "0.60")):
+        return None
+    entry = latest_close
+    stop = max(min(breakout_low, latest_low), prior_high - (breakout_close - prior_high))
+    signal = build_price_action_long_signal(
+        detector_id="pa002_breakout_followthrough_repair_realtime",
+        symbol=symbol,
+        latest=latest,
+        entry=entry,
+        stop=stop,
+        target_r=decimal(spec.get("target_r", "1.30")),
+        max_risk_percent=decimal(spec.get("max_risk_percent", "2.50")),
+        order_type="trigger_limit",
+        trigger_price=entry,
+        generated_at=generated_at,
+    )
+    if signal is not None:
+        signal["repair_rule_id"] = "pa002_false_breakout_confirmation_cooldown_v1"
+        signal["source_breakout_entry_price"] = fmt_money(breakout_close)
+        signal["latest_confirms_entry"] = True
+        signal["next_market_day_timeout"] = True
+    return signal
 
 
 def failed_breakdown_reclaim_signal(
@@ -2365,6 +2424,10 @@ def build_signal_from_intent(
         else {},
         "market_confirmation_status": str(intent.get("market_confirmation_status") or ""),
         "market_confirmation_symbols": str(intent.get("market_confirmation_symbols") or ""),
+        "repair_rule_id": str(intent.get("repair_rule_id") or ""),
+        "source_breakout_entry_price": str(intent.get("source_breakout_entry_price") or ""),
+        "latest_confirms_entry": bool(intent.get("latest_confirms_entry", False)),
+        "next_market_day_timeout": bool(intent.get("next_market_day_timeout", False)),
         "close_position": str(intent.get("close_position") or ""),
         "close_to_close_percent": str(intent.get("close_to_close_percent") or ""),
         "gap_percent": str(intent.get("gap_percent") or ""),
@@ -2450,6 +2513,10 @@ def build_signal_from_intent(
         else {},
         "market_confirmation_status": str(intent.get("market_confirmation_status") or ""),
         "market_confirmation_symbols": str(intent.get("market_confirmation_symbols") or ""),
+        "repair_rule_id": str(intent.get("repair_rule_id") or ""),
+        "source_breakout_entry_price": str(intent.get("source_breakout_entry_price") or ""),
+        "latest_confirms_entry": bool(intent.get("latest_confirms_entry", False)),
+        "next_market_day_timeout": bool(intent.get("next_market_day_timeout", False)),
         "close_position": str(intent.get("close_position") or ""),
         "close_to_close_percent": str(intent.get("close_to_close_percent") or ""),
         "gap_percent": str(intent.get("gap_percent") or ""),
@@ -2485,7 +2552,10 @@ def build_signal_from_intent(
 
 def strategy_isolation_blockers(runtime_id: str, strategy_id: str, allowed_runtime_ids: tuple[str, ...]) -> list[str]:
     lowered = runtime_id.lower()
-    if runtime_id in REPAIR_RUNTIME_IDS:
+    repair_allowed = runtime_id in LONG_BRIDGE_ALLOWED_REPAIR_RUNTIME_IDS and runtime_id in set(
+        allowed_runtime_ids
+    )
+    if runtime_id in REPAIR_RUNTIME_IDS and not repair_allowed:
         return ["blocked_repair_runtime_local_only"]
     if strategy_id in AUXILIARY_STRATEGY_IDS or runtime_id in AUXILIARY_STRATEGY_IDS:
         return ["blocked_auxiliary_module_local_only"]
@@ -2497,6 +2567,7 @@ def strategy_isolation_blockers(runtime_id: str, strategy_id: str, allowed_runti
     shadow_allowed = runtime_id in LONG_BRIDGE_ALLOWED_SHADOW_RUNTIME_IDS and runtime_id in set(allowed_runtime_ids)
     if (
         not loss_streak_allowed
+        and not repair_allowed
         and not shadow_allowed
         and any(marker in lowered for marker in SHADOW_RUNTIME_MARKERS)
     ) or ("-mbf" in lowered and not shadow_allowed):

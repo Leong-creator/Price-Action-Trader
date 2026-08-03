@@ -239,7 +239,6 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                     )
                 ],
             )
-
             payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
             rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
 
@@ -267,7 +266,6 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                     self.signal(signal_id="shadow", runtime_id="M10-PA-004-MBF-1d", strategy_id="M10-PA-004"),
                 ],
             )
-
             payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
             rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
 
@@ -1410,6 +1408,112 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(payload["ready_order_count"], 1)
             self.assertEqual(rows["pa002-5m-dedicated"]["capital_bucket"], "pa002_5m")
             self.assertEqual(rows["pa002-5m-dedicated"]["realtime_decision_status"], "latency_target_met_ready")
+
+    def test_pa002_repaired_runtime_uses_independent_full_size_bucket(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                allowed_runtime_ids=["M10-PA-002-5m-repaired-v1"],
+                virtual_capital_buckets={
+                    "pa002_5m_repaired_v1": {
+                        "label": "PA002-5m原规则复刻版单仓（M10-PA-002-5m-repaired-v1）",
+                        "equity": "10000",
+                        "max_total_exposure": "6000",
+                        "max_symbol_exposure": "1500",
+                        "max_risk_per_order": "20",
+                        "min_cash_reserve": "4000",
+                        "runtime_ids": ["M10-PA-002-5m-repaired-v1"],
+                    },
+                },
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="pa002-repaired",
+                        symbol="MSFT",
+                        runtime_id="M10-PA-002-5m-repaired-v1",
+                        strategy_id="M10-PA-002",
+                        capital_bucket="pa002_5m_repaired_v1",
+                        capital_bucket_label="PA002-5m原规则复刻版单仓（M10-PA-002-5m-repaired-v1）",
+                    )
+                ],
+            )
+            config.pa002_repaired_state_path.parent.mkdir(parents=True, exist_ok=True)
+            config.pa002_repaired_state_path.write_text(
+                json.dumps({"pending_skip_count": 1}),
+                encoding="utf-8",
+            )
+
+            payload = run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            rows = {row["signal_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
+
+            self.assertEqual(payload["ready_order_count"], 1)
+            self.assertEqual(rows["pa002-repaired"]["capital_bucket"], "pa002_5m_repaired_v1")
+            self.assertNotIn("blocked_shadow_runtime_local_only", rows["pa002-repaired"]["blockers"])
+            state = json.loads(config.pa002_repaired_state_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["pending_skip_count"], 1)
+
+    def test_pa002_repaired_live_skip_consumes_once_without_broker_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                execute_orders=True,
+                paper_trading_approval=True,
+                allowed_runtime_ids=["M10-PA-002-5m-repaired-v1"],
+                virtual_capital_buckets={
+                    "pa002_5m_repaired_v1": {
+                        "label": "PA002-5m原规则复刻版单仓（M10-PA-002-5m-repaired-v1）",
+                        "equity": "10000",
+                        "max_total_exposure": "6000",
+                        "max_symbol_exposure": "1500",
+                        "max_risk_per_order": "20",
+                        "min_cash_reserve": "4000",
+                        "runtime_ids": ["M10-PA-002-5m-repaired-v1"],
+                    },
+                },
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="pa002-repaired-live-skip",
+                        symbol="MSFT",
+                        runtime_id="M10-PA-002-5m-repaired-v1",
+                        strategy_id="M10-PA-002",
+                        capital_bucket="pa002_5m_repaired_v1",
+                        position_action="open_long",
+                    )
+                ],
+            )
+            config.pa002_repaired_state_path.parent.mkdir(parents=True, exist_ok=True)
+            config.pa002_repaired_state_path.write_text(
+                json.dumps({"pending_skip_count": 1}),
+                encoding="utf-8",
+            )
+            client = FakeRealtimePaperClient()
+
+            run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                broker_client=client,
+            )
+
+            row = next(
+                row
+                for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+                if row["signal_id"] == "pa002-repaired-live-skip"
+            )
+            state = json.loads(config.pa002_repaired_state_path.read_text(encoding="utf-8"))
+            self.assertEqual(client.orders, [])
+            self.assertEqual(state["pending_skip_count"], 0)
+            self.assertIn("blocked_pa002_repaired_skip_after_two_losses", row["blockers"])
+            self.assertEqual(
+                row["realtime_decision_status"],
+                "blocked_pa002_repaired_next_eligible_signal_skipped",
+            )
 
     def test_pending_new_epoch_generates_flatten_sell_and_suppresses_new_buys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

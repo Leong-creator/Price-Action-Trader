@@ -76,6 +76,13 @@ class LongbridgeDashboardTest(unittest.TestCase):
                 {"symbol": "TSLA.US", "quantity": "1", "cost_price": "250", "market_price": "260", "unrealized_pnl": "10.00"},
             ],
         })
+        pa002_milestone = _write(tmp_path / "pa002-milestone.json", {
+            "generated_at": now,
+            "milestone_phase": "technical_review_only",
+            "aggregate": {"effective_trading_day_count": 5, "completed_trade_count": 28},
+            "recommendation": {"plain_text": "已到技术检查节点，继续收集最终样本。"},
+            "source_status": {"fill_attribution_generated_at": now},
+        })
         fills = _write(tmp_path / "fills.json", {
             "generated_at": now,
             "summary": {
@@ -172,7 +179,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "longbridge_order_id": "SHORT-1",
         }) + "\n", encoding="utf-8")
         config_file = _write(tmp_path / "execution_config.json", {"virtual_capital_buckets": {"one": {"runtime_ids": ["R1"], "equity": "10000"}}})
-        config = {"inputs": {"sdk_runtime_status": runtime, "account_state": account, "account_state_summary": summary, "execution_status": execution, "execution_ledger": str(execution_ledger), "epoch_state": epoch, "formal_epoch_marker": formal, "order_reconciliation": orders, "fill_attribution": fills, "short_signal_diagnostics": short_diagnostics, "pnl_reconciliation": pnl, "execution_config": config_file}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+        config = {"inputs": {"sdk_runtime_status": runtime, "account_state": account, "account_state_summary": summary, "execution_status": execution, "execution_ledger": str(execution_ledger), "epoch_state": epoch, "formal_epoch_marker": formal, "order_reconciliation": orders, "fill_attribution": fills, "short_signal_diagnostics": short_diagnostics, "pnl_reconciliation": pnl, "execution_config": config_file, "pa002_dual_version_milestone": pa002_milestone}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
         payload = run_dashboard(config, generated_at="2026-07-16T00:00:00Z")
         self.assertEqual(payload["data_status"], "trustworthy")
         self.assertEqual(payload["source_of_truth"], "longbridge_sdk_paper_account")
@@ -197,6 +204,8 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["runtime"]["trading_market_data_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["readonly_expansion_subscription_coverage"], "153/153")
         self.assertFalse(payload["pa004_migration"]["enabled"])
+        self.assertEqual(payload["pa002_dual_version_milestone"]["milestone_phase"], "technical_review_only")
+        self.assertTrue(payload["pa002_dual_version_milestone"]["data_available"])
         html = (tmp_path / "out.html").read_text(encoding="utf-8")
         self.assertIn("交易核心正常，统计待刷新", html)
         self.assertIn("账户净资产", html)
@@ -205,6 +214,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertIn("分仓实际成交成绩", html)
         self.assertIn("扣费后盈利因子", html)
         self.assertIn("做空信号诊断", html)
+        self.assertIn("PA002双版本阶段", html)
 
     def test_dashboard_blocks_stale_statistics_and_dead_runtime(self) -> None:
         tmp_path = self.tmp_path
@@ -229,6 +239,39 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertIsNone(payload["account"]["today_pnl"])
         self.assertIsNone(payload["pnl"]["account_pnl"])
         self.assertEqual(payload["orders"]["rows"], [])
+
+    def test_dashboard_blocks_stale_pa002_milestone_when_fill_attribution_is_stale(self) -> None:
+        tmp_path = self.tmp_path
+        now = "2026-07-16T00:00:00Z"
+        stale = "2026-07-15T00:00:00Z"
+        files = {}
+        for name, payload in {
+            "runtime": {"generated_at": now, "runtime_pid": os.getpid(), "runtime_engine": "sdk", "sdk_connected": True},
+            "account": {"generated_at": now, "paper_account_verified": True},
+            "summary": {"generated_at": now},
+            "execution": {}, "epoch": {"status": "active"}, "formal": {"status": "active"},
+            "orders": {"generated_at": now, "rows": []},
+            "fills": {"generated_at": stale, "completed_trades": []},
+            "milestone": {
+                "generated_at": now,
+                "milestone_phase": "final_review_ready",
+                "aggregate": {"effective_trading_day_count": 99, "completed_trade_count": 999},
+                "recommendation": {"plain_text": "旧建议"},
+                "source_status": {"fill_attribution_generated_at": stale},
+            },
+            "pnl": {"generated_at": now},
+            "config": {"virtual_capital_buckets": {}},
+        }.items():
+            files[name] = _write(tmp_path / f"{name}.json", payload)
+        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "fill_attribution": files["fills"], "pa002_dual_version_milestone": files["milestone"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"]}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+
+        payload = build_dashboard(config, generated_at=now)
+
+        milestone = payload["pa002_dual_version_milestone"]
+        self.assertEqual(milestone["evaluation_status"], "stale_source_blocked")
+        self.assertFalse(milestone["data_available"])
+        self.assertNotIn("aggregate", milestone)
+        self.assertNotIn("recommendation", milestone)
 
     def test_dashboard_keeps_trading_health_separate_from_stale_statistics(self) -> None:
         tmp_path = self.tmp_path

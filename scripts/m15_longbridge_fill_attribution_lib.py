@@ -515,6 +515,20 @@ def add_completed_trade_performance(
                 "fault_day": bool(fault_dates),
                 "fault_dates": fault_dates,
                 "fault_day_reasons": fault_reasons,
+                "open_signal_diagnostics": {
+                    key: metadata.get(key)
+                    for key in (
+                        "repair_rule_id",
+                        "source_breakout_entry_price",
+                        "latest_confirms_entry",
+                        "next_market_day_timeout",
+                        "close_position",
+                        "volume_ratio",
+                        "market_confirmation_status",
+                        "quality_score",
+                    )
+                    if metadata.get(key) not in (None, "")
+                },
             }
         )
     completed_trades.sort(

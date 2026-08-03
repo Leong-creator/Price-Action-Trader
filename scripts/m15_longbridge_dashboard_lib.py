@@ -23,6 +23,10 @@ DEFAULT_FILL_ATTRIBUTION_PATH = (
     "m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json"
 )
 DEFAULT_PA004_MIGRATION_STATUS_NAME = "m15_capital_bucket_migration_state.json"
+DEFAULT_PA002_MILESTONE_STATUS = (
+    DEFAULT_FILL_ATTRIBUTION_PATH.parent
+    / "m15_pa002_dual_version_milestone_status.json"
+)
 PA004_MIGRATION_BUCKETS = {"pa004_mbf", "pa004_mbf_qc"}
 NEW_YORK = ZoneInfo("America/New_York")
 
@@ -357,6 +361,9 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     execution_config = _read_json(_resolve(inputs["execution_config"]))
     fill_attribution_path = _resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH)
     migration_status = _read_optional_json(_derive_migration_status_path(config, fill_attribution_path))
+    pa002_milestone = _read_optional_json(
+        _resolve(inputs.get("pa002_dual_version_milestone") or DEFAULT_PA002_MILESTONE_STATUS)
+    )
     short_diagnostics = _merge_short_execution_funnel(
         short_diagnostics,
         execution_ledger,
@@ -371,6 +378,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     orders_age = _age_seconds(reconciliation.get("generated_at"), now)
     pnl_age = _age_seconds(pnl.get("generated_at"), now)
     fill_attribution_age = _age_seconds(fill_attribution.get("generated_at"), now)
+    pa002_milestone_age = _age_seconds(pa002_milestone.get("generated_at"), now)
     runtime_process_alive = _process_alive(runtime.get("runtime_pid"))
     runtime_fresh = runtime_age is not None and runtime_age <= float(health.get("maximum_runtime_age_seconds", 10))
     account_fresh = account_age is not None and account_age <= float(health.get("maximum_account_age_seconds", 45))
@@ -379,6 +387,33 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     orders_fresh = orders_age is not None and orders_age <= slow_limit
     pnl_fresh = pnl_age is not None and pnl_age <= slow_limit
     fill_attribution_fresh = fill_attribution_age is not None and fill_attribution_age <= slow_limit
+    pa002_source_fill_generated_at = str(
+        (pa002_milestone.get("source_status") or {}).get("fill_attribution_generated_at") or ""
+    )
+    current_fill_generated_at = str(fill_attribution.get("generated_at") or "")
+    pa002_milestone_fresh = bool(
+        fill_attribution_fresh
+        and pa002_milestone_age is not None
+        and pa002_milestone_age <= slow_limit
+        and pa002_source_fill_generated_at
+        and pa002_source_fill_generated_at == current_fill_generated_at
+    )
+    if pa002_milestone_fresh:
+        pa002_milestone_view = {**pa002_milestone, "data_available": True}
+    else:
+        pa002_milestone_view = {
+            "evaluation_status": "stale_source_blocked",
+            "data_available": False,
+            "plain_language_result": "长桥实际成交归因未刷新或与里程碑不一致，PA002 双版本统计暂不可计算。",
+            "source_status": {
+                "fill_attribution_fresh": fill_attribution_fresh,
+                "milestone_fresh": (
+                    pa002_milestone_age is not None and pa002_milestone_age <= slow_limit
+                ),
+                "source_fill_generated_at": pa002_source_fill_generated_at,
+                "current_fill_generated_at": current_fill_generated_at,
+            },
+        }
     inventory = _inventory(execution_config)
     coverage = str(runtime.get("subscription_coverage") or "")
     try:
@@ -614,6 +649,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "recent_decisions": list(short_diagnostics.get("decision_rows") or [])[-20:],
         },
         "strategy_inventory": inventory,
+        "pa002_dual_version_milestone": pa002_milestone_view,
         "pa004_migration": {
             "status_file": str(_derive_migration_status_path(config, fill_attribution_path)),
             "active_bucket_baselines": migration_views["active_bucket_baselines"],
@@ -643,7 +679,8 @@ const positionLayers=d.fill_attribution.position_layers||{{}};
 const displaySummary=d.fill_attribution.display_summary||{{}};
 const archivedSummary=d.fill_attribution.archived_summary||{{}};
 const migrationSummary=Object.entries(d.pa004_migration.active_bucket_baselines||{{}}).map(([bucket,startedAt])=>`${{bucket}}: ${{startedAt}}`).join('；')||'未启用';
-const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['行情模式',v(d.runtime.market_data_mode)],['全部行情覆盖',v(d.runtime.market_data_coverage)],['交易池行情覆盖',v(d.runtime.trading_market_data_coverage)],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
+const pa002Milestone=d.pa002_dual_version_milestone||{{}};
+const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['行情模式',v(d.runtime.market_data_mode)],['全部行情覆盖',v(d.runtime.market_data_coverage)],['交易池行情覆盖',v(d.runtime.trading_market_data_coverage)],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['PA002双版本阶段',v(pa002Milestone.milestone_phase)],['PA002有效交易日',v(pa002Milestone.aggregate?.effective_trading_day_count)],['PA002完整交易',v(pa002Milestone.aggregate?.completed_trade_count)],['PA002当前建议',v(pa002Milestone.recommendation?.plain_text)],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
 const shortRows=d.paper_short_diagnostics.runtime_summaries||[];
 const performanceRows=d.fill_attribution.strategy_performance||[];
 const bucketPerformanceRows=d.fill_attribution.bucket_performance||[];

@@ -18,6 +18,11 @@ from zoneinfo import ZoneInfo
 
 from scripts.longbridge_cli_env import build_longbridge_cli_env
 from scripts.m12_readonly_auth_preflight_lib import clean_cli_text
+from scripts.m15_pa002_repaired_state_lib import (
+    RUNTIME_ID as PA002_REPAIRED_RUNTIME_ID,
+    consume_next_eligible_signal,
+    sync_repaired_state,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +41,8 @@ DEFAULT_ACCOUNT_STATE = (
     / "m15_longbridge_realtime_account_state.json"
 )
 DEFAULT_EPOCH_STATE = DEFAULT_OUTPUT_DIR / "m15_longbridge_virtual_account_epoch.json"
+DEFAULT_FILL_ATTRIBUTION = DEFAULT_OUTPUT_DIR / "m15_longbridge_fill_attribution_v2.json"
+DEFAULT_PA002_REPAIRED_STATE = DEFAULT_OUTPUT_DIR / "m15_pa002_repaired_runtime_state.json"
 SUMMARY_JSON = "m15_longbridge_realtime_execution.json"
 LEDGER_JSONL = "m15_longbridge_realtime_execution_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_execution.md"
@@ -56,6 +63,7 @@ DEFAULT_REALTIME_RUNTIME_IDS = (
     "M10-PA-004-long-1d",
     "M10-PA-002-1d",
     "M10-PA-002-5m",
+    "M10-PA-002-5m-repaired-v1",
     "M10-PA-004-MBF-1d",
     "M10-PA-004-MBF-QC-1d",
     "M10-PA-013-1d",
@@ -91,7 +99,12 @@ EXPERIMENT_CAPITAL_BUCKET_RUNTIME_IDS = (
 
 SINGLE_STRATEGY_CAPITAL_BUCKET_SPECS = (
     ("pa004_long", "PA004-long单仓（M10-PA-004-long-1d）", "M10-PA-004-long-1d"),
-    ("pa002_5m", "PA002-5m单仓（M10-PA-002-5m）", "M10-PA-002-5m"),
+    ("pa002_5m", "PA002-5m现行版单仓（M10-PA-002-5m）", "M10-PA-002-5m"),
+    (
+        "pa002_5m_repaired_v1",
+        "PA002-5m原规则复刻版单仓（M10-PA-002-5m-repaired-v1）",
+        "M10-PA-002-5m-repaired-v1",
+    ),
     ("ftd_baseline", "FTD原版单仓（M12-FTD-001-baseline-1d）", "M12-FTD-001-baseline-1d"),
     ("ftd_loss_streak", "FTD连亏保护单仓（M12-FTD-001-loss-streak-guard-1d）", "M12-FTD-001-loss-streak-guard-1d"),
     ("pa004_mbf", "PA004-MBF单仓（M10-PA-004-MBF-1d）", "M10-PA-004-MBF-1d"),
@@ -138,6 +151,10 @@ LONG_BRIDGE_ALLOWED_LOSS_STREAK_RUNTIME_IDS = {
 LONG_BRIDGE_ALLOWED_SHADOW_RUNTIME_IDS = {
     "M10-PA-004-MBF-1d",
     "M10-PA-004-MBF-QC-1d",
+}
+
+LONG_BRIDGE_ALLOWED_REPAIR_RUNTIME_IDS = {
+    "M10-PA-002-5m-repaired-v1",
 }
 
 
@@ -202,6 +219,8 @@ class RealtimeExecutionConfig:
     config_digest: str
     realtime_signal_events_path: Path
     paper_account_state_path: Path
+    fill_attribution_path: Path
+    pa002_repaired_state_path: Path
     output_dir: Path
     required_account_channel: str
     cli_name: str
@@ -400,6 +419,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
     short_testing = payload.get("paper_short_testing", {})
     virtual_buckets, runtime_bucket_map = parse_virtual_capital_buckets(payload, account_model)
     epoch = payload.get("test_epoch", {}) if isinstance(payload.get("test_epoch"), dict) else {}
+    output_dir = resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR))
     return RealtimeExecutionConfig(
         stage=str(payload.get("stage", "M15.longbridge_realtime_execution")),
         title=str(payload.get("title", "长桥模拟账户实时执行链路")),
@@ -411,7 +431,13 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
         paper_account_state_path=resolve_repo_path(
             inputs.get("paper_account_state", DEFAULT_ACCOUNT_STATE)
         ),
-        output_dir=resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR)),
+        fill_attribution_path=resolve_repo_path(
+            inputs.get("fill_attribution") or (output_dir / DEFAULT_FILL_ATTRIBUTION.name)
+        ),
+        pa002_repaired_state_path=resolve_repo_path(
+            inputs.get("pa002_repaired_state") or (output_dir / DEFAULT_PA002_REPAIRED_STATE.name)
+        ),
+        output_dir=output_dir,
         required_account_channel=str(realtime.get("required_account_channel", "lb_papertrading")),
         cli_name=str(realtime.get("cli_name", "longbridge")),
         cli_timeout_seconds=int(realtime.get("cli_timeout_seconds", 6)),
@@ -737,6 +763,11 @@ def run_realtime_execution(
     broker_client = broker_client or (
         LongbridgeCliRealtimePaperClient(config) if config.execute_orders else NullRealtimePaperClient()
     )
+    pa002_repaired_state = sync_repaired_state(
+        config.fill_attribution_path,
+        config.pa002_repaired_state_path,
+        generated_at=generated_at_iso,
+    )
 
     ledger_rows: list[dict[str, Any]] = []
     selected_bucket_exposure: dict[str, Decimal] = {}
@@ -783,6 +814,26 @@ def run_realtime_execution(
         )
         row = decision["ledger_row"]
         ready_for_submission = bool(decision["ready"])
+        if (
+            ready_for_submission
+            and config.execute_orders
+            and config.paper_trading_approval
+            and str(row.get("runtime_id") or "") == PA002_REPAIRED_RUNTIME_ID
+            and str(row.get("position_action") or "") == "open_long"
+            and consume_next_eligible_signal(
+                pa002_repaired_state,
+                config.pa002_repaired_state_path,
+                signal_id=str(row.get("signal_id") or ""),
+                consumed_at=generated_at_iso,
+            )
+        ):
+            row["blockers"] = list(row.get("blockers", [])) + [
+                "blocked_pa002_repaired_skip_after_two_losses"
+            ]
+            row["realtime_decision_status"] = "blocked_pa002_repaired_next_eligible_signal_skipped"
+            row["order_payload"] = {}
+            decision["order_payload"] = {}
+            ready_for_submission = False
         if ready_for_submission and ledger_row_closes_position(row):
             close_symbol = base_symbol(str(row.get("symbol") or ""))
             selected_close_quantity_by_symbol[close_symbol] = (
@@ -1502,6 +1553,10 @@ def evaluate_signal_event(
             "original_order_type": original_order_type,
             "original_trigger_price": fmt_money(original_trigger_price) if original_trigger_price > ZERO else "",
             "quality_score": fmt_decimal(quality_score),
+            "repair_rule_id": str(signal.get("repair_rule_id") or ""),
+            "source_breakout_entry_price": str(signal.get("source_breakout_entry_price") or ""),
+            "latest_confirms_entry": bool(signal.get("latest_confirms_entry")),
+            "next_market_day_timeout": bool(signal.get("next_market_day_timeout")),
             "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
             "bucket_pressure_quality_status": bucket_pressure_quality_status,
             "short_capacity_check": short_capacity_check,
@@ -1565,6 +1620,10 @@ def evaluate_signal_event(
         "close_position": str(signal.get("close_position") or ""),
         "close_to_close_percent": str(signal.get("close_to_close_percent") or ""),
         "volume_ratio": str(signal.get("volume_ratio") or ""),
+        "repair_rule_id": str(signal.get("repair_rule_id") or ""),
+        "source_breakout_entry_price": str(signal.get("source_breakout_entry_price") or ""),
+        "latest_confirms_entry": bool(signal.get("latest_confirms_entry")),
+        "next_market_day_timeout": bool(signal.get("next_market_day_timeout")),
         "bucket_pressure_quality_threshold": fmt_decimal(bucket_pressure_quality_threshold),
         "bucket_pressure_quality_status": bucket_pressure_quality_status,
         "short_capacity_check_status": str(short_capacity_check.get("status") or ""),
@@ -1656,7 +1715,10 @@ def evaluate_signal_event(
 
 def strategy_isolation_blockers(runtime_id: str, strategy_id: str, allowed_runtime_ids: tuple[str, ...]) -> list[str]:
     lowered = runtime_id.lower()
-    if runtime_id in REPAIR_RUNTIME_IDS:
+    repair_allowed = runtime_id in LONG_BRIDGE_ALLOWED_REPAIR_RUNTIME_IDS and runtime_id in set(
+        allowed_runtime_ids
+    )
+    if runtime_id in REPAIR_RUNTIME_IDS and not repair_allowed:
         return ["blocked_repair_runtime_local_only"]
     if strategy_id in AUXILIARY_STRATEGY_IDS or runtime_id in AUXILIARY_STRATEGY_IDS:
         return ["blocked_auxiliary_module_local_only"]
@@ -1668,6 +1730,7 @@ def strategy_isolation_blockers(runtime_id: str, strategy_id: str, allowed_runti
     shadow_allowed = runtime_id in LONG_BRIDGE_ALLOWED_SHADOW_RUNTIME_IDS and runtime_id in set(allowed_runtime_ids)
     if (
         not loss_streak_allowed
+        and not repair_allowed
         and not shadow_allowed
         and any(marker in lowered for marker in SHADOW_RUNTIME_MARKERS)
     ) or ("-mbf" in lowered and not shadow_allowed):
