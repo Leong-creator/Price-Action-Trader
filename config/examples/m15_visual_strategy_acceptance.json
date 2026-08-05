@@ -1,0 +1,32 @@
+{
+  "stage": "M15.visual_strategy_acceptance",
+  "inputs": {
+    "shadow_config": "config/examples/m15_visual_strategy_shadow.json",
+    "shadow_run_summary": "reports/m15_visual_strategy_shadow/run_summary.json",
+    "shadow_state": "reports/m15_visual_strategy_shadow/state.json",
+    "shadow_audit_jsonl": "reports/m15_visual_strategy_shadow/audit_events.jsonl",
+    "realtime_shadow_ledger": "local_runtime/m15_visual_strategy_shadow/session_ledger.jsonl",
+    "session_daily_bars": "local_runtime/m15_visual_strategy_shadow/aggregated_daily_bars.jsonl"
+  },
+  "outputs": {
+    "acceptance_json": "reports/m15_visual_strategy_shadow/acceptance_evidence.json"
+  },
+  "proofs": {
+    "expected_symbol_count": 300,
+    "expected_bars_per_symbol": 60,
+    "segmented_chunk_size": 37,
+    "negative_horizon_bars": 3,
+    "realtime_shadow_sessions": 0
+  },
+  "example_limits": {
+    "positive_examples": 10,
+    "negative_examples": 10,
+    "boundary_examples": 5
+  },
+  "hard_boundaries": {
+    "order_generation": false,
+    "broker_connection": false,
+    "real_orders": false,
+    "live_execution": false
+  }
+}

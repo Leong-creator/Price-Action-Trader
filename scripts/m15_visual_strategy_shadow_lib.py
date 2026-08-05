@@ -455,6 +455,9 @@ def build_promotion_acceptance(config: ShadowConfig) -> dict[str, Any]:
         "negative_examples": 10,
         "boundary_examples": 5,
         "historical_replay_symbol_count": 300,
+        "historical_replay_bars_per_symbol": 60,
+        "historical_replay_bar_count": 18000,
+        "historical_replay_audit_event_count": 54000,
         "required_regimes": ["strong_trend", "range", "gap", "abnormal_volume"],
         "no_future_data": True,
         "restart_parity": True,
@@ -469,13 +472,27 @@ def build_promotion_acceptance(config: ShadowConfig) -> dict[str, Any]:
     strategy_rows: dict[str, Any] = {}
     for strategy in STRATEGIES:
         row = observed.get(strategy, {}) if isinstance(observed.get(strategy), dict) else {}
+        reviewed = (
+            row.get("human_review_passed_counts", {})
+            if isinstance(row.get("human_review_passed_counts"), dict)
+            else {}
+        )
         regimes = set(str(item) for item in row.get("covered_regimes", []))
         checks = {
-            "positive_examples": int(row.get("positive_examples", 0)) >= required["positive_examples"],
-            "negative_examples": int(row.get("negative_examples", 0)) >= required["negative_examples"],
-            "boundary_examples": int(row.get("boundary_examples", 0)) >= required["boundary_examples"],
+            "positive_examples": int(reviewed.get("positive_examples", 0))
+            >= required["positive_examples"],
+            "negative_examples": int(reviewed.get("negative_examples", 0))
+            >= required["negative_examples"],
+            "boundary_examples": int(reviewed.get("boundary_examples", 0))
+            >= required["boundary_examples"],
             "historical_replay_symbol_count": int(row.get("historical_replay_symbol_count", 0))
-            >= required["historical_replay_symbol_count"],
+            == required["historical_replay_symbol_count"],
+            "historical_replay_bars_per_symbol": int(row.get("historical_replay_bars_per_symbol", 0))
+            == required["historical_replay_bars_per_symbol"],
+            "historical_replay_bar_count": int(row.get("historical_replay_bar_count", 0))
+            == required["historical_replay_bar_count"],
+            "historical_replay_audit_event_count": int(row.get("historical_replay_audit_event_count", 0))
+            == required["historical_replay_audit_event_count"],
             "required_regimes": set(required["required_regimes"]).issubset(regimes),
             "no_future_data": row.get("no_future_data") is True,
             "restart_parity": row.get("restart_parity") is True,
@@ -486,6 +503,11 @@ def build_promotion_acceptance(config: ShadowConfig) -> dict[str, Any]:
             "runtime_id": RUNTIME_IDS[strategy],
             "required": required,
             "observed": row,
+            "effective_reviewed_example_counts": {
+                "positive_examples": int(reviewed.get("positive_examples", 0)),
+                "negative_examples": int(reviewed.get("negative_examples", 0)),
+                "boundary_examples": int(reviewed.get("boundary_examples", 0)),
+            },
             "checks": checks,
             "ready_for_paper": all(checks.values()) and config.contract_stage == "shadow-v1",
         }

@@ -27,6 +27,7 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         )
         scheduler_payload["output_dir"] = (root / "scheduler_output").as_posix()
         scheduler_payload["batch_config_path"] = batch_config_path.as_posix()
+        scheduler_payload["visual_shadow_session_config_path"] = None
         scheduler_config_path = root / "scheduler.json"
         scheduler_config_path.write_text(json.dumps(scheduler_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return scheduler_config_path
@@ -76,6 +77,64 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
             self.assertFalse(failed["m15_isolation"]["starts_or_stops_m15"])
             self.assertEqual(repeated["scheduler_status"], "already_triggered_today")
             self.assertEqual(repeated["last_outcome"], "failed")
+
+    def test_visual_shadow_sidecar_runs_once_and_does_not_block_local_batch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.make_scheduler_config(root)
+            scheduler_payload = json.loads(config_path.read_text(encoding="utf-8"))
+            visual_path = root / "visual.json"
+            visual_path.write_text(
+                json.dumps({"stage": "M15.visual_strategy_shadow_session"}),
+                encoding="utf-8",
+            )
+            scheduler_payload["visual_shadow_session_config_path"] = visual_path.as_posix()
+            config_path.write_text(json.dumps(scheduler_payload), encoding="utf-8")
+            config = load_scheduler_config(config_path)
+            visual_calls: list[tuple[str, str | None]] = []
+
+            def batch_runner(_config_path: Path, _generated_at: str | None) -> dict[str, object]:
+                return {"summary": {"completed": True}}
+
+            def visual_runner(
+                _config_path: Path,
+                business_date: str,
+                generated_at: str | None,
+            ) -> dict[str, object]:
+                visual_calls.append((business_date, generated_at))
+                raise RuntimeError("visual sidecar failed")
+
+            first = run_scheduler_once(
+                config,
+                generated_at="2026-07-16T20:15:00Z",
+                batch_runner=batch_runner,
+                visual_shadow_runner=visual_runner,
+            )
+            second = run_scheduler_once(
+                config,
+                generated_at="2026-07-16T21:15:00Z",
+                batch_runner=batch_runner,
+                visual_shadow_runner=visual_runner,
+            )
+            next_day = run_scheduler_once(
+                config,
+                generated_at="2026-07-17T20:15:00Z",
+                batch_runner=batch_runner,
+                visual_shadow_runner=visual_runner,
+            )
+
+            self.assertEqual(first["scheduler_status"], "triggered_successfully")
+            self.assertEqual(first["visual_shadow_status"], "failed")
+            self.assertIn("visual sidecar failed", first["visual_shadow_error"])
+            self.assertEqual(second["scheduler_status"], "already_triggered_today")
+            self.assertEqual(next_day["visual_shadow_status"], "failed")
+            self.assertEqual(
+                visual_calls,
+                [
+                    ("2026-07-16", "2026-07-16T20:15:00Z"),
+                    ("2026-07-17", "2026-07-17T20:15:00Z"),
+                ],
+            )
 
     def test_daemon_status_stop_are_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

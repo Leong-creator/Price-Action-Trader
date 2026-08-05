@@ -188,6 +188,9 @@ class M15VisualStrategyShadowTest(unittest.TestCase):
                     "negative_examples": 10,
                     "boundary_examples": 5,
                     "historical_replay_symbol_count": 300,
+                    "historical_replay_bars_per_symbol": 60,
+                    "historical_replay_bar_count": 18000,
+                    "historical_replay_audit_event_count": 54000,
                     "covered_regimes": ["strong_trend", "range", "gap", "abnormal_volume"],
                     "no_future_data": True,
                     "restart_parity": True,
@@ -210,9 +213,18 @@ class M15VisualStrategyShadowTest(unittest.TestCase):
                 trend_long_window=base.trend_long_window,
                 history_limit=base.history_limit,
             )
-            summary = run_visual_strategy_shadow(config, bars=[self.bar(0, "10")])
+            machine_only = run_visual_strategy_shadow(config, bars=[self.bar(0, "10")])
+            for row in evidence.values():
+                row["human_review_passed_counts"] = {
+                    "positive_examples": 10,
+                    "negative_examples": 10,
+                    "boundary_examples": 5,
+                }
+            acceptance_path.write_text(json.dumps(evidence), encoding="utf-8")
+            reviewed = run_visual_strategy_shadow(config, bars=[])
 
-        self.assertEqual(summary["paper_promotion_acceptance"]["status"], "ready")
+        self.assertEqual(machine_only["paper_promotion_acceptance"]["status"], "blocked")
+        self.assertEqual(reviewed["paper_promotion_acceptance"]["status"], "ready")
 
     def test_pa004_exposes_boundary_failure_and_return_to_channel(self) -> None:
         config = self.make_config(Path("/tmp/not-used"))

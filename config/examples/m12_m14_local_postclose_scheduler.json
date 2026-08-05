@@ -5,6 +5,7 @@
   "output_dir": "local_runtime/m12_m14_local_postclose_scheduler",
   "batch_config_path": "config/examples/m12_m14_local_postclose_batch.json",
   "retention_config_path": "config/examples/m15_artifact_retention.json",
+  "visual_shadow_session_config_path": "config/examples/m15_visual_strategy_shadow_session.json",
   "check_interval_seconds": 300,
   "market_timezone": "America/New_York",
   "regular_close_time": "16:00",

@@ -23,6 +23,7 @@ STATE_FILE = "m12_m14_local_postclose_scheduler_state.json"
 LEDGER_FILE = "m12_m14_local_postclose_scheduler_ledger.jsonl"
 
 BatchRunner = Callable[[Path, str | None], dict[str, Any]]
+VisualShadowRunner = Callable[[Path, str, str | None], dict[str, Any]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,7 @@ class LocalPostcloseSchedulerConfig:
     output_dir: Path
     batch_config_path: Path
     retention_config_path: Path | None
+    visual_shadow_session_config_path: Path | None
     check_interval_seconds: int
     market_timezone: str
     regular_close_time: str
@@ -77,6 +79,11 @@ def load_scheduler_config(path: str | Path = DEFAULT_CONFIG_PATH) -> LocalPostcl
         retention_config_path=(
             resolve_repo_path(payload["retention_config_path"])
             if payload.get("retention_config_path")
+            else None
+        ),
+        visual_shadow_session_config_path=(
+            resolve_repo_path(payload["visual_shadow_session_config_path"])
+            if payload.get("visual_shadow_session_config_path")
             else None
         ),
         check_interval_seconds=int(payload["check_interval_seconds"]),
@@ -117,6 +124,14 @@ def validate_scheduler_config(config: LocalPostcloseSchedulerConfig) -> None:
     batch_payload = read_json(config.batch_config_path)
     if batch_payload.get("stage") != "M12-M14.local_postclose_batch":
         raise ValueError("Local postclose batch config stage drift")
+    if config.visual_shadow_session_config_path is not None:
+        if not config.visual_shadow_session_config_path.exists():
+            raise ValueError(
+                f"Visual shadow session config missing: {config.visual_shadow_session_config_path}"
+            )
+        visual_payload = read_json(config.visual_shadow_session_config_path)
+        if visual_payload.get("stage") != "M15.visual_strategy_shadow_session":
+            raise ValueError("Visual shadow session config stage drift")
 
 
 def parse_clock(value: str) -> wall_time:
@@ -217,6 +232,21 @@ def default_batch_runner(batch_config_path: Path, generated_at: str | None) -> d
     return run_local_postclose_batch(config, generated_at=generated_at)
 
 
+def default_visual_shadow_runner(
+    visual_config_path: Path,
+    business_date: str,
+    generated_at: str | None,
+) -> dict[str, Any]:
+    from scripts.m15_visual_strategy_shadow_session_lib import load_config as load_visual_config
+    from scripts.m15_visual_strategy_shadow_session_lib import run_visual_shadow_session
+
+    return run_visual_shadow_session(
+        load_visual_config(visual_config_path),
+        business_date=business_date,
+        generated_at=generated_at,
+    )
+
+
 def build_state_after_trigger(
     previous: dict[str, Any],
     *,
@@ -245,6 +275,7 @@ def run_scheduler_once(
     *,
     generated_at: str | None = None,
     batch_runner: BatchRunner | None = None,
+    visual_shadow_runner: VisualShadowRunner | None = None,
 ) -> dict[str, Any]:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = generated_at or now_utc_iso()
@@ -259,6 +290,11 @@ def run_scheduler_once(
         "generated_at": generated_at,
         "window": window,
         "batch_config_path": project_path(config.batch_config_path),
+        "visual_shadow_session_config_path": (
+            project_path(config.visual_shadow_session_config_path)
+            if config.visual_shadow_session_config_path is not None
+            else ""
+        ),
         "state_file": project_path(scheduler_state_path(config)),
         "pid_file": project_path(scheduler_pid_path(config)),
         "paper_simulated_only": True,
@@ -302,6 +338,9 @@ def run_scheduler_once(
         return payload
 
     runner = batch_runner or default_batch_runner
+    visual_runner = visual_shadow_runner or default_visual_shadow_runner
+    visual_result: dict[str, Any] = {}
+    visual_error = ""
     try:
         batch_result = runner(config.batch_config_path, generated_at)
         if runner is default_batch_runner and config.retention_config_path is not None:
@@ -313,6 +352,15 @@ def run_scheduler_once(
                 execute=True,
                 generated_at=generated_at,
             )
+        if config.visual_shadow_session_config_path is not None:
+            try:
+                visual_result = visual_runner(
+                    config.visual_shadow_session_config_path,
+                    business_date,
+                    generated_at,
+                )
+            except Exception as exc:
+                visual_error = f"{type(exc).__name__}: {exc}"
         batch_summary = batch_result.get("summary", {}) if isinstance(batch_result, dict) else {}
         batch_summary_ref = ""
         if isinstance(batch_summary, dict):
@@ -331,11 +379,27 @@ def run_scheduler_once(
                 "triggered": True,
                 "batch_status": "success",
                 "batch_result": batch_result,
+                "visual_shadow_session": visual_result,
+                "visual_shadow_status": (
+                    str(visual_result.get("status") or "not_configured")
+                    if not visual_error
+                    else "failed"
+                ),
+                "visual_shadow_error": visual_error,
                 "plain_language_result": "已在纽约盘后窗口触发本地研究与修复系统；重试次数由盘后批处理内部控制。",
             }
         )
     except Exception as exc:
         error_message = f"{type(exc).__name__}: {exc}"
+        if config.visual_shadow_session_config_path is not None:
+            try:
+                visual_result = visual_runner(
+                    config.visual_shadow_session_config_path,
+                    business_date,
+                    generated_at,
+                )
+            except Exception as visual_exc:
+                visual_error = f"{type(visual_exc).__name__}: {visual_exc}"
         state = build_state_after_trigger(
             previous_state,
             business_date=business_date,
@@ -351,6 +415,13 @@ def run_scheduler_once(
                 "batch_status": "failed",
                 "error_type": type(exc).__name__,
                 "error_message": error_message,
+                "visual_shadow_session": visual_result,
+                "visual_shadow_status": (
+                    str(visual_result.get("status") or "not_configured")
+                    if not visual_error
+                    else "failed"
+                ),
+                "visual_shadow_error": visual_error,
                 "plain_language_result": "本地盘后 batch 已触发但执行失败；失败不会阻断 M15，且今日不再重复触发。",
             }
         )
