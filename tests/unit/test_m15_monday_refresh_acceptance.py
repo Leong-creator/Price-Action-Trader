@@ -48,6 +48,27 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(payload["acceptance_status"], "ready_regular_session")
             self.assertEqual(payload["fail_count"], 0)
 
+    def test_pending_flatten_is_safe_waiting_not_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime["dispatch_enabled"] = False
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness["readiness_status"] = "armed_waiting_flatten_session"
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            formal = json.loads(config.formal_epoch_path.read_text(encoding="utf-8"))
+            formal.update({"status": "pending_flatten", "blocks_new_entries": True})
+            config.formal_epoch_path.write_text(json.dumps(formal), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-08-05T10:00:00Z")
+
+            self.assertEqual(payload["acceptance_status"], "armed_waiting_flatten_session")
+            self.assertEqual(payload["fail_count"], 0)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_flatten")
+            self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_flatten")
+
     def test_watchdog_previous_result_does_not_create_acceptance_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=True)

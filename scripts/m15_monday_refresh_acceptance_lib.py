@@ -108,6 +108,12 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     expected_daily_rows = configured * 60
     runtime_alive = str(runtime.get("status") or "") == "running" and process_alive(runtime.get("runtime_pid"))
     formal_active = str(formal_epoch.get("status") or "") == "active"
+    readiness_status = str(readiness.get("readiness_status") or "")
+    pending_flatten = (
+        str(formal_epoch.get("status") or "") == "pending_flatten"
+        and formal_epoch.get("blocks_new_entries") is True
+        and readiness_status == "armed_waiting_flatten_session"
+    )
     formal_consistent = (
         formal_active
         and str(formal_epoch.get("test_epoch_id") or "")
@@ -153,19 +159,32 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             f"age={account_snapshot_age}s",
         ),
         check_row("paper_account_verified", "只连接长桥模拟账户", account.get("paper_account_verified") is True and account.get("account_channel") == "lb_papertrading", f"channel={account.get('account_channel')}"),
-        check_row("paper_dispatch_armed", "模拟账户下单通道已武装", runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True, f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}"),
-        check_row("formal_epoch_active", "正式测试编号已激活且一致", formal_consistent, str(formal_epoch.get("test_epoch_id") or "missing")),
-        check_row(
+        transition_check_row(
+            "paper_dispatch_armed",
+            "模拟账户下单通道已武装",
+            runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True,
+            pending_flatten and runtime.get("dispatch_requested") is True,
+            f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}",
+        ),
+        transition_check_row(
+            "formal_epoch_active",
+            "正式测试编号已激活且一致",
+            formal_consistent,
+            pending_flatten,
+            str(formal_epoch.get("test_epoch_id") or "missing"),
+        ),
+        transition_check_row(
             "opening_readiness",
             "开盘验收没有失败项",
             int(readiness.get("fail_count") or 0) == 0
-            and str(readiness.get("readiness_status") or "")
+            and readiness_status
             in {
                 "armed_waiting_regular_session",
                 "ready_for_regular_session",
                 "ready_for_longbridge_paper_orders",
             },
-            str(readiness.get("readiness_status") or "missing"),
+            pending_flatten and int(readiness.get("fail_count") or 0) == 0,
+            readiness_status or "missing",
         ),
         check_row("dashboard_sdk_source", "长桥看板只使用 SDK 和长桥账户事实源", dashboard.get("source_of_truth") == "longbridge_sdk_paper_account" and dashboard.get("data_status") in {"trustworthy", "trading_ready_statistics_stale"}, f"source={dashboard.get('source_of_truth')}, status={dashboard.get('data_status')}"),
         check_row("paper_only_boundaries", "不接实盘、真实资金或本地模拟信号", paper_only, str(boundaries)),
@@ -181,6 +200,8 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     pass_count = sum(1 for row in checks if row["status"] == "pass")
     if fail_count:
         status = "blocked_monday_acceptance"
+    elif pending_flatten:
+        status = "armed_waiting_flatten_session"
     elif session_should_run:
         status = "ready_regular_session"
     else:
@@ -220,11 +241,24 @@ def check_row(check: str, required_result: str, passed: bool, actual: str) -> di
     return {"check": check, "required_result": required_result, "status": "pass" if passed else "fail", "actual": actual}
 
 
+def transition_check_row(
+    check: str,
+    required_result: str,
+    passed: bool,
+    waiting: bool,
+    actual: str,
+) -> dict[str, Any]:
+    status = "pass" if passed else "waiting_for_flatten" if waiting else "fail"
+    return {"check": check, "required_result": required_result, "status": status, "actual": actual}
+
+
 def plain_result(status: str, fail_count: int) -> str:
     if status == "ready_regular_session":
         return "M15 SDK 模拟交易链路已通过当前交易窗口验收。"
     if status == "armed_waiting_regular_session":
         return "M15 SDK 模拟交易链路已武装；当前只是在等待美股常规交易时段。"
+    if status == "armed_waiting_flatten_session":
+        return "M15 SDK 清仓链路已武装；清仓确认完成前保持停止新开仓。"
     return f"M15 SDK 周一验收被阻断：{fail_count} 个检查失败。"
 
 
