@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M10-PA-007-1d",
+  "strategy_id": "M10-PA-007",
+  "display_name_zh": "PA007 日线第二腿陷阱",
+  "stage": "contract-draft-v1",
+  "direction": "long",
+  "timeframe": "1d",
+  "setup": {"rule": "second_leg_trap", "summary_zh": "第一腿、回调和第二次失败突破组成的第二腿结构"},
+  "entry_rules": {"require_first_leg": true, "require_trap_level_breach": true, "require_failure_to_continue": true, "require_trapped_trader_exit_bar": true, "entry_timing": "next_bar_first_quote", "paper_orders_allowed": false},
+  "exit_rules": {"target": "structure_or_measured_move", "stop": "second_leg_structure_stop", "invalidation": "second_leg_structure_not_confirmed"},
+  "risk_controls": {"max_risk_percent": "6.00", "minimum_reward_r": "1.50", "max_risk_per_order_usd": "20", "paper_orders_allowed": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "daily_context": true, "local_simulation_ledger": false},
+  "visual_acceptance": {"required": true, "status": "pending", "checks_zh": ["标注第一腿和回调区间", "标注第二次失败突破", "人工确认信号不是单根K线近似"]},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true},
+  "source_refs": ["scripts/m12_29_current_day_scan_dashboard_lib.py:RUNTIME_REPAIR_POLICIES", "scripts/m15_longbridge_realtime_execution_lib.py:local_repair_or_shadow_only"]
+}

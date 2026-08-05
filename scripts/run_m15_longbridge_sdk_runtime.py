@@ -41,7 +41,7 @@ from scripts.m15_longbridge_sdk_account_lib import (
 )
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
-    append_market_events, build_status, compact_market_events, config_fingerprint, configured_symbols,
+    append_market_events, attach_next_bar_first_quotes, build_status, compact_market_events, config_fingerprint, configured_symbols,
     configured_trading_symbols, daily_context_covers_symbols, daily_context_is_complete,
     daily_context_row_count_for_symbols, floor_bar_open, fresh_market_events, load_config,
     load_valid_daily_context_cache, read_client_id,
@@ -81,6 +81,18 @@ AUTHORIZED_ACCOUNT_EXIT_FILE = "m15_authorized_account_exit.json"
 CAPITAL_BUCKET_MIGRATION_FILE = "m15_capital_bucket_migration_state.json"
 TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
 TRADE_CONTEXT_RETRY_SECONDS = 5
+
+
+def parse_utc_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def parse_args() -> argparse.Namespace:
@@ -1041,6 +1053,16 @@ def run_pending_flatten_cycle(
         return state
 
     if confirmation["complete"]:
+        activate_not_before = parse_utc_datetime(str(marker.get("activate_not_before") or ""))
+        if activate_not_before is not None and now.astimezone(UTC) < activate_not_before:
+            state["status"] = "waiting_for_activation_window"
+            state["activate_not_before"] = to_iso(activate_not_before)
+            state["blocks_new_entries"] = True
+            marker["activation_blocker"] = "waiting_for_configured_activation_time"
+            marker["blocks_new_entries"] = True
+            write_json_atomic(config.formal_test_marker_path, marker)
+            write_json_atomic(config.formal_test_epoch_state_path, state)
+            return state
         active_marker = activate_formal_epoch_payload(marker, activated_at=now)
         write_json_atomic(config.formal_test_marker_path, active_marker)
         state["status"] = active_marker["status"]
@@ -1261,9 +1283,39 @@ def build_live_daily_confirmation_rows(
             "low": str(low),
             "close": str(close),
             "volume": str(volume),
+            "next_bar_first_quote_price": str(latest.get("next_bar_first_quote_price") or ""),
+            "next_bar_first_quote_at": str(latest.get("next_bar_first_quote_at") or ""),
+            "next_bar_entry_source": str(latest.get("next_bar_entry_source") or ""),
             "local_simulation_ignored": True,
         })
     return daily_rows
+
+
+def historical_daily_context_before_session(
+    rows: list[dict[str, Any]],
+    *,
+    generated_at: datetime,
+) -> list[dict[str, Any]]:
+    """Return only completed prior-session SDK daily bars for strategy context.
+
+    These rows cannot become active signal events.  The current session's
+    completed five-minute event and live daily aggregate remain the trigger.
+    """
+    session_date = generated_at.astimezone(NEW_YORK).date()
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        if str(row.get("timeframe") or "") != "1d" or row.get("bar_final") is not True:
+            continue
+        try:
+            event_date = datetime.fromisoformat(
+                str(row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(NEW_YORK).date()
+        except ValueError:
+            continue
+        if event_date >= session_date:
+            continue
+        result.append(dict(row))
+    return result
 
 
 def dispatch_completed_rows(
@@ -1273,6 +1325,7 @@ def dispatch_completed_rows(
     account_coordinator: SdkAccountCoordinator,
     paper_client: SdkRealtimePaperClient | None,
     *,
+    daily_context_rows: list[dict[str, Any]] | None = None,
     live_quote_session_state: dict[str, dict[str, Any]] | None = None,
     signal_event_cache: list[dict[str, Any]] | None = None,
     signal_id_cache: set[str] | None = None,
@@ -1280,6 +1333,7 @@ def dispatch_completed_rows(
     fill_attribution_state_cache: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     stage_started = time.perf_counter()
+    rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {})
     fresh = fresh_market_events(rows, config.maximum_source_delivery_age_ms)
     append_market_events(config.market_events_path, fresh, config.event_keep_lines)
     trading_fresh = trading_market_events(config, fresh)
@@ -1305,7 +1359,11 @@ def dispatch_completed_rows(
         },
     )
     active_ids.update(str(row.get("event_id") or "") for row in live_daily_rows)
-    router_market_rows = trading_market_rows + live_daily_rows
+    historical_daily_rows = historical_daily_context_before_session(
+        daily_context_rows or [],
+        generated_at=now_dt,
+    )
+    router_market_rows = historical_daily_rows + trading_market_rows + live_daily_rows
     router = load_router_config(config.router_config_path)
     if signal_event_cache is None:
         signal_event_cache = read_jsonl_tail_rows(
@@ -2302,6 +2360,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     context,
                     account,
                     active_client,
+                    daily_context_rows=daily_rows,
                     live_quote_session_state=live_quote_session_state,
                     signal_event_cache=signal_event_cache,
                     signal_id_cache=signal_id_cache,

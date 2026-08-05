@@ -1,0 +1,40 @@
+{
+  "schema_version": "m15-auxiliary-modules-contract-v1",
+  "modules": {
+    "M10-PA-003": {
+      "purpose_zh": "轻量质量排序",
+      "mode": "enabled",
+      "standalone_order_generation": false
+    },
+    "M10-PA-006": {
+      "purpose_zh": "限价入场过滤",
+      "mode": "contract_opt_in_only",
+      "standalone_order_generation": false
+    },
+    "M10-PA-010": {
+      "purpose_zh": "视觉黄金样例与图形证据",
+      "mode": "shadow_only",
+      "standalone_order_generation": false
+    },
+    "M10-PA-014": {
+      "purpose_zh": "目标价计算",
+      "mode": "owned_by_strategy_contract",
+      "standalone_order_generation": false
+    },
+    "M10-PA-015": {
+      "purpose_zh": "止损、整股数量与风险控制",
+      "mode": "mandatory",
+      "standalone_order_generation": false
+    },
+    "M10-PA-016": {
+      "purpose_zh": "区间加仓",
+      "mode": "disabled",
+      "standalone_order_generation": false
+    },
+    "AI-TRADER-EXTERNAL": {
+      "purpose_zh": "外部参考",
+      "mode": "audit_only",
+      "standalone_order_generation": false
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M10-PA-008-1d",
+  "strategy_id": "M10-PA-008",
+  "display_name_zh": "PA008 日线主要趋势反转",
+  "stage": "contract-draft-v1",
+  "direction": "long",
+  "timeframe": "1d",
+  "setup": {"rule": "reversal_followthrough", "summary_zh": "主要趋势反转后的跟进确认"},
+  "entry_rules": {"require_mechanical_trend_break": true, "require_second_test_window": true, "require_failed_final_push": true, "require_reversal_confirmation": true, "entry_timing": "next_bar_first_quote", "paper_orders_allowed": false},
+  "exit_rules": {"target_r": "1.60", "stop": "major_reversal_structure_stop", "invalidation": "reversal_followthrough_failure"},
+  "risk_controls": {"max_risk_percent": "6.00", "minimum_reward_r": "1.50", "max_risk_per_order_usd": "20", "paper_orders_allowed": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "daily_context": true, "local_simulation_ledger": false},
+  "visual_acceptance": {"required": true, "status": "pending", "checks_zh": ["确认主要趋势反转上下文", "确认跟进K线质量", "确认结构止损未跨越无效图形区间"]},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true},
+  "source_refs": ["scripts/m15_longbridge_realtime_signal_router_lib.py:PRICE_ACTION_RUNTIME_SPECS", "scripts/m12_29_current_day_scan_dashboard_lib.py:RUNTIME_REPAIR_POLICIES"]
+}

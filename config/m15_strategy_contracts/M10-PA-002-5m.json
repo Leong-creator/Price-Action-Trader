@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M10-PA-002-5m",
+  "strategy_id": "M10-PA-002",
+  "display_name_zh": "PA002 五分钟突破确认",
+  "stage": "paper-v1",
+  "direction": "long",
+  "timeframe": "5m",
+  "setup": {"rule": "pa002_5m_long_contract_v1", "summary_zh": "严格使用前20根完整五分钟K线、合格突破棒和1至2根首次跟进确认"},
+  "entry_rules": {"range_lookback_bars": 20, "breakout_body_to_range_min": "0.50", "breakout_close_position_min": "0.666666", "follow_through_window_bars": 2, "reject_range_reentry": true, "entry_timing": "next_bar_first_quote", "order_type": "protected_limit", "completed_bar_only": true},
+  "exit_rules": {"target": "prior_20_bar_range_measured_move", "stop": "breakout_bar_low", "invalidation": "close_returns_inside_prior_range", "partial_take_profit": false, "intraday_forced_exit_ny": "15:55"},
+  "risk_controls": {"max_risk_percent": "2.50", "minimum_reward_r": "1.50", "minimum_net_profit_after_fees": "8", "max_total_exposure_usd": "6000", "max_symbol_exposure_usd": "1500", "max_risk_per_order_usd": "20", "minimum_cash_reserve_usd": "4000", "daily_new_symbol_limit": null, "consecutive_loss_hard_stop": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "timeframe": "5m", "local_simulation_ledger": false},
+  "visual_acceptance": {"required": false, "status": "not-required"},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true},
+  "source_refs": ["scripts/m15_longbridge_realtime_signal_router_lib.py:PRICE_ACTION_RUNTIME_SPECS", "config/examples/m15_longbridge_realtime_signal_router.json:virtual_capital_buckets.pa002_5m"]
+}

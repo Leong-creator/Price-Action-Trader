@@ -13,6 +13,40 @@ from scripts.m15_longbridge_fill_attribution_lib import (
 
 
 class M15LongbridgeFillAttributionTest(unittest.TestCase):
+    def test_new_contract_hash_separates_fill_batches_for_rule_revisions(self) -> None:
+        result = rebuild_fill_attribution(
+            [
+                self.local_row(
+                    order_id="order-1",
+                    signal_id="signal-1",
+                    symbol="AAPL",
+                    side="buy",
+                    quantity="1",
+                    runtime_id="R1",
+                    capital_bucket="bucket",
+                    test_epoch_id="epoch",
+                    position_action="open_long",
+                    strategy_contract_hash="contract-hash-a",
+                )
+            ],
+            [
+                {
+                    "order_id": "order-1",
+                    "trade_id": "trade-1",
+                    "status": "filled",
+                    "executed_quantity": "1",
+                    "executed_price": "100",
+                }
+            ],
+            broker_net_positions={"AAPL": "1"},
+        )
+
+        self.assertEqual(
+            result["batches"][0]["batch_id"],
+            "epoch|bucket|R1|long|AAPL|contract-hash-a|order-1|trade-1",
+        )
+        self.assertEqual(result["batches"][0]["strategy_contract_hash"], "contract-hash-a")
+
     def test_completed_trade_is_not_inflated_by_multiple_exit_fill_events(self) -> None:
         result = rebuild_fill_attribution(
             [
@@ -716,6 +750,7 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
         position_action: str,
         source_open_order_id: str = "",
         source_open_trade_id: str = "",
+        strategy_contract_hash: str = "",
     ) -> dict[str, str]:
         return {
             "order_id": order_id,
@@ -729,6 +764,7 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
             "position_action": position_action,
             "source_open_order_id": source_open_order_id,
             "source_open_trade_id": source_open_trade_id,
+            "strategy_contract_hash": strategy_contract_hash,
         }
 
     @staticmethod

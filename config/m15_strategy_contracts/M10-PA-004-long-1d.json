@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M10-PA-004-long-1d",
+  "strategy_id": "M10-PA-004",
+  "display_name_zh": "PA004 日线宽通道边界反转",
+  "stage": "contract-draft-v1",
+  "direction": "long",
+  "timeframe": "1d",
+  "setup": {"rule": "wide_channel_second_push_failure", "summary_zh": "宽通道边界第二次推动失败或被困突破后的反转做多"},
+  "entry_rules": {"require_wide_channel": true, "require_two_boundary_tests": true, "require_second_push_failure_or_trapped_breakout": true, "entry_timing": "next_bar_first_quote", "paper_orders_allowed": false},
+  "exit_rules": {"target": "opposite_channel_or_measured_move", "stop": "outside_failed_second_push", "invalidation": "channel_boundary_failure_resumes"},
+  "risk_controls": {"max_risk_per_order_usd": "20", "minimum_reward_r": "1.50", "paper_orders_allowed": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "daily_context": true, "local_simulation_ledger": false},
+  "visual_acceptance": {"required": true, "status": "pending", "checks_zh": ["确认突破结构与阻力位置", "确认跳空守住不是单根K线误判", "确认止损和目标锚点可从图形复现"]},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true},
+  "source_refs": ["scripts/m12_19_visual_detector_prototypes_lib.py", "scripts/m12_20_visual_detector_implementation_lib.py"]
+}

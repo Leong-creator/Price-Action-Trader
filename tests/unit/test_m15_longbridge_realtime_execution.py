@@ -20,6 +20,7 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     run_realtime_execution,
     submitted_ledger_open_exposure_by_bucket,
 )
+from scripts.m15_strategy_contracts_lib import load_contracts
 
 
 class FakeRealtimePaperClient:
@@ -39,6 +40,61 @@ class SlowRealtimePaperClient(FakeRealtimePaperClient):
 
 
 class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
+    def test_required_contract_hash_missing_or_drifted_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            contracts_dir = Path(__file__).resolve().parents[2] / "config" / "m15_strategy_contracts"
+            contract = load_contracts(contracts_dir)["M10-PA-001-1d"]
+            account = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [],
+                "open_orders": [],
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = replace(
+                self.make_config(root, account_state=account, allowed_runtime_ids=["M10-PA-001-1d"]),
+                require_strategy_contracts=True,
+                strategy_contracts_dir=contracts_dir,
+            )
+            base = self.signal(
+                runtime_id="M10-PA-001-1d",
+                strategy_id="M10-PA-001",
+                created_at="2026-06-04T13:59:59.500Z",
+                net_profit_after_fees_at_target="12.00",
+                target_price="112.00",
+            )
+            emitted: list[dict] = []
+            run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                signal_events_override=[base],
+                account_state_override=account,
+                existing_ledger_override=[],
+                emitted_ledger_rows=emitted,
+                broker_client=FakeRealtimePaperClient(),
+            )
+            self.assertIn("blocked_strategy_contract_hash_missing", emitted[0]["blockers"])
+
+            drifted = {
+                **base,
+                "signal_id": "sig-drift",
+                "strategy_contract_hash": "wrong",
+                "strategy_contract_stage": contract["stage"],
+            }
+            emitted = []
+            run_realtime_execution(
+                config,
+                generated_at="2026-06-04T14:00:00Z",
+                signal_events_override=[drifted],
+                account_state_override=account,
+                existing_ledger_override=[],
+                emitted_ledger_rows=emitted,
+                broker_client=FakeRealtimePaperClient(),
+            )
+            self.assertIn("blocked_strategy_contract_hash_drift", emitted[0]["blockers"])
     def test_stop_loss_executes_before_take_profit_and_new_entries(self) -> None:
         signals = [
             self.signal(
@@ -679,7 +735,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(response["status"], "submit_unconfirmed_missing_order_id")
             self.assertEqual(response["order_id"], "")
 
-    def test_longbridge_cli_short_capacity_parses_cash_table_without_margin(self) -> None:
+    def test_longbridge_cli_short_capacity_uses_margin_quantity_not_cash_quantity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
@@ -708,7 +764,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             response = client.max_short_quantity("TSLA", Decimal("300"))
 
             self.assertTrue(response["ok"])
-            self.assertEqual(response["max_quantity"], Decimal("903"))
+            self.assertEqual(response["max_quantity"], Decimal("9999"))
             self.assertEqual(
                 commands[0],
                 ["longbridge", "max-qty", "TSLA.US", "--side", "sell", "--price", "300.00", "--format", "json"],

@@ -21,6 +21,41 @@ from scripts.m15_longbridge_realtime_position_manager_lib import (
 
 
 class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
+    def test_daily_contract_exits_at_fifth_market_session_close(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = replace(
+                self.make_config(Path(tmp)),
+                maximum_holding_sessions_by_runtime={"M10-PA-001-1d": 5},
+                market_holidays=frozenset(),
+            )
+            row, event = evaluate_position(
+                config,
+                {"symbol": "AAPL", "quantity": "2", "available": "2", "cost_price": "100"},
+                {
+                    "runtime_id": "M10-PA-001-1d",
+                    "strategy_id": "M10-PA-001",
+                    "position_direction": "long",
+                    "open_order_id": "open-order",
+                    "source_open_trade_id": "open-trade",
+                    "signal_id": "open-signal",
+                    "stop_price": "95",
+                    "target_price": "110",
+                    "open_market_date": "2026-08-03",
+                },
+                latest_price=Decimal("101"),
+                generated_at="2026-08-07T19:55:00Z",
+                existing_signal_ids=set(),
+                recent_exit_attempts=set(),
+                retriable_exit_signal_ids=set(),
+            )
+
+            self.assertEqual(row["holding_session_count"], 5)
+            self.assertEqual(row["exit_reason"], "maximum_holding_sessions_exit")
+            self.assertIsNotNone(event)
+            assert event is not None
+            self.assertEqual(event["order_type"], "market")
+            self.assertEqual(event["position_action"], "close_long")
+
     def test_pa002_repaired_five_minute_position_exits_next_market_day(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp))
@@ -322,6 +357,7 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             self.assertEqual(signals[0]["position_action"], "take_profit")
             self.assertEqual(signals[0]["quantity"], "2")
             self.assertEqual(signals[0]["limit_price"], "110.44")
+            self.assertEqual(signals[0]["order_type"], "limit")
             self.assertEqual(signals[0]["exit_limit_price_source"], "current_price_minus_long_exit_buffer")
             self.assertFalse(signals[0]["local_simulation_source"])
             self.assertTrue(signals[0]["longbridge_position_exit_source"])
@@ -339,6 +375,39 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
             signals = self.read_jsonl(root / "signals.jsonl")
 
             self.assertEqual(signals[0]["position_action"], "stop_loss")
+            self.assertEqual(signals[0]["order_type"], "market")
+            self.assertEqual(signals[0]["limit_price"], "")
+            self.assertTrue(signals[0]["market_exit_no_reprice"])
+
+    def test_intraday_contract_position_forces_market_exit_at_1555_new_york(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            _, event = evaluate_position(
+                config,
+                {"symbol": "AAPL", "quantity": "2", "available": "2", "cost_price": "100"},
+                {
+                    "runtime_id": "M10-PA-002-5m",
+                    "strategy_id": "M10-PA-002",
+                    "position_direction": "long",
+                    "open_order_id": "open-order",
+                    "source_open_trade_id": "open-trade",
+                    "signal_id": "open-signal",
+                    "stop_price": "90",
+                    "target_price": "120",
+                    "open_market_date": "2026-08-05",
+                },
+                latest_price=Decimal("101"),
+                generated_at="2026-08-05T19:55:00Z",
+                existing_signal_ids=set(),
+                recent_exit_attempts=set(),
+                retriable_exit_signal_ids=set(),
+            )
+
+        self.assertIsNotNone(event)
+        assert event is not None
+        self.assertEqual(event["exit_reason"], "intraday_forced_exit_1555_ny")
+        self.assertEqual(event["order_type"], "market")
+        self.assertEqual(event["limit_price"], "")
 
     def test_unavailable_position_does_not_generate_repeated_exit_order(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

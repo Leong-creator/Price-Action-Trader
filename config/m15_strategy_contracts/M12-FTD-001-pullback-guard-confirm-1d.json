@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M12-FTD-001-pullback-guard-confirm-1d",
+  "strategy_id": "M12-FTD-001",
+  "display_name_zh": "FTD 长回调保护与跟进确认日线版",
+  "stage": "paper-v1",
+  "direction": "long",
+  "timeframe": "1d",
+  "setup": {"rule": "ftd_pullback_guard_confirm_v1", "summary_zh": "原始趋势顺势信号K、最长20根回调保护和1至2根首次跟进确认的独立混合合同"},
+  "entry_rules": {"max_pullback_bars": 20, "follow_through_window_bars": 2, "signal_min_close_to_close_percent": "1.70", "signal_min_volume_ratio": "1.15", "signal_min_close_position": "0.70", "entry_timing": "next_bar_first_quote", "order_type": "protected_limit", "market_context_mode": "audit_only", "higher_timeframe_mode": "audit_only"},
+  "exit_rules": {"target_r": "2.00", "stop": "signal_bar_or_wider_structure_stop", "invalidation": "signal_follow_through_failure", "maximum_holding_sessions": 5, "maximum_holding_exit_time_ny": "15:55", "partial_take_profit": false, "gap_through_stop": "first_executable_price"},
+  "risk_controls": {"max_risk_percent": "6.00", "minimum_reward_r": "2.00", "minimum_net_profit_after_fees": "8", "max_total_exposure_usd": "6000", "max_symbol_exposure_usd": "1500", "max_risk_per_order_usd": "20", "minimum_cash_reserve_usd": "4000", "daily_new_symbol_limit": null, "consecutive_loss_hard_stop": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "daily_context_bars": 60, "local_simulation_ledger": false},
+  "visual_acceptance": {"required": false, "status": "not-required"},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true},
+  "source_refs": ["scripts/m12_24_ftd_ab_validation_lib.py", "scripts/m15_longbridge_realtime_signal_router_lib.py:ftd_pullback_guard_confirm_signal"]
+}

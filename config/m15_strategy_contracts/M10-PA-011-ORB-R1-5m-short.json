@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M10-PA-011-ORB-R1-5m-short",
+  "strategy_id": "M10-PA-011",
+  "display_name_zh": "PA011 ORB-R1 五分钟受限做空",
+  "stage": "paper-v1",
+  "direction": "short",
+  "timeframe": "5m",
+  "setup": {"rule": "opening_range_breakdown", "summary_zh": "开盘区间向下突破的严格确认做空"},
+  "entry_rules": {"structure": "first_valid_break_below_first_30_minute_range", "opening_range_minutes": 30, "minimum_break_percent": "0.25", "max_close_position": "0.20", "max_close_to_close_percent": "-0.75", "min_volume_ratio": "1.50", "market_confirmation_requirement": "both_spy_and_qqq_weak", "borrow_capacity_required": true},
+  "exit_rules": {"target_r": "2.25", "stop": "opening_range_structure_stop", "invalidation": "opening_range_breakdown_reclaimed", "close_action": "buy_to_cover_with_open_order_id", "intraday_forced_exit_ny": "15:55"},
+  "risk_controls": {"max_risk_percent": "1.25", "minimum_reward_r": "2.25", "minimum_net_profit_after_fees": "15", "minimum_quality_score": "90", "max_total_exposure_usd": "2000", "max_symbol_exposure_usd": "750", "max_risk_per_order_usd": "10", "daily_new_symbol_limit": null, "consecutive_loss_hard_stop": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "shortable_quantity_required": true, "opening_range_context": true, "local_simulation_ledger": false},
+  "visual_acceptance": {"required": false, "status": "not-required"},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true, "restricted_short_only": true},
+  "source_refs": ["scripts/m15_longbridge_realtime_signal_router_lib.py:PRICE_ACTION_RUNTIME_SPECS", "config/examples/m15_longbridge_realtime_execution.json:paper_short_testing"]
+}

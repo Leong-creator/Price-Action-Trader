@@ -6,7 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.m15_longbridge_dashboard_lib import build_dashboard, run_dashboard
+from scripts.m15_longbridge_dashboard_lib import (
+    _build_short_position_views,
+    _inventory,
+    _merge_short_execution_funnel,
+    build_dashboard,
+    run_dashboard,
+)
 
 
 def _write(path: Path, payload: dict) -> str:
@@ -21,6 +27,122 @@ class LongbridgeDashboardTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_contract_inventory_shows_frozen_stage_and_hash(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        execution = json.loads(
+            (root / "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        inventory = _inventory(execution)
+
+        self.assertEqual(inventory["runtime_count"], 8)
+        self.assertEqual(inventory["contract_loaded_count"], 8)
+        self.assertTrue(inventory["strategy_contracts_required"])
+        self.assertTrue(all(row["contract_stage"] == "paper-v1" for row in inventory["contract_rows"]))
+        self.assertTrue(all(len(str(row["contract_hash"])) == 64 for row in inventory["contract_rows"]))
+
+    def test_short_funnel_keeps_three_runtimes_and_capacity_failure_classes(self) -> None:
+        runtimes = [
+            "M10-PA-002-5m-short",
+            "M10-PA-013-5m-short",
+            "M10-PA-011-ORB-R1-5m-short",
+        ]
+        diagnostics = {
+            "test_epoch_id": "short-formal",
+            "summary": {"runtime_count": 3, "detector_attempted_count": 9},
+            "runtime_summaries": [
+                {
+                    "runtime_id": runtime_id,
+                    "detector_attempted_count": 3,
+                    "no_candidate_count": 2,
+                    "candidate_count": 1,
+                    "signal_ready_count": 1,
+                }
+                for runtime_id in runtimes
+            ],
+        }
+        execution_rows = [
+            {
+                "test_epoch_id": "short-formal",
+                "runtime_id": runtime_id,
+                "position_action": "open_short",
+                "short_capacity_check_status": "sdk_short_capacity",
+                "short_capacity_blocker_class": failure_class,
+                "blockers": [f"blocked_short_capacity_{failure_class}"],
+                "order_id": f"SHORT-{index}",
+            }
+            for index, (runtime_id, failure_class) in enumerate(zip(
+                runtimes,
+                ("query_failed", "no_borrow_inventory", "insufficient"),
+            ), start=1)
+        ]
+
+        payload = _merge_short_execution_funnel(
+            diagnostics,
+            execution_rows,
+            [
+                {"order_id": "SHORT-1", "status": "Partially_Filled"},
+                {"order_id": "SHORT-2", "status": "Filled"},
+            ],
+        )
+
+        self.assertEqual(len(payload["runtime_summaries"]), 3)
+        self.assertEqual(
+            payload["summary"]["broker_capacity_failure_classes"],
+            {"query_failed": 1, "no_borrow_inventory": 1, "insufficient": 1},
+        )
+        self.assertTrue(all(row["detector_attempted_count"] == 3 for row in payload["runtime_summaries"]))
+        self.assertEqual(payload["summary"]["broker_partially_filled_order_count"], 1)
+        self.assertEqual(payload["summary"]["broker_fully_filled_order_count"], 1)
+
+    def test_short_position_views_include_symbol_net_and_lot_lifecycle(self) -> None:
+        fill_attribution = {
+            "batches": [
+                {
+                    "batch_id": "long-aapl",
+                    "direction": "long",
+                    "symbol": "AAPL",
+                    "runtime_id": "LONG-RUNTIME",
+                    "filled_quantity": "5",
+                    "remaining_quantity": "5",
+                },
+                {
+                    "batch_id": "short-aapl",
+                    "direction": "short",
+                    "symbol": "AAPL",
+                    "runtime_id": "M10-PA-002-5m-short",
+                    "capital_bucket": "pa002-short",
+                    "open_order_id": "SHORT-OPEN-1",
+                    "filled_quantity": "3",
+                    "remaining_quantity": "2",
+                },
+            ],
+            "completed_trades": [{"batch_id": "short-done", "direction": "short"}],
+        }
+        execution_rows = [{
+            "position_action": "close_short",
+            "source_open_order_id": "SHORT-OPEN-1",
+            "order_id": "SHORT-COVER-1",
+            "submission_status": "submitted",
+        }]
+        reconciliation_rows = [{"order_id": "SHORT-COVER-1", "canonical_status": "partially_filled"}]
+
+        payload = _build_short_position_views(fill_attribution, execution_rows, reconciliation_rows)
+
+        net = payload["same_symbol_long_short_net"][0]
+        self.assertEqual(net["long_quantity"], "5.0000")
+        self.assertEqual(net["short_quantity"], "2.0000")
+        self.assertEqual(net["net_quantity"], "3.0000")
+        self.assertTrue(net["contains_both_directions"])
+        lifecycle = payload["short_lot_lifecycle"]
+        self.assertEqual(lifecycle["summary"]["open_lot_count"], 1)
+        self.assertEqual(lifecycle["summary"]["partially_covered_lot_count"], 1)
+        self.assertEqual(lifecycle["summary"]["pending_cover_order_count"], 1)
+        self.assertEqual(lifecycle["summary"]["completed_lot_count"], 1)
+        self.assertEqual(lifecycle["open_lots"][0]["covered_quantity"], "1.0000")
 
     def test_dashboard_uses_sdk_and_actual_longbridge_sources(self) -> None:
         tmp_path = self.tmp_path

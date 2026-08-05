@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from scripts.m15_strategy_contracts_lib import load_contracts_cached
+
 from scripts.longbridge_cli_env import build_longbridge_cli_env
 from scripts.m12_readonly_auth_preflight_lib import clean_cli_text
 from scripts.m15_pa002_repaired_state_lib import (
@@ -264,6 +266,8 @@ class RealtimeExecutionConfig:
     test_epoch_state_path: Path
     flatten_existing_positions_before_new_epoch: bool
     archive_previous_records: bool
+    strategy_contracts_dir: Path
+    require_strategy_contracts: bool
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -377,12 +381,21 @@ class LongbridgeCliRealtimePaperClient:
                 "command": redact_command(command),
             }
         response = parse_json(stdout)
-        max_quantity = response_max_sell_quantity(response)
+        cash_quantity = response_capacity_quantity(
+            response,
+            keys=("cash_max_qty", "cash_max_quantity"),
+            labels=("cash max qty", "cash max quantity"),
+        )
+        margin_quantity = response_max_sell_quantity(response)
+        max_quantity = margin_quantity
         if max_quantity <= ZERO:
             return {
                 "ok": False,
-                "status": "short_capacity_zero_or_permission_denied",
+                "status": "short_capacity_no_borrow_inventory",
                 "max_quantity": ZERO,
+                "cash_max_quantity": cash_quantity,
+                "margin_max_quantity": margin_quantity,
+                "capacity_basis": "margin_max_qty_for_sell_short",
                 "elapsed_ms": elapsed_ms,
                 "response": response,
                 "command": redact_command(command),
@@ -391,6 +404,9 @@ class LongbridgeCliRealtimePaperClient:
             "ok": True,
             "status": "short_capacity_confirmed",
             "max_quantity": max_quantity,
+            "cash_max_quantity": cash_quantity,
+            "margin_max_quantity": margin_quantity,
+            "capacity_basis": "margin_max_qty_for_sell_short",
             "elapsed_ms": elapsed_ms,
             "response": response,
             "command": redact_command(command),
@@ -417,6 +433,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
     realtime = payload.get("longbridge_realtime", {})
     account_model = payload.get("paper_account_model", {})
     short_testing = payload.get("paper_short_testing", {})
+    strategy_contracts = payload.get("strategy_contracts", {})
     virtual_buckets, runtime_bucket_map = parse_virtual_capital_buckets(payload, account_model)
     epoch = payload.get("test_epoch", {}) if isinstance(payload.get("test_epoch"), dict) else {}
     output_dir = resolve_repo_path(outputs.get("output_dir", DEFAULT_OUTPUT_DIR))
@@ -498,6 +515,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeExecutionConf
             epoch.get("flatten_existing_positions_before_activation", False)
         ),
         archive_previous_records=bool(epoch.get("archive_previous_records", True)),
+        strategy_contracts_dir=resolve_repo_path(
+            strategy_contracts.get("directory", "config/m15_strategy_contracts")
+        ),
+        require_strategy_contracts=bool(strategy_contracts.get("required", False)),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -648,6 +669,18 @@ def validate_config(config: RealtimeExecutionConfig) -> None:
         raise ValueError("M15 realtime execution cannot enable real money actions")
     if config.hard_boundaries.get("local_simulation_as_order_source", False):
         raise ValueError("M15 realtime execution cannot use local simulation as order source")
+    if config.require_strategy_contracts:
+        contracts = load_contracts_cached(str(config.strategy_contracts_dir))
+        missing = set(config.allowed_runtime_ids) - set(contracts)
+        if missing:
+            raise ValueError(f"M15 realtime execution runtime contract missing: {sorted(missing)}")
+        non_executable = {
+            runtime_id: contracts[runtime_id]["stage"]
+            for runtime_id in config.allowed_runtime_ids
+            if contracts[runtime_id]["stage"] not in {"paper-v1", "full-v1"}
+        }
+        if non_executable:
+            raise ValueError(f"M15 realtime execution contract is not executable: {non_executable}")
 
 
 def run_realtime_execution(
@@ -1262,6 +1295,17 @@ def evaluate_signal_event(
         blockers.append("blocked_account_state_stale")
     if not exit_only_position_signal:
         blockers.extend(strategy_isolation_blockers(runtime_id, strategy_id, config.allowed_runtime_ids))
+        if config.require_strategy_contracts:
+            contract = load_contracts_cached(str(config.strategy_contracts_dir)).get(runtime_id)
+            signal_contract_hash = str(signal.get("strategy_contract_hash") or "")
+            if contract is None:
+                blockers.append("blocked_strategy_contract_missing")
+            elif not signal_contract_hash:
+                blockers.append("blocked_strategy_contract_hash_missing")
+            elif signal_contract_hash != str(contract.get("contract_hash") or ""):
+                blockers.append("blocked_strategy_contract_hash_drift")
+            elif str(signal.get("strategy_contract_stage") or "") != str(contract.get("stage") or ""):
+                blockers.append("blocked_strategy_contract_stage_drift")
     held_quantities = held_symbol_quantities(account_state)
     held_long_quantities = long_held_symbol_quantities(account_state)
     available_quantities = available_symbol_quantities(account_state)
@@ -1279,6 +1323,7 @@ def evaluate_signal_event(
         "max_quantity": ZERO,
         "elapsed_ms": 0,
     }
+    short_capacity_blocker_class = ""
     if opening_short:
         if not config.allow_short_selling or not config.paper_short_testing_enabled:
             blockers.append("blocked_short_disabled")
@@ -1491,7 +1536,8 @@ def evaluate_signal_event(
     if opening_short and not blockers and config.execute_orders:
         capacity_provider = getattr(broker_client, "max_short_quantity", None)
         if not callable(capacity_provider):
-            blockers.append("blocked_short_capacity_query_unavailable")
+            short_capacity_blocker_class = "query_failed"
+            blockers.append("blocked_short_capacity_query_failed")
             short_capacity_check = {
                 "status": "short_capacity_query_unavailable",
                 "max_quantity": ZERO,
@@ -1501,9 +1547,14 @@ def evaluate_signal_event(
             short_capacity_check = capacity_provider(symbol, limit_price)
             broker_max_quantity = decimal(short_capacity_check.get("max_quantity", "0"))
             if not short_capacity_check.get("ok"):
-                blockers.append("blocked_short_broker_capacity_unavailable")
+                short_capacity_blocker_class = classify_short_capacity_failure(
+                    short_capacity_check,
+                    requested_quantity=quantity,
+                )
+                blockers.append(f"blocked_short_capacity_{short_capacity_blocker_class}")
             elif broker_max_quantity < quantity:
-                blockers.append("blocked_short_broker_capacity_insufficient")
+                short_capacity_blocker_class = "insufficient"
+                blockers.append("blocked_short_capacity_insufficient")
     if signal_expires_at and generated_at > signal_expires_at:
         blockers.append("blocked_realtime_signal_expired")
     if latency_ms is not None and latency_ms > config.latency_acceptable_ms:
@@ -1541,6 +1592,8 @@ def evaluate_signal_event(
             "capital_bucket_label": bucket_label,
             "execution_run_id": execution_run_id,
             "execution_config_digest": config.config_digest,
+            "strategy_contract_hash": str(signal.get("strategy_contract_hash") or ""),
+            "strategy_contract_stage": str(signal.get("strategy_contract_stage") or ""),
             "session_run_id": session_run_id,
             "test_epoch_id": str(effective_epoch_state.get("test_epoch_id") or ""),
             "raw_suggested_quantity": fmt_decimal(quantity_normalization.raw_quantity),
@@ -1579,6 +1632,10 @@ def evaluate_signal_event(
         "signal_id": signal_id,
         "runtime_id": runtime_id,
         "strategy_id": strategy_id,
+        "strategy_contract_hash": str(signal.get("strategy_contract_hash") or ""),
+        "strategy_contract_stage": str(signal.get("strategy_contract_stage") or ""),
+        "strategy_contract_stage_zh": str(signal.get("strategy_contract_stage_zh") or ""),
+        "strategy_contract_schema_version": str(signal.get("strategy_contract_schema_version") or ""),
         "capital_bucket": capital_bucket,
         "capital_bucket_label": bucket_label,
         "test_epoch_id": str(effective_epoch_state.get("test_epoch_id") or ""),
@@ -1644,6 +1701,7 @@ def evaluate_signal_event(
         "short_capacity_basis": str(
             short_capacity_check.get("capacity_basis") or ""
         ),
+        "short_capacity_blocker_class": short_capacity_blocker_class,
         "short_capacity_query_ms": int_decimal(short_capacity_check.get("elapsed_ms", 0)),
         "short_position_verified_quantity": fmt_decimal(tracked_short_quantity),
         "minimum_reward_r": fmt_decimal(minimum_reward_r),
@@ -3712,39 +3770,60 @@ def response_order_id(response: Any) -> str:
 
 
 def response_max_sell_quantity(response: Any) -> Decimal:
+    """Return only Longbridge's borrowed-stock capacity for Sell open-short."""
+    return response_capacity_quantity(
+        response,
+        keys=("margin_max_qty", "margin_max_quantity"),
+        labels=("margin max qty", "margin max quantity"),
+    )
+
+
+def response_capacity_quantity(
+    response: Any,
+    *,
+    keys: tuple[str, ...],
+    labels: tuple[str, ...],
+) -> Decimal:
     if isinstance(response, dict):
-        for key in ("cash_max_qty", "short_max_qty", "sell_max_qty", "max_sell_quantity", "max_qty"):
+        for key in keys:
             quantity = decimal(response.get(key, "0"))
             if quantity > ZERO:
                 return quantity
-        # `longbridge max-qty --format json` currently returns CLI table rows
-        # such as {"field": "Cash Max Qty", "value": "903"}, rather than a
-        # keyed API object. Only consume explicitly cash/short sell capacity;
-        # margin capacity stays excluded because margin financing is disabled.
         field = str(response.get("field") or "").strip().lower().replace("_", " ")
         field = " ".join(field.split())
-        if field in {
-            "cash max qty",
-            "cash max quantity",
-            "short max qty",
-            "short max quantity",
-            "sell max qty",
-            "sell max quantity",
-            "max sell quantity",
-        }:
+        if field in labels:
             quantity = decimal(response.get("value", "0"))
             if quantity > ZERO:
                 return quantity
         for key in ("data", "result", "max_quantity"):
-            quantity = response_max_sell_quantity(response.get(key))
+            quantity = response_capacity_quantity(response.get(key), keys=keys, labels=labels)
             if quantity > ZERO:
                 return quantity
     if isinstance(response, list):
         for item in response:
-            quantity = response_max_sell_quantity(item)
+            quantity = response_capacity_quantity(item, keys=keys, labels=labels)
             if quantity > ZERO:
                 return quantity
     return ZERO
+
+
+def classify_short_capacity_failure(
+    check: dict[str, Any],
+    *,
+    requested_quantity: Decimal,
+) -> str:
+    """Map broker capacity outcomes to stable diagnostics categories."""
+    if bool(check.get("ok")):
+        return "insufficient" if decimal(check.get("max_quantity", "0")) < requested_quantity else ""
+    status = str(check.get("underlying_status") or check.get("status") or "").lower()
+    source = str(check.get("capacity_source") or "").lower()
+    if not status or check.get("error"):
+        return "query_failed"
+    if any(marker in status for marker in ("failed", "failure", "error", "unavailable", "timeout")):
+        return "query_failed"
+    if source in {"broker_sdk_error", "broker_sdk_unavailable"}:
+        return "query_failed"
+    return "no_borrow_inventory"
 
 
 def decimal(value: Any) -> Decimal:

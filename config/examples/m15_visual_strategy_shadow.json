@@ -1,0 +1,36 @@
+{
+  "stage": "M15.visual_strategy_shadow",
+  "contract": {
+    "stage": "shadow-v1",
+    "schema_version": "m15.visual-strategy-shadow.v1"
+  },
+  "inputs": {
+    "bars": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl"
+  },
+  "state": {
+    "path": "reports/m15_visual_strategy_shadow/state.json",
+    "history_limit": 64,
+    "restore": "atomic_fail_closed"
+  },
+  "outputs": {
+    "audit_jsonl": "reports/m15_visual_strategy_shadow/audit_events.jsonl",
+    "run_summary": "reports/m15_visual_strategy_shadow/run_summary.json",
+    "acceptance_json": "reports/m15_visual_strategy_shadow/acceptance_evidence.json"
+  },
+  "detector": {
+    "base": "M12.20.visual_detector_implementation",
+    "channel_lookback": 12,
+    "channel_tolerance": "0.08",
+    "trend_short_window": 3,
+    "trend_long_window": 6
+  },
+  "hard_boundaries": {
+    "read_only_shadow_audit": true,
+    "order_generation": false,
+    "broker_connection": false,
+    "real_orders": false,
+    "live_execution": false,
+    "future_data": false,
+    "backfill": false
+  }
+}

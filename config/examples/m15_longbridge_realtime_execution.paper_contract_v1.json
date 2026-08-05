@@ -1,0 +1,252 @@
+{
+  "hard_boundaries": {
+    "fractional_shares": false,
+    "live_execution": false,
+    "local_simulation_as_order_source": false,
+    "manual_m12_37_once": false,
+    "margin_financing": false,
+    "options": false,
+    "paper_simulated_only": true,
+    "real_money_actions": false,
+    "short_selling": true
+  },
+  "inputs": {
+    "fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json",
+    "pa002_repaired_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_pa002_repaired_runtime_state.json",
+    "paper_account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
+    "realtime_signal_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_signal_events.jsonl"
+  },
+  "longbridge_realtime": {
+    "allow_replay": false,
+    "allowed_runtime_ids": [
+      "M10-PA-001-1d",
+      "M10-PA-002-5m",
+      "M10-PA-012-5m",
+      "M10-PA-004-MBF-QC-1d",
+      "M12-FTD-001-pullback-guard-confirm-1d",
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
+    ],
+    "cli_name": "longbridge",
+    "cli_timeout_seconds": 6,
+    "daily_new_symbol_limit_by_strategy": {},
+    "execute_orders": true,
+    "latency_acceptable_ms": 5000,
+    "latency_target_ms": 1000,
+    "max_account_state_age_seconds": 45,
+    "max_delayed_signal_age_seconds": 60,
+    "outside_rth": "RTH_ONLY",
+    "paper_trading_approval": true,
+    "required_account_channel": "lb_papertrading",
+    "session_started_at": "auto",
+    "time_in_force": "day",
+    "watch_interval_seconds": 1
+  },
+  "outputs": {
+    "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution"
+  },
+  "paper_account_model": {
+    "allow_fractional_shares": false,
+    "allow_margin_financing": false,
+    "allow_options": false,
+    "allow_short_selling": true,
+    "conditional_net_profit_requires_confluence": false,
+    "equity": "10000",
+    "max_risk_per_order": "20",
+    "max_symbol_exposure": "1500",
+    "max_total_exposure": "6000",
+    "min_cash_reserve": "4000",
+    "minimum_net_profit_after_fees": "5",
+    "minimum_reward_r": "1.5",
+    "normal_minimum_net_profit_after_fees": "8",
+    "runtime_minimum_net_profit_after_fees": {
+      "M10-PA-001-1d": "12",
+      "M10-PA-002-5m-short": "12",
+      "M10-PA-011-ORB-R1-5m-short": "15",
+      "M10-PA-013-5m-short": "12"
+    },
+    "runtime_minimum_reward_r": {
+      "M10-PA-001-1d": "2.0",
+      "M10-PA-002-5m-short": "2.0",
+      "M10-PA-011-ORB-R1-5m-short": "2.25",
+      "M10-PA-013-5m-short": "2.0"
+    }
+  },
+  "paper_short_testing": {
+    "enabled": true,
+    "runtime_ids": [
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
+    ],
+    "test_epoch_id": "m15-sdk-contract-v1-short-20260806",
+    "test_started_at": "2026-08-06T13:30:00Z"
+  },
+  "runtime_layering": {
+    "auxiliary_modules_local_only": [
+      "M10-PA-003",
+      "M10-PA-006",
+      "M10-PA-010",
+      "M10-PA-014",
+      "M10-PA-015",
+      "M10-PA-016",
+      "AI-TRADER-EXTERNAL"
+    ],
+    "local_repair_or_shadow_only": [
+      "M10-PA-001-5m",
+      "M10-PA-004-long-1d",
+      "M10-PA-007-1d",
+      "M10-PA-008-1d",
+      "M10-PA-009-1d",
+      "M10-PA-011-5m",
+      "all m14-modify variants",
+      "all broker-risk-cap-shadow variants",
+      "all target-stop-shadow variants"
+    ],
+    "longbridge_realtime_candidates": [
+      "M10-PA-001-1d",
+      "M10-PA-002-5m",
+      "M10-PA-012-5m",
+      "M10-PA-004-MBF-QC-1d",
+      "M12-FTD-001-pullback-guard-confirm-1d",
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
+    ],
+    "paper_contract_v1": [
+      "M10-PA-001-1d",
+      "M10-PA-002-5m",
+      "M10-PA-012-5m",
+      "M10-PA-004-MBF-QC-1d",
+      "M12-FTD-001-pullback-guard-confirm-1d",
+      "M10-PA-002-5m-short",
+      "M10-PA-013-5m-short",
+      "M10-PA-011-ORB-R1-5m-short"
+    ],
+    "retired_simplified_versions": [
+      "M10-PA-002-5m-repaired-v1",
+      "M12-FTD-001-baseline-1d",
+      "M12-FTD-001-loss-streak-guard-1d",
+      "M10-PA-004-MBF-1d",
+      "M10-PA-013-5m",
+      "M10-PA-011-ORB-R1-5m"
+    ],
+    "visual_shadow_only": [
+      "M10-PA-004-long-1d",
+      "M10-PA-007-1d",
+      "M10-PA-008-1d"
+    ]
+  },
+  "stage": "M15.longbridge_realtime_execution",
+  "strategy_contracts": {
+    "directory": "config/m15_strategy_contracts",
+    "required": true
+  },
+  "test_epoch": {
+    "archive_previous_records": true,
+    "enabled": true,
+    "flatten_existing_positions_before_activation": true,
+    "state_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
+    "test_epoch_id": "m15-sdk-contract-v1-20260806"
+  },
+  "title": "长桥SDK完整策略合同实时执行链路（仅模拟账户）",
+  "virtual_capital_buckets": {
+    "ftd_pullback_guard_confirm_v1": {
+      "equity": "10000",
+      "label": "FTD长回调保护确认仓（M12-FTD-001-pullback-guard-confirm-1d）",
+      "max_risk_per_order": "20",
+      "max_symbol_exposure": "1500",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "position_direction": "long",
+      "runtime_ids": [
+        "M12-FTD-001-pullback-guard-confirm-1d"
+      ]
+    },
+    "pa001_daily_contract_v1": {
+      "equity": "10000",
+      "label": "PA001日线完整执行测试仓（M10-PA-001-1d）",
+      "max_risk_per_order": "20",
+      "max_symbol_exposure": "1500",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "position_direction": "long",
+      "runtime_ids": [
+        "M10-PA-001-1d"
+      ]
+    },
+    "pa002_5m_contract_v1": {
+      "equity": "10000",
+      "label": "PA002五分钟完整执行测试仓（M10-PA-002-5m）",
+      "max_risk_per_order": "20",
+      "max_symbol_exposure": "1500",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "position_direction": "long",
+      "runtime_ids": [
+        "M10-PA-002-5m"
+      ]
+    },
+    "pa002_5m_short_contract_v1": {
+      "equity": "10000",
+      "label": "PA002五分钟受限做空仓（M10-PA-002-5m-short）",
+      "max_risk_per_order": "10",
+      "max_symbol_exposure": "750",
+      "max_total_exposure": "2000",
+      "min_cash_reserve": "8000",
+      "position_direction": "short",
+      "runtime_ids": [
+        "M10-PA-002-5m-short"
+      ]
+    },
+    "pa004_mbf_qc_contract_v1": {
+      "equity": "10000",
+      "label": "PA004-MBF-QC实验合同仓（M10-PA-004-MBF-QC-1d）",
+      "max_risk_per_order": "20",
+      "max_symbol_exposure": "1500",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "position_direction": "long",
+      "runtime_ids": [
+        "M10-PA-004-MBF-QC-1d"
+      ]
+    },
+    "pa011_orb_r1_short_contract_v1": {
+      "equity": "10000",
+      "label": "PA011-ORB-R1五分钟受限做空仓（M10-PA-011-ORB-R1-5m-short）",
+      "max_risk_per_order": "10",
+      "max_symbol_exposure": "750",
+      "max_total_exposure": "2000",
+      "min_cash_reserve": "8000",
+      "position_direction": "short",
+      "runtime_ids": [
+        "M10-PA-011-ORB-R1-5m-short"
+      ]
+    },
+    "pa012_5m_contract_v1": {
+      "equity": "10000",
+      "label": "PA012五分钟完整执行测试仓（M10-PA-012-5m）",
+      "max_risk_per_order": "20",
+      "max_symbol_exposure": "1500",
+      "max_total_exposure": "6000",
+      "min_cash_reserve": "4000",
+      "position_direction": "long",
+      "runtime_ids": [
+        "M10-PA-012-5m"
+      ]
+    },
+    "pa013_5m_short_contract_v1": {
+      "equity": "10000",
+      "label": "PA013五分钟受限做空仓（M10-PA-013-5m-short）",
+      "max_risk_per_order": "10",
+      "max_symbol_exposure": "750",
+      "max_total_exposure": "2000",
+      "min_cash_reserve": "8000",
+      "position_direction": "short",
+      "runtime_ids": [
+        "M10-PA-013-5m-short"
+      ]
+    }
+  }
+}

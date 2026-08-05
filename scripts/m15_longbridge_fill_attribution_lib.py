@@ -28,6 +28,7 @@ class _OpenBatchState:
     runtime_id: str
     direction: str
     symbol: str
+    strategy_contract_hash: str
     open_order_id: str
     trade_id: str
     filled_quantity: Decimal
@@ -1318,6 +1319,7 @@ def _apply_open_fill(
         runtime_id=str(local_row.get("runtime_id") or ""),
         direction=direction,
         symbol=symbol,
+        strategy_contract_hash=str(local_row.get("strategy_contract_hash") or ""),
         open_order_id=order_id,
         trade_id=trade_id,
     )
@@ -1331,6 +1333,7 @@ def _apply_open_fill(
             runtime_id=str(local_row.get("runtime_id") or ""),
             direction=direction,
             symbol=symbol,
+            strategy_contract_hash=str(local_row.get("strategy_contract_hash") or ""),
             open_order_id=order_id,
             trade_id=trade_id,
             filled_quantity=cumulative_quantity,
@@ -1341,6 +1344,7 @@ def _apply_open_fill(
                 for key in (
                     "strategy_id", "signal_id", "timeframe", "stop_price", "target_price",
                     "source_market_event_id", "created_at", "submitted_at", "position_action",
+                    "strategy_contract_hash", "strategy_contract_stage", "strategy_contract_schema_version",
                 )
                 if local_row.get(key) not in (None, "")
             },
@@ -1387,6 +1391,7 @@ def _apply_exit_fill(
         ),
         "source_open_order_id": source_open_order_id,
         "source_open_trade_id": source_open_trade_id,
+        "strategy_contract_hash": str(local_row.get("strategy_contract_hash") or ""),
         "counts_for_performance": True,
     }
     if not source_open_order_id or not source_open_trade_id:
@@ -1411,6 +1416,7 @@ def _apply_exit_fill(
         runtime_id=str(local_row.get("runtime_id") or ""),
         direction=direction,
         symbol=symbol,
+        strategy_contract_hash=str(local_row.get("strategy_contract_hash") or ""),
         open_order_id=source_open_order_id,
         trade_id=source_open_trade_id,
     )
@@ -1552,6 +1558,7 @@ def _serialize_batches(open_batches: Mapping[str, _OpenBatchState]) -> list[dict
                 "runtime_id": batch.runtime_id,
                 "direction": batch.direction,
                 "symbol": batch.symbol,
+                "strategy_contract_hash": batch.strategy_contract_hash,
                 "open_order_id": batch.open_order_id,
                 "trade_id": batch.trade_id,
                 "filled_quantity": _fmt_quantity(batch.filled_quantity),
@@ -1617,6 +1624,12 @@ def _existing_open_batches(existing_state: Mapping[str, Any]) -> dict[str, _Open
         batch_id = str(row.get("batch_id") or "")
         if not batch_id:
             continue
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), Mapping) else {}
+        strategy_contract_hash = str(
+            row.get("strategy_contract_hash")
+            or metadata.get("strategy_contract_hash")
+            or ""
+        )
         batches[batch_id] = _OpenBatchState(
             batch_id=batch_id,
             test_epoch_id=str(row.get("test_epoch_id") or ""),
@@ -1624,12 +1637,13 @@ def _existing_open_batches(existing_state: Mapping[str, Any]) -> dict[str, _Open
             runtime_id=str(row.get("runtime_id") or ""),
             direction=str(row.get("direction") or ""),
             symbol=_normalize_symbol(str(row.get("symbol") or "")),
+            strategy_contract_hash=strategy_contract_hash,
             open_order_id=str(row.get("open_order_id") or ""),
             trade_id=str(row.get("trade_id") or ""),
             filled_quantity=_decimal(row.get("filled_quantity")),
             remaining_quantity=_decimal(row.get("remaining_quantity")),
             open_price=_decimal(row.get("open_price")),
-            metadata=dict(row.get("metadata") or {}) if isinstance(row.get("metadata"), Mapping) else {},
+            metadata=dict(metadata),
         )
     return batches
 
@@ -1744,20 +1758,15 @@ def _build_batch_id(
     runtime_id: str,
     direction: str,
     symbol: str,
+    strategy_contract_hash: str,
     open_order_id: str,
     trade_id: str,
 ) -> str:
-    return "|".join(
-        [
-            test_epoch_id,
-            capital_bucket,
-            runtime_id,
-            direction,
-            symbol,
-            open_order_id,
-            trade_id,
-        ]
-    )
+    parts = [test_epoch_id, capital_bucket, runtime_id, direction, symbol]
+    if strategy_contract_hash:
+        parts.append(strategy_contract_hash)
+    parts.extend([open_order_id, trade_id])
+    return "|".join(parts)
 
 
 def _normalize_symbol(value: str) -> str:

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
@@ -57,6 +57,13 @@ SUMMARY_JSON = "m15_longbridge_realtime_position_manager.json"
 LEDGER_JSONL = "m15_longbridge_realtime_position_manager_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_position_manager.md"
 ZERO = Decimal("0")
+INTRADAY_FORCE_EXIT_RUNTIME_IDS = {
+    "M10-PA-002-5m",
+    "M10-PA-012-5m",
+    "M10-PA-002-5m-short",
+    "M10-PA-013-5m-short",
+    "M10-PA-011-ORB-R1-5m-short",
+}
 NEW_YORK = ZoneInfo("America/New_York")
 PA002_REPAIRED_RUNTIME_ID = "M10-PA-002-5m-repaired-v1"
 
@@ -85,6 +92,8 @@ class RealtimePositionManagerConfig:
     paper_short_testing_enabled: bool
     short_test_epoch_id: str
     paper_short_runtime_ids: tuple[str, ...]
+    maximum_holding_sessions_by_runtime: dict[str, int]
+    market_holidays: frozenset[date]
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -120,7 +129,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
             or (output_dir / "m15_longbridge_fill_attribution_v2.json")
         ),
         output_dir=output_dir,
-        max_exit_events_per_run=int(manager.get("max_exit_events_per_run", 10)),
+        max_exit_events_per_run=int(manager.get("max_exit_events_per_run", 300)),
         stop_loss_events_bypass_run_cap=bool(manager.get("stop_loss_events_bypass_run_cap", True)),
         exit_attempt_cooldown_seconds=int(manager.get("exit_attempt_cooldown_seconds", 900)),
         manage_untracked_positions_for_exit=bool(manager.get("manage_untracked_positions_for_exit", True)),
@@ -133,6 +142,16 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimePositionManag
         paper_short_testing_enabled=bool(short_testing.get("enabled", False)),
         short_test_epoch_id=str(short_testing.get("test_epoch_id") or ""),
         paper_short_runtime_ids=tuple(str(item) for item in short_testing.get("runtime_ids", []) if str(item)),
+        maximum_holding_sessions_by_runtime={
+            str(runtime_id): int(session_count)
+            for runtime_id, session_count in manager.get(
+                "maximum_holding_sessions_by_runtime", {}
+            ).items()
+        },
+        market_holidays=frozenset(
+            date.fromisoformat(str(value))
+            for value in manager.get("market_holidays", [])
+        ),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -170,6 +189,24 @@ def validate_config(config: RealtimePositionManagerConfig) -> None:
             raise ValueError(f"M15 realtime position manager has unapproved short runtime: {sorted(invalid)}")
     elif config.paper_short_testing_enabled or config.paper_short_runtime_ids:
         raise ValueError("M15 realtime position manager short config requires the paper short boundary")
+    if any(value <= 0 for value in config.maximum_holding_sessions_by_runtime.values()):
+        raise ValueError("M15 realtime position manager maximum holding sessions must be positive")
+
+
+def market_sessions_inclusive(
+    opened_on: date,
+    current_on: date,
+    market_holidays: frozenset[date],
+) -> int:
+    if current_on < opened_on:
+        return 0
+    sessions = 0
+    cursor = opened_on
+    while cursor <= current_on:
+        if cursor.weekday() < 5 and cursor not in market_holidays:
+            sessions += 1
+        cursor += timedelta(days=1)
+    return sessions
 
 
 def run_realtime_position_manager(
@@ -470,7 +507,19 @@ def evaluate_position(
         if current_market_date is not None
         else ""
     )
+    current_market_clock = current_market_date.astimezone(NEW_YORK) if current_market_date is not None else None
     open_market_date = str(metadata.get("open_market_date") or "")
+    maximum_holding_sessions = config.maximum_holding_sessions_by_runtime.get(runtime_id)
+    holding_session_count = 0
+    if maximum_holding_sessions and current_market_clock is not None and open_market_date:
+        try:
+            holding_session_count = market_sessions_inclusive(
+                date.fromisoformat(open_market_date),
+                current_market_clock.date(),
+                config.market_holidays,
+            )
+        except ValueError:
+            holding_session_count = 0
     if metadata.get("attribution_mismatch"):
         status = "fill_attribution_mismatch_frozen"
         management_scope = "longbridge_account_attribution_frozen"
@@ -520,16 +569,31 @@ def evaluate_position(
     ):
         status = "exit_signal_created"
         exit_reason = "next_market_day_timeout"
-    elif position_direction == "short":
-        if latest_price >= stop_price:
-            status = "exit_signal_created"
-            exit_reason = "stop_loss"
-        elif latest_price <= target_price:
-            status = "exit_signal_created"
-            exit_reason = "take_profit"
-    elif latest_price <= stop_price:
+    elif position_direction == "short" and latest_price >= stop_price:
         status = "exit_signal_created"
         exit_reason = "stop_loss"
+    elif position_direction != "short" and latest_price <= stop_price:
+        status = "exit_signal_created"
+        exit_reason = "stop_loss"
+    elif (
+        runtime_id in INTRADAY_FORCE_EXIT_RUNTIME_IDS
+        and current_market_clock is not None
+        and (current_market_clock.hour, current_market_clock.minute) >= (15, 55)
+    ):
+        status = "exit_signal_created"
+        exit_reason = "intraday_forced_exit_1555_ny"
+    elif (
+        maximum_holding_sessions
+        and holding_session_count >= maximum_holding_sessions
+        and current_market_clock is not None
+        and (current_market_clock.hour, current_market_clock.minute) >= (15, 55)
+    ):
+        status = "exit_signal_created"
+        exit_reason = "maximum_holding_sessions_exit"
+    elif position_direction == "short":
+        if latest_price <= target_price:
+            status = "exit_signal_created"
+            exit_reason = "take_profit"
     elif latest_price >= target_price:
         status = "exit_signal_created"
         exit_reason = "take_profit"
@@ -581,6 +645,11 @@ def evaluate_position(
                         Decimal("1") - config.long_exit_limit_discount_percent / Decimal("100")
                     )
                     exit_limit_price_source = "current_price_minus_long_exit_buffer"
+                market_exit = exit_reason in {
+                    "stop_loss",
+                    "intraday_forced_exit_1555_ny",
+                    "maximum_holding_sessions_exit",
+                }
                 event = {
                     "signal_id": signal_id,
                     "created_at": generated_at,
@@ -593,11 +662,19 @@ def evaluate_position(
                     "position_action": (
                         "close_short"
                         if position_direction == "short"
-                        else ("close_long" if exit_reason == "next_market_day_timeout" else exit_reason)
+                        else (
+                            "close_long"
+                            if exit_reason in {
+                                "next_market_day_timeout",
+                                "intraday_forced_exit_1555_ny",
+                                "maximum_holding_sessions_exit",
+                            }
+                            else exit_reason
+                        )
                     ),
                     "exit_reason": exit_reason,
-                    "order_type": "limit",
-                    "limit_price": fmt_money(exit_limit_price),
+                    "order_type": "market" if market_exit else "limit",
+                    "limit_price": "" if market_exit else fmt_money(exit_limit_price),
                     "current_price": fmt_money(latest_price),
                     "quantity": fmt_decimal(exit_quantity),
                     "notional": fmt_money(exit_quantity * latest_price),
@@ -607,6 +684,8 @@ def evaluate_position(
                     "source_open_signal_id": str(metadata.get("signal_id", "")),
                     "source_open_order_id": source_open_order_id,
                     "source_open_trade_id": source_open_trade_id,
+                    "strategy_contract_hash": str(metadata.get("strategy_contract_hash") or ""),
+                    "strategy_contract_stage": str(metadata.get("strategy_contract_stage") or ""),
                     "source_open_remaining_quantity": fmt_decimal(quantity),
                     "exit_retry_attempt": exit_retry_attempt,
                     "exit_retry_of_signal_id": exit_retry_of_signal_id,
@@ -617,6 +696,7 @@ def evaluate_position(
                     "test_epoch_id": config.test_epoch_id,
                     "open_market_date": open_market_date,
                     "exit_limit_price_source": exit_limit_price_source,
+                    "market_exit_no_reprice": market_exit,
                 }
     row = {
         "stage": config.stage,
@@ -648,6 +728,8 @@ def evaluate_position(
         "exit_only_takeover": management_scope == "longbridge_account_exit_only",
         "source_open_order_id": source_open_order_id,
         "source_open_trade_id": source_open_trade_id,
+        "holding_session_count": holding_session_count,
+        "maximum_holding_sessions": maximum_holding_sessions,
         "local_simulation_ignored": True,
     }
     return row, event

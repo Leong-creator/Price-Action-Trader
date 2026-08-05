@@ -949,8 +949,7 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(by_runtime["M10-PA-002-1d"]["capital_bucket"], "experimental")
             self.assertEqual(by_runtime["M10-PA-002-1d"]["confluence_multiplier"], "1")
             self.assertEqual(by_runtime["M10-PA-002-1d"]["confluence_support_runtime_ids"], [])
-            ledger_rows = {row["runtime_id"]: row for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)}
-            self.assertIn("blocked_reward_r_below_minimum", ledger_rows["M10-PA-012-5m"]["blockers"])
+            self.assertNotIn("M10-PA-012-5m", by_runtime)
             self.assertTrue(all(not row["local_simulation_source"] for row in signals))
 
     def test_pa002_1d_stays_in_unified_experimental_bucket_without_mirror(self) -> None:

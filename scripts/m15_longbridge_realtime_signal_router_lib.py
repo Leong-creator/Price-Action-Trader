@@ -36,6 +36,12 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     normalize_whole_share_quantity,
     to_iso,
 )
+from scripts.m15_full_strategy_detectors_lib import (
+    pa001_daily_long,
+    pa002_five_minute_long,
+    pa012_five_minute_long,
+)
+from scripts.m15_strategy_contracts_lib import load_contracts_cached
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,8 +86,8 @@ PRICE_ACTION_RUNTIME_SPECS = {
     "M10-PA-001-1d": {
         "strategy_id": "M10-PA-001",
         "timeframe": "1d",
-        "rule": "trend_continuation",
-        "target_r": Decimal("1.60"),
+        "rule": "pa001_daily_contract_v1",
+        "target_r": Decimal("2.00"),
         "min_close_position": Decimal("0.55"),
         "max_risk_percent": Decimal("6.00"),
     },
@@ -104,8 +110,8 @@ PRICE_ACTION_RUNTIME_SPECS = {
     "M10-PA-002-5m": {
         "strategy_id": "M10-PA-002",
         "timeframe": "5m",
-        "rule": "breakout_confirmation",
-        "target_r": Decimal("1.60"),
+        "rule": "pa002_5m_contract_v1",
+        "target_r": Decimal("2.00"),
         "min_close_position": Decimal("0.60"),
         "max_risk_percent": Decimal("2.50"),
     },
@@ -147,8 +153,8 @@ PRICE_ACTION_RUNTIME_SPECS = {
     "M10-PA-012-5m": {
         "strategy_id": "M10-PA-012",
         "timeframe": "5m",
-        "rule": "opening_range_breakout",
-        "target_r": Decimal("1.20"),
+        "rule": "pa012_5m_contract_v1",
+        "target_r": Decimal("2.00"),
         "max_risk_percent": Decimal("2.50"),
     },
     "M10-PA-011-ORB-R1-5m": {
@@ -194,6 +200,15 @@ PRICE_ACTION_RUNTIME_SPECS = {
         "min_close_to_close_percent": Decimal("2.00"),
         "min_volume_ratio": Decimal("1.25"),
         "require_market_confirmation": True,
+        "max_risk_percent": Decimal("6.00"),
+    },
+    "M12-FTD-001-pullback-guard-confirm-1d": {
+        "strategy_id": "M12-FTD-001",
+        "timeframe": "1d",
+        "rule": "ftd_pullback_guard_confirm_v1",
+        "target_r": Decimal("2.00"),
+        "max_pullback_bars": 20,
+        "follow_through_window_bars": 2,
         "max_risk_percent": Decimal("6.00"),
     },
     "M10-PA-002-5m-short": {
@@ -279,6 +294,9 @@ class RealtimeSignalRouterConfig:
     virtual_capital_buckets: dict[str, VirtualCapitalBucket]
     runtime_capital_bucket_map: dict[str, str]
     additional_runtime_bucket_routes: dict[str, tuple[str, ...]]
+    strategy_contracts_dir: Path
+    require_strategy_contracts: bool
+    auxiliary_modules_contract_path: Path | None
     hard_boundaries: dict[str, bool]
 
     def __post_init__(self) -> None:
@@ -304,6 +322,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
     inputs = payload.get("inputs", {})
     outputs = payload.get("outputs", {})
     router = payload.get("realtime_signal_router", {})
+    strategy_contracts = payload.get("strategy_contracts", {})
     account_model = payload.get("paper_account_model", {})
     short_testing = payload.get("paper_short_testing", {})
     fee_model = payload.get("fee_model", {})
@@ -372,6 +391,15 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeSignalRouterC
             for key, value in dict(router.get("additional_runtime_bucket_routes", {})).items()
             if isinstance(value, list)
         },
+        strategy_contracts_dir=resolve_repo_path(
+            strategy_contracts.get("directory", "config/m15_strategy_contracts")
+        ),
+        require_strategy_contracts=bool(strategy_contracts.get("required", False)),
+        auxiliary_modules_contract_path=(
+            resolve_repo_path(payload["auxiliary_modules_contract"])
+            if payload.get("auxiliary_modules_contract")
+            else None
+        ),
         hard_boundaries={str(key): bool(value) for key, value in payload.get("hard_boundaries", {}).items()},
     )
 
@@ -443,6 +471,39 @@ def validate_config(config: RealtimeSignalRouterConfig) -> None:
         raise ValueError("M15 realtime signal router cannot enable real money actions")
     if config.hard_boundaries.get("local_simulation_as_signal_source", False):
         raise ValueError("M15 realtime signal router cannot use local simulation as signal source")
+    if config.require_strategy_contracts:
+        contracts = load_contracts_cached(str(config.strategy_contracts_dir))
+        missing = set(config.allowed_runtime_ids) - set(contracts)
+        if missing:
+            raise ValueError(f"M15 realtime signal router runtime contract missing: {sorted(missing)}")
+        non_executable = {
+            runtime_id: contracts[runtime_id]["stage"]
+            for runtime_id in config.allowed_runtime_ids
+            if contracts[runtime_id]["stage"] not in {"paper-v1", "full-v1"}
+        }
+        if non_executable:
+            raise ValueError(f"M15 realtime signal router contract is not executable: {non_executable}")
+        validate_auxiliary_modules_contract(config.auxiliary_modules_contract_path)
+
+
+def validate_auxiliary_modules_contract(path: Path | None) -> None:
+    if path is None or not path.exists():
+        raise ValueError("M15 realtime signal router requires auxiliary modules contract")
+    payload = read_json(path)
+    if payload.get("schema_version") != "m15-auxiliary-modules-contract-v1":
+        raise ValueError("M15 auxiliary modules contract schema drift")
+    modules = payload.get("modules")
+    if not isinstance(modules, dict):
+        raise ValueError("M15 auxiliary modules contract modules missing")
+    required = {"M10-PA-003", "M10-PA-006", "M10-PA-010", "M10-PA-014", "M10-PA-015", "M10-PA-016"}
+    if not required.issubset(modules):
+        raise ValueError("M15 auxiliary modules contract is incomplete")
+    if any(row.get("standalone_order_generation") is not False for row in modules.values() if isinstance(row, dict)):
+        raise ValueError("M15 auxiliary module cannot generate standalone orders")
+    if modules["M10-PA-015"].get("mode") != "mandatory":
+        raise ValueError("M15 PA015 risk capability must remain mandatory")
+    if modules["M10-PA-016"].get("mode") != "disabled":
+        raise ValueError("M15 PA016 scaling capability must remain disabled")
 
 
 def load_capital_bucket_migration_state(path: Path | None) -> dict[str, str]:
@@ -635,8 +696,17 @@ def run_realtime_signal_router(
     selected_bucket_exposure: dict[str, Decimal] = defaultdict(lambda: ZERO)
     selected_bucket_symbol_exposure: dict[tuple[str, str], Decimal] = defaultdict(lambda: ZERO)
 
+    short_detector_attempts: list[dict[str, Any]] = []
     raw_intents = embedded_signal_intents(config, market_events)
-    raw_intents.extend(detector_signal_candidates(config, market_events, generated_at=now))
+    raw_intents.extend(
+        detector_signal_candidates(
+            config,
+            market_events,
+            generated_at=now,
+            short_detector_attempts=short_detector_attempts,
+        )
+    )
+    annotate_strategy_contracts(config, raw_intents)
     if active_market_event_ids is not None:
         raw_intents = [
             intent
@@ -692,7 +762,12 @@ def run_realtime_signal_router(
     config.signal_events_path.parent.mkdir(parents=True, exist_ok=True)
     append_jsonl(config.signal_events_path, new_signal_events)
     write_jsonl(config.output_dir / LEDGER_JSONL, ledger_rows)
-    short_diagnostics = update_short_signal_diagnostics(config, ledger_rows, generated_at_iso)
+    short_diagnostics = update_short_signal_diagnostics(
+        config,
+        ledger_rows,
+        generated_at_iso,
+        detector_attempts=short_detector_attempts,
+    )
     if emitted_signal_events is not None:
         emitted_signal_events.extend(new_signal_events)
     summary = {
@@ -821,10 +896,33 @@ def run_realtime_signal_router(
     return summary
 
 
+def annotate_strategy_contracts(
+    config: RealtimeSignalRouterConfig,
+    intents: list[dict[str, Any]],
+) -> None:
+    if not config.require_strategy_contracts:
+        return
+    contracts = load_contracts_cached(str(config.strategy_contracts_dir))
+    for intent in intents:
+        runtime_id = str(intent.get("runtime_id") or "")
+        contract = contracts.get(runtime_id)
+        if contract is None:
+            intent.setdefault("pre_gate_blockers", []).append("blocked_strategy_contract_missing")
+            continue
+        intent["strategy_contract_hash"] = str(contract["contract_hash"])
+        intent["strategy_contract_stage"] = str(contract["stage"])
+        intent["strategy_contract_stage_zh"] = str(contract["stage_zh"])
+        intent["strategy_contract_schema_version"] = str(contract["schema_version"])
+        if contract["stage"] not in {"paper-v1", "full-v1"}:
+            intent.setdefault("pre_gate_blockers", []).append("blocked_strategy_contract_not_executable")
+
+
 def update_short_signal_diagnostics(
     config: RealtimeSignalRouterConfig,
     ledger_rows: list[dict[str, Any]],
     generated_at: str,
+    *,
+    detector_attempts: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Persist unique short candidates so a later empty cycle cannot hide them."""
     path = config.output_dir / SHORT_DIAGNOSTICS_JSON
@@ -851,6 +949,8 @@ def update_short_signal_diagnostics(
             continue
         decisions_by_id[signal_id] = {
             "signal_id": signal_id,
+            "detector_attempted": True,
+            "no_candidate_reason": "",
             "created_at": str(row.get("created_at") or ""),
             "processed_at": str(row.get("processed_at") or generated_at),
             "runtime_id": runtime_id,
@@ -873,17 +973,47 @@ def update_short_signal_diagnostics(
         decisions_by_id.values(),
         key=lambda row: (str(row.get("created_at") or ""), str(row.get("signal_id") or "")),
     )[-SHORT_DIAGNOSTIC_ROW_LIMIT:]
+    previous_attempt_rows = previous.get("detector_attempt_rows")
+    attempts_by_id = {
+        str(row.get("attempt_id")): row
+        for row in previous_attempt_rows
+        if isinstance(previous_attempt_rows, list)
+        and isinstance(row, dict)
+        and str(row.get("attempt_id") or "")
+    } if isinstance(previous_attempt_rows, list) else {}
+    for row in detector_attempts or []:
+        attempt_id = str(row.get("attempt_id") or "")
+        if attempt_id:
+            attempts_by_id[attempt_id] = dict(row)
+    detector_attempt_rows = sorted(
+        attempts_by_id.values(),
+        key=lambda row: (str(row.get("market_event_time") or ""), str(row.get("attempt_id") or "")),
+    )[-SHORT_DIAGNOSTIC_ROW_LIMIT:]
     runtime_summaries: list[dict[str, Any]] = []
     total_blockers: Counter[str] = Counter()
     for runtime_id in config.paper_short_runtime_ids:
         runtime_rows = [row for row in decision_rows if row.get("runtime_id") == runtime_id]
+        runtime_attempts = [
+            row for row in detector_attempt_rows if row.get("runtime_id") == runtime_id
+        ]
         blockers: Counter[str] = Counter()
+        no_candidate_reasons = Counter(
+            str(row.get("no_candidate_reason") or "")
+            for row in runtime_attempts
+            if str(row.get("no_candidate_reason") or "")
+        )
         for row in runtime_rows:
             blockers.update(str(item) for item in row.get("blockers", []) if str(item))
         total_blockers.update(blockers)
         runtime_summaries.append(
             {
                 "runtime_id": runtime_id,
+                "detector_attempted": bool(runtime_attempts),
+                "detector_attempted_count": len(runtime_attempts),
+                "no_candidate_count": sum(
+                    1 for row in runtime_attempts if row.get("no_candidate_reason")
+                ),
+                "no_candidate_reasons": dict(no_candidate_reasons.most_common()),
                 "candidate_count": len(runtime_rows),
                 "signal_ready_count": sum(
                     1 for row in runtime_rows if row.get("router_decision_status") == "signal_event_ready"
@@ -898,7 +1028,7 @@ def update_short_signal_diagnostics(
         )
 
     payload = {
-        "schema_version": "m15.longbridge-short-signal-diagnostics.v1",
+        "schema_version": "m15.longbridge-short-signal-diagnostics.v2",
         "stage": "M15.longbridge_short_signal_diagnostics",
         "generated_at": generated_at,
         "test_epoch_id": config.short_test_epoch_id,
@@ -908,6 +1038,10 @@ def update_short_signal_diagnostics(
         "real_money_actions": False,
         "summary": {
             "runtime_count": len(config.paper_short_runtime_ids),
+            "detector_attempted_count": len(detector_attempt_rows),
+            "no_candidate_count": sum(
+                1 for row in detector_attempt_rows if row.get("no_candidate_reason")
+            ),
             "candidate_count": len(decision_rows),
             "signal_ready_count": sum(
                 1 for row in decision_rows if row.get("router_decision_status") == "signal_event_ready"
@@ -916,6 +1050,7 @@ def update_short_signal_diagnostics(
             "top_blockers": dict(total_blockers.most_common(10)),
         },
         "runtime_summaries": runtime_summaries,
+        "detector_attempt_rows": detector_attempt_rows,
         "decision_rows": decision_rows,
     }
     write_json(path, payload)
@@ -1169,6 +1304,7 @@ def detector_signal_candidates(
     market_events: list[dict[str, Any]],
     *,
     generated_at: datetime,
+    short_detector_attempts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -1181,7 +1317,8 @@ def detector_signal_candidates(
             grouped[(symbol, timeframe)].append(event)
     for rows in grouped.values():
         rows.sort(key=lambda row: str(row.get("event_time") or row.get("bar_time") or row.get("timestamp") or ""))
-    if "pa004_followthrough_long" in set(config.enabled_detectors):
+    enabled_detectors = set(config.enabled_detectors)
+    if "pa004_followthrough_long" in enabled_detectors:
         for (symbol, timeframe), rows in grouped.items():
             if timeframe != "1d" or len(rows) < 2:
                 continue
@@ -1191,6 +1328,7 @@ def detector_signal_candidates(
                 signal["strategy_id"] = "M10-PA-004"
                 signal["timeframe"] = timeframe
                 candidates.append(signal)
+    if "pa004_momentum_variants" in enabled_detectors or "pa004_followthrough_long" in enabled_detectors:
         pa004_variants = {
             "M10-PA-004-MBF-1d": {
                 "strategy_id": "M10-PA-004-MBF",
@@ -1207,7 +1345,7 @@ def detector_signal_candidates(
                 "min_gap_percent": Decimal("3.00"),
                 "min_gap_close_to_close_percent": Decimal("2.50"),
                 "min_close_position": Decimal("0.60"),
-                "max_risk_percent": Decimal("5.50"),
+                "max_risk_percent": Decimal("4.00"),
                 "target_r": Decimal("1.50"),
             },
         }
@@ -1230,7 +1368,14 @@ def detector_signal_candidates(
                     signal["timeframe"] = timeframe
                     candidates.append(signal)
     if PRICE_ACTION_REALTIME_DETECTOR in set(config.enabled_detectors):
-        candidates.extend(price_action_realtime_candidates(config, grouped, generated_at=generated_at))
+        candidates.extend(
+            price_action_realtime_candidates(
+                config,
+                grouped,
+                generated_at=generated_at,
+                short_detector_attempts=short_detector_attempts,
+            )
+        )
     return candidates
 
 
@@ -1239,6 +1384,7 @@ def price_action_realtime_candidates(
     grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
     *,
     generated_at: datetime,
+    short_detector_attempts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     allowed = set(config.allowed_runtime_ids)
@@ -1257,9 +1403,74 @@ def price_action_realtime_candidates(
                 grouped_events=grouped_events,
                 generated_at=generated_at,
             )
+            if runtime_id in PAPER_SHORT_RUNTIME_IDS and short_detector_attempts is not None:
+                latest = rows[-1] if rows else {}
+                source_event_id = str(
+                    latest.get("market_event_id")
+                    or latest.get("event_id")
+                    or latest.get("bar_id")
+                    or latest.get("event_time")
+                    or latest.get("bar_time")
+                    or latest.get("timestamp")
+                    or ""
+                )
+                short_detector_attempts.append(
+                    {
+                        "attempt_id": f"{runtime_id}:{symbol}:{source_event_id}",
+                        "runtime_id": runtime_id,
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "detector_attempted": True,
+                        "candidate_emitted": signal is not None,
+                        "no_candidate_reason": "" if signal is not None else short_no_candidate_reason(
+                            str(spec.get("rule") or ""), rows
+                        ),
+                        "source_market_event_id": source_event_id,
+                        "market_event_time": str(
+                            latest.get("event_time")
+                            or latest.get("bar_time")
+                            or latest.get("timestamp")
+                            or ""
+                        ),
+                    }
+                )
             if signal:
                 candidates.append(signal)
     return candidates
+
+
+def short_no_candidate_reason(rule: str, rows: list[dict[str, Any]]) -> str:
+    """Classify a detector miss without changing any strategy gate."""
+    minimum_rows = 7 if rule == "opening_range_breakdown" else 3
+    if len(rows) < minimum_rows:
+        return "insufficient_history"
+    latest = rows[-1]
+    if min(
+        decimal(latest.get("high", "0")),
+        decimal(latest.get("low", "0")),
+        decimal(latest.get("close", "0")),
+    ) <= ZERO:
+        return "invalid_price_geometry"
+    if rule == "bearish_breakdown":
+        prior_low = min(decimal(rows[-3].get("low", "0")), decimal(rows[-2].get("low", "0")))
+        if decimal(latest.get("close", "0")) > prior_low * Decimal("0.998"):
+            return "bearish_structure_not_met"
+    elif rule == "bearish_false_breakout":
+        resistance = max(decimal(rows[-3].get("high", "0")), decimal(rows[-2].get("high", "0")))
+        if decimal(latest.get("high", "0")) < resistance * Decimal("1.0015") or decimal(
+            latest.get("close", "0")
+        ) >= resistance:
+            return "bearish_structure_not_met"
+    elif rule == "opening_range_breakdown":
+        session_rows = latest_ny_session_rows(rows)
+        if len(session_rows) <= 6:
+            return "opening_range_incomplete"
+        opening_low = min(decimal(row.get("low", "0")) for row in session_rows[:6])
+        if decimal(session_rows[-2].get("close", "0")) < opening_low or decimal(
+            session_rows[-1].get("close", "0")
+        ) > opening_low * Decimal("0.9975"):
+            return "bearish_structure_not_met"
+    return "short_validation_filters_not_met"
 
 
 def price_action_signal_for_runtime(
@@ -1275,7 +1486,13 @@ def price_action_signal_for_runtime(
         return None
     rule = str(spec["rule"])
     signal: dict[str, Any] | None
-    if rule == "trend_continuation":
+    if rule == "pa001_daily_contract_v1":
+        signal = pa001_daily_long(symbol, rows)
+    elif rule == "pa002_5m_contract_v1":
+        signal = pa002_five_minute_long(symbol, rows)
+    elif rule == "pa012_5m_contract_v1":
+        signal = pa012_five_minute_long(symbol, rows)
+    elif rule == "trend_continuation":
         signal = trend_continuation_signal(symbol, rows, spec=spec, generated_at=generated_at)
     elif rule == "breakout_confirmation":
         signal = breakout_confirmation_signal(symbol, rows, spec=spec, generated_at=generated_at)
@@ -1315,6 +1532,14 @@ def price_action_signal_for_runtime(
         )
     elif rule == "follow_through_day":
         signal = follow_through_day_signal(
+            symbol,
+            rows,
+            spec=spec,
+            grouped_events=grouped_events,
+            generated_at=generated_at,
+        )
+    elif rule == "ftd_pullback_guard_confirm_v1":
+        signal = ftd_pullback_guard_confirm_signal(
             symbol,
             rows,
             spec=spec,
@@ -1940,6 +2165,98 @@ def follow_through_day_signal(
     return signal
 
 
+def ftd_pullback_guard_confirm_signal(
+    symbol: str,
+    rows: list[dict[str, Any]],
+    *,
+    spec: dict[str, Any],
+    grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
+    generated_at: datetime,
+) -> dict[str, Any] | None:
+    """Unique FTD contract: long-pullback guard plus 1-2 bar confirmation.
+
+    Market context and higher-timeframe quality remain audit fields.  They are
+    intentionally not hidden blockers in this first isolated contract.
+    """
+    if len(rows) < 24:
+        return None
+    latest = rows[-1]
+    entry = decimal(latest.get("next_bar_first_quote_price", "0"))
+    entry_at = str(latest.get("next_bar_first_quote_at") or "")
+    if entry <= ZERO or not entry_at:
+        return None
+    signal_bar: dict[str, Any] | None = None
+    confirmation_count = 0
+    for lag in (1, 2):
+        signal_index = len(rows) - 1 - lag
+        if signal_index < 21:
+            continue
+        candidate = rows[signal_index]
+        previous = rows[signal_index - 1]
+        gain = row_close_to_close_percent(previous, candidate)
+        volume_ratio = row_volume_ratio(previous, candidate)
+        if gain < Decimal("1.70") or volume_ratio < Decimal("1.15") or close_position(candidate) < Decimal("0.70"):
+            continue
+        follow = rows[signal_index + 1:]
+        candidate_close = decimal(candidate.get("close", "0"))
+        if any(decimal(row.get("close", "0")) < candidate_close for row in follow):
+            continue
+        if lag == 2 and decimal(follow[0].get("close", "0")) < candidate_close:
+            continue
+        signal_bar = candidate
+        confirmation_count = lag
+        break
+    if signal_bar is None:
+        return None
+    signal_index = rows.index(signal_bar)
+    preceding = rows[:signal_index]
+    recent_high_index = max(
+        range(max(0, len(preceding) - 60), len(preceding)),
+        key=lambda index: decimal(preceding[index].get("high", "0")),
+    )
+    pullback_bars = signal_index - recent_high_index
+    if pullback_bars > int(spec.get("max_pullback_bars", 20)):
+        return None
+    stop = decimal(signal_bar.get("low", "0"))
+    signal = build_price_action_long_signal(
+        detector_id="ftd001_pullback_guard_confirm_contract_v1",
+        symbol=symbol,
+        latest=latest,
+        entry=entry,
+        stop=stop,
+        target_r=Decimal("2.00"),
+        max_risk_percent=decimal(spec.get("max_risk_percent", "0")),
+        order_type="limit",
+        generated_at=generated_at,
+    )
+    if not signal:
+        return None
+    target_date = ny_event_date(latest)
+    market_confirmed, market_symbols = market_follow_through_confirmed(grouped_events, target_date)
+    signal.update(
+        {
+            "created_at": entry_at,
+            "entry_timing": "next_bar_first_quote",
+            "entry_price_source": str(latest.get("next_bar_entry_source") or "longbridge_sdk_first_quote_after_bar_close"),
+            "contract_evidence": {
+                "signal_bar_event_id": str(signal_bar.get("event_id") or ""),
+                "pullback_bar_count": pullback_bars,
+                "maximum_pullback_bars": int(spec.get("max_pullback_bars", 20)),
+                "follow_through_bar_count": confirmation_count,
+                "signal_bar_stop": fmt_money(stop),
+                "target_model": "2R",
+                "market_context_audit": "confirmed" if market_confirmed else "not_confirmed",
+                "market_context_symbols": market_symbols,
+                "market_context_is_blocker": False,
+            },
+            "market_confirmation_status": "audit_confirmed" if market_confirmed else "audit_not_confirmed",
+            "market_confirmation_symbols": market_symbols,
+            "pre_gate_blockers": [],
+        }
+    )
+    return signal
+
+
 def build_price_action_long_signal(
     *,
     detector_id: str,
@@ -2188,10 +2505,12 @@ def pa004_momentum_variant_signal(
         return None
     if close_position_value < decimal(thresholds["min_close_position"]):
         return None
-    risk = max(close - low, close * Decimal("0.025"))
+    entry = decimal(latest.get("next_bar_first_quote_price", close))
+    entry_at = str(latest.get("next_bar_first_quote_at") or latest.get("received_at") or to_iso(generated_at))
+    risk = max(entry - low, entry * Decimal("0.025"))
     if risk <= ZERO:
         return None
-    risk_percent = risk / close * HUNDRED
+    risk_percent = risk / entry * HUNDRED
     max_risk_percent = decimal(thresholds.get("max_risk_percent", "0"))
     if max_risk_percent > ZERO and risk_percent > max_risk_percent:
         return None
@@ -2217,13 +2536,16 @@ def pa004_momentum_variant_signal(
         "direction": "long",
         "side": "buy",
         "order_type": "limit",
-        "limit_price": fmt_money(close),
-        "stop_price": fmt_money(close - risk),
-        "target_price": fmt_money(close + risk * target_r),
-        "current_price": fmt_money(close),
+        "limit_price": fmt_money(entry),
+        "stop_price": fmt_money(entry - risk),
+        "target_price": fmt_money(entry + risk * target_r),
+        "current_price": fmt_money(entry),
         "source_market_event_id": str(latest.get("event_id") or latest.get("market_event_id") or ""),
         "market_event_time": str(latest.get("event_time") or latest.get("bar_time") or latest.get("timestamp") or ""),
-        "created_at": str(latest.get("received_at") or to_iso(generated_at)),
+        "created_at": entry_at,
+        "entry_timing": "next_bar_first_quote",
+        "entry_price_source": str(latest.get("next_bar_entry_source") or "longbridge_sdk_first_quote_after_bar_close"),
+        "signal_validity_seconds": "900",
         "close_position": fmt_decimal(close_position_value),
         "close_to_close_percent": fmt_decimal(close_to_close_percent),
         "gap_percent": fmt_decimal(gap_percent),
@@ -2233,6 +2555,16 @@ def pa004_momentum_variant_signal(
         "high_quality_signal": quality_score >= Decimal("80"),
         "market_confirmation_status": "not_required",
         "pre_gate_blockers": [],
+        "contract_evidence": {
+            "strong_followthrough": strong_followthrough,
+            "strong_gap_hold": strong_gap_hold,
+            "close_position": fmt_decimal(close_position_value),
+            "volume_ratio": fmt_decimal(volume_ratio),
+            "volume_mode": "audit_only",
+            "maximum_risk_percent": fmt_decimal(max_risk_percent),
+            "target_model": "1.5R",
+            "entry_order_ttl_seconds": 900,
+        },
     }
 
 
@@ -2393,6 +2725,15 @@ def build_signal_from_intent(
         "created_at": created_at,
         "processed_at": to_iso(generated_at),
         "detector_id": str(intent.get("detector_id") or "embedded_signal_intent"),
+        "strategy_contract_hash": str(intent.get("strategy_contract_hash") or ""),
+        "strategy_contract_stage": str(intent.get("strategy_contract_stage") or ""),
+        "strategy_contract_stage_zh": str(intent.get("strategy_contract_stage_zh") or ""),
+        "strategy_contract_schema_version": str(intent.get("strategy_contract_schema_version") or ""),
+        "entry_timing": str(intent.get("entry_timing") or ""),
+        "entry_price_source": str(intent.get("entry_price_source") or ""),
+        "contract_evidence": dict(intent.get("contract_evidence") or {})
+        if isinstance(intent.get("contract_evidence"), dict)
+        else {},
         "router_decision_status": status,
         "blockers": blockers,
         "raw_suggested_quantity": fmt_decimal(quantity_normalization.raw_quantity),
@@ -2465,6 +2806,10 @@ def build_signal_from_intent(
         "created_at": created_at,
         "runtime_id": runtime_id,
         "strategy_id": strategy_id,
+        "strategy_contract_hash": str(intent.get("strategy_contract_hash") or ""),
+        "strategy_contract_stage": str(intent.get("strategy_contract_stage") or ""),
+        "strategy_contract_stage_zh": str(intent.get("strategy_contract_stage_zh") or ""),
+        "strategy_contract_schema_version": str(intent.get("strategy_contract_schema_version") or ""),
         "capital_bucket": capital_bucket,
         "capital_bucket_label": bucket_label,
         "test_epoch_id": epoch_id,
@@ -2542,6 +2887,11 @@ def build_signal_from_intent(
         "primary_capital_bucket": str(intent.get("primary_capital_bucket") or ""),
         "source_market_event_id": source_event_id,
         "market_event_time": str(intent.get("market_event_time") or ""),
+        "entry_timing": str(intent.get("entry_timing") or ""),
+        "entry_price_source": str(intent.get("entry_price_source") or ""),
+        "contract_evidence": dict(intent.get("contract_evidence") or {})
+        if isinstance(intent.get("contract_evidence"), dict)
+        else {},
         "short_structure_low": str(intent.get("short_structure_low") or ""),
         "signal_validity_seconds": str(intent.get("signal_validity_seconds") or "5"),
         "local_simulation_source": False,

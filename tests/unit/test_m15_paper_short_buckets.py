@@ -19,10 +19,12 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     LEDGER_JSONL,
     ORDER_RECONCILIATION_JSON,
     VirtualCapitalBucket,
+    classify_short_capacity_failure,
     hydrate_unconfirmed_execution_rows,
     longbridge_order_command,
     load_config as load_execution_config,
     run_realtime_execution,
+    response_max_sell_quantity,
     submitted_short_cover_key_set,
 )
 from scripts.m15_longbridge_realtime_position_manager_lib import (
@@ -115,6 +117,36 @@ class M15PaperShortBucketsTest(unittest.TestCase):
                 {"blocked_fee_profit_below_minimum": 1},
             )
             self.assertTrue((root / SHORT_DIAGNOSTICS_JSON).exists())
+
+    def test_short_router_diagnostics_preserve_detector_attempts_without_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = replace(
+                load_router_config(),
+                output_dir=Path(tmp),
+                paper_short_runtime_ids=(SHORT_RUNTIME,),
+                short_test_epoch_id=SHORT_EPOCH,
+            )
+            payload = update_short_signal_diagnostics(
+                config,
+                [],
+                "2026-07-13T15:05:01Z",
+                detector_attempts=[{
+                    "attempt_id": f"{SHORT_RUNTIME}:AAPL:bar-1",
+                    "runtime_id": SHORT_RUNTIME,
+                    "symbol": "AAPL",
+                    "detector_attempted": True,
+                    "candidate_emitted": False,
+                    "no_candidate_reason": "bearish_structure_not_met",
+                    "source_market_event_id": "bar-1",
+                    "market_event_time": "2026-07-13T15:05:00Z",
+                }],
+            )
+
+            runtime = payload["runtime_summaries"][0]
+            self.assertTrue(runtime["detector_attempted"])
+            self.assertEqual(runtime["detector_attempted_count"], 1)
+            self.assertEqual(runtime["candidate_count"], 0)
+            self.assertEqual(runtime["no_candidate_reasons"], {"bearish_structure_not_met": 1})
 
     def test_three_short_detectors_require_bearish_structure_and_market_confirmation(self) -> None:
         generated_at = datetime(2026, 7, 13, 15, 5, tzinfo=UTC)
@@ -219,9 +251,41 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             )[0]
 
             self.assertEqual(payload["submitted_count"], 0)
-            self.assertIn("blocked_short_broker_capacity_unavailable", row["blockers"])
+            self.assertIn("blocked_short_capacity_no_borrow_inventory", row["blockers"])
+            self.assertEqual(row["short_capacity_blocker_class"], "no_borrow_inventory")
             self.assertEqual(row["short_capacity_check_status"], "short_capacity_zero_or_permission_denied")
             self.assertEqual(row["short_capacity_max_quantity"], "0")
+
+    def test_short_capacity_failures_have_stable_diagnostic_classes(self) -> None:
+        self.assertEqual(
+            classify_short_capacity_failure(
+                {"ok": False, "status": "short_capacity_sdk_failed:timeout"},
+                requested_quantity=Decimal("4"),
+            ),
+            "query_failed",
+        )
+        self.assertEqual(
+            classify_short_capacity_failure(
+                {"ok": False, "status": "sdk_short_capacity", "margin_max_quantity": "0"},
+                requested_quantity=Decimal("4"),
+            ),
+            "no_borrow_inventory",
+        )
+        self.assertEqual(
+            classify_short_capacity_failure(
+                {"ok": True, "status": "sdk_short_capacity", "max_quantity": "2"},
+                requested_quantity=Decimal("4"),
+            ),
+            "insufficient",
+        )
+
+    def test_sell_short_capacity_parser_uses_only_margin_max_qty(self) -> None:
+        response = {
+            "cash_max_qty": "99",
+            "margin_max_qty": "3",
+        }
+        self.assertEqual(response_max_sell_quantity(response), Decimal("3"))
+        self.assertEqual(response_max_sell_quantity({"cash_max_qty": "99"}), Decimal("0"))
 
     def test_short_reconciliation_requires_exact_order_identity_and_calculates_cover_pnl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -584,6 +584,39 @@ def floor_bar_open(value: datetime, minutes: int) -> datetime:
     return value.replace(minute=minute, second=0, microsecond=0)
 
 
+def attach_next_bar_first_quotes(
+    rows: list[dict[str, Any]],
+    live_quote_session_state: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Attach the quote closing a bar as the next bar's executable price."""
+    enriched: list[dict[str, Any]] = []
+    for source in rows:
+        row = dict(source)
+        if str(row.get("timeframe") or "") != "5m" or row.get("bar_final") is not True:
+            enriched.append(row)
+            continue
+        symbol = str(row.get("symbol") or "").upper().replace(".US", "")
+        quote = live_quote_session_state.get(symbol) or live_quote_session_state.get(f"{symbol}.US") or {}
+        quote_at = str(quote.get("received_at") or quote.get("source_event_at") or "")
+        try:
+            quote_price = Decimal(str(quote.get("last_done") or quote.get("close") or quote.get("price") or "0"))
+            bar_close_at = datetime.fromisoformat(
+                str(row.get("bar_close_at") or row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+            quote_dt = datetime.fromisoformat(quote_at.replace("Z", "+00:00")).astimezone(UTC)
+        except (ArithmeticError, TypeError, ValueError):
+            enriched.append(row)
+            continue
+        if quote_price <= 0 or quote_dt < bar_close_at:
+            enriched.append(row)
+            continue
+        row["next_bar_first_quote_price"] = format(quote_price, "f")
+        row["next_bar_first_quote_at"] = to_iso(quote_dt)
+        row["next_bar_entry_source"] = "longbridge_sdk_first_quote_after_bar_close"
+        enriched.append(row)
+    return enriched
+
+
 class FiveMinuteBarBuilder:
     """Build final regular-session bars from SDK quote/trade pushes."""
 

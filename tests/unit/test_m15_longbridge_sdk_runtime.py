@@ -782,6 +782,31 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(marker["activation_condition_met"], "positions_open_orders_pending_confirmations_zero")
         self.assertEqual(len(client.submissions), 1)
 
+    def test_zero_account_waits_until_configured_activation_time(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            marker["activate_not_before"] = "2026-07-17T13:30:00Z"
+            config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            snapshot["positions"] = []
+            snapshot["orders"] = []
+            snapshot["open_orders"] = []
+
+            state = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 7, 16, 14, 0, tzinfo=UTC),
+            )
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(state["status"], "waiting_for_activation_window")
+        self.assertTrue(state["blocks_new_entries"])
+        self.assertEqual(marker["status"], "pending_flatten")
+        self.assertEqual(marker["activation_blocker"], "waiting_for_configured_activation_time")
+        self.assertEqual(client.submissions, [])
+
     def test_active_marker_repairs_execution_epoch_missing_start_time(self) -> None:
         with TemporaryDirectory() as directory:
             config, _snapshot, account, client = self.pending_flatten_fixture(Path(directory))

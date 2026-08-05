@@ -1,0 +1,17 @@
+{
+  "schema_version": "m15-strategy-contract-v1",
+  "runtime_id": "M10-PA-001-1d",
+  "strategy_id": "M10-PA-001",
+  "display_name_zh": "PA001 日线趋势延续",
+  "stage": "paper-v1",
+  "direction": "long",
+  "timeframe": "1d",
+  "setup": {"rule": "pa001_daily_long_contract_v1", "summary_zh": "20根趋势背景、至少两根逆势回调和H2式第二次顺势恢复"},
+  "entry_rules": {"trend_lookback_bars": 20, "min_countertrend_bars": 2, "require_h2_resumption": true, "reject_tight_range": true, "reject_opposite_breakout": true, "entry_timing": "next_bar_first_quote", "order_type": "protected_limit"},
+  "exit_rules": {"target_r": "2.00", "stop": "pullback_structure_low", "invalidation": "trend_or_h2_structure_failure", "maximum_holding_sessions": 5, "maximum_holding_exit_time_ny": "15:55", "partial_take_profit": false, "gap_through_stop": "first_executable_price"},
+  "risk_controls": {"max_risk_percent": "6.00", "minimum_reward_r": "2.00", "minimum_net_profit_after_fees": "12", "max_total_exposure_usd": "6000", "max_symbol_exposure_usd": "1500", "max_risk_per_order_usd": "20", "minimum_cash_reserve_usd": "4000", "daily_new_symbol_limit": null, "consecutive_loss_hard_stop": false},
+  "data_requirements": {"source": "longbridge_sdk_realtime", "completed_bars": true, "local_simulation_ledger": false},
+  "visual_acceptance": {"required": false, "status": "not-required"},
+  "execution_boundaries": {"paper_simulated_only": true, "live_execution": false, "real_money_actions": false, "local_simulation_as_signal_source": false, "whole_shares_only": true},
+  "source_refs": ["scripts/m15_longbridge_realtime_signal_router_lib.py:PRICE_ACTION_RUNTIME_SPECS", "scripts/m12_29_current_day_scan_dashboard_lib.py:RUNTIME_REPAIR_POLICIES"]
+}
