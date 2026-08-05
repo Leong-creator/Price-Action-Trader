@@ -16,6 +16,7 @@ from scripts.m15_strategy_contracts_lib import (
     validate_contract,
     write_state_atomic,
 )
+from scripts.m15_longbridge_realtime_signal_router_lib import PRICE_ACTION_RUNTIME_SPECS
 
 
 EXPECTED_RUNTIME_IDS = {
@@ -102,9 +103,22 @@ class M15StrategyContractsTest(unittest.TestCase):
 
     def test_get_contract_for_runtime(self):
         contract = get_contract_for_runtime("M10-PA-012-5m")
-        self.assertEqual(contract["setup"]["rule"], "pa012_5m_long_contract_v1")
+        self.assertEqual(contract["setup"]["rule"], "pa012_5m_contract_v1")
         with self.assertRaisesRegex(StrategyContractError, "not found"):
             get_contract_for_runtime("M10-PA-999-1d")
+
+    def test_executable_contract_rule_names_match_runtime_specs(self):
+        contracts = load_contracts()
+        for runtime_id, contract in contracts.items():
+            if contract["stage"] not in {"paper-v1", "full-v1"}:
+                continue
+            if runtime_id not in PRICE_ACTION_RUNTIME_SPECS:
+                continue
+            self.assertEqual(
+                contract["setup"]["rule"],
+                PRICE_ACTION_RUNTIME_SPECS[runtime_id]["rule"],
+                runtime_id,
+            )
 
     def test_atomic_state_write_replaces_content_and_leaves_no_temp_file(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

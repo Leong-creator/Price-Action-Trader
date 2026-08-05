@@ -13,12 +13,23 @@ from scripts.m15_background_watchdog_lib import (
     m15_runtime_status_step,
     pa002_milestone_refresh_step,
     should_append_watchdog_ledger,
+    sdk_runtime_step_is_transient_recovery,
     start_daemon,
     status,
 )
 
 
 class M15BackgroundWatchdogTest(unittest.TestCase):
+    def test_sdk_runtime_context_restore_is_transient_recovery(self) -> None:
+        self.assertTrue(
+            sdk_runtime_step_is_transient_recovery(
+                {
+                    "returncode": 3,
+                    "stderr_tail": "sdk_runtime_not_ready:starting_context_restore",
+                }
+            )
+        )
+
     def test_pa002_milestone_skips_when_fill_attribution_refresh_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp), runtime_engine="sdk")

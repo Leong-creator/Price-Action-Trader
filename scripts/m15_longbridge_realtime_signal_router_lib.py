@@ -55,6 +55,8 @@ LEDGER_JSONL = "m15_longbridge_realtime_signal_router_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_signal_router.md"
 SHORT_DIAGNOSTICS_JSON = "m15_longbridge_short_signal_diagnostics.json"
 SHORT_DIAGNOSTIC_ROW_LIMIT = 2000
+STRATEGY_DIAGNOSTICS_JSON = "m15_longbridge_strategy_signal_diagnostics.json"
+STRATEGY_DIAGNOSTIC_ROW_LIMIT = 10000
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 CONFLUENCE_MAX_MULTIPLIER = Decimal("1.75")
@@ -696,14 +698,14 @@ def run_realtime_signal_router(
     selected_bucket_exposure: dict[str, Decimal] = defaultdict(lambda: ZERO)
     selected_bucket_symbol_exposure: dict[tuple[str, str], Decimal] = defaultdict(lambda: ZERO)
 
-    short_detector_attempts: list[dict[str, Any]] = []
+    detector_attempts: list[dict[str, Any]] = []
     raw_intents = embedded_signal_intents(config, market_events)
     raw_intents.extend(
         detector_signal_candidates(
             config,
             market_events,
             generated_at=now,
-            short_detector_attempts=short_detector_attempts,
+            detector_attempts=detector_attempts,
         )
     )
     annotate_strategy_contracts(config, raw_intents)
@@ -766,7 +768,17 @@ def run_realtime_signal_router(
         config,
         ledger_rows,
         generated_at_iso,
-        detector_attempts=short_detector_attempts,
+        detector_attempts=[
+            row for row in detector_attempts
+            if str(row.get("runtime_id") or "") in set(config.paper_short_runtime_ids)
+        ],
+    )
+    strategy_diagnostics = update_strategy_signal_diagnostics(
+        config,
+        ledger_rows,
+        generated_at_iso,
+        test_epoch_id=str(test_epoch_state.get("test_epoch_id") or ""),
+        detector_attempts=detector_attempts,
     )
     if emitted_signal_events is not None:
         emitted_signal_events.extend(new_signal_events)
@@ -833,6 +845,7 @@ def run_realtime_signal_router(
             1 for row in ledger_rows if "blocked_short_disabled" in row.get("blockers", [])
         ),
         "paper_short_diagnostics": short_diagnostics.get("summary", {}),
+        "strategy_signal_diagnostics": strategy_diagnostics.get("summary", {}),
         "quantity_normalized_risk_or_profit_blocked_count": sum(
             1
             for row in ledger_rows
@@ -884,6 +897,7 @@ def run_realtime_signal_router(
             "router_summary": project_path(config.output_dir / SUMMARY_JSON),
             "router_ledger": project_path(config.output_dir / LEDGER_JSONL),
             "paper_short_diagnostics": project_path(config.output_dir / SHORT_DIAGNOSTICS_JSON),
+            "strategy_signal_diagnostics": project_path(config.output_dir / STRATEGY_DIAGNOSTICS_JSON),
             "router_report": project_path(config.output_dir / REPORT_MD),
         },
         "plain_language_result": plain_language_result(len(market_events), len(new_signal_events), ledger_rows),
@@ -1057,6 +1071,134 @@ def update_short_signal_diagnostics(
     return payload
 
 
+def update_strategy_signal_diagnostics(
+    config: RealtimeSignalRouterConfig,
+    ledger_rows: list[dict[str, Any]],
+    generated_at: str,
+    *,
+    test_epoch_id: str,
+    detector_attempts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Persist the detector-to-router funnel for every executable contract."""
+    path = config.output_dir / STRATEGY_DIAGNOSTICS_JSON
+    previous = read_json(path)
+    contracts = (
+        load_contracts_cached(str(config.strategy_contracts_dir))
+        if config.require_strategy_contracts
+        else {}
+    )
+    contract_hashes = {
+        runtime_id: str((contracts.get(runtime_id) or {}).get("contract_hash") or "")
+        for runtime_id in config.allowed_runtime_ids
+    }
+    contract_signature = sha256(
+        json.dumps(sorted(contract_hashes.items()), separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    epoch_key = f"{test_epoch_id}|{config.short_test_epoch_id}|contracts={contract_signature}"
+    if str(previous.get("epoch_key") or "") != epoch_key:
+        previous = {}
+    attempts_by_id = {
+        str(row.get("attempt_id")): row
+        for row in previous.get("detector_attempt_rows", [])
+        if isinstance(row, dict) and str(row.get("attempt_id") or "")
+    }
+    for row in detector_attempts:
+        attempt_id = str(row.get("attempt_id") or "")
+        if attempt_id:
+            runtime_id = str(row.get("runtime_id") or "")
+            attempts_by_id[attempt_id] = {
+                **dict(row),
+                "strategy_contract_hash": contract_hashes.get(runtime_id, ""),
+            }
+    attempt_rows = sorted(
+        attempts_by_id.values(),
+        key=lambda row: (str(row.get("market_event_time") or ""), str(row.get("attempt_id") or "")),
+    )[-STRATEGY_DIAGNOSTIC_ROW_LIMIT:]
+    decisions_by_id = {
+        str(row.get("signal_id")): row
+        for row in previous.get("decision_rows", [])
+        if isinstance(row, dict) and str(row.get("signal_id") or "")
+    }
+    for row in ledger_rows:
+        signal_id = str(row.get("signal_id") or "")
+        if signal_id:
+            decisions_by_id[signal_id] = {
+                "signal_id": signal_id,
+                "runtime_id": str(row.get("runtime_id") or ""),
+                "strategy_contract_hash": str(
+                    row.get("strategy_contract_hash")
+                    or contract_hashes.get(str(row.get("runtime_id") or ""), "")
+                ),
+                "symbol": str(row.get("symbol") or ""),
+                "created_at": str(row.get("created_at") or ""),
+                "router_decision_status": str(row.get("router_decision_status") or ""),
+                "blockers": list(row.get("blockers") or []),
+            }
+    decision_rows = sorted(
+        decisions_by_id.values(),
+        key=lambda row: (str(row.get("created_at") or ""), str(row.get("signal_id") or "")),
+    )[-STRATEGY_DIAGNOSTIC_ROW_LIMIT:]
+    runtime_summaries: list[dict[str, Any]] = []
+    for runtime_id in config.allowed_runtime_ids:
+        runtime_attempts = [row for row in attempt_rows if row.get("runtime_id") == runtime_id]
+        runtime_decisions = [row for row in decision_rows if row.get("runtime_id") == runtime_id]
+        no_candidate_reasons = Counter(
+            str(row.get("no_candidate_reason") or "")
+            for row in runtime_attempts
+            if str(row.get("no_candidate_reason") or "")
+        )
+        blockers = Counter(
+            str(blocker)
+            for row in runtime_decisions
+            for blocker in row.get("blockers", [])
+            if str(blocker)
+        )
+        runtime_summaries.append(
+            {
+                "runtime_id": runtime_id,
+                "strategy_contract_hash": contract_hashes.get(runtime_id, ""),
+                "detector_attempted_count": len(runtime_attempts),
+                "no_candidate_count": sum(1 for row in runtime_attempts if row.get("no_candidate_reason")),
+                "no_candidate_reasons": dict(no_candidate_reasons.most_common()),
+                "candidate_count": len(runtime_decisions),
+                "signal_ready_count": sum(
+                    1 for row in runtime_decisions
+                    if row.get("router_decision_status") == "signal_event_ready"
+                ),
+                "router_blocked_count": sum(1 for row in runtime_decisions if row.get("blockers")),
+                "router_blockers": dict(blockers.most_common()),
+                "broker_order_and_fill_source": "m15_longbridge_order_reconciliation",
+            }
+        )
+    payload = {
+        "schema_version": "m15.longbridge-strategy-signal-diagnostics.v1",
+        "stage": "M15.longbridge_strategy_signal_diagnostics",
+        "generated_at": generated_at,
+        "epoch_key": epoch_key,
+        "strategy_contract_hashes": contract_hashes,
+        "strategy_contract_signature": contract_signature,
+        "paper_simulated_only": True,
+        "live_execution": False,
+        "real_money_actions": False,
+        "summary": {
+            "runtime_count": len(config.allowed_runtime_ids),
+            "detector_attempted_count": len(attempt_rows),
+            "no_candidate_count": sum(1 for row in attempt_rows if row.get("no_candidate_reason")),
+            "candidate_count": len(decision_rows),
+            "signal_ready_count": sum(
+                1 for row in decision_rows
+                if row.get("router_decision_status") == "signal_event_ready"
+            ),
+            "router_blocked_count": sum(1 for row in decision_rows if row.get("blockers")),
+        },
+        "runtime_summaries": runtime_summaries,
+        "detector_attempt_rows": attempt_rows,
+        "decision_rows": decision_rows,
+    }
+    write_json(path, payload)
+    return payload
+
+
 def realtime_relevant_market_events(rows: list[dict[str, Any]], session_started_at: str) -> list[dict[str, Any]]:
     """Return bounded market events relevant to the realtime hot path.
 
@@ -1091,7 +1233,9 @@ def realtime_relevant_market_events(rows: list[dict[str, Any]], session_started_
     for key in current_keys:
         group_rows = grouped.get(key, [])
         group_rows.sort(key=lambda item: market_event_sort_key(item[1]))
-        for idx, _row in group_rows[-20:]:
+        timeframe = key[1]
+        history_limit = 60 if timeframe == "1d" else 78 if timeframe == "5m" else 20
+        for idx, _row in group_rows[-history_limit:]:
             keep_ids.add(idx)
     return [row for idx, row in enumerate(rows) if idx in keep_ids]
 
@@ -1304,7 +1448,7 @@ def detector_signal_candidates(
     market_events: list[dict[str, Any]],
     *,
     generated_at: datetime,
-    short_detector_attempts: list[dict[str, Any]] | None = None,
+    detector_attempts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -1364,6 +1508,20 @@ def detector_signal_candidates(
                     thresholds=thresholds,
                     generated_at=generated_at,
                 )
+                if detector_attempts is not None:
+                    detector_attempts.append(
+                        detector_attempt_row(
+                            runtime_id,
+                            symbol,
+                            timeframe,
+                            rows,
+                            signal,
+                            no_candidate_reason=(
+                                "pa004_momentum_quality_contract_not_met"
+                                if signal is None else ""
+                            ),
+                        )
+                    )
                 if signal:
                     signal["runtime_id"] = runtime_id
                     signal["strategy_id"] = str(thresholds["strategy_id"])
@@ -1375,7 +1533,7 @@ def detector_signal_candidates(
                 config,
                 grouped,
                 generated_at=generated_at,
-                short_detector_attempts=short_detector_attempts,
+                detector_attempts=detector_attempts,
             )
         )
     return candidates
@@ -1386,7 +1544,7 @@ def price_action_realtime_candidates(
     grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
     *,
     generated_at: datetime,
-    short_detector_attempts: list[dict[str, Any]] | None = None,
+    detector_attempts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     allowed = set(config.allowed_runtime_ids)
@@ -1405,36 +1563,24 @@ def price_action_realtime_candidates(
                 grouped_events=grouped_events,
                 generated_at=generated_at,
             )
-            if runtime_id in PAPER_SHORT_RUNTIME_IDS and short_detector_attempts is not None:
-                latest = rows[-1] if rows else {}
-                source_event_id = str(
-                    latest.get("market_event_id")
-                    or latest.get("event_id")
-                    or latest.get("bar_id")
-                    or latest.get("event_time")
-                    or latest.get("bar_time")
-                    or latest.get("timestamp")
-                    or ""
-                )
-                short_detector_attempts.append(
-                    {
-                        "attempt_id": f"{runtime_id}:{symbol}:{source_event_id}",
-                        "runtime_id": runtime_id,
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "detector_attempted": True,
-                        "candidate_emitted": signal is not None,
-                        "no_candidate_reason": "" if signal is not None else short_no_candidate_reason(
-                            str(spec.get("rule") or ""), rows
-                        ),
-                        "source_market_event_id": source_event_id,
-                        "market_event_time": str(
-                            latest.get("event_time")
-                            or latest.get("bar_time")
-                            or latest.get("timestamp")
-                            or ""
-                        ),
-                    }
+            if detector_attempts is not None:
+                rule = str(spec.get("rule") or "")
+                reason = ""
+                if signal is None:
+                    reason = (
+                        short_no_candidate_reason(rule, rows)
+                        if runtime_id in PAPER_SHORT_RUNTIME_IDS
+                        else long_no_candidate_reason(runtime_id, rows)
+                    )
+                detector_attempts.append(
+                    detector_attempt_row(
+                        runtime_id,
+                        symbol,
+                        timeframe,
+                        rows,
+                        signal,
+                        no_candidate_reason=reason,
+                    )
                 )
             if signal:
                 candidates.append(signal)
@@ -1473,6 +1619,96 @@ def short_no_candidate_reason(rule: str, rows: list[dict[str, Any]]) -> str:
         ) > opening_low * Decimal("0.9975"):
             return "bearish_structure_not_met"
     return "short_validation_filters_not_met"
+
+
+def detector_attempt_row(
+    runtime_id: str,
+    symbol: str,
+    timeframe: str,
+    rows: list[dict[str, Any]],
+    signal: dict[str, Any] | None,
+    *,
+    no_candidate_reason: str,
+) -> dict[str, Any]:
+    latest = rows[-1] if rows else {}
+    source_event_id = str(
+        latest.get("market_event_id")
+        or latest.get("event_id")
+        or latest.get("bar_id")
+        or latest.get("event_time")
+        or latest.get("bar_time")
+        or latest.get("timestamp")
+        or ""
+    )
+    return {
+        "attempt_id": f"{runtime_id}:{symbol}:{source_event_id}",
+        "runtime_id": runtime_id,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "detector_attempted": True,
+        "candidate_emitted": signal is not None,
+        "no_candidate_reason": no_candidate_reason,
+        "source_market_event_id": source_event_id,
+        "market_event_time": str(
+            latest.get("event_time")
+            or latest.get("bar_time")
+            or latest.get("timestamp")
+            or ""
+        ),
+    }
+
+
+def five_minute_rows_are_contiguous(rows: list[dict[str, Any]]) -> bool:
+    times: list[datetime] = []
+    for row in rows:
+        try:
+            times.append(
+                parse_utc_datetime(
+                    str(row.get("event_time") or row.get("bar_time") or row.get("timestamp") or "")
+                )
+            )
+        except ValueError:
+            return False
+    return all(
+        int((current - previous).total_seconds()) == 300
+        for previous, current in zip(times, times[1:])
+    )
+
+
+def long_no_candidate_reason(runtime_id: str, rows: list[dict[str, Any]]) -> str:
+    if runtime_id == "M10-PA-001-1d":
+        if len(rows) < 22:
+            return "insufficient_daily_history"
+    elif runtime_id == "M10-PA-002-5m":
+        if len(rows) < 22:
+            return "insufficient_five_minute_history"
+        if not five_minute_rows_are_contiguous(rows[-23:]):
+            return "non_contiguous_five_minute_context"
+    elif runtime_id == "M10-PA-012-5m":
+        session_rows = latest_ny_session_rows(rows)
+        if session_rows:
+            try:
+                first_close = parse_utc_datetime(
+                    str(
+                        session_rows[0].get("event_time")
+                        or session_rows[0].get("bar_time")
+                        or session_rows[0].get("timestamp")
+                        or ""
+                    )
+                ).astimezone(NEW_YORK)
+            except ValueError:
+                return "invalid_five_minute_event_time"
+            if (first_close.hour, first_close.minute) != (9, 35):
+                return "missing_opening_range_context_after_restart"
+        if len(session_rows) < 8:
+            return "opening_range_or_followthrough_incomplete"
+        if not five_minute_rows_are_contiguous(session_rows):
+            return "non_contiguous_five_minute_context"
+    elif runtime_id == "M12-FTD-001-pullback-guard-confirm-1d" and len(rows) < 3:
+        return "insufficient_daily_history"
+    if rows and not str(rows[-1].get("next_bar_first_quote_at") or ""):
+        return "next_bar_quote_unavailable"
+    return "strategy_structure_not_met"
 
 
 def price_action_signal_for_runtime(

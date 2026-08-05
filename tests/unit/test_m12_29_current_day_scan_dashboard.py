@@ -1058,7 +1058,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(dedicated_rows["M10-PA-002-5m"]["review_status"], "已按运行单元复核")
         self.assertEqual(dedicated_rows["M10-PA-004-MBF-QC-1d"]["review_status"], "已按运行单元复核")
         self.assertIn("单策略仓运行单元复核", html)
-        self.assertIn("PA002-5m单仓", html)
+        self.assertIn("PA002-5m现行版单仓", html)
         self.assertNotIn("实时链路与旧队列", html)
         self.assertIn('http-equiv="Cache-Control"', html)
         self.assertIn('content="no-store, no-cache, must-revalidate"', html)

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import ast
+from collections import deque
 import inspect
 import json
 import pickle
+import queue
 import textwrap
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -21,6 +23,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
     daily_context_is_complete, fresh_market_events, load_config,
     load_current_sdk_intraday_context,
+    symbols_missing_contiguous_intraday_context,
     load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, sdk_object_to_dict, subscribe_private_trade_updates,
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
@@ -30,19 +33,27 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
 from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAccountStateProvider, SdkTradeRequestGate
 from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
+    INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS,
+    REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED,
     acquire_runtime_run_lock,
+    active_event_ids_excluding_intraday_gaps,
+    buffer_pending_market_data_progress,
     build_live_daily_confirmation_rows,
     close_spawn_queue,
     completed_postclose_refresh_dates,
     compact_hot_execution_rows,
     compact_hot_signal_rows,
     dispatch_completed_rows,
+    deferred_intraday_context_after_mid_session_start,
     event_rows_to_daily,
+    event_rows_to_intraday_context,
     effective_runtime_dispatch_enabled,
+    effective_worker_progress,
     is_orphaned_sdk_runtime_child,
     market_data_mode_qualifies_for_subscription_gate,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
+    preserve_partial_bar_suppression,
     preserve_last_order_maintenance_action,
     quote_worker,
     quote_subscription_targets,
@@ -64,6 +75,46 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_intraday_backfill_has_bounded_total_startup_budget(self) -> None:
+        self.assertEqual(INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS, 90)
+
+    def test_realtime_runtime_never_opens_history_connection_before_live_quotes(self) -> None:
+        self.assertFalse(REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED)
+
+    def test_mid_session_context_defers_without_replaying_signals_or_orders(self) -> None:
+        affected, status = deferred_intraday_context_after_mid_session_start(
+            ["MSFT", "AAPL"],
+            suppressed_until="2026-08-05T18:45:00Z",
+        )
+
+        self.assertEqual(affected, ["AAPL", "MSFT"])
+        self.assertEqual(status["status"], "deferred_until_clean_session")
+        self.assertFalse(status["historical_signal_replayed"])
+        self.assertFalse(status["historical_order_replayed"])
+        self.assertEqual(status["failed_symbols"], affected)
+        self.assertTrue(
+            effective_runtime_dispatch_enabled(
+                dispatch_requested=True,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=True,
+                trading_daily_context_ready=True,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+            )
+        )
+
+    def test_intraday_gap_blocks_only_affected_five_minute_active_event(self) -> None:
+        rows = [
+            {"event_id": "aapl-5m", "symbol": "AAPL", "timeframe": "5m"},
+            {"event_id": "aapl-1d", "symbol": "AAPL", "timeframe": "1d"},
+            {"event_id": "msft-5m", "symbol": "MSFT", "timeframe": "5m"},
+        ]
+        self.assertEqual(
+            active_event_ids_excluding_intraday_gaps(rows, {"AAPL.US"}),
+            {"aapl-1d", "msft-5m"},
+        )
+
     def test_sdk_quote_payload_converts_unpicklable_trade_session_enum(self) -> None:
         class UnpicklableTradeSession(int):
             def __new__(cls):
@@ -159,12 +210,78 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
         config = load_config()
 
+        self.assertEqual(config.subscription_batch_size, 300)
+        self.assertEqual(config.subscription_deadline_seconds, 20)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 100)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.5)
+        self.assertEqual(config.market_data_heartbeat_deadline_seconds, 30)
         self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
         self.assertLess(
             config.snapshot_poll_interval_seconds,
             config.market_data_heartbeat_deadline_seconds,
         )
+
+    def test_snapshot_worker_restart_preserves_existing_bar_boundary(self) -> None:
+        self.assertEqual(
+            preserve_partial_bar_suppression(
+                "2026-08-05T18:35:00Z",
+                "2026-08-05T18:40:00Z",
+                market_data_mode="sdk_snapshot_poll",
+            ),
+            "2026-08-05T18:35:00Z",
+        )
+        self.assertEqual(
+            preserve_partial_bar_suppression(
+                "",
+                "2026-08-05T18:40:00Z",
+                market_data_mode="sdk_snapshot_poll",
+            ),
+            "2026-08-05T18:40:00Z",
+        )
+        self.assertEqual(
+            preserve_partial_bar_suppression(
+                "2026-08-05T18:35:00Z",
+                "2026-08-05T18:40:00Z",
+                market_data_mode="sdk_subscription",
+            ),
+            "2026-08-05T18:40:00Z",
+        )
+
+    def test_queued_market_data_progress_is_buffered_before_stale_check(self) -> None:
+        source_queue: queue.Queue[dict[str, object]] = queue.Queue()
+        deferred: deque[dict[str, object]] = deque()
+        source_queue.put({"kind": "daily_context", "rows": []})
+        source_queue.put({"kind": "snapshots", "rows": []})
+
+        progress_at = buffer_pending_market_data_progress(
+            source_queue,
+            deferred,
+            now_monotonic=42.0,
+        )
+
+        self.assertEqual(progress_at, 42.0)
+        self.assertEqual(
+            [message["kind"] for message in deferred],
+            ["daily_context", "snapshots"],
+        )
+
+    def test_unrelated_worker_message_does_not_mask_stale_market_data(self) -> None:
+        source_queue: queue.Queue[dict[str, object]] = queue.Queue()
+        deferred: deque[dict[str, object]] = deque()
+        source_queue.put({"kind": "daily_context", "rows": []})
+
+        progress_at = buffer_pending_market_data_progress(
+            source_queue,
+            deferred,
+            now_monotonic=42.0,
+        )
+
+        self.assertEqual(progress_at, 0.0)
+
+    def test_shared_worker_progress_bypasses_a_blocked_parent_queue(self) -> None:
+        self.assertEqual(effective_worker_progress(10.0, 24.0), 24.0)
+        self.assertEqual(effective_worker_progress(30.0, 24.0), 30.0)
 
     def test_snapshot_recovery_uses_short_heartbeat_grace(self) -> None:
         source = inspect.getsource(
@@ -451,6 +568,121 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 patch(
                     "scripts.run_m15_longbridge_sdk_runtime.config_fingerprint",
                     return_value="expected-fingerprint",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
+                ) as shutdown,
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
+                ) as popen,
+            ):
+                result = start_runtime_daemon(args, config)
+
+            self.assertEqual(result, 0)
+            shutdown.assert_not_called()
+            popen.assert_not_called()
+
+    def test_daemon_does_not_kill_new_pid_while_old_status_is_stale(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            current_pid = __import__("os").getpid()
+            config = SimpleNamespace(
+                output_dir=root,
+                runtime_status_path=root / "runtime-status.json",
+                config_path=root / "runtime-config.json",
+                maximum_account_snapshot_age_seconds=45,
+                daily_context_deadline_seconds=75,
+            )
+            config.runtime_status_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-08-05T18:00:00Z",
+                        "runtime_pid": current_pid - 1,
+                        "config_fingerprint": "old-fingerprint",
+                        "dispatch_requested": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            global_lock = root / "global-sdk-quote.lock"
+            global_lock.write_text(f"{current_pid}\n", encoding="utf-8")
+            args = SimpleNamespace(dispatch=True, config=str(config.config_path))
+            with (
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_QUOTE_SUBSCRIPTION_LOCK",
+                    global_lock,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_RUNTIME_START_LOCK",
+                    root / "global-start.lock",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.is_expected_sdk_runtime_process",
+                    return_value=True,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.process_age_seconds",
+                    return_value=10,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
+                ) as shutdown,
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
+                ) as popen,
+            ):
+                result = start_runtime_daemon(args, config)
+
+            self.assertEqual(result, 0)
+            shutdown.assert_not_called()
+            popen.assert_not_called()
+
+    def test_daemon_does_not_kill_context_restore_within_startup_grace(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            current_pid = __import__("os").getpid()
+            config = SimpleNamespace(
+                output_dir=root,
+                runtime_status_path=root / "runtime-status.json",
+                config_path=root / "runtime-config.json",
+                maximum_account_snapshot_age_seconds=45,
+                daily_context_deadline_seconds=75,
+            )
+            config.runtime_status_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at": datetime.now(UTC).isoformat(),
+                        "status": "starting_context_restore",
+                        "runtime_pid": current_pid,
+                        "config_fingerprint": "expected-fingerprint",
+                        "dispatch_requested": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            global_lock = root / "global-sdk-quote.lock"
+            global_lock.write_text(f"{current_pid}\n", encoding="utf-8")
+            args = SimpleNamespace(dispatch=True, config=str(config.config_path))
+            with (
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_QUOTE_SUBSCRIPTION_LOCK",
+                    global_lock,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_RUNTIME_START_LOCK",
+                    root / "global-start.lock",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.is_expected_sdk_runtime_process",
+                    return_value=True,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.config_fingerprint",
+                    return_value="expected-fingerprint",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.process_age_seconds",
+                    return_value=540,
                 ),
                 patch(
                     "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
@@ -1223,6 +1455,61 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             {"open": "99", "high": "104", "low": "98", "close": "102.5", "volume": "300"},
         )
 
+    def test_bar_builder_freezes_session_quote_at_completed_bar_boundary(self) -> None:
+        builder = FiveMinuteBarBuilder()
+        before_close = datetime(2026, 7, 15, 13, 34, 59, tzinfo=UTC)
+        after_close = datetime(2026, 7, 15, 13, 35, 1, tzinfo=UTC)
+        first_payload = {
+            "timestamp": int(before_close.timestamp()),
+            "last_done": "101",
+            "open": "99",
+            "high": "102",
+            "low": "98",
+            "volume": "300",
+        }
+        second_payload = {
+            "timestamp": int(after_close.timestamp()),
+            "last_done": "103",
+            "open": "99",
+            "high": "104",
+            "low": "98",
+            "volume": "350",
+        }
+        self.assertEqual(builder.on_snapshot("AAPL.US", first_payload, received_at=before_close), [])
+        completed = builder.on_snapshot("AAPL.US", second_payload, received_at=after_close)
+        self.assertEqual(len(completed), 1)
+        self.assertEqual(completed[0]["session_close_at_bar_close"], "101")
+        self.assertEqual(completed[0]["session_high_at_bar_close"], "102")
+        self.assertEqual(completed[0]["session_volume_at_bar_close"], "300")
+
+    def test_live_daily_confirmation_prefers_bar_boundary_snapshot(self) -> None:
+        row = {
+            "event_id": "aapl-boundary", "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
+            "event_time": "2026-07-15T13:40:00Z", "bar_open_at": "2026-07-15T13:35:00Z",
+            "received_at": "2026-07-15T13:40:00.1Z", "open": "101", "high": "103",
+            "low": "100", "close": "102", "volume": "20",
+            "session_open_at_bar_close": "99", "session_high_at_bar_close": "104",
+            "session_low_at_bar_close": "98", "session_close_at_bar_close": "102.5",
+            "session_volume_at_bar_close": "300",
+            "session_quote_source_at_bar_close": "2026-07-15T13:39:59Z",
+        }
+        daily = build_live_daily_confirmation_rows(
+            [row],
+            generated_at=datetime(2026, 7, 15, 13, 40, 1, tzinfo=UTC),
+            live_quote_session_state={
+                "AAPL": {
+                    "symbol": "AAPL", "session_date": "2026-07-15",
+                    "source_event_at": "2026-07-15T13:40:01Z", "received_at": "2026-07-15T13:40:01Z",
+                    "open": "99", "high": "105", "low": "98", "close": "104", "volume": "350",
+                    "market_data_blocked_reason": "",
+                }
+            },
+            active_five_minute_event_ids={"aapl-boundary"},
+        )
+        self.assertEqual(len(daily), 1)
+        self.assertEqual(daily[0]["close"], "102.5")
+        self.assertEqual(daily[0]["daily_confirmation_snapshot"], "completed_five_minute_bar_boundary")
+
     def test_live_daily_confirmation_requires_a_fresh_symbol_bar_this_dispatch(self) -> None:
         rows = [
             {
@@ -1579,6 +1866,76 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 "sdk-5m|AAPL.US|2026-07-15T13:35:00Z",
                 "sdk-5m|AAPL.US|2026-07-15T13:40:00Z",
             ])
+
+    def test_midday_restart_default_context_keeps_the_opening_range(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "events.jsonl"
+            start = datetime(2026, 7, 15, 13, 35, tzinfo=UTC)
+            rows = []
+            for index in range(42):
+                event_time = start + timedelta(minutes=5 * index)
+                rows.append(
+                    {
+                        "event_id": f"sdk-5m|AAPL.US|{event_time.isoformat()}",
+                        "symbol": "AAPL",
+                        "timeframe": "5m",
+                        "bar_final": True,
+                        "source_mode": "longbridge_sdk_intraday_context",
+                        "event_time": event_time.isoformat(),
+                        "received_at": (event_time + timedelta(seconds=1)).isoformat(),
+                    }
+                )
+            path.write_text(
+                "\n".join(json.dumps(row) for row in rows) + "\n",
+                encoding="utf-8",
+            )
+
+            restored = load_current_sdk_intraday_context(
+                path,
+                datetime(2026, 7, 15, 13, 30, tzinfo=UTC),
+            )
+
+            self.assertEqual(len(restored), 42)
+            self.assertEqual(restored[0]["event_time"], start.isoformat())
+
+    def test_intraday_context_backfill_excludes_the_open_bar(self) -> None:
+        candles = [
+            SimpleNamespace(
+                timestamp=datetime(2026, 7, 15, 21, 30 + 5 * index),
+                open=Decimal("100"), high=Decimal("102"), low=Decimal("99"),
+                close=Decimal("101"), volume=100,
+            )
+            for index in range(3)
+        ]
+        rows = event_rows_to_intraday_context(
+            "AAPL.US",
+            candles,
+            datetime(2026, 7, 15, 13, 41, tzinfo=UTC),
+            bar_minutes=5,
+            session_started_at=datetime(2026, 7, 15, 13, 30, tzinfo=UTC),
+            expected_last_close=datetime(2026, 7, 15, 13, 40, tzinfo=UTC),
+        )
+        self.assertEqual([row["event_time"] for row in rows], [
+            "2026-07-15T13:35:00Z",
+            "2026-07-15T13:40:00Z",
+        ])
+        self.assertTrue(all(row["context_only"] for row in rows))
+
+    def test_intraday_context_gap_detection_requires_exact_contiguous_tail(self) -> None:
+        rows = [
+            {
+                "event_id": f"bar-{minute}", "symbol": "AAPL", "timeframe": "5m",
+                "bar_final": True, "event_time": f"2026-07-15T13:{minute:02d}:00Z",
+            }
+            for minute in (35, 40, 50)
+        ]
+        missing = symbols_missing_contiguous_intraday_context(
+            rows,
+            ["AAPL.US", "MSFT.US"],
+            expected_last_close=datetime(2026, 7, 15, 13, 50, tzinfo=UTC),
+            required_bars=3,
+        )
+        self.assertEqual(missing, ["AAPL", "MSFT"])
 
     def test_subscribe_uses_the_installed_sdk_two_argument_contract(self) -> None:
         class QuoteContext:

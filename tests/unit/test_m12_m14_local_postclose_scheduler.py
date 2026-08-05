@@ -163,6 +163,9 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         self.assertIn("m15_windows_hidden_keeper.heartbeat", script)
         self.assertIn("sleep 60", script)
         self.assertIn("Removing stale startup lock", script)
+        keeper_loop = script.rsplit('if [[ "$KEEP_ALIVE" == true ]]', 1)[1]
+        self.assertIn("ensure_supporting_daemons", keeper_loop)
+        self.assertNotIn("start_stack", keeper_loop)
         self.assertNotIn("run_m12_47_session_supervisor.py", script)
         self.assertNotIn("run_m12_37_intraday_auto_loop.py", script)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -161,6 +161,33 @@ def _qualified_upside_breakout(row: dict[str, Any], range_high: Decimal) -> bool
     )
 
 
+def _contiguous_five_minute_rows(rows: list[dict[str, Any]]) -> bool:
+    times = [bar_time(row) for row in rows]
+    return bool(
+        times
+        and all(value is not None for value in times)
+        and all(
+            current - previous == timedelta(minutes=5)
+            for previous, current in zip(times, times[1:])
+            if previous is not None and current is not None
+        )
+    )
+
+
+def _qualified_follow_through(
+    row: dict[str, Any],
+    *,
+    breakout: dict[str, Any],
+    breakout_level: Decimal,
+) -> bool:
+    close = d(row.get("close"))
+    return bool(
+        close > breakout_level
+        and close > d(breakout.get("close"))
+        and close > d(row.get("open"))
+    )
+
+
 def pa002_five_minute_long(
     symbol: str,
     rows: list[dict[str, Any]],
@@ -184,12 +211,22 @@ def pa002_five_minute_long(
         if range_high <= range_low or not _qualified_upside_breakout(breakout, range_high):
             continue
         follow = rows[breakout_index + 1:]
+        if not _contiguous_five_minute_rows(prior + [breakout] + follow):
+            continue
         if any(d(row.get("close")) <= range_high for row in follow):
             continue
-        # Only the first qualifying follow-through bar may confirm the setup.
-        if confirmation_lag == 2 and d(follow[0].get("close")) > range_high:
+        if confirmation_lag == 1 and not _qualified_follow_through(
+            follow[0], breakout=breakout, breakout_level=range_high
+        ):
             continue
-        if d(latest.get("close")) <= range_high:
+        if confirmation_lag == 2 and (
+            _qualified_follow_through(
+                follow[0], breakout=breakout, breakout_level=range_high
+            )
+            or not _qualified_follow_through(
+                follow[1], breakout=breakout, breakout_level=range_high
+            )
+        ):
             continue
         matched = breakout, range_high, range_low, confirmation_lag
         break
@@ -240,6 +277,13 @@ def pa012_five_minute_long(
     session = ny_session_rows(rows)
     if len(session) < 8:
         return None
+    first_close_at = bar_time(session[0])
+    if (
+        first_close_at is None
+        or first_close_at.astimezone(NEW_YORK).time().isoformat() != "09:35:00"
+        or not _contiguous_five_minute_rows(session)
+    ):
+        return None
     latest = session[-1]
     entry, entry_at, entry_source = next_bar_entry(latest)
     if entry <= ZERO:
@@ -260,14 +304,25 @@ def pa012_five_minute_long(
         follow = session[breakout_index + 1:]
         if any(d(row.get("close")) <= opening_high for row in follow):
             continue
-        if offset == 2 and d(follow[0].get("close")) > opening_high:
+        if offset == 1 and not _qualified_follow_through(
+            follow[0], breakout=breakout, breakout_level=opening_high
+        ):
+            continue
+        if offset == 2 and (
+            _qualified_follow_through(
+                follow[0], breakout=breakout, breakout_level=opening_high
+            )
+            or not _qualified_follow_through(
+                follow[1], breakout=breakout, breakout_level=opening_high
+            )
+        ):
             continue
         matched = breakout, offset
         break
     if matched is None:
         return None
     breakout, confirmation_lag = matched
-    stop = min(opening_low, d(breakout.get("low")))
+    stop = d(breakout.get("low"))
     target = entry + (opening_high - opening_low)
     if stop <= ZERO or stop >= entry or target <= entry:
         return None
@@ -289,6 +344,7 @@ def pa012_five_minute_long(
             "breakout_body_fraction": format(body_fraction(breakout), "f"),
             "breakout_close_position": format(close_position(breakout), "f"),
             "follow_through_bar_count": confirmation_lag,
+            "stop_model": "breakout_bar_structural_low",
             "target_model": "opening_range_height_measured_move",
             "forced_exit_time_ny": "15:55",
         },

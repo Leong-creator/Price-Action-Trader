@@ -103,16 +103,53 @@ class M15FullStrategyDetectorsTest(unittest.TestCase):
         ])
         self.assertIsNone(pa002_five_minute_long("TEST", rows))
 
+    def test_pa002_rejects_gapped_five_minute_context(self) -> None:
+        rows = [self.bar(index, high=100, low=90, close=95) for index in range(20)]
+        rows.append(self.bar(20, open_price=99, high=103, low=99, close=102.5))
+        rows.append(self.bar(22, open_price=102.5, high=104, low=101.5, close=103, next_quote=103.2))
+        self.assertIsNone(pa002_five_minute_long("TEST", rows))
+
+    def test_pa002_second_follow_bar_can_confirm_after_first_only_holds(self) -> None:
+        rows = [self.bar(index, high=100, low=90, close=95) for index in range(20)]
+        rows.append(self.bar(20, open_price=99, high=103, low=99, close=102.5))
+        rows.append(self.bar(21, open_price=102.4, high=102.6, low=101.5, close=102.2))
+        rows.append(self.bar(22, open_price=102.2, high=104, low=102, close=103, next_quote=103.2))
+        signal = pa002_five_minute_long("TEST", rows)
+        self.assertIsNotNone(signal)
+        assert signal is not None
+        self.assertEqual(signal["contract_evidence"]["follow_through_bar_count"], 2)
+
     def test_pa012_uses_six_bar_opening_range_and_measured_target(self) -> None:
-        rows = [self.bar(index, high=101, low=99, close=100) for index in range(6)]
-        rows.append(self.bar(6, open_price=100.5, high=103, low=100.5, close=102.5))
-        rows.append(self.bar(7, open_price=102.5, high=104, low=102, close=103, next_quote=103.1))
+        start = datetime(2026, 8, 3, 13, 35, tzinfo=UTC)
+        rows = [self.bar(index, high=101, low=99, close=100, start=start) for index in range(6)]
+        rows.append(self.bar(6, open_price=100.5, high=103, low=100.5, close=102.5, start=start))
+        rows.append(self.bar(7, open_price=102.5, high=104, low=102, close=103, start=start, next_quote=103.1))
         signal = pa012_five_minute_long("TEST", rows)
         self.assertIsNotNone(signal)
         assert signal is not None
-        self.assertEqual(signal["stop_price"], "99")
+        self.assertEqual(signal["stop_price"], "100.5")
         self.assertEqual(signal["target_price"], "105.1")
+        self.assertEqual(signal["contract_evidence"]["stop_model"], "breakout_bar_structural_low")
         self.assertEqual(signal["contract_evidence"]["forced_exit_time_ny"], "15:55")
+
+    def test_pa012_can_produce_contract_feasible_reward_r(self) -> None:
+        start = datetime(2026, 8, 3, 13, 35, tzinfo=UTC)
+        rows = [self.bar(index, high=100, low=90, close=95, start=start) for index in range(6)]
+        rows.append(self.bar(6, open_price=99, high=102, low=99, close=101.5, start=start))
+        rows.append(self.bar(7, open_price=101.5, high=103, low=101, close=102.5, start=start, next_quote=102.6))
+        signal = pa012_five_minute_long("TEST", rows)
+        self.assertIsNotNone(signal)
+        assert signal is not None
+        risk = float(signal["limit_price"]) - float(signal["stop_price"])
+        reward = float(signal["target_price"]) - float(signal["limit_price"])
+        self.assertGreaterEqual(reward / risk, 1.5)
+
+    def test_pa012_rejects_session_without_the_opening_bar(self) -> None:
+        start = datetime(2026, 8, 3, 13, 40, tzinfo=UTC)
+        rows = [self.bar(index, high=101, low=99, close=100, start=start) for index in range(6)]
+        rows.append(self.bar(6, open_price=100.5, high=103, low=100.5, close=102.5, start=start))
+        rows.append(self.bar(7, open_price=102.5, high=104, low=102, close=103, start=start, next_quote=103.1))
+        self.assertIsNone(pa012_five_minute_long("TEST", rows))
 
     def test_pa001_requires_h2_style_pullback_and_uses_two_r(self) -> None:
         closes = [100 + index for index in range(14)] + [112, 111, 112, 111, 112, 111, 112]

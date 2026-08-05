@@ -75,6 +75,8 @@ class SdkRuntimeConfig:
     subscription_deadline_seconds: int
     maximum_consecutive_subscription_failures: int
     snapshot_poll_interval_seconds: float
+    snapshot_poll_request_batch_size: int
+    snapshot_poll_request_interval_seconds: float
     subscription_failures_before_snapshot_fallback: int
     snapshot_poll_dispatch_max_elapsed_ms: int
     snapshot_poll_min_successful_cycles: int
@@ -160,6 +162,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
         snapshot_poll_interval_seconds=float(
             runtime.get("snapshot_poll_interval_seconds", 1)
+        ),
+        snapshot_poll_request_batch_size=int(
+            runtime.get("snapshot_poll_request_batch_size", 100)
+        ),
+        snapshot_poll_request_interval_seconds=float(
+            runtime.get("snapshot_poll_request_interval_seconds", 0.5)
         ),
         subscription_failures_before_snapshot_fallback=int(
             runtime.get("subscription_failures_before_snapshot_fallback", 1)
@@ -272,8 +280,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK stale entry order TTL must be positive")
     if config.exit_order_reprice_seconds <= 0:
         raise ValueError("M15 SDK exit order reprice interval must be positive")
-    if config.subscription_batch_size <= 0 or config.subscription_batch_size > 50:
-        raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
+    if config.subscription_batch_size <= 0 or config.subscription_batch_size > 500:
+        raise ValueError("M15 SDK subscription batch size must be between 1 and 500")
     if not 0 <= config.subscription_request_interval_seconds <= 5:
         raise ValueError("M15 SDK subscription request interval must be between 0 and 5 seconds")
     if not 0 <= config.subscription_retry_backoff_seconds <= 10:
@@ -286,6 +294,14 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
     if not 0.5 <= config.snapshot_poll_interval_seconds <= 5:
         raise ValueError("M15 SDK snapshot poll interval must be between 0.5 and 5 seconds")
+    if not 1 <= config.snapshot_poll_request_batch_size <= 500:
+        raise ValueError(
+            "M15 SDK snapshot poll request batch size must be between 1 and 500"
+        )
+    if not 0 <= config.snapshot_poll_request_interval_seconds <= 1:
+        raise ValueError(
+            "M15 SDK snapshot poll request interval must be between 0 and 1 second"
+        )
     if (
         config.subscription_failures_before_snapshot_fallback <= 0
         or config.subscription_failures_before_snapshot_fallback
@@ -636,6 +652,7 @@ class FiveMinuteBarBuilder:
         self._quote_total_volume: dict[str, int] = {}
         self._quote_last_source_at: dict[str, datetime] = {}
         self._snapshot_total_volume: dict[str, int] = {}
+        self._session_quote_state: dict[str, dict[str, Any]] = {}
 
     @property
     def open_bar_count(self) -> int:
@@ -646,13 +663,15 @@ class FiveMinuteBarBuilder:
         price = decimal(payload.get("last_done"))
         if price <= Decimal("0"):
             return []
+        completed = self.flush(received_at)
         normalized_symbol = symbol.upper()
         volume, blocked_reason = self._quote_volume_delta(
             normalized_symbol,
             payload,
             source_at=source_at,
         )
-        return self._append(
+        self._update_session_quote_state(normalized_symbol, payload, source_at=source_at)
+        completed.extend(self._append(
             symbol,
             source_at,
             received_at,
@@ -660,7 +679,8 @@ class FiveMinuteBarBuilder:
             volume,
             source_mode="longbridge_sdk_push",
             blocked_reason=blocked_reason,
-        )
+        ))
+        return completed
 
     def on_snapshot(
         self,
@@ -674,6 +694,7 @@ class FiveMinuteBarBuilder:
         price = decimal(payload.get("last_done"))
         if price <= Decimal("0"):
             return []
+        completed = self.flush(received_at)
         normalized_symbol = symbol.upper()
         total_volume = max(0, int_like(payload.get("volume")))
         previous_total = self._snapshot_total_volume.get(normalized_symbol)
@@ -683,7 +704,8 @@ class FiveMinuteBarBuilder:
             if previous_total is not None
             else 0
         )
-        return self._append(
+        self._update_session_quote_state(normalized_symbol, payload, source_at=source_at)
+        completed.extend(self._append(
             symbol,
             source_at,
             received_at,
@@ -691,7 +713,8 @@ class FiveMinuteBarBuilder:
             volume_delta,
             source_mode="longbridge_sdk_snapshot_poll",
             bar_at=received_at,
-        )
+        ))
+        return completed
 
     def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
@@ -765,7 +788,7 @@ class FiveMinuteBarBuilder:
         # closed. The last quote timestamp is source evidence, not delivery.
         received_at = emitted_at.astimezone(UTC)
         event_id = f"sdk-5m|{bar['symbol']}|{to_iso(bar['bar_close_at'].astimezone(UTC))}"
-        return {
+        result = {
             "schema_version": "m15.realtime-market-event.v2",
             "event_id": event_id,
             "symbol": bar["symbol"].replace(".US", ""),
@@ -782,6 +805,44 @@ class FiveMinuteBarBuilder:
             "close": fmt(bar["close"]), "volume": str(bar["volume"]),
             "market_data_blocked_reason": ",".join(sorted(bar.get("market_data_blocked_reasons") or ())),
             "local_simulation_ignored": True,
+        }
+        session_state = self._session_quote_state.get(str(bar["symbol"]).upper()) or {}
+        if session_state:
+            result.update(
+                {
+                    "session_open_at_bar_close": str(session_state.get("open") or ""),
+                    "session_high_at_bar_close": str(session_state.get("high") or ""),
+                    "session_low_at_bar_close": str(session_state.get("low") or ""),
+                    "session_close_at_bar_close": str(session_state.get("close") or ""),
+                    "session_volume_at_bar_close": str(session_state.get("volume") or "0"),
+                    "session_quote_source_at_bar_close": str(session_state.get("source_event_at") or ""),
+                }
+            )
+        return result
+
+    def _update_session_quote_state(
+        self,
+        symbol: str,
+        payload: dict[str, Any],
+        *,
+        source_at: datetime,
+    ) -> None:
+        close = decimal(payload.get("last_done") or payload.get("close"))
+        open_price = decimal(payload.get("open"))
+        high = decimal(payload.get("high"))
+        low = decimal(payload.get("low"))
+        volume = max(0, int_like(payload.get("volume")))
+        if min(open_price, high, low, close) <= Decimal("0"):
+            return
+        if not (low <= open_price <= high and low <= close <= high):
+            return
+        self._session_quote_state[symbol] = {
+            "open": fmt(open_price),
+            "high": fmt(high),
+            "low": fmt(low),
+            "close": fmt(close),
+            "volume": str(volume),
+            "source_event_at": to_iso(source_at),
         }
 
     def _quote_volume_delta(
@@ -855,7 +916,7 @@ def load_current_sdk_intraday_context(
     path: Path,
     session_started_at: datetime,
     *,
-    bars_per_symbol: int = 20,
+    bars_per_symbol: int = 78,
 ) -> list[dict[str, Any]]:
     """Restore a bounded same-session SDK bar history after a runtime restart.
 
@@ -880,7 +941,11 @@ def load_current_sdk_intraday_context(
             continue
         if (
             str(row.get("source_mode") or "")
-            not in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
+            not in {
+                "longbridge_sdk_push",
+                "longbridge_sdk_snapshot_poll",
+                "longbridge_sdk_intraday_context",
+            }
             or str(row.get("timeframe") or "") != "5m"
             or not bool(row.get("bar_final"))
             or str(row.get("market_data_blocked_reason") or "")
@@ -895,6 +960,43 @@ def load_current_sdk_intraday_context(
         rows.sort(key=lambda row: str(row.get("event_time") or row.get("received_at") or ""))
         restored.extend(rows[-bars_per_symbol:])
     return sorted(restored, key=lambda row: (str(row.get("event_time") or ""), str(row.get("symbol") or "")))
+
+
+def symbols_missing_contiguous_intraday_context(
+    rows: list[dict[str, Any]],
+    symbols: tuple[str, ...] | list[str],
+    *,
+    expected_last_close: datetime,
+    required_bars: int,
+) -> list[str]:
+    if required_bars <= 0:
+        return []
+    expected_last = expected_last_close.astimezone(UTC).replace(second=0, microsecond=0)
+    expected_times = {
+        expected_last - timedelta(minutes=5 * offset)
+        for offset in range(required_bars)
+    }
+    observed: dict[str, set[datetime]] = {}
+    for row in rows:
+        if str(row.get("timeframe") or "") != "5m" or row.get("bar_final") is not True:
+            continue
+        symbol = str(row.get("symbol") or "").upper()
+        if not symbol:
+            continue
+        try:
+            event_time = datetime.fromisoformat(
+                str(row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(UTC).replace(second=0, microsecond=0)
+        except ValueError:
+            continue
+        observed.setdefault(symbol, set()).add(event_time)
+    return [
+        symbol
+        for raw_symbol in symbols
+        if not expected_times.issubset(
+            observed.get((symbol := str(raw_symbol).upper().replace(".US", "")), set())
+        )
+    ]
 
 
 def fresh_market_events(

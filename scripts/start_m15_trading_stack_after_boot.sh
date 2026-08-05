@@ -72,6 +72,23 @@ start_stack() {
   return "$failed"
 }
 
+ensure_supporting_daemons() {
+  local failed=0
+  # The background watchdog is the single owner of SDK runtime recovery.
+  # The hidden boot keeper only restores the watchdog and post-close scheduler;
+  # otherwise two independent loops can replace a healthy context restore.
+  run_step "ensure M15 background watchdog" \
+    "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
+    --daemon \
+    --config config/examples/m15_background_watchdog.contract_v1.json || failed=1
+
+  run_step "ensure local postclose scheduler" \
+    "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
+    --daemon \
+    --config config/examples/m12_m14_local_postclose_scheduler.json || failed=1
+  return "$failed"
+}
+
 if ! start_stack; then
   if [[ "$KEEP_ALIVE" == false ]]; then
     exit 1
@@ -102,9 +119,9 @@ if [[ "$KEEP_ALIVE" == true ]]; then
   while true; do
     date -u +%Y-%m-%dT%H:%M:%SZ >"$HEARTBEAT_FILE"
     sleep 60
-    # Each daemon entrypoint is idempotent. Running it again only repairs a
-    # dead process or a configuration drift; it never creates an order itself.
-    if ! start_stack; then
+    # Runtime recovery has one owner: the watchdog. The boot keeper only makes
+    # sure that owner and the independent post-close scheduler stay alive.
+    if ! ensure_supporting_daemons; then
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stack repair attempt failed; retry in 60 seconds."
     fi
   done

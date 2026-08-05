@@ -13,8 +13,11 @@ from scripts.m15_longbridge_realtime_signal_router_lib import (
     LEDGER_JSONL,
     SUMMARY_JSON,
     PRICE_ACTION_RUNTIME_SPECS,
+    STRATEGY_DIAGNOSTICS_JSON,
     breakout_followthrough_repair_signal,
     load_config,
+    long_no_candidate_reason,
+    realtime_relevant_market_events,
     run_realtime_signal_router,
 )
 
@@ -59,8 +62,83 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertTrue(payload["local_simulation_isolated"])
             self.assertEqual(payload["inputs"]["local_simulation_ledger"], "")
             self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(
+                payload["strategy_signal_diagnostics"]["runtime_count"],
+                len(config.allowed_runtime_ids),
+            )
+            self.assertTrue((config.output_dir / STRATEGY_DIAGNOSTICS_JSON).exists())
+            diagnostics = json.loads(
+                (config.output_dir / STRATEGY_DIAGNOSTICS_JSON).read_text(encoding="utf-8")
+            )
+            self.assertTrue(diagnostics["strategy_contract_signature"])
+            self.assertTrue(
+                all(
+                    "strategy_contract_hash" in row
+                    for row in diagnostics["runtime_summaries"]
+                )
+            )
             summary_text = (config.output_dir / SUMMARY_JSON).read_text(encoding="utf-8")
             self.assertNotIn("m12_46_account_trade_ledger", summary_text)
+
+    def test_pa012_diagnostics_distinguish_missing_opening_range_after_restart(self) -> None:
+        rows = [
+            {
+                "event_time": f"2026-07-15T{hour:02d}:{minute:02d}:00Z",
+                "next_bar_first_quote_at": "2026-07-15T16:05:01Z",
+            }
+            for hour, minute in ((16, 0), (16, 5), (16, 10), (16, 15), (16, 20), (16, 25), (16, 30), (16, 35))
+        ]
+        self.assertEqual(
+            long_no_candidate_reason("M10-PA-012-5m", rows),
+            "missing_opening_range_context_after_restart",
+        )
+
+    def test_realtime_context_keeps_enough_daily_history_for_pa001(self) -> None:
+        rows = [
+            {
+                "event_id": f"daily-{index}",
+                "symbol": "AAPL",
+                "timeframe": "1d",
+                "event_time": f"2026-06-{index + 1:02d}T20:00:00Z",
+                "received_at": (
+                    "2026-07-15T13:30:01Z"
+                    if index == 29
+                    else f"2026-06-{index + 1:02d}T20:00:01Z"
+                ),
+            }
+            for index in range(30)
+        ]
+
+        relevant = realtime_relevant_market_events(
+            rows,
+            "2026-07-15T13:30:00Z",
+        )
+
+        self.assertEqual(len(relevant), 30)
+
+    def test_realtime_context_keeps_opening_range_during_midday_restart(self) -> None:
+        rows = [
+            {
+                "event_id": f"five-minute-{index}",
+                "symbol": "AAPL",
+                "timeframe": "5m",
+                "event_time": f"2026-07-15T{13 + ((35 + index * 5) // 60):02d}:{(35 + index * 5) % 60:02d}:00Z",
+                "received_at": (
+                    "2026-07-15T17:00:01Z"
+                    if index == 41
+                    else f"2026-07-15T{13 + ((35 + index * 5) // 60):02d}:{(35 + index * 5) % 60:02d}:01Z"
+                ),
+            }
+            for index in range(42)
+        ]
+
+        relevant = realtime_relevant_market_events(
+            rows,
+            "2026-07-15T17:00:00Z",
+        )
+
+        self.assertEqual(len(relevant), 42)
+        self.assertEqual(relevant[0]["event_time"], "2026-07-15T13:35:00Z")
 
     def test_embedded_intent_emits_complete_realtime_signal_event(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
