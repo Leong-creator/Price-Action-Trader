@@ -99,6 +99,9 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertEqual(payload["readiness_status"], "armed_waiting_flatten_session")
             self.assertTrue(payload["paper_order_submission_enabled"])
             self.assertFalse(payload["new_position_submission_enabled"])
+            self.assertEqual(payload["actual_runtime_ids_seen"], [])
+            self.assertEqual(payload["recent_execution_inputs"], [])
+            self.assertEqual(payload["execution_runtime_identity"], {})
             checks = {row["check"]: row for row in payload["checks"]}
             self.assertEqual(checks["formal_test_flatten_transition"]["status"], "waiting")
 

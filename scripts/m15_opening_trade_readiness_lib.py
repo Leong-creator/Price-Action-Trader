@@ -179,9 +179,10 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     except (TypeError, ValueError):
         m12_pid = 0
     m12_alive = m12_reported_alive and (not m12_pid or process_alive(m12_pid))
-    execution_config_linked = config.execution_config_path.resolve() == (
+    linked_execution_config_path = (
         sdk_config.execution_config_path if sdk_config is not None else realtime_config.execution_config_path
-    ).resolve()
+    )
+    execution_config_linked = config.execution_config_path.resolve() == linked_execution_config_path.resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     runtime_dispatch_enabled = bool(realtime_status.get("dispatch_enabled", False))
     formal_transition = realtime_status.get("formal_test_transition", {})
@@ -270,6 +271,16 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
                 if isinstance(row, dict) and str(row.get("runtime_id") or "")
             }
         )
+    execution_runtime_identity = (
+        execution_summary.get("runtime_identity", {}) if isinstance(execution_summary, dict) else {}
+    )
+    if pending_formal_flatten:
+        # A pending flatten belongs to the new epoch, while the latest execution
+        # summary can still describe the archived epoch. Do not present it as
+        # current contract-v1 activity.
+        actual_runtime_ids = []
+        recent_execution_inputs = []
+        execution_runtime_identity = {}
     checks = [
         informational_check_row(
             "m12_47_daemon_alive",
@@ -314,7 +325,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "paper_enabled_config_linked",
             "实时运行层使用模拟订单启用版执行配置",
             "pass" if execution_config_linked else "fail",
-            actual=project_path(realtime_config.execution_config_path),
+            actual=project_path(linked_execution_config_path),
         ),
         check_row(
             "order_safety_boundaries",
@@ -410,7 +421,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "m15_realtime_status_generated_at": realtime_status_generated_at,
         "m15_realtime_status_age_seconds": realtime_status_age_seconds,
         "paper_account_verified": paper_account_ready,
-        "execution_runtime_identity": execution_summary.get("runtime_identity", {}) if isinstance(execution_summary, dict) else {},
+        "execution_runtime_identity": execution_runtime_identity,
         "actual_runtime_ids_seen": actual_runtime_ids,
         "recent_execution_inputs": recent_execution_inputs,
         "pass_count": pass_count,
