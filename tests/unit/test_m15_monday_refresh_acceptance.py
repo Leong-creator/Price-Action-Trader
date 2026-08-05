@@ -69,6 +69,46 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_flatten")
             self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_flatten")
 
+    def test_flatten_complete_waiting_activation_is_safe_waiting_not_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime.update(
+                {
+                    "dispatch_enabled": False,
+                    "formal_test_transition": {
+                        "activation_blocker": "waiting_for_configured_activation_time"
+                    },
+                    "sdk_auto_flatten": {
+                        "confirmation": {
+                            "complete": True,
+                            "remaining_position_count": 0,
+                            "open_order_count": 0,
+                            "pending_confirmation_count": 0,
+                        }
+                    },
+                }
+            )
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness["readiness_status"] = "ready_for_paper_exit_only"
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            formal = json.loads(config.formal_epoch_path.read_text(encoding="utf-8"))
+            formal.update({"status": "pending_flatten", "blocks_new_entries": True})
+            config.formal_epoch_path.write_text(json.dumps(formal), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-05T14:35:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "armed_waiting_activation_window")
+            self.assertEqual(payload["fail_count"], 0)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_activation")
+            self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_activation")
+            self.assertEqual(checks["opening_readiness"]["status"], "waiting_for_activation")
+
     def test_watchdog_previous_result_does_not_create_acceptance_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=True)

@@ -270,3 +270,31 @@ def runtime_flatten_order_payload(intent: dict[str, Any], *, test_epoch_id: str)
         "market_exit_no_reprice": True,
         "exit_only_position_signal": True,
     }
+
+
+def runtime_flatten_retry_order_payload(
+    intent: dict[str, Any],
+    *,
+    test_epoch_id: str,
+    retry_index: int,
+) -> dict[str, Any]:
+    if retry_index < 1:
+        raise ValueError("flatten retry_index must be positive")
+    payload = runtime_flatten_order_payload(intent, test_epoch_id=test_epoch_id)
+    symbol = str(payload.get("symbol") or "").upper()
+    side = str(payload.get("side") or "").lower()
+    action = str(payload.get("position_action") or "")
+    signal_id = f"{payload['signal_id']}|broker-terminal-retry-{retry_index}"
+    return {
+        **payload,
+        "signal_id": signal_id,
+        "client_request_id": stable_client_request_id(
+            signal_id=signal_id,
+            runtime_id="M15-LONGBRIDGE-SDK-AUTO-FLATTEN",
+            symbol=symbol,
+            side=side,
+            position_action=action,
+            test_epoch_id=test_epoch_id,
+        ),
+        "broker_terminal_retry_index": retry_index,
+    }

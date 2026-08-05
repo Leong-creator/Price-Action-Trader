@@ -58,6 +58,7 @@ from scripts.m15_sdk_validation_flatten_lib import (
     in_regular_session,
     latest_flatten_prices,
     runtime_flatten_order_payload,
+    runtime_flatten_retry_order_payload,
 )
 
 NEW_YORK = ZoneInfo("America/New_York")
@@ -1107,6 +1108,13 @@ def run_pending_flatten_cycle(
         write_json_atomic(config.formal_test_epoch_state_path, state)
         return state
 
+    broker_orders_by_id = {
+        str(row.get("order_id") or row.get("id") or ""): row
+        for key in ("orders", "historical_orders")
+        for row in (snapshot.get(key) or [])
+        if isinstance(row, dict) and str(row.get("order_id") or row.get("id") or "")
+    }
+
     plan, blockers = build_flatten_plan(
         snapshot,
         latest_flatten_prices(market_events, now=now),
@@ -1122,6 +1130,90 @@ def run_pending_flatten_cycle(
         payload = runtime_flatten_order_payload(intent, test_epoch_id=epoch_id)
         request_id = str(payload["client_request_id"])
         if request_id in submissions:
+            original_attempt = submissions[request_id]
+            if not isinstance(original_attempt, dict):
+                continue
+            original_order_id = str(original_attempt.get("order_id") or "")
+            broker_order = broker_orders_by_id.get(original_order_id, {})
+            broker_status = str(broker_order.get("status") or "").strip().lower()
+            if "." in broker_status:
+                broker_status = broker_status.rsplit(".", 1)[-1]
+            broker_symbol = str(broker_order.get("symbol") or "").upper()
+            if broker_symbol and "." not in broker_symbol:
+                broker_symbol = f"{broker_symbol}.US"
+            executed_quantity: Decimal | None
+            try:
+                executed_quantity = Decimal(
+                    str(
+                        broker_order.get(
+                            "executed_quantity",
+                            broker_order.get("filled_quantity", broker_order.get("filled_qty")),
+                        )
+                    )
+                )
+            except (ArithmeticError, TypeError, ValueError):
+                executed_quantity = None
+            retry_allowed = (
+                original_order_id
+                and broker_status in {"canceled", "cancelled", "expired"}
+                and executed_quantity == Decimal("0")
+                and broker_symbol == str(payload.get("symbol") or "").upper()
+                and not original_attempt.get("broker_terminal_retry_request_id")
+            )
+            if not retry_allowed:
+                continue
+            retry_payload = runtime_flatten_retry_order_payload(
+                intent,
+                test_epoch_id=epoch_id,
+                retry_index=1,
+            )
+            retry_request_id = str(retry_payload["client_request_id"])
+            original_attempt.update(
+                {
+                    "broker_terminal_status": broker_status,
+                    "broker_terminal_order_id": original_order_id,
+                    "broker_terminal_retry_request_id": retry_request_id,
+                    "broker_terminal_retry_started_at": to_iso(now),
+                }
+            )
+            retry_attempt = {
+                "status": "market_submission_started",
+                "started_at": to_iso(now),
+                "symbol": retry_payload["symbol"],
+                "side": retry_payload["side"],
+                "quantity": retry_payload["quantity"],
+                "signal_id": retry_payload["signal_id"],
+                "client_request_id": retry_request_id,
+                "fallback_attempted": False,
+                "broker_terminal_retry_index": 1,
+                "retried_from_order_id": original_order_id,
+            }
+            submissions[retry_request_id] = retry_attempt
+            write_json_atomic(config.formal_test_epoch_state_path, state)
+            try:
+                retry_response = flatten_client.submit_order(retry_payload)
+            except Exception as exc:
+                retry_attempt.update(
+                    {
+                        "status": "submission_state_unknown",
+                        "error": f"{type(exc).__name__}:{exc}"[:500],
+                    }
+                )
+                state["status"] = "submission_state_unknown_waiting_reconciliation"
+                write_json_atomic(config.formal_test_epoch_state_path, state)
+                return state
+            retry_order_id = str(retry_response.get("order_id") or "")
+            retry_attempt.update(
+                {
+                    "status": str(retry_response.get("status") or "market_submission_unknown"),
+                    "order_id": retry_order_id,
+                    "primary_response": retry_response,
+                }
+            )
+            submitted_now += 1
+            if not retry_order_id:
+                retry_attempt["status"] = "submission_state_unknown"
+            write_json_atomic(config.formal_test_epoch_state_path, state)
             continue
         attempt = {
             "status": "market_submission_started",

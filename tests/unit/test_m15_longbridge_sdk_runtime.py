@@ -680,6 +680,133 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["submitted_this_cycle"], 0)
         self.assertEqual(len(state["submissions"]), 1)
 
+    def test_pending_flatten_retries_once_after_broker_confirms_cancel(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
+            first = run_pending_flatten_cycle(config, account, client, [], now=now)
+            original_order_id = next(iter(first["submissions"].values()))["order_id"]
+            snapshot["orders"] = [
+                {
+                    "order_id": original_order_id,
+                    "symbol": "AAPL.US",
+                    "side": "Sell",
+                    "status": "OrderStatus.Canceled",
+                    "executed_quantity": "0",
+                }
+            ]
+            snapshot["generated_at"] = "2026-07-16T14:00:45Z"
+            second = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=now + timedelta(seconds=45),
+            )
+            snapshot["generated_at"] = "2026-07-16T14:01:00Z"
+            third = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=now + timedelta(seconds=60),
+            )
+
+        self.assertEqual(len(client.submissions), 2)
+        self.assertNotEqual(
+            client.submissions[0]["client_request_id"],
+            client.submissions[1]["client_request_id"],
+        )
+        self.assertEqual(client.submissions[1]["broker_terminal_retry_index"], 1)
+        self.assertEqual(second["submitted_this_cycle"], 1)
+        self.assertEqual(third["submitted_this_cycle"], 0)
+        self.assertEqual(len(third["submissions"]), 2)
+
+    def test_pending_flatten_retries_once_after_broker_confirms_expired_zero_fill(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
+            first = run_pending_flatten_cycle(config, account, client, [], now=now)
+            original_order_id = next(iter(first["submissions"].values()))["order_id"]
+            snapshot["historical_orders"] = [
+                {
+                    "order_id": original_order_id,
+                    "symbol": "AAPL.US",
+                    "side": "Sell",
+                    "status": "OrderStatus.Expired",
+                    "executed_quantity": "0",
+                }
+            ]
+            snapshot["generated_at"] = "2026-07-16T14:00:45Z"
+
+            state = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=now + timedelta(seconds=45),
+            )
+
+        self.assertEqual(len(client.submissions), 2)
+        self.assertEqual(client.submissions[1]["broker_terminal_retry_index"], 1)
+        self.assertEqual(state["submitted_this_cycle"], 1)
+
+    def test_pending_flatten_does_not_retry_unknown_or_open_order_state(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
+            first = run_pending_flatten_cycle(config, account, client, [], now=now)
+            original_order_id = next(iter(first["submissions"].values()))["order_id"]
+            snapshot["orders"] = [
+                {
+                    "order_id": original_order_id,
+                    "symbol": "AAPL.US",
+                    "side": "Sell",
+                    "status": "OrderStatus.Submitted",
+                    "executed_quantity": "0",
+                }
+            ]
+            snapshot["open_orders"] = list(snapshot["orders"])
+            snapshot["generated_at"] = "2026-07-16T14:00:45Z"
+            state = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=now + timedelta(seconds=45),
+            )
+
+        self.assertEqual(len(client.submissions), 1)
+        self.assertEqual(state["status"], "waiting_for_open_orders_and_pending_confirmations")
+
+    def test_pending_flatten_does_not_retry_partially_filled_canceled_order(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
+            first = run_pending_flatten_cycle(config, account, client, [], now=now)
+            original_order_id = next(iter(first["submissions"].values()))["order_id"]
+            snapshot["positions"][0].update({"quantity": "1", "available": "1"})
+            snapshot["orders"] = [
+                {
+                    "order_id": original_order_id,
+                    "symbol": "AAPL.US",
+                    "side": "Sell",
+                    "status": "OrderStatus.Canceled",
+                    "executed_quantity": "1",
+                }
+            ]
+            snapshot["generated_at"] = "2026-07-16T14:00:45Z"
+            state = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=now + timedelta(seconds=45),
+            )
+
+        self.assertEqual(len(client.submissions), 1)
+        self.assertEqual(state["status"], "flatten_attempts_exhausted_waiting_reconciliation")
+
     def test_pending_flatten_uses_one_fallback_only_for_fresh_explicit_reject(self) -> None:
         with TemporaryDirectory() as directory:
             config, _snapshot, account, _client = self.pending_flatten_fixture(Path(directory))

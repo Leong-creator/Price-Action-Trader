@@ -109,9 +109,34 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     runtime_alive = str(runtime.get("status") or "") == "running" and process_alive(runtime.get("runtime_pid"))
     formal_active = str(formal_epoch.get("status") or "") == "active"
     readiness_status = str(readiness.get("readiness_status") or "")
-    pending_flatten = (
+    transition_pending = (
         str(formal_epoch.get("status") or "") == "pending_flatten"
         and formal_epoch.get("blocks_new_entries") is True
+    )
+    runtime_transition = (
+        runtime.get("formal_test_transition")
+        if isinstance(runtime.get("formal_test_transition"), dict)
+        else {}
+    )
+    flatten_confirmation = (
+        runtime.get("sdk_auto_flatten", {}).get("confirmation", {})
+        if isinstance(runtime.get("sdk_auto_flatten"), dict)
+        and isinstance(runtime.get("sdk_auto_flatten", {}).get("confirmation"), dict)
+        else {}
+    )
+    waiting_activation = (
+        transition_pending
+        and flatten_confirmation.get("complete") is True
+        and int(flatten_confirmation.get("remaining_position_count") or 0) == 0
+        and int(flatten_confirmation.get("open_order_count") or 0) == 0
+        and int(flatten_confirmation.get("pending_confirmation_count") or 0) == 0
+        and str(runtime_transition.get("activation_blocker") or "")
+        == "waiting_for_configured_activation_time"
+        and readiness_status == "ready_for_paper_exit_only"
+    )
+    pending_flatten = (
+        transition_pending
+        and not waiting_activation
         and readiness_status == "armed_waiting_flatten_session"
     )
     formal_consistent = (
@@ -163,15 +188,17 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "paper_dispatch_armed",
             "模拟账户下单通道已武装",
             runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True,
-            pending_flatten and runtime.get("dispatch_requested") is True,
+            (pending_flatten or waiting_activation) and runtime.get("dispatch_requested") is True,
             f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}",
+            "waiting_for_activation" if waiting_activation else "waiting_for_flatten",
         ),
         transition_check_row(
             "formal_epoch_active",
             "正式测试编号已激活且一致",
             formal_consistent,
-            pending_flatten,
+            pending_flatten or waiting_activation,
             str(formal_epoch.get("test_epoch_id") or "missing"),
+            "waiting_for_activation" if waiting_activation else "waiting_for_flatten",
         ),
         transition_check_row(
             "opening_readiness",
@@ -183,8 +210,9 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
                 "ready_for_regular_session",
                 "ready_for_longbridge_paper_orders",
             },
-            pending_flatten and int(readiness.get("fail_count") or 0) == 0,
+            (pending_flatten or waiting_activation) and int(readiness.get("fail_count") or 0) == 0,
             readiness_status or "missing",
+            "waiting_for_activation" if waiting_activation else "waiting_for_flatten",
         ),
         check_row("dashboard_sdk_source", "长桥看板只使用 SDK 和长桥账户事实源", dashboard.get("source_of_truth") == "longbridge_sdk_paper_account" and dashboard.get("data_status") in {"trustworthy", "trading_ready_statistics_stale"}, f"source={dashboard.get('source_of_truth')}, status={dashboard.get('data_status')}"),
         check_row("paper_only_boundaries", "不接实盘、真实资金或本地模拟信号", paper_only, str(boundaries)),
@@ -200,6 +228,8 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     pass_count = sum(1 for row in checks if row["status"] == "pass")
     if fail_count:
         status = "blocked_monday_acceptance"
+    elif waiting_activation:
+        status = "armed_waiting_activation_window"
     elif pending_flatten:
         status = "armed_waiting_flatten_session"
     elif session_should_run:
@@ -247,8 +277,9 @@ def transition_check_row(
     passed: bool,
     waiting: bool,
     actual: str,
+    waiting_status: str = "waiting_for_flatten",
 ) -> dict[str, Any]:
-    status = "pass" if passed else "waiting_for_flatten" if waiting else "fail"
+    status = "pass" if passed else waiting_status if waiting else "fail"
     return {"check": check, "required_result": required_result, "status": status, "actual": actual}
 
 
@@ -259,6 +290,8 @@ def plain_result(status: str, fail_count: int) -> str:
         return "M15 SDK 模拟交易链路已武装；当前只是在等待美股常规交易时段。"
     if status == "armed_waiting_flatten_session":
         return "M15 SDK 清仓链路已武装；清仓确认完成前保持停止新开仓。"
+    if status == "armed_waiting_activation_window":
+        return "M15 SDK 旧持仓已清空；当前按计划等待正式测试激活时间，期间保持停止新开仓。"
     return f"M15 SDK 周一验收被阻断：{fail_count} 个检查失败。"
 
 
