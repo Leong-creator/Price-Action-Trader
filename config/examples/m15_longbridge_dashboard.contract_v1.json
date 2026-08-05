@@ -1,0 +1,26 @@
+{
+  "health": {
+    "maximum_account_age_seconds": 45,
+    "maximum_runtime_age_seconds": 10,
+    "maximum_statistics_age_seconds": 300
+  },
+  "inputs": {
+    "account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
+    "account_state_summary": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state_summary.json",
+    "epoch_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
+    "execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl",
+    "execution_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution.json",
+    "fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json",
+    "formal_epoch_marker": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
+    "local_runtime_registry": "config/examples/m13_strategy_runtime_registry.json",
+    "order_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_order_reconciliation.json",
+    "pnl_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json",
+    "sdk_runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json",
+    "short_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_short_signal_diagnostics.json"
+  },
+  "outputs": {
+    "html": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_dashboard.html",
+    "json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_dashboard_data.json"
+  }
+}

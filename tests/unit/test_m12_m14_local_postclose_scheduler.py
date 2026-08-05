@@ -98,6 +98,8 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         script = Path("scripts/start_m15_trading_stack_after_boot.sh").read_text(encoding="utf-8")
 
         self.assertIn("run_m12_m14_local_postclose_scheduler.py", script)
+        self.assertIn("m15_longbridge_sdk_runtime.contract_v1.json", script)
+        self.assertIn("m15_background_watchdog.contract_v1.json", script)
         self.assertIn('if [[ "${1:-}" == "--keep-alive" ]]', script)
         self.assertIn("m15_windows_hidden_keeper.heartbeat", script)
         self.assertIn("sleep 60", script)

@@ -220,6 +220,14 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
     watchdog["inputs"]["readiness_config"] = (
         "config/examples/m15_opening_trade_readiness.paper_contract_v1.json"
     )
+    watchdog["inputs"]["m15_dashboard_config"] = (
+        "config/examples/m15_longbridge_dashboard.contract_v1.json"
+    )
+
+    dashboard = read_json(ROOT / "config/examples/m15_longbridge_dashboard.json")
+    dashboard["inputs"]["execution_config"] = (
+        "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json"
+    )
 
     return {
         ROOT / "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json": router,
@@ -228,6 +236,7 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
         ROOT / "config/examples/m15_longbridge_sdk_runtime.contract_v1.json": runtime,
         ROOT / "config/examples/m15_opening_trade_readiness.paper_contract_v1.json": readiness,
         ROOT / "config/examples/m15_background_watchdog.contract_v1.json": watchdog,
+        ROOT / "config/examples/m15_longbridge_dashboard.contract_v1.json": dashboard,
     }
 
 
