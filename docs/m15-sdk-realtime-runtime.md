@@ -4,7 +4,7 @@
 
 M15 的长桥模拟账户实时链路需要由长桥 SDK 的行情推送驱动：实时行情或成交推送 -> 五分钟 K 线完成 -> 实时信号 -> 快速风控 -> 长桥模拟订单请求。它不读取本地模拟账本，也不使用旧快速队列作为下单来源。
 
-SDK 行情运行层的入口是 `scripts/run_m15_longbridge_sdk_runtime.py`，配置为 `config/examples/m15_longbridge_sdk_runtime.json`。它将最终 K 线写入现有 `m15_realtime_market_events.jsonl` 契约，因此路由、执行、看板与审计产物不需要改变字段协议。
+SDK 行情运行层的入口是 `scripts/run_m15_longbridge_sdk_runtime.py`。当前合同 v1 正式运行配置为 `config/examples/m15_longbridge_sdk_runtime.contract_v1.json`，配套开盘验收和后台看护必须分别使用 `config/examples/m15_opening_trade_readiness.paper_contract_v1.json` 与 `config/examples/m15_background_watchdog.contract_v1.json`；旧配置只用于旧基线兼容，不得用于判断合同版进程是否漂移。运行层将最终 K 线写入现有 `m15_realtime_market_events.jsonl` 契约，因此路由、执行、看板与审计产物不需要改变字段协议。
 
 ## 运行边界
 

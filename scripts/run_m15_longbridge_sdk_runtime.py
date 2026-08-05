@@ -974,22 +974,48 @@ def run_pending_flatten_cycle(
     marker = load_formal_test_marker(config)
     marker_status = str(marker.get("status") or "")
     if marker_status == "active":
-        state = read_json_object(config.formal_test_epoch_state_path)
-        canonical = {
-            "test_epoch_id": str(marker.get("test_epoch_id") or ""),
-            "short_test_epoch_id": str(marker.get("short_test_epoch_id") or ""),
-            "status": "active",
-            "test_started_at": str(marker.get("test_started_at") or ""),
-            "activated_at": str(marker.get("activated_at") or marker.get("test_started_at") or ""),
-            "blocks_new_entries": False,
-        }
-        if canonical["test_started_at"] and any(state.get(key) != value for key, value in canonical.items()):
-            state.update(canonical)
-            state.setdefault("schema_version", "m15.sdk-runtime-auto-flatten.v1")
-            state.setdefault("stage", "M15.sdk_runtime_auto_flatten")
-            state["updated_at"] = to_iso(now)
-            write_json_atomic(config.formal_test_epoch_state_path, state)
-        return {"status": "inactive", "blocks_new_entries": False}
+        validation_end_at = parse_utc_datetime(str(marker.get("validation_end_at") or ""))
+        if (
+            marker.get("validation_session") is True
+            and validation_end_at is not None
+            and now.astimezone(UTC) >= validation_end_at
+        ):
+            marker.update(
+                {
+                    "status": "pending_flatten",
+                    "test_started_at": "",
+                    "activation_blocker": "validation_session_ended_account_flatten_required",
+                    "blocks_new_entries": True,
+                    "validation_session": False,
+                    "validation_completed_at": to_iso(now),
+                    "last_validation_end_at": to_iso(validation_end_at),
+                    "activate_not_before": str(marker.get("formal_activate_not_before") or ""),
+                }
+            )
+            write_json_atomic(config.formal_test_marker_path, marker)
+            marker_status = "pending_flatten"
+        else:
+            state = read_json_object(config.formal_test_epoch_state_path)
+            canonical = {
+                "test_epoch_id": str(marker.get("test_epoch_id") or ""),
+                "short_test_epoch_id": str(marker.get("short_test_epoch_id") or ""),
+                "status": "active",
+                "test_started_at": str(marker.get("test_started_at") or ""),
+                "activated_at": str(marker.get("activated_at") or marker.get("test_started_at") or ""),
+                "blocks_new_entries": False,
+                "validation_session": marker.get("validation_session") is True,
+            }
+            if canonical["test_started_at"] and any(state.get(key) != value for key, value in canonical.items()):
+                state.update(canonical)
+                state.setdefault("schema_version", "m15.sdk-runtime-auto-flatten.v1")
+                state.setdefault("stage", "M15.sdk_runtime_auto_flatten")
+                state["updated_at"] = to_iso(now)
+                write_json_atomic(config.formal_test_epoch_state_path, state)
+            return {
+                "status": "preactivation_validation_active" if marker.get("validation_session") is True else "inactive",
+                "blocks_new_entries": False,
+                "validation_end_at": str(marker.get("validation_end_at") or ""),
+            }
     if marker_status != "pending_flatten":
         return {"status": "inactive", "blocks_new_entries": False}
 
@@ -1438,6 +1464,27 @@ def dispatch_completed_rows(
 
     now = str(new_rows[-1]["received_at"])
     now_dt = datetime.fromisoformat(now.replace("Z", "+00:00"))
+    formal_marker = load_formal_test_marker(config)
+    if str(formal_marker.get("status") or "") == "pending_flatten":
+        return {
+            "event_count": len(fresh),
+            "trading_event_count": len(new_rows),
+            "readonly_expansion_event_count": len(fresh) - len(trading_fresh),
+            "signal_count": 0,
+            "live_daily_confirmation_count": 0,
+            "router": {"status": "suppressed_pending_formal_epoch"},
+            "execution": {
+                "status": "blocked_pending_account_flatten",
+                "submitted_count": 0,
+            },
+            "formal_test_epoch_id": str(formal_marker.get("test_epoch_id") or ""),
+            "stage_latency_ms": {
+                "router": 0,
+                "position_manager": 0,
+                "execution": 0,
+                "total": int((time.perf_counter() - stage_started) * 1000),
+            },
+        }
     trading_market_rows = market_context.rows()
     active_ids = {str(row["event_id"]) for row in new_rows}
     live_daily_rows = build_live_daily_confirmation_rows(
@@ -1476,7 +1523,6 @@ def dispatch_completed_rows(
         )
     if fill_attribution_state_cache is None:
         fill_attribution_state_cache = {}
-    formal_marker = load_formal_test_marker(config)
     if formal_marker:
         router = replace(
             router,

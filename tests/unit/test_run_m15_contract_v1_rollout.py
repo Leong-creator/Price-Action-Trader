@@ -7,7 +7,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.run_m15_contract_v1_rollout import prepare_rollout, rollout_check
+from scripts.run_m15_contract_v1_rollout import (
+    activate_validation_session,
+    prepare_rollout,
+    rollout_check,
+)
 
 
 class ContractV1RolloutTest(unittest.TestCase):
@@ -41,6 +45,33 @@ class ContractV1RolloutTest(unittest.TestCase):
             self.assertEqual(marker["status"], "pending_flatten")
             self.assertTrue(marker["blocks_new_entries"])
             self.assertEqual(marker["test_started_at"], "")
+
+    def test_validation_session_requires_flat_account_and_records_automatic_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path, account_path = self.fixture(root)
+            self.write(account_path, {
+                "generated_at": "2026-08-05T14:00:00Z",
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "positions_ok": True,
+                "orders_ok": True,
+                "positions": [],
+                "open_orders": [],
+            })
+            with patch("scripts.run_m15_contract_v1_rollout.ROOT", root):
+                result = activate_validation_session(
+                    config_path,
+                    validation_end_at="2026-08-05T19:45:00Z",
+                    now=datetime(2026, 8, 5, 14, 0, tzinfo=UTC),
+                )
+
+            self.assertEqual(result["status"], "validation_active")
+            marker = json.loads((root / "marker.json").read_text(encoding="utf-8"))
+            self.assertEqual(marker["status"], "active")
+            self.assertTrue(marker["validation_session"])
+            self.assertEqual(marker["validation_end_at"], "2026-08-05T19:45:00Z")
+            self.assertFalse(marker["blocks_new_entries"])
 
     def fixture(self, root: Path) -> tuple[Path, Path]:
         contracts = root / "contracts"

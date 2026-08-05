@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.m15_longbridge_sdk_runtime_lib import load_config
+from scripts.m15_sdk_validation_flatten_lib import in_regular_session
 from scripts.m15_strategy_contracts_lib import load_contracts, write_state_atomic
 
 
@@ -171,18 +172,102 @@ def prepare_rollout(config_path: Path, *, now: datetime | None = None) -> dict[s
     return {**check, "status": "prepared_pending_flatten", "marker": marker, "state": state}
 
 
+def activate_validation_session(
+    config_path: Path,
+    *,
+    validation_end_at: str,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    current = now or datetime.now(UTC)
+    check = rollout_check(config_path, now=current)
+    try:
+        end_at = datetime.fromisoformat(validation_end_at.replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        return {**check, "status": "blocked", "blockers": [*check["blockers"], "invalid_validation_end_at"]}
+    blockers = list(check["blockers"])
+    if not in_regular_session(current):
+        blockers.append("validation_requires_us_regular_session")
+    if end_at <= current.astimezone(UTC):
+        blockers.append("validation_end_must_be_in_future")
+    if end_at.astimezone(UTC).date() != current.astimezone(UTC).date():
+        blockers.append("validation_must_end_on_same_utc_date")
+    if check["position_count"] or check["open_order_count"] or check["pending_confirmation_count"]:
+        blockers.append("validation_requires_flat_paper_account")
+    config = load_config(config_path)
+    previous = read_json(config.formal_test_marker_path)
+    if previous and (
+        str(previous.get("test_epoch_id") or "") != config.formal_test_epoch_id
+        or str(previous.get("short_test_epoch_id") or "") != config.formal_short_test_epoch_id
+    ):
+        blockers.append("formal_epoch_identity_mismatch")
+    if blockers:
+        return {**check, "status": "blocked", "blockers": sorted(set(blockers))}
+
+    started_at = current.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    raw_config = read_json(config.config_path)
+    formal_activate_not_before = str(
+        (raw_config.get("formal_test_transition") or {}).get("activate_not_before") or ""
+    )
+    marker = {
+        "schema_version": "m15.sdk-formal-test-epoch.v1",
+        "status": "active",
+        "test_epoch_id": config.formal_test_epoch_id,
+        "short_test_epoch_id": config.formal_short_test_epoch_id,
+        "created_at": str(previous.get("created_at") or started_at),
+        "test_started_at": started_at,
+        "activated_at": started_at,
+        "activation_blocker": "",
+        "blocks_new_entries": False,
+        "paper_simulated_only": True,
+        "validation_session": True,
+        "validation_started_at": started_at,
+        "validation_end_at": end_at.isoformat().replace("+00:00", "Z"),
+        "formal_activate_not_before": formal_activate_not_before,
+        "prepared_by": "run_m15_contract_v1_rollout.py --activate-validation",
+    }
+    state = {
+        "schema_version": "m15.sdk-runtime-auto-flatten.v1",
+        "stage": "M15.sdk_runtime_auto_flatten",
+        "status": "active",
+        "test_epoch_id": config.formal_test_epoch_id,
+        "short_test_epoch_id": config.formal_short_test_epoch_id,
+        "test_started_at": started_at,
+        "activated_at": started_at,
+        "blocks_new_entries": False,
+        "validation_session": True,
+        "validation_end_at": marker["validation_end_at"],
+        "cancel_attempts": {},
+        "submissions": {},
+    }
+    write_state_atomic(config.formal_test_marker_path, marker)
+    write_state_atomic(config.formal_test_epoch_state_path, state)
+    return {**check, "status": "validation_active", "marker": marker, "state": state, "blockers": []}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate and prepare the M15 contract-v1 paper rollout.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--prepare", action="store_true")
+    parser.add_argument("--activate-validation", action="store_true")
+    parser.add_argument("--validation-end-at", default="", help="UTC timestamp when validation must stop opening positions and flatten.")
     args = parser.parse_args()
-    if args.check == args.prepare:
-        parser.error("choose exactly one of --check or --prepare")
+    if sum(bool(value) for value in (args.check, args.prepare, args.activate_validation)) != 1:
+        parser.error("choose exactly one of --check, --prepare or --activate-validation")
+    if args.activate_validation and not args.validation_end_at:
+        parser.error("--activate-validation requires --validation-end-at")
     config_path = Path(args.config)
-    payload = prepare_rollout(config_path) if args.prepare else rollout_check(config_path)
+    if args.prepare:
+        payload = prepare_rollout(config_path)
+    elif args.activate_validation:
+        payload = activate_validation_session(
+            config_path,
+            validation_end_at=args.validation_end_at,
+        )
+    else:
+        payload = rollout_check(config_path)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 0 if payload.get("ready_to_prepare") else 1
+    return 0 if payload.get("ready_to_prepare") and payload.get("status") != "blocked" else 1
 
 
 if __name__ == "__main__":

@@ -578,6 +578,61 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(result["execution"]["status"], "blocked_outside_regular_session")
         self.assertEqual(result["execution"]["submitted_count"], 0)
 
+    def test_pending_formal_epoch_suppresses_router_before_empty_epoch_replacement(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker_path = root / "formal.json"
+            marker_path.write_text(json.dumps({
+                "status": "pending_flatten",
+                "test_epoch_id": "formal-main",
+                "short_test_epoch_id": "formal-short",
+                "test_started_at": "",
+            }), encoding="utf-8")
+            config = SimpleNamespace(
+                market="US",
+                maximum_source_delivery_age_ms=2000,
+                market_events_path=root / "market.jsonl",
+                event_keep_lines=0,
+                universe_path=None,
+                use_seed_universe=True,
+                symbol_limit=147,
+                trading_symbol_limit=147,
+                formal_test_transition_enabled=True,
+                formal_test_epoch_id="formal-main",
+                formal_short_test_epoch_id="formal-short",
+                formal_test_marker_path=marker_path,
+            )
+            row = {
+                "event_id": "sdk-5m|AAPL.US|2026-07-16T14:00:00Z",
+                "symbol": "AAPL.US",
+                "timeframe": "5m",
+                "event_time": "2026-07-16T14:00:00Z",
+                "received_at": "2026-07-16T14:00:00Z",
+                "source_event_at": "2026-07-16T14:00:00Z",
+                "source_delivery_age_ms": 0,
+                "bar_final": True,
+                "open": "200",
+                "high": "201",
+                "low": "199",
+                "close": "200.5",
+                "volume": "1000",
+            }
+            with patch(
+                "scripts.m15_longbridge_realtime_signal_router_lib.run_realtime_signal_router"
+            ) as router:
+                result = dispatch_completed_rows(
+                    config,
+                    [row],
+                    MarketEventContext(maximum_rows=100),
+                    SimpleNamespace(),
+                    None,
+                )
+
+        router.assert_not_called()
+        self.assertEqual(result["router"]["status"], "suppressed_pending_formal_epoch")
+        self.assertEqual(result["execution"]["status"], "blocked_pending_account_flatten")
+        self.assertEqual(result["execution"]["submitted_count"], 0)
+
     def pending_flatten_fixture(self, root: Path) -> tuple[SimpleNamespace, dict, object, object]:
         marker_path = root / "marker.json"
         state_path = root / "state.json"
@@ -933,6 +988,41 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(marker["status"], "pending_flatten")
         self.assertEqual(marker["activation_blocker"], "waiting_for_configured_activation_time")
         self.assertEqual(client.submissions, [])
+
+    def test_validation_session_end_blocks_entries_and_starts_account_flatten(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            snapshot["generated_at"] = "2026-07-16T19:45:00Z"
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            marker.update(
+                {
+                    "status": "active",
+                    "test_started_at": "2026-07-16T14:00:00Z",
+                    "activated_at": "2026-07-16T14:00:00Z",
+                    "validation_session": True,
+                    "validation_end_at": "2026-07-16T19:45:00Z",
+                    "formal_activate_not_before": "2026-07-17T13:30:00Z",
+                }
+            )
+            config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
+
+            state = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 7, 16, 19, 45, 1, tzinfo=UTC),
+            )
+            refreshed_marker = json.loads(
+                config.formal_test_marker_path.read_text(encoding="utf-8")
+            )
+
+        self.assertTrue(state["blocks_new_entries"])
+        self.assertEqual(state["status"], "waiting_for_broker_flatten_confirmation")
+        self.assertEqual(len(client.submissions), 1)
+        self.assertEqual(refreshed_marker["status"], "pending_flatten")
+        self.assertFalse(refreshed_marker["validation_session"])
+        self.assertEqual(refreshed_marker["activate_not_before"], "2026-07-17T13:30:00Z")
 
     def test_active_marker_repairs_execution_epoch_missing_start_time(self) -> None:
         with TemporaryDirectory() as directory:
