@@ -1345,6 +1345,8 @@ def detector_signal_candidates(
                 "min_gap_percent": Decimal("3.00"),
                 "min_gap_close_to_close_percent": Decimal("2.50"),
                 "min_close_position": Decimal("0.60"),
+                "min_volume_ratio": Decimal("1.10"),
+                "require_next_bar_quote": True,
                 "max_risk_percent": Decimal("4.00"),
                 "target_r": Decimal("1.50"),
             },
@@ -2505,8 +2507,16 @@ def pa004_momentum_variant_signal(
         return None
     if close_position_value < decimal(thresholds["min_close_position"]):
         return None
-    entry = decimal(latest.get("next_bar_first_quote_price", close))
-    entry_at = str(latest.get("next_bar_first_quote_at") or latest.get("received_at") or to_iso(generated_at))
+    next_quote = decimal(latest.get("next_bar_first_quote_price", "0"))
+    next_quote_at = str(latest.get("next_bar_first_quote_at") or "")
+    if thresholds.get("require_next_bar_quote") and (next_quote <= ZERO or not next_quote_at):
+        return None
+    entry = next_quote if next_quote > ZERO else close
+    entry_at = next_quote_at or str(latest.get("received_at") or to_iso(generated_at))
+    volume_ratio = row_volume_ratio(previous, latest)
+    minimum_volume_ratio = decimal(thresholds.get("min_volume_ratio", "0"))
+    if minimum_volume_ratio > ZERO and volume_ratio < minimum_volume_ratio:
+        return None
     risk = max(entry - low, entry * Decimal("0.025"))
     if risk <= ZERO:
         return None
@@ -2515,7 +2525,6 @@ def pa004_momentum_variant_signal(
     if max_risk_percent > ZERO and risk_percent > max_risk_percent:
         return None
     target_r = decimal(thresholds["target_r"])
-    volume_ratio = row_volume_ratio(previous, latest)
     quality_score = base_quality_score(
         close_position_value=close_position_value,
         close_to_close_percent=close_to_close_percent,

@@ -146,7 +146,6 @@ def prepare_rollout(config_path: Path, *, now: datetime | None = None) -> dict[s
         "activation_blocker": "waiting_for_broker_positions_orders_and_pending_confirmations_to_reach_zero",
         "activate_not_before": activate_not_before,
         "blocks_new_entries": True,
-        "activate_not_before": activate_not_before,
         "prepared_by": "run_m15_contract_v1_rollout.py",
     }
     state = {

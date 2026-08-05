@@ -7,7 +7,7 @@
   "direction": "long",
   "timeframe": "1d",
   "setup": {"rule": "momentum_breakout_quality_confirmed", "summary_zh": "强突破后继续站稳的质量确认变体"},
-  "entry_rules": {"min_close_to_close_percent": "4.00", "min_gap_percent": "3.00", "min_gap_hold_close_to_close_percent": "2.50", "min_close_position": "0.60", "volume_mode": "audit_only", "order_type": "protected_limit", "entry_order_ttl_minutes": 15},
+  "entry_rules": {"min_close_to_close_percent": "4.00", "min_gap_percent": "3.00", "min_gap_hold_close_to_close_percent": "2.50", "min_close_position": "0.60", "volume_mode": "required", "min_volume_ratio": "1.10", "entry_timing": "next_bar_first_quote", "order_type": "protected_limit", "entry_order_ttl_minutes": 15},
   "exit_rules": {"target_r": "1.50", "stop": "compressed_structure_stop", "invalidation": "quality_confirmation_failure", "maximum_holding_sessions": 5, "maximum_holding_exit_time_ny": "15:55", "partial_take_profit": false},
   "risk_controls": {"max_risk_percent": "4.00", "minimum_reward_r": "1.50", "minimum_net_profit_after_fees": "8", "max_total_exposure_usd": "6000", "max_symbol_exposure_usd": "1500", "max_risk_per_order_usd": "20", "minimum_cash_reserve_usd": "4000", "daily_new_symbol_limit": null, "consecutive_loss_hard_stop": false},
   "data_requirements": {"source": "longbridge_sdk_realtime", "daily_context": true, "local_simulation_ledger": false},

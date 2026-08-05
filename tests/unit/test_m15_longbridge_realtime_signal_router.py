@@ -618,6 +618,9 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                     self.market_event(
                         event_id="current-day", symbol="AAPL", event_time="2026-06-04T14:00:00Z",
                         open="102.5", high="105", low="101", close="104", volume="1200000",
+                        next_bar_first_quote_price="104.1",
+                        next_bar_first_quote_at="2026-06-04T14:00:00.100Z",
+                        next_bar_entry_source="longbridge_sdk_first_quote_after_bar_close",
                         strategy_signal_intents=[],
                     ),
                 ],
@@ -635,6 +638,43 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
                 {row["capital_bucket"] for row in signals},
                 {"pa004_mbf", "pa004_mbf_qc"},
             )
+
+    def test_pa004_mbf_qc_requires_volume_and_next_bar_quote(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                enabled_detectors=["pa004_momentum_variants"],
+                allowed_runtime_ids=["M10-PA-004-MBF-QC-1d"],
+                runtime_position_multipliers={"M10-PA-004-MBF-QC-1d": "1.0"},
+            )
+            previous = self.market_event(
+                event_id="previous-day", symbol="AAPL", event_time="2026-06-03T20:00:00Z",
+                open="99", high="101", low="98", close="100", volume="1000000",
+                strategy_signal_intents=[],
+            )
+            weak_volume = self.market_event(
+                event_id="weak-volume", symbol="AAPL", event_time="2026-06-04T14:00:00Z",
+                open="102.5", high="105", low="101", close="104", volume="1050000",
+                next_bar_first_quote_price="104.1",
+                next_bar_first_quote_at="2026-06-04T14:00:00.100Z",
+                next_bar_entry_source="longbridge_sdk_first_quote_after_bar_close",
+                strategy_signal_intents=[],
+            )
+            self.write_jsonl(root / "market_events.jsonl", [previous, weak_volume])
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+            self.assertEqual(payload["new_signal_event_count"], 0)
+
+            missing_next_quote = {
+                **weak_volume,
+                "event_id": "missing-next-quote",
+                "volume": "1200000",
+                "next_bar_first_quote_price": "",
+                "next_bar_first_quote_at": "",
+            }
+            self.write_jsonl(root / "market_events.jsonl", [previous, missing_next_quote])
+            payload = run_realtime_signal_router(config, generated_at="2026-06-04T14:05:01Z")
+            self.assertEqual(payload["new_signal_event_count"], 0)
 
     def test_quality_sorting_prioritizes_stronger_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
