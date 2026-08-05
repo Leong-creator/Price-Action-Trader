@@ -128,6 +128,20 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            execution_config_path = root / "execution.json"
+            execution_payload = json.loads(
+                execution_config_path.read_text(encoding="utf-8")
+            )
+            execution_payload["test_epoch"] = {
+                "enabled": True,
+                "test_epoch_id": "formal-epoch",
+                "state_path": str(epoch_state_path),
+                "flatten_existing_positions_before_activation": False,
+                "archive_previous_records": True,
+            }
+            execution_config_path.write_text(
+                json.dumps(execution_payload), encoding="utf-8"
+            )
 
             payload = run_m15_opening_trade_readiness(
                 load_config(config_path),
@@ -138,6 +152,66 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertFalse(payload["new_position_submission_enabled"])
             checks = {row["check"]: row for row in payload["checks"]}
             self.assertEqual(checks["formal_test_execution_epoch"]["status"], "fail")
+
+    def test_active_validation_epoch_must_match_execution_epoch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(
+                root, paper_enabled=True, live_execution=False
+            )
+            status_path = (
+                root
+                / "realtime"
+                / "m15_longbridge_realtime_session_supervisor.json"
+            )
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            status_payload["formal_test_transition"] = {
+                "status": "validation_active",
+                "blocks_new_entries": False,
+                "validation_session": True,
+                "test_epoch_id": "formal-main-next-day",
+                "test_started_at": "",
+                "validation_test_epoch_id": "m15-sdk-validation-20260806",
+                "validation_test_started_at": "2026-08-06T13:35:00Z",
+            }
+            status_payload["dispatch_enabled"] = True
+            status_path.write_text(json.dumps(status_payload), encoding="utf-8")
+            epoch_state_path = (
+                root / "realtime" / "m15_longbridge_virtual_account_epoch.json"
+            )
+            epoch_state_path.write_text(
+                json.dumps(
+                    {
+                        "status": "validation_active",
+                        "test_epoch_id": "m15-sdk-validation-20260806",
+                        "test_started_at": "2026-08-06T13:35:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            execution_config_path = root / "execution.json"
+            execution_payload = json.loads(
+                execution_config_path.read_text(encoding="utf-8")
+            )
+            execution_payload["test_epoch"] = {
+                "enabled": True,
+                "test_epoch_id": "formal-main-next-day",
+                "state_path": str(epoch_state_path),
+                "flatten_existing_positions_before_activation": False,
+                "archive_previous_records": True,
+            }
+            execution_config_path.write_text(
+                json.dumps(execution_payload), encoding="utf-8"
+            )
+
+            payload = run_m15_opening_trade_readiness(
+                load_config(config_path),
+                generated_at="2026-06-04T14:00:00Z",
+            )
+
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["formal_test_execution_epoch"]["status"], "pass")
+            self.assertTrue(payload["new_position_submission_enabled"])
 
     def test_blocks_when_execution_config_enables_live_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -386,8 +386,12 @@ class LongbridgeCliRealtimePaperClient:
             keys=("cash_max_qty", "cash_max_quantity"),
             labels=("cash max qty", "cash max quantity"),
         )
-        margin_quantity = response_max_sell_quantity(response)
-        max_quantity = margin_quantity
+        margin_quantity = response_capacity_quantity(
+            response,
+            keys=("margin_max_qty", "margin_max_quantity"),
+            labels=("margin max qty", "margin max quantity"),
+        )
+        max_quantity = cash_quantity
         if max_quantity <= ZERO:
             return {
                 "ok": False,
@@ -395,7 +399,7 @@ class LongbridgeCliRealtimePaperClient:
                 "max_quantity": ZERO,
                 "cash_max_quantity": cash_quantity,
                 "margin_max_quantity": margin_quantity,
-                "capacity_basis": "margin_max_qty_for_sell_short",
+                "capacity_basis": "cash_max_qty_for_sell_short_no_margin_financing",
                 "elapsed_ms": elapsed_ms,
                 "response": response,
                 "command": redact_command(command),
@@ -406,7 +410,7 @@ class LongbridgeCliRealtimePaperClient:
             "max_quantity": max_quantity,
             "cash_max_quantity": cash_quantity,
             "margin_max_quantity": margin_quantity,
-            "capacity_basis": "margin_max_qty_for_sell_short",
+            "capacity_basis": "cash_max_qty_for_sell_short_no_margin_financing",
             "elapsed_ms": elapsed_ms,
             "response": response,
             "command": redact_command(command),
@@ -3770,11 +3774,11 @@ def response_order_id(response: Any) -> str:
 
 
 def response_max_sell_quantity(response: Any) -> Decimal:
-    """Return only Longbridge's borrowed-stock capacity for Sell open-short."""
+    """Return Longbridge's cash-backed Sell short capacity without margin."""
     return response_capacity_quantity(
         response,
-        keys=("margin_max_qty", "margin_max_quantity"),
-        labels=("margin max qty", "margin max quantity"),
+        keys=("cash_max_qty", "cash_max_quantity"),
+        labels=("cash max qty", "cash max quantity"),
     )
 
 

@@ -104,6 +104,8 @@ class SdkRuntimeConfig:
     formal_short_test_epoch_id: str
     formal_test_marker_path: Path
     formal_test_epoch_state_path: Path
+    validation_business_date: str
+    validation_end_at: str
     trading_universe_path: Path | None = None
 
 
@@ -224,6 +226,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
                 "m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
             )
         ),
+        validation_business_date=str(transition.get("validation_business_date") or ""),
+        validation_end_at=str(transition.get("validation_end_at") or ""),
         trading_universe_path=(
             resolve_path(market_data["trading_universe_path"])
             if market_data.get("trading_universe_path")
@@ -345,6 +349,23 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         not config.formal_test_epoch_id or not config.formal_short_test_epoch_id
     ):
         raise ValueError("M15 SDK formal test transition requires both epoch ids")
+    if bool(config.validation_business_date) != bool(config.validation_end_at):
+        raise ValueError(
+            "M15 SDK formal test transition validation session requires both validation_business_date and validation_end_at"
+        )
+    if config.validation_business_date:
+        try:
+            validation_end_at = datetime.fromisoformat(
+                config.validation_end_at.replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except ValueError as exc:
+            raise ValueError(
+                "M15 SDK formal test transition validation_end_at must be a valid UTC timestamp"
+            ) from exc
+        if validation_end_at.astimezone(NEW_YORK).date().isoformat() != config.validation_business_date:
+            raise ValueError(
+                "M15 SDK formal test transition validation_end_at must align with validation_business_date in New York"
+            )
     validate_formal_epoch_alignment(config)
     return config
 
@@ -1146,7 +1167,12 @@ def load_formal_test_marker(config: SdkRuntimeConfig) -> dict[str, Any]:
         marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    if str(marker.get("status") or "") not in {"pending_flatten", "scheduled", "active"}:
+    if str(marker.get("status") or "") not in {
+        "pending_flatten",
+        "scheduled",
+        "active",
+        "validation_active",
+    }:
         return {}
     if str(marker.get("test_epoch_id") or "") != config.formal_test_epoch_id:
         return {}
@@ -1415,8 +1441,8 @@ class SdkRealtimePaperClient:
         }
 
     def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
-        # The SDK reports borrowed-stock capacity for a Sell open-short request
-        # in margin_max_qty. cash_max_qty can instead describe owned shares.
+        # Longbridge documents Sell estimates as US short-sale queries. Use the
+        # cash-backed quantity so short tests do not opt into margin financing.
         normalized_symbol = longbridge_symbol(symbol)
         now = self.monotonic_clock()
         cached = self._short_capacity_cache.get(normalized_symbol)
@@ -1471,18 +1497,17 @@ class SdkRealtimePaperClient:
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
             cash_quantity = decimal(getattr(response, "cash_max_qty", "0"))
             margin_quantity = decimal(getattr(response, "margin_max_qty", "0"))
-            # For an open-short Sell request Longbridge reports borrowed-stock
-            # capacity in margin_max_qty. cash_max_qty can represent shares
-            # already owned, so using it here would confuse closing a long with
-            # opening a new short. Normal buys still enforce USD cash only.
-            quantity = margin_quantity
+            # Sell estimates are short-sale estimates rather than ordinary
+            # long-position availability. cash_max_qty is the broker-approved
+            # non-margin short capacity; margin_max_qty would opt into margin.
+            quantity = cash_quantity
             result = {
                 "ok": quantity > 0,
                 "status": "sdk_short_capacity",
                 "max_quantity": quantity,
                 "cash_max_quantity": cash_quantity,
                 "margin_max_quantity": margin_quantity,
-                "capacity_basis": "margin_max_qty_for_sell_short",
+                "capacity_basis": "cash_max_qty_for_sell_short_no_margin_financing",
                 "elapsed_ms": max(0, int((perf_counter() - started_at) * 1000)),
                 "cache_age_seconds": 0,
                 "capacity_source": "broker_sdk_live",
@@ -1500,7 +1525,7 @@ class SdkRealtimePaperClient:
                 "max_quantity": Decimal("0"),
                 "cash_max_quantity": Decimal("0"),
                 "margin_max_quantity": Decimal("0"),
-                "capacity_basis": "margin_max_qty_for_sell_short",
+                "capacity_basis": "cash_max_qty_for_sell_short_no_margin_financing",
                 "elapsed_ms": max(0, int((perf_counter() - started_at) * 1000)),
                 "cache_age_seconds": None,
                 "capacity_source": "broker_sdk_error",

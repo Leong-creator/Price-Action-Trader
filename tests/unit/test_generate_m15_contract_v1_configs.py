@@ -12,7 +12,11 @@ from scripts.generate_m15_contract_v1_configs import (
 
 class ContractV1ConfigGenerationTest(unittest.TestCase):
     def setUp(self) -> None:
-        generated = build_configs("20260806")
+        generated = build_configs(
+            "20260807",
+            validation_business_date="2026-08-06",
+            validation_end_at="2026-08-06T19:45:00Z",
+        )
         self.by_name = {path.name: payload for path, payload in generated.items()}
         self.router = self.by_name["m15_longbridge_realtime_signal_router.contract_v1.json"]
         self.execution = self.by_name["m15_longbridge_realtime_execution.paper_contract_v1.json"]
@@ -50,7 +54,7 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
         )
         self.assertEqual(
             self.execution["test_epoch"]["test_epoch_id"],
-            "m15-sdk-contract-v1-20260806",
+            "m15-sdk-contract-v1-20260807",
         )
         self.assertTrue(self.execution["test_epoch"]["flatten_existing_positions_before_activation"])
         self.assertEqual(
@@ -76,7 +80,15 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
         runtime = self.by_name["m15_longbridge_sdk_runtime.contract_v1.json"]
         self.assertEqual(
             runtime["formal_test_transition"]["activate_not_before"],
-            "2026-08-06T13:30:00Z",
+            "2026-08-07T13:30:00Z",
+        )
+        self.assertEqual(
+            runtime["formal_test_transition"]["validation_business_date"],
+            "2026-08-06",
+        )
+        self.assertEqual(
+            runtime["formal_test_transition"]["validation_end_at"],
+            "2026-08-06T19:45:00Z",
         )
 
 

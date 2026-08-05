@@ -1,11 +1,13 @@
 {
   "formal_test_transition": {
-    "activate_not_before": "2026-08-06T13:30:00Z",
+    "activate_not_before": "2026-08-07T13:30:00Z",
     "enabled": true,
     "epoch_state_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
     "marker_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
-    "short_test_epoch_id": "m15-sdk-contract-v1-short-20260806",
-    "test_epoch_id": "m15-sdk-contract-v1-20260806"
+    "short_test_epoch_id": "m15-sdk-contract-v1-short-20260807",
+    "test_epoch_id": "m15-sdk-contract-v1-20260807",
+    "validation_business_date": "2026-08-06",
+    "validation_end_at": "2026-08-06T19:45:00Z"
   },
   "market_data": {
     "bar_minutes": 5,
@@ -69,9 +71,9 @@
     "reconnect_backoff_seconds": 5,
     "snapshot_poll_dispatch_max_elapsed_ms": 2500,
     "snapshot_poll_interval_seconds": 3,
+    "snapshot_poll_min_successful_cycles": 1,
     "snapshot_poll_request_batch_size": 100,
     "snapshot_poll_request_interval_seconds": 0.5,
-    "snapshot_poll_min_successful_cycles": 1,
     "stale_entry_order_ttl_seconds": 900,
     "subscription_batch_size": 300,
     "subscription_deadline_seconds": 20,

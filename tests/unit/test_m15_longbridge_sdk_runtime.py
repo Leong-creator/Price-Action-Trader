@@ -865,6 +865,73 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(result["execution"]["status"], "blocked_pending_account_flatten")
         self.assertEqual(result["execution"]["submitted_count"], 0)
 
+    def test_validation_cutoff_suppresses_router_before_same_batch_can_open_entry(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker_path = root / "formal.json"
+            marker_path.write_text(json.dumps({
+                "status": "validation_active",
+                "test_epoch_id": "formal-main-next-day",
+                "short_test_epoch_id": "formal-short-next-day",
+                "test_started_at": "",
+                "validation_session": True,
+                "validation_business_date": "2026-08-05",
+                "validation_end_at": "2026-08-05T19:45:00Z",
+                "validation_test_epoch_id": "m15-sdk-validation-20260805",
+                "validation_short_test_epoch_id": "m15-sdk-validation-short-20260805",
+                "validation_test_started_at": "2026-08-05T13:35:00Z",
+            }), encoding="utf-8")
+            config = SimpleNamespace(
+                market="US",
+                maximum_source_delivery_age_ms=2000,
+                market_events_path=root / "market.jsonl",
+                event_keep_lines=0,
+                universe_path=None,
+                use_seed_universe=True,
+                symbol_limit=147,
+                trading_symbol_limit=147,
+                formal_test_transition_enabled=True,
+                formal_test_epoch_id="formal-main-next-day",
+                formal_short_test_epoch_id="formal-short-next-day",
+                formal_test_marker_path=marker_path,
+            )
+            row = {
+                "event_id": "sdk-5m|AAPL.US|2026-08-05T19:45:00Z",
+                "symbol": "AAPL.US",
+                "timeframe": "5m",
+                "event_time": "2026-08-05T19:45:00Z",
+                "received_at": "2026-08-05T19:45:00Z",
+                "source_event_at": "2026-08-05T19:45:00Z",
+                "source_delivery_age_ms": 0,
+                "bar_final": True,
+                "open": "200",
+                "high": "201",
+                "low": "199",
+                "close": "200.5",
+                "volume": "1000",
+            }
+            with patch(
+                "scripts.m15_longbridge_realtime_signal_router_lib.run_realtime_signal_router"
+            ) as router:
+                result = dispatch_completed_rows(
+                    config,
+                    [row],
+                    MarketEventContext(maximum_rows=100),
+                    SimpleNamespace(),
+                    None,
+                )
+
+        router.assert_not_called()
+        self.assertEqual(
+            result["router"]["status"],
+            "suppressed_validation_session_ended",
+        )
+        self.assertEqual(
+            result["execution"]["status"],
+            "blocked_validation_session_ended",
+        )
+        self.assertEqual(result["execution"]["submitted_count"], 0)
+
     def pending_flatten_fixture(self, root: Path) -> tuple[SimpleNamespace, dict, object, object]:
         marker_path = root / "marker.json"
         state_path = root / "state.json"
@@ -884,9 +951,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             formal_test_marker_path=marker_path,
             formal_test_epoch_state_path=state_path,
             maximum_account_snapshot_age_seconds=30,
+            validation_business_date="",
+            validation_end_at="",
         )
         snapshot = {
             "generated_at": "2026-07-16T14:00:00Z",
+            "account_channel": "lb_papertrading",
             "paper_account_verified": True,
             "positions_ok": True,
             "orders_ok": True,
@@ -1196,6 +1266,133 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(marker["activation_condition_met"], "positions_open_orders_pending_confirmations_zero")
         self.assertEqual(len(client.submissions), 1)
 
+    def test_zero_account_auto_starts_validation_session_during_configured_window(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            config.validation_business_date = "2026-08-05"
+            config.validation_end_at = "2026-08-05T19:45:00Z"
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            marker["activate_not_before"] = "2026-08-06T13:30:00Z"
+            config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            snapshot["generated_at"] = "2026-08-05T14:00:00Z"
+            snapshot["positions"] = []
+            snapshot["orders"] = []
+            snapshot["open_orders"] = []
+
+            result = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 8, 5, 14, 0, tzinfo=UTC),
+            )
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            state = json.loads(config.formal_test_epoch_state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "preactivation_validation_active")
+        self.assertFalse(result["blocks_new_entries"])
+        self.assertEqual(marker["status"], "validation_active")
+        self.assertTrue(marker["validation_session"])
+        self.assertEqual(marker["validation_business_date"], "2026-08-05")
+        self.assertEqual(marker["validation_end_at"], "2026-08-05T19:45:00Z")
+        self.assertEqual(marker["activate_not_before"], "2026-08-06T13:30:00Z")
+        self.assertEqual(marker["test_epoch_id"], "formal-main")
+        self.assertEqual(marker["short_test_epoch_id"], "formal-short")
+        self.assertEqual(marker["test_started_at"], "")
+        self.assertEqual(marker["validation_test_epoch_id"], "m15-sdk-validation-20260805")
+        self.assertEqual(
+            marker["validation_short_test_epoch_id"],
+            "m15-sdk-validation-short-20260805",
+        )
+        self.assertEqual(state["status"], "validation_active")
+        self.assertEqual(state["test_epoch_id"], "m15-sdk-validation-20260805")
+        self.assertEqual(
+            state["short_test_epoch_id"],
+            "m15-sdk-validation-short-20260805",
+        )
+        self.assertTrue(state["validation_session"])
+        self.assertEqual(state["validation_business_date"], "2026-08-05")
+        self.assertEqual(client.submissions, [])
+
+    def test_zero_account_does_not_auto_start_validation_session_outside_regular_session(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            config.validation_business_date = "2026-08-05"
+            config.validation_end_at = "2026-08-05T19:45:00Z"
+            snapshot["generated_at"] = "2026-08-05T12:00:00Z"
+            snapshot["positions"] = []
+            snapshot["orders"] = []
+            snapshot["open_orders"] = []
+
+            result = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+            )
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "waiting_for_regular_session")
+        self.assertEqual(marker["status"], "pending_flatten")
+        self.assertEqual(client.submissions, [])
+
+    def test_zero_account_does_not_auto_start_validation_session_on_other_new_york_date(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            config.validation_business_date = "2026-08-06"
+            config.validation_end_at = "2026-08-06T19:45:00Z"
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+            marker["activate_not_before"] = "2026-08-06T13:30:00Z"
+            config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            snapshot["generated_at"] = "2026-08-05T14:00:00Z"
+            snapshot["positions"] = []
+            snapshot["orders"] = []
+            snapshot["open_orders"] = []
+
+            result = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 8, 5, 14, 0, tzinfo=UTC),
+            )
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "waiting_for_activation_window")
+        self.assertEqual(marker["status"], "pending_flatten")
+        self.assertEqual(client.submissions, [])
+
+    def test_pending_flatten_nonzero_or_untrusted_account_never_auto_starts_validation_session(self) -> None:
+        with TemporaryDirectory() as directory:
+            config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
+            config.validation_business_date = "2026-08-05"
+            config.validation_end_at = "2026-08-05T19:45:00Z"
+            snapshot["generated_at"] = "2026-08-05T14:00:00Z"
+
+            nonzero = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 8, 5, 14, 0, tzinfo=UTC),
+            )
+            snapshot["positions"] = []
+            snapshot["paper_account_verified"] = False
+            untrusted = run_pending_flatten_cycle(
+                config,
+                account,
+                client,
+                [],
+                now=datetime(2026, 8, 5, 14, 1, tzinfo=UTC),
+            )
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(nonzero["status"], "waiting_for_broker_flatten_confirmation")
+        self.assertEqual(untrusted["status"], "account_state_unknown")
+        self.assertEqual(marker["status"], "pending_flatten")
+        self.assertFalse(marker.get("validation_session", False))
+
     def test_zero_account_waits_until_configured_activation_time(self) -> None:
         with TemporaryDirectory() as directory:
             config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
@@ -1228,12 +1425,15 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
             marker.update(
                 {
-                    "status": "active",
-                    "test_started_at": "2026-07-16T14:00:00Z",
-                    "activated_at": "2026-07-16T14:00:00Z",
+                    "status": "validation_active",
                     "validation_session": True,
+                    "validation_business_date": "2026-07-16",
                     "validation_end_at": "2026-07-16T19:45:00Z",
-                    "formal_activate_not_before": "2026-07-17T13:30:00Z",
+                    "validation_test_epoch_id": "m15-sdk-validation-20260716",
+                    "validation_short_test_epoch_id": "m15-sdk-validation-short-20260716",
+                    "validation_test_started_at": "2026-07-16T14:00:00Z",
+                    "validation_activated_at": "2026-07-16T14:00:00Z",
+                    "activate_not_before": "2026-07-17T13:30:00Z",
                 }
             )
             config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
@@ -1255,6 +1455,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(refreshed_marker["status"], "pending_flatten")
         self.assertFalse(refreshed_marker["validation_session"])
         self.assertEqual(refreshed_marker["activate_not_before"], "2026-07-17T13:30:00Z")
+        self.assertEqual(refreshed_marker["test_epoch_id"], "formal-main")
+        self.assertEqual(refreshed_marker["short_test_epoch_id"], "formal-short")
+        self.assertEqual(
+            refreshed_marker["last_validation_test_epoch_id"],
+            "m15-sdk-validation-20260716",
+        )
 
     def test_active_marker_repairs_execution_epoch_missing_start_time(self) -> None:
         with TemporaryDirectory() as directory:
@@ -2200,8 +2406,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             OrderSide = Enum
 
         class Response:
-            cash_max_qty = Decimal("0")
-            margin_max_qty = Decimal("12")
+            cash_max_qty = Decimal("12")
+            margin_max_qty = Decimal("40")
 
         class Trade:
             def __init__(self) -> None:
@@ -2232,13 +2438,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(cached["status"], "sdk_short_capacity_cached")
         self.assertEqual(cached["capacity_source"], "broker_sdk_cache")
         self.assertEqual(cached["max_quantity"], Decimal("12"))
-        self.assertEqual(cached["cash_max_quantity"], Decimal("0"))
-        self.assertEqual(cached["margin_max_quantity"], Decimal("12"))
-        self.assertEqual(cached["capacity_basis"], "margin_max_qty_for_sell_short")
+        self.assertEqual(cached["cash_max_quantity"], Decimal("12"))
+        self.assertEqual(cached["margin_max_quantity"], Decimal("40"))
+        self.assertEqual(
+            cached["capacity_basis"],
+            "cash_max_qty_for_sell_short_no_margin_financing",
+        )
         self.assertEqual(cached["cache_age_seconds"], 30.0)
         self.assertEqual(refreshed["capacity_source"], "broker_sdk_live")
 
-    def test_sdk_short_capacity_does_not_treat_owned_cash_quantity_as_borrow_capacity(self) -> None:
+    def test_sdk_short_capacity_uses_cash_backed_quantity_and_not_margin_quantity(self) -> None:
         class Enum:
             LO = "LO"
             Sell = "Sell"
@@ -2261,9 +2470,13 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["max_quantity"], Decimal("7"))
+        self.assertEqual(result["max_quantity"], Decimal("999"))
         self.assertEqual(result["cash_max_quantity"], Decimal("999"))
         self.assertEqual(result["margin_max_quantity"], Decimal("7"))
+        self.assertEqual(
+            result["capacity_basis"],
+            "cash_max_qty_for_sell_short_no_margin_financing",
+        )
 
     def test_sdk_trade_context_healthcheck_marks_oauth_refresh_failure(self) -> None:
         class Trade:

@@ -69,6 +69,98 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_flatten")
             self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_flatten")
 
+    def test_planned_validation_session_is_safe_waiting_not_flatten_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime["dispatch_enabled"] = False
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness.update(
+                {
+                    "readiness_status": "armed_waiting_validation_session",
+                    "validation_session_waiting": True,
+                }
+            )
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            formal = json.loads(config.formal_epoch_path.read_text(encoding="utf-8"))
+            formal.update({"status": "pending_flatten", "blocks_new_entries": True})
+            config.formal_epoch_path.write_text(json.dumps(formal), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-06T10:00:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "armed_waiting_validation_session")
+            self.assertEqual(payload["fail_count"], 0)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_validation")
+            self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_validation")
+            self.assertEqual(checks["opening_readiness"]["status"], "waiting_for_validation")
+
+    def test_active_validation_session_uses_validation_epoch_without_formal_epoch_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
+            validation_marker = {
+                "status": "validation_active",
+                "blocks_new_entries": False,
+                "validation_session": True,
+                "test_epoch_id": "formal-main-next-day",
+                "short_test_epoch_id": "formal-short-next-day",
+                "test_started_at": "",
+                "validation_test_epoch_id": "m15-sdk-validation-20260806",
+                "validation_short_test_epoch_id": "m15-sdk-validation-short-20260806",
+                "validation_test_started_at": "2026-08-06T13:35:00Z",
+            }
+            runtime = json.loads(
+                config.sdk_runtime_status_path.read_text(encoding="utf-8")
+            )
+            runtime.update(
+                {
+                    "dispatch_enabled": True,
+                    "dispatch_requested": True,
+                    "formal_test_transition": validation_marker,
+                    "sdk_auto_flatten": {
+                        "status": "validation_active",
+                        "test_epoch_id": "m15-sdk-validation-20260806",
+                        "short_test_epoch_id": "m15-sdk-validation-short-20260806",
+                        "test_started_at": "2026-08-06T13:35:00Z",
+                        "blocks_new_entries": False,
+                    },
+                }
+            )
+            config.sdk_runtime_status_path.write_text(
+                json.dumps(runtime), encoding="utf-8"
+            )
+            readiness = json.loads(
+                config.opening_readiness_path.read_text(encoding="utf-8")
+            )
+            readiness.update(
+                {
+                    "readiness_status": "ready_for_longbridge_paper_orders",
+                    "fail_count": 0,
+                    "formal_test_transition": validation_marker,
+                }
+            )
+            config.opening_readiness_path.write_text(
+                json.dumps(readiness), encoding="utf-8"
+            )
+            config.formal_epoch_path.write_text(
+                json.dumps(validation_marker), encoding="utf-8"
+            )
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-06T14:00:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "ready_validation_session")
+            self.assertEqual(payload["fail_count"], 0)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["formal_epoch_active"]["status"], "pass")
+            self.assertEqual(checks["paper_dispatch_armed"]["status"], "pass")
+
     def test_flatten_complete_waiting_activation_is_safe_waiting_not_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=True)

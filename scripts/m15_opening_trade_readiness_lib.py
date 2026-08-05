@@ -189,23 +189,68 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     formal_transition = formal_transition if isinstance(formal_transition, dict) else {}
     pending_formal_flatten = str(formal_transition.get("status") or "") == "pending_flatten"
     formal_test_active = str(formal_transition.get("status") or "") == "active"
+    validation_test_active = bool(
+        str(formal_transition.get("status") or "") == "validation_active"
+        and formal_transition.get("validation_session") is True
+        and formal_transition.get("blocks_new_entries") is False
+    )
+    flatten_confirmation = (
+        realtime_status.get("sdk_auto_flatten", {}).get("confirmation", {})
+        if isinstance(realtime_status.get("sdk_auto_flatten"), dict)
+        and isinstance(realtime_status.get("sdk_auto_flatten", {}).get("confirmation"), dict)
+        else {}
+    )
+    validation_end_at = (
+        parse_utc_datetime(sdk_config.validation_end_at)
+        if sdk_config is not None and sdk_config.validation_end_at
+        else None
+    )
+    generated_datetime = parse_utc_datetime(generated_at)
+    validation_session_waiting = bool(
+        pending_formal_flatten
+        and sdk_config is not None
+        and sdk_config.validation_business_date
+        and validation_end_at is not None
+        and generated_datetime is not None
+        and str(window.get("market_date") or "") <= sdk_config.validation_business_date
+        and generated_datetime < validation_end_at
+        and flatten_confirmation.get("complete") is True
+        and int(flatten_confirmation.get("remaining_position_count") or 0) == 0
+        and int(flatten_confirmation.get("open_order_count") or 0) == 0
+        and int(flatten_confirmation.get("pending_confirmation_count") or 0) == 0
+    )
     execution_epoch = (
         read_json(execution_config.test_epoch_state_path)
         if execution_config is not None
         else {}
     )
     execution_epoch = execution_epoch if isinstance(execution_epoch, dict) else {}
+    expected_epoch_id = str(
+        formal_transition.get("validation_test_epoch_id")
+        if validation_test_active
+        else formal_transition.get("test_epoch_id")
+        or ""
+    )
     expected_epoch_start = str(
-        formal_transition.get("test_started_at") or formal_transition.get("activated_at") or ""
+        (
+            formal_transition.get("validation_test_started_at")
+            or formal_transition.get("validation_activated_at")
+        )
+        if validation_test_active
+        else (
+            formal_transition.get("test_started_at")
+            or formal_transition.get("activated_at")
+        )
+        or ""
     )
     execution_epoch_start = str(execution_epoch.get("test_started_at") or "")
     execution_epoch_consistent = (
-        not formal_test_active
+        not (formal_test_active or validation_test_active)
         or (
             bool(expected_epoch_start)
             and execution_epoch_start == expected_epoch_start
             and str(execution_epoch.get("test_epoch_id") or "")
-            == str(formal_transition.get("test_epoch_id") or "")
+            == expected_epoch_id
         )
     )
     runtime_dispatch_requested = bool(realtime_status.get("dispatch_requested", False))
@@ -384,11 +429,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         ),
         check_row(
             "formal_test_execution_epoch",
-            "正式测试标记与实时执行器必须使用同一测试编号和开始时间",
+            "当前验收或正式测试标记与实时执行器必须使用同一编号和开始时间",
             "fail" if not execution_epoch_consistent else "pass",
             actual=(
                 f"formal_epoch={formal_transition.get('test_epoch_id', '')}, "
-                f"formal_started_at={expected_epoch_start}, "
+                f"active_epoch={expected_epoch_id}, "
+                f"active_started_at={expected_epoch_start}, "
                 f"execution_epoch={execution_epoch.get('test_epoch_id', '')}, "
                 f"execution_started_at={execution_epoch_start}"
             ),
@@ -400,6 +446,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     informational_count = sum(1 for row in checks if row["status"] == "informational")
     if fail_count:
         readiness_status = "blocked_opening_trade_watch"
+    elif validation_session_waiting:
+        readiness_status = (
+            "ready_for_validation_session_start"
+            if window["market_phase"] == "regular_session"
+            else "armed_waiting_validation_session"
+        )
     elif pending_formal_flatten:
         readiness_status = "ready_for_paper_exit_only" if window["market_phase"] == "regular_session" else "armed_waiting_flatten_session"
     elif window["market_phase"] == "regular_session":
@@ -414,6 +466,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "market_window": window,
         "paper_order_submission_enabled": effective_paper_orders_enabled,
         "new_position_submission_enabled": new_position_submission_enabled,
+        "validation_session_waiting": validation_session_waiting,
         "formal_test_transition": formal_transition,
         "m12_47_daemon_alive": m12_alive,
         "m15_realtime_daemon_alive": realtime_alive,
@@ -625,6 +678,10 @@ def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[
         return f"开盘值守已武装：当前是{window.get('market_status')}，等待美股常规交易时段；到点后只走长桥模拟账户。"
     if status == "ready_for_paper_exit_only":
         return "长桥模拟账户仅允许平仓：先清除 SDK 验收持仓，清仓确认完成后才启用新开仓。"
+    if status == "ready_for_validation_session_start":
+        return "今晚自然信号验收条件已满足：SDK 正在按配置自动开启纸面账户验收，不制造订单、不降低策略门槛。"
+    if status == "armed_waiting_validation_session":
+        return f"今晚自然信号验收已武装：当前是{window.get('market_status')}，到常规交易时段自动开启纸面账户全链路验收。"
     if status == "armed_waiting_flatten_session":
         return f"清仓链路已武装：当前是{window.get('market_status')}，下个常规交易时段只处理验收持仓退出。"
     return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"

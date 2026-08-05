@@ -58,6 +58,7 @@ from scripts.m15_sdk_validation_flatten_lib import (
     flatten_confirmation,
     in_regular_session,
     latest_flatten_prices,
+    market_date,
     runtime_flatten_order_payload,
     runtime_flatten_retry_order_payload,
 )
@@ -271,7 +272,10 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
         )
         short_capacity_cash = str(getattr(response, "cash_max_qty", "0"))
         short_capacity_margin = str(getattr(response, "margin_max_qty", "0"))
-        short_capacity = short_capacity_margin
+        # Sell-side estimates are dedicated US short-sale queries. The project
+        # deliberately uses only the cash-backed quantity and keeps margin
+        # financing disabled.
+        short_capacity = short_capacity_cash
     except Exception as exc:
         short_capacity_error = f"sdk_short_capacity_probe_failed:{type(exc).__name__}:{exc}"
         errors.append(short_capacity_error)
@@ -290,14 +294,14 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
         "short_capacity_endpoint_ok": not short_capacity_error,
         "short_capacity_probe_ok": not short_capacity_error,
         "short_capacity_probe_has_borrow_capacity": (
-            not short_capacity_error and Decimal(short_capacity_margin) > 0
+            not short_capacity_error and Decimal(short_capacity_cash) > 0
         ),
         "short_capacity_probe_symbol": short_capacity_probe_symbol,
         "short_capacity_probe_price_is_connectivity_only": True,
         "short_capacity_probe_quantity": short_capacity,
         "short_capacity_probe_cash_quantity": short_capacity_cash,
         "short_capacity_probe_margin_quantity": short_capacity_margin,
-        "short_capacity_probe_basis": "margin_max_qty_for_sell_short",
+        "short_capacity_probe_basis": "cash_max_qty_for_sell_short_no_margin_financing",
         "errors": errors,
     }
 
@@ -1348,37 +1352,71 @@ def run_pending_flatten_cycle(
     """Advance the persisted SDK-only account flatten state machine once."""
     marker = load_formal_test_marker(config)
     marker_status = str(marker.get("status") or "")
-    if marker_status == "active":
+    if marker_status in {"active", "validation_active"}:
         validation_end_at = parse_utc_datetime(str(marker.get("validation_end_at") or ""))
         if (
-            marker.get("validation_session") is True
+            marker_status == "validation_active"
+            and marker.get("validation_session") is True
             and validation_end_at is not None
             and now.astimezone(UTC) >= validation_end_at
         ):
+            validation_test_epoch_id = str(
+                marker.pop("validation_test_epoch_id", "") or ""
+            )
+            validation_short_test_epoch_id = str(
+                marker.pop("validation_short_test_epoch_id", "") or ""
+            )
+            validation_test_started_at = str(
+                marker.pop("validation_test_started_at", "") or ""
+            )
             marker.update(
                 {
                     "status": "pending_flatten",
-                    "test_started_at": "",
                     "activation_blocker": "validation_session_ended_account_flatten_required",
                     "blocks_new_entries": True,
                     "validation_session": False,
                     "validation_completed_at": to_iso(now),
                     "last_validation_end_at": to_iso(validation_end_at),
-                    "activate_not_before": str(marker.get("formal_activate_not_before") or ""),
+                    "last_validation_test_epoch_id": validation_test_epoch_id,
+                    "last_validation_short_test_epoch_id": validation_short_test_epoch_id,
+                    "last_validation_test_started_at": validation_test_started_at,
                 }
             )
             write_json_atomic(config.formal_test_marker_path, marker)
             marker_status = "pending_flatten"
         else:
             state = read_json_object(config.formal_test_epoch_state_path)
+            if marker_status == "validation_active":
+                active_test_epoch_id = str(
+                    marker.get("validation_test_epoch_id") or ""
+                )
+                active_short_test_epoch_id = str(
+                    marker.get("validation_short_test_epoch_id") or ""
+                )
+                active_test_started_at = str(
+                    marker.get("validation_test_started_at") or ""
+                )
+            else:
+                active_test_epoch_id = str(marker.get("test_epoch_id") or "")
+                active_short_test_epoch_id = str(
+                    marker.get("short_test_epoch_id") or ""
+                )
+                active_test_started_at = str(marker.get("test_started_at") or "")
             canonical = {
-                "test_epoch_id": str(marker.get("test_epoch_id") or ""),
-                "short_test_epoch_id": str(marker.get("short_test_epoch_id") or ""),
-                "status": "active",
-                "test_started_at": str(marker.get("test_started_at") or ""),
-                "activated_at": str(marker.get("activated_at") or marker.get("test_started_at") or ""),
+                "test_epoch_id": active_test_epoch_id,
+                "short_test_epoch_id": active_short_test_epoch_id,
+                "status": marker_status,
+                "test_started_at": active_test_started_at,
+                "activated_at": str(
+                    marker.get("validation_activated_at")
+                    or marker.get("activated_at")
+                    or active_test_started_at
+                    or ""
+                ),
                 "blocks_new_entries": False,
-                "validation_session": marker.get("validation_session") is True,
+                "validation_session": marker_status == "validation_active",
+                "validation_business_date": str(marker.get("validation_business_date") or ""),
+                "validation_end_at": str(marker.get("validation_end_at") or ""),
             }
             if canonical["test_started_at"] and any(state.get(key) != value for key, value in canonical.items()):
                 state.update(canonical)
@@ -1387,7 +1425,7 @@ def run_pending_flatten_cycle(
                 state["updated_at"] = to_iso(now)
                 write_json_atomic(config.formal_test_epoch_state_path, state)
             return {
-                "status": "preactivation_validation_active" if marker.get("validation_session") is True else "inactive",
+                "status": "preactivation_validation_active" if marker_status == "validation_active" else "inactive",
                 "blocks_new_entries": False,
                 "validation_end_at": str(marker.get("validation_end_at") or ""),
             }
@@ -1443,7 +1481,8 @@ def run_pending_flatten_cycle(
         snapshot_age_seconds = -1
     state["account_snapshot_age_seconds"] = snapshot_age_seconds
     account_known = (
-        snapshot.get("paper_account_verified") is True
+        snapshot.get("account_channel") == "lb_papertrading"
+        and snapshot.get("paper_account_verified") is True
         and snapshot.get("positions_ok") is True
         and snapshot.get("orders_ok") is True
         and 0 <= snapshot_age_seconds <= config.maximum_account_snapshot_age_seconds
@@ -1455,6 +1494,55 @@ def run_pending_flatten_cycle(
         return state
 
     if confirmation["complete"]:
+        validation_business_date = str(getattr(config, "validation_business_date", "") or "")
+        validation_end_at = parse_utc_datetime(
+            str(getattr(config, "validation_end_at", "") or "")
+        )
+        validation_window_open = (
+            bool(validation_business_date)
+            and validation_end_at is not None
+            and market_date(now) == validation_business_date
+            and in_regular_session(now)
+            and now.astimezone(UTC) < validation_end_at
+        )
+        if validation_window_open:
+            validation_suffix = validation_business_date.replace("-", "")
+            validation_test_epoch_id = f"m15-sdk-validation-{validation_suffix}"
+            validation_short_test_epoch_id = (
+                f"m15-sdk-validation-short-{validation_suffix}"
+            )
+            active_marker = dict(marker)
+            active_marker.update(
+                {
+                    "status": "validation_active",
+                    "validation_session": True,
+                    "validation_business_date": validation_business_date,
+                    "validation_end_at": to_iso(validation_end_at),
+                    "validation_test_epoch_id": validation_test_epoch_id,
+                    "validation_short_test_epoch_id": validation_short_test_epoch_id,
+                    "validation_test_started_at": to_iso(now),
+                    "validation_activated_at": to_iso(now),
+                    "activation_condition_met": "validation_session_auto_activated_after_flat_account",
+                    "blocks_new_entries": False,
+                }
+            )
+            write_json_atomic(config.formal_test_marker_path, active_marker)
+            state["status"] = "validation_active"
+            state["test_epoch_id"] = validation_test_epoch_id
+            state["short_test_epoch_id"] = validation_short_test_epoch_id
+            state["test_started_at"] = active_marker["validation_test_started_at"]
+            state["activated_at"] = active_marker["validation_activated_at"]
+            state["blocks_new_entries"] = False
+            state["validation_session"] = True
+            state["validation_business_date"] = validation_business_date
+            state["validation_end_at"] = active_marker["validation_end_at"]
+            write_json_atomic(config.formal_test_epoch_state_path, state)
+            return {
+                "status": "preactivation_validation_active",
+                "blocks_new_entries": False,
+                "validation_business_date": validation_business_date,
+                "validation_end_at": active_marker["validation_end_at"],
+            }
         activate_not_before = parse_utc_datetime(str(marker.get("activate_not_before") or ""))
         if activate_not_before is not None and now.astimezone(UTC) < activate_not_before:
             state["status"] = "waiting_for_activation_window"
@@ -1880,16 +1968,35 @@ def dispatch_completed_rows(
     now = str(new_rows[-1]["received_at"])
     now_dt = datetime.fromisoformat(now.replace("Z", "+00:00"))
     formal_marker = load_formal_test_marker(config)
-    if str(formal_marker.get("status") or "") == "pending_flatten":
+    marker_status = str(formal_marker.get("status") or "")
+    validation_end_at = parse_utc_datetime(
+        str(formal_marker.get("validation_end_at") or "")
+    )
+    validation_cutoff_reached = (
+        marker_status == "validation_active"
+        and validation_end_at is not None
+        and now_dt.astimezone(UTC) >= validation_end_at
+    )
+    if marker_status == "pending_flatten" or validation_cutoff_reached:
         return {
             "event_count": len(fresh),
             "trading_event_count": len(new_rows),
             "readonly_expansion_event_count": len(fresh) - len(trading_fresh),
             "signal_count": 0,
             "live_daily_confirmation_count": 0,
-            "router": {"status": "suppressed_pending_formal_epoch"},
+            "router": {
+                "status": (
+                    "suppressed_validation_session_ended"
+                    if validation_cutoff_reached
+                    else "suppressed_pending_formal_epoch"
+                )
+            },
             "execution": {
-                "status": "blocked_pending_account_flatten",
+                "status": (
+                    "blocked_validation_session_ended"
+                    if validation_cutoff_reached
+                    else "blocked_pending_account_flatten"
+                ),
                 "submitted_count": 0,
             },
             "formal_test_epoch_id": str(formal_marker.get("test_epoch_id") or ""),
@@ -1941,11 +2048,27 @@ def dispatch_completed_rows(
         )
     if fill_attribution_state_cache is None:
         fill_attribution_state_cache = {}
+    if marker_status == "validation_active":
+        active_test_epoch_id = str(
+            formal_marker.get("validation_test_epoch_id") or ""
+        )
+        active_short_test_epoch_id = str(
+            formal_marker.get("validation_short_test_epoch_id") or ""
+        )
+        active_test_started_at = str(
+            formal_marker.get("validation_test_started_at") or ""
+        )
+    else:
+        active_test_epoch_id = str(formal_marker.get("test_epoch_id") or "")
+        active_short_test_epoch_id = str(
+            formal_marker.get("short_test_epoch_id") or ""
+        )
+        active_test_started_at = str(formal_marker.get("test_started_at") or "")
     if formal_marker:
         router = replace(
             router,
-            short_test_epoch_id=str(formal_marker["short_test_epoch_id"]),
-            short_test_started_at=str(formal_marker["test_started_at"]),
+            short_test_epoch_id=active_short_test_epoch_id,
+            short_test_started_at=active_test_started_at,
         )
     emitted: list[dict[str, Any]] = []
     router_started = time.perf_counter()
@@ -1967,9 +2090,9 @@ def dispatch_completed_rows(
     if formal_marker:
         position_config = replace(
             position_config,
-            test_epoch_id=str(formal_marker["test_epoch_id"]),
-            test_started_at=str(formal_marker["test_started_at"]),
-            short_test_epoch_id=str(formal_marker["short_test_epoch_id"]),
+            test_epoch_id=active_test_epoch_id,
+            test_started_at=active_test_started_at,
+            short_test_epoch_id=active_short_test_epoch_id,
         )
     position_started = time.perf_counter()
     positions = run_realtime_position_manager(
@@ -2019,9 +2142,9 @@ def dispatch_completed_rows(
         if formal_marker:
             execution_config = replace(
                 execution_config,
-                test_epoch_id=str(formal_marker["test_epoch_id"]),
-                short_test_epoch_id=str(formal_marker["short_test_epoch_id"]),
-                short_test_started_at=str(formal_marker["test_started_at"]),
+                test_epoch_id=active_test_epoch_id,
+                short_test_epoch_id=active_short_test_epoch_id,
+                short_test_started_at=active_test_started_at,
             )
         execution_account_snapshot = dict(snapshot)
         execution_account_snapshot["fill_attribution_frozen_symbols"] = list(
@@ -2070,6 +2193,7 @@ def dispatch_completed_rows(
         "router": router_payload,
         "execution": execution,
         "formal_test_epoch_id": str(formal_marker.get("test_epoch_id") or ""),
+        "active_test_epoch_id": active_test_epoch_id,
         "stage_latency_ms": {
             "router": router_elapsed_ms,
             "position_manager": position_elapsed_ms,
@@ -3035,7 +3159,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 trading_daily_context_ready = daily_context_covers_symbols(
                     config, daily_rows, configured_trading_symbols(config), daily_failed
                 )
+                # Re-evaluate the validation/flatten gate before every closed-bar
+                # batch.  This prevents a 15:45 cutoff from waiting for the slower
+                # maintenance cadence while a new-entry batch is already running.
+                if dispatch_enabled and bool(trade_context_health.get("ok")):
+                    flatten_transition = run_pending_flatten_cycle(
+                        config,
+                        account,
+                        flatten_client,
+                        context.rows(),
+                        now=datetime.now(UTC),
+                    )
                 active_client = paper_client if trading_daily_context_ready else None
+                if bool(flatten_transition.get("blocks_new_entries")):
+                    active_client = None
                 if (
                     market_data_mode == "sdk_snapshot_poll"
                     and not market_data_fallback_validated

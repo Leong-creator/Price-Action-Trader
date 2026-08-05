@@ -174,6 +174,36 @@ class VisualStrategyShadowSessionTest(unittest.TestCase):
                 self.assertEqual(result["status"], "blocked_incomplete_session")
                 self.assertGreater(result["diagnostics"][diagnostic], 0)
 
+    def test_context_only_rows_do_not_invalidate_realtime_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = load_config(self.write_fixture(root))
+            context_row = {
+                "symbol": "AAPL",
+                "timeframe": "5m",
+                "event_time": "2026-08-04T13:35:00Z",
+                "bar_final": True,
+                "source_mode": "longbridge_sdk_intraday_context",
+                "context_only": True,
+                "market_data_blocked_reason": "",
+                "open": "1",
+                "high": "1",
+                "low": "1",
+                "close": "1",
+                "volume": "1",
+            }
+            with config.market_events_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(context_row) + "\n")
+
+            result = run_visual_shadow_session(
+                config,
+                business_date="2026-08-04",
+                generated_at="2026-08-04T20:15:00Z",
+            )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result.get("diagnostics", {}).get("invalid_source_count", 0), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

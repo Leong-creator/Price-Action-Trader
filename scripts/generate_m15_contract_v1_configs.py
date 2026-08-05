@@ -101,7 +101,12 @@ def paper_account_model() -> dict[str, Any]:
     }
 
 
-def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
+def build_configs(
+    epoch_date: str,
+    *,
+    validation_business_date: str = "",
+    validation_end_at: str = "",
+) -> dict[Path, dict[str, Any]]:
     long_epoch = f"m15-sdk-contract-v1-{epoch_date}"
     short_epoch = f"m15-sdk-contract-v1-short-{epoch_date}"
     buckets = capital_buckets()
@@ -208,6 +213,15 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
     runtime["formal_test_transition"]["activate_not_before"] = (
         f"{epoch_date[:4]}-{epoch_date[4:6]}-{epoch_date[6:]}T13:30:00Z"
     )
+    if validation_business_date or validation_end_at:
+        if not validation_business_date or not validation_end_at:
+            raise ValueError(
+                "validation_business_date and validation_end_at must be configured together"
+            )
+        runtime["formal_test_transition"]["validation_business_date"] = (
+            validation_business_date
+        )
+        runtime["formal_test_transition"]["validation_end_at"] = validation_end_at
 
     readiness = read_json(ROOT / "config/examples/m15_opening_trade_readiness.paper_orders_enabled.json")
     readiness["inputs"]["sdk_runtime_config"] = "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
@@ -243,10 +257,24 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate frozen M15 contract-v1 paper configuration.")
     parser.add_argument("--epoch-date", required=True, help="New York market date as YYYYMMDD")
+    parser.add_argument(
+        "--validation-business-date",
+        default="",
+        help="Optional New York validation date in YYYY-MM-DD format.",
+    )
+    parser.add_argument(
+        "--validation-end-at",
+        default="",
+        help="Optional UTC timestamp when the validation session stops new entries.",
+    )
     args = parser.parse_args()
     if len(args.epoch_date) != 8 or not args.epoch_date.isdigit():
         parser.error("--epoch-date must use YYYYMMDD")
-    for path, payload in build_configs(args.epoch_date).items():
+    for path, payload in build_configs(
+        args.epoch_date,
+        validation_business_date=args.validation_business_date,
+        validation_end_at=args.validation_end_at,
+    ).items():
         write_state_atomic(path, payload)
         print(path.relative_to(ROOT))
     return 0

@@ -5,6 +5,7 @@
     "shadow_run_summary": "reports/m15_visual_strategy_shadow/run_summary.json",
     "shadow_state": "reports/m15_visual_strategy_shadow/state.json",
     "shadow_audit_jsonl": "reports/m15_visual_strategy_shadow/audit_events.jsonl",
+    "historical_replay_bars": "reports/m15_visual_strategy_shadow/historical_replay_bars.jsonl",
     "realtime_shadow_ledger": "local_runtime/m15_visual_strategy_shadow/session_ledger.jsonl",
     "session_daily_bars": "local_runtime/m15_visual_strategy_shadow/aggregated_daily_bars.jsonl"
   },
@@ -16,7 +17,7 @@
     "expected_bars_per_symbol": 60,
     "segmented_chunk_size": 37,
     "negative_horizon_bars": 3,
-    "realtime_shadow_sessions": 0
+    "realtime_shadow_sessions": 1
   },
   "example_limits": {
     "positive_examples": 10,

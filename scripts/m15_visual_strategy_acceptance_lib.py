@@ -56,6 +56,7 @@ class AcceptanceConfig:
     summary_path: Path = ROOT / "reports" / "m15_visual_strategy_shadow" / "run_summary.json"
     state_path: Path = ROOT / "reports" / "m15_visual_strategy_shadow" / "state.json"
     audit_path: Path = ROOT / "reports" / "m15_visual_strategy_shadow" / "audit_events.jsonl"
+    historical_replay_bars_path: Path | None = None
     realtime_shadow_ledger_path: Path | None = None
     session_daily_bars_path: Path | None = None
     output_path: Path = ROOT / "reports" / "m15_visual_strategy_shadow" / "acceptance_evidence.json"
@@ -101,6 +102,11 @@ def load_acceptance_config(path: str | Path) -> AcceptanceConfig:
         summary_path=resolve_path(inputs["shadow_run_summary"]),
         state_path=resolve_path(inputs["shadow_state"]),
         audit_path=resolve_path(inputs["shadow_audit_jsonl"]),
+        historical_replay_bars_path=(
+            resolve_path(inputs["historical_replay_bars"])
+            if inputs.get("historical_replay_bars")
+            else None
+        ),
         realtime_shadow_ledger_path=resolve_path(inputs["realtime_shadow_ledger"])
         if inputs.get("realtime_shadow_ledger")
         else None,
@@ -126,20 +132,14 @@ def generate_acceptance_evidence(
 ) -> dict[str, Any]:
     observed_at = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     shadow_config = load_config(config.shadow_config_path)
-    historical_bars = [normalize_bar(row) for row in load_bars(shadow_config.input_path)]
-    session_bars = (
-        [normalize_bar(row) for row in _load_jsonl(config.session_daily_bars_path)]
-        if config.session_daily_bars_path and config.session_daily_bars_path.exists()
-        else []
-    )
-    session_dates = {_market_date(row) for row in session_bars}
-    bars = sorted(
-        [row for row in historical_bars if _market_date(row) not in session_dates] + session_bars,
-        key=lambda row: (row["event_time"], stream_key(row)),
-    )
     summary = _load_json(config.summary_path)
     state = _load_json(config.state_path)
     audit_rows = _load_jsonl(config.audit_path)
+    bars = _load_frozen_historical_replay_bars(
+        config,
+        state,
+        fallback_input_path=shadow_config.input_path,
+    )
     realtime_shadow_rows = (
         _load_jsonl(config.realtime_shadow_ledger_path)
         if config.realtime_shadow_ledger_path and config.realtime_shadow_ledger_path.exists()
@@ -250,6 +250,11 @@ def generate_acceptance_evidence(
             "shadow_state": str(config.state_path),
             "shadow_audit_jsonl": str(config.audit_path),
             "daily_context_bars": str(shadow_config.input_path),
+            "historical_replay_bars": (
+                str(config.historical_replay_bars_path)
+                if config.historical_replay_bars_path
+                else ""
+            ),
             "realtime_shadow_ledger": str(config.realtime_shadow_ledger_path) if config.realtime_shadow_ledger_path else "",
             "session_daily_bars": str(config.session_daily_bars_path) if config.session_daily_bars_path else "",
         },
@@ -328,6 +333,47 @@ def generate_acceptance_evidence(
         }
     atomic_write_json(config.output_path, payload)
     return payload
+
+
+def _load_frozen_historical_replay_bars(
+    config: AcceptanceConfig,
+    state: dict[str, Any],
+    *,
+    fallback_input_path: Path,
+) -> list[dict[str, Any]]:
+    path = config.historical_replay_bars_path
+    if path is not None and path.exists():
+        rows = [normalize_bar(row) for row in _load_jsonl(path)]
+    else:
+        rows = []
+        streams = state.get("streams", {})
+        if not isinstance(streams, dict):
+            raise ValueError("visual shadow state streams must be an object")
+        can_seed_from_state = len(streams) == config.expected_symbol_count
+        for stream in streams.values():
+            history = stream.get("history", []) if isinstance(stream, dict) else []
+            if len(history) < config.expected_bars_per_symbol:
+                can_seed_from_state = False
+                break
+            rows.extend(normalize_bar(row) for row in history[: config.expected_bars_per_symbol])
+        if not can_seed_from_state:
+            rows = [normalize_bar(row) for row in load_bars(fallback_input_path)]
+        rows.sort(key=lambda row: (row["event_time"], stream_key(row)))
+        expected = config.expected_symbol_count * config.expected_bars_per_symbol
+        if path is not None and len(rows) == expected:
+            _write_jsonl_atomic(path, rows)
+    expected = config.expected_symbol_count * config.expected_bars_per_symbol
+    return sorted(rows, key=lambda row: (row["event_time"], stream_key(row)))
+
+
+def _write_jsonl_atomic(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(
+        "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    temporary.replace(path)
 
 
 def _load_json(path: Path) -> dict[str, Any]:

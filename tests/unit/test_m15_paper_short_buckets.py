@@ -279,13 +279,13 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             "insufficient",
         )
 
-    def test_sell_short_capacity_parser_uses_only_margin_max_qty(self) -> None:
+    def test_sell_short_capacity_parser_uses_cash_backed_quantity_without_margin(self) -> None:
         response = {
             "cash_max_qty": "99",
             "margin_max_qty": "3",
         }
-        self.assertEqual(response_max_sell_quantity(response), Decimal("3"))
-        self.assertEqual(response_max_sell_quantity({"cash_max_qty": "99"}), Decimal("0"))
+        self.assertEqual(response_max_sell_quantity(response), Decimal("99"))
+        self.assertEqual(response_max_sell_quantity({"margin_max_qty": "3"}), Decimal("0"))
 
     def test_short_reconciliation_requires_exact_order_identity_and_calculates_cover_pnl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

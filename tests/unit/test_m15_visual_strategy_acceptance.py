@@ -60,6 +60,7 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
                 "shadow_run_summary": str(root / "summary.json"),
                 "shadow_state": str(root / "state.json"),
                 "shadow_audit_jsonl": str(root / "audit.jsonl"),
+                "historical_replay_bars": str(root / "historical_replay_bars.jsonl"),
                 "realtime_shadow_ledger": str(root / "realtime_shadow_ledger.jsonl"),
             },
             "outputs": {"acceptance_json": str(root / "acceptance.json")},
@@ -244,6 +245,42 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
         self.assertEqual(proof["observed_bar_count"], 11)
         self.assertEqual(proof["expected_bar_count"], 12)
         self.assertEqual(proof["observed_bars_per_symbol_values"], [5, 6])
+
+    def test_frozen_replay_baseline_does_not_drift_with_live_daily_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bars = [self.bar("AAA", day, "10", "11", "9", "10", "100") for day in range(1, 7)]
+            bars += [self.bar("BBB", day, "20", "21", "19", "20", "100") for day in range(1, 7)]
+            self.write_jsonl(root / "bars.jsonl", bars)
+            self.write_shadow_config(root)
+            self.write_ledger(root, [])
+            run_visual_strategy_shadow(
+                self.make_shadow_config(root),
+                bars=bars,
+                generated_at="2026-08-05T11:20:00Z",
+            )
+            config = load_acceptance_config(self.write_acceptance_config(root))
+            first = generate_acceptance_evidence(config, generated_at="2026-08-05T11:30:00Z")
+            frozen_rows = [
+                json.loads(line)
+                for line in config.historical_replay_bars_path.read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                if line.strip()
+            ]
+            shifted = bars[1:6] + [self.bar("AAA", 7, "10", "11", "9", "10", "100")]
+            shifted += bars[7:12] + [self.bar("BBB", 7, "20", "21", "19", "20", "100")]
+            self.write_jsonl(root / "bars.jsonl", shifted)
+            second = generate_acceptance_evidence(config, generated_at="2026-08-05T12:30:00Z")
+
+        self.assertTrue(first["replay_proofs"]["audit_matches_replay"]["passed"])
+        self.assertEqual(len(frozen_rows), 12)
+        self.assertEqual(
+            {(row["symbol"], row["event_time"]) for row in frozen_rows},
+            {(row["symbol"], row["event_time"]) for row in bars},
+        )
+        self.assertTrue(second["replay_proofs"]["audit_matches_replay"]["passed"])
+        self.assertTrue(second["replay_proofs"]["no_future_data"]["passed"])
 
 
 if __name__ == "__main__":

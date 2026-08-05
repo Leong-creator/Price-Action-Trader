@@ -735,7 +735,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(response["status"], "submit_unconfirmed_missing_order_id")
             self.assertEqual(response["order_id"], "")
 
-    def test_longbridge_cli_short_capacity_uses_margin_quantity_not_cash_quantity(self) -> None:
+    def test_longbridge_cli_short_capacity_uses_cash_quantity_without_margin(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = self.make_config(root, execute_orders=True, paper_trading_approval=True)
@@ -764,7 +764,11 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             response = client.max_short_quantity("TSLA", Decimal("300"))
 
             self.assertTrue(response["ok"])
-            self.assertEqual(response["max_quantity"], Decimal("9999"))
+            self.assertEqual(response["max_quantity"], Decimal("903"))
+            self.assertEqual(
+                response["capacity_basis"],
+                "cash_max_qty_for_sell_short_no_margin_financing",
+            )
             self.assertEqual(
                 commands[0],
                 ["longbridge", "max-qty", "TSLA.US", "--side", "sell", "--price", "300.00", "--format", "json"],

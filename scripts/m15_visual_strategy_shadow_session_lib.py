@@ -196,6 +196,10 @@ def collect_session_rows(
     for row in read_jsonl(config.market_events_path):
         if str(row.get("timeframe")) != f"{config.timeframe_minutes}m" or row.get("bar_final") is not True:
             continue
+        # Context-only rows restore strategy state after a process restart. They
+        # are not evidence that the realtime SDK stream delivered that bar.
+        if row.get("context_only") is True:
+            continue
         symbol = str(row.get("symbol") or "").upper()
         if symbol not in required:
             continue
