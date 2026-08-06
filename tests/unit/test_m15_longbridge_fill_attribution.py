@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from scripts.m15_longbridge_fill_attribution_lib import (
     add_completed_trade_performance,
+    apply_account_flatten_fill_allocations,
+    apply_aggregate_strategy_exit_fill_allocations,
     apply_account_reconciliation_adjustments,
     build_virtual_position_layers,
     rebuild_fill_attribution,
@@ -13,6 +15,163 @@ from scripts.m15_longbridge_fill_attribution_lib import (
 
 
 class M15LongbridgeFillAttributionTest(unittest.TestCase):
+    def test_aggregate_exit_allocates_only_within_exact_strategy_scope(self) -> None:
+        local_rows = [
+            self.local_row(
+                order_id="open-a",
+                signal_id="open-a",
+                symbol="HPQ",
+                side="buy",
+                quantity="2",
+                runtime_id="RUNTIME-A",
+                capital_bucket="bucket-a",
+                test_epoch_id="m15-sdk-contract-v1-20260806",
+                position_action="open_long",
+            ),
+            self.local_row(
+                order_id="open-b",
+                signal_id="open-b",
+                symbol="HPQ",
+                side="buy",
+                quantity="3",
+                runtime_id="RUNTIME-A",
+                capital_bucket="bucket-a",
+                test_epoch_id="m15-sdk-contract-v1-20260806",
+                position_action="open_long",
+            ),
+            self.local_row(
+                order_id="exit-all",
+                signal_id="exit-all",
+                symbol="HPQ",
+                side="sell",
+                quantity="5",
+                runtime_id="RUNTIME-A",
+                capital_bucket="bucket-a",
+                test_epoch_id="m15-sdk-contract-v1-20260806",
+                position_action="stop_loss",
+                source_open_order_id="open-b",
+                source_open_trade_id="trade-b",
+            ),
+        ]
+        local_rows[-1]["source_open_remaining_quantity"] = "5"
+        broker_rows = [
+            self.broker_row(order_id="open-a", trade_id="trade-a", symbol="HPQ.US", side="Buy", status="Filled", executed_quantity="2", executed_price="30", created_at="2026-08-05T14:00:00Z"),
+            self.broker_row(order_id="open-b", trade_id="trade-b", symbol="HPQ.US", side="Buy", status="Filled", executed_quantity="3", executed_price="31", created_at="2026-08-05T14:05:00Z"),
+            self.broker_row(order_id="exit-all", trade_id="trade-exit", symbol="HPQ.US", side="Sell", status="Filled", executed_quantity="5", executed_price="29", created_at="2026-08-05T15:00:00Z"),
+        ]
+        result = rebuild_fill_attribution(
+            local_rows,
+            broker_rows,
+            broker_net_positions={"HPQ": "0"},
+        )
+        self.assertEqual(result["anomalies"][0]["code"], "exit_quantity_exceeds_open_batch")
+
+        result = apply_aggregate_strategy_exit_fill_allocations(
+            result,
+            local_rows,
+            broker_rows,
+            broker_net_positions={"HPQ": "0"},
+        )
+
+        exits = [row for row in result["events"] if row["event_type"] == "exit_fill"]
+        self.assertEqual(len(exits), 2)
+        self.assertEqual({row["source_open_order_id"] for row in exits}, {"open-a", "open-b"})
+        self.assertEqual({row["runtime_id"] for row in exits}, {"RUNTIME-A"})
+        self.assertEqual(result["summary"]["open_batch_count"], 0)
+        self.assertEqual(result["summary"]["anomaly_count"], 0)
+        self.assertTrue(result["symbol_checks"][0]["matches_broker_net"])
+
+    def test_account_flatten_fill_allocates_exactly_across_strategy_lots(self) -> None:
+        result = rebuild_fill_attribution(
+            [
+                self.local_row(
+                    order_id="open-a",
+                    signal_id="signal-a",
+                    symbol="AAPL",
+                    side="buy",
+                    quantity="2",
+                    runtime_id="RUNTIME-A",
+                    capital_bucket="bucket-a",
+                    test_epoch_id="m15-sdk-validation-20260805",
+                    position_action="open_long",
+                ),
+                self.local_row(
+                    order_id="open-b",
+                    signal_id="signal-b",
+                    symbol="AAPL",
+                    side="buy",
+                    quantity="3",
+                    runtime_id="RUNTIME-B",
+                    capital_bucket="bucket-b",
+                    test_epoch_id="m15-sdk-validation-20260805",
+                    position_action="open_long",
+                ),
+            ],
+            [
+                self.broker_row(
+                    order_id="open-a",
+                    trade_id="trade-a",
+                    symbol="AAPL.US",
+                    side="Buy",
+                    status="Filled",
+                    executed_quantity="2",
+                    executed_price="100",
+                    created_at="2026-08-05T14:00:00Z",
+                ),
+                self.broker_row(
+                    order_id="open-b",
+                    trade_id="trade-b",
+                    symbol="AAPL.US",
+                    side="Buy",
+                    status="Filled",
+                    executed_quantity="3",
+                    executed_price="101",
+                    created_at="2026-08-05T14:01:00Z",
+                ),
+            ],
+            broker_net_positions={"AAPL": "5"},
+        )
+
+        result = apply_account_flatten_fill_allocations(
+            result,
+            [
+                {
+                    "order_id": "flatten-aapl",
+                    "symbol": "AAPL",
+                    "position_action": "close_long",
+                    "test_epoch_id": "m15-sdk-validation-20260805",
+                    "account_flatten_allocation": True,
+                }
+            ],
+            [
+                self.broker_row(
+                    order_id="flatten-aapl",
+                    trade_id="flatten-trade",
+                    symbol="AAPL.US",
+                    side="Sell",
+                    status="Filled",
+                    executed_quantity="5",
+                    executed_price="102",
+                    created_at="2026-08-05T19:45:00Z",
+                )
+            ],
+            broker_net_positions={"AAPL": "0"},
+        )
+        result = add_completed_trade_performance(
+            result,
+            commission_per_order_side=Decimal("0"),
+            regulatory_fee_per_sell_order=Decimal("0"),
+        )
+
+        exits = [row for row in result["events"] if row["event_type"] == "exit_fill"]
+        self.assertEqual(len(exits), 2)
+        self.assertEqual({row["runtime_id"] for row in exits}, {"RUNTIME-A", "RUNTIME-B"})
+        self.assertEqual({row["order_id"] for row in exits}, {"flatten-aapl"})
+        self.assertEqual(result["summary"]["open_batch_count"], 0)
+        self.assertEqual(result["summary"]["anomaly_count"], 0)
+        self.assertEqual(result["summary"]["gross_realized_pnl"], "7.00")
+        self.assertTrue(result["symbol_checks"][0]["matches_broker_net"])
+
     def test_new_contract_hash_separates_fill_batches_for_rule_revisions(self) -> None:
         result = rebuild_fill_attribution(
             [

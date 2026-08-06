@@ -100,6 +100,67 @@ def parse_utc_datetime(value: str) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def pending_flatten_test_epoch_id(marker: dict[str, Any]) -> str:
+    """Keep validation cleanup outside the next formal performance epoch."""
+    if (
+        str(marker.get("activation_blocker") or "")
+        == "validation_session_ended_account_flatten_required"
+        and str(marker.get("last_validation_test_epoch_id") or "")
+    ):
+        return str(marker["last_validation_test_epoch_id"])
+    return str(marker.get("test_epoch_id") or "")
+
+
+def append_account_flatten_submission_audit(
+    config: Any,
+    payload: dict[str, Any],
+    response: dict[str, Any],
+    *,
+    now: datetime,
+) -> None:
+    order_id = str(response.get("order_id") or "")
+    if not order_id:
+        return
+    row = {
+        "stage": "M15.sdk_runtime_auto_flatten",
+        "created_at": to_iso(now),
+        "processed_at": to_iso(now),
+        "submitted_at": to_iso(now),
+        "submission_status": "submitted",
+        "execute_orders": True,
+        "paper_trading_approval": True,
+        "account_flatten_allocation": True,
+        "market_exit_no_reprice": True,
+        "exit_only_position_signal": True,
+        "order_id": order_id,
+        "broker_order_id": order_id,
+        "longbridge_order_id": order_id,
+        "signal_id": str(payload.get("signal_id") or ""),
+        "client_request_id": str(payload.get("client_request_id") or ""),
+        "runtime_id": "M15-LONGBRIDGE-SDK-AUTO-FLATTEN",
+        "strategy_id": "M15-LONGBRIDGE-SDK-AUTO-FLATTEN",
+        "capital_bucket": "account_validation_flatten",
+        "test_epoch_id": str(payload.get("test_epoch_id") or ""),
+        "symbol": str(payload.get("symbol") or "").upper().replace(".US", ""),
+        "side": str(payload.get("side") or "").lower(),
+        "direction": str(payload.get("direction") or ""),
+        "position_action": str(payload.get("position_action") or ""),
+        "order_type": str(payload.get("order_type") or "market"),
+        "quantity": str(payload.get("quantity") or ""),
+        "response": dict(response),
+        "local_simulation_ignored": True,
+        "paper_simulated_only": True,
+        "live_execution": False,
+        "real_money_actions": False,
+    }
+    path = config.output_dir / EXECUTION_LEDGER_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the persistent Longbridge SDK paper runtime.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
@@ -538,6 +599,25 @@ def snapshot_poll_cycle_is_healthy(
     )
 
 
+def snapshot_poll_should_idle(ready_emitted: bool, now: datetime) -> bool:
+    """Do not hammer the quote endpoint after a complete off-hours probe."""
+    return bool(ready_emitted and not in_regular_session(now))
+
+
+def validated_snapshot_poll_is_reusable(
+    previous_status: dict[str, Any],
+    expected_symbol_count: int,
+) -> bool:
+    """Reuse a previously validated SDK snapshot path without a dead subscribe probe."""
+    return bool(
+        previous_status.get("market_data_mode") == "sdk_snapshot_poll"
+        and previous_status.get("market_data_fallback_validated") is True
+        and int(previous_status.get("snapshot_poll_covered_count") or 0)
+        == int(expected_symbol_count)
+        and int(previous_status.get("snapshot_poll_missing_count") or 0) == 0
+    )
+
+
 MARKET_DATA_PROGRESS_KINDS = frozenset(
     {
         "subscription_progress",
@@ -768,6 +848,27 @@ def quote_snapshot_worker(
         successful_fast_polls = 0
         ready_emitted = False
         while not stop_event.is_set():
+            idle_now = datetime.now(UTC)
+            if snapshot_poll_should_idle(ready_emitted, idle_now):
+                progress_now = time.monotonic()
+                if progress_value is not None:
+                    progress_value.value = progress_now
+                emit_worker(
+                    queue_out,
+                    {
+                        "kind": "heartbeat",
+                        "at": to_iso(idle_now),
+                        "market_data_mode": "sdk_snapshot_poll",
+                        "poll_elapsed_ms": 0,
+                        "poll_is_fast_and_complete": True,
+                        "poll_covered_count": len(target_symbols),
+                        "poll_missing_count": 0,
+                        "successful_fast_polls": successful_fast_polls,
+                        "off_hours_idle": True,
+                    },
+                )
+                stop_event.wait(1)
+                continue
             became_ready_this_cycle = False
             poll_started = time.monotonic()
             received_at = datetime.now(UTC)
@@ -1432,7 +1533,7 @@ def run_pending_flatten_cycle(
     if marker_status != "pending_flatten":
         return {"status": "inactive", "blocks_new_entries": False}
 
-    epoch_id = str(marker.get("test_epoch_id") or "")
+    epoch_id = pending_flatten_test_epoch_id(marker)
     state = read_json_object(config.formal_test_epoch_state_path)
     if str(state.get("test_epoch_id") or "") != epoch_id:
         state = {
@@ -1548,6 +1649,9 @@ def run_pending_flatten_cycle(
             state["status"] = "waiting_for_activation_window"
             state["activate_not_before"] = to_iso(activate_not_before)
             state["blocks_new_entries"] = True
+            state["last_flatten_test_epoch_id"] = epoch_id
+            state["test_epoch_id"] = str(marker.get("test_epoch_id") or "")
+            state["short_test_epoch_id"] = str(marker.get("short_test_epoch_id") or "")
             marker["activation_blocker"] = "waiting_for_configured_activation_time"
             marker["blocks_new_entries"] = True
             write_json_atomic(config.formal_test_marker_path, marker)
@@ -1556,6 +1660,8 @@ def run_pending_flatten_cycle(
         active_marker = activate_formal_epoch_payload(marker, activated_at=now)
         write_json_atomic(config.formal_test_marker_path, active_marker)
         state["status"] = active_marker["status"]
+        state["test_epoch_id"] = str(active_marker.get("test_epoch_id") or "")
+        state["short_test_epoch_id"] = str(active_marker.get("short_test_epoch_id") or "")
         state["test_started_at"] = active_marker["test_started_at"]
         state["activated_at"] = active_marker["activated_at"]
         state["blocks_new_entries"] = False
@@ -1699,6 +1805,12 @@ def run_pending_flatten_cycle(
                     "primary_response": retry_response,
                 }
             )
+            append_account_flatten_submission_audit(
+                config,
+                retry_payload,
+                retry_response,
+                now=now,
+            )
             submitted_now += 1
             if not retry_order_id:
                 retry_attempt["status"] = "submission_state_unknown"
@@ -1732,6 +1844,12 @@ def run_pending_flatten_cycle(
             "order_id": order_id,
             "primary_response": response,
         })
+        append_account_flatten_submission_audit(
+            config,
+            payload,
+            response,
+            now=now,
+        )
         submitted_now += 1
         if response.get("explicit_reject") is True and not order_id:
             quote_age_ms = int(intent.get("fallback_quote_age_ms", -1) or -1)
@@ -1763,6 +1881,12 @@ def run_pending_flatten_cycle(
                     "fallback_status": str(fallback_response.get("status") or "fallback_submission_unknown"),
                     "fallback_response": fallback_response,
                 })
+                append_account_flatten_submission_audit(
+                    config,
+                    fallback_payload,
+                    fallback_response,
+                    now=now,
+                )
             else:
                 attempt["status"] = "explicit_reject_without_fresh_fallback_quote"
         elif not order_id:
@@ -2511,6 +2635,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     sdk = require_sdk_contract()
     run_id = f"sdk-{uuid.uuid4().hex[:12]}"
     loaded_config_fingerprint = config_fingerprint(config)
+    previous_runtime_status = read_json_object(config.runtime_status_path)
     readonly_gate_passed_now, readonly_sessions_passed, readonly_sessions_required = readonly_gate_passed(config.readonly_gate_path)
     expansion_gate_path = config.output_dir / "m15_sdk_expansion_readonly_gate.json"
     expansion_gate_passed, expansion_sessions_passed, expansion_sessions_required = readonly_gate_passed(
@@ -2698,14 +2823,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     deferred_messages: deque[dict[str, Any]] = deque()
     partial_bar_suppressed_until = ""
     last_subscription_failure_reason = ""
-    market_data_mode = "sdk_subscription"
-    snapshot_fallback_active = False
+    snapshot_fallback_active = validated_snapshot_poll_is_reusable(
+        previous_runtime_status,
+        len(configured_symbols(config)),
+    )
+    market_data_mode = (
+        "sdk_snapshot_poll" if snapshot_fallback_active else "sdk_subscription"
+    )
     subscription_recovery_failures = 0
     market_data_symbols: set[str] = set()
     market_data_failed: list[str] = []
     trading_market_data_failed: list[str] = []
     snapshot_poll_elapsed_ms = 0
-    market_data_fallback_validated = False
+    market_data_fallback_validated = snapshot_fallback_active
     snapshot_bar_builder: FiveMinuteBarBuilder | None = None
     snapshot_batch_count = 0
     snapshot_row_count = 0

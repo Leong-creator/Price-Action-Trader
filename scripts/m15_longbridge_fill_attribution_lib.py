@@ -87,6 +87,381 @@ def rebuild_fill_attribution_from_history(
     )
 
 
+def apply_account_flatten_fill_allocations(
+    payload: dict[str, Any],
+    local_flatten_rows: Iterable[Mapping[str, Any]],
+    broker_fill_rows: Iterable[Mapping[str, Any]],
+    *,
+    broker_net_positions: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Allocate one broker-level flatten fill across exact virtual lots FIFO.
+
+    Longbridge exposes one net position per symbol, while the project keeps one
+    virtual lot per strategy. The validation cutoff therefore closes the broker
+    symbol once and allocates that exact fill to the still-open lots in opening
+    order. The broker order/trade ids remain on every allocation event.
+    """
+    flatten_by_order = {
+        str(row.get("order_id") or ""): dict(row)
+        for row in local_flatten_rows
+        if isinstance(row, Mapping) and str(row.get("order_id") or "")
+    }
+    if not flatten_by_order:
+        return payload
+
+    batches = [
+        dict(row) for row in payload.get("batches", []) if isinstance(row, Mapping)
+    ]
+    flatten_order_ids = set(flatten_by_order)
+    events = [
+        dict(row)
+        for row in payload.get("events", [])
+        if isinstance(row, Mapping)
+        and str(row.get("order_id") or "") not in flatten_order_ids
+    ]
+    anomalies = [
+        dict(row)
+        for row in payload.get("anomalies", [])
+        if isinstance(row, Mapping)
+        and str(row.get("order_id") or "") not in flatten_order_ids
+    ]
+
+    fills = sorted(
+        (
+            dict(row)
+            for row in broker_fill_rows
+            if isinstance(row, Mapping)
+            and str(row.get("order_id") or "") in flatten_order_ids
+            and _canonical_status(row) in FILL_FACT_STATUSES
+        ),
+        key=_row_sort_key,
+    )
+    for broker_row in fills:
+        order_id = str(broker_row.get("order_id") or "")
+        local_row = flatten_by_order[order_id]
+        trade_id = str(broker_row.get("trade_id") or "")
+        symbol = _normalize_symbol(
+            str(local_row.get("symbol") or broker_row.get("symbol") or "")
+        )
+        test_epoch_id = str(local_row.get("test_epoch_id") or "")
+        action = str(local_row.get("position_action") or "")
+        direction = "short" if action == "close_short" else "long"
+        remaining_fill = _decimal(
+            broker_row.get("executed_quantity")
+            or broker_row.get("filled_quantity")
+            or broker_row.get("quantity")
+        )
+        fill_price = _decimal(
+            broker_row.get("executed_price") or broker_row.get("price")
+        )
+        candidates = sorted(
+            (
+                batch
+                for batch in batches
+                if str(batch.get("test_epoch_id") or "") == test_epoch_id
+                and _normalize_symbol(str(batch.get("symbol") or "")) == symbol
+                and str(batch.get("direction") or "") == direction
+                and _decimal(batch.get("remaining_quantity")) > ZERO
+            ),
+            key=lambda batch: (
+                str((batch.get("metadata") or {}).get("submitted_at") or (batch.get("metadata") or {}).get("created_at") or ""),
+                str(batch.get("batch_id") or ""),
+            ),
+        )
+        allocation_index = 0
+        for batch in candidates:
+            if remaining_fill <= ZERO:
+                break
+            batch_remaining = _decimal(batch.get("remaining_quantity"))
+            allocated = min(batch_remaining, remaining_fill)
+            if allocated <= ZERO:
+                continue
+            allocation_index += 1
+            batch["remaining_quantity"] = _fmt_quantity(batch_remaining - allocated)
+            remaining_fill -= allocated
+            open_price = _decimal(batch.get("open_price"))
+            realized = (
+                (open_price - fill_price) * allocated
+                if direction == "short"
+                else (fill_price - open_price) * allocated
+            )
+            events.append(
+                {
+                    "event_type": "exit_fill",
+                    "attribution_status": "matched_fill_batch",
+                    "allocation_method": "account_flatten_fifo_by_open_fill",
+                    "allocation_index": allocation_index,
+                    "include_in_bucket_performance": True,
+                    "include_in_strategy_performance": True,
+                    "counts_for_performance": True,
+                    "symbol": symbol,
+                    "direction": direction,
+                    "capital_bucket": str(batch.get("capital_bucket") or ""),
+                    "runtime_id": str(batch.get("runtime_id") or ""),
+                    "test_epoch_id": test_epoch_id,
+                    "order_id": order_id,
+                    "trade_id": trade_id,
+                    "filled_quantity": _fmt_quantity(allocated),
+                    "filled_price": _fmt_money(fill_price),
+                    "filled_at": str(
+                        broker_row.get("trade_done_at")
+                        or broker_row.get("updated_at")
+                        or broker_row.get("created_at")
+                        or ""
+                    ),
+                    "source_batch_id": str(batch.get("batch_id") or ""),
+                    "source_open_order_id": str(batch.get("open_order_id") or ""),
+                    "source_open_trade_id": str(batch.get("trade_id") or ""),
+                    "strategy_contract_hash": str(batch.get("strategy_contract_hash") or ""),
+                    "realized_pnl": _fmt_money(realized),
+                }
+            )
+        if remaining_fill > ZERO:
+            anomalies.append(
+                {
+                    "code": "account_flatten_quantity_exceeds_attributed_lots",
+                    "order_id": order_id,
+                    "trade_id": trade_id,
+                    "symbol": symbol,
+                    "test_epoch_id": test_epoch_id,
+                    "unallocated_quantity": _fmt_quantity(remaining_fill),
+                    "message": "Broker flatten fill exceeded the exact open virtual lots.",
+                }
+            )
+
+    virtual_by_symbol: dict[str, Decimal] = {}
+    for batch in batches:
+        symbol = _normalize_symbol(str(batch.get("symbol") or ""))
+        quantity = _decimal(batch.get("remaining_quantity"))
+        if str(batch.get("direction") or "") == "short":
+            quantity = -quantity
+        if symbol:
+            virtual_by_symbol[symbol] = virtual_by_symbol.get(symbol, ZERO) + quantity
+    normalized_broker = {
+        _normalize_symbol(str(symbol)): _decimal(quantity)
+        for symbol, quantity in broker_net_positions.items()
+    }
+    payload["batches"] = batches
+    payload["events"] = events
+    payload["anomalies"] = anomalies
+    payload["symbol_checks"] = [
+        {
+            "symbol": symbol,
+            "virtual_net_quantity": _fmt_quantity(virtual_by_symbol.get(symbol, ZERO)),
+            "broker_net_quantity": _fmt_quantity(normalized_broker.get(symbol, ZERO)),
+            "matches_broker_net": virtual_by_symbol.get(symbol, ZERO)
+            == normalized_broker.get(symbol, ZERO),
+        }
+        for symbol in sorted(set(virtual_by_symbol) | set(normalized_broker))
+    ]
+    summary = dict(payload.get("summary") or {})
+    summary.update(
+        {
+            "open_batch_count": sum(
+                _decimal(batch.get("remaining_quantity")) > ZERO for batch in batches
+            ),
+            "anomaly_count": len(anomalies),
+            "matched_event_count": sum(
+                row.get("attribution_status") == "matched_fill_batch" for row in events
+            ),
+        }
+    )
+    payload["summary"] = summary
+    return payload
+
+
+def apply_aggregate_strategy_exit_fill_allocations(
+    payload: dict[str, Any],
+    local_exit_rows: Iterable[Mapping[str, Any]],
+    broker_fill_rows: Iterable[Mapping[str, Any]],
+    *,
+    broker_net_positions: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Repair an aggregate exit without crossing strategy ownership.
+
+    The position manager may close several fills owned by one runtime with one
+    broker order. Allocation is permitted only when the local exit explicitly
+    declares the same aggregate remaining quantity and all candidate lots share
+    epoch, bucket, runtime, symbol, direction, and contract hash.
+    """
+    anomalous_order_ids = {
+        str(row.get("order_id") or "")
+        for row in payload.get("anomalies", [])
+        if isinstance(row, Mapping)
+        and str(row.get("code") or "") == "exit_quantity_exceeds_open_batch"
+        and str(row.get("order_id") or "")
+    }
+    exits_by_order = {
+        str(row.get("order_id") or ""): dict(row)
+        for row in local_exit_rows
+        if isinstance(row, Mapping)
+        and str(row.get("order_id") or "") in anomalous_order_ids
+        and str(row.get("position_action") or "") in EXIT_ACTIONS
+    }
+    if not exits_by_order:
+        return payload
+
+    batches = [
+        dict(row) for row in payload.get("batches", []) if isinstance(row, Mapping)
+    ]
+    events = [dict(row) for row in payload.get("events", []) if isinstance(row, Mapping)]
+    anomalies = [
+        dict(row) for row in payload.get("anomalies", []) if isinstance(row, Mapping)
+    ]
+    fills = sorted(
+        (
+            dict(row)
+            for row in broker_fill_rows
+            if isinstance(row, Mapping)
+            and str(row.get("order_id") or "") in exits_by_order
+            and _canonical_status(row) in FILL_FACT_STATUSES
+        ),
+        key=_row_sort_key,
+    )
+    repaired_order_ids: set[str] = set()
+    replacement_events: list[dict[str, Any]] = []
+    for broker_row in fills:
+        order_id = str(broker_row.get("order_id") or "")
+        local_row = exits_by_order[order_id]
+        fill_quantity = _decimal(
+            broker_row.get("executed_quantity")
+            or broker_row.get("filled_quantity")
+            or broker_row.get("quantity")
+        )
+        declared_quantity = _decimal(local_row.get("source_open_remaining_quantity"))
+        if fill_quantity <= ZERO or declared_quantity != fill_quantity:
+            continue
+        action = str(local_row.get("position_action") or "")
+        direction = "short" if action == "close_short" else "long"
+        symbol = _normalize_symbol(
+            str(local_row.get("symbol") or broker_row.get("symbol") or "")
+        )
+        test_epoch_id = str(local_row.get("test_epoch_id") or "")
+        capital_bucket = str(local_row.get("capital_bucket") or "")
+        runtime_id = str(local_row.get("runtime_id") or "")
+        contract_hash = str(local_row.get("strategy_contract_hash") or "")
+        candidates = sorted(
+            (
+                batch
+                for batch in batches
+                if str(batch.get("test_epoch_id") or "") == test_epoch_id
+                and str(batch.get("capital_bucket") or "") == capital_bucket
+                and str(batch.get("runtime_id") or "") == runtime_id
+                and _normalize_symbol(str(batch.get("symbol") or "")) == symbol
+                and str(batch.get("direction") or "") == direction
+                and (
+                    not contract_hash
+                    or str(batch.get("strategy_contract_hash") or "") == contract_hash
+                )
+                and _decimal(batch.get("remaining_quantity")) > ZERO
+            ),
+            key=lambda batch: (
+                str(
+                    (batch.get("metadata") or {}).get("submitted_at")
+                    or (batch.get("metadata") or {}).get("created_at")
+                    or ""
+                ),
+                str(batch.get("batch_id") or ""),
+            ),
+        )
+        if sum((_decimal(row.get("remaining_quantity")) for row in candidates), ZERO) != fill_quantity:
+            continue
+
+        repaired_order_ids.add(order_id)
+        fill_price = _decimal(
+            broker_row.get("executed_price") or broker_row.get("price")
+        )
+        trade_id = str(broker_row.get("trade_id") or "")
+        for allocation_index, batch in enumerate(candidates, start=1):
+            allocated = _decimal(batch.get("remaining_quantity"))
+            batch["remaining_quantity"] = _fmt_quantity(ZERO)
+            open_price = _decimal(batch.get("open_price"))
+            realized = (
+                (open_price - fill_price) * allocated
+                if direction == "short"
+                else (fill_price - open_price) * allocated
+            )
+            replacement_events.append(
+                {
+                    "event_type": "exit_fill",
+                    "attribution_status": "matched_fill_batch",
+                    "allocation_method": "aggregate_strategy_exit_fifo_by_open_fill",
+                    "allocation_index": allocation_index,
+                    "include_in_bucket_performance": True,
+                    "include_in_strategy_performance": True,
+                    "counts_for_performance": True,
+                    "symbol": symbol,
+                    "direction": direction,
+                    "capital_bucket": capital_bucket,
+                    "runtime_id": runtime_id,
+                    "test_epoch_id": test_epoch_id,
+                    "order_id": order_id,
+                    "trade_id": trade_id,
+                    "filled_quantity": _fmt_quantity(allocated),
+                    "filled_price": _fmt_money(fill_price),
+                    "filled_at": str(
+                        broker_row.get("trade_done_at")
+                        or broker_row.get("updated_at")
+                        or broker_row.get("created_at")
+                        or ""
+                    ),
+                    "source_batch_id": str(batch.get("batch_id") or ""),
+                    "source_open_order_id": str(batch.get("open_order_id") or ""),
+                    "source_open_trade_id": str(batch.get("trade_id") or ""),
+                    "strategy_contract_hash": str(batch.get("strategy_contract_hash") or ""),
+                    "realized_pnl": _fmt_money(realized),
+                }
+            )
+
+    if not repaired_order_ids:
+        return payload
+    events = [
+        row for row in events if str(row.get("order_id") or "") not in repaired_order_ids
+    ] + replacement_events
+    anomalies = [
+        row for row in anomalies if str(row.get("order_id") or "") not in repaired_order_ids
+    ]
+    virtual_by_symbol: dict[str, Decimal] = {}
+    for batch in batches:
+        symbol = _normalize_symbol(str(batch.get("symbol") or ""))
+        quantity = _decimal(batch.get("remaining_quantity"))
+        if str(batch.get("direction") or "") == "short":
+            quantity = -quantity
+        if symbol:
+            virtual_by_symbol[symbol] = virtual_by_symbol.get(symbol, ZERO) + quantity
+    normalized_broker = {
+        _normalize_symbol(str(symbol)): _decimal(quantity)
+        for symbol, quantity in broker_net_positions.items()
+    }
+    payload["batches"] = batches
+    payload["events"] = events
+    payload["anomalies"] = anomalies
+    payload["symbol_checks"] = [
+        {
+            "symbol": symbol,
+            "virtual_net_quantity": _fmt_quantity(virtual_by_symbol.get(symbol, ZERO)),
+            "broker_net_quantity": _fmt_quantity(normalized_broker.get(symbol, ZERO)),
+            "matches_broker_net": virtual_by_symbol.get(symbol, ZERO)
+            == normalized_broker.get(symbol, ZERO),
+        }
+        for symbol in sorted(set(virtual_by_symbol) | set(normalized_broker))
+    ]
+    summary = dict(payload.get("summary") or {})
+    summary.update(
+        {
+            "open_batch_count": sum(
+                _decimal(batch.get("remaining_quantity")) > ZERO for batch in batches
+            ),
+            "anomaly_count": len(anomalies),
+            "matched_event_count": sum(
+                row.get("attribution_status") == "matched_fill_batch" for row in events
+            ),
+        }
+    )
+    payload["summary"] = summary
+    return payload
+
+
 def apply_account_reconciliation_adjustments(
     payload: dict[str, Any],
     adjustments: Mapping[str, Any],

@@ -21,6 +21,8 @@ from scripts.m15_longbridge_fill_attribution_lib import (
     DEFAULT_COMMISSION_PER_ORDER_SIDE,
     DEFAULT_REGULATORY_FEE_PER_SELL_ORDER,
     add_completed_trade_performance,
+    apply_aggregate_strategy_exit_fill_allocations,
+    apply_account_flatten_fill_allocations,
     apply_account_reconciliation_adjustments,
     broker_fill_rows_from_orders_and_executions,
     rebuild_fill_attribution_from_history,
@@ -54,8 +56,18 @@ SYSTEM_FAULT_BLOCKERS = {
     "blocked_delayed_signal_age_over_limit",
     "blocked_delayed_signal_missing_revalidation_price",
 }
+STRATEGY_TEST_EPOCH_PREFIXES = (
+    "m15-sdk-formal-",
+    "m15-short-single-strategy-",
+    "m15-sdk-contract-v1-",
+    "m15-sdk-validation-",
+)
 
 CommandRunner = Callable[[list[str]], Any]
+
+
+def strategy_test_epoch_id(value: str) -> bool:
+    return value.startswith(STRATEGY_TEST_EPOCH_PREFIXES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1049,7 +1061,7 @@ def build_fill_attribution_v2(
         dict(row)
         for row in reconciled_rows
         if isinstance(row, dict)
-        and str(row.get("test_epoch_id") or "").startswith(("m15-sdk-formal-", "m15-short-single-strategy-"))
+        and strategy_test_epoch_id(str(row.get("test_epoch_id") or ""))
     ]
     local_rows = [
         row for row in formal_rows if row.get("attribution_status") == "matched_m15_realtime_ledger"
@@ -1092,6 +1104,24 @@ def build_fill_attribution_v2(
         broker_fill_rows,
         broker_net_positions=broker_positions,
     )
+    payload = apply_aggregate_strategy_exit_fill_allocations(
+        payload,
+        local_rows,
+        broker_fill_rows,
+        broker_net_positions=broker_positions,
+    )
+    payload = apply_account_flatten_fill_allocations(
+        payload,
+        [
+            row
+            for row in local_rows
+            if row.get("account_flatten_allocation") is True
+            or str(row.get("runtime_id") or "")
+            == "M15-LONGBRIDGE-SDK-AUTO-FLATTEN"
+        ],
+        broker_fill_rows,
+        broker_net_positions=broker_positions,
+    )
     payload = apply_account_reconciliation_adjustments(
         payload,
         account_reconciliation_adjustments or {},
@@ -1119,9 +1149,7 @@ def fault_days_from_execution_rows(
 ) -> dict[str, list[str]]:
     fault_days: dict[str, set[str]] = {}
     for row in rows:
-        if not str(row.get("test_epoch_id") or "").startswith(
-            "m15-sdk-formal-"
-        ):
+        if not strategy_test_epoch_id(str(row.get("test_epoch_id") or "")):
             continue
         if str(row.get("position_action") or "") not in {
             "open_long",
@@ -1509,7 +1537,11 @@ def reconciled_longbridge_order_row(
         "position_action": position_action,
         "source_open_order_id": source_open_order_id,
         "source_open_trade_id": source_open_trade_id,
+        "source_open_remaining_quantity": str(local_row.get("source_open_remaining_quantity") or "") if local_row else "",
         "source_open_signal_id": str(local_row.get("source_open_signal_id") or "") if local_row else "",
+        "strategy_contract_hash": str(local_row.get("strategy_contract_hash") or "") if local_row else "",
+        "account_flatten_allocation": bool(local_row.get("account_flatten_allocation")) if local_row else False,
+        "historical_audit_repair": bool(local_row.get("historical_audit_repair")) if local_row else False,
         "attribution_key": attribution_key(
             capital_bucket=capital_bucket,
             runtime_id=runtime_id,
@@ -1599,6 +1631,10 @@ def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> 
         "position_action": position_action,
         "source_open_order_id": str(local_row.get("source_open_order_id") or ""),
         "source_open_trade_id": str(local_row.get("source_open_trade_id") or ""),
+        "source_open_remaining_quantity": str(local_row.get("source_open_remaining_quantity") or ""),
+        "strategy_contract_hash": str(local_row.get("strategy_contract_hash") or ""),
+        "account_flatten_allocation": bool(local_row.get("account_flatten_allocation")),
+        "historical_audit_repair": bool(local_row.get("historical_audit_repair")),
         "attribution_key": attribution_key(
             capital_bucket=capital_bucket,
             runtime_id=runtime_id,

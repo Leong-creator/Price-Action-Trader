@@ -53,6 +53,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_mode_qualifies_for_subscription_gate,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
+    pending_flatten_test_epoch_id,
     preserve_partial_bar_suppression,
     preserve_last_order_maintenance_action,
     quote_worker,
@@ -69,12 +70,79 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     runtime_dispatch_block_reason,
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
+    snapshot_poll_should_idle,
     start_runtime_daemon,
     trade_context_health_requires_rebuild,
+    validated_snapshot_poll_is_reusable,
 )
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_validated_snapshot_poll_restarts_without_dead_subscription_probe(self) -> None:
+        self.assertTrue(
+            validated_snapshot_poll_is_reusable(
+                {
+                    "market_data_mode": "sdk_snapshot_poll",
+                    "market_data_fallback_validated": True,
+                    "snapshot_poll_covered_count": 300,
+                    "snapshot_poll_missing_count": 0,
+                },
+                300,
+            )
+        )
+        self.assertFalse(
+            validated_snapshot_poll_is_reusable(
+                {
+                    "market_data_mode": "sdk_snapshot_poll",
+                    "market_data_fallback_validated": True,
+                    "snapshot_poll_covered_count": 299,
+                    "snapshot_poll_missing_count": 1,
+                },
+                300,
+            )
+        )
+
+    def test_snapshot_poll_idles_only_after_off_hours_probe_is_ready(self) -> None:
+        self.assertTrue(
+            snapshot_poll_should_idle(
+                True,
+                datetime(2026, 8, 6, 12, 0, tzinfo=UTC),
+            )
+        )
+        self.assertFalse(
+            snapshot_poll_should_idle(
+                True,
+                datetime(2026, 8, 6, 14, 0, tzinfo=UTC),
+            )
+        )
+        self.assertFalse(
+            snapshot_poll_should_idle(
+                False,
+                datetime(2026, 8, 6, 12, 0, tzinfo=UTC),
+            )
+        )
+
+    def test_validation_cleanup_keeps_validation_epoch(self) -> None:
+        self.assertEqual(
+            pending_flatten_test_epoch_id(
+                {
+                    "test_epoch_id": "m15-sdk-contract-v1-20260807",
+                    "activation_blocker": "validation_session_ended_account_flatten_required",
+                    "last_validation_test_epoch_id": "m15-sdk-validation-20260806",
+                }
+            ),
+            "m15-sdk-validation-20260806",
+        )
+        self.assertEqual(
+            pending_flatten_test_epoch_id(
+                {
+                    "test_epoch_id": "m15-sdk-contract-v1-20260807",
+                    "activation_blocker": "waiting_for_configured_activation_time",
+                }
+            ),
+            "m15-sdk-contract-v1-20260807",
+        )
+
     def test_intraday_backfill_has_bounded_total_startup_budget(self) -> None:
         self.assertEqual(INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS, 90)
 
@@ -953,6 +1021,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             maximum_account_snapshot_age_seconds=30,
             validation_business_date="",
             validation_end_at="",
+            output_dir=root,
         )
         snapshot = {
             "generated_at": "2026-07-16T14:00:00Z",
@@ -1448,6 +1517,15 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             refreshed_marker = json.loads(
                 config.formal_test_marker_path.read_text(encoding="utf-8")
             )
+            ledger_rows = [
+                json.loads(line)
+                for line in (
+                    config.output_dir / "m15_longbridge_realtime_execution_ledger.jsonl"
+                )
+                .read_text(encoding="utf-8")
+                .splitlines()
+                if line.strip()
+            ]
 
         self.assertTrue(state["blocks_new_entries"])
         self.assertEqual(state["status"], "waiting_for_broker_flatten_confirmation")
@@ -1461,6 +1539,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             refreshed_marker["last_validation_test_epoch_id"],
             "m15-sdk-validation-20260716",
         )
+        self.assertEqual(
+            client.submissions[0]["test_epoch_id"],
+            "m15-sdk-validation-20260716",
+        )
+        self.assertEqual(ledger_rows[0]["test_epoch_id"], "m15-sdk-validation-20260716")
+        self.assertTrue(ledger_rows[0]["account_flatten_allocation"])
 
     def test_active_marker_repairs_execution_epoch_missing_start_time(self) -> None:
         with TemporaryDirectory() as directory:

@@ -31,10 +31,17 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
     refresh_trusted_order_history,
     restore_historical_order_history_if_unavailable,
     run_realtime_account_state,
+    strategy_test_epoch_id,
 )
 
 
 class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
+    def test_current_contract_and_validation_epochs_are_strategy_test_epochs(self) -> None:
+        self.assertTrue(strategy_test_epoch_id("m15-sdk-contract-v1-20260807"))
+        self.assertTrue(strategy_test_epoch_id("m15-sdk-validation-20260806"))
+        self.assertTrue(strategy_test_epoch_id("m15-sdk-formal-test"))
+        self.assertFalse(strategy_test_epoch_id("old-test"))
+
     def test_fault_days_use_only_formal_entry_system_blockers(self) -> None:
         rows = [
             {
