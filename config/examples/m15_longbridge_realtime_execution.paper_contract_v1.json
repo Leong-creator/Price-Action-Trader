@@ -80,8 +80,8 @@
       "M10-PA-013-5m-short",
       "M10-PA-011-ORB-R1-5m-short"
     ],
-    "test_epoch_id": "m15-sdk-contract-v1-short-20260807",
-    "test_started_at": "2026-08-07T13:30:00Z"
+    "test_epoch_id": "m15-sdk-contract-v1-short-20260806",
+    "test_started_at": "2026-08-06T13:30:00Z"
   },
   "runtime_layering": {
     "auxiliary_modules_local_only": [
@@ -148,7 +148,7 @@
     "enabled": true,
     "flatten_existing_positions_before_activation": true,
     "state_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json",
-    "test_epoch_id": "m15-sdk-contract-v1-20260807"
+    "test_epoch_id": "m15-sdk-contract-v1-20260806"
   },
   "title": "长桥SDK完整策略合同实时执行链路（仅模拟账户）",
   "virtual_capital_buckets": {

@@ -91,6 +91,26 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
             "2026-08-06T19:45:00Z",
         )
 
+    def test_formal_run_omits_validation_window_and_keeps_all_contracts(self) -> None:
+        generated = build_configs("20260806")
+        by_name = {path.name: payload for path, payload in generated.items()}
+        runtime = by_name["m15_longbridge_sdk_runtime.contract_v1.json"]
+        transition = runtime["formal_test_transition"]
+        router = by_name["m15_longbridge_realtime_signal_router.contract_v1.json"]
+
+        self.assertEqual(transition["test_epoch_id"], "m15-sdk-contract-v1-20260806")
+        self.assertEqual(
+            transition["short_test_epoch_id"],
+            "m15-sdk-contract-v1-short-20260806",
+        )
+        self.assertEqual(transition["activate_not_before"], "2026-08-06T13:30:00Z")
+        self.assertNotIn("validation_business_date", transition)
+        self.assertNotIn("validation_end_at", transition)
+        self.assertEqual(
+            router["realtime_signal_router"]["allowed_runtime_ids"],
+            list(ALL_RUNTIMES),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

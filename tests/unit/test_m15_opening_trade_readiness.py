@@ -105,6 +105,37 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             checks = {row["check"]: row for row in payload["checks"]}
             self.assertEqual(checks["formal_test_flatten_transition"]["status"], "waiting")
 
+    def test_zero_account_without_validation_waits_for_formal_activation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.write_fixture(root, paper_enabled=True, live_execution=False)
+            status_path = root / "realtime" / "m15_longbridge_realtime_session_supervisor.json"
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            status_payload["formal_test_transition"] = {
+                "status": "pending_flatten",
+                "test_epoch_id": "formal-epoch",
+                "activation_blocker": "",
+            }
+            status_payload["sdk_auto_flatten"] = {
+                "confirmation": {
+                    "complete": True,
+                    "remaining_position_count": 0,
+                    "open_order_count": 0,
+                    "pending_confirmation_count": 0,
+                }
+            }
+            status_path.write_text(json.dumps(status_payload), encoding="utf-8")
+
+            payload = run_m15_opening_trade_readiness(
+                load_config(config_path),
+                generated_at="2026-06-04T12:20:00Z",
+            )
+
+            self.assertEqual(payload["readiness_status"], "armed_waiting_formal_activation")
+            self.assertTrue(payload["paper_order_submission_enabled"])
+            self.assertFalse(payload["new_position_submission_enabled"])
+            self.assertIn("账户已清空", payload["plain_language_result"])
+
     def test_active_formal_epoch_blocks_when_execution_start_time_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

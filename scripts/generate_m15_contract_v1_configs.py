@@ -213,6 +213,9 @@ def build_configs(
     runtime["formal_test_transition"]["activate_not_before"] = (
         f"{epoch_date[:4]}-{epoch_date[4:6]}-{epoch_date[6:]}T13:30:00Z"
     )
+    # Formal runs must not inherit a previous bounded validation window.
+    runtime["formal_test_transition"].pop("validation_business_date", None)
+    runtime["formal_test_transition"].pop("validation_end_at", None)
     if validation_business_date or validation_end_at:
         if not validation_business_date or not validation_end_at:
             raise ValueError(

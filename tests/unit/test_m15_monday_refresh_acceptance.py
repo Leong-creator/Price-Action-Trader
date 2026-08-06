@@ -69,6 +69,44 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_flatten")
             self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_flatten")
 
+    def test_flat_account_waiting_for_direct_formal_activation_is_safe(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime["dispatch_enabled"] = False
+            runtime["formal_test_transition"] = {
+                "status": "pending_flatten",
+                "blocks_new_entries": True,
+                "activation_blocker": "",
+            }
+            runtime["sdk_auto_flatten"] = {
+                "confirmation": {
+                    "complete": True,
+                    "remaining_position_count": 0,
+                    "open_order_count": 0,
+                    "pending_confirmation_count": 0,
+                }
+            }
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness["readiness_status"] = "armed_waiting_formal_activation"
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            formal = json.loads(config.formal_epoch_path.read_text(encoding="utf-8"))
+            formal.update({"status": "pending_flatten", "blocks_new_entries": True})
+            config.formal_epoch_path.write_text(json.dumps(formal), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-06T10:00:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "armed_waiting_activation_window")
+            self.assertEqual(payload["fail_count"], 0)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_activation")
+            self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_activation")
+            self.assertEqual(checks["opening_readiness"]["status"], "waiting_for_activation")
+
     def test_planned_validation_session_is_safe_waiting_not_flatten_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)

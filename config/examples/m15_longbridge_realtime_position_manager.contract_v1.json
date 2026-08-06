@@ -43,12 +43,12 @@
         "M10-PA-013-5m-short",
         "M10-PA-011-ORB-R1-5m-short"
       ],
-      "test_epoch_id": "m15-sdk-contract-v1-short-20260807"
+      "test_epoch_id": "m15-sdk-contract-v1-short-20260806"
     },
     "short_cover_limit_premium_percent": "0.5",
     "stop_loss_events_bypass_run_cap": true,
-    "test_epoch_id": "m15-sdk-contract-v1-20260807",
-    "test_started_at": "2026-08-07T13:30:00Z",
+    "test_epoch_id": "m15-sdk-contract-v1-20260806",
+    "test_started_at": "2026-08-06T13:30:00Z",
     "untracked_stop_loss_percent": "3",
     "untracked_take_profit_percent": "3"
   },

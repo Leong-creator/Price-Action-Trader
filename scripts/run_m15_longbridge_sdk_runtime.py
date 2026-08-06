@@ -266,6 +266,7 @@ def runtime_dispatch_block_reason(
     flatten_blocks_new_entries: bool,
     account_snapshot_ready: bool,
     trading_daily_context_ready: bool,
+    formal_activation_waiting: bool = False,
 ) -> str:
     if not paper_order_dispatch_enabled:
         return "paper_order_dispatch_disabled"
@@ -276,7 +277,11 @@ def runtime_dispatch_block_reason(
     if not market_data_ready:
         return "market_data_recovering"
     if flatten_blocks_new_entries:
-        return "pending_account_flatten"
+        return (
+            "waiting_for_formal_test_activation"
+            if formal_activation_waiting
+            else "pending_account_flatten"
+        )
     if not account_snapshot_ready:
         return "account_snapshot_recovering"
     if not trading_daily_context_ready:
@@ -3903,6 +3908,31 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
                         trading_daily_context_ready=trading_daily_context_ready,
+                        formal_activation_waiting=bool(
+                            str(flatten_transition.get("status") or "")
+                            == "waiting_for_regular_session"
+                            and isinstance(flatten_transition.get("confirmation"), dict)
+                            and flatten_transition["confirmation"].get("complete") is True
+                            and int(
+                                flatten_transition["confirmation"].get(
+                                    "remaining_position_count"
+                                )
+                                or 0
+                            )
+                            == 0
+                            and int(
+                                flatten_transition["confirmation"].get("open_order_count")
+                                or 0
+                            )
+                            == 0
+                            and int(
+                                flatten_transition["confirmation"].get(
+                                    "pending_confirmation_count"
+                                )
+                                or 0
+                            )
+                            == 0
+                        ),
                     ),
                     "two_day_readonly_gate": config.two_day_readonly_gate,
                     "readonly_gate_path": str(config.readonly_gate_path),

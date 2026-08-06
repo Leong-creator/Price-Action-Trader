@@ -255,6 +255,22 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "market_data_recovering",
         )
 
+    def test_runtime_dispatch_explains_flat_account_waiting_for_formal_activation(self) -> None:
+        self.assertEqual(
+            runtime_dispatch_block_reason(
+                paper_order_dispatch_enabled=True,
+                readonly_gate_blocked=False,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=True,
+                flatten_blocks_new_entries=True,
+                account_snapshot_ready=True,
+                trading_daily_context_ready=True,
+                formal_activation_waiting=True,
+            ),
+            "waiting_for_formal_test_activation",
+        )
+
     def test_quote_worker_does_not_requery_subscriptions_after_acknowledged_batches(self) -> None:
         tree = ast.parse(textwrap.dedent(inspect.getsource(quote_worker)))
         called_methods = [

@@ -200,6 +200,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         and isinstance(realtime_status.get("sdk_auto_flatten", {}).get("confirmation"), dict)
         else {}
     )
+    flatten_confirmed_zero = bool(
+        flatten_confirmation.get("complete") is True
+        and int(flatten_confirmation.get("remaining_position_count") or 0) == 0
+        and int(flatten_confirmation.get("open_order_count") or 0) == 0
+        and int(flatten_confirmation.get("pending_confirmation_count") or 0) == 0
+    )
     validation_end_at = (
         parse_utc_datetime(sdk_config.validation_end_at)
         if sdk_config is not None and sdk_config.validation_end_at
@@ -214,10 +220,21 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         and generated_datetime is not None
         and str(window.get("market_date") or "") <= sdk_config.validation_business_date
         and generated_datetime < validation_end_at
-        and flatten_confirmation.get("complete") is True
-        and int(flatten_confirmation.get("remaining_position_count") or 0) == 0
-        and int(flatten_confirmation.get("open_order_count") or 0) == 0
-        and int(flatten_confirmation.get("pending_confirmation_count") or 0) == 0
+        and flatten_confirmed_zero
+    )
+    formal_activation_waiting = bool(
+        pending_formal_flatten
+        and flatten_confirmed_zero
+        and not validation_session_waiting
+        and not formal_transition.get("validation_business_date")
+        and not formal_transition.get("validation_end_at")
+        and (
+            sdk_config is None
+            or (
+                not sdk_config.validation_business_date
+                and not sdk_config.validation_end_at
+            )
+        )
     )
     execution_epoch = (
         read_json(execution_config.test_epoch_state_path)
@@ -420,7 +437,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         ),
         check_row(
             "formal_test_flatten_transition",
-            "验收持仓清空前只允许平仓，不允许新开仓",
+            (
+                "账户已清空，等待常规交易时段激活正式测试"
+                if formal_activation_waiting
+                else "验收持仓清空前只允许平仓，不允许新开仓"
+            ),
             "waiting" if pending_formal_flatten else "pass",
             actual=(
                 f"status={formal_transition.get('status', 'not_configured')}, "
@@ -451,6 +472,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "ready_for_validation_session_start"
             if window["market_phase"] == "regular_session"
             else "armed_waiting_validation_session"
+        )
+    elif formal_activation_waiting:
+        readiness_status = (
+            "ready_for_formal_activation"
+            if window["market_phase"] == "regular_session"
+            else "armed_waiting_formal_activation"
         )
     elif pending_formal_flatten:
         readiness_status = "ready_for_paper_exit_only" if window["market_phase"] == "regular_session" else "armed_waiting_flatten_session"
@@ -682,6 +709,10 @@ def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[
         return "今晚自然信号验收条件已满足：SDK 正在按配置自动开启纸面账户验收，不制造订单、不降低策略门槛。"
     if status == "armed_waiting_validation_session":
         return f"今晚自然信号验收已武装：当前是{window.get('market_status')}，到常规交易时段自动开启纸面账户全链路验收。"
+    if status == "ready_for_formal_activation":
+        return "长桥模拟账户已清空：系统正在常规交易时段激活正式测试编号，激活后才允许新开仓。"
+    if status == "armed_waiting_formal_activation":
+        return f"长桥模拟账户已清空：当前是{window.get('market_status')}，到常规交易时段自动激活正式测试并允许合格新信号下单。"
     if status == "armed_waiting_flatten_session":
         return f"清仓链路已武装：当前是{window.get('market_status')}，下个常规交易时段只处理验收持仓退出。"
     return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"

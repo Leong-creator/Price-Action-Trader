@@ -137,8 +137,13 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         and int(flatten_confirmation.get("open_order_count") or 0) == 0
         and int(flatten_confirmation.get("pending_confirmation_count") or 0) == 0
         and str(runtime_transition.get("activation_blocker") or "")
-        == "waiting_for_configured_activation_time"
-        and readiness_status == "ready_for_paper_exit_only"
+        in {"", "waiting_for_configured_activation_time"}
+        and readiness_status
+        in {
+            "ready_for_paper_exit_only",
+            "armed_waiting_formal_activation",
+            "ready_for_formal_activation",
+        }
     )
     validation_waiting = bool(
         transition_pending
