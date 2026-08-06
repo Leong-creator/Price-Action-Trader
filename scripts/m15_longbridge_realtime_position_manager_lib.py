@@ -40,6 +40,7 @@ from scripts.m15_longbridge_realtime_execution_lib import (
     parse_signal_time,
     parse_utc_datetime,
     project_path,
+    requires_exact_fill_epoch,
     to_iso,
 )
 
@@ -264,7 +265,7 @@ def run_realtime_position_manager(
     existing_signal_ids = {str(row.get("signal_id")) for row in existing_signal_events if row.get("signal_id")}
 
     latest_prices = latest_price_by_symbol(market_events)
-    exact_attribution_required = config.test_epoch_id.startswith("m15-sdk-formal-")
+    exact_attribution_required = requires_exact_fill_epoch(config.test_epoch_id)
     fill_attribution = (
         cached_or_refreshed_fill_attribution(
             config,
@@ -551,7 +552,7 @@ def evaluate_position(
             management_note = "长桥模拟账户已有持仓，但只接管退出配置关闭；不参与新开仓或加仓，需人工复核退出计划。"
     elif (
         position_direction == "long"
-        and config.test_epoch_id.startswith("m15-sdk-formal-")
+        and requires_exact_fill_epoch(config.test_epoch_id)
         and (not source_open_order_id or not source_open_trade_id)
     ):
         status = "missing_exact_open_fill_identity"
@@ -872,9 +873,7 @@ def refresh_fill_attribution_state(
         dict(row)
         for row in execution_rows
         if ledger_row_order_id(row)
-        and str(row.get("test_epoch_id") or "").startswith(
-            ("m15-sdk-formal-", "m15-short-single-strategy-")
-        )
+        and requires_exact_fill_epoch(row.get("test_epoch_id"))
     ]
     eligible_order_ids = {
         ledger_row_order_id(row)

@@ -172,18 +172,34 @@ class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
         self.assertEqual(sum(row["exit_reason"] == "take_profit" for row in selected), 10)
         self.assertEqual([row["signal_id"] for row in deferred], ["target-10", "target-11"])
 
-    def test_formal_epoch_same_symbol_uses_exact_fill_batches_for_two_strategies(self) -> None:
+    def test_contract_epoch_same_symbol_uses_exact_fill_batches_for_two_strategies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = replace(
                 self.make_config(root),
-                test_epoch_id="m15-sdk-formal-single-strategy-test",
+                test_epoch_id="m15-sdk-contract-v1-test",
                 test_started_at="2026-07-16T13:31:40Z",
             )
             account = self.account_state(quantity="5", available="5", cost_price="100")
             account["orders"] = [
-                {"order_id": "order-a", "status": "Filled"},
-                {"order_id": "order-b", "status": "Filled"},
+                {
+                    "order_id": "order-a",
+                    "status": "Filled",
+                    "symbol": "AAPL.US",
+                    "side": "Buy",
+                    "quantity": "2",
+                    "executed_quantity": "2",
+                    "executed_price": "100",
+                },
+                {
+                    "order_id": "order-b",
+                    "status": "Filled",
+                    "symbol": "AAPL.US",
+                    "side": "Buy",
+                    "quantity": "3",
+                    "executed_quantity": "3",
+                    "executed_price": "101",
+                },
             ]
             account["executions"] = [
                 {"order_id": "order-a", "trade_id": "trade-a", "quantity": "2", "price": "100"},

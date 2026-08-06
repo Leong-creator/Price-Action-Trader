@@ -362,11 +362,16 @@ def require_fresh_paper_account(
 def require_live_sdk_runtime(runtime_config: Any, generated_at: datetime) -> None:
     """Reject analytics refreshes unless the configured SDK runtime is live and fresh."""
     runtime_status = read_json(runtime_config.runtime_status_path)
-    if (
-        runtime_status.get("status") != "running"
-        or runtime_status.get("runtime_engine") != "sdk"
-        or runtime_status.get("sdk_connected") is not True
-    ):
+    status = str(runtime_status.get("status") or "")
+    runtime_engine_ready = runtime_status.get("runtime_engine") == "sdk"
+    fully_connected = status == "running" and runtime_status.get("sdk_connected") is True
+    quote_recovery_is_readonly_safe = (
+        status in {"connecting", "reconnecting_market_data_circuit"}
+        and runtime_status.get("market_data_mode") == "sdk_snapshot_poll"
+        and runtime_status.get("paper_simulated_only") is True
+        and runtime_status.get("real_money_actions") is False
+    )
+    if not runtime_engine_ready or not (fully_connected or quote_recovery_is_readonly_safe):
         raise RuntimeError("sdk_analytics_requires_live_sdk_runtime")
     if str(runtime_status.get("config_fingerprint") or "") != config_fingerprint(runtime_config):
         raise RuntimeError("sdk_analytics_requires_matching_runtime_config")

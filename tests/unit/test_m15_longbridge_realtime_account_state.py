@@ -29,6 +29,7 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
     historical_order_history_refresh_due,
     preserve_previous_holding_prices_if_degraded,
     refresh_trusted_order_history,
+    requires_exact_realtime_attribution,
     restore_historical_order_history_if_unavailable,
     run_realtime_account_state,
     strategy_test_epoch_id,
@@ -41,6 +42,17 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
         self.assertTrue(strategy_test_epoch_id("m15-sdk-validation-20260806"))
         self.assertTrue(strategy_test_epoch_id("m15-sdk-formal-test"))
         self.assertFalse(strategy_test_epoch_id("old-test"))
+
+    def test_contract_epoch_requires_exact_broker_attribution(self) -> None:
+        self.assertTrue(
+            requires_exact_realtime_attribution(
+                {
+                    "test_epoch_id": "m15-sdk-contract-v1-20260807",
+                    "direction": "long",
+                    "position_action": "open_long",
+                }
+            )
+        )
 
     def test_fault_days_use_only_formal_entry_system_blockers(self) -> None:
         rows = [

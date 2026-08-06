@@ -216,6 +216,53 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "live_sdk_runtime"):
                     require_live_sdk_runtime(runtime_config, datetime(2026, 7, 18, 5, 0, 5, tzinfo=UTC))
 
+    def test_sdk_analytics_accepts_paper_snapshot_runtime_during_quote_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            status_path = Path(tmp) / "runtime.json"
+            runtime_config = SimpleNamespace(runtime_status_path=status_path, heartbeat_interval_seconds=1)
+            status_path.write_text(
+                json.dumps(
+                    {
+                        "status": "connecting",
+                        "runtime_engine": "sdk",
+                        "sdk_connected": False,
+                        "runtime_pid": __import__("os").getpid(),
+                        "config_fingerprint": "expected",
+                        "generated_at": "2026-07-18T05:00:00Z",
+                        "market_data_mode": "sdk_snapshot_poll",
+                        "paper_simulated_only": True,
+                        "real_money_actions": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch("scripts.m15_longbridge_sdk_analytics_lib.config_fingerprint", return_value="expected"):
+                require_live_sdk_runtime(runtime_config, datetime(2026, 7, 18, 5, 0, 1, tzinfo=UTC))
+
+    def test_sdk_analytics_rejects_non_paper_snapshot_runtime_during_quote_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            status_path = Path(tmp) / "runtime.json"
+            runtime_config = SimpleNamespace(runtime_status_path=status_path, heartbeat_interval_seconds=1)
+            status_path.write_text(
+                json.dumps(
+                    {
+                        "status": "connecting",
+                        "runtime_engine": "sdk",
+                        "sdk_connected": False,
+                        "runtime_pid": __import__("os").getpid(),
+                        "config_fingerprint": "expected",
+                        "generated_at": "2026-07-18T05:00:00Z",
+                        "market_data_mode": "sdk_snapshot_poll",
+                        "paper_simulated_only": False,
+                        "real_money_actions": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch("scripts.m15_longbridge_sdk_analytics_lib.config_fingerprint", return_value="expected"):
+                with self.assertRaisesRegex(RuntimeError, "live_sdk_runtime"):
+                    require_live_sdk_runtime(runtime_config, datetime(2026, 7, 18, 5, 0, 1, tzinfo=UTC))
+
     def test_sdk_analytics_rejects_stale_runtime_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             status_path = Path(tmp) / "runtime.json"

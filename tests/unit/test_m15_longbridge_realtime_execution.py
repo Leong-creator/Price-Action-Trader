@@ -1728,7 +1728,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertEqual(rows["close-aapl"]["exit_state"], "ready_to_submit")
             self.assertIn("blocked_short_disabled", rows["short-aapl"]["blockers"])
 
-    def test_formal_close_long_requires_exact_open_fill_identity(self) -> None:
+    def test_contract_close_long_requires_exact_open_fill_identity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             account_state = {
@@ -1745,7 +1745,7 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 account_state=account_state,
                 test_epoch={
                     "enabled": True,
-                    "test_epoch_id": "m15-sdk-formal-single-strategy-test",
+                    "test_epoch_id": "m15-sdk-contract-v1-test",
                     "state_path": str(root / "epoch.json"),
                     "flatten_existing_positions_before_activation": False,
                     "archive_previous_records": True,

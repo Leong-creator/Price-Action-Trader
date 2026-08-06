@@ -1741,7 +1741,7 @@ def requires_exact_realtime_attribution(row: dict[str, Any]) -> bool:
     return (
         direction == "short"
         or epoch_id.startswith("m15-short-single-strategy-")
-        or epoch_id.startswith("m15-sdk-formal-")
+        or strategy_test_epoch_id(epoch_id)
     )
 
 

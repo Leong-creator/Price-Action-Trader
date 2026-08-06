@@ -54,12 +54,22 @@ MONEY = Decimal("0.01")
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 FRESH_FALLBACK_QUOTE_MAX_AGE_MS = 2000
+EXACT_FILL_EPOCH_PREFIXES = (
+    "m15-sdk-formal-",
+    "m15-short-single-strategy-",
+    "m15-sdk-contract-v1-",
+    "m15-sdk-validation-",
+)
 FLATTEN_CURRENT_PRICE_SELL_LIMIT_MULTIPLIER = Decimal("0.995")
 FLATTEN_FALLBACK_COST_SELL_LIMIT_MULTIPLIER = Decimal("0.95")
 FLATTEN_CURRENT_PRICE_BUY_LIMIT_MULTIPLIER = Decimal("1.005")
 FLATTEN_FALLBACK_COST_BUY_LIMIT_MULTIPLIER = Decimal("1.05")
 OPTION_SYMBOL_RE = re.compile(r"^[A-Z]{1,6}\d{6}[CP]\d{8}$")
 NEW_YORK = ZoneInfo("America/New_York")
+
+
+def requires_exact_fill_epoch(value: Any) -> bool:
+    return str(value or "").startswith(EXACT_FILL_EPOCH_PREFIXES)
 
 DEFAULT_REALTIME_RUNTIME_IDS = (
     "M10-PA-004-long-1d",
@@ -1355,8 +1365,8 @@ def evaluate_signal_event(
         elif previous_cover_low > ZERO and current_structure_low >= previous_cover_low:
             blockers.append("blocked_short_reentry_requires_new_structure_low")
     elif closing_long:
-        exact_fill_identity_required = str(effective_epoch_state.get("test_epoch_id") or "").startswith(
-            "m15-sdk-formal-"
+        exact_fill_identity_required = requires_exact_fill_epoch(
+            effective_epoch_state.get("test_epoch_id")
         ) and not exit_only_position_signal
         if exact_fill_identity_required and (not source_open_order_id or not source_open_trade_id):
             blockers.append("blocked_close_long_missing_exact_open_fill_identity")
