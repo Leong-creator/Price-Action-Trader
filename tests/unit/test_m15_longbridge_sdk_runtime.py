@@ -55,6 +55,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_heartbeat_is_stale,
     pending_flatten_test_epoch_id,
     preserve_partial_bar_suppression,
+    rollover_snapshot_cycle,
     preserve_last_order_maintenance_action,
     quote_worker,
     quote_subscription_targets,
@@ -88,6 +89,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "snapshot_poll_missing_count": 0,
                 },
                 300,
+                now=datetime(2026, 8, 6, 12, 0, tzinfo=UTC),
             )
         )
         self.assertFalse(
@@ -99,6 +101,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "snapshot_poll_missing_count": 1,
                 },
                 300,
+                now=datetime(2026, 8, 6, 12, 0, tzinfo=UTC),
+            )
+        )
+        self.assertFalse(
+            validated_snapshot_poll_is_reusable(
+                {
+                    "market_data_mode": "sdk_snapshot_poll",
+                    "market_data_fallback_validated": True,
+                    "snapshot_poll_covered_count": 300,
+                    "snapshot_poll_missing_count": 0,
+                },
+                300,
+                now=datetime(2026, 8, 6, 14, 0, tzinfo=UTC),
             )
         )
 
@@ -297,9 +312,9 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(config.subscription_batch_size, 300)
         self.assertEqual(config.subscription_deadline_seconds, 20)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 100)
-        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.5)
-        self.assertEqual(config.market_data_heartbeat_deadline_seconds, 30)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 300)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0)
+        self.assertEqual(config.market_data_heartbeat_deadline_seconds, 8)
         self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
         self.assertLess(
             config.snapshot_poll_interval_seconds,
@@ -322,6 +337,20 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 market_data_mode="sdk_snapshot_poll",
             ),
             "2026-08-05T18:40:00Z",
+        )
+
+    def test_interrupted_snapshot_cycle_keeps_finalized_bars_for_dispatch(self) -> None:
+        cycle_id, buffered, ready = rollover_snapshot_cycle(
+            "cycle-a",
+            "cycle-b",
+            [{"symbol": "AAPL", "event_time": "2026-08-06T15:05:00Z"}],
+        )
+
+        self.assertEqual(cycle_id, "cycle-b")
+        self.assertEqual(buffered, [])
+        self.assertEqual(
+            ready,
+            [{"symbol": "AAPL", "event_time": "2026-08-06T15:05:00Z"}],
         )
         self.assertEqual(
             preserve_partial_bar_suppression(
@@ -1571,6 +1600,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "status": "active",
                     "test_started_at": "2026-07-16T14:00:00Z",
                     "activated_at": "2026-07-16T14:00:00Z",
+                    "blocks_new_entries": True,
                 }
             )
             config.formal_test_marker_path.write_text(json.dumps(marker), encoding="utf-8")
@@ -1595,11 +1625,13 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 now=datetime(2026, 7, 16, 14, 5, tzinfo=UTC),
             )
             state = json.loads(config.formal_test_epoch_state_path.read_text(encoding="utf-8"))
+            marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
 
         self.assertEqual(result["status"], "inactive")
         self.assertFalse(result["blocks_new_entries"])
         self.assertEqual(state["status"], "active")
         self.assertEqual(state["test_started_at"], "2026-07-16T14:00:00Z")
+        self.assertFalse(marker["blocks_new_entries"])
 
     def test_active_marker_repairs_execution_epoch_id_drift(self) -> None:
         with TemporaryDirectory() as directory:

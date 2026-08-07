@@ -80,6 +80,7 @@ def activate_formal_epoch_payload(marker: dict[str, Any], *, activated_at: datet
         "activated_at": activated_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "activation_blocker": "",
         "activation_condition_met": "positions_open_orders_pending_confirmations_zero",
+        "blocks_new_entries": False,
     }
 
 

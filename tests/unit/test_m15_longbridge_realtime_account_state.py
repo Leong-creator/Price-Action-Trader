@@ -25,6 +25,7 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
     fault_days_from_execution_rows,
     load_config,
     longbridge_account_pnl_market_date,
+    merge_fault_day_registry,
     parse_json,
     historical_order_history_refresh_due,
     preserve_previous_holding_prices_if_degraded,
@@ -79,6 +80,24 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
         self.assertEqual(
             fault_days_from_execution_rows(rows),
             {"2026-07-21": ["blocked_account_state_stale"]},
+        )
+
+    def test_fault_day_registry_merges_explicit_system_fault_override(self) -> None:
+        self.assertEqual(
+            merge_fault_day_registry(
+                {"2026-08-06": ["blocked_account_state_stale"]},
+                {
+                    "2026-08-06": [
+                        "sdk_market_data_gaps_and_pre_fix_overexposure"
+                    ]
+                },
+            ),
+            {
+                "2026-08-06": [
+                    "blocked_account_state_stale",
+                    "sdk_market_data_gaps_and_pre_fix_overexposure",
+                ]
+            },
         )
 
     def test_canonical_order_status_strips_sdk_enum_prefix(self) -> None:

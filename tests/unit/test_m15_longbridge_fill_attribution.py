@@ -314,6 +314,29 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
         )
         self.assertTrue(fault_tagged["completed_trades"][0]["fault_day"])
 
+        result["batches"][0]["metadata"]["created_at"] = (
+            "2026-07-21T14:00:00Z"
+        )
+        baseline_filtered = add_completed_trade_performance(
+            result,
+            commission_per_order_side=Decimal("1.99"),
+            regulatory_fee_per_sell_order=Decimal("0.02"),
+            test_started_at_by_epoch={
+                "formal-epoch": "2026-07-21T14:01:00Z",
+            },
+        )
+        self.assertEqual(baseline_filtered["summary"]["completed_trade_count"], 0)
+        self.assertEqual(
+            baseline_filtered["summary"][
+                "archived_pre_baseline_completed_trade_count"
+            ],
+            1,
+        )
+        self.assertEqual(
+            len(baseline_filtered["archived_pre_baseline_completed_trades"]),
+            1,
+        )
+
     def test_account_reconciliation_closes_only_approved_order_ids_and_preserves_future_position(self) -> None:
         payload = {
             "batches": [

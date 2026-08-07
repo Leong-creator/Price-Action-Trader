@@ -19,6 +19,11 @@
     "regulatory_fee_per_sell_order": "0.02",
     "source": "configured_conservative_estimate"
   },
+  "fault_day_registry_overrides": {
+    "2026-08-06": [
+      "sdk_market_data_gaps_and_pre_fix_overexposure"
+    ]
+  },
   "hard_boundaries": {
     "paper_simulated_only": true,
     "live_execution": false,

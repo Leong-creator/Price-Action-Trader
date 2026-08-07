@@ -18,11 +18,64 @@ from scripts.m15_longbridge_realtime_signal_router_lib import (
     load_config,
     long_no_candidate_reason,
     realtime_relevant_market_events,
+    realtime_structure_instance_id,
     run_realtime_signal_router,
 )
 
 
 class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
+    def test_daily_structure_id_is_stable_across_five_minute_confirmation_events(self) -> None:
+        base = {
+            "timeframe": "1d",
+            "runtime_id": "M10-PA-001-1d",
+            "symbol": "AAPL",
+            "direction": "long",
+        }
+        first = realtime_structure_instance_id(
+            base,
+            runtime_id="M10-PA-001-1d",
+            symbol="AAPL",
+            direction="long",
+            created_at="2026-08-06T14:00:00Z",
+            source_event_id="bar-1",
+        )
+        second = realtime_structure_instance_id(
+            base,
+            runtime_id="M10-PA-001-1d",
+            symbol="AAPL",
+            direction="long",
+            created_at="2026-08-06T18:00:00Z",
+            source_event_id="bar-2",
+        )
+
+        self.assertEqual(first, second)
+
+    def test_intraday_structure_id_changes_with_completed_bar(self) -> None:
+        base = {
+            "timeframe": "5m",
+            "runtime_id": "M10-PA-002-5m",
+            "symbol": "AAPL",
+            "direction": "long",
+        }
+        first = realtime_structure_instance_id(
+            base,
+            runtime_id="M10-PA-002-5m",
+            symbol="AAPL",
+            direction="long",
+            created_at="2026-08-06T14:00:00Z",
+            source_event_id="bar-1",
+        )
+        second = realtime_structure_instance_id(
+            base,
+            runtime_id="M10-PA-002-5m",
+            symbol="AAPL",
+            direction="long",
+            created_at="2026-08-06T14:05:00Z",
+            source_event_id="bar-2",
+        )
+
+        self.assertNotEqual(first, second)
+
     def test_pa002_repaired_requires_followthrough_and_builds_1_3r_target(self) -> None:
         rows = [
             {"open": "99", "high": "100", "low": "98", "close": "99", "event_id": "one"},
@@ -1226,6 +1279,34 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(len(signals), 1)
             self.assertEqual(payload["new_signal_event_count"], 0)
             self.assertIn("duplicate_signal_event", rows[0]["blockers"])
+
+    def test_router_deduplicates_same_daily_structure_from_later_bar_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(root)
+            self.write_jsonl(root / "market_events.jsonl", [self.market_event()])
+            run_realtime_signal_router(config, generated_at="2026-06-04T14:00:01Z")
+
+            self.write_jsonl(
+                root / "market_events.jsonl",
+                [
+                    self.market_event(
+                        event_id="bar-2",
+                        received_at="2026-06-04T14:05:00Z",
+                        event_time="2026-06-04T14:05:00Z",
+                    )
+                ],
+            )
+            payload = run_realtime_signal_router(
+                config,
+                generated_at="2026-06-04T14:05:01Z",
+            )
+            signals = self.read_jsonl(root / "signals.jsonl")
+            rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+        self.assertEqual(len(signals), 1)
+        self.assertEqual(payload["new_signal_event_count"], 0)
+        self.assertIn("duplicate_structure_instance", rows[0]["blockers"])
 
     def test_router_ignores_market_events_before_current_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

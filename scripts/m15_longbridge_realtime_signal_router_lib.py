@@ -663,6 +663,7 @@ def run_realtime_signal_router(
     active_market_event_ids: set[str] | None = None,
     emitted_signal_events: list[dict[str, Any]] | None = None,
     existing_signal_ids_override: set[str] | None = None,
+    existing_structure_ids_override: set[str] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
@@ -689,6 +690,15 @@ def run_realtime_signal_router(
         }
     )
     existing_signal_event_count = len(existing_signal_ids)
+    existing_structure_ids = (
+        set(existing_structure_ids_override)
+        if existing_structure_ids_override is not None
+        else {
+            str(row.get("structure_instance_id") or "")
+            for row in existing_signal_events
+            if str(row.get("structure_instance_id") or "")
+        }
+    )
     test_epoch_state = normalize_active_epoch_state(read_json(config.test_epoch_state_path))
     capital_bucket_migration_state = load_capital_bucket_migration_state(
         config.capital_bucket_migration_state_path
@@ -730,6 +740,7 @@ def run_realtime_signal_router(
             test_epoch_state=test_epoch_state,
             capital_bucket_migration_state=capital_bucket_migration_state,
             existing_signal_ids=existing_signal_ids,
+            existing_structure_ids=existing_structure_ids,
             selected_bucket_exposure=selected_bucket_exposure,
             selected_bucket_symbol_exposure=selected_bucket_symbol_exposure,
         )
@@ -748,6 +759,7 @@ def run_realtime_signal_router(
             test_epoch_state=test_epoch_state,
             capital_bucket_migration_state=capital_bucket_migration_state,
             existing_signal_ids=existing_signal_ids,
+            existing_structure_ids=existing_structure_ids,
             selected_bucket_exposure=selected_bucket_exposure,
             selected_bucket_symbol_exposure=selected_bucket_symbol_exposure,
         )
@@ -755,6 +767,9 @@ def run_realtime_signal_router(
         if signal and len(new_signal_events) < config.max_signal_events_per_run:
             new_signal_events.append(signal)
             existing_signal_ids.add(signal["signal_id"])
+            structure_instance_id = str(signal.get("structure_instance_id") or "")
+            if structure_instance_id:
+                existing_structure_ids.add(structure_instance_id)
             bucket_id = str(signal.get("capital_bucket") or "")
             symbol = str(signal["symbol"])
             selected_bucket_exposure[bucket_id] += decimal(signal.get("notional", "0"))
@@ -2822,6 +2837,7 @@ def build_signal_from_intent(
     test_epoch_state: dict[str, Any],
     capital_bucket_migration_state: dict[str, str],
     existing_signal_ids: set[str],
+    existing_structure_ids: set[str],
     selected_bucket_exposure: dict[str, Decimal],
     selected_bucket_symbol_exposure: dict[tuple[str, str], Decimal],
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
@@ -2843,6 +2859,16 @@ def build_signal_from_intent(
     is_short = direction == "short"
     effective_epoch_state = short_test_epoch_state(config) if is_short else test_epoch_state
     epoch_id = str(effective_epoch_state.get("test_epoch_id") or "")
+    structure_instance_id = realtime_structure_instance_id(
+        intent,
+        runtime_id=runtime_id,
+        symbol=symbol,
+        direction=str(intent.get("direction") or intent.get("side") or ""),
+        created_at=created_at,
+        source_event_id=source_event_id,
+    )
+    if epoch_id:
+        structure_instance_id = f"{structure_instance_id}-{epoch_id}"
     epoch_started_at = parse_epoch_started_at(effective_epoch_state)
     original_created_dt = parse_optional_utc_datetime(original_created_at)
     if (
@@ -2861,6 +2887,13 @@ def build_signal_from_intent(
             signal_id = f"{base_signal_id}-{epoch_id}"
             created_at = to_iso(generated_at)
             rebuilt_after_epoch_activation = True
+    if epoch_id and epoch_started_at is not None and original_created_dt is not None:
+        structure_phase = (
+            "active"
+            if generated_at >= epoch_started_at
+            else "prebaseline"
+        )
+        structure_instance_id = f"{structure_instance_id}-{structure_phase}"
     side = "buy" if direction == "long" else "sell_short"
     order_type = normalize_order_type(intent.get("order_type"))
     entry = decimal(intent.get("limit_price", intent.get("entry_price", intent.get("current_price", "0"))))
@@ -2880,6 +2913,8 @@ def build_signal_from_intent(
         blockers.append("missing_symbol")
     if signal_id in existing_signal_ids:
         blockers.append("duplicate_signal_event")
+    if structure_instance_id and structure_instance_id in existing_structure_ids:
+        blockers.append("duplicate_structure_instance")
     try:
         session_started_dt = parse_utc_datetime(session_started_at)
         if parse_utc_datetime(created_at) < session_started_dt:
@@ -2967,6 +3002,7 @@ def build_signal_from_intent(
         "symbol": symbol,
         "timeframe": str(intent.get("timeframe") or ""),
         "source_market_event_id": source_event_id,
+        "structure_instance_id": structure_instance_id,
         "created_at": created_at,
         "processed_at": to_iso(generated_at),
         "detector_id": str(intent.get("detector_id") or "embedded_signal_intent"),
@@ -3048,6 +3084,7 @@ def build_signal_from_intent(
         return row, None
     signal = {
         "signal_id": signal_id,
+        "structure_instance_id": structure_instance_id,
         "created_at": created_at,
         "runtime_id": runtime_id,
         "strategy_id": strategy_id,
@@ -3193,6 +3230,38 @@ def normalize_order_type(value: Any) -> str:
 def deterministic_signal_id(runtime_id: str, symbol: str, source_event_id: str, created_at: str) -> str:
     digest = sha256(f"{runtime_id}|{symbol}|{source_event_id}|{created_at}".encode("utf-8")).hexdigest()[:16]
     return f"m15rt-{digest}"
+
+
+def realtime_structure_instance_id(
+    intent: dict[str, Any],
+    *,
+    runtime_id: str,
+    symbol: str,
+    direction: str,
+    created_at: str,
+    source_event_id: str,
+) -> str:
+    """Identify one executable structure independently from polling events.
+
+    Daily contracts can be re-evaluated on every completed five-minute bar.
+    They still represent one daily setup, so their identity is stable for the
+    New York trading date. Intraday contracts keep the source event identity.
+    """
+    explicit = str(intent.get("structure_instance_id") or "").strip()
+    if explicit:
+        return explicit
+    timeframe = str(intent.get("timeframe") or "").strip().lower()
+    if timeframe == "1d":
+        created = parse_optional_utc_datetime(created_at)
+        trading_date = (
+            created.astimezone(NEW_YORK).date().isoformat()
+            if created is not None
+            else created_at[:10]
+        )
+        material = f"daily|{runtime_id}|{symbol}|{direction}|{trading_date}"
+    else:
+        material = f"intraday|{runtime_id}|{symbol}|{direction}|{source_event_id}|{created_at}"
+    return f"m15-structure-{sha256(material.encode('utf-8')).hexdigest()[:20]}"
 
 
 def parse_optional_utc_datetime(value: str) -> datetime | None:

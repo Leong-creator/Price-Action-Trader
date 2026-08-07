@@ -14,6 +14,7 @@ from scripts.m15_longbridge_realtime_position_manager_lib import (
     evaluate_position,
     exit_event_priority,
     fill_attributed_open_exposure_by_bucket_symbol,
+    fill_attributed_order_states,
     load_config,
     run_realtime_position_manager,
     select_exit_events,
@@ -21,6 +22,19 @@ from scripts.m15_longbridge_realtime_position_manager_lib import (
 
 
 class M15LongbridgeRealtimePositionManagerTest(unittest.TestCase):
+    def test_fill_attributed_order_states_distinguish_open_and_closed_orders(self) -> None:
+        states = fill_attributed_order_states(
+            {
+                "batches": [
+                    {"open_order_id": "OPEN-1", "remaining_quantity": "2"},
+                    {"open_order_id": "OPEN-1", "remaining_quantity": "0"},
+                    {"open_order_id": "CLOSED-1", "remaining_quantity": "0"},
+                ]
+            }
+        )
+
+        self.assertEqual(states, {"CLOSED-1": "closed", "OPEN-1": "open"})
+
     def test_daily_contract_exits_at_fifth_market_session_close(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = replace(

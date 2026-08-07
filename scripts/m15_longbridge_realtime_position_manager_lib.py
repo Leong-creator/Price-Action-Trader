@@ -292,6 +292,7 @@ def run_realtime_position_manager(
     bucket_open_exposure = fill_attributed_open_exposure_by_bucket_symbol(
         fill_attribution
     )
+    attributed_order_states = fill_attributed_order_states(fill_attribution)
     position_slices.extend(confirmed_short_position_slices(account_state, short_execution_rows, config))
     retriable_short_exit_signal_ids = terminal_retriable_short_exit_signal_ids(short_execution_rows, account_state)
     retriable_exit_signal_ids = (
@@ -369,6 +370,7 @@ def run_realtime_position_manager(
             if isinstance(row, dict) and not bool(row.get("matches_broker_net")) and row.get("symbol")
         ),
         "fill_attributed_open_exposure_by_bucket_symbol": bucket_open_exposure,
+        "fill_attributed_order_states": attributed_order_states,
         "account_position_count": len(account_positions(account_state)),
         "managed_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "m15_realtime_managed"),
         "unmanaged_position_count": sum(1 for row in ledger_rows if row.get("position_management_scope") == "longbridge_account_unmanaged"),
@@ -439,6 +441,34 @@ def fill_attributed_open_exposure_by_bucket_symbol(
             for symbol, value in sorted(symbols.items())
         }
         for bucket, symbols in sorted(exposure.items())
+    }
+
+
+def fill_attributed_order_states(
+    fill_attribution: dict[str, Any],
+) -> dict[str, str]:
+    """Expose whether an opening broker order is already represented exactly.
+
+    The execution hot path uses this bridge to keep submitted capital reserved
+    while broker fills and the exact-fill ledger converge.  An order is open
+    when any attributed batch still has quantity; otherwise it is closed.
+    """
+    remaining_by_order: dict[str, Decimal] = {}
+    known_order_ids: set[str] = set()
+    for row in fill_attribution.get("batches", []):
+        if not isinstance(row, dict):
+            continue
+        order_id = str(row.get("open_order_id") or "").strip()
+        if not order_id:
+            continue
+        known_order_ids.add(order_id)
+        remaining_by_order[order_id] = (
+            remaining_by_order.get(order_id, ZERO)
+            + max(decimal(row.get("remaining_quantity", "0")), ZERO)
+        )
+    return {
+        order_id: ("open" if remaining_by_order.get(order_id, ZERO) > ZERO else "closed")
+        for order_id in sorted(known_order_ids)
     }
 
 

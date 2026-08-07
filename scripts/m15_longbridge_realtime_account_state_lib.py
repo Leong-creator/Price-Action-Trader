@@ -93,6 +93,7 @@ class RealtimeAccountStateConfig:
     historical_refresh_interval_seconds: int = 300
     commission_per_order_side: Decimal = DEFAULT_COMMISSION_PER_ORDER_SIDE
     regulatory_fee_per_sell_order: Decimal = DEFAULT_REGULATORY_FEE_PER_SELL_ORDER
+    fault_day_registry_overrides: dict[str, list[str]] | None = None
 
     def __post_init__(self) -> None:
         validate_config(self)
@@ -139,6 +140,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RealtimeAccountStateC
                 )
             )
         ),
+        fault_day_registry_overrides={
+            str(day): [str(reason) for reason in reasons if str(reason)]
+            for day, reasons in payload.get("fault_day_registry_overrides", {}).items()
+            if isinstance(reasons, list)
+        },
     )
 
 
@@ -376,6 +382,7 @@ def run_realtime_account_state(
         commission_per_order_side=config.commission_per_order_side,
         regulatory_fee_per_sell_order=config.regulatory_fee_per_sell_order,
         execution_rows_for_fault_days=realtime_execution_ledger,
+        fault_day_overrides=config.fault_day_registry_overrides,
     )
     summary = build_summary(
         config,
@@ -1054,6 +1061,8 @@ def build_fill_attribution_v2(
     commission_per_order_side: Decimal = DEFAULT_COMMISSION_PER_ORDER_SIDE,
     regulatory_fee_per_sell_order: Decimal = DEFAULT_REGULATORY_FEE_PER_SELL_ORDER,
     execution_rows_for_fault_days: list[dict[str, Any]] | None = None,
+    fault_day_overrides: dict[str, list[str]] | None = None,
+    test_started_at_by_epoch: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Rebuild exact virtual lots from broker executions and exact order identity."""
     reconciled_rows = order_reconciliation.get("rows") if isinstance(order_reconciliation.get("rows"), list) else []
@@ -1127,15 +1136,31 @@ def build_fill_attribution_v2(
         account_reconciliation_adjustments or {},
         broker_net_positions=broker_positions,
     )
+    epoch_starts = {
+        epoch_id: max(starts)
+        for epoch_id, starts in _epoch_start_candidates(local_rows).items()
+        if starts
+    }
+    epoch_starts.update(
+        {
+            str(epoch_id): str(started_at)
+            for epoch_id, started_at in (test_started_at_by_epoch or {}).items()
+            if str(epoch_id) and str(started_at)
+        }
+    )
     payload = add_completed_trade_performance(
         payload,
         commission_per_order_side=commission_per_order_side,
         regulatory_fee_per_sell_order=regulatory_fee_per_sell_order,
-        fault_days=fault_days_from_execution_rows(
-            execution_rows_for_fault_days
-            if execution_rows_for_fault_days is not None
-            else formal_rows
+        fault_days=merge_fault_day_registry(
+            fault_days_from_execution_rows(
+                execution_rows_for_fault_days
+                if execution_rows_for_fault_days is not None
+                else formal_rows
+            ),
+            fault_day_overrides or {},
         ),
+        test_started_at_by_epoch=epoch_starts,
     )
     payload["generated_at"] = str(account_state.get("generated_at") or order_reconciliation.get("generated_at") or "")
     payload["paper_simulated_only"] = True
@@ -1176,6 +1201,36 @@ def fault_days_from_execution_rows(
         market_date: sorted(reasons)
         for market_date, reasons in sorted(fault_days.items())
     }
+
+
+def merge_fault_day_registry(
+    detected: dict[str, list[str]],
+    overrides: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    merged = {
+        str(day): {str(reason) for reason in reasons if str(reason)}
+        for day, reasons in detected.items()
+    }
+    for day, reasons in overrides.items():
+        merged.setdefault(str(day), set()).update(
+            str(reason) for reason in reasons if str(reason)
+        )
+    return {
+        day: sorted(reasons)
+        for day, reasons in sorted(merged.items())
+    }
+
+
+def _epoch_start_candidates(
+    rows: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    candidates: dict[str, list[str]] = {}
+    for row in rows:
+        epoch_id = str(row.get("test_epoch_id") or "")
+        started_at = str(row.get("test_started_at") or "")
+        if epoch_id and started_at:
+            candidates.setdefault(epoch_id, []).append(started_at)
+    return candidates
 
 
 def refresh_trusted_order_history(

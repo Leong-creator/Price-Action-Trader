@@ -612,10 +612,14 @@ def snapshot_poll_should_idle(ready_emitted: bool, now: datetime) -> bool:
 def validated_snapshot_poll_is_reusable(
     previous_status: dict[str, Any],
     expected_symbol_count: int,
+    *,
+    now: datetime | None = None,
 ) -> bool:
-    """Reuse a previously validated SDK snapshot path without a dead subscribe probe."""
+    """Reuse snapshot fallback off-hours; retry push at every regular-session start."""
+    current = now or datetime.now(UTC)
     return bool(
-        previous_status.get("market_data_mode") == "sdk_snapshot_poll"
+        not in_regular_session(current)
+        and previous_status.get("market_data_mode") == "sdk_snapshot_poll"
         and previous_status.get("market_data_fallback_validated") is True
         and int(previous_status.get("snapshot_poll_covered_count") or 0)
         == int(expected_symbol_count)
@@ -672,6 +676,17 @@ def preserve_partial_bar_suppression(
     if market_data_mode == "sdk_snapshot_poll" and current_value:
         return current_value
     return worker_value
+
+
+def rollover_snapshot_cycle(
+    current_cycle_id: str,
+    next_cycle_id: str,
+    buffered_completed_bars: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Carry finalized bars forward when an SDK poll cycle is interrupted."""
+    if next_cycle_id == current_cycle_id:
+        return current_cycle_id, buffered_completed_bars, []
+    return next_cycle_id, [], list(buffered_completed_bars)
 
 
 def market_data_mode_qualifies_for_subscription_gate(mode: str) -> bool:
@@ -1492,6 +1507,10 @@ def run_pending_flatten_cycle(
             marker_status = "pending_flatten"
         else:
             state = read_json_object(config.formal_test_epoch_state_path)
+            if marker.get("blocks_new_entries") is not False:
+                marker["blocks_new_entries"] = False
+                marker["activation_blocker"] = ""
+                write_json_atomic(config.formal_test_marker_path, marker)
             if marker_status == "validation_active":
                 active_test_epoch_id = str(
                     marker.get("validation_test_epoch_id") or ""
@@ -2205,6 +2224,11 @@ def dispatch_completed_rows(
         router, generated_at=now, market_events_override=router_market_rows,
         active_market_event_ids=active_ids, emitted_signal_events=emitted,
         existing_signal_ids_override=signal_id_cache,
+        existing_structure_ids_override={
+            str(row.get("structure_instance_id") or "")
+            for row in signal_event_cache
+            if str(row.get("structure_instance_id") or "")
+        },
     )
     router_elapsed_ms = int((time.perf_counter() - router_started) * 1000)
     if emitted:
@@ -2283,6 +2307,9 @@ def dispatch_completed_rows(
             "fill_attributed_open_exposure_by_bucket_symbol"
         ] = dict(
             positions.get("fill_attributed_open_exposure_by_bucket_symbol") or {}
+        )
+        execution_account_snapshot["fill_attributed_order_states"] = dict(
+            positions.get("fill_attributed_order_states") or {}
         )
         execution_rows_emitted: list[dict[str, Any]] = []
         execution_started = time.perf_counter()
@@ -2831,6 +2858,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_fallback_active = validated_snapshot_poll_is_reusable(
         previous_runtime_status,
         len(configured_symbols(config)),
+        now=datetime.now(UTC),
     )
     market_data_mode = (
         "sdk_snapshot_poll" if snapshot_fallback_active else "sdk_subscription"
@@ -3129,9 +3157,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 message_cycle_id = str(
                     message.get("poll_cycle_id") or message.get("received_at") or ""
                 )
-                if message_cycle_id != snapshot_poll_cycle_id:
-                    snapshot_poll_cycle_id = message_cycle_id
-                    snapshot_poll_cycle_completed_bars = []
+                (
+                    snapshot_poll_cycle_id,
+                    snapshot_poll_cycle_completed_bars,
+                    interrupted_cycle_bars,
+                ) = rollover_snapshot_cycle(
+                    snapshot_poll_cycle_id,
+                    message_cycle_id,
+                    snapshot_poll_cycle_completed_bars,
+                )
+                completed_snapshot_bars.extend(interrupted_cycle_bars)
                 for snapshot_row in snapshot_rows:
                     update_live_quote_session_state(
                         live_quote_session_state,
@@ -3151,7 +3186,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     snapshot_poll_cycle_completed_bars.extend(
                         snapshot_bar_builder.flush(snapshot_received_at)
                     )
-                    completed_snapshot_bars = snapshot_poll_cycle_completed_bars
+                    completed_snapshot_bars.extend(
+                        snapshot_poll_cycle_completed_bars
+                    )
                     snapshot_poll_cycle_completed_bars = []
                 snapshot_completed_bar_count += len(completed_snapshot_bars)
                 if completed_snapshot_bars:

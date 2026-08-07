@@ -467,6 +467,15 @@ def build_sdk_account_summary(
 ) -> dict[str, Any]:
     daily_profit = str((daily_profit_analysis or {}).get("profit") or "")
     app_today_profit = str((app_display_metrics or {}).get("today_pnl") or "")
+    app_total_asset = str((app_display_metrics or {}).get("total_asset") or "")
+    if app_total_asset:
+        total_equity = app_total_asset
+        total_equity_currency = (app_display_metrics or {}).get("currency")
+        total_equity_source = (app_display_metrics or {}).get("source")
+    else:
+        total_equity = account_state.get("account_total_equity_estimate")
+        total_equity_currency = account_state.get("account_total_equity_currency")
+        total_equity_source = account_state.get("account_total_equity_source")
     return {
         "schema_version": "m15.longbridge-realtime-account-state-summary.sdk.v1",
         "stage": "M15.longbridge_realtime_account_state",
@@ -479,9 +488,9 @@ def build_sdk_account_summary(
         "buying_power": account_state.get("account_buying_power"),
         "cash": (app_display_metrics or {}).get("total_cash") or account_state.get("cash"),
         "available_cash": account_state.get("cash"),
-        "account_total_equity_estimate": (app_display_metrics or {}).get("total_asset") or account_state.get("account_total_equity_estimate"),
-        "account_total_equity_currency": (app_display_metrics or {}).get("currency") or account_state.get("account_total_equity_currency"),
-        "account_total_equity_source": (app_display_metrics or {}).get("source") or account_state.get("account_total_equity_source"),
+        "account_total_equity_estimate": total_equity,
+        "account_total_equity_currency": total_equity_currency,
+        "account_total_equity_source": total_equity_source,
         "account_today_total_pnl": app_today_profit or "等待长桥字段对齐",
         "account_today_total_pnl_source": (
             str((app_display_metrics or {}).get("source"))
@@ -534,6 +543,13 @@ def write_sdk_analytics_outputs(
         read_jsonl(config.output_dir / STALE_ORDER_CLEANUP_LEDGER_JSONL),
     )
     diagnostics = build_unfilled_order_diagnostics(generated_at_iso, reconciliation)
+    epoch_marker = read_json(config.output_dir / "m15_sdk_formal_test_epoch.json")
+    epoch_started_at = str(epoch_marker.get("test_started_at") or "")
+    test_started_at_by_epoch = {
+        str(epoch_marker.get(key) or ""): epoch_started_at
+        for key in ("test_epoch_id", "short_test_epoch_id")
+        if str(epoch_marker.get(key) or "") and epoch_started_at
+    }
     fill_attribution = build_fill_attribution_v2(
         augmented,
         reconciliation,
@@ -543,6 +559,8 @@ def write_sdk_analytics_outputs(
         commission_per_order_side=config.commission_per_order_side,
         regulatory_fee_per_sell_order=config.regulatory_fee_per_sell_order,
         execution_rows_for_fault_days=ledger,
+        fault_day_overrides=config.fault_day_registry_overrides,
+        test_started_at_by_epoch=test_started_at_by_epoch,
     )
     pnl = build_sdk_pnl_reconciliation(
         generated_at_iso,

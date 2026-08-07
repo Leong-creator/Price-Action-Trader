@@ -144,6 +144,7 @@ class M15SdkValidationFlattenTest(unittest.TestCase):
             marker,
             activated_at=datetime(2026, 7, 16, 14, 5, tzinfo=UTC),
         )
+        self.assertFalse(active["blocks_new_entries"])
 
         self.assertEqual(active["status"], "active")
         self.assertEqual(active["test_started_at"], "2026-07-16T14:05:00Z")

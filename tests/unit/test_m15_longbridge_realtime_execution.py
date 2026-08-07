@@ -1149,6 +1149,59 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             self.assertIn("blocked_existing_submitted_order_same_bucket_symbol", rows["new-aapl"]["blockers"])
             self.assertTrue(rows["new-aapl"]["longbridge_realtime_submitted_ledger_checked"])
 
+    def test_closed_daily_structure_cannot_be_reopened_from_later_poll_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            account_state = {
+                "account_channel": "lb_papertrading",
+                "paper_account_verified": True,
+                "buying_power": "10000",
+                "positions": [],
+                "orders": [],
+                "fill_attributed_open_exposure_by_bucket_symbol": {},
+                "fill_attributed_order_states": {"OLD-ORDER": "closed"},
+                "live_execution": False,
+                "real_money_actions": False,
+            }
+            config = self.make_config(root, account_state=account_state)
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            self.write_jsonl(
+                config.output_dir / LEDGER_JSONL,
+                [
+                    {
+                        "signal_id": "old-daily-confirmation",
+                        "structure_instance_id": "daily-pa004-aapl-20260604",
+                        "submission_status": "submitted",
+                        "submitted_at": "2026-06-04T13:31:00Z",
+                        "side": "buy",
+                        "position_action": "open_long",
+                        "symbol": "AAPL",
+                        "capital_bucket": "pa004_long",
+                        "quantity": "1",
+                        "notional": "100.00",
+                        "order_id": "OLD-ORDER",
+                    }
+                ],
+            )
+            self.write_jsonl(
+                root / "signals.jsonl",
+                [
+                    self.signal(
+                        signal_id="later-daily-confirmation",
+                        structure_instance_id="daily-pa004-aapl-20260604",
+                        source_market_event_id="bar-later",
+                    )
+                ],
+            )
+
+            run_realtime_execution(config, generated_at="2026-06-04T14:00:00Z")
+            row = {
+                item["signal_id"]: item
+                for item in self.read_jsonl(config.output_dir / LEDGER_JSONL)
+            }["later-daily-confirmation"]
+
+        self.assertIn("blocked_duplicate_submitted_structure_instance", row["blockers"])
+
     def test_materialized_submitted_order_is_not_double_counted_after_account_refresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2182,8 +2235,9 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 }
             ],
             "fill_attributed_open_exposure_by_bucket_symbol": {
-                "pa004_long": {"SPY": "100.00"}
+                "pa004_long": {"SPY": "100.00", "MSFT": "100.00"}
             },
+            "fill_attributed_order_states": {"LIVE-PENDING": "open"},
         }
         rows = [
             {
@@ -2206,7 +2260,149 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
         )
 
         self.assertEqual(exposure[("pa004_long", "SPY")], Decimal("100.00"))
-        self.assertEqual(exposure[("pa004_long", "MSFT")], Decimal("200"))
+        self.assertEqual(exposure[("pa004_long", "MSFT")], Decimal("300"))
+
+    def test_submitted_order_is_reserved_before_account_snapshot_contains_it(self) -> None:
+        account_state = {
+            "orders": [],
+            "fill_attributed_open_exposure_by_bucket_symbol": {},
+            "fill_attributed_order_states": {},
+        }
+        rows = [
+            {
+                "signal_id": "submitted-before-snapshot",
+                "submission_status": "submitted",
+                "submitted_at": "2026-06-04T13:31:00Z",
+                "side": "buy",
+                "position_action": "open_long",
+                "symbol": "AAPL",
+                "capital_bucket": "pa004_long",
+                "quantity": "5",
+                "notional": "500.00",
+                "order_id": "BROKER-NEW",
+            }
+        ]
+
+        exposure = submitted_ledger_open_exposure_by_bucket(
+            rows,
+            "2026-06-04T13:30:00Z",
+            account_state,
+        )
+
+        self.assertEqual(exposure[("pa004_long", "AAPL")], Decimal("500.00"))
+
+    def test_filled_order_is_reserved_until_exact_attribution_catches_up(self) -> None:
+        account_state = {
+            "orders": [
+                {
+                    "order_id": "BROKER-FILLED",
+                    "status": "Filled",
+                    "quantity": "5",
+                    "executed_quantity": "5",
+                    "executed_price": "100",
+                }
+            ],
+            "fill_attributed_open_exposure_by_bucket_symbol": {},
+            "fill_attributed_order_states": {},
+        }
+        rows = [
+            {
+                "signal_id": "filled-before-attribution",
+                "submission_status": "submitted",
+                "submitted_at": "2026-06-04T13:31:00Z",
+                "side": "buy",
+                "position_action": "open_long",
+                "symbol": "AAPL",
+                "capital_bucket": "pa004_long",
+                "quantity": "5",
+                "notional": "500.00",
+                "order_id": "BROKER-FILLED",
+            }
+        ]
+
+        exposure = submitted_ledger_open_exposure_by_bucket(
+            rows,
+            "2026-06-04T13:30:00Z",
+            account_state,
+        )
+
+        self.assertEqual(exposure[("pa004_long", "AAPL")], Decimal("500"))
+
+    def test_attributed_open_order_is_not_double_counted(self) -> None:
+        account_state = {
+            "orders": [
+                {
+                    "order_id": "BROKER-ATTRIBUTED",
+                    "status": "Filled",
+                    "quantity": "5",
+                    "executed_quantity": "5",
+                    "executed_price": "100",
+                }
+            ],
+            "fill_attributed_open_exposure_by_bucket_symbol": {
+                "pa004_long": {"AAPL": "500.00"}
+            },
+            "fill_attributed_order_states": {"BROKER-ATTRIBUTED": "open"},
+        }
+        rows = [
+            {
+                "signal_id": "already-attributed",
+                "submission_status": "submitted",
+                "submitted_at": "2026-06-04T13:31:00Z",
+                "side": "buy",
+                "position_action": "open_long",
+                "symbol": "AAPL",
+                "capital_bucket": "pa004_long",
+                "quantity": "5",
+                "notional": "500.00",
+                "order_id": "BROKER-ATTRIBUTED",
+            }
+        ]
+
+        exposure = submitted_ledger_open_exposure_by_bucket(
+            rows,
+            "2026-06-04T13:30:00Z",
+            account_state,
+        )
+
+        self.assertEqual(exposure[("pa004_long", "AAPL")], Decimal("500.00"))
+
+    def test_attributed_closed_order_releases_reserved_exposure(self) -> None:
+        account_state = {
+            "orders": [
+                {
+                    "order_id": "BROKER-CLOSED",
+                    "status": "Filled",
+                    "quantity": "5",
+                    "executed_quantity": "5",
+                    "executed_price": "100",
+                }
+            ],
+            "fill_attributed_open_exposure_by_bucket_symbol": {},
+            "fill_attributed_order_states": {"BROKER-CLOSED": "closed"},
+        }
+        rows = [
+            {
+                "signal_id": "already-closed",
+                "submission_status": "submitted",
+                "submitted_at": "2026-06-04T13:31:00Z",
+                "side": "buy",
+                "position_action": "open_long",
+                "symbol": "AAPL",
+                "capital_bucket": "pa004_long",
+                "quantity": "5",
+                "notional": "500.00",
+                "order_id": "BROKER-CLOSED",
+            }
+        ]
+
+        exposure = submitted_ledger_open_exposure_by_bucket(
+            rows,
+            "2026-06-04T13:30:00Z",
+            account_state,
+        )
+
+        self.assertEqual(exposure, {})
 
     def test_over_cap_exact_fill_attribution_blocks_new_open_and_is_visible(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2247,6 +2443,81 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
             bucket["exposure_source"],
             "longbridge_filled_batches_plus_pending_orders",
         )
+
+    def test_contract_v1_long_buckets_enforce_independent_six_thousand_cap(self) -> None:
+        cases = (
+            ("pa001_daily_contract_v1", "M10-PA-001-1d", "M10-PA-001"),
+            ("pa002_5m_contract_v1", "M10-PA-002-5m", "M10-PA-002"),
+            ("pa004_mbf_qc_contract_v1", "M10-PA-004-MBF-QC-1d", "M10-PA-004-MBF-QC"),
+            ("pa012_5m_contract_v1", "M10-PA-012-5m", "M10-PA-012"),
+            ("ftd_pullback_guard_confirm_v1", "M12-FTD-001-baseline-1d", "M12-FTD-001"),
+        )
+        for bucket_id, runtime_id, strategy_id in cases:
+            with self.subTest(bucket_id=bucket_id), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                account_state = {
+                    "account_channel": "lb_papertrading",
+                    "paper_account_verified": True,
+                    "buying_power": "10000",
+                    "positions": [{"symbol": "SPY.US", "quantity": "60"}],
+                    "orders": [],
+                    "fill_attributed_open_exposure_by_bucket_symbol": {
+                        bucket_id: {"SPY": "6000.00"}
+                    },
+                    "fill_attributed_order_states": {f"{bucket_id}-OPEN": "open"},
+                    "live_execution": False,
+                    "real_money_actions": False,
+                }
+                config = self.make_config(
+                    root,
+                    account_state=account_state,
+                    allowed_runtime_ids=[runtime_id],
+                    virtual_capital_buckets={
+                        bucket_id: {
+                            "label": bucket_id,
+                            "equity": "10000",
+                            "max_total_exposure": "6000",
+                            "max_symbol_exposure": "1500",
+                            "max_risk_per_order": "20",
+                            "min_cash_reserve": "4000",
+                            "runtime_ids": [runtime_id],
+                        }
+                    },
+                )
+                self.write_jsonl(
+                    root / "signals.jsonl",
+                    [
+                        self.signal(
+                            signal_id=f"{bucket_id}-new",
+                            runtime_id=runtime_id,
+                            strategy_id=strategy_id,
+                            symbol="MSFT",
+                            capital_bucket=bucket_id,
+                            net_profit_after_fees_at_target="20",
+                            reward_r="2.0",
+                        )
+                    ],
+                )
+
+                payload = run_realtime_execution(
+                    config,
+                    generated_at="2026-06-04T14:00:00Z",
+                )
+                row = self.read_jsonl(config.output_dir / LEDGER_JSONL)[0]
+                bucket = next(
+                    item
+                    for item in payload["virtual_capital_buckets"]
+                    if item["capital_bucket"] == bucket_id
+                )
+
+                self.assertEqual(row["bucket_max_total_exposure"], "6000.00")
+                self.assertIn(
+                    "blocked_bucket_remaining_exposure_below_one_share",
+                    row["blockers"],
+                )
+                self.assertEqual(bucket["remaining_exposure"], "0.00")
+                self.assertEqual(bucket["used_exposure"], "6000.00")
+                self.assertFalse(bucket["over_exposure_cap"])
 
     def test_buy_quantity_is_reduced_to_remaining_bucket_exposure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

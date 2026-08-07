@@ -13,6 +13,7 @@ from unittest.mock import patch
 from scripts.m15_longbridge_sdk_analytics_lib import (
     app_intraday_window_start,
     build_app_display_metrics,
+    build_sdk_account_summary,
     current_history_rows,
     incremental_history_start,
     market_profit_query_dates,
@@ -28,6 +29,38 @@ from scripts.m15_longbridge_sdk_analytics_lib import (
 
 
 class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
+    def test_incomplete_app_metrics_keep_sdk_equity_currency_and_source_together(self) -> None:
+        summary = build_sdk_account_summary(
+            "2026-08-07T02:00:00Z",
+            {
+                "paper_account_verified": True,
+                "account_channel": "lb_papertrading",
+                "account_buying_power": "1000",
+                "cash": "500",
+                "account_total_equity_estimate": "709274.95",
+                "account_total_equity_currency": "HKD",
+                "account_total_equity_source": "longbridge_sdk_account_balance.net_assets",
+                "position_row_count": 0,
+                "open_order_count": 0,
+                "held_symbols": [],
+            },
+            {},
+            app_display_metrics={
+                "status": "incomplete",
+                "currency": "USD",
+                "total_asset": "",
+                "total_cash": "500",
+                "source": "unavailable_without_second_sdk_quote_connection",
+            },
+        )
+
+        self.assertEqual(summary["account_total_equity_estimate"], "709274.95")
+        self.assertEqual(summary["account_total_equity_currency"], "HKD")
+        self.assertEqual(
+            summary["account_total_equity_source"],
+            "longbridge_sdk_account_balance.net_assets",
+        )
+
     def test_background_analytics_never_creates_a_second_quote_context(self) -> None:
         tree = ast.parse(inspect.getsource(run_sdk_analytics))
         quote_context_calls = [
@@ -367,6 +400,9 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                             "local_simulation_as_account_source": False,
                             "order_submit_or_cancel_commands": False,
                         },
+                        "fault_day_registry_overrides": {
+                            "2026-07-18": ["sdk_market_data_gap"]
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -404,6 +440,16 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                                 "resolve_symbol_anomalies": True,
                             }
                         ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (output / "m15_sdk_formal_test_epoch.json").write_text(
+                json.dumps(
+                    {
+                        "test_epoch_id": "m15-sdk-contract-v1-current",
+                        "short_test_epoch_id": "m15-sdk-contract-v1-short-current",
+                        "test_started_at": "2026-07-18T00:00:00Z",
                     }
                 ),
                 encoding="utf-8",
@@ -463,6 +509,10 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
             self.assertEqual(result["fill_attribution_anomaly_count"], 0)
             self.assertEqual(fill_attribution["summary"]["account_reconciliation_adjustment_count"], 1)
             self.assertEqual(fill_attribution["account_reconciliation_adjustments"][0]["status"], "applied")
+            self.assertEqual(
+                fill_attribution["fault_day_registry"]["2026-07-18"],
+                ["sdk_market_data_gap"],
+            )
             self.assertEqual(summary["account_today_total_pnl"], "7.89")
             self.assertEqual(
                 summary["account_today_total_pnl_source"],

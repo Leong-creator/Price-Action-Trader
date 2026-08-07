@@ -768,6 +768,7 @@ def add_completed_trade_performance(
     commission_per_order_side: Decimal = DEFAULT_COMMISSION_PER_ORDER_SIDE,
     regulatory_fee_per_sell_order: Decimal = DEFAULT_REGULATORY_FEE_PER_SELL_ORDER,
     fault_days: Mapping[str, Iterable[str]] | None = None,
+    test_started_at_by_epoch: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Add fee-aware performance using only fully closed, exactly attributed lots."""
     batches = [
@@ -803,6 +804,7 @@ def add_completed_trade_performance(
             )
 
     completed_trades: list[dict[str, Any]] = []
+    archived_pre_baseline_completed_trades: list[dict[str, Any]] = []
     normalized_fault_days = {
         str(day): sorted({str(reason) for reason in reasons if str(reason)})
         for day, reasons in (fault_days or {}).items()
@@ -866,8 +868,7 @@ def add_completed_trade_performance(
                 for reason in normalized_fault_days.get(day, [])
             }
         )
-        completed_trades.append(
-            {
+        completed_trade = {
                 "batch_id": batch_id,
                 "test_epoch_id": str(batch.get("test_epoch_id") or ""),
                 "capital_bucket": str(batch.get("capital_bucket") or ""),
@@ -906,7 +907,26 @@ def add_completed_trade_performance(
                     if metadata.get(key) not in (None, "")
                 },
             }
+        epoch_started_at = str(
+            (test_started_at_by_epoch or {}).get(
+                str(batch.get("test_epoch_id") or ""),
+                "",
+            )
+            or ""
         )
+        opened_timestamp = _parse_aware_datetime(opened_at)
+        baseline_timestamp = _parse_aware_datetime(epoch_started_at)
+        if (
+            epoch_started_at
+            and opened_timestamp is not None
+            and baseline_timestamp is not None
+            and opened_timestamp < baseline_timestamp
+        ):
+            completed_trade["excluded_from_current_baseline"] = True
+            completed_trade["baseline_started_at"] = epoch_started_at
+            archived_pre_baseline_completed_trades.append(completed_trade)
+            continue
+        completed_trades.append(completed_trade)
     completed_trades.sort(
         key=lambda row: (
             str(row.get("closed_at") or ""),
@@ -914,6 +934,9 @@ def add_completed_trade_performance(
         )
     )
     payload["completed_trades"] = completed_trades
+    payload["archived_pre_baseline_completed_trades"] = (
+        archived_pre_baseline_completed_trades
+    )
     normal_trades = [
         row for row in completed_trades if not bool(row.get("fault_day"))
     ]
@@ -947,6 +970,9 @@ def add_completed_trade_performance(
             ),
             "exit_fill_event_count": len(exit_events),
             "completed_trade_count": len(completed_trades),
+            "archived_pre_baseline_completed_trade_count": len(
+                archived_pre_baseline_completed_trades
+            ),
             "normal_completed_trade_count": len(normal_trades),
             "fault_day_completed_trade_count": len(fault_day_trades),
             "gross_realized_pnl": _fmt_money(
@@ -1638,6 +1664,16 @@ def _new_york_date(value: str) -> str:
     if parsed.tzinfo is None:
         return ""
     return parsed.astimezone(NEW_YORK).date().isoformat()
+
+
+def _parse_aware_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
 
 
 def _dedupe_unmatched_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

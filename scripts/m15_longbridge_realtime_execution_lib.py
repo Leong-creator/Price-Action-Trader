@@ -751,6 +751,12 @@ def run_realtime_execution(
         for row in current_epoch_ledger
         if row.get("signal_id") and row.get("submission_status") == "submitted"
     }
+    existing_submitted_structure_ids = {
+        str(row.get("structure_instance_id") or "")
+        for row in current_epoch_ledger
+        if row.get("submission_status") == "submitted"
+        and str(row.get("structure_instance_id") or "")
+    }
     existing_processed_ids = processed_signal_ids(current_epoch_ledger, config)
     if epoch_state.get("status") == "pending_flatten":
         signal_events_to_process = build_epoch_flatten_signals(config, account_state, now, epoch_state)
@@ -828,6 +834,7 @@ def run_realtime_execution(
     target_met_count = 0
     acceptable_count = 0
     submitted_signal_ids = set(existing_submitted_ids)
+    selected_structure_ids: set[str] = set()
     selected_strategy_symbols: dict[str, set[str]] = {}
     selected_close_quantity_by_symbol: dict[str, Decimal] = {}
 
@@ -842,6 +849,8 @@ def run_realtime_execution(
             execution_run_id=execution_run_id,
             session_run_id=session_run_id,
             submitted_signal_ids=submitted_signal_ids,
+            existing_submitted_structure_ids=existing_submitted_structure_ids,
+            selected_structure_ids=selected_structure_ids,
             existing_submitted_exposure=existing_submitted_exposure,
             selected_bucket_exposure=selected_bucket_exposure,
             selected_bucket_symbol_exposure=selected_bucket_symbol_exposure,
@@ -916,6 +925,9 @@ def run_realtime_execution(
 
         if ready_for_submission:
             ready_count += 1
+            structure_instance_id = str(row.get("structure_instance_id") or "")
+            if structure_instance_id:
+                selected_structure_ids.add(structure_instance_id)
             order_payload = decision["order_payload"]
             if config.execute_orders:
                 attempted_count += 1
@@ -1195,6 +1207,8 @@ def evaluate_signal_event(
     execution_run_id: str,
     session_run_id: str,
     submitted_signal_ids: set[str],
+    existing_submitted_structure_ids: set[str],
+    selected_structure_ids: set[str],
     existing_submitted_exposure: dict[tuple[str, str], Decimal],
     selected_bucket_exposure: dict[str, Decimal],
     selected_bucket_symbol_exposure: dict[tuple[str, str], Decimal],
@@ -1214,6 +1228,7 @@ def evaluate_signal_event(
 ) -> dict[str, Any]:
     risk_check_started_at = datetime.now(UTC)
     signal_id = str(signal.get("signal_id") or "")
+    structure_instance_id = str(signal.get("structure_instance_id") or "")
     runtime_id = str(signal.get("runtime_id") or "")
     strategy_id = str(signal.get("strategy_id") or parent_strategy_id(runtime_id))
     symbol = str(signal.get("symbol") or "").upper()
@@ -1428,6 +1443,10 @@ def evaluate_signal_event(
             blockers.append("blocked_existing_submitted_order_same_bucket_symbol")
         if selected_bucket_symbol_exposure.get(bucket_symbol, ZERO) > ZERO:
             blockers.append("blocked_existing_selected_order_same_bucket_symbol")
+        if structure_instance_id in existing_submitted_structure_ids:
+            blockers.append("blocked_duplicate_submitted_structure_instance")
+        if structure_instance_id in selected_structure_ids:
+            blockers.append("blocked_duplicate_selected_structure_instance")
         if opening_long and bucket_symbol in same_day_loss_exit_symbols:
             blockers.append("blocked_same_day_loss_exit_cooldown")
         strategy_key = parent_strategy_id(strategy_id or runtime_id)
@@ -1644,6 +1663,7 @@ def evaluate_signal_event(
         "execution_config_digest": config.config_digest,
         "session_run_id": session_run_id,
         "signal_id": signal_id,
+        "structure_instance_id": structure_instance_id,
         "runtime_id": runtime_id,
         "strategy_id": strategy_id,
         "strategy_contract_hash": str(signal.get("strategy_contract_hash") or ""),
@@ -2690,12 +2710,25 @@ def add_pending_open_order_exposure(
     session_start: datetime,
     account_state: dict[str, Any],
 ) -> dict[tuple[str, str], Decimal]:
-    """Add only the unfilled part of broker orders to actual fill exposure."""
+    """Bridge submitted capital until exact fill attribution takes ownership.
+
+    Exact attribution is authoritative for filled lots, but it can lag the
+    broker response by one or more processing cycles.  A submitted order must
+    remain reserved during that hand-off or the next cycle can reuse the same
+    virtual capital.  Once an order is represented as ``open`` we add only its
+    unfilled broker remainder; once represented as ``closed`` we release it.
+    """
     exposure = dict(attributed_exposure)
     order_by_id = latest_account_orders_by_id(account_state)
-    materialized_symbols = (
-        set(held_symbol_quantities(account_state))
-        | open_order_symbol_set(account_state)
+    raw_attributed_states = account_state.get("fill_attributed_order_states")
+    attributed_states = (
+        {
+            str(order_id): str(state).strip().lower()
+            for order_id, state in raw_attributed_states.items()
+            if str(order_id)
+        }
+        if isinstance(raw_attributed_states, dict)
+        else {}
     )
     seen_order_ids: set[str] = set()
     for row in rows:
@@ -2723,18 +2756,16 @@ def add_pending_open_order_exposure(
             continue
         if order_id:
             seen_order_ids.add(order_id)
+        attributed_state = attributed_states.get(order_id, "") if order_id else ""
+        if attributed_state == "closed":
+            continue
         account_order = broker_order_for_ledger_row(row, order_by_id)
         if account_order is None:
-            # Confirmed historical orders are already represented by the
-            # fill-attribution baseline. Only an unconfirmed request without
-            # a broker id may still need a temporary reservation.
-            if order_id or symbol in materialized_symbols:
+            if attributed_state == "open":
                 continue
             pending_notional = decimal(row.get("notional", "0"))
         else:
             status = str(account_order.get("status") or "").strip().lower().replace(" ", "_")
-            if status in {"filled", "done", "completed", "canceled", "cancelled", "rejected", "expired", "withdrawn", "failed"}:
-                continue
             order_quantity = decimal(
                 account_order.get(
                     "quantity",
@@ -2751,10 +2782,46 @@ def add_pending_open_order_exposure(
             order_price = decimal(
                 account_order.get(
                     "price",
-                    row.get("limit_price", row.get("current_price", "0")),
+                    account_order.get(
+                        "executed_price",
+                        account_order.get(
+                            "average_price",
+                            row.get("limit_price", row.get("current_price", "0")),
+                        ),
+                    ),
                 )
             )
-            pending_notional = remaining_quantity * order_price
+            terminal_unfilled_statuses = {
+                "canceled",
+                "cancelled",
+                "rejected",
+                "expired",
+                "withdrawn",
+                "failed",
+            }
+            filled_statuses = {"filled", "done", "completed"}
+            if status in terminal_unfilled_statuses:
+                pending_notional = (
+                    ZERO
+                    if executed_quantity <= ZERO or attributed_state == "open"
+                    else executed_quantity * order_price
+                )
+            elif status in filled_statuses:
+                if attributed_state == "open":
+                    pending_notional = ZERO
+                else:
+                    filled_quantity = executed_quantity if executed_quantity > ZERO else order_quantity
+                    pending_notional = filled_quantity * order_price
+                    if pending_notional <= ZERO:
+                        pending_notional = decimal(row.get("notional", "0"))
+            elif attributed_state == "open":
+                pending_notional = remaining_quantity * order_price
+            else:
+                # No attributed batch exists yet. Reserve both the filled and
+                # unfilled portions until the exact-fill state catches up.
+                pending_notional = order_quantity * order_price
+                if pending_notional <= ZERO:
+                    pending_notional = decimal(row.get("notional", "0"))
         if pending_notional > ZERO:
             key = (bucket, symbol)
             exposure[key] = exposure.get(key, ZERO) + pending_notional
