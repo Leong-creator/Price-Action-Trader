@@ -14,6 +14,7 @@ from scripts.m15_longbridge_realtime_signal_router_lib import (
     SUMMARY_JSON,
     PRICE_ACTION_RUNTIME_SPECS,
     STRATEGY_DIAGNOSTICS_JSON,
+    assign_daily_structure_episode_ids,
     breakout_followthrough_repair_signal,
     load_config,
     long_no_candidate_reason,
@@ -24,6 +25,137 @@ from scripts.m15_longbridge_realtime_signal_router_lib import (
 
 
 class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
+    def test_daily_structure_rearms_only_after_completed_detector_reset(self) -> None:
+        now = datetime(2026, 8, 6, 14, 0, tzinfo=UTC)
+        attempt = {
+            "runtime_id": "M10-PA-001-1d",
+            "symbol": "AAPL",
+            "timeframe": "1d",
+            "candidate_emitted": True,
+        }
+        first_intent = {
+            "timeframe": "1d",
+            "runtime_id": "M10-PA-001-1d",
+            "symbol": "AAPL",
+            "direction": "long",
+            "created_at": "2026-08-06T14:00:00Z",
+            "source_market_event_id": "bar-1",
+        }
+        first_state = assign_daily_structure_episode_ids(
+            [first_intent],
+            [attempt],
+            {},
+            generated_at=now,
+            long_test_epoch_id="long-epoch",
+            short_test_epoch_id="short-epoch",
+        )
+        first_id = first_intent["structure_instance_id"]
+
+        later_intent = {
+            "timeframe": "1d",
+            "runtime_id": "M10-PA-001-1d",
+            "symbol": "AAPL",
+            "direction": "long",
+            "created_at": "2026-08-06T14:05:00Z",
+            "source_market_event_id": "bar-2",
+        }
+        continuous_state = assign_daily_structure_episode_ids(
+            [later_intent],
+            [attempt],
+            first_state,
+            generated_at=now,
+            long_test_epoch_id="long-epoch",
+            short_test_epoch_id="short-epoch",
+        )
+        self.assertEqual(later_intent["structure_instance_id"], first_id)
+
+        reset_state = assign_daily_structure_episode_ids(
+            [],
+            [{**attempt, "candidate_emitted": False}],
+            continuous_state,
+            generated_at=now,
+            long_test_epoch_id="long-epoch",
+            short_test_epoch_id="short-epoch",
+        )
+        self.assertEqual(reset_state, {})
+
+        rearmed_intent = {
+            "timeframe": "1d",
+            "runtime_id": "M10-PA-001-1d",
+            "symbol": "AAPL",
+            "direction": "long",
+            "created_at": "2026-08-06T15:00:00Z",
+            "source_market_event_id": "bar-13",
+        }
+        rearmed_state = assign_daily_structure_episode_ids(
+            [rearmed_intent],
+            [attempt],
+            reset_state,
+            generated_at=now,
+            long_test_epoch_id="long-epoch",
+            short_test_epoch_id="short-epoch",
+        )
+        self.assertNotEqual(rearmed_intent["structure_instance_id"], first_id)
+        self.assertEqual(len(rearmed_state), 1)
+
+    def test_unattempted_daily_structure_state_is_not_rearmed_by_data_gap(self) -> None:
+        now = datetime(2026, 8, 6, 14, 0, tzinfo=UTC)
+        previous = {
+            "epoch|M10-PA-001-1d|AAPL|long|2026-08-06": {
+                "structure_instance_id": "existing-episode",
+                "test_epoch_id": "epoch",
+                "runtime_id": "M10-PA-001-1d",
+                "symbol": "AAPL",
+                "direction": "long",
+                "trading_date": "2026-08-06",
+                "episode_started_at": "2026-08-06T13:35:00Z",
+            }
+        }
+
+        state = assign_daily_structure_episode_ids(
+            [],
+            [],
+            previous,
+            generated_at=now,
+            long_test_epoch_id="epoch",
+            short_test_epoch_id="short-epoch",
+        )
+
+        self.assertEqual(state, previous)
+
+    def test_inactive_daily_detector_miss_does_not_rearm_structure(self) -> None:
+        now = datetime(2026, 8, 6, 14, 0, tzinfo=UTC)
+        previous = {
+            "epoch|M10-PA-001-1d|AAPL|long|2026-08-06": {
+                "structure_instance_id": "existing-episode",
+                "test_epoch_id": "epoch",
+                "runtime_id": "M10-PA-001-1d",
+                "symbol": "AAPL",
+                "direction": "long",
+                "trading_date": "2026-08-06",
+                "episode_started_at": "2026-08-06T13:35:00Z",
+            }
+        }
+        miss = {
+            "runtime_id": "M10-PA-001-1d",
+            "symbol": "AAPL",
+            "timeframe": "1d",
+            "candidate_emitted": False,
+            "source_market_event_id": "stale-bar",
+        }
+
+        state = assign_daily_structure_episode_ids(
+            [],
+            [miss],
+            previous,
+            generated_at=now,
+            long_test_epoch_id="epoch",
+            short_test_epoch_id="short-epoch",
+            active_market_event_ids={"current-bar"},
+        )
+
+        self.assertEqual(state, previous)
+
     def test_daily_structure_id_is_stable_across_five_minute_confirmation_events(self) -> None:
         base = {
             "timeframe": "1d",

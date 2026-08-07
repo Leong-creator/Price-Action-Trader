@@ -700,6 +700,12 @@ def run_realtime_signal_router(
         }
     )
     test_epoch_state = normalize_active_epoch_state(read_json(config.test_epoch_state_path))
+    previous_summary = read_json(config.output_dir / SUMMARY_JSON)
+    previous_daily_structure_state = (
+        previous_summary.get("daily_structure_episode_state", {})
+        if isinstance(previous_summary.get("daily_structure_episode_state"), dict)
+        else {}
+    )
     capital_bucket_migration_state = load_capital_bucket_migration_state(
         config.capital_bucket_migration_state_path
     )
@@ -726,6 +732,15 @@ def run_realtime_signal_router(
             if str(intent.get("source_market_event_id") or intent.get("market_event_id") or "")
             in active_market_event_ids
         ]
+    daily_structure_episode_state = assign_daily_structure_episode_ids(
+        raw_intents,
+        detector_attempts,
+        previous_daily_structure_state,
+        generated_at=now,
+        long_test_epoch_id=str(test_epoch_state.get("test_epoch_id") or ""),
+        short_test_epoch_id=config.short_test_epoch_id,
+        active_market_event_ids=active_market_event_ids,
+    )
     raw_intents = expand_additional_bucket_routes(config, raw_intents)
     routed_intents, merged_support_intents = merge_confluence_intents(config, raw_intents)
     annotate_relative_strengths(market_events, routed_intents)
@@ -822,6 +837,7 @@ def run_realtime_signal_router(
         "test_epoch_id": str(test_epoch_state.get("test_epoch_id") or ""),
         "test_epoch_status": str(test_epoch_state.get("status") or ""),
         "test_started_at": str(test_epoch_state.get("test_started_at") or ""),
+        "daily_structure_episode_state": daily_structure_episode_state,
         "epoch_rebuilt_signal_count": sum(1 for signal in new_signal_events if signal.get("realtime_rebuilt_after_epoch_activation")),
         "confluence_primary_count": sum(1 for intent in routed_intents if decimal(intent.get("confluence_multiplier", "1")) > Decimal("1")),
         "confluence_merged_support_count": len(merged_support_intents),
@@ -3243,9 +3259,10 @@ def realtime_structure_instance_id(
 ) -> str:
     """Identify one executable structure independently from polling events.
 
-    Daily contracts can be re-evaluated on every completed five-minute bar.
-    They still represent one daily setup, so their identity is stable for the
-    New York trading date. Intraday contracts keep the source event identity.
+    Daily contracts normally receive an explicit episode identity from
+    ``assign_daily_structure_episode_ids``. The date-level fallback is only a
+    conservative compatibility path. Intraday contracts keep the source event
+    identity.
     """
     explicit = str(intent.get("structure_instance_id") or "").strip()
     if explicit:
@@ -3262,6 +3279,131 @@ def realtime_structure_instance_id(
     else:
         material = f"intraday|{runtime_id}|{symbol}|{direction}|{source_event_id}|{created_at}"
     return f"m15-structure-{sha256(material.encode('utf-8')).hexdigest()[:20]}"
+
+
+def assign_daily_structure_episode_ids(
+    intents: list[dict[str, Any]],
+    detector_attempts: list[dict[str, Any]],
+    previous_state: dict[str, Any],
+    *,
+    generated_at: datetime,
+    long_test_epoch_id: str,
+    short_test_epoch_id: str,
+    active_market_event_ids: set[str] | None = None,
+) -> dict[str, dict[str, str]]:
+    """Keep one id while a daily setup remains true, then re-arm after reset.
+
+    A later five-minute poll is not a new setup by itself. A daily detector must
+    first report no candidate on a completed evaluation cycle; if the setup
+    subsequently becomes valid again, that transition starts a new episode and
+    may trade again subject to normal position, order and exposure checks.
+    """
+    current_date = generated_at.astimezone(NEW_YORK).date().isoformat()
+    previous = {
+        str(key): dict(value)
+        for key, value in previous_state.items()
+        if isinstance(value, dict)
+        and str(value.get("trading_date") or "") == current_date
+    }
+    next_state = dict(previous)
+
+    reset_keys: set[str] = set()
+    for attempt in detector_attempts:
+        if str(attempt.get("timeframe") or "").lower() != "1d":
+            continue
+        if attempt.get("candidate_emitted") is not False:
+            continue
+        source_event_id = str(attempt.get("source_market_event_id") or "")
+        if (
+            active_market_event_ids is not None
+            and source_event_id not in active_market_event_ids
+        ):
+            continue
+        runtime_id = str(attempt.get("runtime_id") or "")
+        symbol = str(attempt.get("symbol") or "").upper()
+        if not runtime_id or not symbol:
+            continue
+        epoch_id = long_test_epoch_id
+        reset_keys.add(
+            daily_structure_episode_key(
+                epoch_id=epoch_id,
+                runtime_id=runtime_id,
+                symbol=symbol,
+                direction="long",
+                trading_date=current_date,
+            )
+        )
+    for key in reset_keys:
+        next_state.pop(key, None)
+
+    for intent in intents:
+        if str(intent.get("timeframe") or "").strip().lower() != "1d":
+            continue
+        runtime_id = str(intent.get("runtime_id") or "")
+        symbol = str(intent.get("symbol") or "").upper()
+        direction = normalize_direction(intent.get("direction") or intent.get("side"))
+        if not runtime_id or not symbol or direction not in {"long", "short"}:
+            continue
+        created_at = str(intent.get("created_at") or to_iso(generated_at))
+        created = parse_optional_utc_datetime(created_at)
+        trading_date = (
+            created.astimezone(NEW_YORK).date().isoformat()
+            if created is not None
+            else current_date
+        )
+        epoch_id = short_test_epoch_id if direction == "short" else long_test_epoch_id
+        key = daily_structure_episode_key(
+            epoch_id=epoch_id,
+            runtime_id=runtime_id,
+            symbol=symbol,
+            direction=direction,
+            trading_date=trading_date,
+        )
+        existing = previous.get(key, {})
+        structure_instance_id = str(existing.get("structure_instance_id") or "")
+        if not structure_instance_id:
+            source_event_id = str(
+                intent.get("source_market_event_id")
+                or intent.get("market_event_id")
+                or ""
+            )
+            material = (
+                f"daily-episode|{key}|{source_event_id}|{created_at}"
+            )
+            structure_instance_id = (
+                f"m15-structure-{sha256(material.encode('utf-8')).hexdigest()[:20]}"
+            )
+        intent["structure_instance_id"] = structure_instance_id
+        next_state[key] = {
+            "structure_instance_id": structure_instance_id,
+            "test_epoch_id": epoch_id,
+            "runtime_id": runtime_id,
+            "symbol": symbol,
+            "direction": direction,
+            "trading_date": trading_date,
+            "episode_started_at": str(
+                existing.get("episode_started_at") or created_at
+            ),
+            "latest_source_market_event_id": str(
+                intent.get("source_market_event_id")
+                or intent.get("market_event_id")
+                or ""
+            ),
+        }
+    return next_state
+
+
+def daily_structure_episode_key(
+    *,
+    epoch_id: str,
+    runtime_id: str,
+    symbol: str,
+    direction: str,
+    trading_date: str,
+) -> str:
+    return "|".join(
+        (epoch_id, runtime_id, symbol, direction, trading_date)
+    )
 
 
 def parse_optional_utc_datetime(value: str) -> datetime | None:
