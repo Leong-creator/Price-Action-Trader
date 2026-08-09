@@ -281,7 +281,8 @@ def pa012_five_minute_long(
     if (
         first_close_at is None
         or first_close_at.astimezone(NEW_YORK).time().isoformat() != "09:35:00"
-        or not _contiguous_five_minute_rows(session)
+        or not _contiguous_five_minute_rows(session[:6])
+        or not _contiguous_five_minute_rows(session[-3:])
     ):
         return None
     latest = session[-1]
@@ -302,6 +303,8 @@ def pa012_five_minute_long(
         if offset not in (1, 2):
             continue
         follow = session[breakout_index + 1:]
+        if not _contiguous_five_minute_rows(session[breakout_index:]):
+            continue
         if any(d(row.get("close")) <= opening_high for row in follow):
             continue
         if offset == 1 and not _qualified_follow_through(

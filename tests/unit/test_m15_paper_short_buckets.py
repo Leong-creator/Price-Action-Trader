@@ -254,6 +254,46 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             "non_contiguous_five_minute_context",
         )
 
+    def test_opening_range_short_ignores_unrelated_mid_session_gap(self) -> None:
+        generated_at = datetime(2026, 7, 13, 16, 5, tzinfo=UTC)
+        opening = [
+            self.bar(
+                f"opening-{index}",
+                (
+                    datetime(2026, 7, 13, 13, 35, tzinfo=UTC)
+                    + timedelta(minutes=index * 5)
+                ).isoformat().replace("+00:00", "Z"),
+                "101", "102", "100", "101", "100",
+            )
+            for index in range(6)
+        ]
+        trailing = [
+            self.bar("tail-1", "2026-07-13T15:55:00Z", "101", "102", "100", "101", "100"),
+            self.bar("tail-2", "2026-07-13T16:00:00Z", "101.9", "102", "100", "101.9", "100"),
+            self.bar("tail-3", "2026-07-13T16:05:00Z", "98.8", "99", "98.79", "98.8", "200"),
+        ]
+        market = {
+            ("SPY", "5m"): [
+                self.bar("SPY-1", "2026-07-13T16:00:00Z", "100", "100.2", "99.7", "100", "100"),
+                self.bar("SPY-2", "2026-07-13T16:05:00Z", "99.6", "99.8", "99.4", "99.7", "200"),
+            ],
+            ("QQQ", "5m"): [
+                self.bar("QQQ-1", "2026-07-13T16:00:00Z", "100", "100.2", "99.7", "100", "100"),
+                self.bar("QQQ-2", "2026-07-13T16:05:00Z", "99.6", "99.8", "99.4", "99.7", "200"),
+            ],
+        }
+        rows = opening + trailing
+        signal = price_action_signal_for_runtime(
+            runtime_id="M10-PA-011-ORB-R1-5m-short",
+            spec=PRICE_ACTION_RUNTIME_SPECS["M10-PA-011-ORB-R1-5m-short"],
+            symbol="PA011",
+            rows=rows,
+            grouped_events={**market, ("PA011", "5m"): rows},
+            generated_at=generated_at,
+        )
+
+        self.assertIsNotNone(signal)
+
     def test_execution_floors_short_quantity_and_submits_sell_after_capacity_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -54,6 +54,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     effective_worker_progress,
     five_minute_contract_context_status,
     is_orphaned_sdk_runtime_child,
+    latest_completed_intraday_close,
     market_data_mode_qualifies_for_subscription_gate,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
@@ -87,6 +88,16 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_weekend_has_no_intraday_session_progress(self) -> None:
+        sunday = datetime(2026, 8, 9, 12, 45, tzinfo=ZoneInfo("America/New_York"))
+
+        latest = latest_completed_intraday_close(sunday, 5)
+
+        self.assertEqual(
+            latest,
+            datetime(2026, 8, 9, 13, 30, tzinfo=UTC),
+        )
+
     def test_quote_workers_report_invalid_config_through_structured_queue(self) -> None:
         for worker in (quote_worker, quote_snapshot_worker):
             messages: queue.Queue = queue.Queue()
@@ -258,7 +269,11 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
         self.assertEqual(
             status["pa012_5m_long_and_pa011_orb_short"]["status"],
-            "blocked_until_next_complete_market_session",
+            "ready",
+        )
+        self.assertFalse(
+            status["pa012_5m_long_and_pa011_orb_short"]
+            ["requires_full_session_from_0935_new_york"]
         )
 
     def test_sdk_quote_payload_converts_unpicklable_trade_session_enum(self) -> None:

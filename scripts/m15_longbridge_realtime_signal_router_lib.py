@@ -1628,7 +1628,11 @@ def short_no_candidate_reason(rule: str, rows: list[dict[str, Any]]) -> str:
             return "non_contiguous_five_minute_context"
     elif rule == "opening_range_breakdown":
         session_rows = latest_ny_session_rows(rows)
-        if not session_rows or not five_minute_rows_are_contiguous(session_rows):
+        if (
+            len(session_rows) < 7
+            or not five_minute_rows_are_contiguous(session_rows[:6])
+            or not five_minute_rows_are_contiguous(session_rows[-3:])
+        ):
             return "non_contiguous_five_minute_context"
         try:
             first_close = parse_utc_datetime(
@@ -1749,7 +1753,10 @@ def long_no_candidate_reason(runtime_id: str, rows: list[dict[str, Any]]) -> str
                 return "missing_opening_range_context_after_restart"
         if len(session_rows) < 8:
             return "opening_range_or_followthrough_incomplete"
-        if not five_minute_rows_are_contiguous(session_rows):
+        if (
+            not five_minute_rows_are_contiguous(session_rows[:6])
+            or not five_minute_rows_are_contiguous(session_rows[-3:])
+        ):
             return "non_contiguous_five_minute_context"
     elif runtime_id == "M12-FTD-001-pullback-guard-confirm-1d" and len(rows) < 3:
         return "insufficient_daily_history"
@@ -2050,7 +2057,8 @@ def opening_range_breakout_signal(
     opening_bars_required = 6
     if (
         len(session_rows) <= opening_bars_required
-        or not five_minute_rows_are_contiguous(session_rows)
+        or not five_minute_rows_are_contiguous(session_rows[:opening_bars_required])
+        or not five_minute_rows_are_contiguous(session_rows[-3:])
     ):
         return None
     try:
@@ -2201,7 +2209,8 @@ def opening_range_breakdown_signal(
     opening_bars_required = 6
     if (
         len(session_rows) <= opening_bars_required
-        or not five_minute_rows_are_contiguous(session_rows)
+        or not five_minute_rows_are_contiguous(session_rows[:opening_bars_required])
+        or not five_minute_rows_are_contiguous(session_rows[-3:])
     ):
         return None
     try:

@@ -2247,14 +2247,16 @@ def five_minute_contract_context_status(
             pa002_ready += 1
         if trailing >= 3:
             basic_short_ready += 1
-        session_contiguous = bool(values) and all(
+        opening_contiguous = len(values) >= 6 and all(
             current - previous == timedelta(minutes=5)
-            for previous, current in zip(values, values[1:])
+            for previous, current in zip(values[:6], values[1:6])
         )
+        trigger_context_contiguous = trailing >= 3
         first_ny = values[0].astimezone(NEW_YORK) if values else None
         if (
             len(values) >= 7
-            and session_contiguous
+            and opening_contiguous
+            and trigger_context_contiguous
             and first_ny is not None
             and (first_ny.hour, first_ny.minute) == (9, 35)
         ):
@@ -2294,9 +2296,11 @@ def five_minute_contract_context_status(
             "status": (
                 "ready"
                 if opening_range_ready == total
-                else "blocked_until_next_complete_market_session"
+                else "recovering_opening_and_trigger_context"
             ),
-            "requires_full_session_from_0935_new_york": True,
+            "requires_full_session_from_0935_new_york": False,
+            "required_opening_contiguous_bars": 6,
+            "required_trigger_contiguous_bars": 3,
         },
     }
 
@@ -2867,6 +2871,22 @@ def completed_postclose_refresh_dates(
     return set()
 
 
+def latest_completed_intraday_close(now_ny: datetime, bar_minutes: int) -> datetime:
+    """Return zero session progress outside a weekday US session."""
+    session_start = now_ny.replace(
+        hour=9, minute=30, second=0, microsecond=0
+    ).astimezone(UTC)
+    if now_ny.weekday() >= 5 or (now_ny.hour, now_ny.minute) < (9, 30):
+        return session_start
+    session_end = now_ny.replace(
+        hour=16, minute=0, second=0, microsecond=0
+    ).astimezone(UTC)
+    return min(
+        floor_bar_open(now_ny, bar_minutes).astimezone(UTC),
+        session_end,
+    )
+
+
 def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     run_lock = acquire_runtime_run_lock(config.output_dir)
     if run_lock is None:
@@ -2967,10 +2987,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         config.market_events_path,
         session_started_at,
     )
-    session_end_at = now_ny.replace(hour=16, minute=0, second=0, microsecond=0).astimezone(UTC)
-    latest_completed_close = min(
-        floor_bar_open(now_ny, config.bar_minutes).astimezone(UTC),
-        session_end_at,
+    latest_completed_close = latest_completed_intraday_close(
+        now_ny,
+        config.bar_minutes,
     )
     completed_bar_count = max(
         0,

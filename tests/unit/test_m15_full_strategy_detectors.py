@@ -151,6 +151,20 @@ class M15FullStrategyDetectorsTest(unittest.TestCase):
         rows.append(self.bar(7, open_price=102.5, high=104, low=102, close=103, start=start, next_quote=103.1))
         self.assertIsNone(pa012_five_minute_long("TEST", rows))
 
+    def test_pa012_ignores_unrelated_mid_session_gap(self) -> None:
+        start = datetime(2026, 8, 3, 13, 35, tzinfo=UTC)
+        rows = [self.bar(index, high=101, low=99, close=100, start=start) for index in range(6)]
+        resumed = datetime(2026, 8, 3, 15, 0, tzinfo=UTC)
+        rows.extend([
+            self.bar(0, high=101, low=99, close=100, start=resumed),
+            self.bar(1, open_price=100.5, high=103, low=100.5, close=102.5, start=resumed),
+            self.bar(2, open_price=102.5, high=104, low=102, close=103, start=resumed, next_quote=103.1),
+        ])
+
+        signal = pa012_five_minute_long("TEST", rows)
+
+        self.assertIsNotNone(signal)
+
     def test_pa001_requires_h2_style_pullback_and_uses_two_r(self) -> None:
         closes = [100 + index for index in range(14)] + [112, 111, 112, 111, 112, 111, 112]
         lows = [value - 1 for value in closes]
