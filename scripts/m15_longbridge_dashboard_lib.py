@@ -224,6 +224,98 @@ def _merge_short_execution_funnel(
     return output
 
 
+def _merge_strategy_execution_funnel(
+    strategy_diagnostics: dict[str, Any],
+    execution_rows: list[dict[str, Any]],
+    reconciliation_rows: list[dict[str, Any]],
+    *,
+    expected_runtime_ids: list[str],
+    runtime_directions: dict[str, str],
+    long_test_epoch_id: str = "",
+    short_test_epoch_id: str = "",
+) -> dict[str, Any]:
+    """Join detector, router, execution and broker facts for every runtime."""
+    output = dict(strategy_diagnostics)
+    runtime_rows = {
+        str(row.get("runtime_id") or ""): dict(row)
+        for row in output.get("runtime_summaries", [])
+        if isinstance(row, dict) and str(row.get("runtime_id") or "")
+    }
+    status_by_order_id = {
+        str(row.get("order_id") or ""): str(
+            row.get("canonical_status") or row.get("longbridge_status") or row.get("status") or ""
+        ).lower()
+        for row in reconciliation_rows
+        if isinstance(row, dict) and str(row.get("order_id") or "")
+    }
+
+    def relevant(row: dict[str, Any], runtime_id: str) -> bool:
+        if str(row.get("runtime_id") or "") != runtime_id:
+            return False
+        direction = runtime_directions.get(runtime_id, "long")
+        expected_action = "open_short" if direction == "short" else "open_long"
+        if str(row.get("position_action") or "") != expected_action:
+            return False
+        expected_epoch = short_test_epoch_id if direction == "short" else long_test_epoch_id
+        if expected_epoch and str(row.get("test_epoch_id") or "") != expected_epoch:
+            return False
+        expected_hash = str(runtime_rows.get(runtime_id, {}).get("strategy_contract_hash") or "")
+        return not expected_hash or str(row.get("strategy_contract_hash") or "") == expected_hash
+
+    for runtime_id in sorted(set(expected_runtime_ids) | set(runtime_rows)):
+        current = runtime_rows.get(runtime_id, {"runtime_id": runtime_id})
+        rows = [row for row in execution_rows if relevant(row, runtime_id)]
+        blockers = Counter(
+            str(blocker)
+            for row in rows
+            for blocker in (row.get("blockers") or [])
+            if str(blocker)
+        )
+        order_ids = {
+            str(row.get("longbridge_order_id") or row.get("broker_order_id") or row.get("order_id") or "")
+            for row in rows
+            if str(row.get("longbridge_order_id") or row.get("broker_order_id") or row.get("order_id") or "")
+        }
+        filled = {order_id for order_id in order_ids if status_by_order_id.get(order_id) in {"filled", "partially_filled"}}
+        current.update(
+            {
+                "direction": runtime_directions.get(runtime_id, "long"),
+                "execution_attempted_count": len(rows),
+                "execution_blocked_count": sum(bool(row.get("blockers")) for row in rows),
+                "execution_blockers": dict(blockers.most_common()),
+                "broker_order_id_count": len(order_ids),
+                "broker_partially_filled_order_count": sum(
+                    status_by_order_id.get(order_id) == "partially_filled" for order_id in order_ids
+                ),
+                "broker_fully_filled_order_count": sum(
+                    status_by_order_id.get(order_id) == "filled" for order_id in order_ids
+                ),
+                "broker_filled_order_count": len(filled),
+                "last_execution_at": max(
+                    (str(row.get("processed_at") or row.get("created_at") or "") for row in rows),
+                    default="",
+                ),
+            }
+        )
+        runtime_rows[runtime_id] = current
+    output["runtime_summaries"] = [runtime_rows[runtime_id] for runtime_id in sorted(runtime_rows)]
+    summary = dict(output.get("summary") or {})
+    for field in (
+        "execution_attempted_count",
+        "execution_blocked_count",
+        "broker_order_id_count",
+        "broker_partially_filled_order_count",
+        "broker_fully_filled_order_count",
+        "broker_filled_order_count",
+    ):
+        summary[field] = sum(int(row.get(field) or 0) for row in runtime_rows.values())
+    output["summary"] = summary
+    output["funnel_source"] = (
+        "router_strategy_diagnostics_plus_realtime_execution_ledger_plus_longbridge_order_reconciliation"
+    )
+    return output
+
+
 def _build_short_position_views(
     fill_attribution: dict[str, Any],
     execution_rows: list[dict[str, Any]],
@@ -552,6 +644,9 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     reconciliation = _read_json(_resolve(inputs["order_reconciliation"]))
     fill_attribution = _read_json(_resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH))
     short_diagnostics = _read_json(_resolve(inputs["short_signal_diagnostics"])) if inputs.get("short_signal_diagnostics") else {}
+    strategy_diagnostics = _read_json(_resolve(inputs["strategy_signal_diagnostics"])) if inputs.get("strategy_signal_diagnostics") else {}
+    visual_acceptance = _read_json(_resolve(inputs["visual_strategy_acceptance"])) if inputs.get("visual_strategy_acceptance") else {}
+    visual_session = _read_json(_resolve(inputs["visual_strategy_session_summary"])) if inputs.get("visual_strategy_session_summary") else {}
     pnl = _read_json(_resolve(inputs["pnl_reconciliation"]))
     execution_config = _read_json(_resolve(inputs["execution_config"]))
     inventory = _inventory(execution_config)
@@ -561,6 +656,16 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         if bucket["direction"] == "short"
         for runtime_id in bucket["runtime_ids"]
     ]
+    expected_runtime_ids = [
+        runtime_id
+        for bucket in inventory["buckets"]
+        for runtime_id in bucket["runtime_ids"]
+    ]
+    runtime_directions = {
+        runtime_id: bucket["direction"]
+        for bucket in inventory["buckets"]
+        for runtime_id in bucket["runtime_ids"]
+    }
     fill_attribution_path = _resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH)
     migration_status = _read_optional_json(_derive_migration_status_path(config, fill_attribution_path))
     pa002_milestone = _read_optional_json(
@@ -571,6 +676,15 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         execution_ledger,
         reconciliation.get("rows") or [],
         expected_runtime_ids=expected_short_runtime_ids,
+    )
+    strategy_diagnostics = _merge_strategy_execution_funnel(
+        strategy_diagnostics,
+        execution_ledger,
+        reconciliation.get("rows") or [],
+        expected_runtime_ids=expected_runtime_ids,
+        runtime_directions=runtime_directions,
+        long_test_epoch_id=str(formal_epoch.get("test_epoch_id") or epoch.get("test_epoch_id") or ""),
+        short_test_epoch_id=str(formal_epoch.get("short_test_epoch_id") or ""),
     )
     timestamp = generated_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     now = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(timezone.utc)
@@ -869,6 +983,50 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "short_lot_lifecycle": short_position_views["short_lot_lifecycle"],
             "recent_decisions": list(short_diagnostics.get("decision_rows") or [])[-20:],
         },
+        "strategy_execution_funnel": {
+            "generated_at": strategy_diagnostics.get("generated_at"),
+            "summary": strategy_diagnostics.get("summary") or {"runtime_count": inventory["runtime_count"]},
+            "runtime_summaries": strategy_diagnostics.get("runtime_summaries") or [],
+            "recent_decisions": list(strategy_diagnostics.get("decision_rows") or [])[-20:],
+            "source": strategy_diagnostics.get("funnel_source"),
+        },
+        "visual_strategy_shadow": {
+            "generated_at": visual_acceptance.get("generated_at"),
+            "latest_session": {
+                "business_date": visual_session.get("business_date"),
+                "status": visual_session.get("status") or "not_run",
+                "session_complete": visual_session.get("session_complete") is True,
+                "complete_symbol_count": (visual_session.get("diagnostics") or {}).get("complete_symbol_count"),
+                "required_symbol_count": (visual_session.get("diagnostics") or {}).get("required_symbol_count"),
+                "accepted_five_minute_bar_count": (visual_session.get("diagnostics") or {}).get("accepted_five_minute_bar_count"),
+            },
+            "runtime_rows": [
+                {
+                    "strategy_id": strategy_id,
+                    "runtime_id": (visual_acceptance.get(strategy_id) or {}).get("runtime_id"),
+                    "historical_replay_symbol_count": (visual_acceptance.get(strategy_id) or {}).get("historical_replay_symbol_count"),
+                    "historical_replay_bar_count": (visual_acceptance.get(strategy_id) or {}).get("historical_replay_bar_count"),
+                    "no_future_data": (visual_acceptance.get(strategy_id) or {}).get("no_future_data") is True,
+                    "restart_parity": (visual_acceptance.get(strategy_id) or {}).get("restart_parity") is True,
+                    "positive_examples": ((visual_acceptance.get(strategy_id) or {}).get("human_review_passed_counts") or {}).get("positive_examples", 0),
+                    "negative_examples": ((visual_acceptance.get(strategy_id) or {}).get("human_review_passed_counts") or {}).get("negative_examples", 0),
+                    "boundary_examples": ((visual_acceptance.get(strategy_id) or {}).get("human_review_passed_counts") or {}).get("boundary_examples", 0),
+                    "realtime_shadow_sessions": (visual_acceptance.get(strategy_id) or {}).get("realtime_shadow_sessions", 0),
+                    "paper_eligible": bool(
+                        (visual_acceptance.get(strategy_id) or {}).get("no_future_data") is True
+                        and (visual_acceptance.get(strategy_id) or {}).get("restart_parity") is True
+                        and visual_session.get("session_complete") is True
+                        and int((visual_session.get("diagnostics") or {}).get("complete_symbol_count") or 0)
+                        == int((visual_session.get("diagnostics") or {}).get("required_symbol_count") or -1)
+                        and int(((visual_acceptance.get(strategy_id) or {}).get("human_review_passed_counts") or {}).get("positive_examples") or 0) >= 10
+                        and int(((visual_acceptance.get(strategy_id) or {}).get("human_review_passed_counts") or {}).get("negative_examples") or 0) >= 10
+                        and int(((visual_acceptance.get(strategy_id) or {}).get("human_review_passed_counts") or {}).get("boundary_examples") or 0) >= 5
+                        and int((visual_acceptance.get(strategy_id) or {}).get("realtime_shadow_sessions") or 0) >= 1
+                    ),
+                }
+                for strategy_id in ("PA004", "PA007", "PA008")
+            ],
+        },
         "strategy_inventory": inventory,
         "pa002_dual_version_milestone": pa002_milestone_view,
         "pa004_migration": {
@@ -904,6 +1062,8 @@ const pa002Milestone=d.pa002_dual_version_milestone||{{}};
 const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['行情模式',v(d.runtime.market_data_mode)],['全部行情覆盖',v(d.runtime.market_data_coverage)],['交易池行情覆盖',v(d.runtime.trading_market_data_coverage)],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['PA002双版本阶段',v(pa002Milestone.milestone_phase)],['PA002有效交易日',v(pa002Milestone.aggregate?.effective_trading_day_count)],['PA002完整交易',v(pa002Milestone.aggregate?.completed_trade_count)],['PA002当前建议',v(pa002Milestone.recommendation?.plain_text)],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
 cards.push(['做空检测尝试',d.paper_short_diagnostics.summary?.detector_attempted_count],['做空未形成候选',d.paper_short_diagnostics.summary?.no_candidate_count],['容量查询失败',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.query_failed],['无借券库存',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.no_borrow_inventory],['借券数量不足',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.insufficient],['做空部分成交',d.paper_short_diagnostics.summary?.broker_partially_filled_order_count],['做空完全成交',d.paper_short_diagnostics.summary?.broker_fully_filled_order_count]);
 const shortRows=d.paper_short_diagnostics.runtime_summaries||[];
+const strategyFunnelRows=d.strategy_execution_funnel.runtime_summaries||[];
+const visualRows=d.visual_strategy_shadow.runtime_rows||[];
 const longShortNetRows=d.fill_attribution.same_symbol_long_short_net||[];
 const shortLotLifecycle=d.fill_attribution.short_lot_lifecycle||{{summary:{{}},open_lots:[]}};
 const performanceRows=d.fill_attribution.strategy_performance||[];
@@ -913,7 +1073,8 @@ const bucketOpenRows=positionLayers.bucket_rows||[];
 const concentrationRows=(positionLayers.cross_bucket_concentration||[]).filter(x=>Number(x.bucket_count||0)>1);
 const symbolRows=(positionLayers.symbol_rows||[]).filter(x=>x.unreconciled_net_quantity!=='0.0000'||x.unreconciled_gross_market_value!=='0.00');
 document.getElementById('app').innerHTML=`<section class=\"grid\">${{cards.map(x=>`<div class=\"card\"><div>${{x[0]}}</div><div class=\"v ${{x[0]==='数据状态'?cls:''}}\">${{v(x[1])}}</div></div>`).join('')}}</section><h2>策略实际成交成绩（默认按新基线展示，排除故障日）</h2><table><thead><tr><th>运行单元</th><th>完整交易</th><th>扣费后胜率</th><th>毛盈亏</th><th>估算费用</th><th>扣费后盈亏</th><th>扣费后盈利因子</th><th>最大回撤</th></tr></thead><tbody>${{performanceRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.completed_trade_count)}}</td><td>${{v(x.win_rate_after_estimated_fees_pct)}}%</td><td>${{v(x.gross_realized_pnl)}}</td><td>${{v(x.estimated_fees)}}</td><td>${{v(x.estimated_net_realized_pnl)}}</td><td>${{v(x.profit_factor_after_estimated_fees)}}</td><td>${{v(x.maximum_drawdown_after_estimated_fees)}}</td></tr>`).join('')}}</tbody></table><h2>分仓实际成交成绩（默认按新基线展示，排除故障日）</h2><table><thead><tr><th>资金池</th><th>完整交易</th><th>扣费后胜率</th><th>毛盈亏</th><th>估算费用</th><th>扣费后盈亏</th><th>扣费后盈利因子</th><th>最大回撤</th></tr></thead><tbody>${{bucketPerformanceRows.map(x=>`<tr><td>${{v(x.capital_bucket)}}</td><td>${{v(x.completed_trade_count)}}</td><td>${{v(x.win_rate_after_estimated_fees_pct)}}%</td><td>${{v(x.gross_realized_pnl)}}</td><td>${{v(x.estimated_fees)}}</td><td>${{v(x.estimated_net_realized_pnl)}}</td><td>${{v(x.profit_factor_after_estimated_fees)}}</td><td>${{v(x.maximum_drawdown_after_estimated_fees)}}</td></tr>`).join('')}}</tbody></table><h2>当前持仓三层口径</h2><table><thead><tr><th>层级</th><th>净数量</th><th>市值</th><th>持仓浮盈</th><th>说明</th></tr></thead><tbody><tr><td>真实账户总口径</td><td>${{v(positionLayers.actual_account_total?.net_quantity)}}</td><td>${{v(positionLayers.actual_account_total?.gross_market_value)}}</td><td>${{v(positionLayers.actual_account_total?.unrealized_pnl)}}</td><td>只用长桥实际持仓价格</td></tr><tr><td>策略虚拟归因汇总</td><td>${{v(positionLayers.attributed_virtual_total?.net_quantity)}}</td><td>${{v(positionLayers.attributed_virtual_total?.gross_market_value)}}</td><td>${{v(positionLayers.attributed_virtual_total?.unrealized_pnl)}}</td><td>按虚拟批次乘长桥实际持仓价格</td></tr><tr><td>无法归因/对账差额</td><td>${{v(positionLayers.unreconciled_delta?.net_quantity)}}</td><td>${{v(positionLayers.unreconciled_delta?.gross_market_value)}}</td><td>${{v(positionLayers.unreconciled_delta?.unrealized_pnl)}}</td><td>真实账户减虚拟归因</td></tr></tbody></table><h2>分仓当前持仓浮盈</h2><table><thead><tr><th>资金池</th><th>批次数</th><th>净数量</th><th>当前市值</th><th>当前浮盈</th></tr></thead><tbody>${{bucketOpenRows.map(x=>`<tr><td>${{v(x.capital_bucket)}}</td><td>${{v(x.batch_count)}}</td><td>${{v(x.net_quantity)}}</td><td>${{v(x.gross_market_value)}}</td><td>${{v(x.unrealized_pnl)}}</td></tr>`).join('')}}</tbody></table><h2>策略当前持仓浮盈</h2><table><thead><tr><th>运行单元</th><th>批次数</th><th>净数量</th><th>当前市值</th><th>当前浮盈</th></tr></thead><tbody>${{runtimeOpenRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.batch_count)}}</td><td>${{v(x.net_quantity)}}</td><td>${{v(x.gross_market_value)}}</td><td>${{v(x.unrealized_pnl)}}</td></tr>`).join('')}}</tbody></table><h2>同标的跨仓集中度</h2><table><thead><tr><th>标的</th><th>涉及分仓</th><th>涉及运行单元</th><th>虚拟归因市值</th><th>占全部虚拟持仓</th><th>分仓拆分</th></tr></thead><tbody>${{concentrationRows.map(x=>`<tr><td>${{v(x.symbol)}}</td><td>${{v(x.bucket_count)}}</td><td>${{v(x.runtime_count)}}</td><td>${{v(x.gross_market_value)}}</td><td>${{v(x.share_of_virtual_gross_exposure_pct)}}%</td><td>${{(x.bucket_breakdown||[]).map(y=>`${{y.capital_bucket}} ${{y.gross_market_value}}`).join('；')}}</td></tr>`).join('')}}</tbody></table><h2>无法归因/对账差额明细</h2><table><thead><tr><th>标的</th><th>真实净数量</th><th>虚拟净数量</th><th>净数量差额</th><th>市值差额</th><th>浮盈差额</th></tr></thead><tbody>${{symbolRows.map(x=>`<tr><td>${{v(x.symbol)}}</td><td>${{v(x.actual_net_quantity)}}</td><td>${{v(x.attributed_net_quantity)}}</td><td>${{v(x.unreconciled_net_quantity)}}</td><td>${{v(x.unreconciled_gross_market_value)}}</td><td>${{v(x.unreconciled_unrealized_pnl)}}</td></tr>`).join('')}}</tbody></table><p>费用为配置中的保守估算；长桥未提供可直接核对的实际费用字段时，不把估算冒充券商实际费用。未成交、取消、拒绝订单不进入成绩。PA004 若存在迁移状态文件，则默认展示新基线之后的成绩，旧成绩保留为归档。</p><h2>策略与虚拟仓</h2><table><thead><tr><th>仓位</th><th>方向</th><th>运行单元</th><th>资金</th><th>敞口上限</th></tr></thead><tbody>${{d.strategy_inventory.buckets.map(x=>`<tr><td>${{x.label}}</td><td>${{x.direction==='short'?'做空':'做多'}}</td><td>${{x.runtime_ids.join(', ')}}</td><td>${{v(x.equity)}}</td><td>${{v(x.max_total_exposure)}}</td></tr>`).join('')}}</tbody></table><h2>做空信号诊断</h2><table><thead><tr><th>策略运行单元</th><th>结构候选</th><th>路由通过</th><th>容量检查</th><th>容量阻断</th><th>订单号</th><th>实际成交</th><th>主要原因</th></tr></thead><tbody>${{shortRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.broker_capacity_checked_count)}}</td><td>${{v(x.broker_capacity_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.blockers||{{}}),...(x.broker_capacity_blockers||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table>`;
-document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>策略合同版本</h2><table><thead><tr><th>运行单元</th><th>合同阶段</th><th>合同哈希</th><th>装载状态</th></tr></thead><tbody>${{(d.strategy_inventory.contract_rows||[]).map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.contract_stage_zh||x.contract_stage)}}</td><td>${{x.contract_hash?x.contract_hash.slice(0,12):'未装载'}}</td><td>${{x.contract_loaded?'已锁定':'未装载'}}</td></tr>`).join('')}}</tbody></table>`);
+document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>全部正式策略执行漏斗</h2><table><thead><tr><th>运行单元</th><th>方向</th><th>检测尝试</th><th>未形成候选</th><th>结构候选</th><th>路由通过</th><th>执行检查</th><th>执行阻断</th><th>订单号</th><th>实际成交</th><th>主要原因</th></tr></thead><tbody>${{strategyFunnelRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{x.direction==='short'?'做空':'做多'}}</td><td>${{v(x.detector_attempted_count)}}</td><td>${{v(x.no_candidate_count)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.execution_attempted_count)}}</td><td>${{v(x.execution_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.no_candidate_reasons||{{}}),...(x.router_blockers||{{}}),...(x.execution_blockers||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table><h2>策略合同版本</h2><table><thead><tr><th>运行单元</th><th>合同阶段</th><th>合同哈希</th><th>装载状态</th></tr></thead><tbody>${{(d.strategy_inventory.contract_rows||[]).map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.contract_stage_zh||x.contract_stage)}}</td><td>${{x.contract_hash?x.contract_hash.slice(0,12):'未装载'}}</td><td>${{x.contract_loaded?'已锁定':'未装载'}}</td></tr>`).join('')}}</tbody></table>`);
+document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>视觉策略影子验收</h2><table><thead><tr><th>运行单元</th><th>历史标的</th><th>历史K线</th><th>无未来数据</th><th>重启一致</th><th>正例审核</th><th>反例审核</th><th>边界例审核</th><th>完整实时影子日</th><th>可进入模拟仓</th></tr></thead><tbody>${{visualRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.historical_replay_symbol_count)}}</td><td>${{v(x.historical_replay_bar_count)}}</td><td>${{x.no_future_data?'通过':'未通过'}}</td><td>${{x.restart_parity?'通过':'未通过'}}</td><td>${{v(x.positive_examples)}}/10</td><td>${{v(x.negative_examples)}}/10</td><td>${{v(x.boundary_examples)}}/5</td><td>${{v(x.realtime_shadow_sessions)}}/1</td><td>${{x.paper_eligible?'是':'否'}}</td></tr>`).join('')}}</tbody></table>`);
 document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>三条 Short 分阶段漏斗</h2><table><thead><tr><th>运行单元</th><th>检测尝试</th><th>未形成候选</th><th>结构候选</th><th>路由通过</th><th>容量检查</th><th>容量阻断</th><th>订单号</th><th>成交</th><th>主要原因</th></tr></thead><tbody>${{shortRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.detector_attempted_count)}}</td><td>${{v(x.no_candidate_count)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.broker_capacity_checked_count)}}</td><td>${{v(x.broker_capacity_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.no_candidate_reasons||{{}}),...(x.broker_capacity_failure_classes||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table><h2>同标的多空净额</h2><table><thead><tr><th>标的</th><th>多头数量</th><th>空头数量</th><th>净数量</th><th>总数量</th><th>同时多空</th></tr></thead><tbody>${{longShortNetRows.map(x=>`<tr><td>${{v(x.symbol)}}</td><td>${{v(x.long_quantity)}}</td><td>${{v(x.short_quantity)}}</td><td>${{v(x.net_quantity)}}</td><td>${{v(x.gross_quantity)}}</td><td>${{x.contains_both_directions?'是':'否'}}</td></tr>`).join('')}}</tbody></table><h2>Short lot 生命周期</h2><table><thead><tr><th>开仓订单</th><th>运行单元</th><th>标的</th><th>开仓数量</th><th>剩余数量</th><th>已回补</th><th>状态</th><th>待确认回补</th></tr></thead><tbody>${{(shortLotLifecycle.open_lots||[]).map(x=>`<tr><td>${{v(x.open_order_id)}}</td><td>${{v(x.runtime_id)}}</td><td>${{v(x.symbol)}}</td><td>${{v(x.filled_quantity)}}</td><td>${{v(x.remaining_quantity)}}</td><td>${{v(x.covered_quantity)}}</td><td>${{v(x.lifecycle_status)}}</td><td>${{v(x.pending_cover_order_count)}}</td></tr>`).join('')}}</tbody></table>`);
 </script></main></body></html>"""
 

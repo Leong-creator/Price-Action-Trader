@@ -278,6 +278,23 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             "missing_opening_range_context_after_restart",
         )
 
+    def test_legacy_five_minute_runtime_rejects_non_contiguous_context(self) -> None:
+        rows = [
+            {
+                "event_time": event_time,
+                "next_bar_first_quote_at": "2026-07-15T16:20:01Z",
+            }
+            for event_time in (
+                "2026-07-15T16:00:00Z",
+                "2026-07-15T16:05:00Z",
+                "2026-07-15T16:20:00Z",
+            )
+        ]
+        self.assertEqual(
+            long_no_candidate_reason("M10-PA-013-5m", rows),
+            "non_contiguous_five_minute_context",
+        )
+
     def test_realtime_context_keeps_enough_daily_history_for_pa001(self) -> None:
         rows = [
             {

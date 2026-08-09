@@ -175,6 +175,12 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                     "portfolio_total_today_pl": "12.34",
                 },
                 "today_account_pnl": {
+                    "metric_contract_id": "longbridge_app_asset_daily_pnl_v1",
+                    "start_date": "2026-06-08",
+                    "end_date": "2026-06-08",
+                    "sum_profit": "12.34",
+                },
+                "market_day_profit_analysis": {
                     "start_date": "2026-06-08",
                     "end_date": "2026-06-08",
                     "sum_profit": "56.78",
@@ -191,7 +197,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(summary["longbridge_today_total_pnl"], "12.34")
         self.assertEqual(summary["longbridge_account_intraday_pnl"], "56.78")
         self.assertEqual(summary["longbridge_net_asset_intraday_pnl"], "56.78")
-        self.assertEqual(summary["longbridge_app_display_today_pnl"], "等待长桥字段对齐")
+        self.assertEqual(summary["longbridge_app_display_today_pnl"], "12.34")
         self.assertEqual(summary["longbridge_profit_analysis_market_day_pnl"], "56.78")
         self.assertIn("profit-analysis", summary["account_total_pnl_note"])
 
@@ -218,6 +224,20 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(summary["longbridge_unrealized_pnl"], "等待长桥持仓行情")
         self.assertEqual(summary["longbridge_portfolio_today_holding_pnl"], "等待长桥持仓行情")
         self.assertIn("退化", summary["longbridge_account_total_pnl_note"])
+
+    def test_profit_analysis_cannot_impersonate_app_daily_pnl(self):
+        summary = m15_longbridge_account_pnl_summary({}, {}, "10000")
+
+        m15_apply_longbridge_reconciliation_to_account_pnl(
+            summary,
+            {
+                "today_account_pnl": {"sum_profit": "63.12"},
+                "market_day_profit_analysis": {"sum_profit": "63.12"},
+            },
+        )
+
+        self.assertEqual(summary["longbridge_app_display_today_pnl"], "暂不可计算")
+        self.assertEqual(summary["longbridge_profit_analysis_market_day_pnl"], "63.12")
 
     def test_longbridge_reconciliation_must_not_be_older_than_account_state(self):
         stale_reconciliation = {"generated_at": "2026-06-08T03:32:43Z", "pnl_reconciliation_ok": True}
@@ -1037,7 +1057,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn("暂无阻断", queue_by_label["实时提交流程"]["note"])
         pnl_cards_by_label = {row["label"]: row for row in panel["realtime_pnl_cards"]}
         self.assertEqual(pnl_cards_by_label["接口持仓今日浮动"]["value"], "234.00")
-        self.assertEqual(pnl_cards_by_label["App当日盈亏"]["value"], "等待长桥字段对齐")
+        self.assertEqual(pnl_cards_by_label["App当日盈亏"]["value"], "暂不可计算")
         self.assertEqual(pnl_cards_by_label["当前持仓总盈亏"]["value"], "269.87")
         self.assertEqual(pnl_cards_by_label["持仓浮动"]["value"], "269.87")
         self.assertNotIn("长桥总盈亏", panel_json)

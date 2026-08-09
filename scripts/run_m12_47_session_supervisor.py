@@ -775,7 +775,7 @@ def apply_dashboard_longbridge_overlay(dashboard: dict[str, Any], longbridge_con
     top_metrics.pop("长桥接口交易日盈亏", None)
     top_metrics.pop("长桥账户总盈亏", None)
     top_metrics.pop("长桥接口净值日内变化", None)
-    top_metrics["长桥App当日盈亏"] = str(longbridge_context.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"))
+    top_metrics["长桥App当日盈亏"] = str(longbridge_context.get("longbridge_app_display_today_pnl", "暂不可计算"))
     top_metrics["长桥接口净值日内变化"] = str(longbridge_context.get("longbridge_account_intraday_pnl", "无法计算"))
     top_metrics["长桥接口持仓今日浮动"] = str(longbridge_context.get("longbridge_account_today_total_pnl", "暂无"))
     top_metrics["长桥当前持仓总盈亏"] = str(longbridge_context.get("longbridge_account_total_pnl", "暂无"))

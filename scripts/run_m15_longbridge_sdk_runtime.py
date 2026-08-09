@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import gzip
 import json
 import multiprocessing as mp
 import os
 import queue
+import shutil
 import signal
 import subprocess
 import sys
@@ -40,7 +42,7 @@ from scripts.m15_longbridge_sdk_account_lib import (
     SdkTradeRequestGate,
 )
 from scripts.m15_longbridge_sdk_runtime_lib import (
-    DEFAULT_CONFIG_PATH, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
+    DEFAULT_CONFIG_PATH, QUOTE_SNAPSHOT_JSON, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
     append_market_events, attach_next_bar_first_quotes, build_status, compact_market_events, config_fingerprint, configured_symbols,
     configured_trading_symbols, daily_context_covers_symbols, daily_context_is_complete,
     daily_context_row_count_for_symbols, floor_bar_open, fresh_market_events, load_config,
@@ -86,6 +88,7 @@ TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
 TRADE_CONTEXT_RETRY_SECONDS = 5
 INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS = 90
 REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED = False
+RUNTIME_LOG_ROTATE_BYTES = 10 * 1024 * 1024
 
 
 def parse_utc_datetime(value: str) -> datetime | None:
@@ -537,11 +540,56 @@ def update_live_quote_session_state(
         "high": high,
         "low": low,
         "close": close,
+        "prev_close": str(
+            payload.get("prev_close")
+            or (previous or {}).get("prev_close")
+            or ""
+        ),
         "volume": volume,
         "market_data_blocked_reason": blocked_reason,
     }
     state_by_symbol[normalized_symbol] = state
     return state
+
+
+def build_sdk_quote_snapshot(
+    state_by_symbol: dict[str, dict[str, Any]],
+    *,
+    generated_at: datetime,
+) -> dict[str, Any]:
+    """Publish broker-native prices for slow App-metric reconciliation."""
+    rows: list[dict[str, Any]] = []
+    for symbol, state in sorted(state_by_symbol.items()):
+        current_price = str(state.get("close") or "")
+        previous_close = str(state.get("prev_close") or "")
+        rows.append(
+            {
+                "symbol": f"{symbol.removesuffix('.US')}.US",
+                "current_price": current_price,
+                "prev_close": previous_close,
+                "price_phase": "regular",
+                "source_event_at": str(state.get("source_event_at") or ""),
+                "received_at": str(state.get("received_at") or ""),
+                "source_mode": str(state.get("source_mode") or ""),
+                "market_data_blocked_reason": str(
+                    state.get("market_data_blocked_reason") or ""
+                ),
+            }
+        )
+    latest_quote_received_at = max(
+        (str(row.get("received_at") or "") for row in rows),
+        default="",
+    )
+    return {
+        "schema_version": "m15.longbridge-sdk-quote-snapshot.v1",
+        "metric_contract_id": "longbridge_app_asset_daily_pnl_v1",
+        "generated_at": to_iso(generated_at),
+        "market_date": generated_at.astimezone(NEW_YORK).date().isoformat(),
+        "source": "longbridge_sdk_runtime_single_quote_connection",
+        "latest_quote_received_at": latest_quote_received_at,
+        "row_count": len(rows),
+        "rows": rows,
+    }
 
 
 def load_daily_context(
@@ -716,6 +764,56 @@ def market_data_heartbeat_grace_elapsed(
     )
 
 
+def recent_restart_count(
+    restart_times: deque[float],
+    now_monotonic: float,
+    window_seconds: float,
+) -> int:
+    cutoff = float(now_monotonic) - float(window_seconds)
+    while restart_times and float(restart_times[0]) < cutoff:
+        restart_times.popleft()
+    return len(restart_times)
+
+
+def adaptive_market_data_deadline_seconds(
+    base_deadline_seconds: float,
+    recovery_deadline_seconds: float,
+    recent_restarts: int,
+    now: datetime,
+    bar_minutes: int,
+) -> float:
+    """Back off a restart storm without relaxing the five-minute boundary."""
+    base = float(base_deadline_seconds)
+    if int(recent_restarts) < 3:
+        return base
+    interval_seconds = max(1, int(bar_minutes)) * 60
+    seconds_into_interval = (
+        (int(now.minute) % max(1, int(bar_minutes))) * 60
+        + int(now.second)
+        + int(now.microsecond) / 1_000_000
+    )
+    seconds_to_boundary = interval_seconds - seconds_into_interval
+    distance_to_boundary = min(seconds_into_interval, seconds_to_boundary)
+    if distance_to_boundary <= base:
+        return base
+    return max(base, float(recovery_deadline_seconds))
+
+
+def subscription_quote_stream_is_stale(
+    worker_ready_since_monotonic: float,
+    last_quote_monotonic: float,
+    now_monotonic: float,
+    deadline_seconds: float,
+) -> bool:
+    if float(worker_ready_since_monotonic) <= 0:
+        return False
+    last_real_quote = max(
+        float(worker_ready_since_monotonic),
+        float(last_quote_monotonic),
+    )
+    return float(now_monotonic) - last_real_quote > float(deadline_seconds)
+
+
 def deferred_intraday_context_after_mid_session_start(
     symbols: list[str],
     *,
@@ -735,6 +833,19 @@ def deferred_intraday_context_after_mid_session_start(
     }
 
 
+def silence_sdk_worker_console() -> None:
+    """Keep repeated SDK connection banners out of the runtime log.
+
+    Worker failures still reach the parent through structured queue messages.
+    """
+    null_fd = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(null_fd, 1)
+        os.dup2(null_fd, 2)
+    finally:
+        os.close(null_fd)
+
+
 def quote_worker(
     config_path: str,
     queue_out: Any,
@@ -742,8 +853,9 @@ def quote_worker(
     progress_value: Any | None = None,
 ) -> None:
     """Own the one SDK quote connection and never run history, routing or orders."""
-    config = load_config(config_path)
     try:
+        config = load_config(config_path)
+        silence_sdk_worker_console()
         sdk = require_sdk_contract()
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
         quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
@@ -849,8 +961,9 @@ def quote_snapshot_worker(
     progress_value: Any | None = None,
 ) -> None:
     """Fetch bounded SDK snapshots; the parent owns bar state across worker restarts."""
-    config = load_config(config_path)
     try:
+        config = load_config(config_path)
+        silence_sdk_worker_console()
         sdk = require_sdk_contract()
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
         quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
@@ -2068,21 +2181,123 @@ def active_event_ids_excluding_intraday_gaps(
     rows: list[dict[str, Any]],
     blocked_symbols: set[str] | None,
 ) -> set[str]:
-    """Block only affected five-minute entries while preserving daily signals."""
-    blocked_bases = {
-        str(symbol).upper().split(".")[0]
-        for symbol in (blocked_symbols or set())
-        if str(symbol)
-    }
+    """Keep current events active while detectors enforce runtime-specific gaps.
+
+    A single symbol-level block used to disable every five-minute runtime even
+    after shorter-lookback strategies rebuilt valid context.  The compatibility
+    argument remains for status reporting; each detector now owns its exact
+    continuity requirement.
+    """
+    del blocked_symbols
     return {
         str(row.get("event_id") or "")
         for row in rows
         if str(row.get("event_id") or "")
-        and not (
-            str(row.get("timeframe") or "") == "5m"
-            and str(row.get("symbol") or "").upper().split(".")[0]
-            in blocked_bases
+    }
+
+
+def five_minute_contract_context_status(
+    rows: list[dict[str, Any]],
+    symbols: tuple[str, ...] | list[str],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Summarize the exact continuity available to each five-minute contract."""
+    expected = {
+        str(symbol).upper().split(".")[0]
+        for symbol in symbols
+        if str(symbol)
+    }
+    current_date = now.astimezone(NEW_YORK).date()
+    times_by_symbol: dict[str, set[datetime]] = {symbol: set() for symbol in expected}
+    for row in rows:
+        if str(row.get("timeframe") or "") != "5m" or row.get("bar_final") is not True:
+            continue
+        symbol = str(row.get("symbol") or "").upper().split(".")[0]
+        if symbol not in expected:
+            continue
+        try:
+            event_at = datetime.fromisoformat(
+                str(row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except ValueError:
+            continue
+        if event_at.astimezone(NEW_YORK).date() == current_date:
+            times_by_symbol[symbol].add(event_at)
+
+    def trailing_count(values: list[datetime]) -> int:
+        if not values:
+            return 0
+        count = 1
+        for previous, current in zip(reversed(values[:-1]), reversed(values[1:])):
+            if current - previous != timedelta(minutes=5):
+                break
+            count += 1
+        return count
+
+    pa002_ready = 0
+    basic_short_ready = 0
+    opening_range_ready = 0
+    pa002_recovery_times: list[datetime] = []
+    latest_bar_at = ""
+    for values_set in times_by_symbol.values():
+        values = sorted(values_set)
+        trailing = trailing_count(values)
+        if trailing >= 23:
+            pa002_ready += 1
+        if trailing >= 3:
+            basic_short_ready += 1
+        session_contiguous = bool(values) and all(
+            current - previous == timedelta(minutes=5)
+            for previous, current in zip(values, values[1:])
         )
+        first_ny = values[0].astimezone(NEW_YORK) if values else None
+        if (
+            len(values) >= 7
+            and session_contiguous
+            and first_ny is not None
+            and (first_ny.hour, first_ny.minute) == (9, 35)
+        ):
+            opening_range_ready += 1
+        if values:
+            latest_bar_at = max(latest_bar_at, to_iso(values[-1]))
+            pa002_recovery_times.append(
+                values[-1] + timedelta(minutes=max(0, 23 - trailing) * 5)
+            )
+
+    total = len(expected)
+    recovery_at = (
+        to_iso(max(pa002_recovery_times))
+        if pa002_ready < total and len(pa002_recovery_times) == total
+        else ""
+    )
+    return {
+        "generated_at": to_iso(now),
+        "latest_complete_bar_at": latest_bar_at,
+        "symbol_count": total,
+        "pa002_5m_long": {
+            "ready_symbol_count": pa002_ready,
+            "required_symbol_count": total,
+            "status": "ready" if pa002_ready == total else "recovering_contiguous_context",
+            "minimum_contiguous_bars": 23,
+            "expected_full_recovery_at": recovery_at,
+        },
+        "pa002_and_pa013_5m_short": {
+            "ready_symbol_count": basic_short_ready,
+            "required_symbol_count": total,
+            "status": "ready" if basic_short_ready == total else "recovering_contiguous_context",
+            "minimum_contiguous_bars": 3,
+        },
+        "pa012_5m_long_and_pa011_orb_short": {
+            "ready_symbol_count": opening_range_ready,
+            "required_symbol_count": total,
+            "status": (
+                "ready"
+                if opening_range_ready == total
+                else "blocked_until_next_complete_market_session"
+            ),
+            "requires_full_session_from_0935_new_york": True,
+        },
     }
 
 
@@ -2801,12 +3016,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     )
     context.append(trading_market_events(config, cached_daily_rows))
     context.append(trading_market_events(config, cached_intraday_rows))
+    five_minute_strategy_context = five_minute_contract_context_status(
+        context.rows(),
+        configured_trading_symbols(config),
+        now=datetime.now(UTC),
+    )
     intraday_context_event_ids = {
         str(row.get("event_id") or "")
         for row in cached_intraday_rows
         if str(row.get("event_id") or "")
     }
     live_quote_session_state: dict[str, dict[str, Any]] = {}
+    last_quote_snapshot_write = 0.0
     # The live quote WebSocket also owns a fresh native runtime.
     message_queue: Any = process_context.Queue(maxsize=2048)
     stop_event: Any = process_context.Event()
@@ -2881,12 +3102,23 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_poll_is_fast_and_complete = False
     last_market_data_worker_error = ""
     market_data_worker_restart_events: deque[dict[str, Any]] = deque(maxlen=20)
+    market_data_worker_restart_times: deque[float] = deque(maxlen=100)
+    market_data_worker_restart_total = 0
+    market_data_worker_recent_restart_count = 0
+    market_data_applied_heartbeat_deadline_seconds = float(
+        config.market_data_heartbeat_deadline_seconds
+    )
+    last_subscription_quote_monotonic = 0.0
+    subscription_quote_silence_fallback_count = 0
 
     def record_market_data_worker_restart(
         reason: str,
         *,
         exit_code: int | None = None,
     ) -> None:
+        nonlocal market_data_worker_restart_total
+        market_data_worker_restart_total += 1
+        market_data_worker_restart_times.append(time.monotonic())
         market_data_worker_restart_events.append(
             {
                 "at": to_iso(datetime.now(UTC)),
@@ -2900,13 +3132,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         "failed_symbols": [],
     }
     previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
+    shutdown_requested = False
 
     def stop_requested(_signum: int, _frame: Any) -> None:
-        raise KeyboardInterrupt
+        nonlocal shutdown_requested
+        shutdown_requested = True
 
     signal.signal(signal.SIGTERM, stop_requested)
     try:
-        while True:
+        while not shutdown_requested:
             if worker is None or not worker.is_alive():
                 if worker is not None:
                     record_market_data_worker_restart(
@@ -2997,6 +3231,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_ready = False
                 worker_started = time.monotonic()
                 worker_last_progress = worker_started
+                last_subscription_quote_monotonic = 0.0
                 subscription_progress_completed = 0
                 subscription_progress_total = (
                     len(configured_trading_symbols(config))
@@ -3032,17 +3267,34 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_last_progress,
                 market_data_worker_progress.value,
             )
+            market_data_worker_recent_restart_count = recent_restart_count(
+                market_data_worker_restart_times,
+                time.monotonic(),
+                120,
+            )
+            market_data_applied_heartbeat_deadline_seconds = (
+                adaptive_market_data_deadline_seconds(
+                    config.market_data_heartbeat_deadline_seconds,
+                    config.snapshot_poll_recovery_deadline_seconds,
+                    max(
+                        market_data_worker_recent_restart_count,
+                        market_data_worker_restart_total,
+                    ),
+                    datetime.now(UTC),
+                    config.bar_minutes,
+                )
+            )
             if (
                 not worker_ready
                 and time.monotonic() - worker_last_progress
                 > (
-                    config.market_data_heartbeat_deadline_seconds
+                    market_data_applied_heartbeat_deadline_seconds
                     if snapshot_fallback_active
                     else config.subscription_deadline_seconds
                 )
             ):
                 startup_deadline_seconds = (
-                    config.market_data_heartbeat_deadline_seconds
+                    market_data_applied_heartbeat_deadline_seconds
                     if snapshot_fallback_active
                     else config.subscription_deadline_seconds
                 )
@@ -3071,11 +3323,38 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 continue
             if (
                 worker_ready
+                and market_data_mode == "sdk_subscription"
+                and in_regular_session(datetime.now(UTC))
+                and subscription_quote_stream_is_stale(
+                    worker_ready_since,
+                    last_subscription_quote_monotonic,
+                    time.monotonic(),
+                    config.market_data_heartbeat_deadline_seconds,
+                )
+            ):
+                last_subscription_failure_reason = (
+                    "sdk_quote_stream_silent_after_acknowledged_subscription:"
+                    f"{config.market_data_heartbeat_deadline_seconds}s"
+                )
+                record_market_data_worker_restart(
+                    last_subscription_failure_reason,
+                    exit_code=worker.exitcode if worker else None,
+                )
+                subscription_quote_silence_fallback_count += 1
+                snapshot_fallback_active = True
+                market_data_fallback_validated = False
+                worker_ready = False
+                worker_ready_since = 0.0
+                stop_spawned_process(worker, graceful=False)
+                worker = None
+                continue
+            if (
+                worker_ready
                 and market_data_heartbeat_grace_elapsed(
                     worker_ready_since,
                     time.monotonic(),
                     (
-                        config.market_data_heartbeat_deadline_seconds
+                        market_data_applied_heartbeat_deadline_seconds
                         if market_data_mode == "sdk_snapshot_poll"
                         else config.subscription_deadline_seconds
                     ),
@@ -3083,14 +3362,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and market_data_heartbeat_is_stale(
                     worker_last_progress,
                     time.monotonic(),
-                    config.market_data_heartbeat_deadline_seconds,
+                    market_data_applied_heartbeat_deadline_seconds,
                 )
             ):
                 worker_ready = False
                 worker_ready_since = 0.0
                 last_subscription_failure_reason = (
                     "sdk_market_data_heartbeat_deadline_exceeded:"
-                    f"{config.market_data_heartbeat_deadline_seconds}s"
+                    f"{market_data_applied_heartbeat_deadline_seconds:g}s"
                 )
                 record_market_data_worker_restart(
                     last_subscription_failure_reason,
@@ -3206,6 +3485,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     message.get("total") or subscription_progress_total
                 )
             elif kind == "quote_state":
+                last_subscription_quote_monotonic = time.monotonic()
                 try:
                     quote_received_at = datetime.fromisoformat(
                         str(message.get("received_at") or "").replace("Z", "+00:00")
@@ -3365,6 +3645,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     intraday_context_blocked_symbols=set(
                         residual_intraday_context_gaps
                     ),
+                )
+                five_minute_strategy_context = five_minute_contract_context_status(
+                    context.rows(),
+                    configured_trading_symbols(config),
+                    now=datetime.now(UTC),
                 )
                 current_market_date = (
                     datetime.now(NEW_YORK).date().isoformat()
@@ -3805,6 +4090,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 expansion_acceptance_status = "latency_above_target"
             else:
                 expansion_acceptance_status = "readonly_observing"
+            if (
+                live_quote_session_state
+                and time.monotonic() - last_quote_snapshot_write >= 15
+            ):
+                quote_snapshot_generated_at = datetime.now(UTC)
+                write_json_atomic(
+                    config.output_dir / QUOTE_SNAPSHOT_JSON,
+                    build_sdk_quote_snapshot(
+                        live_quote_session_state,
+                        generated_at=quote_snapshot_generated_at,
+                    ),
+                )
+                last_quote_snapshot_write = time.monotonic()
             build_status(
                 config,
                 status="running" if worker_ready else "connecting",
@@ -3842,8 +4140,31 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_poll_successful_fast_polls": snapshot_poll_successful_fast_polls,
                     "snapshot_poll_is_fast_and_complete": snapshot_poll_is_fast_and_complete,
                     "last_market_data_worker_error": last_market_data_worker_error,
-                    "market_data_worker_restart_count": len(
-                        market_data_worker_restart_events
+                    "market_data_worker_restart_count": (
+                        market_data_worker_restart_total
+                    ),
+                    "market_data_worker_recent_restart_count": (
+                        market_data_worker_recent_restart_count
+                    ),
+                    "market_data_applied_heartbeat_deadline_seconds": (
+                        market_data_applied_heartbeat_deadline_seconds
+                    ),
+                    "snapshot_poll_recovery_deadline_seconds": (
+                        config.snapshot_poll_recovery_deadline_seconds
+                    ),
+                    "subscription_quote_silence_fallback_count": (
+                        subscription_quote_silence_fallback_count
+                    ),
+                    "subscription_quote_stream_age_seconds": (
+                        max(
+                            0,
+                            int(
+                                time.monotonic()
+                                - last_subscription_quote_monotonic
+                            ),
+                        )
+                        if last_subscription_quote_monotonic > 0
+                        else None
                     ),
                     "market_data_worker_restart_events": list(
                         market_data_worker_restart_events
@@ -3911,6 +4232,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "intraday_context_repair": intraday_repair_status,
                     "intraday_context_gap_blocks_only_affected_five_minute_symbols": True,
                     "intraday_context_gap_blocks_new_entries_globally": False,
+                    "five_minute_strategy_context": five_minute_strategy_context,
                     "partial_bar_suppressed_until": partial_bar_suppressed_until,
                     "daily_context_worker_pids": [worker.pid for worker, _started_at, _symbols in daily_workers.values()],
                     "account_snapshot_age_seconds": age,
@@ -3996,13 +4318,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     except KeyboardInterrupt:
         return 0
     finally:
+        # Restore the previous handler before waking child processes.  A second
+        # SIGTERM during Event.set() must not interrupt multiprocessing cleanup
+        # and leave a misleading shutdown traceback in the runtime log.
+        signal.signal(signal.SIGTERM, previous_sigterm_handler)
         stop_event.set()
         stop_spawned_process(worker, graceful=True)
         for daily_worker, _started_at, _symbols in daily_workers.values():
             stop_spawned_process(daily_worker, graceful=False)
         close_spawn_queue(message_queue)
         account.stop()
-        signal.signal(signal.SIGTERM, previous_sigterm_handler)
         if read_pid(pid_path(config)) == os.getpid():
             pid_path(config).unlink(missing_ok=True)
         run_lock.seek(0)
@@ -4127,6 +4452,31 @@ def stop_legacy_cli_supervisor(config: Any) -> None:
     path.unlink(missing_ok=True)
 
 
+def rotate_runtime_log(
+    path: Path,
+    *,
+    maximum_bytes: int = RUNTIME_LOG_ROTATE_BYTES,
+) -> Path | None:
+    """Compress an oversized stopped-runtime log before opening a new one."""
+    try:
+        if path.stat().st_size <= maximum_bytes:
+            return None
+    except OSError:
+        return None
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    archived = path.with_name(f"{path.stem}.{stamp}.archived.log")
+    path.replace(archived)
+    compressed = Path(f"{archived}.gz")
+    try:
+        with archived.open("rb") as source, gzip.open(compressed, "wb") as target:
+            shutil.copyfileobj(source, target, length=1024 * 1024)
+        archived.unlink()
+        return compressed
+    except OSError:
+        compressed.unlink(missing_ok=True)
+        return archived
+
+
 def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     GLOBAL_RUNTIME_START_LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -4200,6 +4550,7 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
                 raise RuntimeError("sdk_runtime_shutdown_escalation_failed")
             pid_path(config).unlink(missing_ok=True)
         stop_legacy_cli_supervisor(config)
+        rotate_runtime_log(config.output_dir / LOG_FILE)
         command = [sys.executable, str(Path(__file__).resolve()), "--watch", "--config", str(args.config)]
         if args.dispatch:
             command.append("--dispatch")

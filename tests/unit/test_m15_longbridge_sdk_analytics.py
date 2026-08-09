@@ -11,11 +11,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.m15_longbridge_sdk_analytics_lib import (
+    APP_DAILY_PNL_METRIC_ID,
     app_intraday_window_start,
     build_app_display_metrics,
     build_sdk_account_summary,
     current_history_rows,
     incremental_history_start,
+    load_runtime_quote_rows,
     market_profit_query_dates,
     merge_history_rows,
     normalize_order,
@@ -29,6 +31,33 @@ from scripts.m15_longbridge_sdk_analytics_lib import (
 
 
 class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
+    def test_market_profit_analysis_never_replaces_app_daily_pnl(self) -> None:
+        summary = build_sdk_account_summary(
+            "2026-08-07T20:00:00Z",
+            {
+                "paper_account_verified": True,
+                "account_channel": "lb_papertrading",
+                "account_total_equity_estimate": "709967.81",
+                "account_total_equity_currency": "HKD",
+                "account_total_equity_source": "longbridge_sdk_account_balance.net_assets",
+            },
+            {},
+            daily_profit_analysis={"profit": "63.12"},
+            app_display_metrics={
+                "status": "incomplete",
+                "metric_contract_id": APP_DAILY_PNL_METRIC_ID,
+                "today_pnl": "",
+                "source": "longbridge_sdk_app_daily_pnl_inputs_incomplete",
+            },
+        )
+
+        self.assertEqual(summary["account_today_total_pnl"], "暂不可计算")
+        self.assertEqual(
+            summary["account_today_total_pnl_metric_id"],
+            APP_DAILY_PNL_METRIC_ID,
+        )
+        self.assertEqual(summary["market_day_profit_analysis"], "63.12")
+
     def test_incomplete_app_metrics_keep_sdk_equity_currency_and_source_together(self) -> None:
         summary = build_sdk_account_summary(
             "2026-08-07T02:00:00Z",
@@ -50,7 +79,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                 "currency": "USD",
                 "total_asset": "",
                 "total_cash": "500",
-                "source": "unavailable_without_second_sdk_quote_connection",
+                "source": "longbridge_sdk_app_daily_pnl_inputs_incomplete",
             },
         )
 
@@ -150,6 +179,76 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
         self.assertEqual(metrics["total_cash"], "88254.34")
         self.assertEqual(metrics["market_value"], "220.00")
         self.assertEqual(metrics["total_asset"], "88474.34")
+        self.assertEqual(metrics["metric_contract_id"], APP_DAILY_PNL_METRIC_ID)
+        self.assertEqual(
+            metrics["source"],
+            "longbridge_sdk_app_asset_daily_pnl_formula_v1",
+        )
+
+    def test_runtime_quote_snapshot_supplies_app_formula_without_second_context(self) -> None:
+        generated_at = datetime(2026, 7, 21, 15, 0, tzinfo=UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "m15_longbridge_sdk_quote_snapshot.json").write_text(
+                json.dumps(
+                    {
+                        "metric_contract_id": APP_DAILY_PNL_METRIC_ID,
+                        "market_date": "2026-07-21",
+                        "rows": [
+                            {
+                                "symbol": "AAPL.US",
+                                "current_price": "210.5",
+                                "prev_close": "205.0",
+                                "received_at": "2026-07-21T14:59:50Z",
+                                "price_phase": "regular",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rows = load_runtime_quote_rows(
+                SimpleNamespace(output_dir=root),
+                generated_at,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["prev_close"], "205.0")
+
+    def test_runtime_quote_snapshot_rejects_stale_or_wrong_contract_data(self) -> None:
+        generated_at = datetime(2026, 7, 21, 15, 0, tzinfo=UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            snapshot = root / "m15_longbridge_sdk_quote_snapshot.json"
+            snapshot.write_text(
+                json.dumps(
+                    {
+                        "metric_contract_id": APP_DAILY_PNL_METRIC_ID,
+                        "market_date": "2026-07-21",
+                        "rows": [
+                            {
+                                "symbol": "AAPL.US",
+                                "current_price": "210.5",
+                                "prev_close": "205.0",
+                                "received_at": "2026-07-21T14:58:00Z",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                load_runtime_quote_rows(SimpleNamespace(output_dir=root), generated_at),
+                [],
+            )
+            payload = json.loads(snapshot.read_text(encoding="utf-8"))
+            payload["metric_contract_id"] = "wrong_metric"
+            payload["rows"][0]["received_at"] = "2026-07-21T14:59:50Z"
+            snapshot.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertEqual(
+                load_runtime_quote_rows(SimpleNamespace(output_dir=root), generated_at),
+                [],
+            )
 
     def test_app_window_uses_previous_new_york_0400_before_boundary(self) -> None:
         self.assertEqual(
@@ -496,7 +595,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                     "today_pnl": "7.89",
                     "total_cash": "1000.00",
                     "total_asset": "1200.00",
-                    "source": "longbridge_sdk_asset_page_formula_positions_executions_extended_quotes",
+                    "source": "longbridge_sdk_app_asset_daily_pnl_formula_v1",
                     "symbol_pnl_rows": [{"symbol": "Apple.US", "today_pnl": "7.89"}],
                 },
             )
@@ -516,7 +615,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
             self.assertEqual(summary["account_today_total_pnl"], "7.89")
             self.assertEqual(
                 summary["account_today_total_pnl_source"],
-                "longbridge_sdk_asset_page_formula_positions_executions_extended_quotes",
+                "longbridge_sdk_app_asset_daily_pnl_formula_v1",
             )
             pnl = json.loads((output / "m15_longbridge_account_pnl_reconciliation.json").read_text())
             self.assertEqual(pnl["today_account_pnl"]["symbol_pnl_rows"][0]["symbol"], "Apple.US")

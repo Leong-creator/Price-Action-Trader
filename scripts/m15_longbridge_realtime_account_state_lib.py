@@ -553,7 +553,7 @@ def build_summary(
         else {}
     )
     today_account_sum_profit = today_account_pnl.get("sum_profit") or "无法计算"
-    app_display_today_pnl = "等待长桥字段对齐"
+    app_display_today_pnl = "暂不可计算"
     historical_history_cached = bool(account_state.get("historical_orders_cache_used")) or bool(
         account_state.get("historical_executions_cache_used")
     )
@@ -576,10 +576,10 @@ def build_summary(
         "net_asset_intraday_pnl": today_account_sum_profit,
         "net_asset_intraday_pnl_source": "longbridge_profit_analysis_market_day",
         "app_display_today_pnl": app_display_today_pnl,
-        "app_display_today_pnl_source": "not_exposed_by_current_longbridge_cli",
+        "app_display_today_pnl_source": "legacy_cli_path_not_app_metric_source",
         "app_display_today_pnl_note": (
-            "长桥 App 顶部当日盈亏截图口径暂未在 portfolio/profit-analysis/cash-flow CLI 字段中找到；"
-            "看板不得用接口净值变化或持仓今日浮动冒充该字段。"
+            "长桥 App 当日盈亏只允许由 SDK 持仓、成交、最新价和昨收价按固定公式计算；"
+            "遗留 CLI 路径不得输出或替代该指标。"
         ),
         "today_holding_pnl": today_holding_pnl,
         "today_total_pnl_label": "长桥 portfolio.total_today_pl，表示当前持仓今日浮动。",

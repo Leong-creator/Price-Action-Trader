@@ -4,7 +4,7 @@ import json
 import tempfile
 import unittest
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -36,6 +36,7 @@ from scripts.m15_longbridge_realtime_signal_router_lib import (
     SHORT_DIAGNOSTICS_JSON,
     load_config as load_router_config,
     price_action_signal_for_runtime,
+    short_no_candidate_reason,
     update_short_signal_diagnostics,
 )
 
@@ -165,8 +166,33 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             self.bar("PA013-3", "2026-07-13T15:00:00Z", "101.2", "102.66", "101.15", "101.2", "200"),
         ]
         pa011_rows = [
-            self.bar(f"PA011-{index}", f"2026-07-13T{14 + index // 6:02d}:{30 + (index % 6) * 5:02d}:00Z", "101", "102", "100", "101", "100")
+            self.bar(
+                f"PA011-{index}",
+                (
+                    datetime(2026, 7, 13, 13, 35, tzinfo=UTC)
+                    + timedelta(minutes=index * 5)
+                ).isoformat().replace("+00:00", "Z"),
+                "101",
+                "102",
+                "100",
+                "101",
+                "100",
+            )
             for index in range(6)
+        ] + [
+            self.bar(
+                f"PA011-middle-{index}",
+                (
+                    datetime(2026, 7, 13, 13, 35, tzinfo=UTC)
+                    + timedelta(minutes=index * 5)
+                ).isoformat().replace("+00:00", "Z"),
+                "101",
+                "102",
+                "100",
+                "101",
+                "100",
+            )
+            for index in range(6, 17)
         ] + [
             self.bar("PA011-previous", "2026-07-13T15:00:00Z", "101.9", "102.0", "100.0", "101.9", "100"),
             self.bar("PA011-latest", "2026-07-13T15:05:00Z", "98.8", "99.0", "98.79", "98.8", "200"),
@@ -193,6 +219,40 @@ class M15PaperShortBucketsTest(unittest.TestCase):
             self.assertEqual(signal["side"], "sell_short")
             self.assertEqual(signal["position_action"], "open_short")
             self.assertGreaterEqual(float(signal["quality_score"]), float(signal["minimum_quality_score"]))
+
+    def test_short_detectors_reject_non_contiguous_five_minute_context(self) -> None:
+        three_bar_gap = [
+            self.bar("gap-1", "2026-07-13T14:45:00Z", "100", "101", "99", "100", "100"),
+            self.bar("gap-2", "2026-07-13T14:55:00Z", "100", "101", "99", "100", "100"),
+            self.bar("gap-3", "2026-07-13T15:00:00Z", "98", "99", "97", "98", "200"),
+        ]
+        opening_range_gap = [
+            self.bar(
+                f"orb-gap-{index}",
+                f"2026-07-13T{14 + index // 6:02d}:{30 + (index % 6) * 5:02d}:00Z",
+                "100",
+                "101",
+                "99",
+                "100",
+                "100",
+            )
+            for index in range(6)
+        ] + [
+            self.bar("orb-gap-7", "2026-07-13T15:05:00Z", "99", "100", "98", "99", "100"),
+        ]
+
+        self.assertEqual(
+            short_no_candidate_reason("bearish_breakdown", three_bar_gap),
+            "non_contiguous_five_minute_context",
+        )
+        self.assertEqual(
+            short_no_candidate_reason("bearish_false_breakout", three_bar_gap),
+            "non_contiguous_five_minute_context",
+        )
+        self.assertEqual(
+            short_no_candidate_reason("opening_range_breakdown", opening_range_gap),
+            "non_contiguous_five_minute_context",
+        )
 
     def test_execution_floors_short_quantity_and_submits_sell_after_capacity_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

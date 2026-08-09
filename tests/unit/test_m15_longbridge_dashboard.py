@@ -10,6 +10,7 @@ from scripts.m15_longbridge_dashboard_lib import (
     _build_short_position_views,
     _inventory,
     _merge_short_execution_funnel,
+    _merge_strategy_execution_funnel,
     build_dashboard,
     run_dashboard,
 )
@@ -97,6 +98,35 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertTrue(all(row["detector_attempted_count"] == 3 for row in payload["runtime_summaries"]))
         self.assertEqual(payload["summary"]["broker_partially_filled_order_count"], 1)
         self.assertEqual(payload["summary"]["broker_fully_filled_order_count"], 1)
+
+    def test_strategy_funnel_joins_each_runtime_to_actual_broker_fill(self) -> None:
+        diagnostics = {
+            "summary": {"runtime_count": 2},
+            "runtime_summaries": [
+                {"runtime_id": "LONG", "strategy_contract_hash": "hash-long", "detector_attempted_count": 3, "signal_ready_count": 1},
+                {"runtime_id": "SHORT", "strategy_contract_hash": "hash-short", "detector_attempted_count": 4, "signal_ready_count": 1},
+            ],
+        }
+        execution_rows = [
+            {"runtime_id": "LONG", "strategy_contract_hash": "hash-long", "test_epoch_id": "long-v1", "position_action": "open_long", "longbridge_order_id": "L1"},
+            {"runtime_id": "SHORT", "strategy_contract_hash": "hash-short", "test_epoch_id": "short-v1", "position_action": "open_short", "longbridge_order_id": "S1"},
+            {"runtime_id": "LONG", "strategy_contract_hash": "hash-long", "test_epoch_id": "old", "position_action": "open_long", "longbridge_order_id": "OLD"},
+            {"runtime_id": "LONG", "strategy_contract_hash": "wrong-hash", "test_epoch_id": "long-v1", "position_action": "open_long", "longbridge_order_id": "WRONG"},
+        ]
+        payload = _merge_strategy_execution_funnel(
+            diagnostics,
+            execution_rows,
+            [{"order_id": "L1", "canonical_status": "Filled"}, {"order_id": "S1", "canonical_status": "Partially_Filled"}],
+            expected_runtime_ids=["LONG", "SHORT"],
+            runtime_directions={"LONG": "long", "SHORT": "short"},
+            long_test_epoch_id="long-v1",
+            short_test_epoch_id="short-v1",
+        )
+
+        rows = {row["runtime_id"]: row for row in payload["runtime_summaries"]}
+        self.assertEqual(rows["LONG"]["broker_fully_filled_order_count"], 1)
+        self.assertEqual(rows["SHORT"]["broker_partially_filled_order_count"], 1)
+        self.assertEqual(payload["summary"]["broker_order_id_count"], 2)
 
     def test_short_position_views_include_symbol_net_and_lot_lifecycle(self) -> None:
         fill_attribution = {
@@ -336,6 +366,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertIn("分仓实际成交成绩", html)
         self.assertIn("扣费后盈利因子", html)
         self.assertIn("做空信号诊断", html)
+        self.assertIn("全部正式策略执行漏斗", html)
         self.assertIn("PA002双版本阶段", html)
 
     def test_dashboard_blocks_stale_statistics_and_dead_runtime(self) -> None:

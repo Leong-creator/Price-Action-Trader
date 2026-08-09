@@ -3733,7 +3733,7 @@ def build_accountized_dashboard_payload(
             "FTD001 对照": ftd001_monitor["current_plain_status"],
             "盘前/盘后异动": extended_session_monitor["plain_language_summary"],
             "长桥模拟账户": longbridge_paper_account["top_metric"],
-            "长桥App当日盈亏": longbridge_paper_account.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
+            "长桥App当日盈亏": longbridge_paper_account.get("longbridge_app_display_today_pnl", "暂不可计算"),
             "长桥接口净值日内变化": longbridge_paper_account.get("longbridge_account_intraday_pnl", "无法计算"),
             "长桥接口持仓今日浮动": longbridge_paper_account["longbridge_account_today_total_pnl"],
             "长桥当前持仓总盈亏": longbridge_paper_account["longbridge_account_total_pnl"],
@@ -4390,8 +4390,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         },
         {
             "label": "App当日盈亏",
-            "value": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
-            "note": account_pnl_summary.get("longbridge_app_display_today_pnl_note", "长桥 App 顶部当日盈亏字段等待接口对齐。"),
+            "value": account_pnl_summary.get("longbridge_app_display_today_pnl", "暂不可计算"),
+            "note": account_pnl_summary.get("longbridge_app_display_today_pnl_note", "固定指标 longbridge_app_asset_daily_pnl_v1；输入不完整时暂不可计算。"),
         },
         {
             "label": "接口净值日内变化",
@@ -4510,8 +4510,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_pnl_cards = [
         {
             "label": "App当日盈亏",
-            "value": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
-            "note": account_pnl_summary.get("longbridge_app_display_today_pnl_note", "长桥 App 顶部当日盈亏字段等待接口对齐。"),
+            "value": account_pnl_summary.get("longbridge_app_display_today_pnl", "暂不可计算"),
+            "note": account_pnl_summary.get("longbridge_app_display_today_pnl_note", "固定指标 longbridge_app_asset_daily_pnl_v1；输入不完整时暂不可计算。"),
             "value_type": "status",
         },
         {
@@ -4680,7 +4680,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "longbridge_net_asset_intraday_pnl": account_pnl_summary.get("longbridge_net_asset_intraday_pnl", account_pnl_summary.get("longbridge_account_intraday_pnl", "无法计算")),
         "longbridge_profit_analysis_market_day_pnl": account_pnl_summary.get("longbridge_profit_analysis_market_day_pnl", "无法计算"),
         "longbridge_account_today_total_pnl": account_pnl_summary["longbridge_account_today_total_pnl"],
-        "longbridge_app_display_today_pnl": account_pnl_summary.get("longbridge_app_display_today_pnl", "等待长桥字段对齐"),
+        "longbridge_app_display_today_pnl": account_pnl_summary.get("longbridge_app_display_today_pnl", "暂不可计算"),
         "longbridge_portfolio_today_holding_pnl": account_pnl_summary.get("longbridge_portfolio_today_holding_pnl", account_pnl_summary["longbridge_account_today_total_pnl"]),
         "longbridge_stock_total_pnl": account_pnl_summary["longbridge_stock_total_pnl"],
         "longbridge_realized_pnl_estimate": account_pnl_summary["longbridge_realized_pnl_estimate"],
@@ -5170,7 +5170,7 @@ def m15_longbridge_account_pnl_summary(
         "longbridge_account_total_pnl": "无法计算",
         "longbridge_account_intraday_pnl": "无法计算",
         "longbridge_account_today_total_pnl": str(pnl_summary.get("today_total_pnl") or "无法计算"),
-        "longbridge_app_display_today_pnl": "等待长桥字段对齐",
+        "longbridge_app_display_today_pnl": "暂不可计算",
         "longbridge_portfolio_today_holding_pnl": str(pnl_summary.get("today_total_pnl") or "无法计算"),
         "longbridge_account_total_pnl_note": "等待长桥 portfolio 总盈亏；缺数据时不使用旧本地模拟估算覆盖。",
         "longbridge_account_intraday_pnl_note": "等待长桥当日 profit-analysis；缺数据时不使用本地估算覆盖。",
@@ -5201,12 +5201,22 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         if isinstance(reconciliation.get("today_account_pnl"), dict)
         else {}
     )
+    market_day_profit_analysis = (
+        reconciliation.get("market_day_profit_analysis", {})
+        if isinstance(reconciliation.get("market_day_profit_analysis"), dict)
+        else {}
+    )
     trading_pnl = reconciliation.get("trading_pnl", {}) if isinstance(reconciliation.get("trading_pnl"), dict) else {}
     account_snapshot = reconciliation.get("account_snapshot", {}) if isinstance(reconciliation.get("account_snapshot"), dict) else {}
     source_status = reconciliation.get("source_status", {}) if isinstance(reconciliation.get("source_status"), dict) else {}
     query_range = reconciliation.get("query_range", {}) if isinstance(reconciliation.get("query_range"), dict) else {}
     account_total = str(account_pnl.get("sum_profit") or "")
-    today_account_total = str(today_account_pnl.get("sum_profit") or "")
+    app_metric_valid = (
+        str(today_account_pnl.get("metric_contract_id") or "")
+        == "longbridge_app_asset_daily_pnl_v1"
+    )
+    app_today_total = str(today_account_pnl.get("sum_profit") or "") if app_metric_valid else ""
+    market_day_total = str(market_day_profit_analysis.get("sum_profit") or "")
     stock_total = str(trading_pnl.get("stock_total_pnl") or "")
     unrealized = str(trading_pnl.get("current_position_unrealized_pnl") or "")
     realized_estimate = str(trading_pnl.get("realized_pnl_estimate") or "")
@@ -5234,10 +5244,10 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         account_pnl_summary["cash"] = str(account_snapshot.get("portfolio_total_cash"))
     if account_portfolio_total_pl and not (holding_prices_degraded and not holding_prices_restored):
         account_pnl_summary["longbridge_account_total_pnl"] = account_portfolio_total_pl
-    account_pnl_summary["longbridge_account_intraday_pnl"] = today_account_total or "无法计算"
-    account_pnl_summary["longbridge_net_asset_intraday_pnl"] = today_account_total or "无法计算"
-    account_pnl_summary["longbridge_app_display_today_pnl"] = "等待长桥字段对齐"
-    account_pnl_summary["longbridge_profit_analysis_market_day_pnl"] = today_account_total or "无法计算"
+    account_pnl_summary["longbridge_account_intraday_pnl"] = market_day_total or "无法计算"
+    account_pnl_summary["longbridge_net_asset_intraday_pnl"] = market_day_total or "无法计算"
+    account_pnl_summary["longbridge_app_display_today_pnl"] = app_today_total or "暂不可计算"
+    account_pnl_summary["longbridge_profit_analysis_market_day_pnl"] = market_day_total or "无法计算"
     if account_portfolio_today_pl and not (holding_prices_degraded and not holding_prices_restored):
         account_pnl_summary["longbridge_account_today_total_pnl"] = account_portfolio_today_pl
         account_pnl_summary["longbridge_today_total_pnl"] = account_portfolio_today_pl
@@ -5245,7 +5255,7 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         account_portfolio_today_pl
         if not (holding_prices_degraded and not holding_prices_restored)
         else "等待长桥持仓行情"
-    )
+    ) or "等待长桥持仓行情"
     account_pnl_summary["longbridge_stock_total_pnl"] = stock_total or "无法计算"
     account_pnl_summary["longbridge_realized_pnl_estimate"] = realized_estimate or "无法计算"
     account_pnl_summary["longbridge_unrealized_pnl"] = (
@@ -5260,17 +5270,13 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         f"初始资产 {account_pnl.get('initial_asset_value', '暂无')}，期末资产 {account_pnl.get('ending_asset_value', '暂无')}。"
     )
     account_pnl_summary["longbridge_account_intraday_pnl_note"] = (
-        f"来自长桥只读 profit-analysis 交易日查询，表示接口净值日内变化，区间 "
-        f"{today_account_pnl.get('start_date', '暂无')} ~ {today_account_pnl.get('end_date', '暂无')}，"
-        f"初始资产 {today_account_pnl.get('initial_asset_value', '暂无')}，"
-        f"当前资产 {today_account_pnl.get('current_total_asset', '暂无')}。"
-        "它不等同于长桥 App 顶部“当日盈亏”截图字段。"
+        "来自长桥 SDK 纽约交易日收益分析；它与长桥 App 账户当日盈亏分开显示。"
     )
     account_pnl_summary["longbridge_profit_analysis_market_day_pnl_note"] = (
         f"来自长桥只读 profit-analysis 交易日区间查询，区间 "
-        f"{today_account_pnl.get('start_date', '暂无')} ~ {today_account_pnl.get('end_date', '暂无')}，"
-        f"初始资产 {today_account_pnl.get('initial_asset_value', '暂无')}，"
-        f"当前资产 {today_account_pnl.get('current_total_asset', '暂无')}。"
+        f"{market_day_profit_analysis.get('start_date', '暂无')} ~ {market_day_profit_analysis.get('end_date', '暂无')}，"
+        f"初始资产 {market_day_profit_analysis.get('initial_asset_value', '暂无')}，"
+        f"当前资产 {market_day_profit_analysis.get('current_total_asset', '暂无')}。"
     )
     account_pnl_summary["account_total_equity_note"] = (
         f"来自长桥 portfolio：现金 {account_snapshot.get('portfolio_total_cash', '暂无')} + "
@@ -5283,7 +5289,7 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
     )
     account_pnl_summary["longbridge_today_total_pnl_note"] = (
         f"来自长桥只读 portfolio.total_today_pl，当前更像持仓今日浮动；数值 {account_snapshot.get('portfolio_total_today_pl', '暂无')}。"
-        "它不等同于 App 顶部当日盈亏字段，App 字段仍待接口对齐。"
+        "它不等同于固定指标 longbridge_app_asset_daily_pnl_v1，仅作为接口持仓今日浮动展示。"
     )
     account_pnl_summary["longbridge_account_total_pnl_note"] = (
         f"来自长桥只读 portfolio.total_pl；这是当前持仓总盈亏，"
@@ -5291,7 +5297,7 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
     )
     account_pnl_summary["longbridge_account_today_total_pnl_note"] = (
         f"来自长桥只读 portfolio.total_today_pl；当前值 {account_portfolio_today_pl or '暂无'}。"
-        "该字段与 App 顶部“当日盈亏”截图不一致，因此看板只作为接口持仓今日浮动展示。"
+        "该字段不属于固定指标 longbridge_app_asset_daily_pnl_v1，因此看板只作为接口持仓今日浮动展示。"
     )
     if holding_prices_degraded:
         source_time = str(source_status.get("previous_reconciliation_generated_at") or "")
@@ -5303,8 +5309,8 @@ def m15_apply_longbridge_reconciliation_to_account_pnl(
         account_pnl_summary["longbridge_account_today_total_pnl_note"] = note
         account_pnl_summary["longbridge_today_total_pnl_note"] = note
     account_pnl_summary["longbridge_app_display_today_pnl_note"] = (
-        "长桥 App 顶部当日盈亏截图口径暂未在当前 CLI 的 portfolio、profit-analysis、cash-flow 字段中找到；"
-        "看板保留该状态，禁止用其它口径硬填。"
+        "固定指标 longbridge_app_asset_daily_pnl_v1：按长桥 SDK 实际持仓、成交、最新价和昨收价计算；"
+        "输入不完整时暂不可计算，禁止用收益分析或本地估算替代。"
     )
 
 
@@ -5386,8 +5392,8 @@ def m15_mask_account_pnl_summary_for_stale_account_state(
     account_pnl_summary["longbridge_account_intraday_pnl_note"] = "当前账户状态产物已过期；接口净值日内变化等待下一次只读对账刷新。"
     account_pnl_summary["longbridge_account_today_total_pnl_note"] = "当前账户状态产物已过期；接口持仓今日浮动等待下一次只读 portfolio 刷新。"
     account_pnl_summary["longbridge_today_total_pnl_note"] = "当前账户状态产物已过期；今日盈亏相关字段全部等待下一次长桥只读刷新。"
-    account_pnl_summary["longbridge_app_display_today_pnl"] = "等待长桥字段对齐"
-    account_pnl_summary["longbridge_app_display_today_pnl_note"] = "当前账户状态产物已过期；App 当日盈亏字段继续等待接口对齐。"
+    account_pnl_summary["longbridge_app_display_today_pnl"] = "暂不可计算"
+    account_pnl_summary["longbridge_app_display_today_pnl_note"] = "当前账户状态产物已过期；固定公式输入不可用，不展示旧值。"
 
 
 def m15_longbridge_symbol_pnl_rows(reconciliation: dict[str, Any]) -> list[dict[str, str]]:
@@ -7940,7 +7946,7 @@ def longbridge_panel_row_html(row: dict[str, Any]) -> str:
 
 def longbridge_realtime_pnl_value(value: Any) -> str:
     raw_value = str(value or "")
-    if raw_value in {"", "无法计算", "等待长桥数据", "等待长桥字段对齐", "暂无"}:
+    if raw_value in {"", "无法计算", "等待长桥数据", "等待长桥字段对齐", "暂不可计算", "暂无"}:
         return raw_value or "暂无"
     parsed_value = money_to_decimal(raw_value)
     if parsed_value == ZERO and raw_value.strip() not in {"0", "0.0", "0.00", "+0", "+0.0", "+0.00", "-0", "-0.0", "-0.00"}:
@@ -7951,7 +7957,7 @@ def longbridge_realtime_pnl_value(value: Any) -> str:
 def longbridge_realtime_pnl_card_html(row: dict[str, Any]) -> str:
     value = str(row.get("value", ""))
     value_type = str(row.get("value_type", ""))
-    value_class = pnl_css_class(value) if value_type == "money" and value not in {"", "无法计算", "等待长桥数据", "等待长桥字段对齐", "暂无"} else ""
+    value_class = pnl_css_class(value) if value_type == "money" and value not in {"", "无法计算", "等待长桥数据", "等待长桥字段对齐", "暂不可计算", "暂无"} else ""
     return (
         "<div class=\"pnl-card\">"
         f"<small>{html.escape(str(row.get('label', '')))}</small>"

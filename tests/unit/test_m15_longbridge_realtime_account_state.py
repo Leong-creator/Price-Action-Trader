@@ -226,7 +226,7 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
             self.assertTrue(payload["pnl_reconciliation_ok"])
             self.assertEqual(payload["account_total_pnl_estimate"], "15.50")
             self.assertEqual(payload["longbridge_stock_total_pnl"], "12.00")
-            self.assertEqual(payload["app_display_today_pnl"], "等待长桥字段对齐")
+            self.assertEqual(payload["app_display_today_pnl"], "暂不可计算")
             self.assertEqual(payload["net_asset_intraday_pnl"], "15.50")
             self.assertEqual(payload["account_today_total_pnl"], "15.50")
             self.assertEqual(reconciliation["account_pnl"]["ending_asset_value"], "10215.50")

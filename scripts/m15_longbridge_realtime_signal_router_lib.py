@@ -1623,6 +1623,21 @@ def short_no_candidate_reason(rule: str, rows: list[dict[str, Any]]) -> str:
     minimum_rows = 7 if rule == "opening_range_breakdown" else 3
     if len(rows) < minimum_rows:
         return "insufficient_history"
+    if rule in {"bearish_breakdown", "bearish_false_breakout"}:
+        if not five_minute_rows_are_contiguous(rows[-3:]):
+            return "non_contiguous_five_minute_context"
+    elif rule == "opening_range_breakdown":
+        session_rows = latest_ny_session_rows(rows)
+        if not session_rows or not five_minute_rows_are_contiguous(session_rows):
+            return "non_contiguous_five_minute_context"
+        try:
+            first_close = parse_utc_datetime(
+                str(session_rows[0].get("event_time") or "")
+            ).astimezone(NEW_YORK)
+        except ValueError:
+            return "invalid_five_minute_event_time"
+        if (first_close.hour, first_close.minute) != (9, 35):
+            return "missing_opening_range_context_after_restart"
     latest = rows[-1]
     if min(
         decimal(latest.get("high", "0")),
@@ -1707,6 +1722,7 @@ def five_minute_rows_are_contiguous(rows: list[dict[str, Any]]) -> bool:
 
 
 def long_no_candidate_reason(runtime_id: str, rows: list[dict[str, Any]]) -> str:
+    spec = PRICE_ACTION_RUNTIME_SPECS.get(runtime_id) or {}
     if runtime_id == "M10-PA-001-1d":
         if len(rows) < 22:
             return "insufficient_daily_history"
@@ -1737,6 +1753,11 @@ def long_no_candidate_reason(runtime_id: str, rows: list[dict[str, Any]]) -> str
             return "non_contiguous_five_minute_context"
     elif runtime_id == "M12-FTD-001-pullback-guard-confirm-1d" and len(rows) < 3:
         return "insufficient_daily_history"
+    elif str(spec.get("timeframe") or "") == "5m":
+        if len(rows) < 3:
+            return "insufficient_five_minute_history"
+        if not five_minute_rows_are_contiguous(rows[-3:]):
+            return "non_contiguous_five_minute_context"
     if rows and not str(rows[-1].get("next_bar_first_quote_at") or ""):
         return "next_bar_quote_unavailable"
     return "strategy_structure_not_met"
@@ -1752,6 +1773,14 @@ def price_action_signal_for_runtime(
     generated_at: datetime,
 ) -> dict[str, Any] | None:
     if symbol in {"SQQQ", "TQQQ"}:
+        return None
+    if (
+        str(spec.get("timeframe") or "") == "5m"
+        and (
+            len(rows) < 3
+            or not five_minute_rows_are_contiguous(rows[-3:])
+        )
+    ):
         return None
     rule = str(spec["rule"])
     signal: dict[str, Any] | None
@@ -2019,7 +2048,18 @@ def opening_range_breakout_signal(
 ) -> dict[str, Any] | None:
     session_rows = latest_ny_session_rows(rows)
     opening_bars_required = 6
-    if len(session_rows) <= opening_bars_required:
+    if (
+        len(session_rows) <= opening_bars_required
+        or not five_minute_rows_are_contiguous(session_rows)
+    ):
+        return None
+    try:
+        first_close = parse_utc_datetime(
+            str(session_rows[0].get("event_time") or "")
+        ).astimezone(NEW_YORK)
+    except ValueError:
+        return None
+    if (first_close.hour, first_close.minute) != (9, 35):
         return None
     opening = session_rows[:opening_bars_required]
     latest = session_rows[-1]
@@ -2091,7 +2131,7 @@ def bearish_breakdown_signal(
     grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
     generated_at: datetime,
 ) -> dict[str, Any] | None:
-    if len(rows) < 3:
+    if len(rows) < 3 or not five_minute_rows_are_contiguous(rows[-3:]):
         return None
     prior, previous, latest = rows[-3], rows[-2], rows[-1]
     prior_low = min(decimal(prior.get("low", "0")), decimal(previous.get("low", "0")))
@@ -2124,7 +2164,7 @@ def bearish_false_breakout_signal(
     grouped_events: dict[tuple[str, str], list[dict[str, Any]]],
     generated_at: datetime,
 ) -> dict[str, Any] | None:
-    if len(rows) < 3:
+    if len(rows) < 3 or not five_minute_rows_are_contiguous(rows[-3:]):
         return None
     prior, previous, latest = rows[-3], rows[-2], rows[-1]
     resistance = max(decimal(prior.get("high", "0")), decimal(previous.get("high", "0")))
@@ -2159,7 +2199,18 @@ def opening_range_breakdown_signal(
 ) -> dict[str, Any] | None:
     session_rows = latest_ny_session_rows(rows)
     opening_bars_required = 6
-    if len(session_rows) <= opening_bars_required:
+    if (
+        len(session_rows) <= opening_bars_required
+        or not five_minute_rows_are_contiguous(session_rows)
+    ):
+        return None
+    try:
+        first_close = parse_utc_datetime(
+            str(session_rows[0].get("event_time") or "")
+        ).astimezone(NEW_YORK)
+    except ValueError:
+        return None
+    if (first_close.hour, first_close.minute) != (9, 35):
         return None
     opening = session_rows[:opening_bars_required]
     previous = session_rows[-2]

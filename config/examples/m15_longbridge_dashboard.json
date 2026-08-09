@@ -10,6 +10,9 @@
     "order_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_order_reconciliation.json",
     "fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json",
     "short_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_short_signal_diagnostics.json",
+    "strategy_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_strategy_signal_diagnostics.json",
+    "visual_strategy_acceptance": "reports/m15_visual_strategy_shadow/acceptance_evidence.json",
+    "visual_strategy_session_summary": "local_runtime/m15_visual_strategy_shadow/session_summary.json",
     "pnl_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json",
     "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
     "local_runtime_registry": "config/examples/m13_strategy_runtime_registry.json"

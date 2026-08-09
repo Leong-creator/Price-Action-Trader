@@ -264,7 +264,7 @@ class SdkAccountStateProvider:
             "executions": executions,
             "execution_row_count": len(executions),
             "longbridge_sdk_profit_analysis": pnl,
-            "longbridge_app_display_today_pnl": "等待长桥字段对齐",
+            "longbridge_app_display_today_pnl": "暂不可计算",
         }
         state["open_order_count"] = len(state["open_orders"])
         return state

@@ -26,6 +26,7 @@ from scripts.m15_universe_lib import load_m15_universe
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json"
 SUMMARY_JSON = "m15_longbridge_sdk_runtime.json"
+QUOTE_SNAPSHOT_JSON = "m15_longbridge_sdk_quote_snapshot.json"
 NEW_YORK = ZoneInfo("America/New_York")
 RUNTIME_CODE_PATHS = (
     ROOT / "scripts" / "m15_longbridge_sdk_runtime_lib.py",
@@ -81,6 +82,7 @@ class SdkRuntimeConfig:
     snapshot_poll_dispatch_max_elapsed_ms: int
     snapshot_poll_min_successful_cycles: int
     market_data_heartbeat_deadline_seconds: int
+    snapshot_poll_recovery_deadline_seconds: int
     account_snapshot_interval_seconds: int
     account_snapshot_refresh_deadline_seconds: int
     account_snapshot_circuit_retry_seconds: int
@@ -182,6 +184,15 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         ),
         market_data_heartbeat_deadline_seconds=int(
             runtime.get("market_data_heartbeat_deadline_seconds", 5)
+        ),
+        snapshot_poll_recovery_deadline_seconds=int(
+            runtime.get(
+                "snapshot_poll_recovery_deadline_seconds",
+                max(
+                    int(runtime.get("market_data_heartbeat_deadline_seconds", 5)),
+                    int(runtime.get("subscription_deadline_seconds", 20)),
+                ),
+            )
         ),
         account_snapshot_interval_seconds=int(runtime.get("account_snapshot_interval_seconds", 15)),
         account_snapshot_refresh_deadline_seconds=int(runtime.get("account_snapshot_refresh_deadline_seconds", 8)),
@@ -326,6 +337,14 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     ):
         raise ValueError(
             "M15 SDK market data heartbeat deadline must exceed the snapshot interval"
+        )
+    if not (
+        config.market_data_heartbeat_deadline_seconds
+        <= config.snapshot_poll_recovery_deadline_seconds
+        <= 120
+    ):
+        raise ValueError(
+            "M15 SDK snapshot recovery deadline must be between the base heartbeat deadline and 120 seconds"
         )
     if config.daily_context_bars < 2:
         raise ValueError("M15 SDK daily context needs at least two bars")
@@ -1689,7 +1708,7 @@ def sdk_object_to_dict(value: Any) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in (
         "symbol", "sub_types", "timestamp", "last_done", "current_volume", "volume", "trades", "price", "open",
-        "high", "low", "close", "turnover", "trade_session", "sequence",
+        "high", "low", "close", "prev_close", "turnover", "trade_session", "sequence",
     ):
         if hasattr(value, key):
             item = getattr(value, key)

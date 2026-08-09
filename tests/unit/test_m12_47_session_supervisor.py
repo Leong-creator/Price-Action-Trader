@@ -391,7 +391,7 @@ class M1247SessionSupervisorTest(unittest.TestCase):
                 "longbridge_account_intraday_pnl": "12.34",
                 "longbridge_profit_analysis_market_day_pnl": "12.34",
                 "longbridge_account_today_total_pnl": "234.00",
-                "longbridge_app_display_today_pnl": "等待长桥字段对齐",
+                "longbridge_app_display_today_pnl": "暂不可计算",
                 "longbridge_stock_total_pnl": "-154.18",
                 "longbridge_symbol_win_rate_label": "38.46%",
                 "longbridge_closed_trade_win_rate_label": "33.33%",
@@ -407,7 +407,7 @@ class M1247SessionSupervisorTest(unittest.TestCase):
         self.assertNotIn("长桥可提交订单", dashboard["top_metrics"])
         self.assertEqual(dashboard["top_metrics"]["长桥账户总资产"], "102375.57")
         self.assertEqual(dashboard["top_metrics"]["长桥当前持仓总盈亏"], "269.866")
-        self.assertEqual(dashboard["top_metrics"]["长桥App当日盈亏"], "等待长桥字段对齐")
+        self.assertEqual(dashboard["top_metrics"]["长桥App当日盈亏"], "暂不可计算")
         self.assertEqual(dashboard["top_metrics"]["长桥接口净值日内变化"], "12.34")
         self.assertEqual(dashboard["top_metrics"]["长桥接口持仓今日浮动"], "234.00")
         self.assertEqual(dashboard["top_metrics"]["长桥交易累计盈亏"], "-154.18")

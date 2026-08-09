@@ -504,7 +504,7 @@ class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
         self.assertEqual(dashboard["top_metrics"]["长桥模拟账户"], "模拟账户已连接 / 9持仓 / 1挂单")
         self.assertNotIn("长桥可提交订单", dashboard["top_metrics"])
         self.assertEqual(dashboard["top_metrics"]["长桥账户总资产"], "102375.57")
-        self.assertEqual(dashboard["top_metrics"]["长桥App当日盈亏"], "等待长桥字段对齐")
+        self.assertEqual(dashboard["top_metrics"]["长桥App当日盈亏"], "暂不可计算")
         self.assertEqual(dashboard["top_metrics"]["长桥接口净值日内变化"], "-2.44")
         self.assertEqual(dashboard["top_metrics"]["长桥接口持仓今日浮动"], "-2.46")
         self.assertEqual(dashboard["top_metrics"]["长桥当前持仓总盈亏"], "117.88")

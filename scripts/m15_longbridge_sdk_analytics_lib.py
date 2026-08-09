@@ -30,6 +30,7 @@ from scripts.m15_longbridge_realtime_account_state_lib import (
 )
 from scripts.m15_longbridge_sdk_account_lib import sdk_plain
 from scripts.m15_longbridge_sdk_runtime_lib import (
+    QUOTE_SNAPSHOT_JSON,
     config_fingerprint,
     load_config as load_sdk_config,
     read_client_id,
@@ -41,6 +42,7 @@ from scripts.m15_longbridge_realtime_execution_lib import to_iso
 MAX_ACCOUNT_SNAPSHOT_AGE_SECONDS = 45
 MIN_RUNTIME_STATUS_AGE_SECONDS = 15
 NEW_YORK = ZoneInfo("America/New_York")
+APP_DAILY_PNL_METRIC_ID = "longbridge_app_asset_daily_pnl_v1"
 T = TypeVar("T")
 
 
@@ -81,6 +83,50 @@ def normalize_app_quote(row: Any, generated_at: datetime) -> dict[str, str]:
         "prev_close": str(decimal_value(getattr(row, "prev_close", "0"))),
         "price_phase": phase,
     }
+
+
+def load_runtime_quote_rows(
+    runtime_config: Any,
+    generated_at: datetime,
+) -> list[dict[str, Any]]:
+    """Read the live runtime's quote snapshot without opening another SDK connection."""
+    payload = read_json(runtime_config.output_dir / QUOTE_SNAPSHOT_JSON)
+    if payload.get("metric_contract_id") != APP_DAILY_PNL_METRIC_ID:
+        return []
+    local = generated_at.astimezone(NEW_YORK)
+    minutes = local.hour * 60 + local.minute
+    is_regular_or_closing = local.weekday() < 5 and 570 <= minutes < 965
+    is_same_day_postclose = (
+        local.weekday() < 5
+        and minutes >= 960
+        and str(payload.get("market_date") or "") == local.date().isoformat()
+    )
+    if not is_regular_or_closing and not is_same_day_postclose:
+        return []
+    rows: list[dict[str, Any]] = []
+    for source in payload.get("rows") or []:
+        if not isinstance(source, dict):
+            continue
+        symbol = str(source.get("symbol") or "")
+        current_price = decimal_value(source.get("current_price"))
+        previous_close = decimal_value(source.get("prev_close"))
+        try:
+            received_at = datetime.fromisoformat(
+                str(source.get("received_at") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except (TypeError, ValueError):
+            continue
+        age_seconds = (generated_at.astimezone(UTC) - received_at).total_seconds()
+        if (
+            not symbol
+            or current_price <= 0
+            or previous_close <= 0
+            or age_seconds < 0
+            or (is_regular_or_closing and age_seconds > MAX_ACCOUNT_SNAPSHOT_AGE_SECONDS)
+        ):
+            continue
+        rows.append(dict(source))
+    return rows
 
 
 def build_app_display_metrics(
@@ -125,7 +171,11 @@ def build_app_display_metrics(
         if str(row.get("symbol") or "")
     }
     quotes_by_symbol = {
-        str(row.get("symbol") or ""): row for row in quote_rows if str(row.get("symbol") or "")
+        str(row.get("symbol") or ""): row
+        for row in quote_rows
+        if str(row.get("symbol") or "")
+        and decimal_value(row.get("current_price")) > 0
+        and decimal_value(row.get("prev_close")) > 0
     }
     symbols = sorted(set(current_quantity) | set(buy_quantity) | set(sell_quantity))
     missing_symbols = [symbol for symbol in symbols if symbol not in quotes_by_symbol]
@@ -165,8 +215,9 @@ def build_app_display_metrics(
     available_cash = decimal_value(account_state.get("usd_available_cash") or account_state.get("cash"))
     frozen_cash = decimal_value(account_state.get("usd_frozen_cash"))
     total_cash = available_cash + frozen_cash
-    complete = bool(symbols) and not missing_symbols
+    complete = not missing_symbols
     return {
+        "metric_contract_id": APP_DAILY_PNL_METRIC_ID,
         "status": "fresh" if complete else "incomplete",
         "currency": "USD",
         "window_start": to_iso(window_start),
@@ -178,9 +229,9 @@ def build_app_display_metrics(
         "symbol_pnl_rows": symbol_rows,
         "missing_symbols": missing_symbols,
         "source": (
-            "longbridge_sdk_asset_page_formula_positions_executions_extended_quotes"
+            "longbridge_sdk_app_asset_daily_pnl_formula_v1"
             if complete
-            else "unavailable_without_second_sdk_quote_connection"
+            else "longbridge_sdk_app_daily_pnl_inputs_incomplete"
         ),
     }
 
@@ -430,6 +481,7 @@ def build_sdk_pnl_reconciliation(
             "source": "longbridge_sdk_us_market_profit_analysis",
         },
         "today_account_pnl": {
+            "metric_contract_id": APP_DAILY_PNL_METRIC_ID,
             "sum_profit": str((app_display_metrics or {}).get("today_pnl") or ""),
             "source": str((app_display_metrics or {}).get("source") or ""),
             "status": str((app_display_metrics or {}).get("status") or "incomplete"),
@@ -440,7 +492,7 @@ def build_sdk_pnl_reconciliation(
         "market_day_profit_analysis": {
             "sum_profit": daily_profit,
             "source": "longbridge_sdk_us_market_profit_analysis_single_market_date",
-            "status": "fresh" if daily_profit else "等待长桥字段对齐",
+            "status": "fresh" if daily_profit else "暂不可计算",
             "symbol_pnl_rows": daily_stock_items,
         },
         "trading_pnl": {
@@ -452,7 +504,7 @@ def build_sdk_pnl_reconciliation(
         "source_status": {
             "status": "fresh",
             "sdk_profit_analysis_ok": True,
-            "today_account_pnl_field_available": bool((app_display_metrics or {}).get("today_pnl")),
+            "today_account_pnl_available": bool((app_display_metrics or {}).get("today_pnl")),
             "market_day_profit_analysis_available": bool(daily_profit),
         },
     }
@@ -491,7 +543,8 @@ def build_sdk_account_summary(
         "account_total_equity_estimate": total_equity,
         "account_total_equity_currency": total_equity_currency,
         "account_total_equity_source": total_equity_source,
-        "account_today_total_pnl": app_today_profit or "等待长桥字段对齐",
+        "account_today_total_pnl": app_today_profit or "暂不可计算",
+        "account_today_total_pnl_metric_id": APP_DAILY_PNL_METRIC_ID,
         "account_today_total_pnl_source": (
             str((app_display_metrics or {}).get("source"))
             if app_today_profit
@@ -674,12 +727,9 @@ def run_sdk_analytics(
     ]
     daily_order_ids = {str(row.get("order_id") or "") for row in daily_execution_rows}
     daily_orders = [row for row in orders if str(row.get("order_id") or "") in daily_order_ids]
-    # One Longbridge account may own only one quote long connection.  The live
-    # runtime owns it; a reporting refresh must never create a second
-    # QuoteContext and destabilize trading.  Broker-native order, execution and
-    # portfolio analytics remain available below.  The App display formula is
-    # explicitly incomplete until quote data is provided by the live runtime.
-    quote_rows: list[dict[str, Any]] = []
+    # The live runtime owns the only quote connection and publishes a bounded
+    # atomic snapshot for this slow App-metric reconciliation path.
+    quote_rows = load_runtime_quote_rows(runtime_config, generated_at)
     app_display_metrics = build_app_display_metrics(
         generated_at,
         account_state,
