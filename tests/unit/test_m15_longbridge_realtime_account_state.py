@@ -137,6 +137,46 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
         self.assertEqual(len(attribution["events"]), 2)
         self.assertEqual(attribution["summary"]["anomaly_count"], 0)
 
+    def test_reconciliation_preserves_aggregate_cleanup_batch_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp))
+            reconciliation = build_order_reconciliation(
+                config,
+                "2026-08-10T13:31:00Z",
+                {
+                    "orders": [],
+                    "historical_orders": [{
+                        "order_id": "cleanup-1",
+                        "symbol": "BDX.US",
+                        "side": "Sell",
+                        "status": "Filled",
+                        "quantity": "5",
+                        "executed_quantity": "5",
+                        "executed_price": "175",
+                    }],
+                },
+                [{
+                    "submission_status": "submitted",
+                    "order_id": "cleanup-1",
+                    "signal_id": "bucket-cleanup-1",
+                    "symbol": "BDX",
+                    "side": "sell",
+                    "quantity": "5",
+                    "runtime_id": "M10-PA-001-1d",
+                    "capital_bucket": "pa001_daily_contract_v1",
+                    "position_action": "close_long",
+                    "test_epoch_id": "m15-sdk-contract-v1-20260806",
+                    "order_payload": {
+                        "aggregate_strategy_exit": True,
+                        "source_batch_ids": ["batch-a", "batch-b"],
+                    },
+                }],
+            )
+
+        row = reconciliation["rows"][0]
+        self.assertTrue(row["aggregate_strategy_exit"])
+        self.assertEqual(row["source_batch_ids"], ["batch-a", "batch-b"])
+
     def test_account_pnl_market_date_uses_new_york_trading_date_after_utc_midnight(self) -> None:
         self.assertEqual(
             longbridge_account_pnl_market_date(datetime(2026, 7, 7, 2, 15, tzinfo=UTC)),

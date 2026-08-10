@@ -81,6 +81,157 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
         self.assertEqual(result["summary"]["anomaly_count"], 0)
         self.assertTrue(result["symbol_checks"][0]["matches_broker_net"])
 
+    def test_authorized_aggregate_cleanup_allocates_declared_batches_without_source_trade(self) -> None:
+        local_rows = [
+            self.local_row(
+                order_id="open-a",
+                signal_id="open-a",
+                symbol="BDX",
+                side="buy",
+                quantity="2",
+                runtime_id="M10-PA-001-1d",
+                capital_bucket="pa001_daily_contract_v1",
+                test_epoch_id="m15-sdk-contract-v1-20260806",
+                position_action="open_long",
+                strategy_contract_hash="contract-a",
+            ),
+            self.local_row(
+                order_id="open-b",
+                signal_id="open-b",
+                symbol="BDX",
+                side="buy",
+                quantity="3",
+                runtime_id="M10-PA-001-1d",
+                capital_bucket="pa001_daily_contract_v1",
+                test_epoch_id="m15-sdk-contract-v1-20260806",
+                position_action="open_long",
+                strategy_contract_hash="contract-a",
+            ),
+            self.local_row(
+                order_id="cleanup",
+                signal_id="cleanup",
+                symbol="BDX",
+                side="sell",
+                quantity="5",
+                runtime_id="M10-PA-001-1d",
+                capital_bucket="pa001_daily_contract_v1",
+                test_epoch_id="m15-sdk-contract-v1-20260806",
+                position_action="close_long",
+                strategy_contract_hash="contract-a",
+            ),
+        ]
+        local_rows[-1]["source_open_remaining_quantity"] = "5"
+        local_rows[-1]["aggregate_strategy_exit"] = True
+        broker_rows = [
+            self.broker_row(order_id="open-a", trade_id="trade-a", symbol="BDX.US", side="Buy", status="Filled", executed_quantity="2", executed_price="180", created_at="2026-08-06T14:00:00Z"),
+            self.broker_row(order_id="open-b", trade_id="trade-b", symbol="BDX.US", side="Buy", status="Filled", executed_quantity="3", executed_price="181", created_at="2026-08-06T14:05:00Z"),
+            self.broker_row(order_id="cleanup", trade_id="trade-cleanup", symbol="BDX.US", side="Sell", status="Filled", executed_quantity="5", executed_price="175", created_at="2026-08-10T13:30:00Z"),
+        ]
+        result = rebuild_fill_attribution(
+            local_rows,
+            broker_rows,
+            broker_net_positions={"BDX": "0"},
+        )
+        self.assertEqual(result["anomalies"][0]["code"], "exit_missing_source_batch")
+        local_rows[-1]["source_batch_ids"] = [
+            row["batch_id"] for row in result["batches"]
+        ]
+
+        result = apply_aggregate_strategy_exit_fill_allocations(
+            result,
+            local_rows,
+            broker_rows,
+            broker_net_positions={"BDX": "0"},
+        )
+
+        self.assertEqual(result["summary"]["open_batch_count"], 0)
+        self.assertEqual(result["summary"]["anomaly_count"], 0)
+        self.assertEqual(
+            {row["source_open_order_id"] for row in result["events"] if row["event_type"] == "exit_fill"},
+            {"open-a", "open-b"},
+        )
+        self.assertTrue(result["symbol_checks"][0]["matches_broker_net"])
+
+    def test_aggregate_cleanup_requires_complete_declared_batch_set(self) -> None:
+        def fixture() -> tuple[list[dict], list[dict], dict]:
+            local_rows = [
+                self.local_row(
+                    order_id="open-a",
+                    signal_id="open-a",
+                    symbol="BDX",
+                    side="buy",
+                    quantity="2",
+                    runtime_id="M10-PA-001-1d",
+                    capital_bucket="pa001_daily_contract_v1",
+                    test_epoch_id="m15-sdk-contract-v1-20260806",
+                    position_action="open_long",
+                    strategy_contract_hash="contract-a",
+                ),
+                self.local_row(
+                    order_id="open-b",
+                    signal_id="open-b",
+                    symbol="BDX",
+                    side="buy",
+                    quantity="3",
+                    runtime_id="M10-PA-001-1d",
+                    capital_bucket="pa001_daily_contract_v1",
+                    test_epoch_id="m15-sdk-contract-v1-20260806",
+                    position_action="open_long",
+                    strategy_contract_hash="contract-a",
+                ),
+                self.local_row(
+                    order_id="cleanup",
+                    signal_id="cleanup",
+                    symbol="BDX",
+                    side="sell",
+                    quantity="5",
+                    runtime_id="M10-PA-001-1d",
+                    capital_bucket="pa001_daily_contract_v1",
+                    test_epoch_id="m15-sdk-contract-v1-20260806",
+                    position_action="close_long",
+                    strategy_contract_hash="contract-a",
+                ),
+            ]
+            local_rows[-1]["source_open_remaining_quantity"] = "5"
+            local_rows[-1]["aggregate_strategy_exit"] = True
+            broker_rows = [
+                self.broker_row(order_id="open-a", trade_id="trade-a", symbol="BDX.US", side="Buy", status="Filled", executed_quantity="2", executed_price="180", created_at="2026-08-06T14:00:00Z"),
+                self.broker_row(order_id="open-b", trade_id="trade-b", symbol="BDX.US", side="Buy", status="Filled", executed_quantity="3", executed_price="181", created_at="2026-08-06T14:05:00Z"),
+                self.broker_row(order_id="cleanup", trade_id="trade-cleanup", symbol="BDX.US", side="Sell", status="Filled", executed_quantity="5", executed_price="175", created_at="2026-08-10T13:30:00Z"),
+            ]
+            initial = rebuild_fill_attribution(
+                local_rows,
+                broker_rows,
+                broker_net_positions={"BDX": "0"},
+            )
+            return local_rows, broker_rows, initial
+
+        for case in ("missing", "incomplete", "external"):
+            with self.subTest(case=case):
+                local_rows, broker_rows, initial = fixture()
+                batch_ids = [row["batch_id"] for row in initial["batches"]]
+                if case == "incomplete":
+                    local_rows[-1]["source_batch_ids"] = batch_ids[:1]
+                elif case == "external":
+                    local_rows[-1]["source_batch_ids"] = batch_ids + ["external-batch"]
+
+                result = apply_aggregate_strategy_exit_fill_allocations(
+                    initial,
+                    local_rows,
+                    broker_rows,
+                    broker_net_positions={"BDX": "0"},
+                )
+
+                self.assertEqual(result["summary"]["anomaly_count"], 1)
+                self.assertEqual(result["anomalies"][0]["code"], "exit_missing_source_batch")
+                self.assertFalse(
+                    any(
+                        row["event_type"] == "exit_fill"
+                        and row.get("attribution_status") == "matched_fill_batch"
+                        for row in result["events"]
+                    )
+                )
+
     def test_account_flatten_fill_allocates_exactly_across_strategy_lots(self) -> None:
         result = rebuild_fill_attribution(
             [

@@ -1566,6 +1566,25 @@ def reconciled_longbridge_order_row(
     position_action = str(local_row.get("position_action") or "") if local_row else ""
     source_open_order_id = str(local_row.get("source_open_order_id") or "") if local_row else ""
     source_open_trade_id = str(local_row.get("source_open_trade_id") or "") if local_row else ""
+    order_payload = (
+        local_row.get("order_payload")
+        if local_row and isinstance(local_row.get("order_payload"), dict)
+        else {}
+    )
+    aggregate_strategy_exit = bool(
+        local_row
+        and (
+            local_row.get("aggregate_strategy_exit") is True
+            or order_payload.get("aggregate_strategy_exit") is True
+        )
+    )
+    source_batch_ids = list(
+        local_row.get("source_batch_ids")
+        if local_row and isinstance(local_row.get("source_batch_ids"), list)
+        else order_payload.get("source_batch_ids")
+        if isinstance(order_payload.get("source_batch_ids"), list)
+        else []
+    )
     order_id = str(order.get("order_id") or order.get("id") or "")
     if runtime_id and not strategy_id:
         strategy_id = runtime_id_parent(runtime_id)
@@ -1595,6 +1614,8 @@ def reconciled_longbridge_order_row(
         "source_open_remaining_quantity": str(local_row.get("source_open_remaining_quantity") or "") if local_row else "",
         "source_open_signal_id": str(local_row.get("source_open_signal_id") or "") if local_row else "",
         "strategy_contract_hash": str(local_row.get("strategy_contract_hash") or "") if local_row else "",
+        "aggregate_strategy_exit": aggregate_strategy_exit,
+        "source_batch_ids": source_batch_ids,
         "account_flatten_allocation": bool(local_row.get("account_flatten_allocation")) if local_row else False,
         "historical_audit_repair": bool(local_row.get("historical_audit_repair")) if local_row else False,
         "attribution_key": attribution_key(
@@ -1663,6 +1684,11 @@ def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> 
     order_id = str(local_row.get("order_id") or local_row.get("longbridge_order_id") or "")
     symbol = base_symbol(str(local_row.get("symbol") or ""))
     capital_bucket = str(local_row.get("capital_bucket") or "未归因")
+    order_payload = (
+        local_row.get("order_payload")
+        if isinstance(local_row.get("order_payload"), dict)
+        else {}
+    )
     return {
         "order_id": order_id,
         "symbol": symbol,
@@ -1688,6 +1714,17 @@ def local_submission_without_longbridge_order_row(local_row: dict[str, Any]) -> 
         "source_open_trade_id": str(local_row.get("source_open_trade_id") or ""),
         "source_open_remaining_quantity": str(local_row.get("source_open_remaining_quantity") or ""),
         "strategy_contract_hash": str(local_row.get("strategy_contract_hash") or ""),
+        "aggregate_strategy_exit": bool(
+            local_row.get("aggregate_strategy_exit") is True
+            or order_payload.get("aggregate_strategy_exit") is True
+        ),
+        "source_batch_ids": list(
+            local_row.get("source_batch_ids")
+            if isinstance(local_row.get("source_batch_ids"), list)
+            else order_payload.get("source_batch_ids")
+            if isinstance(order_payload.get("source_batch_ids"), list)
+            else []
+        ),
         "account_flatten_allocation": bool(local_row.get("account_flatten_allocation")),
         "historical_audit_repair": bool(local_row.get("historical_audit_repair")),
         "attribution_key": attribution_key(

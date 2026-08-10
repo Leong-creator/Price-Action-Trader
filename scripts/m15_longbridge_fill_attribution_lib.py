@@ -284,20 +284,31 @@ def apply_aggregate_strategy_exit_fill_allocations(
     declares the same aggregate remaining quantity and all candidate lots share
     epoch, bucket, runtime, symbol, direction, and contract hash.
     """
-    anomalous_order_ids = {
-        str(row.get("order_id") or "")
+    anomaly_code_by_order = {
+        str(row.get("order_id") or ""): str(row.get("code") or "")
         for row in payload.get("anomalies", [])
         if isinstance(row, Mapping)
-        and str(row.get("code") or "") == "exit_quantity_exceeds_open_batch"
+        and str(row.get("code") or "")
+        in {"exit_quantity_exceeds_open_batch", "exit_missing_source_batch"}
         and str(row.get("order_id") or "")
     }
-    exits_by_order = {
-        str(row.get("order_id") or ""): dict(row)
-        for row in local_exit_rows
-        if isinstance(row, Mapping)
-        and str(row.get("order_id") or "") in anomalous_order_ids
-        and str(row.get("position_action") or "") in EXIT_ACTIONS
-    }
+    exits_by_order: dict[str, dict[str, Any]] = {}
+    for row in local_exit_rows:
+        if not isinstance(row, Mapping):
+            continue
+        order_id = str(row.get("order_id") or "")
+        anomaly_code = anomaly_code_by_order.get(order_id, "")
+        if not anomaly_code or str(row.get("position_action") or "") not in EXIT_ACTIONS:
+            continue
+        if anomaly_code == "exit_missing_source_batch":
+            declared_batch_ids = row.get("source_batch_ids")
+            if not (
+                row.get("aggregate_strategy_exit") is True
+                and isinstance(declared_batch_ids, list)
+                and any(str(value) for value in declared_batch_ids)
+            ):
+                continue
+        exits_by_order[order_id] = dict(row)
     if not exits_by_order:
         return payload
 
@@ -340,6 +351,16 @@ def apply_aggregate_strategy_exit_fill_allocations(
         capital_bucket = str(local_row.get("capital_bucket") or "")
         runtime_id = str(local_row.get("runtime_id") or "")
         contract_hash = str(local_row.get("strategy_contract_hash") or "")
+        declared_batch_ids = {
+            str(value)
+            for value in (local_row.get("source_batch_ids") or [])
+            if str(value)
+        }
+        if (
+            anomaly_code_by_order.get(order_id) == "exit_missing_source_batch"
+            and not declared_batch_ids
+        ):
+            continue
         candidates = sorted(
             (
                 batch
@@ -353,6 +374,10 @@ def apply_aggregate_strategy_exit_fill_allocations(
                     not contract_hash
                     or str(batch.get("strategy_contract_hash") or "") == contract_hash
                 )
+                and (
+                    not declared_batch_ids
+                    or str(batch.get("batch_id") or "") in declared_batch_ids
+                )
                 and _decimal(batch.get("remaining_quantity")) > ZERO
             ),
             key=lambda batch: (
@@ -364,6 +389,10 @@ def apply_aggregate_strategy_exit_fill_allocations(
                 str(batch.get("batch_id") or ""),
             ),
         )
+        if declared_batch_ids and declared_batch_ids != {
+            str(batch.get("batch_id") or "") for batch in candidates
+        }:
+            continue
         if sum((_decimal(row.get("remaining_quantity")) for row in candidates), ZERO) != fill_quantity:
             continue
 
