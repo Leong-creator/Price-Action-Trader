@@ -45,6 +45,12 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
+DNS_ENV_FILE="$OUTPUT_DIR/m15_sdk_dns_override.env"
+"$PYTHON_BIN" scripts/prepare_m15_sdk_dns_override.py --env-file "$DNS_ENV_FILE"
+# This environment affects only this bootstrap and the M15 children it owns.
+# It does not edit Windows/WSL proxy, resolver or hosts settings.
+source "$DNS_ENV_FILE"
+
 run_step() {
   local label="$1"
   shift

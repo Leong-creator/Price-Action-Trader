@@ -157,6 +157,16 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         and not validation_waiting
         and readiness_status == "armed_waiting_flatten_session"
     )
+    capital_bucket_migration = (
+        runtime.get("capital_bucket_migration")
+        if isinstance(runtime.get("capital_bucket_migration"), dict)
+        else {}
+    )
+    authorized_cleanup_waiting = bool(
+        readiness.get("authorized_cleanup_waiting") is True
+        and capital_bucket_migration.get("authorized") is True
+        and capital_bucket_migration.get("blocks_new_entries") is True
+    )
     readiness_transition = (
         readiness.get("formal_test_transition")
         if isinstance(readiness.get("formal_test_transition"), dict)
@@ -226,25 +236,29 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "paper_dispatch_armed",
             "模拟账户下单通道已武装",
             runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True,
-            (pending_flatten or waiting_activation or validation_waiting)
+            (pending_flatten or waiting_activation or validation_waiting or authorized_cleanup_waiting)
             and runtime.get("dispatch_requested") is True,
             f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}",
             "waiting_for_validation"
             if validation_waiting
             else "waiting_for_activation"
             if waiting_activation
+            else "waiting_for_authorized_cleanup"
+            if authorized_cleanup_waiting
             else "waiting_for_flatten",
         ),
         transition_check_row(
             "formal_epoch_active",
             "当前验收或正式测试编号已激活且一致",
             active_epoch_consistent,
-            pending_flatten or waiting_activation or validation_waiting,
+            pending_flatten or waiting_activation or validation_waiting or authorized_cleanup_waiting,
             str(formal_epoch.get("test_epoch_id") or "missing"),
             "waiting_for_validation"
             if validation_waiting
             else "waiting_for_activation"
             if waiting_activation
+            else "waiting_for_authorized_cleanup"
+            if authorized_cleanup_waiting
             else "waiting_for_flatten",
         ),
         transition_check_row(
@@ -256,14 +270,18 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
                 "armed_waiting_regular_session",
                 "ready_for_regular_session",
                 "ready_for_longbridge_paper_orders",
+                "armed_waiting_authorized_bucket_cleanup",
+                "ready_for_authorized_bucket_cleanup",
             },
-            (pending_flatten or waiting_activation or validation_waiting)
+            (pending_flatten or waiting_activation or validation_waiting or authorized_cleanup_waiting)
             and int(readiness.get("fail_count") or 0) == 0,
             readiness_status or "missing",
             "waiting_for_validation"
             if validation_waiting
             else "waiting_for_activation"
             if waiting_activation
+            else "waiting_for_authorized_cleanup"
+            if authorized_cleanup_waiting
             else "waiting_for_flatten",
         ),
         check_row("dashboard_sdk_source", "长桥看板只使用 SDK 和长桥账户事实源", dashboard.get("source_of_truth") == "longbridge_sdk_paper_account" and dashboard.get("data_status") in {"trustworthy", "trading_ready_statistics_stale"}, f"source={dashboard.get('source_of_truth')}, status={dashboard.get('data_status')}"),
@@ -288,6 +306,12 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         status = "armed_waiting_activation_window"
     elif pending_flatten:
         status = "armed_waiting_flatten_session"
+    elif authorized_cleanup_waiting:
+        status = (
+            "ready_authorized_bucket_cleanup"
+            if session_should_run
+            else "armed_waiting_authorized_bucket_cleanup"
+        )
     elif session_should_run:
         status = "ready_regular_session"
     else:
@@ -352,6 +376,10 @@ def plain_result(status: str, fail_count: int) -> str:
         return "M15 SDK 自然信号验收已武装；今晚常规交易时段自动开启纸面账户全链路验证。"
     if status == "armed_waiting_activation_window":
         return "M15 SDK 旧持仓已清空；当前按计划等待正式测试激活时间，期间保持停止新开仓。"
+    if status == "ready_authorized_bucket_cleanup":
+        return "M15 SDK 故障仓清仓正在运行；长桥确认全部退出后自动恢复正式策略测试。"
+    if status == "armed_waiting_authorized_bucket_cleanup":
+        return "M15 SDK 故障仓清仓已武装；开盘先退出用户授权的两个故障仓，完成后自动恢复正式策略测试。"
     return f"M15 SDK 周一验收被阻断：{fail_count} 个检查失败。"
 
 

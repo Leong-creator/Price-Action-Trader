@@ -270,6 +270,7 @@ def runtime_dispatch_block_reason(
     account_snapshot_ready: bool,
     trading_daily_context_ready: bool,
     formal_activation_waiting: bool = False,
+    authorized_cleanup_waiting: bool = False,
 ) -> str:
     if not paper_order_dispatch_enabled:
         return "paper_order_dispatch_disabled"
@@ -280,6 +281,8 @@ def runtime_dispatch_block_reason(
     if not market_data_ready:
         return "market_data_recovering"
     if flatten_blocks_new_entries:
+        if authorized_cleanup_waiting:
+            return "pending_authorized_bucket_cleanup"
         return (
             "waiting_for_formal_test_activation"
             if formal_activation_waiting
@@ -1391,6 +1394,23 @@ def account_age_seconds(snapshot: dict[str, Any], *, now: datetime | None = None
     return max(0, int((current - created.astimezone(UTC)).total_seconds()))
 
 
+def account_snapshot_ready_for_orders(
+    snapshot: dict[str, Any],
+    *,
+    maximum_age_seconds: int,
+    now: datetime | None = None,
+) -> bool:
+    age = account_age_seconds(snapshot, now=now)
+    return bool(
+        age is not None
+        and age <= maximum_age_seconds
+        and snapshot.get("paper_account_verified") is True
+        and snapshot.get("positions_ok") is True
+        and snapshot.get("orders_ok") is True
+        and not snapshot.get("worker_circuit_open")
+    )
+
+
 def read_json_object(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -1468,12 +1488,10 @@ def run_authorized_account_exit_cycle(
 
     snapshot = account.snapshot()
     age = account_age_seconds(snapshot, now=now)
-    account_ready = bool(
-        snapshot.get("paper_account_verified") is True
-        and snapshot.get("positions_ok") is True
-        and snapshot.get("orders_ok") is True
-        and age is not None
-        and age <= config.maximum_account_snapshot_age_seconds
+    account_ready = account_snapshot_ready_for_orders(
+        snapshot,
+        maximum_age_seconds=config.maximum_account_snapshot_age_seconds,
+        now=now,
     )
     if not account_ready:
         state.update({"status": "waiting_for_fresh_paper_account", "reason": "account_snapshot_not_verified", "updated_at": to_iso(now)})
@@ -3923,15 +3941,24 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
 
                 migration_path = config.output_dir / CAPITAL_BUCKET_MIGRATION_FILE
-                capital_bucket_migration = advance_cleanup_state(
-                    read_json_object(migration_path),
-                    account.snapshot(),
-                    paper_client,
+                migration_input = read_json_object(migration_path)
+                migration_account_snapshot = account.snapshot()
+                if account_snapshot_ready_for_orders(
+                    migration_account_snapshot,
+                    maximum_age_seconds=config.maximum_account_snapshot_age_seconds,
                     now=maintenance_now,
-                    execution_ledger_path=(
-                        hot_execution_config.output_dir / EXECUTION_LEDGER_FILE
-                    ),
-                )
+                ):
+                    capital_bucket_migration = advance_cleanup_state(
+                        migration_input,
+                        migration_account_snapshot,
+                        paper_client,
+                        now=maintenance_now,
+                        execution_ledger_path=(
+                            hot_execution_config.output_dir / EXECUTION_LEDGER_FILE
+                        ),
+                    )
+                else:
+                    capital_bucket_migration = migration_input
                 if capital_bucket_migration.get("status") != "inactive":
                     write_json_atomic(migration_path, capital_bucket_migration)
                 authorized_account_exit = run_authorized_account_exit_cycle(
@@ -3940,7 +3967,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     flatten_client,
                     now=maintenance_now,
                 )
-            flatten_blocks_new_entries = bool(flatten_transition.get("blocks_new_entries"))
+            authorized_cleanup_waiting = bool(
+                capital_bucket_migration.get("blocks_new_entries")
+            )
+            flatten_blocks_new_entries = bool(
+                flatten_transition.get("blocks_new_entries")
+                or authorized_cleanup_waiting
+            )
             if (
                 paper_client is not None
                 and not flatten_blocks_new_entries
@@ -4311,6 +4344,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                             )
                             == 0
                         ),
+                        authorized_cleanup_waiting=authorized_cleanup_waiting,
                     ),
                     "two_day_readonly_gate": config.two_day_readonly_gate,
                     "readonly_gate_path": str(config.readonly_gate_path),

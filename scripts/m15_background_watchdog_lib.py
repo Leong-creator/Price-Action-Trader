@@ -23,7 +23,7 @@ DEFAULT_DAILY_DIR = (
     / "daily_observation"
 )
 DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_background_watchdog"
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_background_watchdog.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_background_watchdog.contract_v1.json"
 SUMMARY_JSON = "m15_background_watchdog_status.json"
 REPORT_MD = "m15_background_watchdog_status.md"
 LEDGER_JSONL = "m15_background_watchdog_ledger.jsonl"

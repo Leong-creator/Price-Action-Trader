@@ -31,11 +31,11 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
     def test_default_readiness_config_targets_active_sdk_paper_runtime(self) -> None:
         config = load_config()
 
-        self.assertEqual(DEFAULT_CONFIG_PATH.name, "m15_opening_trade_readiness.paper_orders_enabled.json")
+        self.assertEqual(DEFAULT_CONFIG_PATH.name, "m15_opening_trade_readiness.paper_contract_v1.json")
         self.assertEqual(config.realtime_runtime_engine, "sdk")
         self.assertEqual(
             config.execution_config_path.name,
-            "m15_longbridge_realtime_execution.paper_orders_enabled.json",
+            "m15_longbridge_realtime_execution.paper_contract_v1.json",
         )
 
     def test_sdk_run_overwrites_legacy_readiness_with_canonical_pointer(self) -> None:

@@ -24,7 +24,7 @@ from scripts.m15_longbridge_realtime_market_event_ingestor_lib import US_LIQUID_
 from scripts.m15_universe_lib import load_m15_universe
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.contract_v1.json"
 SUMMARY_JSON = "m15_longbridge_sdk_runtime.json"
 QUOTE_SNAPSHOT_JSON = "m15_longbridge_sdk_quote_snapshot.json"
 NEW_YORK = ZoneInfo("America/New_York")

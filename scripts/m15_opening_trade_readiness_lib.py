@@ -38,10 +38,9 @@ DEFAULT_DAILY_DIR = (
 DEFAULT_M12_DIR = DEFAULT_DAILY_DIR / "m12_29_current_day_scan_dashboard"
 DEFAULT_M15_REALTIME_DIR = DEFAULT_DAILY_DIR / "m15_longbridge_realtime_execution"
 DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_opening_trade_readiness"
-# M15 now runs only through the SDK paper runtime.  Keeping the retired CLI
-# readiness config as the implicit default lets an otherwise healthy runtime be
-# reported as dead whenever callers omit --config.
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_opening_trade_readiness.paper_orders_enabled.json"
+# The contract-v1 SDK stack is the only production paper path. Omitting
+# --config must not silently inspect the retired mixed-strategy configuration.
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_opening_trade_readiness.paper_contract_v1.json"
 READINESS_JSON = "m15_opening_trade_readiness.json"
 READINESS_MD = "m15_opening_trade_readiness.md"
 
@@ -185,6 +184,18 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     execution_config_linked = config.execution_config_path.resolve() == linked_execution_config_path.resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     runtime_dispatch_enabled = bool(realtime_status.get("dispatch_enabled", False))
+    capital_bucket_migration = (
+        realtime_status.get("capital_bucket_migration")
+        if isinstance(realtime_status.get("capital_bucket_migration"), dict)
+        else {}
+    )
+    authorized_cleanup_waiting = bool(
+        capital_bucket_migration.get("authorized") is True
+        and capital_bucket_migration.get("paper_simulated_only") is True
+        and capital_bucket_migration.get("blocks_new_entries") is True
+        and str(capital_bucket_migration.get("status") or "")
+        in {"pending_cleanup", "submitted_waiting_broker_fill", "waiting_for_fresh_paper_account"}
+    )
     formal_transition = realtime_status.get("formal_test_transition", {})
     formal_transition = formal_transition if isinstance(formal_transition, dict) else {}
     pending_formal_flatten = str(formal_transition.get("status") or "") == "pending_flatten"
@@ -279,13 +290,16 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     )
     if sdk_config is not None:
         effective_paper_orders_enabled = (
-            sdk_paper_channel_armed if pending_formal_flatten else runtime_dispatch_enabled
+            sdk_paper_channel_armed
+            if pending_formal_flatten or authorized_cleanup_waiting
+            else runtime_dispatch_enabled
         )
     else:
         effective_paper_orders_enabled = paper_orders_enabled
     new_position_submission_enabled = (
         effective_paper_orders_enabled
         and not pending_formal_flatten
+        and not authorized_cleanup_waiting
         and execution_epoch_consistent
     )
     readonly_gate_waiting = bool(
@@ -369,7 +383,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
                 if sdk_config is not None and not sdk_config.two_day_readonly_gate
                 else "已武装长桥模拟账户订单提交；两日只读验收完成前必须等待"
             ),
-            "waiting" if readonly_gate_waiting else ("pass" if effective_paper_orders_enabled else "fail"),
+            (
+                "waiting"
+                if readonly_gate_waiting or authorized_cleanup_waiting
+                else ("pass" if effective_paper_orders_enabled else "fail")
+            ),
             actual=execution_config_error
             or (
                 f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}, "
@@ -460,6 +478,16 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
                 f"execution_started_at={execution_epoch_start}"
             ),
         ),
+        check_row(
+            "authorized_bucket_cleanup",
+            "用户授权的故障仓清仓完成后才恢复全部策略新开仓",
+            "waiting" if authorized_cleanup_waiting else "pass",
+            actual=(
+                f"status={capital_bucket_migration.get('status', 'inactive')}, "
+                f"planned={capital_bucket_migration.get('planned_batch_count', 0)}, "
+                f"submitted={len(capital_bucket_migration.get('submissions') or {})}"
+            ),
+        ),
     ]
     fail_count = sum(1 for row in checks if row["status"] == "fail")
     waiting_count = sum(1 for row in checks if row["status"] == "waiting")
@@ -481,6 +509,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         )
     elif pending_formal_flatten:
         readiness_status = "ready_for_paper_exit_only" if window["market_phase"] == "regular_session" else "armed_waiting_flatten_session"
+    elif authorized_cleanup_waiting:
+        readiness_status = (
+            "ready_for_authorized_bucket_cleanup"
+            if window["market_phase"] == "regular_session"
+            else "armed_waiting_authorized_bucket_cleanup"
+        )
     elif window["market_phase"] == "regular_session":
         readiness_status = "ready_for_longbridge_paper_orders"
     else:
@@ -494,6 +528,8 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "paper_order_submission_enabled": effective_paper_orders_enabled,
         "new_position_submission_enabled": new_position_submission_enabled,
         "validation_session_waiting": validation_session_waiting,
+        "authorized_cleanup_waiting": authorized_cleanup_waiting,
+        "capital_bucket_migration": capital_bucket_migration,
         "formal_test_transition": formal_transition,
         "m12_47_daemon_alive": m12_alive,
         "m15_realtime_daemon_alive": realtime_alive,
@@ -715,6 +751,10 @@ def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[
         return f"长桥模拟账户已清空：当前是{window.get('market_status')}，到常规交易时段自动激活正式测试并允许合格新信号下单。"
     if status == "armed_waiting_flatten_session":
         return f"清仓链路已武装：当前是{window.get('market_status')}，下个常规交易时段只处理验收持仓退出。"
+    if status == "ready_for_authorized_bucket_cleanup":
+        return "故障仓清仓已开始：系统只提交用户授权的纸面市价退出，全部确认成交后自动恢复正式策略测试。"
+    if status == "armed_waiting_authorized_bucket_cleanup":
+        return f"故障仓清仓已武装：当前是{window.get('market_status')}，开盘后先清仓，确认完成后自动恢复全部正式策略测试。"
     return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"
 
 

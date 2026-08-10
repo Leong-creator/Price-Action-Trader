@@ -3063,7 +3063,6 @@ def build_signal_from_intent(
         blockers.append("blocked_short_quality_score_below_minimum")
     if (
         capital_bucket_migration_status == "pending_cleanup"
-        and capital_bucket in {"pa004_mbf", "pa004_mbf_qc"}
         and intent_is_open_entry(intent)
     ):
         blockers.append("blocked_capital_bucket_pending_cleanup")

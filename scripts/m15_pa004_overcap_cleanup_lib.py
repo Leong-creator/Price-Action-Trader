@@ -1,4 +1,4 @@
-"""Build an exact-batch cleanup plan for legacy PA004 paper positions."""
+"""Build exact or strategy-symbol aggregate paper bucket cleanup plans."""
 from __future__ import annotations
 
 import hashlib
@@ -35,6 +35,11 @@ def normalize_symbol(value: Any) -> str:
 def stable_cleanup_id(*, batch_id: str, cleanup_epoch_id: str) -> str:
     digest = hashlib.sha256(f"{cleanup_epoch_id}|{batch_id}".encode()).hexdigest()
     return f"pa004-cleanup-{digest[:24]}"
+
+
+def aggregate_cleanup_id(*, group_key: str, cleanup_epoch_id: str) -> str:
+    digest = hashlib.sha256(f"{cleanup_epoch_id}|{group_key}".encode()).hexdigest()
+    return f"bucket-cleanup-{digest[:24]}"
 
 
 def plan_digest(rows: Iterable[Mapping[str, Any]]) -> str:
@@ -100,9 +105,19 @@ def build_cleanup_plan(
     *,
     cleanup_epoch_id: str,
     generated_at: datetime | None = None,
+    target_buckets: Iterable[str] | None = None,
+    target_runtimes: Iterable[str] | None = None,
+    aggregate_by_strategy_symbol: bool = False,
+    cleanup_scope: str = "all_open_lots_in_target_buckets_for_fresh_baseline",
+    exit_reason: str = "pa004_legacy_overcap_cleanup",
 ) -> dict[str, Any]:
     now = generated_at or datetime.now(UTC)
+    selected_buckets = set(target_buckets or TARGET_BUCKETS)
+    selected_runtimes = set(target_runtimes or TARGET_RUNTIMES)
+    if not selected_buckets or not selected_runtimes:
+        raise ValueError("cleanup_targets_must_not_be_empty")
     rows: list[dict[str, Any]] = []
+    selected_batches: list[dict[str, Any]] = []
     planned_by_symbol: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for batch in attribution.get("batches", []) or []:
         if not isinstance(batch, Mapping):
@@ -112,8 +127,8 @@ def build_cleanup_plan(
         direction = str(batch.get("direction") or "").lower()
         quantity = decimal(batch.get("remaining_quantity"))
         if (
-            bucket not in TARGET_BUCKETS
-            or runtime_id not in TARGET_RUNTIMES
+            bucket not in selected_buckets
+            or runtime_id not in selected_runtimes
             or direction != "long"
             or quantity <= ZERO
         ):
@@ -123,6 +138,9 @@ def build_cleanup_plan(
             raise ValueError(
                 f"cleanup_batch_requires_whole_positive_quantity:{batch.get('batch_id')}"
             )
+        selected_batches.append(dict(batch))
+        if aggregate_by_strategy_symbol:
+            continue
         symbol = normalize_symbol(batch.get("symbol"))
         row = {
             "cleanup_id": stable_cleanup_id(
@@ -151,11 +169,53 @@ def build_cleanup_plan(
                 batch_id=str(batch.get("batch_id") or ""),
                 cleanup_epoch_id=cleanup_epoch_id,
             ),
+            "cleanup_exit_reason": exit_reason,
         }
         if not row["batch_id"] or not row["source_open_order_id"] or not row["source_open_trade_id"]:
             raise ValueError("cleanup_batch_missing_exact_attribution_key")
         rows.append(row)
         planned_by_symbol[symbol] += whole_quantity
+
+    if aggregate_by_strategy_symbol:
+        groups: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+        for batch in selected_batches:
+            groups[(
+                str(batch.get("test_epoch_id") or ""),
+                str(batch.get("capital_bucket") or ""),
+                str(batch.get("runtime_id") or ""),
+                normalize_symbol(batch.get("symbol")),
+                str(batch.get("strategy_contract_hash") or ""),
+            )].append(batch)
+        for (test_epoch_id, bucket, runtime_id, symbol, contract_hash), batches in groups.items():
+            quantity = sum((decimal(batch.get("remaining_quantity")) for batch in batches), ZERO)
+            group_key = "|".join((test_epoch_id, bucket, runtime_id, symbol, contract_hash))
+            request_id = aggregate_cleanup_id(group_key=group_key, cleanup_epoch_id=cleanup_epoch_id)
+            rows.append({
+                "cleanup_id": request_id,
+                "cleanup_epoch_id": cleanup_epoch_id,
+                "batch_id": f"aggregate|{group_key}",
+                "test_epoch_id": test_epoch_id,
+                "capital_bucket": bucket,
+                "runtime_id": runtime_id,
+                "strategy_id": str((batches[0].get("metadata") or {}).get("strategy_id") or ""),
+                "strategy_contract_hash": contract_hash,
+                "symbol": symbol,
+                "direction": "long",
+                "position_action": "close_long",
+                "side": "sell",
+                "order_type": "market",
+                "quantity": str(quantity),
+                "source_open_order_id": "",
+                "source_open_trade_id": "",
+                "source_open_signal_id": "",
+                "source_batch_ids": [str(batch.get("batch_id") or "") for batch in batches],
+                "source_batch_count": len(batches),
+                "open_price": "",
+                "client_request_id": request_id,
+                "cleanup_exit_reason": exit_reason,
+                "aggregate_strategy_exit": True,
+            })
+            planned_by_symbol[symbol] += quantity
 
     rows.sort(key=lambda row: (row["symbol"], row["capital_bucket"], row["batch_id"]))
     broker_available = _broker_available_by_symbol(account_state)
@@ -190,10 +250,12 @@ def build_cleanup_plan(
     affected_buckets = sorted({str(row["capital_bucket"]) for row in rows})
     affected_runtimes = sorted({str(row["runtime_id"]) for row in rows})
     return {
-        "schema_version": "m15.pa004-overcap-cleanup.v1",
-        "stage": "M15.pa004_overcap_cleanup",
+        "schema_version": "m15.capital-bucket-cleanup.v2",
+        "stage": "M15.capital_bucket_cleanup",
         "status": "blocked" if blockers else "ready",
-        "cleanup_scope": "all_open_lots_in_target_buckets_for_fresh_baseline",
+        "cleanup_scope": cleanup_scope,
+        "cleanup_exit_reason": exit_reason,
+        "aggregate_by_strategy_symbol": aggregate_by_strategy_symbol,
         "cleanup_epoch_id": cleanup_epoch_id,
         "generated_at": now.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "market_date": market_date(now),
@@ -268,6 +330,7 @@ def _cleanup_ledger_row(
         "client_request_id": str(order.get("client_request_id") or ""),
         "runtime_id": str(order.get("runtime_id") or ""),
         "strategy_id": str(order.get("strategy_id") or ""),
+        "strategy_contract_hash": str(order.get("strategy_contract_hash") or ""),
         "capital_bucket": str(order.get("capital_bucket") or ""),
         "test_epoch_id": str(order.get("test_epoch_id") or ""),
         "symbol": str(order.get("symbol") or "").replace(".US", ""),
@@ -282,7 +345,7 @@ def _cleanup_ledger_row(
         "source_open_order_id": str(order.get("source_open_order_id") or ""),
         "source_open_trade_id": str(order.get("source_open_trade_id") or ""),
         "source_open_remaining_quantity": str(order.get("quantity") or ""),
-        "exit_reason": "pa004_legacy_overcap_cleanup",
+        "exit_reason": str(order.get("cleanup_exit_reason") or "capital_bucket_cleanup"),
         "market_exit_no_reprice": True,
         "paper_trading_approval": True,
         "execute_orders": True,
@@ -314,7 +377,7 @@ def advance_cleanup_state(
     now: datetime,
     execution_ledger_path: Path,
 ) -> dict[str, Any]:
-    """Advance at most one exact-batch PA004 cleanup request per cycle."""
+    """Advance at most one exact or aggregate bucket cleanup request per cycle."""
     status = str(state.get("status") or "")
     if not state or status in {"inactive", "complete", "blocked"}:
         return state or {"status": "inactive"}
@@ -373,6 +436,20 @@ def advance_cleanup_state(
                 if str(row.get("capital_bucket") or "")
             }
         )
+        preserved_baselines = {
+            str(bucket): dict(value)
+            for bucket, value in (state.get("preserved_bucket_baselines") or {}).items()
+            if isinstance(value, Mapping)
+        }
+        new_baselines = {
+            bucket: {
+                "started_at": state["updated_at"],
+                "test_started_at": state["updated_at"],
+                "exclude_prior_batches": True,
+                "cleanup_epoch_id": str(state.get("cleanup_epoch_id") or ""),
+            }
+            for bucket in affected_buckets
+        }
         state.update({
             "status": "complete",
             "completed_at": state["updated_at"],
@@ -380,15 +457,7 @@ def advance_cleanup_state(
             "capital_bucket_states": {
                 bucket: {"status": "active"} for bucket in affected_buckets
             },
-            "bucket_baselines": {
-                bucket: {
-                    "started_at": state["updated_at"],
-                    "test_started_at": state["updated_at"],
-                    "exclude_prior_batches": True,
-                    "cleanup_epoch_id": str(state.get("cleanup_epoch_id") or ""),
-                }
-                for bucket in affected_buckets
-            },
+            "bucket_baselines": {**preserved_baselines, **new_baselines},
         })
         return state
     if not in_regular_session(now):

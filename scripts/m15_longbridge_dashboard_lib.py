@@ -18,7 +18,7 @@ from scripts.m15_strategy_contracts_lib import load_contracts_cached
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_PATH = ROOT / "config/examples/m15_longbridge_dashboard.json"
+DEFAULT_CONFIG_PATH = ROOT / "config/examples/m15_longbridge_dashboard.contract_v1.json"
 DEFAULT_FILL_ATTRIBUTION_PATH = (
     ROOT
     / "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/"

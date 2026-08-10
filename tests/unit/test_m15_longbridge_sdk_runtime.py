@@ -36,6 +36,7 @@ from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
     INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS,
     REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED,
+    account_snapshot_ready_for_orders,
     acquire_runtime_run_lock,
     active_event_ids_excluding_intraday_gaps,
     adaptive_market_data_deadline_seconds,
@@ -88,6 +89,49 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_account_snapshot_for_orders_requires_fresh_verified_worker(self) -> None:
+        now = datetime(2026, 8, 10, 13, 30, tzinfo=UTC)
+        healthy = {
+            "generated_at": "2026-08-10T13:29:40Z",
+            "paper_account_verified": True,
+            "positions_ok": True,
+            "orders_ok": True,
+            "worker_circuit_open": False,
+        }
+        self.assertTrue(
+            account_snapshot_ready_for_orders(
+                healthy, maximum_age_seconds=45, now=now
+            )
+        )
+        self.assertFalse(
+            account_snapshot_ready_for_orders(
+                {**healthy, "generated_at": "2026-08-10T13:28:00Z"},
+                maximum_age_seconds=45,
+                now=now,
+            )
+        )
+        self.assertFalse(
+            account_snapshot_ready_for_orders(
+                {**healthy, "worker_circuit_open": True},
+                maximum_age_seconds=45,
+                now=now,
+            )
+        )
+
+    def test_authorized_bucket_cleanup_has_specific_dispatch_block_reason(self) -> None:
+        reason = runtime_dispatch_block_reason(
+            paper_order_dispatch_enabled=True,
+            readonly_gate_blocked=False,
+            paper_client_ready=True,
+            trade_context_ready=True,
+            market_data_ready=True,
+            flatten_blocks_new_entries=True,
+            account_snapshot_ready=True,
+            trading_daily_context_ready=True,
+            authorized_cleanup_waiting=True,
+        )
+        self.assertEqual(reason, "pending_authorized_bucket_cleanup")
+
     def test_weekend_has_no_intraday_session_progress(self) -> None:
         sunday = datetime(2026, 8, 9, 12, 45, tzinfo=ZoneInfo("America/New_York"))
 
@@ -412,10 +456,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(config.subscription_batch_size, 300)
         self.assertEqual(config.subscription_deadline_seconds, 20)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 300)
-        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 100)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.12)
         self.assertEqual(config.market_data_heartbeat_deadline_seconds, 8)
-        self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 20)
+        self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 60)
         self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
         self.assertLess(
             config.snapshot_poll_interval_seconds,

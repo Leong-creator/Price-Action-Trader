@@ -168,6 +168,36 @@ class Pa004OvercapCleanupTest(unittest.TestCase):
         self.assertEqual(plan["status"], "blocked")
         self.assertEqual(plan["blockers"], [{"code": "no_target_open_batches"}])
 
+    def test_generic_cleanup_aggregates_one_order_per_strategy_symbol(self) -> None:
+        first = _batch()
+        first.update({
+            "capital_bucket": "pa001_daily_contract_v1",
+            "runtime_id": "M10-PA-001-1d",
+            "strategy_contract_hash": "contract-1",
+        })
+        second = dict(first)
+        second.update({
+            "batch_id": "epoch|pa001|M10-PA-001-1d|long|AMD|open-2|trade-2",
+            "open_order_id": "open-2",
+            "trade_id": "trade-2",
+            "remaining_quantity": "3",
+        })
+        plan = build_cleanup_plan(
+            {"batches": [first, second]},
+            _account("5"),
+            cleanup_epoch_id="fault-cleanup",
+            target_buckets={"pa001_daily_contract_v1"},
+            target_runtimes={"M10-PA-001-1d"},
+            aggregate_by_strategy_symbol=True,
+            exit_reason="authorized_fault_day_bucket_cleanup",
+        )
+        self.assertEqual(plan["status"], "ready")
+        self.assertEqual(plan["planned_batch_count"], 1)
+        self.assertEqual(plan["orders"][0]["quantity"], "5")
+        self.assertEqual(plan["orders"][0]["source_batch_count"], 2)
+        self.assertTrue(plan["orders"][0]["aggregate_strategy_exit"])
+        self.assertEqual(plan["cleanup_exit_reason"], "authorized_fault_day_bucket_cleanup")
+
     def test_execute_requires_rth_market_date_and_digest(self) -> None:
         plan = build_cleanup_plan(
             {"batches": [_batch()]},

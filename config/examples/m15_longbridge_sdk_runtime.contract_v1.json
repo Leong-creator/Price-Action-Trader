@@ -36,7 +36,7 @@
   "oauth": {
     "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
     "quote_region": "cn",
-    "trade_region": "cn"
+    "trade_region": "global"
   },
   "outputs": {
     "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
