@@ -11,6 +11,7 @@ from scripts.prepare_m15_sdk_dns_override import (
     read_cached_overrides,
     tls_reachable_address,
     valid_ipv4,
+    process_local_environment,
     write_shell_environment,
 )
 
@@ -88,3 +89,22 @@ class M15SdkDnsOverrideTest(unittest.TestCase):
             self.assertIn("NO_PROXY", text)
             self.assertIn("openapi-quote.longbridge.cn", text)
             self.assertNotIn("unset HTTP_PROXY", text)
+
+    def test_process_environment_preserves_proxy_and_adds_child_only_override(self) -> None:
+        overrides = {host: f"203.0.113.{index + 1}" for index, host in enumerate(HOSTS)}
+        environment = process_local_environment(
+            {"library": "/tmp/liboverride.so", "overrides": overrides},
+            base_environment={
+                "HTTP_PROXY": "http://127.0.0.1:10808",
+                "LD_PRELOAD": "/tmp/existing.so",
+                "NO_PROXY": "localhost",
+            },
+        )
+
+        self.assertEqual(environment["HTTP_PROXY"], "http://127.0.0.1:10808")
+        self.assertEqual(
+            environment["LD_PRELOAD"],
+            "/tmp/liboverride.so:/tmp/existing.so",
+        )
+        self.assertTrue(all(host in environment["NO_PROXY"] for host in HOSTS))
+        self.assertEqual(environment["NO_PROXY"], environment["no_proxy"])

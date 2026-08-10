@@ -64,6 +64,12 @@ from scripts.m15_sdk_validation_flatten_lib import (
     runtime_flatten_order_payload,
     runtime_flatten_retry_order_payload,
 )
+from scripts.prepare_m15_sdk_dns_override import (
+    DEFAULT_CACHE_DIR as SDK_DNS_OVERRIDE_CACHE_DIR,
+    DEFAULT_ENV_FILE as SDK_DNS_OVERRIDE_ENV_FILE,
+    prepare as prepare_sdk_dns_override,
+    process_local_environment,
+)
 
 NEW_YORK = ZoneInfo("America/New_York")
 PID_FILE = "m15_longbridge_sdk_runtime.pid"
@@ -2859,6 +2865,19 @@ def runtime_requires_health_replacement(status: dict[str, Any], config: Any) -> 
         return True
     if account_age_value is not None and account_age_value > max(90, config.maximum_account_snapshot_age_seconds * 2):
         return True
+    try:
+        recent_market_data_restarts = int(
+            status.get("market_data_worker_recent_restart_count") or 0
+        )
+    except (TypeError, ValueError):
+        recent_market_data_restarts = 0
+    if (
+        str(status.get("status") or "")
+        in {"connecting", "reconnecting_market_data_circuit"}
+        and status.get("sdk_connected") is False
+        and recent_market_data_restarts >= 3
+    ):
+        return True
     return False
 
 
@@ -4530,6 +4549,18 @@ def rotate_runtime_log(
         return archived
 
 
+def sdk_runtime_daemon_environment(config: Any) -> dict[str, str]:
+    """Prepare the same child-only DNS environment for every daemon entrypoint."""
+    environment = dict(os.environ)
+    if str(getattr(config, "quote_region", "")).lower() != "cn":
+        return environment
+    payload = prepare_sdk_dns_override(
+        SDK_DNS_OVERRIDE_CACHE_DIR,
+        SDK_DNS_OVERRIDE_ENV_FILE,
+    )
+    return process_local_environment(payload, base_environment=environment)
+
+
 def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     GLOBAL_RUNTIME_START_LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -4569,10 +4600,15 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
                     int(getattr(config, "daily_context_deadline_seconds", 75)) * 8,
                 ),
             )
+            health_replacement_required = runtime_requires_health_replacement(
+                status,
+                config,
+            )
             if (
                 status_runtime_pid != str(existing)
                 and startup_age is not None
                 and startup_age < startup_grace_seconds
+                and not health_replacement_required
             ):
                 print(
                     "SDK 实时运行层正在恢复上下文，"
@@ -4585,6 +4621,7 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
                 in {"starting", "starting_context_restore", "connecting"}
                 and startup_age is not None
                 and startup_age < startup_grace_seconds
+                and not health_replacement_required
             ):
                 print(
                     "SDK 实时运行层仍在有界启动阶段，"
@@ -4595,7 +4632,7 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
             if (
                 str(status.get("config_fingerprint") or "") == expected_fingerprint
                 and same_invocation
-                and not runtime_requires_health_replacement(status, config)
+                and not health_replacement_required
             ):
                 print(f"SDK 实时运行层已在运行，PID={existing}")
                 return 0
@@ -4607,8 +4644,16 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
         command = [sys.executable, str(Path(__file__).resolve()), "--watch", "--config", str(args.config)]
         if args.dispatch:
             command.append("--dispatch")
+        child_environment = sdk_runtime_daemon_environment(config)
         with (config.output_dir / LOG_FILE).open("a", encoding="utf-8") as handle:
-            process = subprocess.Popen(command, cwd=str(ROOT), stdout=handle, stderr=handle, start_new_session=True)
+            process = subprocess.Popen(
+                command,
+                cwd=str(ROOT),
+                stdout=handle,
+                stderr=handle,
+                start_new_session=True,
+                env=child_environment,
+            )
         pid_path(config).write_text(f"{process.pid}\n", encoding="utf-8")
         print(f"SDK 实时运行层已启动，PID={process.pid}")
     return 0

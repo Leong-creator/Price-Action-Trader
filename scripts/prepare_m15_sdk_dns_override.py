@@ -21,6 +21,7 @@ from typing import Any, Callable, Iterable
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "scripts/m15_sdk_dns_override.c"
 DEFAULT_CACHE_DIR = Path("~/.cache/price-action-trader").expanduser()
+DEFAULT_ENV_FILE = ROOT / "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_startup/m15_sdk_dns_override.env"
 HOSTS = (
     "openapi.longbridge.cn",
     "openapi-quote.longbridge.cn",
@@ -155,6 +156,32 @@ def write_shell_environment(path: Path, library: Path, overrides: dict[str, str]
     )
 
 
+def process_local_environment(
+    payload: dict[str, Any],
+    *,
+    base_environment: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Build the child-only environment represented by a validated override."""
+    environment = dict(base_environment if base_environment is not None else os.environ)
+    library = str(payload.get("library") or "")
+    overrides = payload.get("overrides") if isinstance(payload.get("overrides"), dict) else {}
+    if not library or any(not valid_ipv4(str(overrides.get(host) or "")) for host in HOSTS):
+        raise RuntimeError("longbridge_dns_override_payload_incomplete")
+    mapping = ";".join(f"{host}={overrides[host]}" for host in HOSTS)
+    existing_preload = str(environment.get("LD_PRELOAD") or "")
+    preload_parts = [part for part in existing_preload.split(":") if part and part != library]
+    environment["LD_PRELOAD"] = ":".join([library, *preload_parts])
+    environment["M15_LONGBRIDGE_DNS_OVERRIDES"] = mapping
+    existing_no_proxy = str(environment.get("NO_PROXY") or environment.get("no_proxy") or "")
+    no_proxy_parts = [part for part in existing_no_proxy.split(",") if part]
+    for host in HOSTS:
+        if host not in no_proxy_parts:
+            no_proxy_parts.append(host)
+    environment["NO_PROXY"] = ",".join(no_proxy_parts)
+    environment["no_proxy"] = environment["NO_PROXY"]
+    return environment
+
+
 def prepare(cache_dir: Path, env_file: Path) -> dict[str, Any]:
     cache_dir.mkdir(parents=True, exist_ok=True)
     library = cache_dir / "libm15_sdk_dns_override.so"
@@ -186,7 +213,7 @@ def main() -> int:
     parser.add_argument("--cache-dir", default=str(DEFAULT_CACHE_DIR))
     parser.add_argument(
         "--env-file",
-        default=str(ROOT / "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_startup/m15_sdk_dns_override.env"),
+        default=str(DEFAULT_ENV_FILE),
     )
     args = parser.parse_args()
     payload = prepare(Path(args.cache_dir).expanduser(), Path(args.env_file).expanduser())

@@ -81,6 +81,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
     snapshot_poll_should_idle,
+    sdk_runtime_daemon_environment,
     start_runtime_daemon,
     subscription_quote_stream_is_stale,
     trade_context_health_requires_rebuild,
@@ -820,6 +821,45 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 finally:
                     first.close()
 
+    def test_daemon_environment_always_prepares_cn_quote_dns_override(self) -> None:
+        config = SimpleNamespace(quote_region="cn")
+        payload = {
+            "library": "/tmp/libm15.so",
+            "overrides": {
+                "openapi.longbridge.cn": "203.0.113.1",
+                "openapi-quote.longbridge.cn": "203.0.113.2",
+                "openapi-trade.longbridge.cn": "203.0.113.3",
+            },
+        }
+        with (
+            patch(
+                "scripts.run_m15_longbridge_sdk_runtime.prepare_sdk_dns_override",
+                return_value=payload,
+            ) as prepare,
+            patch.dict(
+                "scripts.run_m15_longbridge_sdk_runtime.os.environ",
+                {"HTTP_PROXY": "http://127.0.0.1:10808"},
+                clear=True,
+            ),
+        ):
+            environment = sdk_runtime_daemon_environment(config)
+
+        prepare.assert_called_once()
+        self.assertEqual(environment["HTTP_PROXY"], "http://127.0.0.1:10808")
+        self.assertEqual(environment["LD_PRELOAD"], "/tmp/libm15.so")
+        self.assertIn("openapi.longbridge.cn", environment["NO_PROXY"])
+
+    def test_global_quote_daemon_does_not_prepare_cn_override(self) -> None:
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.prepare_sdk_dns_override"
+        ) as prepare:
+            environment = sdk_runtime_daemon_environment(
+                SimpleNamespace(quote_region="global")
+            )
+
+        prepare.assert_not_called()
+        self.assertIsInstance(environment, dict)
+
     def test_daemon_does_not_spawn_when_another_config_holds_global_runtime_lock(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1041,6 +1081,33 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 {
                     "generated_at": datetime.now(UTC).isoformat(),
                     "account_snapshot_age_seconds": 8,
+                },
+                config,
+            )
+        )
+
+    def test_connecting_runtime_with_restart_storm_requires_replacement(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertTrue(
+            runtime_requires_health_replacement(
+                {
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "status": "connecting",
+                    "sdk_connected": False,
+                    "account_snapshot_age_seconds": 8,
+                    "market_data_worker_recent_restart_count": 3,
+                },
+                config,
+            )
+        )
+        self.assertFalse(
+            runtime_requires_health_replacement(
+                {
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "status": "connecting",
+                    "sdk_connected": False,
+                    "account_snapshot_age_seconds": 8,
+                    "market_data_worker_recent_restart_count": 2,
                 },
                 config,
             )

@@ -6,7 +6,8 @@
 
 ### 1.1 当前运行规则（覆盖后文历史阶段描述）
 
-- M15 合同版 SDK 的生产端点固定为“中国行情端 + 全球交易账户端”：`quote_region=cn`、`trade_region=global`。启动器只允许给 M15 子进程注入经 DNS-over-HTTPS 获取且完成 TLS 握手的 `.cn` 行情域名映射；不得修改系统 DNS、hosts 或用户代理。所有未显式指定配置的 SDK、看护、开盘验收和长桥看板入口必须默认使用合同 v1 配置，禁止静默回到旧混合策略配置。
+- M15 合同版 SDK 的生产端点固定为“中国行情端 + 全球交易账户端”：`quote_region=cn`、`trade_region=global`。开机启动器和 SDK `--daemon` 入口都必须给 M15 子进程注入经 DNS-over-HTTPS 获取且完成 TLS 握手的 `.cn` 行情域名映射；两条入口必须产生相同的 `LD_PRELOAD`、域名映射和 `NO_PROXY` 子进程环境。不得修改系统 DNS、hosts 或用户代理，也不得因直接执行守护命令而绕过映射。所有未显式指定配置的 SDK、看护、开盘验收和长桥看板入口必须默认使用合同 v1 配置，禁止静默回到旧混合策略配置。
+- SDK 主进程处于 `connecting/reconnecting_market_data_circuit`、行情连接为未就绪且两分钟内行情子进程已经重建至少 3 次时，后台看护必须绕过普通启动宽限并安全替换该主进程，清理失效的原生 SDK 上下文。少于 3 次的瞬时恢复、健康的账户刷新和正常上下文初始化仍保留启动宽限，禁止形成主进程重启风暴。
 - 用户授权的故障仓清理是开盘前置事务：清理状态为 `pending_cleanup` 或等待券商成交时，模拟账户退出通道保持武装，但所有正式策略新开仓统一关闭。只有账户快照为已验证纸面账户、持仓和订单读取正常、快照不超过 45 秒且没有账户熔断时才允许提交；每张退出单必须取得长桥订单号并按实际成交确认。全部目标批次清理完成后才能建立对应资金池新基线并自动恢复正式策略，不得用盘前补单、本地模拟持仓或标的总量猜配替代。
 - 合同 v1 的正式启动、开盘验收和后台看护必须成套使用 `config/examples/m15_longbridge_sdk_runtime.contract_v1.json`、`config/examples/m15_opening_trade_readiness.paper_contract_v1.json`、`config/examples/m15_background_watchdog.contract_v1.json`。不得用旧 `m15_longbridge_sdk_runtime.json` 或 `paper_orders_enabled` 验收配置判断合同版进程，否则会产生虚假的配置指纹漂移。
 - 合同 v1 正式测试标记进入 `active` 后必须规范化为 `blocks_new_entries=false`；全局标记只表达正式会话是否激活，具体资金池是否可新增由该仓实际持仓、待确认订单、成交归因和仓位上限独立决定。禁止用全局残留字段掩盖单仓超限，也禁止因一个超限仓冻结其他仓。
