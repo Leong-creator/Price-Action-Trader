@@ -23,7 +23,7 @@ import uuid
 from collections import deque
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -643,6 +643,54 @@ def build_sdk_quote_snapshot(
     }
 
 
+def write_trusted_sdk_quote_snapshot(
+    path: Path,
+    state_by_symbol: dict[str, dict[str, Any]],
+    *,
+    generated_at: datetime,
+    required_symbols: tuple[str, ...] | list[str],
+) -> dict[str, Any]:
+    """Replace the canonical quote snapshot only with complete broker data."""
+    snapshot = build_sdk_quote_snapshot(
+        state_by_symbol,
+        generated_at=generated_at,
+    )
+    valid_symbols: set[str] = set()
+    for row in snapshot["rows"]:
+        try:
+            current_price = Decimal(str(row.get("current_price") or "0"))
+            previous_close = Decimal(str(row.get("prev_close") or "0"))
+        except (InvalidOperation, ValueError):
+            continue
+        if (
+            current_price > 0
+            and previous_close > 0
+            and str(row.get("received_at") or "")
+        ):
+            valid_symbols.add(str(row.get("symbol") or "").upper())
+    expected_symbols = {
+        str(symbol).upper()
+        if str(symbol).upper().endswith(".US")
+        else f"{str(symbol).upper()}.US"
+        for symbol in required_symbols
+    }
+    missing_symbols = sorted(expected_symbols - valid_symbols)
+    if missing_symbols:
+        return {
+            "written": False,
+            "row_count": int(snapshot.get("row_count") or 0),
+            "required_symbol_count": len(expected_symbols),
+            "missing_symbols": missing_symbols,
+        }
+    write_json_atomic(path, snapshot)
+    return {
+        "written": True,
+        "row_count": int(snapshot.get("row_count") or 0),
+        "required_symbol_count": len(expected_symbols),
+        "missing_symbols": [],
+    }
+
+
 def fetch_daily_context_rows(
     quote: Any,
     sdk: Any,
@@ -843,19 +891,10 @@ def adaptive_market_data_deadline_seconds(
     now: datetime,
     bar_minutes: int,
 ) -> float:
-    """Back off a restart storm without relaxing the five-minute boundary."""
+    """Back off a restart storm without killing a worker at a bar boundary."""
+    del now, bar_minutes
     base = float(base_deadline_seconds)
     if int(recent_restarts) < 3:
-        return base
-    interval_seconds = max(1, int(bar_minutes)) * 60
-    seconds_into_interval = (
-        (int(now.minute) % max(1, int(bar_minutes))) * 60
-        + int(now.second)
-        + int(now.microsecond) / 1_000_000
-    )
-    seconds_to_boundary = interval_seconds - seconds_into_interval
-    distance_to_boundary = min(seconds_into_interval, seconds_to_boundary)
-    if distance_to_boundary <= base:
         return base
     return max(base, float(recovery_deadline_seconds))
 
@@ -4303,12 +4342,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and time.monotonic() - last_quote_snapshot_write >= 15
             ):
                 quote_snapshot_generated_at = datetime.now(UTC)
-                write_json_atomic(
+                write_trusted_sdk_quote_snapshot(
                     config.output_dir / QUOTE_SNAPSHOT_JSON,
-                    build_sdk_quote_snapshot(
-                        live_quote_session_state,
-                        generated_at=quote_snapshot_generated_at,
-                    ),
+                    live_quote_session_state,
+                    generated_at=quote_snapshot_generated_at,
+                    required_symbols=configured_symbols(config),
                 )
                 last_quote_snapshot_write = time.monotonic()
             session_coverage = five_minute_session_coverage(

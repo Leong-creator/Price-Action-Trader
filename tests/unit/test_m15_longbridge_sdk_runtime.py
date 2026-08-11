@@ -90,6 +90,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     subscription_quote_stream_is_stale,
     trade_context_health_requires_rebuild,
     validated_snapshot_poll_is_reusable,
+    write_trusted_sdk_quote_snapshot,
 )
 
 
@@ -481,6 +482,43 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(payload["rows"][0]["symbol"], "AAPL.US")
         self.assertEqual(payload["rows"][0]["prev_close"], "205.25")
 
+    def test_partial_sdk_quote_snapshot_cannot_replace_trusted_complete_snapshot(self) -> None:
+        complete_state = {
+            symbol: {
+                "close": price,
+                "prev_close": str(Decimal(price) - Decimal("1")),
+                "source_event_at": "2026-08-11T14:00:00Z",
+                "received_at": "2026-08-11T14:00:01Z",
+                "source_mode": "longbridge_sdk_snapshot_poll",
+                "market_data_blocked_reason": "",
+            }
+            for symbol, price in (("AAPL", "210.50"), ("MSFT", "510.25"))
+        }
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "quote_snapshot.json"
+            complete_result = write_trusted_sdk_quote_snapshot(
+                path,
+                complete_state,
+                generated_at=datetime(2026, 8, 11, 14, 0, 2, tzinfo=UTC),
+                required_symbols=("AAPL.US", "MSFT.US"),
+            )
+            trusted_payload = json.loads(path.read_text(encoding="utf-8"))
+
+            partial_result = write_trusted_sdk_quote_snapshot(
+                path,
+                {"AAPL": complete_state["AAPL"]},
+                generated_at=datetime(2026, 8, 11, 14, 0, 17, tzinfo=UTC),
+                required_symbols=("AAPL.US", "MSFT.US"),
+            )
+
+            self.assertTrue(complete_result["written"])
+            self.assertFalse(partial_result["written"])
+            self.assertEqual(partial_result["missing_symbols"], ["MSFT.US"])
+            self.assertEqual(
+                json.loads(path.read_text(encoding="utf-8")),
+                trusted_payload,
+            )
+
     def test_only_oauth_or_missing_trade_context_triggers_rebuild(self) -> None:
         self.assertTrue(
             trade_context_health_requires_rebuild(
@@ -731,7 +769,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 44, 55, tzinfo=UTC),
                 5,
             ),
-            8,
+            60,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
