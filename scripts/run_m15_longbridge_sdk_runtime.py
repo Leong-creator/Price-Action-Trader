@@ -393,6 +393,17 @@ def emit_worker(queue_out: Any, payload: dict[str, Any]) -> None:
         return
 
 
+def emit_daily_context_result(queue_out: Any, payload: dict[str, Any]) -> None:
+    """Flush the one critical daily-context result before the child exits."""
+    queue_out.put(payload, block=True, timeout=5)
+    close = getattr(queue_out, "close", None)
+    if callable(close):
+        close()
+    join_thread = getattr(queue_out, "join_thread", None)
+    if callable(join_thread):
+        join_thread()
+
+
 def event_rows_to_daily(symbol: str, candles: Any, received_at: datetime) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for candle in candles if isinstance(candles, list) else []:
@@ -1247,7 +1258,7 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
                     config.daily_context_bars,
                 )
                 rows.extend(retry_rows)
-            emit_worker(
+            emit_daily_context_result(
                 queue_out,
                 {
                     "kind": "daily_context_task_complete",
@@ -1260,7 +1271,7 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
             return
         except BaseException as exc:
             last_error = exc
-    emit_worker(
+    emit_daily_context_result(
         queue_out,
         {
             "kind": "daily_context_error",

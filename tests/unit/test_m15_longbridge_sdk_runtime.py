@@ -3455,9 +3455,21 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         class Queue:
             def __init__(self):
                 self.items = []
+                self.closed = False
+                self.joined = False
 
             def put_nowait(self, payload):
                 self.items.append(payload)
+
+            def put(self, payload, *, block, timeout):
+                self.assertions = (block, timeout)
+                self.items.append(payload)
+
+            def close(self):
+                self.closed = True
+
+            def join_thread(self):
+                self.joined = True
 
         queue = Queue()
         config = SimpleNamespace(daily_context_bars=60, quote_region="cn")
@@ -3478,6 +3490,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(queue.items[-1]["failures"], [])
         self.assertEqual(len(queue.items), 1)
         self.assertEqual(len(queue.items[-1]["rows"]), 1)
+        self.assertTrue(queue.closed)
+        self.assertTrue(queue.joined)
 
     def test_daily_context_failures_retry_as_one_batch(self) -> None:
         pending: deque[list[str]] = deque()
