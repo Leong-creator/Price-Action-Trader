@@ -240,9 +240,16 @@ def build_sdk_trade_clients(
 def runtime_owns_quote_connection(config: Any, runtime_status: dict[str, Any]) -> bool:
     """Treat a connecting live runtime as the sole owner of the quote channel."""
     return bool(
+        runtime_status_matches_config(config, runtime_status)
+        and process_alive(int(runtime_status.get("runtime_pid") or 0))
+    )
+
+
+def runtime_status_matches_config(config: Any, runtime_status: dict[str, Any]) -> bool:
+    """Identify the production runtime even during a bounded process handoff."""
+    return bool(
         str(runtime_status.get("config_fingerprint") or "")
         == config_fingerprint(config)
-        and process_alive(int(runtime_status.get("runtime_pid") or 0))
     )
 
 
@@ -324,10 +331,12 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
         runtime_status = json.loads(config.runtime_status_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         runtime_status = {}
-    quote_connection_owned = runtime_owns_quote_connection(config, runtime_status)
-    if quote_connection_owned:
+    runtime_status_matches = runtime_status_matches_config(config, runtime_status)
+    if runtime_status_matches:
         quote_probe_source = "active_sdk_runtime_status"
-        if runtime_status.get("sdk_connected") is not True:
+        if not process_alive(int(runtime_status.get("runtime_pid") or 0)):
+            quote_error = "sdk_quote_runtime_process_not_alive"
+        elif runtime_status.get("sdk_connected") is not True:
             quote_error = "sdk_quote_runtime_not_connected"
     else:
         try:
@@ -882,6 +891,21 @@ def recent_restart_count(
     while restart_times and float(restart_times[0]) < cutoff:
         restart_times.popleft()
     return len(restart_times)
+
+
+def clear_restart_burst_after_stable_polls(
+    restart_times: deque[float],
+    successful_fast_polls: int,
+    *,
+    stable_poll_threshold: int = 3,
+) -> bool:
+    """End recovery backoff after the replacement worker proves stable."""
+    if int(successful_fast_polls) < int(stable_poll_threshold):
+        return False
+    if not restart_times:
+        return False
+    restart_times.clear()
+    return True
 
 
 def adaptive_market_data_deadline_seconds(
@@ -3031,11 +3055,20 @@ def runtime_requires_health_replacement(status: dict[str, Any], config: Any) -> 
         )
     except (TypeError, ValueError):
         recent_market_data_restarts = 0
+    snapshot_recovery_has_progress = bool(
+        str(status.get("market_data_mode") or "") == "sdk_snapshot_poll"
+        and (
+            int(status.get("snapshot_poll_successful_fast_polls") or 0) > 0
+            or int(status.get("snapshot_poll_covered_count") or 0) > 0
+            or int(status.get("snapshot_row_count") or 0) > 0
+        )
+    )
     if (
         str(status.get("status") or "")
         in {"connecting", "reconnecting_market_data_circuit"}
         and status.get("sdk_connected") is False
         and recent_market_data_restarts >= 3
+        and not snapshot_recovery_has_progress
     ):
         return True
     return False
@@ -3501,10 +3534,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 adaptive_market_data_deadline_seconds(
                     config.market_data_heartbeat_deadline_seconds,
                     config.snapshot_poll_recovery_deadline_seconds,
-                    max(
-                        market_data_worker_recent_restart_count,
-                        market_data_worker_restart_total,
-                    ),
+                    market_data_worker_recent_restart_count,
                     datetime.now(UTC),
                     config.bar_minutes,
                 )
@@ -3980,6 +4010,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
                 snapshot_poll_successful_fast_polls = int(
                     message.get("successful_fast_polls") or 0
+                )
+                clear_restart_burst_after_stable_polls(
+                    market_data_worker_restart_times,
+                    snapshot_poll_successful_fast_polls,
                 )
                 snapshot_poll_is_fast_and_complete = bool(
                     message.get("poll_is_fast_and_complete")

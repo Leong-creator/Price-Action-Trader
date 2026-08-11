@@ -41,6 +41,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     acquire_runtime_run_lock,
     active_event_ids_excluding_intraday_gaps,
     adaptive_market_data_deadline_seconds,
+    clear_restart_burst_after_stable_polls,
     buffer_pending_market_data_progress,
     build_sdk_quote_snapshot,
     build_live_daily_confirmation_rows,
@@ -76,6 +77,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     rotate_runtime_log,
     runtime_requires_health_replacement,
     runtime_owns_quote_connection,
+    runtime_status_matches_config,
     schedule_daily_context_retry,
     run_sdk_order_maintenance,
     run_pending_flatten_cycle,
@@ -811,6 +813,15 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(recent_restart_count(restart_times, 120.0, 30.0), 2)
         self.assertEqual(list(restart_times), [100.0, 119.0])
 
+    def test_stable_snapshot_polls_end_restart_burst_backoff(self) -> None:
+        restart_times = deque([100.0, 110.0, 119.0])
+
+        self.assertFalse(clear_restart_burst_after_stable_polls(restart_times, 2))
+        self.assertEqual(list(restart_times), [100.0, 110.0, 119.0])
+        self.assertTrue(clear_restart_burst_after_stable_polls(restart_times, 3))
+        self.assertEqual(list(restart_times), [])
+        self.assertFalse(clear_restart_burst_after_stable_polls(restart_times, 4))
+
     def test_acknowledged_subscription_requires_real_quote_progress(self) -> None:
         self.assertFalse(subscription_quote_stream_is_stale(10.0, 0.0, 18.0, 8.0))
         self.assertTrue(subscription_quote_stream_is_stale(10.0, 0.0, 18.001, 8.0))
@@ -859,6 +870,18 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         }
 
         self.assertTrue(runtime_owns_quote_connection(config, status))
+
+    def test_runtime_status_matches_config_during_process_handoff(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        status = {
+            "runtime_pid": 999999999,
+            "config_fingerprint": config_fingerprint(config),
+            "sdk_connected": False,
+            "status": "connecting",
+        }
+
+        self.assertTrue(runtime_status_matches_config(config, status))
+        self.assertFalse(runtime_owns_quote_connection(config, status))
 
     def test_regular_session_recovery_prioritizes_the_frozen_trading_universe(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
@@ -1262,6 +1285,25 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "sdk_connected": False,
                     "account_snapshot_age_seconds": 8,
                     "market_data_worker_recent_restart_count": 2,
+                },
+                config,
+            )
+        )
+
+    def test_connecting_runtime_with_snapshot_progress_is_not_replaced(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertFalse(
+            runtime_requires_health_replacement(
+                {
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "status": "connecting",
+                    "sdk_connected": False,
+                    "account_snapshot_age_seconds": 8,
+                    "market_data_mode": "sdk_snapshot_poll",
+                    "market_data_worker_recent_restart_count": 4,
+                    "snapshot_poll_successful_fast_polls": 1,
+                    "snapshot_poll_covered_count": 100,
+                    "snapshot_row_count": 400,
                 },
                 config,
             )
