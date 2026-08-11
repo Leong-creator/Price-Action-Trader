@@ -388,7 +388,6 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
 
 WORKER_MESSAGES_ALLOWED_TO_DROP = {
     "heartbeat",
-    "quote_state",
     "subscription_progress",
 }
 
@@ -398,9 +397,9 @@ def emit_worker(queue_out: Any, payload: dict[str, Any]) -> bool:
 
     A full multiprocessing queue used to silently discard complete bars and
     snapshot batches.  That made an otherwise healthy 300-symbol cycle lose a
-    whole five-minute boundary.  Heartbeats and quote-state telemetry may be
-    superseded by the next update; bars, snapshots and lifecycle messages may
-    not.
+    whole five-minute boundary.  Only heartbeats and subscription progress may
+    be superseded by the next update; quote state, bars, snapshots and
+    lifecycle messages may not.
     """
     kind = str(payload.get("kind") or "")
     if kind in WORKER_MESSAGES_ALLOWED_TO_DROP:

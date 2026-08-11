@@ -704,6 +704,17 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     orders_fresh = orders_age is not None and orders_age <= slow_limit
     pnl_fresh = pnl_age is not None and pnl_age <= slow_limit
     fill_attribution_fresh = fill_attribution_age is not None and fill_attribution_age <= slow_limit
+    statistics_reported_stale = bool(
+        account_summary.get("statistics_stale")
+        or reconciliation.get("statistics_stale")
+        or pnl.get("statistics_stale")
+        or (pnl.get("source_status") or {}).get("statistics_stale")
+    )
+    if statistics_reported_stale:
+        account_summary_fresh = False
+        orders_fresh = False
+        pnl_fresh = False
+        fill_attribution_fresh = False
     pa002_source_fill_generated_at = str(
         (pa002_milestone.get("source_status") or {}).get("fill_attribution_generated_at") or ""
     )
@@ -849,6 +860,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         "legacy_queue_used": False,
         "legacy_cli_used": False,
         "data_status": data_status,
+        "statistics_stale": statistics_reported_stale,
         "source_checks": source_checks,
         "runtime": {
             "runtime_engine": runtime.get("runtime_engine"),

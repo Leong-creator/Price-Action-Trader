@@ -696,11 +696,19 @@ def write_sdk_analytics_outputs(
     summary["history_refresh_mode"] = history_refresh_mode
     summary["statistics_stale"] = statistics_stale
     summary["fill_attribution_summary"] = fill_attribution.get("summary", {})
+    pnl["statistics_stale"] = statistics_stale
     if statistics_stale:
         summary["plain_language_result"] = (
             "SDK 交易核心正常；慢速历史或收益统计暂未刷新，"
             f"statistics_stale=true，原因={history_refresh_mode}。"
         )
+        pnl["source_status"] = {
+            **(pnl.get("source_status") or {}),
+            "status": "statistics_stale",
+            "statistics_stale": True,
+        }
+        if isinstance(pnl.get("market_day_profit_analysis"), dict):
+            pnl["market_day_profit_analysis"]["status"] = "statistics_stale"
     reconciliation["history_refresh_mode"] = history_refresh_mode
     reconciliation["statistics_stale"] = statistics_stale
     trusted_history = {

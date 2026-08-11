@@ -98,18 +98,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         output = queue.Queue(maxsize=1)
         output.put({"kind": "occupied"})
         self.assertFalse(emit_worker(output, {"kind": "heartbeat"}))
-        self.assertFalse(emit_worker(output, {"kind": "quote_state"}))
+        self.assertFalse(emit_worker(output, {"kind": "subscription_progress"}))
 
-    def test_worker_never_silently_drops_complete_bars_when_queue_is_full(self) -> None:
+    def test_worker_never_silently_drops_trading_or_quote_state_when_queue_is_full(self) -> None:
         class SaturatedQueue:
             def put(self, *_args, **_kwargs):
                 raise queue.Full
 
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "critical_worker_message_queue_saturated:bars",
-        ):
-            emit_worker(SaturatedQueue(), {"kind": "bars", "rows": []})
+        for kind in ("bars", "snapshots", "ready", "quote_state"):
+            with self.subTest(kind=kind), self.assertRaisesRegex(
+                RuntimeError,
+                f"critical_worker_message_queue_saturated:{kind}",
+            ):
+                emit_worker(SaturatedQueue(), {"kind": kind, "rows": []})
 
     def test_full_300_symbol_session_requires_23400_real_sdk_bars(self) -> None:
         symbols = [f"S{index:03d}" for index in range(300)]

@@ -452,6 +452,32 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertIsNone(payload["account"]["today_pnl"])
         self.assertEqual(payload["orders"]["summary"], {"status": "stale_source_blocked"})
 
+    def test_dashboard_honors_explicit_statistics_stale_on_fresh_files(self) -> None:
+        tmp_path = self.tmp_path
+        now = "2026-07-16T00:00:00Z"
+        files = {}
+        for name, payload in {
+            "runtime": {"generated_at": now, "runtime_pid": os.getpid(), "runtime_engine": "sdk", "sdk_connected": True},
+            "account": {"generated_at": now, "paper_account_verified": True},
+            "summary": {"generated_at": now, "statistics_stale": True, "account_today_total_pnl": "99"},
+            "execution": {}, "epoch": {"status": "active"}, "formal": {"status": "active"},
+            "orders": {"generated_at": now, "statistics_stale": True, "summary": {"filled": 99}, "rows": []},
+            "fills": {"generated_at": now, "summary": {"completed_trade_count": 99}, "completed_trades": []},
+            "pnl": {"generated_at": now, "statistics_stale": True, "account_pnl": {"sum_profit": "99"}},
+            "config": {"virtual_capital_buckets": {}},
+        }.items():
+            files[name] = _write(tmp_path / f"{name}.json", payload)
+        config = {"inputs": {"sdk_runtime_status": files["runtime"], "account_state": files["account"], "account_state_summary": files["summary"], "execution_status": files["execution"], "epoch_state": files["epoch"], "formal_epoch_marker": files["formal"], "order_reconciliation": files["orders"], "fill_attribution": files["fills"], "pnl_reconciliation": files["pnl"], "execution_config": files["config"]}, "outputs": {"json": str(tmp_path / "out.json"), "html": str(tmp_path / "out.html")}}
+
+        payload = build_dashboard(config, generated_at=now)
+
+        self.assertEqual(payload["data_status"], "trading_ready_statistics_stale")
+        self.assertTrue(payload["statistics_stale"])
+        self.assertIsNone(payload["account"]["today_pnl"])
+        self.assertIsNone(payload["pnl"]["account_pnl"])
+        self.assertEqual(payload["orders"]["summary"], {"status": "stale_source_blocked"})
+        self.assertEqual(payload["fill_attribution"]["summary"], {"status": "stale_source_blocked"})
+
     def test_dashboard_uses_sdk_dispatch_state_when_legacy_entry_field_is_absent(self) -> None:
         tmp_path = self.tmp_path
         now = "2026-07-16T00:00:00Z"

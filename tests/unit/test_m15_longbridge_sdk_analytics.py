@@ -758,9 +758,12 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
             )
 
             summary = json.loads((output / "m15_longbridge_realtime_account_state_summary.json").read_text())
+            pnl = json.loads((output / "m15_longbridge_account_pnl_reconciliation.json").read_text())
             trusted_history = json.loads((output / TRUSTED_ORDER_HISTORY_JSON).read_text())
             self.assertTrue(result["statistics_stale"])
             self.assertTrue(summary["statistics_stale"])
+            self.assertTrue(pnl["statistics_stale"])
+            self.assertEqual(pnl["source_status"]["status"], "statistics_stale")
             self.assertTrue(trusted_history["statistics_stale"])
             self.assertIn("statistics_stale=true", summary["plain_language_result"])
 
