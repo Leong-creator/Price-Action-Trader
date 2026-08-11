@@ -250,6 +250,39 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                 [],
             )
 
+    def test_runtime_quote_snapshot_keeps_previous_session_after_midnight(self) -> None:
+        generated_at = datetime(2026, 8, 11, 4, 16, tzinfo=UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "m15_longbridge_sdk_quote_snapshot.json").write_text(
+                json.dumps(
+                    {
+                        "metric_contract_id": APP_DAILY_PNL_METRIC_ID,
+                        "market_date": "2026-08-11",
+                        "latest_quote_received_at": "2026-08-11T04:15:58Z",
+                        "rows": [
+                            {
+                                "symbol": "AAPL.US",
+                                "current_price": "210.5",
+                                "prev_close": "205.0",
+                                "source_event_at": "2026-08-10T20:00:00Z",
+                                "received_at": "2026-08-11T04:15:58Z",
+                                "price_phase": "regular",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = load_runtime_quote_rows(
+                SimpleNamespace(output_dir=root),
+                generated_at,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["current_price"], "210.5")
+
     def test_app_window_uses_previous_new_york_0400_before_boundary(self) -> None:
         self.assertEqual(
             app_intraday_window_start(datetime(2026, 7, 21, 7, 0, tzinfo=UTC)),

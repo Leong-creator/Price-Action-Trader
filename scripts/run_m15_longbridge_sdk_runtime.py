@@ -1210,18 +1210,60 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
     in a separate process means a timeout can be recovered without stopping
     the WebSocket feed or delaying a newly completed five-minute bar.
     """
-    try:
-        config = load_config(config_path)
-        sdk = require_sdk_contract()
-        oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-        quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
-        failures = load_daily_context(quote, sdk, tuple(symbols), config.daily_context_bars, queue_out, task_id=task_id)
-        emit_worker(queue_out, {"kind": "daily_context_task_complete", "task_id": task_id, "failures": failures})
-    except BaseException as exc:
-        emit_worker(queue_out, {
-            "kind": "daily_context_error", "task_id": task_id, "symbols": symbols,
-            "reason": f"sdk_daily_context_failed:{type(exc).__name__}:{exc}",
-        })
+    silence_sdk_worker_console()
+    last_error: BaseException | None = None
+    for connection_attempt, delay_seconds in enumerate((0, 2, 5), start=1):
+        if delay_seconds:
+            time.sleep(delay_seconds)
+        try:
+            config = load_config(config_path)
+            sdk = require_sdk_contract()
+            oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
+            quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
+            failures = load_daily_context(
+                quote,
+                sdk,
+                tuple(symbols),
+                config.daily_context_bars,
+                queue_out,
+                task_id=task_id,
+            )
+            for retry_delay in (2, 5):
+                if not failures:
+                    break
+                time.sleep(retry_delay)
+                failures = load_daily_context(
+                    quote,
+                    sdk,
+                    tuple(failures),
+                    config.daily_context_bars,
+                    queue_out,
+                    task_id=task_id,
+                )
+            emit_worker(
+                queue_out,
+                {
+                    "kind": "daily_context_task_complete",
+                    "task_id": task_id,
+                    "failures": failures,
+                    "connection_attempt": connection_attempt,
+                },
+            )
+            return
+        except BaseException as exc:
+            last_error = exc
+    emit_worker(
+        queue_out,
+        {
+            "kind": "daily_context_error",
+            "task_id": task_id,
+            "symbols": symbols,
+            "reason": (
+                "sdk_daily_context_failed_after_backoff:"
+                f"{type(last_error).__name__}:{last_error}"
+            ),
+        },
+    )
 
 
 def intraday_context_worker(

@@ -1556,7 +1556,22 @@ def reconciled_longbridge_order_row(
     quantity = first_decimal(order, ("quantity", "qty", "submitted_quantity"))
     price = first_decimal(order, ("price", "limit_price", "submitted_price"))
     executed_price = first_decimal(order, ("executed_price", "filled_price", "avg_price", "price"))
-    counts_for_performance = status in {"filled", "partially_filled"} or executed_quantity > ZERO
+    signal_id = str(local_row.get("signal_id") or "") if local_row else ""
+    client_request_id = str(local_row.get("client_request_id") or "") if local_row else ""
+    execution_run_id = str(local_row.get("execution_run_id") or "") if local_row else ""
+    exit_reason = str(local_row.get("exit_reason") or "") if local_row else ""
+    authorized_fault_day_cleanup = bool(
+        local_row
+        and (
+            exit_reason == "authorized_fault_day_bucket_cleanup"
+            or signal_id.startswith("bucket-cleanup-")
+            or client_request_id.startswith("bucket-cleanup-")
+            or execution_run_id.startswith("fault-day-bucket-cleanup-")
+        )
+    )
+    counts_for_performance = (
+        status in {"filled", "partially_filled"} or executed_quantity > ZERO
+    ) and not authorized_fault_day_cleanup
     attribution_status = "matched_m15_realtime_ledger" if local_row is not None else "legacy_or_unattributed_longbridge_order"
     diagnostic = longbridge_order_diagnostic(status, executed_quantity, order)
     runtime_id = str(local_row.get("runtime_id") or "") if local_row else ""
@@ -1605,7 +1620,7 @@ def reconciled_longbridge_order_row(
         "capital_bucket": capital_bucket,
         "runtime_id": runtime_id or "未归因长桥成交",
         "strategy_id": strategy_id or "未归因长桥成交",
-        "signal_id": str(local_row.get("signal_id") or "") if local_row else "",
+        "signal_id": signal_id,
         "test_epoch_id": str(local_row.get("test_epoch_id") or "") if local_row else "",
         "direction": direction,
         "position_action": position_action,
@@ -1618,6 +1633,7 @@ def reconciled_longbridge_order_row(
         "source_batch_ids": source_batch_ids,
         "account_flatten_allocation": bool(local_row.get("account_flatten_allocation")) if local_row else False,
         "historical_audit_repair": bool(local_row.get("historical_audit_repair")) if local_row else False,
+        "authorized_fault_day_cleanup": authorized_fault_day_cleanup,
         "attribution_key": attribution_key(
             capital_bucket=capital_bucket,
             runtime_id=runtime_id,

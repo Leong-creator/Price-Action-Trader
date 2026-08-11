@@ -101,7 +101,35 @@ def load_runtime_quote_rows(
         and minutes >= 960
         and str(payload.get("market_date") or "") == local.date().isoformat()
     )
-    if not is_regular_or_closing and not is_same_day_postclose:
+    latest_source_event_at = max(
+        (
+            str(row.get("source_event_at") or "")
+            for row in (payload.get("rows") or [])
+            if isinstance(row, dict)
+        ),
+        default="",
+    )
+    latest_quote_received_at = (
+        latest_source_event_at
+        or str(payload.get("latest_quote_received_at") or "")
+    )
+    try:
+        latest_quote_date = datetime.fromisoformat(
+            latest_quote_received_at.replace("Z", "+00:00")
+        ).astimezone(NEW_YORK).date()
+    except (TypeError, ValueError):
+        latest_quote_date = None
+    previous_market_date = (local.date() - timedelta(days=1))
+    is_previous_day_overnight_postclose = bool(
+        minutes < 240
+        and previous_market_date.weekday() < 5
+        and latest_quote_date == previous_market_date
+    )
+    if not (
+        is_regular_or_closing
+        or is_same_day_postclose
+        or is_previous_day_overnight_postclose
+    ):
         return []
     rows: list[dict[str, Any]] = []
     for source in payload.get("rows") or []:

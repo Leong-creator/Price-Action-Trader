@@ -165,6 +165,8 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
                     "runtime_id": "M10-PA-001-1d",
                     "capital_bucket": "pa001_daily_contract_v1",
                     "position_action": "close_long",
+                    "exit_reason": "authorized_fault_day_bucket_cleanup",
+                    "execution_run_id": "fault-day-bucket-cleanup-2026-08-10",
                     "test_epoch_id": "m15-sdk-contract-v1-20260806",
                     "order_payload": {
                         "aggregate_strategy_exit": True,
@@ -176,6 +178,10 @@ class M15LongbridgeRealtimeAccountStateTest(unittest.TestCase):
         row = reconciliation["rows"][0]
         self.assertTrue(row["aggregate_strategy_exit"])
         self.assertEqual(row["source_batch_ids"], ["batch-a", "batch-b"])
+        self.assertTrue(row["authorized_fault_day_cleanup"])
+        self.assertFalse(row["counts_for_performance"])
+        self.assertFalse(row["include_in_bucket_performance"])
+        self.assertFalse(row["include_in_strategy_performance"])
 
     def test_account_pnl_market_date_uses_new_york_trading_date_after_utc_midnight(self) -> None:
         self.assertEqual(

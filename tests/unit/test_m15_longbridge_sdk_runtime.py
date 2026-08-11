@@ -48,6 +48,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     compact_hot_execution_rows,
     compact_hot_signal_rows,
     dispatch_completed_rows,
+    daily_context_worker,
     deferred_intraday_context_after_mid_session_start,
     event_rows_to_daily,
     event_rows_to_intraday_context,
@@ -3414,6 +3415,66 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         from scripts.run_m15_longbridge_sdk_runtime import load_daily_context
         load_daily_context(Quote(), Sdk(), ("AAPL.US",), 60, queue, task_id="daily-001")
         self.assertEqual(queue.items[0]["task_id"], "daily-001")
+
+    def test_daily_context_worker_retries_a_transient_sdk_connection_failure(self) -> None:
+        class Candle:
+            timestamp = 1784073600
+            open = high = low = close = "100"
+            volume = 1
+
+        class Quote:
+            def candlesticks(self, *_args):
+                return [Candle()]
+
+        class OAuthBuilder:
+            def __init__(self, _client_id):
+                pass
+
+            def build(self, _callback):
+                return object()
+
+        class Sdk:
+            class Period:
+                Day = "day"
+
+            class AdjustType:
+                NoAdjust = "no-adjust"
+
+            connection_attempts = 0
+
+            @classmethod
+            def QuoteContext(cls, _config):
+                cls.connection_attempts += 1
+                if cls.connection_attempts == 1:
+                    raise RuntimeError("temporary connect timeout")
+                return Quote()
+
+        Sdk.OAuthBuilder = OAuthBuilder
+
+        class Queue:
+            def __init__(self):
+                self.items = []
+
+            def put_nowait(self, payload):
+                self.items.append(payload)
+
+        queue = Queue()
+        config = SimpleNamespace(daily_context_bars=60, quote_region="cn")
+        with (
+            patch("scripts.run_m15_longbridge_sdk_runtime.silence_sdk_worker_console"),
+            patch("scripts.run_m15_longbridge_sdk_runtime.load_config", return_value=config),
+            patch("scripts.run_m15_longbridge_sdk_runtime.require_sdk_contract", return_value=Sdk),
+            patch("scripts.run_m15_longbridge_sdk_runtime.read_client_id", return_value="client"),
+            patch("scripts.run_m15_longbridge_sdk_runtime.sdk_config_from_oauth", return_value=object()),
+            patch("scripts.run_m15_longbridge_sdk_runtime.time.sleep") as sleep,
+        ):
+            daily_context_worker("runtime.json", ["BABA.US"], "daily-baba", queue)
+
+        self.assertEqual(Sdk.connection_attempts, 2)
+        self.assertIn(2, [call.args[0] for call in sleep.call_args_list])
+        self.assertEqual(queue.items[-1]["kind"], "daily_context_task_complete")
+        self.assertEqual(queue.items[-1]["connection_attempt"], 2)
+        self.assertEqual(queue.items[-1]["failures"], [])
 
     def test_installed_sdk_exposes_required_contexts(self) -> None:
         self.assertIsNotNone(require_sdk_contract())
