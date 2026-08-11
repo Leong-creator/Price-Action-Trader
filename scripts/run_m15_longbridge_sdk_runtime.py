@@ -1274,6 +1274,24 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
     )
 
 
+def schedule_daily_context_retry(
+    symbols: list[str],
+    retry_counts: dict[str, int],
+    retry_limit: int,
+    pending: deque[list[str]],
+    failed: list[str],
+) -> None:
+    retry_batch: list[str] = []
+    for symbol in symbols:
+        retry_counts[symbol] = retry_counts.get(symbol, 0) + 1
+        if retry_counts[symbol] <= retry_limit:
+            retry_batch.append(symbol)
+        elif symbol not in failed:
+            failed.append(symbol)
+    if retry_batch:
+        pending.append(retry_batch)
+
+
 def intraday_context_worker(
     config_path: str,
     symbols: list[str],
@@ -3508,12 +3526,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         stop_spawned_process(daily_worker, graceful=False)
                         daily_workers.pop(task_id, None)
                         daily_completed.add(task_id)
-                        for symbol in symbols:
-                            daily_retry_counts[symbol] = daily_retry_counts.get(symbol, 0) + 1
-                            if daily_retry_counts[symbol] <= config.daily_context_retry_count:
-                                daily_pending.append([symbol])
-                            else:
-                                daily_failed.append(symbol)
+                        schedule_daily_context_retry(
+                            symbols,
+                            daily_retry_counts,
+                            config.daily_context_retry_count,
+                            daily_pending,
+                            daily_failed,
+                        )
                 if not daily_pending and not daily_workers and daily_context_state == "loading":
                     daily_context_state = "complete" if daily_rows and not daily_failed else "failed"
                 if daily_context_is_complete(config, daily_context_state, len(daily_rows), daily_failed) and not daily_context_persisted:
@@ -3680,12 +3699,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     stop_spawned_process(daily_worker, graceful=True)
                 daily_completed.add(task_id)
                 failures = daily_task_failures.pop(task_id, [str(value) for value in (message.get("failures") or [])])
-                for symbol in failures:
-                    daily_retry_counts[symbol] = daily_retry_counts.get(symbol, 0) + 1
-                    if daily_retry_counts[symbol] <= config.daily_context_retry_count:
-                        daily_pending.append([symbol])
-                    else:
-                        daily_failed.append(symbol)
+                schedule_daily_context_retry(
+                    failures,
+                    daily_retry_counts,
+                    config.daily_context_retry_count,
+                    daily_pending,
+                    daily_failed,
+                )
             elif kind == "daily_context_error":
                 task_id = str(message.get("task_id") or "")
                 task = daily_workers.pop(task_id, None)
@@ -3695,12 +3715,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 else:
                     symbols = [str(value) for value in (message.get("symbols") or [])]
                 daily_completed.add(task_id)
-                for symbol in symbols:
-                    daily_retry_counts[symbol] = daily_retry_counts.get(symbol, 0) + 1
-                    if daily_retry_counts[symbol] <= config.daily_context_retry_count:
-                        daily_pending.append([symbol])
-                    else:
-                        daily_failed.append(symbol)
+                schedule_daily_context_retry(
+                    symbols,
+                    daily_retry_counts,
+                    config.daily_context_retry_count,
+                    daily_pending,
+                    daily_failed,
+                )
             elif kind == "bars" and worker_ready:
                 # Quotes arrive one symbol at a time at a bar boundary.  Give
                 # the queue a very short coalescing window, then evaluate all

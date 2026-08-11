@@ -74,6 +74,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     rotate_runtime_log,
     runtime_requires_health_replacement,
     runtime_owns_quote_connection,
+    schedule_daily_context_retry,
     run_sdk_order_maintenance,
     run_pending_flatten_cycle,
     run_authorized_account_exit_cycle,
@@ -3477,6 +3478,22 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(queue.items[-1]["failures"], [])
         self.assertEqual(len(queue.items), 1)
         self.assertEqual(len(queue.items[-1]["rows"]), 1)
+
+    def test_daily_context_failures_retry_as_one_batch(self) -> None:
+        pending: deque[list[str]] = deque()
+        failed: list[str] = []
+        retry_counts = {"AAPL.US": 1, "MSFT.US": 2}
+
+        schedule_daily_context_retry(
+            ["AAPL.US", "MSFT.US", "BABA.US"],
+            retry_counts,
+            2,
+            pending,
+            failed,
+        )
+
+        self.assertEqual(list(pending), [["AAPL.US", "BABA.US"]])
+        self.assertEqual(failed, ["MSFT.US"])
 
     def test_installed_sdk_exposes_required_contexts(self) -> None:
         self.assertIsNotNone(require_sdk_contract())
