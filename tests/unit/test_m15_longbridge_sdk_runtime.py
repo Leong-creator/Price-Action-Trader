@@ -23,6 +23,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
     config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
     daily_context_is_complete, fresh_market_events, load_config,
+    five_minute_session_coverage,
     load_current_sdk_intraday_context,
     symbols_missing_contiguous_intraday_context,
     load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, sdk_object_to_dict, subscribe_private_trade_updates,
@@ -53,6 +54,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     event_rows_to_daily,
     event_rows_to_intraday_context,
     effective_runtime_dispatch_enabled,
+    emit_worker,
     effective_worker_progress,
     five_minute_contract_context_status,
     is_orphaned_sdk_runtime_child,
@@ -92,6 +94,117 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_worker_drops_only_superseded_telemetry_when_queue_is_full(self) -> None:
+        output = queue.Queue(maxsize=1)
+        output.put({"kind": "occupied"})
+        self.assertFalse(emit_worker(output, {"kind": "heartbeat"}))
+        self.assertFalse(emit_worker(output, {"kind": "quote_state"}))
+
+    def test_worker_never_silently_drops_complete_bars_when_queue_is_full(self) -> None:
+        class SaturatedQueue:
+            def put(self, *_args, **_kwargs):
+                raise queue.Full
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "critical_worker_message_queue_saturated:bars",
+        ):
+            emit_worker(SaturatedQueue(), {"kind": "bars", "rows": []})
+
+    def test_full_300_symbol_session_requires_23400_real_sdk_bars(self) -> None:
+        symbols = [f"S{index:03d}" for index in range(300)]
+        rows = []
+        start = datetime(2026, 8, 10, 13, 35, tzinfo=UTC)
+        for boundary in range(78):
+            event_at = start + timedelta(minutes=5 * boundary)
+            for symbol in symbols:
+                rows.append(
+                    {
+                        "symbol": symbol,
+                        "timeframe": "5m",
+                        "event_time": event_at.isoformat().replace("+00:00", "Z"),
+                        "bar_final": True,
+                        "source_mode": "longbridge_sdk_snapshot_poll",
+                        "market_data_blocked_reason": "",
+                    }
+                )
+        result = five_minute_session_coverage(
+            rows,
+            symbols,
+            now=datetime(2026, 8, 10, 20, 1, tzinfo=UTC),
+        )
+        self.assertTrue(result["session_complete"])
+        self.assertEqual(result["accepted_row_count_so_far"], 23_400)
+        self.assertEqual(result["complete_boundary_count"], 78)
+
+    def test_whole_missing_boundary_is_reported_without_counting_context_rows(self) -> None:
+        symbols = ["A", "B"]
+        rows = []
+        start = datetime(2026, 8, 10, 13, 35, tzinfo=UTC)
+        for boundary in range(3):
+            if boundary == 1:
+                continue
+            event_at = start + timedelta(minutes=5 * boundary)
+            for symbol in symbols:
+                rows.append(
+                    {
+                        "symbol": symbol,
+                        "timeframe": "5m",
+                        "event_time": event_at.isoformat().replace("+00:00", "Z"),
+                        "bar_final": True,
+                        "source_mode": "longbridge_sdk_snapshot_poll",
+                        "market_data_blocked_reason": "",
+                    }
+                )
+        rows.append(
+            {
+                "symbol": "A",
+                "timeframe": "5m",
+                "event_time": (start + timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
+                "bar_final": True,
+                "source_mode": "longbridge_sdk_snapshot_poll",
+                "context_only": True,
+            }
+        )
+        result = five_minute_session_coverage(
+            rows,
+            symbols,
+            now=datetime(2026, 8, 10, 13, 46, tzinfo=UTC),
+        )
+        self.assertFalse(result["complete_so_far"])
+        self.assertEqual(result["missing_boundary_count"], 1)
+        self.assertEqual(result["accepted_row_count_so_far"], 4)
+
+    def test_out_of_session_invalid_rows_do_not_poison_current_session_coverage(self) -> None:
+        boundary = datetime(2026, 8, 10, 13, 35, tzinfo=UTC)
+        rows = [
+            {
+                "symbol": "A",
+                "timeframe": "5m",
+                "event_time": boundary.isoformat().replace("+00:00", "Z"),
+                "bar_final": True,
+                "source_mode": "longbridge_sdk_push",
+                "market_data_blocked_reason": "",
+            },
+            {
+                "symbol": "A",
+                "timeframe": "5m",
+                "event_time": "2026-08-09T13:35:00Z",
+                "bar_final": True,
+                "source_mode": "fallback_quotes",
+                "market_data_blocked_reason": "old_session_failure",
+            },
+        ]
+
+        result = five_minute_session_coverage(
+            rows,
+            ["A"],
+            now=datetime(2026, 8, 10, 13, 36, tzinfo=UTC),
+        )
+
+        self.assertTrue(result["complete_so_far"])
+        self.assertEqual(result["invalid_row_count"], 0)
+
     def test_account_snapshot_for_orders_requires_fresh_verified_worker(self) -> None:
         now = datetime(2026, 8, 10, 13, 30, tzinfo=UTC)
         healthy = {

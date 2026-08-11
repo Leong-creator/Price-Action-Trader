@@ -936,6 +936,129 @@ class MarketEventContext:
         return list(self._rows)
 
 
+def five_minute_session_coverage(
+    rows: list[dict[str, Any]],
+    symbols: list[str] | tuple[str, ...],
+    *,
+    now: datetime,
+    minutes: int = 5,
+    completion_grace_seconds: int = 10,
+) -> dict[str, Any]:
+    """Summarize real SDK bars for every completed regular-session boundary."""
+    now_utc = now.astimezone(UTC)
+    now_ny = now_utc.astimezone(NEW_YORK)
+    normalized_symbols = {
+        str(symbol).upper().replace(".US", "") for symbol in symbols
+    }
+    business_date = now_ny.date().isoformat()
+    session_open = now_ny.replace(hour=9, minute=30, second=0, microsecond=0)
+    session_close = now_ny.replace(hour=16, minute=0, second=0, microsecond=0)
+    expected_boundaries: list[datetime] = []
+    if now_ny.weekday() < 5:
+        boundary = session_open + timedelta(minutes=minutes)
+        grace = timedelta(seconds=max(0, completion_grace_seconds))
+        while boundary <= session_close and boundary + grace <= now_ny:
+            expected_boundaries.append(boundary.astimezone(UTC))
+            boundary += timedelta(minutes=minutes)
+
+    expected_keys = {to_iso(value) for value in expected_boundaries}
+    observed_by_boundary: dict[str, set[str]] = {
+        key: set() for key in expected_keys
+    }
+    duplicates: list[str] = []
+    invalid_rows = 0
+    accepted_rows = 0
+    for row in rows:
+        if str(row.get("timeframe") or "") != "5m":
+            continue
+        if row.get("bar_final") is not True or row.get("context_only") is True:
+            continue
+        symbol = str(row.get("symbol") or "").upper().replace(".US", "")
+        if symbol not in normalized_symbols:
+            continue
+        try:
+            event_at = datetime.fromisoformat(
+                str(row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except ValueError:
+            invalid_rows += 1
+            continue
+        if event_at.astimezone(NEW_YORK).date().isoformat() != business_date:
+            continue
+        boundary_key = to_iso(event_at)
+        if boundary_key not in observed_by_boundary:
+            continue
+        if str(row.get("market_data_blocked_reason") or ""):
+            invalid_rows += 1
+            continue
+        source_mode = str(row.get("source_mode") or "")
+        if source_mode not in {
+            "longbridge_sdk_push",
+            "longbridge_sdk_snapshot_poll",
+        }:
+            invalid_rows += 1
+            continue
+        if symbol in observed_by_boundary[boundary_key]:
+            duplicates.append(f"{symbol}@{boundary_key}")
+            continue
+        observed_by_boundary[boundary_key].add(symbol)
+        accepted_rows += 1
+
+    complete: list[str] = []
+    partial: list[dict[str, Any]] = []
+    missing: list[str] = []
+    required_per_boundary = len(normalized_symbols)
+    for boundary_key in sorted(expected_keys):
+        count = len(observed_by_boundary[boundary_key])
+        if count == required_per_boundary:
+            complete.append(boundary_key)
+        elif count == 0:
+            missing.append(boundary_key)
+        else:
+            partial.append(
+                {
+                    "boundary_at": boundary_key,
+                    "observed_symbol_count": count,
+                    "missing_symbol_count": required_per_boundary - count,
+                }
+            )
+
+    expected_boundary_count = len(expected_boundaries)
+    complete_so_far = bool(
+        not duplicates
+        and invalid_rows == 0
+        and not partial
+        and not missing
+        and len(complete) == expected_boundary_count
+    )
+    return {
+        "business_date": business_date,
+        "required_symbol_count": required_per_boundary,
+        "full_session_boundary_count": 78,
+        "full_session_expected_row_count": required_per_boundary * 78,
+        "expected_boundary_count_so_far": expected_boundary_count,
+        "expected_row_count_so_far": required_per_boundary * expected_boundary_count,
+        "accepted_row_count_so_far": accepted_rows,
+        "complete_boundary_count": len(complete),
+        "partial_boundary_count": len(partial),
+        "missing_boundary_count": len(missing),
+        "duplicate_row_count": len(duplicates),
+        "invalid_row_count": invalid_rows,
+        "partial_boundaries": partial[:20],
+        "missing_boundary_times": missing[:78],
+        "duplicate_examples": duplicates[:20],
+        "complete_so_far": complete_so_far,
+        "session_complete": bool(expected_boundary_count == 78 and complete_so_far),
+        "status": (
+            "complete_session"
+            if expected_boundary_count == 78 and complete_so_far
+            else "complete_so_far"
+            if complete_so_far
+            else "incomplete_session_data"
+        ),
+    }
+
+
 def append_market_events(path: Path, rows: list[dict[str, Any]], keep_lines: int) -> None:
     """Append finalized SDK bars without rereading the audit stream.
 

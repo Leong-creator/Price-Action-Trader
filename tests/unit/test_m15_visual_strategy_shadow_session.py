@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from scripts.m15_visual_strategy_shadow_session_lib import load_config, run_visual_shadow_session
@@ -16,21 +17,35 @@ class VisualStrategyShadowSessionTest(unittest.TestCase):
         omit_last_msft_bar: bool = False,
         duplicate_aapl_bar: bool = False,
         source_mode: str = "longbridge_sdk_snapshot_poll",
+        symbol_count: int = 2,
+        expected_bars_per_symbol: int = 3,
     ) -> Path:
         universe_path = root / "universe.json"
-        universe_path.write_text(json.dumps({"symbols": ["AAPL", "MSFT"]}), encoding="utf-8")
+        symbols = (
+            ["AAPL", "MSFT"]
+            if symbol_count == 2
+            else [f"S{index:03d}" for index in range(symbol_count)]
+        )
+        universe_path.write_text(json.dumps({"symbols": symbols}), encoding="utf-8")
 
         rows: list[dict[str, object]] = []
-        for symbol, base in (("AAPL", 100), ("MSFT", 200)):
-            for offset, minute in enumerate((35, 40, 45)):
-                if omit_last_msft_bar and symbol == "MSFT" and minute == 45:
+        session_start = datetime(2026, 8, 4, 13, 35, tzinfo=UTC)
+        for symbol_index, symbol in enumerate(symbols):
+            base = 100 + symbol_index
+            for offset in range(expected_bars_per_symbol):
+                event_at = session_start + timedelta(minutes=offset * 5)
+                if (
+                    omit_last_msft_bar
+                    and symbol == "MSFT"
+                    and offset == expected_bars_per_symbol - 1
+                ):
                     continue
                 price = base + offset
                 rows.append(
                     {
                         "symbol": symbol,
                         "timeframe": "5m",
-                        "event_time": f"2026-08-04T13:{minute}:00Z",
+                        "event_time": event_at.isoformat().replace("+00:00", "Z"),
                         "bar_final": True,
                         "source_mode": source_mode,
                         "market_data_blocked_reason": "",
@@ -94,10 +109,12 @@ class VisualStrategyShadowSessionTest(unittest.TestCase):
                     "session": {
                         "market_timezone": "America/New_York",
                         "regular_open_time": "09:30",
-                        "regular_close_time": "09:45",
+                        "regular_close_time": (
+                            "16:00" if expected_bars_per_symbol == 78 else "09:45"
+                        ),
                         "timeframe_minutes": 5,
-                        "expected_bars_per_symbol": 3,
-                        "required_symbol_count": 2,
+                        "expected_bars_per_symbol": expected_bars_per_symbol,
+                        "required_symbol_count": symbol_count,
                         "allowed_source_modes": ["longbridge_sdk_snapshot_poll"],
                     },
                     "hard_boundaries": {
@@ -111,6 +128,29 @@ class VisualStrategyShadowSessionTest(unittest.TestCase):
             encoding="utf-8",
         )
         return config_path
+
+    def test_full_300_symbol_regular_session_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = load_config(
+                self.write_fixture(
+                    root,
+                    symbol_count=300,
+                    expected_bars_per_symbol=78,
+                )
+            )
+
+            result = run_visual_shadow_session(
+                config,
+                business_date="2026-08-04",
+                generated_at="2026-08-04T20:15:00Z",
+            )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertTrue(result["session_complete"])
+            self.assertEqual(result["accepted_five_minute_bar_count"], 23_400)
+            self.assertEqual(result["aggregated_daily_bar_count"], 300)
+            self.assertEqual(result["shadow_accepted_daily_bar_count"], 300)
 
     def test_complete_sdk_session_aggregates_and_advances_shadow_once(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -51,7 +51,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     symbols_missing_contiguous_intraday_context,
     market_event_is_tradable, trading_market_events,
     sdk_config_from_oauth, sdk_object_to_dict, sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
-    subscribe_quote_and_trades, to_iso,
+    subscribe_quote_and_trades, to_iso, five_minute_session_coverage,
     unix_to_utc,
 )
 from scripts.m15_sdk_validation_flatten_lib import (
@@ -88,6 +88,8 @@ GLOBAL_RUNTIME_START_LOCK = (
 LEGACY_CLI_PID_FILE = "m15_longbridge_realtime_session_supervisor.pid"
 EXECUTION_LEDGER_FILE = "m15_longbridge_realtime_execution_ledger.jsonl"
 ORDER_MAINTENANCE_FILE = "m15_sdk_order_maintenance.json"
+MARKET_DATA_HEALTH_JSON = "m15_sdk_market_data_health.json"
+MARKET_DATA_HEALTH_LEDGER_JSONL = "m15_sdk_market_data_health_ledger.jsonl"
 AUTHORIZED_ACCOUNT_EXIT_FILE = "m15_authorized_account_exit.json"
 CAPITAL_BUCKET_MIGRATION_FILE = "m15_capital_bucket_migration_state.json"
 TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
@@ -384,13 +386,43 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
     }
 
 
-def emit_worker(queue_out: Any, payload: dict[str, Any]) -> None:
-    try:
+WORKER_MESSAGES_ALLOWED_TO_DROP = {
+    "heartbeat",
+    "quote_state",
+    "subscription_progress",
+}
+
+
+def emit_worker(queue_out: Any, payload: dict[str, Any]) -> bool:
+    """Deliver trading inputs reliably while allowing telemetry to coalesce.
+
+    A full multiprocessing queue used to silently discard complete bars and
+    snapshot batches.  That made an otherwise healthy 300-symbol cycle lose a
+    whole five-minute boundary.  Heartbeats and quote-state telemetry may be
+    superseded by the next update; bars, snapshots and lifecycle messages may
+    not.
+    """
+    kind = str(payload.get("kind") or "")
+    if kind in WORKER_MESSAGES_ALLOWED_TO_DROP:
+        try:
+            queue_out.put_nowait(payload)
+            return True
+        except queue.Full:
+            return False
+    put = getattr(queue_out, "put", None)
+    if not callable(put):
+        # Lightweight test/in-process queues may expose only put_nowait. The
+        # production multiprocessing queue always takes the bounded blocking
+        # branch below.
         queue_out.put_nowait(payload)
-    except queue.Full:
-        # Bars are never replayed after a saturated queue: a later fresh event
-        # is safer than an old order intent.
-        return
+        return True
+    try:
+        put(payload, block=True, timeout=5)
+        return True
+    except queue.Full as exc:
+        raise RuntimeError(
+            f"critical_worker_message_queue_saturated:{kind or 'unknown'}"
+        ) from exc
 
 
 def emit_daily_context_result(queue_out: Any, payload: dict[str, Any]) -> None:
@@ -1539,6 +1571,17 @@ def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
+
+
+def append_runtime_health_event(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            + "\n"
+        )
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def run_authorized_account_exit_cycle(
@@ -3240,6 +3283,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     market_data_worker_restart_times: deque[float] = deque(maxlen=100)
     market_data_worker_restart_total = 0
     market_data_worker_recent_restart_count = 0
+    last_market_data_health_signature = ""
     market_data_applied_heartbeat_deadline_seconds = float(
         config.market_data_heartbeat_deadline_seconds
     )
@@ -3254,12 +3298,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         nonlocal market_data_worker_restart_total
         market_data_worker_restart_total += 1
         market_data_worker_restart_times.append(time.monotonic())
-        market_data_worker_restart_events.append(
-            {
-                "at": to_iso(datetime.now(UTC)),
-                "reason": reason,
-                "exit_code": exit_code,
-            }
+        event = {
+            "schema_version": "m15.sdk-market-data-health.v1",
+            "event_type": "market_data_worker_restart",
+            "at": to_iso(datetime.now(UTC)),
+            "run_id": run_id,
+            "runtime_pid": os.getpid(),
+            "reason": reason,
+            "exit_code": exit_code,
+            "market_data_mode": market_data_mode,
+        }
+        market_data_worker_restart_events.append(event)
+        append_runtime_health_event(
+            config.output_dir / MARKET_DATA_HEALTH_LEDGER_JSONL,
+            event,
         )
     intraday_repair_status: dict[str, Any] = {
         "status": "not_required",
@@ -4260,6 +4312,64 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                 )
                 last_quote_snapshot_write = time.monotonic()
+            session_coverage = five_minute_session_coverage(
+                context.rows(),
+                configured_trading_symbols(config),
+                now=datetime.now(UTC),
+                minutes=config.bar_minutes,
+            )
+            market_data_health = {
+                "schema_version": "m15.sdk-market-data-health.v1",
+                "generated_at": to_iso(datetime.now(UTC)),
+                "run_id": run_id,
+                "runtime_pid": os.getpid(),
+                "market_data_mode": market_data_mode,
+                "actual_market_data_coverage": (
+                    f"{len(set(configured_trading_symbols(config)) & market_data_symbols)}"
+                    f"/{len(configured_trading_symbols(config))}"
+                    if worker_ready
+                    else f"0/{len(configured_trading_symbols(config))}"
+                ),
+                "sdk_push_subscription_coverage": (
+                    f"{len(configured_trading_symbols(config)) - len(trading_subscription_failed)}"
+                    f"/{len(configured_trading_symbols(config))}"
+                    if worker_ready and market_data_mode == "sdk_subscription"
+                    else f"0/{len(configured_trading_symbols(config))}"
+                ),
+                "worker_ready": worker_ready,
+                "worker_restart_count_this_run": market_data_worker_restart_total,
+                "worker_recent_restart_count": market_data_worker_recent_restart_count,
+                "last_worker_error": last_market_data_worker_error,
+                "five_minute_session_coverage": session_coverage,
+            }
+            write_json_atomic(
+                config.output_dir / MARKET_DATA_HEALTH_JSON,
+                market_data_health,
+            )
+            health_signature = json.dumps(
+                {
+                    "run_id": run_id,
+                    "mode": market_data_mode,
+                    "ready": worker_ready,
+                    "restart_count": market_data_worker_restart_total,
+                    "business_date": session_coverage["business_date"],
+                    "expected": session_coverage["expected_boundary_count_so_far"],
+                    "complete": session_coverage["complete_boundary_count"],
+                    "partial": session_coverage["partial_boundary_count"],
+                    "missing": session_coverage["missing_boundary_times"],
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if health_signature != last_market_data_health_signature:
+                append_runtime_health_event(
+                    config.output_dir / MARKET_DATA_HEALTH_LEDGER_JSONL,
+                    {
+                        **market_data_health,
+                        "event_type": "five_minute_session_coverage_changed",
+                    },
+                )
+                last_market_data_health_signature = health_signature
             build_status(
                 config,
                 status="running" if worker_ready else "connecting",
@@ -4390,6 +4500,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "intraday_context_gap_blocks_only_affected_five_minute_symbols": True,
                     "intraday_context_gap_blocks_new_entries_globally": False,
                     "five_minute_strategy_context": five_minute_strategy_context,
+                    "five_minute_session_coverage": session_coverage,
                     "partial_bar_suppressed_until": partial_bar_suppressed_until,
                     "daily_context_worker_pids": [worker.pid for worker, _started_at, _symbols in daily_workers.values()],
                     "account_snapshot_age_seconds": age,

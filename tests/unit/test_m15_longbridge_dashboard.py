@@ -354,6 +354,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["runtime"]["trading_subscription_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["market_data_coverage"], "300/300")
         self.assertEqual(payload["runtime"]["trading_market_data_coverage"], "147/147")
+        self.assertEqual(payload["runtime"]["sdk_push_subscription_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["readonly_expansion_subscription_coverage"], "153/153")
         self.assertFalse(payload["pa004_migration"]["enabled"])
         self.assertEqual(payload["pa002_dual_version_milestone"]["milestone_phase"], "technical_review_only")
