@@ -228,6 +228,37 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertTrue(any("run_m15_longbridge_sdk_analytics.py" in command for command in joined))
             self.assertFalse(any("run_m15_longbridge_realtime_account_state.py" in command for command in joined))
 
+    def test_sdk_watchdog_keeps_healthy_when_analytics_reports_statistics_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+
+            def runner(command: list[str], _timeout: int):
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                elif script.endswith("run_m15_longbridge_sdk_analytics.py"):
+                    stdout = json.dumps({"statistics_stale": True, "history_refresh_mode": "trusted_cache_plus_fresh_snapshot_statistics_stale_history_orders_timeout"})
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-08-11T16:00:00Z",
+                command_runner=runner,
+            )
+
+            analytics_step = next(step for step in payload["steps"] if step["step_id"] == "m15_account_state_full_refresh")
+            self.assertEqual(payload["watchdog_status"], "healthy")
+            self.assertEqual(analytics_step["returncode"], 0)
+
     def test_watchdog_no_longer_runs_or_requires_m12_47_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

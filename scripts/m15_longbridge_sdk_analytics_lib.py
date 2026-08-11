@@ -287,6 +287,19 @@ def read_with_timeout_recovery(
         return callback(replacement), replacement
 
 
+def is_sdk_timeout_error(exc: Exception) -> bool:
+    error_text = str(exc).lower()
+    return any(
+        marker in error_text
+        for marker in (
+            "request timeout",
+            "connect timeout",
+            "client error (connect)",
+            "error sending request",
+        )
+    )
+
+
 def enum_token(value: Any) -> str:
     return str(value or "").strip().split(".")[-1]
 
@@ -367,16 +380,29 @@ def refresh_order_and_execution_history(
             generated_at,
             cached_row_count=max(len(cached_orders), len(cached_executions)),
         )
-        recent_order_rows, trade = read_with_timeout_recovery(
-            trade,
-            build_trade,
-            lambda context: context.history_orders(start_at=incremental_start, end_at=generated_at),
-        )
-        recent_execution_rows, trade = read_with_timeout_recovery(
-            trade,
-            build_trade,
-            lambda context: context.history_executions(start_at=incremental_start, end_at=generated_at),
-        )
+        recent_order_rows: list[Any] = []
+        recent_execution_rows: list[Any] = []
+        stale_reasons: list[str] = []
+        try:
+            recent_order_rows, trade = read_with_timeout_recovery(
+                trade,
+                build_trade,
+                lambda context: context.history_orders(start_at=incremental_start, end_at=generated_at),
+            )
+        except Exception as exc:
+            if not is_sdk_timeout_error(exc):
+                raise
+            stale_reasons.append("history_orders_timeout")
+        try:
+            recent_execution_rows, trade = read_with_timeout_recovery(
+                trade,
+                build_trade,
+                lambda context: context.history_executions(start_at=incremental_start, end_at=generated_at),
+            )
+        except Exception as exc:
+            if not is_sdk_timeout_error(exc):
+                raise
+            stale_reasons.append("history_executions_timeout")
         orders = merge_history_rows(
             cached_orders,
             [normalize_order(row) for row in recent_order_rows],
@@ -399,6 +425,13 @@ def refresh_order_and_execution_history(
             identity_field="trade_id",
             normalizer=normalize_execution,
         )
+        if stale_reasons:
+            return (
+                orders,
+                executions,
+                trade,
+                "trusted_cache_plus_fresh_snapshot_statistics_stale_" + "_".join(stale_reasons),
+            )
         return orders, executions, trade, "trusted_cache_plus_two_day_sdk_incremental_and_fresh_snapshot"
     order_rows, trade = read_with_timeout_recovery(
         trade,
@@ -608,6 +641,7 @@ def write_sdk_analytics_outputs(
     daily_profit_analysis: dict[str, Any] | None = None,
     app_display_metrics: dict[str, Any] | None = None,
     history_refresh_mode: str = "sdk_history_query",
+    statistics_stale: bool = False,
 ) -> dict[str, Any]:
     config = load_account_config(account_config_path)
     generated_at_iso = to_iso(generated_at)
@@ -660,12 +694,20 @@ def write_sdk_analytics_outputs(
         app_display_metrics,
     )
     summary["history_refresh_mode"] = history_refresh_mode
+    summary["statistics_stale"] = statistics_stale
     summary["fill_attribution_summary"] = fill_attribution.get("summary", {})
+    if statistics_stale:
+        summary["plain_language_result"] = (
+            "SDK 交易核心正常；慢速历史或收益统计暂未刷新，"
+            f"statistics_stale=true，原因={history_refresh_mode}。"
+        )
     reconciliation["history_refresh_mode"] = history_refresh_mode
+    reconciliation["statistics_stale"] = statistics_stale
     trusted_history = {
         "schema_version": "m15.longbridge-trusted-order-history.sdk.v1",
         "generated_at": generated_at_iso,
         "history_refresh_mode": history_refresh_mode,
+        "statistics_stale": statistics_stale,
         "historical_orders": historical_orders,
         "historical_executions": historical_executions,
     }
@@ -683,6 +725,7 @@ def write_sdk_analytics_outputs(
         "filled_order_count": int(reconciliation.get("summary", {}).get("filled_order_count", 0)),
         "fill_attribution_anomaly_count": int(fill_attribution.get("summary", {}).get("anomaly_count", 0)),
         "paper_account_verified": bool(account_state.get("paper_account_verified")),
+        "statistics_stale": statistics_stale,
     }
 
 
@@ -723,30 +766,43 @@ def run_sdk_analytics(
         account_state=account_state,
     )
     market_date, cumulative_end_date = market_profit_query_dates(generated_at)
-    profit_response, portfolio = read_with_timeout_recovery(
-        portfolio,
-        build_portfolio,
-        lambda context: context.profit_analysis_by_market(
-            page=1,
-            size=100,
-            market="US",
-            start=start_at.date().isoformat(),
-            end=cumulative_end_date,
-        ),
-    )
-    daily_profit_response, portfolio = read_with_timeout_recovery(
-        portfolio,
-        build_portfolio,
-        lambda context: context.profit_analysis_by_market(
-            page=1,
-            size=100,
-            market="US",
-            start=market_date,
-            end=market_date,
-        ),
-    )
-    profit = sdk_plain(profit_response)
-    daily_profit = sdk_plain(daily_profit_response)
+    stale_reasons: list[str] = []
+    try:
+        profit_response, portfolio = read_with_timeout_recovery(
+            portfolio,
+            build_portfolio,
+            lambda context: context.profit_analysis_by_market(
+                page=1,
+                size=100,
+                market="US",
+                start=start_at.date().isoformat(),
+                end=cumulative_end_date,
+            ),
+        )
+        profit = sdk_plain(profit_response)
+    except Exception as exc:
+        if not is_sdk_timeout_error(exc):
+            raise
+        profit = {}
+        stale_reasons.append("cumulative_profit_analysis_timeout")
+    try:
+        daily_profit_response, portfolio = read_with_timeout_recovery(
+            portfolio,
+            build_portfolio,
+            lambda context: context.profit_analysis_by_market(
+                page=1,
+                size=100,
+                market="US",
+                start=market_date,
+                end=market_date,
+            ),
+        )
+        daily_profit = sdk_plain(daily_profit_response)
+    except Exception as exc:
+        if not is_sdk_timeout_error(exc):
+            raise
+        daily_profit = {}
+        stale_reasons.append("daily_profit_analysis_timeout")
     app_window_start = app_intraday_window_start(generated_at)
     daily_execution_rows = [
         row
@@ -765,6 +821,9 @@ def run_sdk_analytics(
         daily_execution_rows,
         quote_rows,
     )
+    if stale_reasons:
+        history_refresh_mode += "_statistics_stale_" + "_".join(stale_reasons)
+    statistics_stale = "statistics_stale" in history_refresh_mode
     return write_sdk_analytics_outputs(
         account_config_path=account_config_path,
         generated_at=generated_at,
@@ -775,4 +834,5 @@ def run_sdk_analytics(
         daily_profit_analysis=daily_profit if isinstance(daily_profit, dict) else {},
         app_display_metrics=app_display_metrics,
         history_refresh_mode=history_refresh_mode,
+        statistics_stale=statistics_stale,
     )

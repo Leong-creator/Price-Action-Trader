@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 from scripts.m15_longbridge_sdk_analytics_lib import (
     APP_DAILY_PNL_METRIC_ID,
+    TRUSTED_ORDER_HISTORY_JSON,
+    is_sdk_timeout_error,
     app_intraday_window_start,
     build_app_display_metrics,
     build_sdk_account_summary,
@@ -31,6 +33,15 @@ from scripts.m15_longbridge_sdk_analytics_lib import (
 
 
 class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
+    def test_sdk_connect_error_is_treated_as_slow_statistics_failure(self) -> None:
+        self.assertTrue(
+            is_sdk_timeout_error(
+                RuntimeError(
+                    "error sending request for url (https://example): client error (Connect)"
+                )
+            )
+        )
+
     def test_market_profit_analysis_never_replaces_app_daily_pnl(self) -> None:
         summary = build_sdk_account_summary(
             "2026-08-07T20:00:00Z",
@@ -161,6 +172,36 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
         by_id = {row["order_id"]: row for row in rows}
         self.assertEqual(by_id["1"]["status"], "Filled")
         self.assertEqual(by_id["2"]["status"], "Filled")
+
+    def test_incremental_history_timeout_falls_back_to_trusted_cache_and_marks_stale(self) -> None:
+        class Trade:
+            def history_orders(self, *, start_at, end_at):
+                raise RuntimeError("request timeout")
+
+            def history_executions(self, *, start_at, end_at):
+                return [SimpleNamespace(trade_id="t1", order_id="1", quantity="1", price="10")]
+
+        generated_at = datetime(2026, 7, 21, 9, 0, tzinfo=UTC)
+        orders, executions, returned_trade, mode = refresh_order_and_execution_history(
+            Trade(),
+            lambda: Trade(),
+            start_at=datetime(2026, 6, 1, tzinfo=UTC),
+            generated_at=generated_at,
+            cached_orders=[{"order_id": "1", "status": "Submitted"}],
+            cached_executions=[],
+            account_state={
+                "orders": [SimpleNamespace(order_id="1", status="Filled", side="Buy", order_type="LO")],
+                "executions": [],
+            },
+        )
+
+        self.assertIsNotNone(returned_trade)
+        self.assertEqual({row["order_id"]: row["status"] for row in orders}, {"1": "Filled"})
+        self.assertEqual(executions[0]["trade_id"], "t1")
+        self.assertEqual(
+            mode,
+            "trusted_cache_plus_fresh_snapshot_statistics_stale_history_orders_timeout",
+        )
 
     def test_app_display_pnl_matches_longbridge_asset_formula(self) -> None:
         generated_at = datetime(2026, 7, 21, 3, 15, tzinfo=UTC)
@@ -654,6 +695,74 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
             self.assertEqual(pnl["today_account_pnl"]["symbol_pnl_rows"][0]["symbol"], "Apple.US")
             self.assertEqual(pnl["market_day_profit_analysis"]["sum_profit"], "-3.21")
             self.assertFalse(summary["order_submit_or_cancel_command_used"])
+
+    def test_sdk_outputs_mark_statistics_stale_when_history_refresh_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "out"
+            account_config = root / "account.json"
+            account_config.write_text(
+                json.dumps(
+                    {
+                        "stage": "M15.longbridge_realtime_account_state",
+                        "outputs": {"output_dir": str(output), "account_state": str(output / "account_state.json")},
+                        "longbridge_account_state": {
+                            "required_account_channel": "lb_papertrading",
+                            "historical_order_start_date": "2026-07-01",
+                        },
+                        "hard_boundaries": {
+                            "paper_simulated_only": True,
+                            "live_execution": False,
+                            "real_money_actions": False,
+                            "local_simulation_as_account_source": False,
+                            "order_submit_or_cancel_commands": False,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output.mkdir(parents=True)
+            (output / "m15_longbridge_realtime_execution_ledger.jsonl").write_text("", encoding="utf-8")
+            (output / "m15_account_reconciliation_adjustments.json").write_text(
+                json.dumps({"approved": True, "adjustments": []}),
+                encoding="utf-8",
+            )
+            (output / "m15_sdk_formal_test_epoch.json").write_text(json.dumps({}), encoding="utf-8")
+
+            result = write_sdk_analytics_outputs(
+                account_config_path=account_config,
+                generated_at=datetime(2026, 7, 18, tzinfo=UTC),
+                account_state={
+                    "paper_account_verified": True,
+                    "account_channel": "lb_papertrading",
+                    "position_row_count": 0,
+                    "open_order_count": 0,
+                    "positions": [],
+                    "orders": [],
+                },
+                historical_orders=[],
+                historical_executions=[],
+                profit_analysis={"profit": "0", "stock_items": []},
+                daily_profit_analysis={"profit": "0", "stock_items": []},
+                app_display_metrics={
+                    "status": "incomplete",
+                    "currency": "USD",
+                    "today_pnl": "",
+                    "total_cash": "1000.00",
+                    "total_asset": "",
+                    "source": "longbridge_sdk_app_daily_pnl_inputs_incomplete",
+                    "symbol_pnl_rows": [],
+                },
+                history_refresh_mode="trusted_cache_plus_fresh_snapshot_statistics_stale_history_orders_timeout",
+                statistics_stale=True,
+            )
+
+            summary = json.loads((output / "m15_longbridge_realtime_account_state_summary.json").read_text())
+            trusted_history = json.loads((output / TRUSTED_ORDER_HISTORY_JSON).read_text())
+            self.assertTrue(result["statistics_stale"])
+            self.assertTrue(summary["statistics_stale"])
+            self.assertTrue(trusted_history["statistics_stale"])
+            self.assertIn("statistics_stale=true", summary["plain_language_result"])
 
 
 if __name__ == "__main__":
