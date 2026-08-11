@@ -601,6 +601,23 @@ def build_sdk_quote_snapshot(
     }
 
 
+def fetch_daily_context_rows(
+    quote: Any,
+    sdk: Any,
+    symbols: tuple[str, ...],
+    bars: int,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    failures: list[str] = []
+    all_rows: list[dict[str, Any]] = []
+    for symbol in symbols:
+        try:
+            candles = quote.candlesticks(symbol, sdk.Period.Day, bars, sdk.AdjustType.NoAdjust)
+            all_rows.extend(event_rows_to_daily(symbol, list(candles), datetime.now(UTC)))
+        except Exception:
+            failures.append(symbol)
+    return all_rows, failures
+
+
 def load_daily_context(
     quote: Any,
     sdk: Any,
@@ -610,14 +627,7 @@ def load_daily_context(
     *,
     task_id: str = "",
 ) -> list[str]:
-    failures: list[str] = []
-    all_rows: list[dict[str, Any]] = []
-    for symbol in symbols:
-        try:
-            candles = quote.candlesticks(symbol, sdk.Period.Day, bars, sdk.AdjustType.NoAdjust)
-            all_rows.extend(event_rows_to_daily(symbol, list(candles), datetime.now(UTC)))
-        except Exception:
-            failures.append(symbol)
+    all_rows, failures = fetch_daily_context_rows(quote, sdk, symbols, bars)
     emit_worker(queue_out, {"kind": "daily_context", "task_id": task_id, "rows": all_rows, "failures": failures})
     return failures
 
@@ -1220,31 +1230,29 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
             sdk = require_sdk_contract()
             oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
             quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
-            failures = load_daily_context(
+            rows, failures = fetch_daily_context_rows(
                 quote,
                 sdk,
                 tuple(symbols),
                 config.daily_context_bars,
-                queue_out,
-                task_id=task_id,
             )
             for retry_delay in (2, 5):
                 if not failures:
                     break
                 time.sleep(retry_delay)
-                failures = load_daily_context(
+                retry_rows, failures = fetch_daily_context_rows(
                     quote,
                     sdk,
                     tuple(failures),
                     config.daily_context_bars,
-                    queue_out,
-                    task_id=task_id,
                 )
+                rows.extend(retry_rows)
             emit_worker(
                 queue_out,
                 {
                     "kind": "daily_context_task_complete",
                     "task_id": task_id,
+                    "rows": rows,
                     "failures": failures,
                     "connection_attempt": connection_attempt,
                 },
@@ -3663,6 +3671,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 context.append(trading_market_events(config, rows))
             elif kind == "daily_context_task_complete":
                 task_id = str(message.get("task_id") or "")
+                rows = list(message.get("rows") or [])
+                if rows:
+                    daily_rows.extend(rows)
+                    context.append(trading_market_events(config, rows))
                 if task_id in daily_workers:
                     daily_worker, _started_at, _symbols = daily_workers.pop(task_id)
                     stop_spawned_process(daily_worker, graceful=True)

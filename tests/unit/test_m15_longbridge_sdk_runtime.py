@@ -3475,6 +3475,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(queue.items[-1]["kind"], "daily_context_task_complete")
         self.assertEqual(queue.items[-1]["connection_attempt"], 2)
         self.assertEqual(queue.items[-1]["failures"], [])
+        self.assertEqual(len(queue.items), 1)
+        self.assertEqual(len(queue.items[-1]["rows"]), 1)
 
     def test_installed_sdk_exposes_required_contexts(self) -> None:
         self.assertIsNotNone(require_sdk_contract())

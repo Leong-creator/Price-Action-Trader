@@ -26,7 +26,7 @@
     "daily_context_bars": 60,
     "daily_context_deadline_seconds": 75,
     "daily_context_parallel_workers": 1,
-    "daily_context_batch_size": 10,
+    "daily_context_batch_size": 25,
     "daily_context_retry_count": 5,
     "expansion_trade_pool_upgrade_gate": {
       "enabled": true,
