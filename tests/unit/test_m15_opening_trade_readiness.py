@@ -308,6 +308,13 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             "account_snapshot_healthy": True,
         }
         self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
+        status["market_data_mode"] = "sdk_snapshot_poll"
+        status["market_data_worker_recent_restart_count"] = 3
+        self.assertIn(
+            "sdk_market_data_worker_restart_storm",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
+        status["market_data_worker_recent_restart_count"] = 0
         status["trading_market_data_coverage"] = f"{trading_count}/{trading_count}"
         status["trading_subscription_coverage"] = f"0/{trading_count}"
         self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])

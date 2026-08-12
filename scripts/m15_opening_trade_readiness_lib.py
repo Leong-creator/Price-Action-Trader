@@ -708,6 +708,11 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
         issues.append("sdk_account_snapshot_stale")
     if status.get("account_snapshot_circuit_open") is True:
         issues.append("sdk_account_snapshot_circuit_open")
+    if (
+        str(status.get("market_data_mode") or "") == "sdk_snapshot_poll"
+        and int(status.get("market_data_worker_recent_restart_count") or 0) >= 3
+    ):
+        issues.append("sdk_market_data_worker_restart_storm")
     worker_status = str(status.get("account_snapshot_worker_status") or "")
     if worker_status and worker_status not in {"healthy", "healthy_circuit_probe", "healthy_circuit_recovered"}:
         issues.append(f"sdk_account_worker_status={worker_status}")

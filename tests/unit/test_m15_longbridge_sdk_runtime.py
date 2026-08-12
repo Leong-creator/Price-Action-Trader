@@ -64,6 +64,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
     pending_flatten_test_epoch_id,
+    pop_deferred_worker_error,
     preserve_partial_bar_suppression,
     rollover_snapshot_cycle,
     preserve_last_order_maintenance_action,
@@ -617,16 +618,42 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertFalse(snapshot_poll_cycle_is_healthy(146, 147, 100, 1000))
         self.assertFalse(snapshot_poll_cycle_is_healthy(147, 147, 1001, 1000))
 
+    def test_snapshot_sdk_timeout_refreshes_progress_then_exits_worker(self) -> None:
+        source = inspect.getsource(quote_snapshot_worker)
+        failure_branch = source[source.index("except Exception as exc:") :]
+
+        self.assertIn("progress_value.value = failure_at", failure_branch)
+        self.assertIn('"snapshot_retry_in_progress": True', failure_branch)
+        self.assertIn("raise", failure_branch)
+        self.assertNotIn("snapshot_connection_rebuilt", failure_branch)
+
+    def test_dead_worker_error_is_removed_without_dropping_other_messages(self) -> None:
+        messages = deque(
+            [
+                {"kind": "bars", "rows": [1]},
+                {"kind": "error", "reason": "snapshot request timeout"},
+                {"kind": "heartbeat"},
+            ]
+        )
+
+        worker_error = pop_deferred_worker_error(messages)
+
+        self.assertEqual(worker_error, {"kind": "error", "reason": "snapshot request timeout"})
+        self.assertEqual(
+            list(messages),
+            [{"kind": "bars", "rows": [1]}, {"kind": "heartbeat"}],
+        )
+
     def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
         config = load_config()
 
-        self.assertEqual(config.subscription_batch_size, 300)
+        self.assertEqual(config.subscription_batch_size, 50)
         self.assertEqual(config.subscription_deadline_seconds, 20)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 100)
-        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.12)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 50)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
         self.assertEqual(config.market_data_heartbeat_deadline_seconds, 8)
-        self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 60)
+        self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
         self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
         self.assertLess(
             config.snapshot_poll_interval_seconds,
@@ -767,6 +794,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             adaptive_market_data_deadline_seconds(
                 8,
                 60,
+                0,
+                datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
+                5,
+            ),
+            45,
+        )
+        self.assertEqual(
+            adaptive_market_data_deadline_seconds(
+                8,
+                60,
                 3,
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
@@ -791,7 +828,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            8,
+            45,
         )
 
     def test_contract_runtime_uses_longer_snapshot_recovery_deadline(self) -> None:
@@ -799,9 +836,9 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
         )
 
-        self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 60)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 100)
-        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.12)
+        self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 50)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
 
     def test_oversized_runtime_log_is_compressed_before_restart(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -831,6 +868,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(clear_restart_burst_after_stable_polls(restart_times, 3))
         self.assertEqual(list(restart_times), [])
         self.assertFalse(clear_restart_burst_after_stable_polls(restart_times, 4))
+
+    def test_runtime_does_not_erase_restart_history_after_three_fast_polls(self) -> None:
+        source = inspect.getsource(
+            __import__(
+                "scripts.run_m15_longbridge_sdk_runtime",
+                fromlist=["run_watch"],
+            ).run_watch
+        )
+
+        self.assertNotIn(
+            "clear_restart_burst_after_stable_polls(",
+            source,
+        )
 
     def test_acknowledged_subscription_requires_real_quote_progress(self) -> None:
         self.assertFalse(subscription_quote_stream_is_stale(10.0, 0.0, 18.0, 8.0))
@@ -3008,6 +3058,59 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
         self.assertEqual(failures, ["BAD.US"])
         self.assertIn(["AAPL.US"], quote.calls)
+
+    def test_failed_batch_reports_progress_during_single_symbol_recovery(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, _subscription_types) -> None:
+                self.calls.append(symbols)
+                if len(symbols) > 1:
+                    raise TimeoutError("batch request timed out")
+
+        quote = QuoteContext()
+        progress = []
+        failures = subscribe_quote_and_trades(
+            quote,
+            ["BKR.US", "DVN.US", "FANG.US"],
+            ["Quote"],
+            batch_size=3,
+            retry_count=0,
+            progress_callback=lambda completed, total: progress.append(
+                (completed, total)
+            ),
+        )
+
+        self.assertEqual(failures, [])
+        self.assertEqual(progress, [(1, 3), (2, 3), (3, 3)])
+
+    def test_quote_worker_mode_discards_a_connection_after_batch_timeout(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, _subscription_types) -> None:
+                self.calls.append(symbols)
+                raise TimeoutError("connection poisoned")
+
+        quote = QuoteContext()
+        progress = []
+        failures = subscribe_quote_and_trades(
+            quote,
+            ["BKNG.US", "EXPE.US", "LYFT.US"],
+            ["Quote"],
+            batch_size=3,
+            retry_count=0,
+            progress_callback=lambda completed, total: progress.append(
+                (completed, total)
+            ),
+            recover_failed_batch_symbols=False,
+        )
+
+        self.assertEqual(failures, ["BKNG.US", "EXPE.US", "LYFT.US"])
+        self.assertEqual(quote.calls, [["BKNG.US", "EXPE.US", "LYFT.US"]])
+        self.assertEqual(progress, [(3, 3)])
 
     def test_sdk_region_endpoints_are_explicit(self) -> None:
         self.assertEqual(

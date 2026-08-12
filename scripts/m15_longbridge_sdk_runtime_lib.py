@@ -1414,6 +1414,7 @@ def subscribe_quote_and_trades(
     progress_callback: Callable[[int, int], None] | None = None,
     request_interval_seconds: float = 0,
     retry_backoff_seconds: float = 0,
+    recover_failed_batch_symbols: bool = True,
 ) -> list[str]:
     """Subscribe in bounded requests and identify every failed symbol."""
     if batch_size <= 0:
@@ -1426,21 +1427,37 @@ def subscribe_quote_and_trades(
     total_symbols = len(symbols)
     for offset in range(0, len(symbols), batch_size):
         batch = symbols[offset : offset + batch_size]
+        batch_succeeded = False
         for attempt in range(retry_count + 1):
             try:
                 quote_context.subscribe(batch, subscription_types)
+                batch_succeeded = True
                 break
             except Exception:
-                if attempt == retry_count:
-                    for symbol in batch:
-                        try:
-                            quote_context.subscribe([symbol], subscription_types)
-                        except Exception:
-                            failed_symbols.append(symbol)
-                elif retry_backoff_seconds:
+                if attempt < retry_count and retry_backoff_seconds:
                     sleep(retry_backoff_seconds)
-                continue
-        if progress_callback is not None:
+        if not batch_succeeded and recover_failed_batch_symbols:
+            # The SDK can time out for a particular symbol combination even
+            # when every symbol subscribes successfully on its own. Split a
+            # failed batch and keep progress alive during recovery.
+            for index, symbol in enumerate(batch, start=1):
+                try:
+                    quote_context.subscribe([symbol], subscription_types)
+                except Exception:
+                    failed_symbols.append(symbol)
+                if progress_callback is not None:
+                    progress_callback(
+                        min(offset + index, total_symbols),
+                        total_symbols,
+                    )
+        elif not batch_succeeded:
+            failed_symbols.extend(batch)
+            if progress_callback is not None:
+                progress_callback(
+                    min(offset + len(batch), total_symbols),
+                    total_symbols,
+                )
+        elif progress_callback is not None:
             progress_callback(min(offset + len(batch), total_symbols), total_symbols)
         if request_interval_seconds and offset + len(batch) < total_symbols:
             sleep(request_interval_seconds)

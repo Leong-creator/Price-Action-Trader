@@ -859,6 +859,22 @@ def buffer_pending_market_data_progress(
     return now_monotonic if progress_seen else 0.0
 
 
+def pop_deferred_worker_error(
+    deferred_messages: deque[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Remove one worker error while preserving all other queued messages."""
+    worker_error: dict[str, Any] | None = None
+    remaining: deque[dict[str, Any]] = deque()
+    while deferred_messages:
+        message = deferred_messages.popleft()
+        if worker_error is None and str(message.get("kind") or "") == "error":
+            worker_error = message
+        else:
+            remaining.append(message)
+    deferred_messages.extend(remaining)
+    return worker_error
+
+
 def effective_worker_progress(
     queued_progress_monotonic: float,
     shared_progress_monotonic: float,
@@ -951,7 +967,13 @@ def adaptive_market_data_deadline_seconds(
 ) -> float:
     """Back off a restart storm without killing a worker at a bar boundary."""
     del now, bar_minutes
-    base = float(base_deadline_seconds)
+    # Snapshot calls can legitimately take longer than the push-stream
+    # heartbeat.  Killing the isolated worker after eight seconds caused a
+    # reconnect storm and occasionally removed an entire five-minute boundary.
+    # The native SDK request timeout is about 30 seconds. The parent must let
+    # the isolated worker receive and handle that exception instead of killing
+    # it first and creating a restart storm.
+    base = max(float(base_deadline_seconds), 45.0)
     if int(recent_restarts) < 3:
         return base
     return max(base, float(recovery_deadline_seconds))
@@ -1083,6 +1105,7 @@ def quote_worker(
             progress_callback=report_subscription_progress,
             request_interval_seconds=config.subscription_request_interval_seconds,
             retry_backoff_seconds=config.subscription_retry_backoff_seconds,
+            recover_failed_batch_symbols=False,
         )
         expected = set(all_symbols)
         trading_expected = set(trading_symbols)
@@ -1224,6 +1247,9 @@ def quote_snapshot_worker(
                 consecutive_failures = 0
             except Exception as exc:
                 consecutive_failures += 1
+                failure_at = time.monotonic()
+                if progress_value is not None:
+                    progress_value.value = failure_at
                 emit_worker(
                     queue_out,
                     {
@@ -1235,10 +1261,20 @@ def quote_snapshot_worker(
                         ),
                     },
                 )
-                if consecutive_failures >= 3:
-                    raise
-                stop_event.wait(config.snapshot_poll_interval_seconds)
-                continue
+                emit_worker(
+                    queue_out,
+                    {
+                        "kind": "heartbeat",
+                        "at": to_iso(datetime.now(UTC)),
+                        "market_data_mode": "sdk_snapshot_poll",
+                        "snapshot_retry_in_progress": True,
+                        "consecutive_failures": consecutive_failures,
+                    },
+                )
+                # The native context is not reliable after a request timeout.
+                # Exit once and let the parent replace this isolated process
+                # while retaining its five-minute bar builder.
+                raise
             rows_by_symbol = {
                 str(getattr(row, "symbol", "") or "").upper(): row
                 for row in snapshot_rows
@@ -3555,15 +3591,24 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and (worker is None or not worker.is_alive())
             ):
                 if worker is not None:
+                    worker.join(timeout=0.2)
+                    buffer_pending_market_data_progress(
+                        message_queue,
+                        deferred_messages,
+                        now_monotonic=time.monotonic(),
+                    )
+                    worker_error = pop_deferred_worker_error(deferred_messages)
+                    worker_exit_reason = str(
+                        (worker_error or {}).get("reason")
+                        or "worker_process_exited"
+                    )
                     record_market_data_worker_restart(
-                        "worker_process_exited",
+                        worker_exit_reason,
                         exit_code=worker.exitcode,
                     )
-                    last_subscription_failure_reason = (
-                        "sdk_quote_worker_exited_before_ready:"
-                        f"exit_code={worker.exitcode}"
-                    )
-                    worker.join(timeout=0.2)
+                    last_subscription_failure_reason = worker_exit_reason
+                    if worker_error is not None:
+                        last_market_data_worker_error = worker_exit_reason
                     attempts += 1
                 if (
                     not snapshot_fallback_active
@@ -3657,14 +3702,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     if snapshot_fallback_active
                     else quote_worker
                 )
+                worker_args: tuple[Any, ...] = (
+                    str(config.config_path),
+                    message_queue,
+                    stop_event,
+                    market_data_worker_progress,
+                )
                 worker = process_context.Process(
                     target=worker_target,
-                    args=(
-                        str(config.config_path),
-                        message_queue,
-                        stop_event,
-                        market_data_worker_progress,
-                    ),
+                    args=worker_args,
                     daemon=True,
                 )
                 market_data_worker_progress.value = time.monotonic()
@@ -4223,10 +4269,6 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
                 snapshot_poll_successful_fast_polls = int(
                     message.get("successful_fast_polls") or 0
-                )
-                clear_restart_burst_after_stable_polls(
-                    market_data_worker_restart_times,
-                    snapshot_poll_successful_fast_polls,
                 )
                 snapshot_poll_is_fast_and_complete = bool(
                     message.get("poll_is_fast_and_complete")
