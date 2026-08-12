@@ -517,6 +517,9 @@ def build_sdk_pnl_reconciliation(
     app_display_metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     profit = str(profit_analysis.get("profit") or "")
+    account_total_asset_currency = str(
+        account_state.get("account_total_equity_currency") or ""
+    )
     daily_profit = str((daily_profit_analysis or {}).get("profit") or "")
     stock_items = profit_analysis.get("stock_items") if isinstance(profit_analysis.get("stock_items"), list) else []
     daily_stock_items = (
@@ -536,9 +539,11 @@ def build_sdk_pnl_reconciliation(
         "local_simulation_isolated": True,
         "query_range": {"start": start_date, "end": end_date},
         "account_pnl": {
-            "currency": "USD",
+            "currency": account_total_asset_currency,
             "current_total_asset": account_state.get("account_total_equity_estimate"),
+            "current_total_asset_currency": account_total_asset_currency,
             "sum_profit": profit,
+            "sum_profit_currency": "USD",
             "source": "longbridge_sdk_us_market_profit_analysis",
         },
         "today_account_pnl": {

@@ -17,6 +17,7 @@ from scripts.m15_longbridge_sdk_analytics_lib import (
     app_intraday_window_start,
     build_app_display_metrics,
     build_sdk_account_summary,
+    build_sdk_pnl_reconciliation,
     current_history_rows,
     incremental_history_start,
     load_runtime_quote_rows,
@@ -33,6 +34,26 @@ from scripts.m15_longbridge_sdk_analytics_lib import (
 
 
 class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
+    def test_pnl_reconciliation_keeps_account_asset_and_us_profit_currencies_separate(self) -> None:
+        result = build_sdk_pnl_reconciliation(
+            "2026-08-12T12:00:00Z",
+            {
+                "account_total_equity_estimate": "704835.23",
+                "account_total_equity_currency": "HKD",
+                "positions": [],
+            },
+            {"profit": "-1757.73", "stock_items": []},
+            "2026-06-01",
+            "2026-08-12",
+        )
+
+        account_pnl = result["account_pnl"]
+        self.assertEqual(account_pnl["current_total_asset"], "704835.23")
+        self.assertEqual(account_pnl["current_total_asset_currency"], "HKD")
+        self.assertEqual(account_pnl["currency"], "HKD")
+        self.assertEqual(account_pnl["sum_profit"], "-1757.73")
+        self.assertEqual(account_pnl["sum_profit_currency"], "USD")
+
     def test_sdk_connect_error_is_treated_as_slow_statistics_failure(self) -> None:
         self.assertTrue(
             is_sdk_timeout_error(
