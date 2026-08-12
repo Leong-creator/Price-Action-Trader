@@ -418,6 +418,29 @@ def run_visual_shadow_session(
             **base,
             "status": "blocked_incomplete_session",
             "session_complete": False,
+            "required_symbol_count": diagnostics["required_symbol_count"],
+            "complete_symbol_count": diagnostics["complete_symbol_count"],
+            "expected_bars_per_symbol": diagnostics["expected_bars_per_symbol"],
+            "expected_five_minute_bar_count": (
+                diagnostics["required_symbol_count"]
+                * diagnostics["expected_bars_per_symbol"]
+            ),
+            "accepted_five_minute_bar_count": diagnostics[
+                "accepted_five_minute_bar_count"
+            ],
+            "missing_five_minute_bar_count": max(
+                0,
+                diagnostics["required_symbol_count"]
+                * diagnostics["expected_bars_per_symbol"]
+                - diagnostics["accepted_five_minute_bar_count"],
+            ),
+            "incomplete_symbol_count": diagnostics["incomplete_symbol_count"],
+            "incomplete_symbol_examples": diagnostics[
+                "incomplete_symbol_examples"
+            ],
+            "duplicate_count": diagnostics["duplicate_count"],
+            "invalid_source_count": diagnostics["invalid_source_count"],
+            "blocked_row_count": diagnostics["blocked_row_count"],
             "diagnostics": diagnostics,
             "plain_language_result": "当天300只标的的SDK常规时段五分钟数据不完整，本次不计入实时影子验收。",
         }

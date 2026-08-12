@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import gzip
+import hashlib
 import json
 import multiprocessing as mp
 import os
@@ -90,13 +91,37 @@ EXECUTION_LEDGER_FILE = "m15_longbridge_realtime_execution_ledger.jsonl"
 ORDER_MAINTENANCE_FILE = "m15_sdk_order_maintenance.json"
 MARKET_DATA_HEALTH_JSON = "m15_sdk_market_data_health.json"
 MARKET_DATA_HEALTH_LEDGER_JSONL = "m15_sdk_market_data_health_ledger.jsonl"
+PENDING_RUNTIME_RELOAD_JSON = "m15_sdk_pending_runtime_reload.json"
 AUTHORIZED_ACCOUNT_EXIT_FILE = "m15_authorized_account_exit.json"
 CAPITAL_BUCKET_MIGRATION_FILE = "m15_capital_bucket_migration_state.json"
 TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
 TRADE_CONTEXT_RETRY_SECONDS = 5
 INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS = 90
+POSTCLOSE_INTRADAY_RECOVERY_DEADLINE_SECONDS = 240
 REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED = False
 RUNTIME_LOG_ROTATE_BYTES = 10 * 1024 * 1024
+RUNTIME_SOURCE_FILES = (
+    Path(__file__).resolve(),
+    ROOT / "scripts" / "m15_longbridge_sdk_runtime_lib.py",
+    ROOT / "scripts" / "m15_longbridge_sdk_account_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_signal_router_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_execution_lib.py",
+    ROOT / "scripts" / "m15_longbridge_realtime_position_manager_lib.py",
+)
+
+
+def runtime_source_fingerprint() -> str:
+    """Fingerprint the code actually loaded by a newly started runtime."""
+    digest = hashlib.sha256()
+    for path in RUNTIME_SOURCE_FILES:
+        digest.update(str(path.relative_to(ROOT)).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]
+
+
+LOADED_RUNTIME_SOURCE_FINGERPRINT = runtime_source_fingerprint()
 
 
 def parse_utc_datetime(value: str) -> datetime | None:
@@ -109,6 +134,15 @@ def parse_utc_datetime(value: str) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def runtime_deployment_is_frozen(now: datetime | None = None) -> bool:
+    """Keep a healthy loaded runtime stable through the full US session."""
+    observed = (now or datetime.now(UTC)).astimezone(NEW_YORK)
+    if observed.weekday() >= 5:
+        return False
+    minutes = observed.hour * 60 + observed.minute
+    return (9 * 60 + 25) <= minutes <= (16 * 60 + 5)
 
 
 def pending_flatten_test_epoch_id(marker: dict[str, Any]) -> str:
@@ -992,7 +1026,11 @@ def quote_worker(
             complete_bar_open_not_before=first_complete_bar_open,
         )
 
-        aggregation_enabled = False
+        # The Python SDK may deliver the initial quote burst from the subscribe
+        # call itself.  The callback must be live before that call;
+        # otherwise the parent sees an acknowledged subscription with no quote
+        # heartbeat and incorrectly falls back to snapshot polling.
+        aggregation_enabled = True
 
         def on_quote(symbol: str, event: Any) -> None:
             if not aggregation_enabled:
@@ -1015,8 +1053,8 @@ def quote_worker(
 
         # Register the SDK callback exactly once. Replacing it after all
         # subscriptions are acknowledged can block the quote connection.
-        # The in-memory gate drains the initial snapshot burst without doing
-        # bar aggregation and does not make another SDK call.
+        # FiveMinuteBarBuilder suppresses the partial startup bar, so the
+        # initial quote burst is safe and is required to seed stream health.
         quote.set_on_quote(on_quote)
 
         def report_subscription_progress(completed: int, total: int) -> None:
@@ -1054,13 +1092,13 @@ def quote_worker(
         # Treat the acknowledged batch results as authoritative.
         subscribed = expected - set(failed)
         missing = sorted((expected - subscribed) | set(failed))
-        aggregation_enabled = True
         emit_worker(queue_out, {
             "kind": "ready", "subscribed_symbols": sorted(expected - set(missing)),
             "subscription_failed_symbols": missing, "daily_context_failed_symbols": [],
             "trading_subscription_failed_symbols": sorted(trading_expected & set(missing)),
             "partial_bar_suppressed_until": to_iso(first_complete_bar_open.astimezone(UTC)),
             "subscription_target_count": len(subscription_targets),
+            "initial_quote_callbacks_enabled": True,
         })
         last_heartbeat = 0.0
         while not stop_event.is_set():
@@ -1407,6 +1445,7 @@ def intraday_context_worker(
 ) -> None:
     """Fetch completed SDK five-minute bars as restart context only."""
     try:
+        silence_sdk_worker_console()
         config = load_config(config_path)
         sdk = require_sdk_contract()
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
@@ -1561,6 +1600,88 @@ def fetch_intraday_context_backfill(
         unique_rows.values(),
         key=lambda row: (str(row.get("event_time") or ""), str(row.get("symbol") or "")),
     ), sorted(failures)
+
+
+def verified_postclose_recovery_rows(
+    fetched_rows: list[dict[str, Any]],
+    existing_rows: list[dict[str, Any]],
+    *,
+    business_date: str,
+) -> list[dict[str, Any]]:
+    """Return missing SDK history rows for audit recovery, never dispatch.
+
+    Recovered rows remain context-only.  They can prove that the stored OHLCV
+    dataset is complete after close, but they never count as realtime stream
+    evidence and must never be passed to the strategy router.
+    """
+    valid_existing_keys = {
+        (
+            str(row.get("symbol") or "").upper().removesuffix(".US"),
+            str(row.get("event_time") or ""),
+        )
+        for row in existing_rows
+        if str(row.get("timeframe") or "") == "5m"
+        and row.get("bar_final") is True
+        and not str(row.get("market_data_blocked_reason") or "")
+        and (
+            str(row.get("source_mode") or "")
+            in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
+            or (
+                row.get("context_only") is True
+                and row.get("recovery_verified") is True
+                and str(row.get("source_mode") or "")
+                == "longbridge_sdk_intraday_recovery"
+            )
+        )
+    }
+    existing_ids = {
+        str(row.get("event_id") or "")
+        for row in existing_rows
+        if str(row.get("event_id") or "")
+    }
+    recovered: list[dict[str, Any]] = []
+    for row in fetched_rows:
+        event_id = str(row.get("event_id") or "")
+        key = (
+            str(row.get("symbol") or "").upper().removesuffix(".US"),
+            str(row.get("event_time") or ""),
+        )
+        recovery_event_id = f"{event_id}|recovery"
+        if (
+            not event_id
+            or key in valid_existing_keys
+            or recovery_event_id in existing_ids
+        ):
+            continue
+        try:
+            event_date = datetime.fromisoformat(
+                str(row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(NEW_YORK).date().isoformat()
+        except ValueError:
+            continue
+        if event_date != business_date or row.get("context_only") is not True:
+            continue
+        recovered_row = dict(row)
+        recovered_row.update(
+            {
+                "event_id": recovery_event_id,
+                "recovery_source_event_id": event_id,
+                "source_mode": "longbridge_sdk_intraday_recovery",
+                "recovery_verified": True,
+                "recovery_business_date": business_date,
+                "recovery_reason": "postclose_session_gap_reconciliation",
+                "strategy_dispatch_eligible": False,
+                "historical_signal_replayed": False,
+                "historical_order_replayed": False,
+            }
+        )
+        recovered.append(recovered_row)
+        existing_ids.add(recovery_event_id)
+        valid_existing_keys.add(key)
+    return sorted(
+        recovered,
+        key=lambda row: (str(row.get("event_time") or ""), str(row.get("symbol") or "")),
+    )
 
 
 def account_age_seconds(snapshot: dict[str, Any], *, now: datetime | None = None) -> int | None:
@@ -2529,6 +2650,25 @@ def dispatch_completed_rows(
     intraday_context_blocked_symbols: set[str] | None = None,
 ) -> dict[str, Any]:
     stage_started = time.perf_counter()
+    ignored_context_rows = [
+        row
+        for row in rows
+        if row.get("context_only") is True
+        or row.get("strategy_dispatch_eligible") is False
+    ]
+    rows = [
+        row
+        for row in rows
+        if row.get("context_only") is not True
+        and row.get("strategy_dispatch_eligible") is not False
+    ]
+    if not rows:
+        return {
+            "event_count": 0,
+            "signal_count": 0,
+            "execution": {"submitted_count": 0},
+            "ignored_context_only_count": len(ignored_context_rows),
+        }
     rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {})
     fresh = fresh_market_events(rows, config.maximum_source_delivery_age_ms)
     append_market_events(config.market_events_path, fresh, config.event_keep_lines)
@@ -3132,6 +3272,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     sdk = require_sdk_contract()
     run_id = f"sdk-{uuid.uuid4().hex[:12]}"
     loaded_config_fingerprint = config_fingerprint(config)
+    loaded_source_fingerprint = LOADED_RUNTIME_SOURCE_FINGERPRINT
     previous_runtime_status = read_json_object(config.runtime_status_path)
     readonly_gate_passed_now, readonly_sessions_passed, readonly_sessions_required = readonly_gate_passed(config.readonly_gate_path)
     expansion_gate_path = config.output_dir / "m15_sdk_expansion_readonly_gate.json"
@@ -3156,6 +3297,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             "dispatch_enabled": False,
             "dispatch_requested": dispatch_requested,
             "config_fingerprint": loaded_config_fingerprint,
+            "runtime_source_fingerprint": loaded_source_fingerprint,
             "startup_context_restore_in_progress": True,
         },
     )
@@ -3322,6 +3464,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     observed_regular_sessions: set[str] = set()
     observed_expansion_sessions: set[str] = set()
     postclose_daily_refresh_dates = completed_postclose_refresh_dates(cached_daily_rows, now_ny)
+    postclose_recovery_attempted_dates: set[str] = set()
+    postclose_recovery_workers: dict[str, tuple[mp.Process, float, list[str]]] = {}
+    postclose_recovery_status: dict[str, Any] = {
+        "status": "not_started",
+        "recovered_row_count": 0,
+        "failed_symbols": [],
+        "historical_signal_replayed": False,
+        "historical_order_replayed": False,
+    }
     deferred_messages: deque[dict[str, Any]] = deque()
     partial_bar_suppressed_until = ""
     last_subscription_failure_reason = ""
@@ -3399,7 +3550,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     signal.signal(signal.SIGTERM, stop_requested)
     try:
         while not shutdown_requested:
-            if worker is None or not worker.is_alive():
+            if (
+                postclose_recovery_status.get("status") != "running"
+                and (worker is None or not worker.is_alive())
+            ):
                 if worker is not None:
                     record_market_data_worker_restart(
                         "worker_process_exited",
@@ -3435,6 +3589,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                                 "dispatch_enabled": False,
                                 "dispatch_requested": dispatch_requested,
                                 "config_fingerprint": loaded_config_fingerprint,
+                                "runtime_source_fingerprint": loaded_source_fingerprint,
                                 "worker_attempts": attempts,
                                 "last_subscription_failure_reason": last_subscription_failure_reason,
                                 "market_data_mode": "sdk_snapshot_poll",
@@ -3461,6 +3616,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                             "dispatch_enabled": False,
                             "dispatch_requested": dispatch_requested,
                             "config_fingerprint": loaded_config_fingerprint,
+                            "runtime_source_fingerprint": loaded_source_fingerprint,
                             "worker_attempts": attempts,
                             "last_subscription_failure_reason": last_subscription_failure_reason,
                         },
@@ -3514,6 +3670,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 market_data_worker_progress.value = time.monotonic()
                 worker.start()
                 worker_ready_since = 0.0
+            if postclose_recovery_status.get("status") == "running":
+                # A bounded post-close history repair intentionally owns the
+                # only quote context.  Do not classify the absent realtime
+                # worker as a startup or heartbeat failure during this phase.
+                worker_last_progress = time.monotonic()
             queued_progress_at = buffer_pending_market_data_progress(
                 message_queue,
                 deferred_messages,
@@ -3813,6 +3974,58 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     last_subscription_failure_reason = ""
                 worker_last_progress = time.monotonic()
                 worker_ready_since = worker_last_progress
+            elif kind == "intraday_context" and str(message.get("task_id") or "").startswith("postclose-recovery-"):
+                task_id = str(message.get("task_id") or "")
+                recovered_rows = verified_postclose_recovery_rows(
+                    list(message.get("rows") or []),
+                    context.rows(),
+                    business_date=str(postclose_recovery_status.get("business_date") or ""),
+                )
+                if recovered_rows:
+                    append_market_events(
+                        config.market_events_path,
+                        recovered_rows,
+                        config.event_keep_lines,
+                    )
+                    context.append(recovered_rows)
+                    postclose_recovery_status["recovered_row_count"] = int(
+                        postclose_recovery_status.get("recovered_row_count") or 0
+                    ) + len(recovered_rows)
+                postclose_recovery_status.setdefault("completed_tasks", []).append(task_id)
+                postclose_recovery_status["failed_symbols"] = sorted(
+                    set(postclose_recovery_status.get("failed_symbols") or [])
+                    | {str(value) for value in (message.get("failures") or [])}
+                )
+            elif kind == "intraday_context_task_complete" and str(message.get("task_id") or "").startswith("postclose-recovery-"):
+                task_id = str(message.get("task_id") or "")
+                task = postclose_recovery_workers.pop(task_id, None)
+                if task is not None:
+                    stop_spawned_process(task[0], graceful=True)
+                postclose_recovery_status["failed_symbols"] = sorted(
+                    set(postclose_recovery_status.get("failed_symbols") or [])
+                    | {str(value) for value in (message.get("failures") or [])}
+                )
+                if not postclose_recovery_workers:
+                    postclose_recovery_status["status"] = (
+                        "completed_with_failures"
+                        if postclose_recovery_status.get("failed_symbols")
+                        else "completed"
+                    )
+                    postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
+            elif kind == "intraday_context_error" and str(message.get("task_id") or "").startswith("postclose-recovery-"):
+                task_id = str(message.get("task_id") or "")
+                task = postclose_recovery_workers.pop(task_id, None)
+                task_symbols = task[2] if task is not None else list(message.get("symbols") or [])
+                if task is not None:
+                    stop_spawned_process(task[0], graceful=False)
+                postclose_recovery_status["failed_symbols"] = sorted(
+                    set(postclose_recovery_status.get("failed_symbols") or [])
+                    | {str(value) for value in task_symbols}
+                )
+                postclose_recovery_status["last_error"] = str(message.get("reason") or "")
+                if not postclose_recovery_workers:
+                    postclose_recovery_status["status"] = "completed_with_failures"
+                    postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
             elif kind == "daily_context":
                 rows = list(message.get("rows") or [])
                 daily_rows.extend(rows)
@@ -4237,23 +4450,115 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             )
             now_ny = datetime.now(NEW_YORK)
             session_date = now_ny.date().isoformat()
+            pre_recovery_coverage = five_minute_session_coverage(
+                context.rows(),
+                configured_trading_symbols(config),
+                now=datetime.now(UTC),
+                minutes=config.bar_minutes,
+            )
+            if (
+                now_ny.weekday() < 5
+                and (now_ny.hour, now_ny.minute) >= (16, 5)
+                and session_date not in postclose_recovery_attempted_dates
+                and not pre_recovery_coverage.get("session_complete")
+            ):
+                # Recovery is deliberately post-close and context-only.  It
+                # repairs the audit dataset without reopening an SDK history
+                # connection in the realtime trading path or replaying signals.
+                postclose_recovery_attempted_dates.add(session_date)
+                stop_spawned_process(worker, graceful=True)
+                worker = None
+                worker_ready = False
+                worker_ready_since = 0.0
+                recovery_session_start = now_ny.replace(
+                    hour=9, minute=30, second=0, microsecond=0
+                ).astimezone(UTC)
+                recovery_session_close = now_ny.replace(
+                    hour=16, minute=0, second=0, microsecond=0
+                ).astimezone(UTC)
+                recovery_symbols = list(configured_trading_symbols(config))
+                postclose_recovery_status = {
+                    "status": "running",
+                    "business_date": session_date,
+                    "started_at": to_iso(datetime.now(UTC)),
+                    "requested_symbol_count": len(recovery_symbols),
+                    "recovered_row_count": 0,
+                    "failed_symbols": [],
+                    "historical_signal_replayed": False,
+                    "historical_order_replayed": False,
+                    "recovery_counts_as_realtime_evidence": False,
+                }
+                task_id = f"postclose-recovery-{session_date}-00"
+                recovery_worker = process_context.Process(
+                    target=intraday_context_worker,
+                    args=(
+                        str(config.config_path),
+                        recovery_symbols,
+                        task_id,
+                        to_iso(recovery_session_start),
+                        to_iso(recovery_session_close),
+                        message_queue,
+                    ),
+                    daemon=True,
+                )
+                recovery_worker.start()
+                postclose_recovery_workers[task_id] = (
+                    recovery_worker,
+                    time.monotonic(),
+                    recovery_symbols,
+                )
+            for task_id, (recovery_worker, started_at, task_symbols) in list(
+                postclose_recovery_workers.items()
+            ):
+                if (
+                    time.monotonic() - started_at
+                    <= POSTCLOSE_INTRADAY_RECOVERY_DEADLINE_SECONDS
+                ):
+                    continue
+                stop_spawned_process(recovery_worker, graceful=False)
+                postclose_recovery_workers.pop(task_id, None)
+                postclose_recovery_status["failed_symbols"] = sorted(
+                    set(postclose_recovery_status.get("failed_symbols") or [])
+                    | set(task_symbols)
+                )
+                postclose_recovery_status["last_error"] = (
+                    "postclose_intraday_recovery_deadline_exceeded"
+                )
+            if (
+                postclose_recovery_status.get("status") == "running"
+                and not postclose_recovery_workers
+            ):
+                postclose_recovery_status["status"] = (
+                    "completed_with_failures"
+                    if postclose_recovery_status.get("failed_symbols")
+                    else "completed"
+                )
+                postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
             if (
                 worker_ready
                 and daily_context_ready
                 and now_ny.weekday() < 5
                 and (now_ny.hour, now_ny.minute) >= (16, 10)
                 and session_date not in postclose_daily_refresh_dates
+                and postclose_recovery_status.get("status") != "running"
             ):
                 # Refresh the completed daily bar after close so tomorrow's
                 # session never starts with yesterday's stale context.
                 postclose_daily_refresh_dates.add(session_date)
+                retained_intraday_rows = [
+                    row
+                    for row in context.rows()
+                    if str(row.get("timeframe") or "") == "5m"
+                ]
                 context = MarketEventContext(
                     maximum_rows=(
                         len(configured_trading_symbols(config))
                         * config.daily_context_bars
                     )
+                    + (len(configured_trading_symbols(config)) * 78)
                     + 4096
                 )
+                context.append(retained_intraday_rows)
                 daily_rows = []
                 daily_failed = []
                 daily_workers = {}
@@ -4389,6 +4694,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 now=datetime.now(UTC),
                 minutes=config.bar_minutes,
             )
+            if (
+                str(postclose_recovery_status.get("business_date") or "")
+                == str(session_coverage.get("business_date") or "")
+                and str(postclose_recovery_status.get("status") or "").startswith(
+                    "completed"
+                )
+            ):
+                postclose_recovery_status["data_complete_after_recovery"] = bool(
+                    session_coverage.get("data_complete_after_recovery")
+                )
+                postclose_recovery_status["residual_missing_boundary_count"] = int(
+                    session_coverage.get("recovered_missing_boundary_count") or 0
+                )
+                postclose_recovery_status["residual_partial_boundary_count"] = int(
+                    session_coverage.get("recovered_partial_boundary_count") or 0
+                )
+                if not postclose_recovery_status["data_complete_after_recovery"]:
+                    postclose_recovery_status["status"] = (
+                        "completed_incomplete_data"
+                    )
             market_data_health = {
                 "schema_version": "m15.sdk-market-data-health.v1",
                 "generated_at": to_iso(datetime.now(UTC)),
@@ -4428,6 +4753,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "complete": session_coverage["complete_boundary_count"],
                     "partial": session_coverage["partial_boundary_count"],
                     "missing": session_coverage["missing_boundary_times"],
+                    "recovered_rows": session_coverage["recovered_row_count"],
+                    "data_complete_after_recovery": session_coverage[
+                        "data_complete_after_recovery"
+                    ],
                 },
                 sort_keys=True,
                 separators=(",", ":"),
@@ -4517,6 +4846,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_completed_bar_count": snapshot_completed_bar_count,
                     "orphaned_runtime_children_cleaned": orphaned_runtime_children_cleaned,
                     "config_fingerprint": loaded_config_fingerprint,
+                    "runtime_source_fingerprint": loaded_source_fingerprint,
                     "subscription_symbol_count": len(configured_symbols(config)),
                     "subscription_coverage": f"{len(configured_symbols(config)) - len(subscription_failed) if worker_ready else 0}/{len(configured_symbols(config))}",
                     "trading_symbol_count": len(configured_trading_symbols(config)),
@@ -4572,6 +4902,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "intraday_context_gap_blocks_new_entries_globally": False,
                     "five_minute_strategy_context": five_minute_strategy_context,
                     "five_minute_session_coverage": session_coverage,
+                    "postclose_intraday_recovery": postclose_recovery_status,
                     "partial_bar_suppressed_until": partial_bar_suppressed_until,
                     "daily_context_worker_pids": [worker.pid for worker, _started_at, _symbols in daily_workers.values()],
                     "account_snapshot_age_seconds": age,
@@ -4666,6 +4997,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         stop_spawned_process(worker, graceful=True)
         for daily_worker, _started_at, _symbols in daily_workers.values():
             stop_spawned_process(daily_worker, graceful=False)
+        for recovery_worker, _started_at, _symbols in postclose_recovery_workers.values():
+            stop_spawned_process(recovery_worker, graceful=False)
         close_spawn_queue(message_queue)
         account.stop()
         if read_pid(pid_path(config)) == os.getpid():
@@ -4858,7 +5191,12 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
             except (OSError, json.JSONDecodeError):
                 status = {}
             expected_fingerprint = config_fingerprint(config)
+            expected_source_fingerprint = runtime_source_fingerprint()
             same_invocation = bool(status.get("dispatch_requested", False)) == bool(args.dispatch)
+            same_source = (
+                str(status.get("runtime_source_fingerprint") or "")
+                == expected_source_fingerprint
+            )
             status_runtime_pid = str(status.get("runtime_pid") or "")
             startup_age = process_age_seconds(existing)
             startup_grace_seconds = max(
@@ -4899,10 +5237,40 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
                 return 0
             if (
                 str(status.get("config_fingerprint") or "") == expected_fingerprint
+                and same_source
                 and same_invocation
                 and not health_replacement_required
             ):
                 print(f"SDK 实时运行层已在运行，PID={existing}")
+                return 0
+            if runtime_deployment_is_frozen() and not health_replacement_required:
+                write_json_atomic(
+                    config.output_dir / PENDING_RUNTIME_RELOAD_JSON,
+                    {
+                        "schema_version": "m15.sdk-pending-runtime-reload.v1",
+                        "status": "deferred_until_postclose",
+                        "generated_at": to_iso(datetime.now(UTC)),
+                        "runtime_pid": existing,
+                        "loaded_config_fingerprint": str(
+                            status.get("config_fingerprint") or ""
+                        ),
+                        "expected_config_fingerprint": expected_fingerprint,
+                        "loaded_runtime_source_fingerprint": str(
+                            status.get("runtime_source_fingerprint") or ""
+                        ),
+                        "expected_runtime_source_fingerprint": (
+                            expected_source_fingerprint
+                        ),
+                        "same_runtime_source": same_source,
+                        "same_dispatch_invocation": same_invocation,
+                        "health_replacement_required": False,
+                        "new_entries_still_use_loaded_runtime_contract": True,
+                    },
+                )
+                print(
+                    "SDK 实时运行层处于交易时段部署冻结，"
+                    f"PID={existing}；新版本将在盘后重载。"
+                )
                 return 0
             if not request_runtime_shutdown(existing):
                 raise RuntimeError("sdk_runtime_shutdown_escalation_failed")
@@ -4923,6 +5291,7 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
                 env=child_environment,
             )
         pid_path(config).write_text(f"{process.pid}\n", encoding="utf-8")
+        (config.output_dir / PENDING_RUNTIME_RELOAD_JSON).unlink(missing_ok=True)
         print(f"SDK 实时运行层已启动，PID={process.pid}")
     return 0
 
@@ -4950,6 +5319,7 @@ def main() -> int:
             "runtime_process_alive": alive,
             "runtime_pid": pid or "",
             "expected_config_fingerprint": config_fingerprint(config),
+            "expected_runtime_source_fingerprint": runtime_source_fingerprint(),
         })
         if not alive:
             payload.update({

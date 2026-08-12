@@ -965,13 +965,16 @@ def five_minute_session_coverage(
     observed_by_boundary: dict[str, set[str]] = {
         key: set() for key in expected_keys
     }
+    recovered_by_boundary: dict[str, set[str]] = {
+        key: set() for key in expected_keys
+    }
     duplicates: list[str] = []
     invalid_rows = 0
     accepted_rows = 0
     for row in rows:
         if str(row.get("timeframe") or "") != "5m":
             continue
-        if row.get("bar_final") is not True or row.get("context_only") is True:
+        if row.get("bar_final") is not True:
             continue
         symbol = str(row.get("symbol") or "").upper().replace(".US", "")
         if symbol not in normalized_symbols:
@@ -992,6 +995,16 @@ def five_minute_session_coverage(
             invalid_rows += 1
             continue
         source_mode = str(row.get("source_mode") or "")
+        is_verified_recovery = bool(
+            row.get("context_only") is True
+            and row.get("recovery_verified") is True
+            and source_mode == "longbridge_sdk_intraday_recovery"
+        )
+        if is_verified_recovery:
+            recovered_by_boundary[boundary_key].add(symbol)
+            continue
+        if row.get("context_only") is True:
+            continue
         if source_mode not in {
             "longbridge_sdk_push",
             "longbridge_sdk_snapshot_poll",
@@ -1031,6 +1044,34 @@ def five_minute_session_coverage(
         and not missing
         and len(complete) == expected_boundary_count
     )
+    recovered_complete: list[str] = []
+    recovered_partial: list[dict[str, Any]] = []
+    recovered_missing: list[str] = []
+    recovered_rows_used = 0
+    for boundary_key in sorted(expected_keys):
+        combined = observed_by_boundary[boundary_key] | recovered_by_boundary[boundary_key]
+        recovered_rows_used += len(
+            recovered_by_boundary[boundary_key] - observed_by_boundary[boundary_key]
+        )
+        count = len(combined)
+        if count == required_per_boundary:
+            recovered_complete.append(boundary_key)
+        elif count == 0:
+            recovered_missing.append(boundary_key)
+        else:
+            recovered_partial.append(
+                {
+                    "boundary_at": boundary_key,
+                    "observed_symbol_count": count,
+                    "missing_symbol_count": required_per_boundary - count,
+                }
+            )
+    data_complete_after_recovery = bool(
+        expected_boundary_count == 78
+        and not recovered_partial
+        and not recovered_missing
+        and len(recovered_complete) == expected_boundary_count
+    )
     return {
         "business_date": business_date,
         "required_symbol_count": required_per_boundary,
@@ -1049,6 +1090,14 @@ def five_minute_session_coverage(
         "duplicate_examples": duplicates[:20],
         "complete_so_far": complete_so_far,
         "session_complete": bool(expected_boundary_count == 78 and complete_so_far),
+        "recovered_row_count": recovered_rows_used,
+        "recovered_complete_boundary_count": len(recovered_complete),
+        "recovered_partial_boundary_count": len(recovered_partial),
+        "recovered_missing_boundary_count": len(recovered_missing),
+        "recovered_partial_boundaries": recovered_partial[:20],
+        "recovered_missing_boundary_times": recovered_missing[:78],
+        "data_complete_after_recovery": data_complete_after_recovery,
+        "recovery_counts_as_realtime_evidence": False,
         "status": (
             "complete_session"
             if expected_boundary_count == 78 and complete_so_far
@@ -1073,6 +1122,8 @@ def append_market_events(path: Path, rows: list[dict[str, Any]], keep_lines: int
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def load_current_sdk_intraday_context(
@@ -1108,6 +1159,7 @@ def load_current_sdk_intraday_context(
                 "longbridge_sdk_push",
                 "longbridge_sdk_snapshot_poll",
                 "longbridge_sdk_intraday_context",
+                "longbridge_sdk_intraday_recovery",
             }
             or str(row.get("timeframe") or "") != "5m"
             or not bool(row.get("bar_final"))

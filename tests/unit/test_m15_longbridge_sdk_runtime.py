@@ -75,6 +75,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     request_runtime_shutdown,
     restore_pipeline_observability,
     rotate_runtime_log,
+    runtime_deployment_is_frozen,
     runtime_requires_health_replacement,
     runtime_owns_quote_connection,
     runtime_status_matches_config,
@@ -92,6 +93,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     subscription_quote_stream_is_stale,
     trade_context_health_requires_rebuild,
     validated_snapshot_poll_is_reusable,
+    verified_postclose_recovery_rows,
     write_trusted_sdk_quote_snapshot,
 )
 
@@ -358,6 +360,14 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
     def test_realtime_runtime_never_opens_history_connection_before_live_quotes(self) -> None:
         self.assertFalse(REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED)
+
+    def test_quote_callback_is_enabled_before_the_subscribe_call(self) -> None:
+        source = inspect.getsource(quote_worker)
+        enabled = source.index("aggregation_enabled = True")
+        callback = source.index("quote.set_on_quote(on_quote)")
+        subscribe = source.index("failed = subscribe_quote_and_trades(")
+        self.assertLess(enabled, callback)
+        self.assertLess(callback, subscribe)
 
     def test_mid_session_context_defers_without_replaying_signals_or_orders(self) -> None:
         affected, status = deferred_intraday_context_after_mid_session_start(
@@ -1087,6 +1097,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "status": "reconnecting_market_data_circuit",
                     "runtime_pid": current_pid,
                     "config_fingerprint": "expected-fingerprint",
+                    "runtime_source_fingerprint": "expected-source",
                     "dispatch_requested": True,
                 }),
                 encoding="utf-8",
@@ -1112,6 +1123,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     return_value="expected-fingerprint",
                 ),
                 patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.runtime_source_fingerprint",
+                    return_value="expected-source",
+                ),
+                patch(
                     "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
                 ) as shutdown,
                 patch(
@@ -1123,6 +1138,81 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             self.assertEqual(result, 0)
             shutdown.assert_not_called()
             popen.assert_not_called()
+
+    def test_daemon_defers_healthy_code_drift_during_market_session(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            current_pid = __import__("os").getpid()
+            config = SimpleNamespace(
+                output_dir=root,
+                runtime_status_path=root / "runtime-status.json",
+                config_path=root / "runtime-config.json",
+                maximum_account_snapshot_age_seconds=45,
+            )
+            config.runtime_status_path.write_text(
+                json.dumps({
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "status": "running",
+                    "runtime_pid": current_pid,
+                    "config_fingerprint": "same-config",
+                    "runtime_source_fingerprint": "loaded-source",
+                    "dispatch_requested": True,
+                    "account_snapshot_age_seconds": 5,
+                }),
+                encoding="utf-8",
+            )
+            global_lock = root / "global-sdk-quote.lock"
+            global_lock.write_text(f"{current_pid}\n", encoding="utf-8")
+            args = SimpleNamespace(dispatch=True, config=str(config.config_path))
+            with (
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_QUOTE_SUBSCRIPTION_LOCK",
+                    global_lock,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_RUNTIME_START_LOCK",
+                    root / "global-start.lock",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.is_expected_sdk_runtime_process",
+                    return_value=True,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.config_fingerprint",
+                    return_value="same-config",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.runtime_source_fingerprint",
+                    return_value="new-source",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.runtime_deployment_is_frozen",
+                    return_value=True,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
+                ) as shutdown,
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
+                ) as popen,
+            ):
+                result = start_runtime_daemon(args, config)
+
+            self.assertEqual(result, 0)
+            shutdown.assert_not_called()
+            popen.assert_not_called()
+            pending = json.loads(
+                (root / "m15_sdk_pending_runtime_reload.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(pending["status"], "deferred_until_postclose")
+            self.assertEqual(pending["runtime_pid"], current_pid)
+            self.assertFalse(pending["same_runtime_source"])
+            self.assertEqual(
+                pending["expected_runtime_source_fingerprint"],
+                "new-source",
+            )
 
     def test_daemon_does_not_kill_new_pid_while_old_status_is_stale(self) -> None:
         with TemporaryDirectory() as directory:
@@ -2614,7 +2704,9 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "events.jsonl"
             rows = [{"event_id": f"event-{index}", "value": index} for index in range(5)]
-            append_market_events(path, rows, keep_lines=3)
+            with patch("scripts.m15_longbridge_sdk_runtime_lib.os.fsync") as fsync:
+                append_market_events(path, rows, keep_lines=3)
+            fsync.assert_called_once()
             self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 5)
             compact_market_events(path, 3)
             lines = path.read_text(encoding="utf-8").splitlines()
@@ -2749,6 +2841,120 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             required_bars=3,
         )
         self.assertEqual(missing, ["AAPL", "MSFT"])
+
+    def test_postclose_recovery_is_context_only_and_never_replays_orders(self) -> None:
+        fetched = [{
+            "event_id": "sdk-5m|AAPL.US|2026-08-11T13:35:00Z",
+            "symbol": "AAPL",
+            "timeframe": "5m",
+            "event_time": "2026-08-11T13:35:00Z",
+            "bar_final": True,
+            "context_only": True,
+            "source_mode": "longbridge_sdk_intraday_context",
+        }]
+        recovered = verified_postclose_recovery_rows(
+            fetched,
+            [],
+            business_date="2026-08-11",
+        )
+        self.assertEqual(len(recovered), 1)
+        self.assertEqual(
+            recovered[0]["source_mode"],
+            "longbridge_sdk_intraday_recovery",
+        )
+        self.assertTrue(recovered[0]["context_only"])
+        self.assertFalse(recovered[0]["strategy_dispatch_eligible"])
+        self.assertFalse(recovered[0]["historical_signal_replayed"])
+        self.assertFalse(recovered[0]["historical_order_replayed"])
+
+        result = dispatch_completed_rows(
+            SimpleNamespace(),
+            recovered,
+            MarketEventContext(),
+            None,
+            None,
+        )
+        self.assertEqual(result["event_count"], 0)
+        self.assertEqual(result["signal_count"], 0)
+        self.assertEqual(result["execution"]["submitted_count"], 0)
+        self.assertEqual(result["ignored_context_only_count"], 1)
+
+    def test_postclose_recovery_replaces_invalid_boundary_without_event_id_collision(self) -> None:
+        source_event_id = "sdk-5m|AAPL.US|2026-08-11T13:35:00Z"
+        fetched = [{
+            "event_id": source_event_id,
+            "symbol": "AAPL",
+            "timeframe": "5m",
+            "event_time": "2026-08-11T13:35:00Z",
+            "bar_final": True,
+            "context_only": True,
+            "source_mode": "longbridge_sdk_intraday_context",
+        }]
+        invalid_existing = [{
+            "event_id": source_event_id,
+            "symbol": "AAPL",
+            "timeframe": "5m",
+            "event_time": "2026-08-11T13:35:00Z",
+            "bar_final": True,
+            "source_mode": "longbridge_sdk_snapshot_poll",
+            "market_data_blocked_reason": "incomplete_snapshot",
+        }]
+
+        recovered = verified_postclose_recovery_rows(
+            fetched,
+            invalid_existing,
+            business_date="2026-08-11",
+        )
+
+        self.assertEqual(len(recovered), 1)
+        self.assertEqual(recovered[0]["event_id"], f"{source_event_id}|recovery")
+        self.assertEqual(recovered[0]["recovery_source_event_id"], source_event_id)
+        self.assertFalse(recovered[0]["strategy_dispatch_eligible"])
+
+    def test_verified_recovery_completes_audit_but_not_realtime_coverage(self) -> None:
+        boundary = "2026-08-11T13:35:00Z"
+        rows = [
+            {
+                "event_id": "AAPL-live",
+                "symbol": "AAPL",
+                "timeframe": "5m",
+                "event_time": boundary,
+                "bar_final": True,
+                "source_mode": "longbridge_sdk_push",
+            },
+            {
+                "event_id": "MSFT-recovered",
+                "symbol": "MSFT",
+                "timeframe": "5m",
+                "event_time": boundary,
+                "bar_final": True,
+                "context_only": True,
+                "recovery_verified": True,
+                "source_mode": "longbridge_sdk_intraday_recovery",
+            },
+        ]
+        coverage = five_minute_session_coverage(
+            rows,
+            ["AAPL.US", "MSFT.US"],
+            now=datetime(2026, 8, 11, 13, 40, 11, tzinfo=UTC),
+        )
+        self.assertFalse(coverage["complete_so_far"])
+        self.assertEqual(coverage["accepted_row_count_so_far"], 1)
+        self.assertEqual(coverage["recovered_row_count"], 1)
+        self.assertEqual(coverage["recovered_complete_boundary_count"], 1)
+        self.assertFalse(coverage["recovery_counts_as_realtime_evidence"])
+
+    def test_runtime_deployment_freezes_only_during_session_envelope(self) -> None:
+        self.assertTrue(
+            runtime_deployment_is_frozen(
+                datetime(2026, 8, 11, 14, 0, tzinfo=UTC)
+            )
+        )
+        self.assertFalse(
+            runtime_deployment_is_frozen(
+                datetime(2026, 8, 11, 21, 0, tzinfo=UTC)
+            )
+        )
 
     def test_subscribe_uses_the_installed_sdk_two_argument_contract(self) -> None:
         class QuoteContext:
