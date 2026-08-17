@@ -14,7 +14,7 @@
     "visual_strategy_acceptance": "reports/m15_visual_strategy_shadow/acceptance_evidence.json",
     "visual_strategy_session_summary": "local_runtime/m15_visual_strategy_shadow/session_summary.json",
     "pnl_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json",
-    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
     "local_runtime_registry": "config/examples/m13_strategy_runtime_registry.json"
   },
   "outputs": {
