@@ -470,6 +470,7 @@ def _process_alive(pid: Any) -> bool:
 def _inventory(execution_config: dict[str, Any]) -> dict[str, Any]:
     buckets = execution_config.get("virtual_capital_buckets") or {}
     contract_config = execution_config.get("strategy_contracts") or {}
+    layering = execution_config.get("runtime_layering") or {}
     contracts: dict[str, dict[str, Any]] = {}
     if contract_config.get("directory"):
         try:
@@ -511,12 +512,36 @@ def _inventory(execution_config: dict[str, Any]) -> dict[str, Any]:
         )
     long_count = sum(row["runtime_count"] for row in rows if row["direction"] != "short")
     short_count = sum(row["runtime_count"] for row in rows if row["direction"] == "short")
+    visual_runtime_ids = [str(value) for value in layering.get("visual_shadow_only") or []]
+    retired_runtime_ids = [
+        str(value) for value in layering.get("retired_simplified_versions") or []
+    ]
+    visual_contract_rows = []
+    for runtime_id in visual_runtime_ids:
+        contract = contracts.get(runtime_id) or {}
+        visual_contract_rows.append(
+            {
+                "runtime_id": runtime_id,
+                "contract_stage": contract.get("stage") or "contract-draft-v1",
+                "contract_stage_zh": contract.get("stage_zh") or "视觉合同草案",
+                "contract_hash": contract.get("contract_hash"),
+                "contract_loaded": bool(contract),
+                "paper_orders_allowed": False,
+            }
+        )
     return {
         "bucket_count": len(rows),
         "runtime_count": len(runtime_ids),
         "long_runtime_count": long_count,
         "short_runtime_count": short_count,
         "runtime_ids": runtime_ids,
+        "executable_contract_count": len(runtime_ids),
+        "executable_contract_runtime_ids": runtime_ids,
+        "visual_contract_draft_count": len(visual_runtime_ids),
+        "visual_contract_draft_runtime_ids": visual_runtime_ids,
+        "visual_contract_rows": visual_contract_rows,
+        "retired_simplified_count": len(retired_runtime_ids),
+        "retired_simplified_runtime_ids": retired_runtime_ids,
         "strategy_contracts_required": bool(contract_config.get("required", False)),
         "contract_loaded_count": sum(row["contract_loaded"] for row in contract_rows),
         "contract_rows": contract_rows,
@@ -647,6 +672,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     strategy_diagnostics = _read_json(_resolve(inputs["strategy_signal_diagnostics"])) if inputs.get("strategy_signal_diagnostics") else {}
     visual_acceptance = _read_json(_resolve(inputs["visual_strategy_acceptance"])) if inputs.get("visual_strategy_acceptance") else {}
     visual_session = _read_json(_resolve(inputs["visual_strategy_session_summary"])) if inputs.get("visual_strategy_session_summary") else {}
+    formal_test_evidence = _read_json(_resolve(inputs["formal_test_evidence"])) if inputs.get("formal_test_evidence") else {}
     pnl = _read_json(_resolve(inputs["pnl_reconciliation"]))
     execution_config = _read_json(_resolve(inputs["execution_config"]))
     inventory = _inventory(execution_config)
@@ -913,6 +939,33 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "open_orders": open_order_count,
             "pending_orders": pending_count,
         },
+        "formal_test_evidence": formal_test_evidence or {
+            "layers": {
+                "market_session": {
+                    "status": "waiting_for_postclose_evidence",
+                    "complete": False,
+                    "plain_language_result": "等待盘后生成147只完整会话证据。",
+                },
+                "strategy_operation": {
+                    "status": "waiting_for_postclose_evidence",
+                    "complete": False,
+                    "plain_language_result": "等待盘后逐策略运行证据。",
+                },
+                "broker_execution": {
+                    "status": "waiting_for_postclose_evidence",
+                    "complete": False,
+                    "plain_language_result": "等待盘后核对长桥订单链路。",
+                },
+                "performance_sample": {
+                    "status": "insufficient",
+                    "plain_language_result": "尚未形成足够的完整交易日和实际成交样本。",
+                },
+            },
+            "progress": {
+                "consecutive_clean_session_count": 0,
+                "stable_session_target": 3,
+            },
+        },
         "account": {
             "cash": account_summary.get("cash") if account_summary_fresh else account.get("cash"),
             "usd_available_cash": account.get("usd_available_cash"),
@@ -1075,8 +1128,13 @@ const archivedSummary=d.fill_attribution.archived_summary||{{}};
 const migrationSummary=Object.entries(d.pa004_migration.active_bucket_baselines||{{}}).map(([bucket,startedAt])=>`${{bucket}}: ${{startedAt}}`).join('；')||'未启用';
 const pa002Milestone=d.pa002_dual_version_milestone||{{}};
 const five=d.runtime.five_minute_session_coverage||{{}};
+const formalEvidence=d.formal_test_evidence||{{layers:{{}},progress:{{}}}};
+const evidenceLayers=formalEvidence.layers||{{}};
+const evidenceStatus={{complete:'完整',operational:'正常',sufficient:'样本足够',insufficient:'样本不足',reference_only:'旧周期参考',incomplete:'不完整',needs_attention:'需要修复',waiting_for_session_close:'等待收盘',waiting_for_postclose_evidence:'等待盘后证据',not_applicable_non_trading_day:'非交易日不适用',blocked_runtime_prerequisite:'运行前提不满足',contract_draft:'规则草案'}};
+const evidenceLayerRows=[['行情会话',evidenceLayers.market_session],['策略运行',evidenceLayers.strategy_operation],['券商执行',evidenceLayers.broker_execution],['盈利样本',evidenceLayers.performance_sample]];
 const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['行情模式',v(d.runtime.market_data_mode)],['SDK推送订阅',v(d.runtime.sdk_push_subscription_coverage)],['实际行情覆盖',v(d.runtime.trading_market_data_coverage)],['实时五分钟完整边界',`${{v(five.complete_boundary_count)}}/${{v(five.expected_boundary_count_so_far)}}`],['实时五分钟缺失边界',v(five.missing_boundary_count)],['盘后补齐后完整',five.data_complete_after_recovery?'是':'否'],['盘后补录K线',v(five.recovered_row_count)],['盘后补录状态',v(d.runtime.postclose_intraday_recovery?.status)],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['PA002双版本阶段',v(pa002Milestone.milestone_phase)],['PA002有效交易日',v(pa002Milestone.aggregate?.effective_trading_day_count)],['PA002完整交易',v(pa002Milestone.aggregate?.completed_trade_count)],['PA002当前建议',v(pa002Milestone.recommendation?.plain_text)],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
 cards.push(['做空检测尝试',d.paper_short_diagnostics.summary?.detector_attempted_count],['做空未形成候选',d.paper_short_diagnostics.summary?.no_candidate_count],['容量查询失败',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.query_failed],['无借券库存',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.no_borrow_inventory],['借券数量不足',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.insufficient],['做空部分成交',d.paper_short_diagnostics.summary?.broker_partially_filled_order_count],['做空完全成交',d.paper_short_diagnostics.summary?.broker_fully_filled_order_count]);
+cards.splice(7,0,['SDK模拟账户硬门禁',formalEvidence.sdk_paper_runtime_ready?'通过':'未通过'],['连续完整正式日',`${{v(formalEvidence.progress?.consecutive_clean_session_count)}}/${{v(formalEvidence.progress?.stable_session_target)}}`],['正式可执行合同',v(d.strategy_inventory.executable_contract_count)],['视觉规则草案',v(d.strategy_inventory.visual_contract_draft_count)],['已退出简化版本',v(d.strategy_inventory.retired_simplified_count)]);
 const shortRows=d.paper_short_diagnostics.runtime_summaries||[];
 const strategyFunnelRows=d.strategy_execution_funnel.runtime_summaries||[];
 const visualRows=d.visual_strategy_shadow.runtime_rows||[];
@@ -1092,6 +1150,7 @@ document.getElementById('app').innerHTML=`<section class=\"grid\">${{cards.map(x
 document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>全部正式策略执行漏斗</h2><table><thead><tr><th>运行单元</th><th>方向</th><th>检测尝试</th><th>未形成候选</th><th>结构候选</th><th>路由通过</th><th>执行检查</th><th>执行阻断</th><th>订单号</th><th>实际成交</th><th>主要原因</th></tr></thead><tbody>${{strategyFunnelRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{x.direction==='short'?'做空':'做多'}}</td><td>${{v(x.detector_attempted_count)}}</td><td>${{v(x.no_candidate_count)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.execution_attempted_count)}}</td><td>${{v(x.execution_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.no_candidate_reasons||{{}}),...(x.router_blockers||{{}}),...(x.execution_blockers||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table><h2>策略合同版本</h2><table><thead><tr><th>运行单元</th><th>合同阶段</th><th>合同哈希</th><th>装载状态</th></tr></thead><tbody>${{(d.strategy_inventory.contract_rows||[]).map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.contract_stage_zh||x.contract_stage)}}</td><td>${{x.contract_hash?x.contract_hash.slice(0,12):'未装载'}}</td><td>${{x.contract_loaded?'已锁定':'未装载'}}</td></tr>`).join('')}}</tbody></table>`);
 document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>视觉策略影子验收</h2><table><thead><tr><th>运行单元</th><th>历史标的</th><th>历史K线</th><th>无未来数据</th><th>重启一致</th><th>正例审核</th><th>反例审核</th><th>边界例审核</th><th>完整实时影子日</th><th>可进入模拟仓</th></tr></thead><tbody>${{visualRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.historical_replay_symbol_count)}}</td><td>${{v(x.historical_replay_bar_count)}}</td><td>${{x.no_future_data?'通过':'未通过'}}</td><td>${{x.restart_parity?'通过':'未通过'}}</td><td>${{v(x.positive_examples)}}/10</td><td>${{v(x.negative_examples)}}/10</td><td>${{v(x.boundary_examples)}}/5</td><td>${{v(x.realtime_shadow_sessions)}}/1</td><td>${{x.paper_eligible?'是':'否'}}</td></tr>`).join('')}}</tbody></table>`);
 document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>三条 Short 分阶段漏斗</h2><table><thead><tr><th>运行单元</th><th>检测尝试</th><th>未形成候选</th><th>结构候选</th><th>路由通过</th><th>容量检查</th><th>容量阻断</th><th>订单号</th><th>成交</th><th>主要原因</th></tr></thead><tbody>${{shortRows.map(x=>`<tr><td>${{v(x.runtime_id)}}</td><td>${{v(x.detector_attempted_count)}}</td><td>${{v(x.no_candidate_count)}}</td><td>${{v(x.candidate_count)}}</td><td>${{v(x.signal_ready_count)}}</td><td>${{v(x.broker_capacity_checked_count)}}</td><td>${{v(x.broker_capacity_blocked_count)}}</td><td>${{v(x.broker_order_id_count)}}</td><td>${{v(x.broker_filled_order_count)}}</td><td>${{Object.entries({{...(x.no_candidate_reasons||{{}}),...(x.broker_capacity_failure_classes||{{}})}}).slice(0,3).map(([k,n])=>`${{k}} ${{n}}`).join('；')||'暂无'}}</td></tr>`).join('')}}</tbody></table><h2>同标的多空净额</h2><table><thead><tr><th>标的</th><th>多头数量</th><th>空头数量</th><th>净数量</th><th>总数量</th><th>同时多空</th></tr></thead><tbody>${{longShortNetRows.map(x=>`<tr><td>${{v(x.symbol)}}</td><td>${{v(x.long_quantity)}}</td><td>${{v(x.short_quantity)}}</td><td>${{v(x.net_quantity)}}</td><td>${{v(x.gross_quantity)}}</td><td>${{x.contains_both_directions?'是':'否'}}</td></tr>`).join('')}}</tbody></table><h2>Short lot 生命周期</h2><table><thead><tr><th>开仓订单</th><th>运行单元</th><th>标的</th><th>开仓数量</th><th>剩余数量</th><th>已回补</th><th>状态</th><th>待确认回补</th></tr></thead><tbody>${{(shortLotLifecycle.open_lots||[]).map(x=>`<tr><td>${{v(x.open_order_id)}}</td><td>${{v(x.runtime_id)}}</td><td>${{v(x.symbol)}}</td><td>${{v(x.filled_quantity)}}</td><td>${{v(x.remaining_quantity)}}</td><td>${{v(x.covered_quantity)}}</td><td>${{v(x.lifecycle_status)}}</td><td>${{v(x.pending_cover_order_count)}}</td></tr>`).join('')}}</tbody></table>`);
+document.getElementById('app').insertAdjacentHTML('beforeend',`<h2>正式测试四层证据</h2><table><thead><tr><th>层级</th><th>状态</th><th>交易日</th><th>人话结论</th></tr></thead><tbody>${{evidenceLayerRows.map(([name,row])=>`<tr><td>${{name}}</td><td>${{evidenceStatus[row?.status]||v(row?.status)}}</td><td>${{v(row?.business_date||row?.source_business_date||formalEvidence.business_date)}}</td><td>${{v(row?.plain_language_result)}}</td></tr>`).join('')}}</tbody></table><h2>策略身份分类</h2><table><thead><tr><th>身份</th><th>数量</th><th>运行单元</th></tr></thead><tbody><tr><td>正式可执行合同</td><td>${{v(d.strategy_inventory.executable_contract_count)}}</td><td>${{(d.strategy_inventory.executable_contract_runtime_ids||[]).join('、')}}</td></tr><tr><td>视觉规则草案（只读）</td><td>${{v(d.strategy_inventory.visual_contract_draft_count)}}</td><td>${{(d.strategy_inventory.visual_contract_draft_runtime_ids||[]).join('、')}}</td></tr><tr><td>已退出简化版本</td><td>${{v(d.strategy_inventory.retired_simplified_count)}}</td><td>${{(d.strategy_inventory.retired_simplified_runtime_ids||[]).join('、')}}</td></tr></tbody></table>`);
 </script></main></body></html>"""
 
 

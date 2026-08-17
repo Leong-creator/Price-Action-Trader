@@ -52,7 +52,13 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
     def write_jsonl(self, path: Path, rows: list[dict[str, str]]) -> None:
         path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
 
-    def write_acceptance_config(self, root: Path, *, expected_symbol_count: int = 2) -> Path:
+    def write_acceptance_config(
+        self,
+        root: Path,
+        *,
+        expected_symbol_count: int = 2,
+        realtime_required_symbol_count: int | None = None,
+    ) -> Path:
         path = root / "acceptance_config.json"
         payload = {
             "inputs": {
@@ -62,6 +68,7 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
                 "shadow_audit_jsonl": str(root / "audit.jsonl"),
                 "historical_replay_bars": str(root / "historical_replay_bars.jsonl"),
                 "realtime_shadow_ledger": str(root / "realtime_shadow_ledger.jsonl"),
+                "human_review_ledger": str(root / "human_review_ledger.jsonl"),
             },
             "outputs": {"acceptance_json": str(root / "acceptance.json")},
             "hard_boundaries": {
@@ -71,7 +78,12 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
                 "live_execution": False,
             },
             "proofs": {
-                "expected_symbol_count": expected_symbol_count,
+                "historical_expected_symbol_count": expected_symbol_count,
+                "realtime_required_symbol_count": (
+                    realtime_required_symbol_count
+                    if realtime_required_symbol_count is not None
+                    else expected_symbol_count
+                ),
                 "expected_bars_per_symbol": 6,
                 "segmented_chunk_size": 2,
                 "negative_horizon_bars": 2,
@@ -281,6 +293,119 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
         )
         self.assertTrue(second["replay_proofs"]["audit_matches_replay"]["passed"])
         self.assertTrue(second["replay_proofs"]["no_future_data"]["passed"])
+
+    def test_realtime_shadow_uses_production_147_separately_from_300_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bars = [self.bar("AAA", day, "10", "11", "9", "10", "100") for day in range(1, 7)]
+            bars += [self.bar("BBB", day, "20", "21", "19", "20", "100") for day in range(1, 7)]
+            self.write_jsonl(root / "bars.jsonl", bars)
+            self.write_shadow_config(root)
+            self.write_ledger(
+                root,
+                [
+                    {
+                        "schema_version": "m15.visual-strategy-shadow-session.v1",
+                        "business_date": "2026-08-14",
+                        "status": "completed",
+                        "session_complete": True,
+                        "required_symbol_count": 147,
+                        "complete_symbol_count": 147,
+                        "mode": "read_only_sdk_session_shadow",
+                        "source_mode": "longbridge_sdk_rth_5m_aggregate",
+                    }
+                ],
+            )
+            run_visual_strategy_shadow(
+                self.make_shadow_config(root),
+                bars=bars,
+                generated_at="2026-08-15T01:00:00Z",
+            )
+            evidence = generate_acceptance_evidence(
+                load_acceptance_config(
+                    self.write_acceptance_config(
+                        root,
+                        expected_symbol_count=2,
+                        realtime_required_symbol_count=147,
+                    )
+                ),
+                generated_at="2026-08-15T01:30:00Z",
+            )
+
+        self.assertEqual(
+            evidence["realtime_shadow_ledger_summary"]["required_symbol_count"],
+            147,
+        )
+        self.assertEqual(
+            evidence["realtime_shadow_ledger_summary"]["completed_unique_business_dates"],
+            1,
+        )
+        self.assertEqual(
+            evidence["replay_proofs"]["historical_replay_symbol_count"]["expected"],
+            2,
+        )
+
+    def test_matching_human_review_counts_only_current_candidate_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bars = [
+                self.bar("AAA", 1, "10", "11", "9", "10", "100"),
+                self.bar("AAA", 2, "10", "11", "9.8", "10.8", "100"),
+                self.bar("AAA", 3, "10.8", "11.2", "9.1", "9.7", "100"),
+                self.bar("AAA", 4, "9.8", "10.2", "9.0", "9.1", "100"),
+                self.bar("AAA", 5, "9.0", "10.6", "8.9", "10.5", "100"),
+                self.bar("AAA", 6, "10.5", "10.8", "10.2", "10.7", "250"),
+                *[
+                    self.bar("BBB", day, "20", "21", "19", str(20 + day / 10), "100")
+                    for day in range(1, 7)
+                ],
+            ]
+            self.write_jsonl(root / "bars.jsonl", bars)
+            self.write_shadow_config(root)
+            self.write_ledger(root, [])
+            run_visual_strategy_shadow(
+                self.make_shadow_config(root),
+                bars=bars,
+                generated_at="2026-08-15T01:00:00Z",
+            )
+            config = load_acceptance_config(self.write_acceptance_config(root))
+            first = generate_acceptance_evidence(config, generated_at="2026-08-15T01:30:00Z")
+            candidate = next(
+                row
+                for strategy in ("PA004", "PA007", "PA008")
+                for rows in first[strategy]["candidate_examples"].values()
+                for row in rows
+            )
+            review_rows = [
+                {
+                    "strategy_id": candidate["strategy_id"],
+                    "case_id": candidate["case_id"],
+                    "case_type": candidate["case_type"],
+                    "candidate_fingerprint": candidate["candidate_fingerprint"],
+                    "decision": "pass",
+                    "reviewer": "human-test",
+                    "reviewed_at": "2026-08-15T02:00:00Z",
+                },
+                {
+                    "strategy_id": candidate["strategy_id"],
+                    "case_id": "unknown-case",
+                    "case_type": candidate["case_type"],
+                    "candidate_fingerprint": "wrong",
+                    "decision": "pass",
+                },
+            ]
+            self.write_jsonl(config.human_review_ledger_path, review_rows)
+            second = generate_acceptance_evidence(config, generated_at="2026-08-15T02:30:00Z")
+
+        strategy_row = second[candidate["strategy_id"]]
+        count_key = {
+            "positive": "positive_examples",
+            "negative": "negative_examples",
+            "boundary": "boundary_examples",
+        }[candidate["case_type"]]
+        self.assertEqual(strategy_row["reviewed_counts"][count_key], 1)
+        self.assertEqual(strategy_row["human_review_passed_counts"][count_key], 1)
+        self.assertEqual(strategy_row["human_review_invalid_row_count"], 1)
 
 
 if __name__ == "__main__":

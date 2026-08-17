@@ -1,0 +1,34 @@
+{
+  "stage": "M15.formal_test_evidence",
+  "inputs": {
+    "sdk_runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json",
+    "account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
+    "strategy_signal_diagnostics": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_strategy_signal_diagnostics.json",
+    "execution_ledger": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution_ledger.jsonl",
+    "order_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_order_reconciliation.json",
+    "fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json",
+    "formal_epoch": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
+    "visual_acceptance": "reports/m15_visual_strategy_shadow/acceptance_evidence.json",
+    "market_calendar": "config/examples/m12_47_session_supervisor.json"
+  },
+  "outputs": {
+    "session_ledger_jsonl": "local_runtime/m15_formal_test_evidence/session_ledger.jsonl",
+    "summary_json": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_formal_test_evidence.json",
+    "report_md": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_formal_test_evidence.md"
+  },
+  "acceptance": {
+    "required_symbol_count": 147,
+    "required_boundary_count": 78,
+    "stable_session_target": 3,
+    "operational_session_target": 5,
+    "performance_minimum_clean_days": 20,
+    "performance_minimum_completed_trades": 30
+  },
+  "hard_boundaries": {
+    "paper_simulated_only": true,
+    "local_simulation_used": false,
+    "changes_trading_permissions": false,
+    "recovered_rows_count_as_realtime": false
+  }
+}

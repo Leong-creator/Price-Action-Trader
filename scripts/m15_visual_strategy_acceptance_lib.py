@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from hashlib import sha256
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -59,8 +60,10 @@ class AcceptanceConfig:
     historical_replay_bars_path: Path | None = None
     realtime_shadow_ledger_path: Path | None = None
     session_daily_bars_path: Path | None = None
+    human_review_ledger_path: Path | None = None
     output_path: Path = ROOT / "reports" / "m15_visual_strategy_shadow" / "acceptance_evidence.json"
     expected_symbol_count: int = 300
+    realtime_required_symbol_count: int = 147
     expected_bars_per_symbol: int = 60
     segmented_chunk_size: int = 37
     negative_horizon_bars: int = 3
@@ -113,8 +116,22 @@ def load_acceptance_config(path: str | Path) -> AcceptanceConfig:
         session_daily_bars_path=resolve_path(inputs["session_daily_bars"])
         if inputs.get("session_daily_bars")
         else None,
+        human_review_ledger_path=resolve_path(inputs["human_review_ledger"])
+        if inputs.get("human_review_ledger")
+        else None,
         output_path=resolve_path(outputs["acceptance_json"]),
-        expected_symbol_count=int(proofs.get("expected_symbol_count", 300)),
+        expected_symbol_count=int(
+            proofs.get(
+                "historical_expected_symbol_count",
+                proofs.get("expected_symbol_count", 300),
+            )
+        ),
+        realtime_required_symbol_count=int(
+            proofs.get(
+                "realtime_required_symbol_count",
+                proofs.get("expected_symbol_count", 300),
+            )
+        ),
         expected_bars_per_symbol=int(proofs.get("expected_bars_per_symbol", 60)),
         segmented_chunk_size=int(proofs.get("segmented_chunk_size", 37)),
         negative_horizon_bars=int(proofs.get("negative_horizon_bars", 3)),
@@ -145,9 +162,14 @@ def generate_acceptance_evidence(
         if config.realtime_shadow_ledger_path and config.realtime_shadow_ledger_path.exists()
         else []
     )
+    human_review_rows = (
+        _load_jsonl(config.human_review_ledger_path)
+        if config.human_review_ledger_path and config.human_review_ledger_path.exists()
+        else []
+    )
     realtime_shadow_sessions = _count_completed_shadow_sessions(
         realtime_shadow_rows,
-        expected_symbol_count=config.expected_symbol_count,
+        expected_symbol_count=config.realtime_required_symbol_count,
     )
 
     batch = _replay_events(shadow_config, bars, observed_at)
@@ -257,11 +279,16 @@ def generate_acceptance_evidence(
             ),
             "realtime_shadow_ledger": str(config.realtime_shadow_ledger_path) if config.realtime_shadow_ledger_path else "",
             "session_daily_bars": str(config.session_daily_bars_path) if config.session_daily_bars_path else "",
+            "human_review_ledger": str(config.human_review_ledger_path) if config.human_review_ledger_path else "",
         },
         "realtime_shadow_ledger_summary": {
             "completed_unique_business_dates": realtime_shadow_sessions,
+            "required_symbol_count": config.realtime_required_symbol_count,
             "ledger_row_count": len(realtime_shadow_rows),
-            "counting_rule": "count unique business_date where status=completed and session_complete=true",
+            "counting_rule": (
+                "count unique business_date where status=completed, session_complete=true "
+                f"and required_symbol_count={config.realtime_required_symbol_count}"
+            ),
             "source_modes": sorted({str(row.get('source_mode', '')) for row in realtime_shadow_rows if row.get('source_mode')}),
         },
         "replay_proofs": replay_proofs,
@@ -283,11 +310,12 @@ def generate_acceptance_evidence(
                 for regime in candidate["covered_regimes"]
             }
         )
+        review = _apply_human_reviews(strategy, selected, human_review_rows)
         payload[strategy] = {
             "runtime_id": RUNTIME_IDS[strategy],
-            "positive_examples": 0,
-            "negative_examples": 0,
-            "boundary_examples": 0,
+            "positive_examples": review["passed_counts"]["positive_examples"],
+            "negative_examples": review["passed_counts"]["negative_examples"],
+            "boundary_examples": review["passed_counts"]["boundary_examples"],
             "historical_replay_symbol_count": historical_symbol_count,
             "historical_replay_bars_per_symbol": (
                 config.expected_bars_per_symbol if historical_replay_ok else 0
@@ -299,16 +327,11 @@ def generate_acceptance_evidence(
             "restart_parity": restart_parity_ok,
             "realtime_shadow_sessions": realtime_shadow_sessions,
             "example_count_basis": "human_review_passed_only",
-            "reviewed_counts": {
-                "positive_examples": 0,
-                "negative_examples": 0,
-                "boundary_examples": 0,
-            },
-            "human_review_passed_counts": {
-                "positive_examples": 0,
-                "negative_examples": 0,
-                "boundary_examples": 0,
-            },
+            "reviewed_counts": review["reviewed_counts"],
+            "human_review_passed_counts": review["passed_counts"],
+            "human_review_rejected_counts": review["rejected_counts"],
+            "human_review_invalid_row_count": review["invalid_row_count"],
+            "human_review_invalid_reasons": review["invalid_reasons"],
             "machine_candidate_pool_counts": {
                 "positive_examples": len(strategy_pool["positive"]),
                 "negative_examples": len(strategy_pool["negative"]),
@@ -620,7 +643,7 @@ def _build_candidate(
     context_end = min(len(bars), event_index + 4)
     context_bars = bars[context_start:context_end]
     covered_regimes = _classify_regimes(bars, event_index)
-    return {
+    candidate = {
         "case_id": f"{RUNTIME_IDS[strategy]}-{case_type}-{event['symbol']}-{event['event_time'][:10]}-{event['source_bar_id'][:8]}",
         "case_type": case_type,
         "strategy_id": strategy,
@@ -643,6 +666,85 @@ def _build_candidate(
         "context_bars": context_bars,
         "context_before_count": event_index - context_start,
         "context_after_count": max(0, context_end - event_index - 1),
+    }
+    candidate["candidate_fingerprint"] = _candidate_fingerprint(candidate)
+    return candidate
+
+
+def _candidate_fingerprint(candidate: dict[str, Any]) -> str:
+    excluded = {
+        "candidate_fingerprint",
+        "manual_review_status",
+        "manually_reviewed",
+        "manually_passed",
+    }
+    canonical = {
+        key: value for key, value in candidate.items() if key not in excluded
+    }
+    return sha256(
+        json.dumps(
+            canonical,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _apply_human_reviews(
+    strategy: str,
+    selected: dict[str, list[dict[str, Any]]],
+    review_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    candidates = {
+        candidate["case_id"]: candidate
+        for case_rows in selected.values()
+        for candidate in case_rows
+    }
+    latest: dict[str, dict[str, Any]] = {}
+    invalid_reasons: dict[str, int] = {}
+    for row in review_rows:
+        if str(row.get("strategy_id") or "") != strategy:
+            continue
+        case_id = str(row.get("case_id") or "")
+        candidate = candidates.get(case_id)
+        reason = ""
+        if candidate is None:
+            reason = "candidate_not_in_current_selected_set"
+        elif str(row.get("case_type") or "") != candidate["case_type"]:
+            reason = "case_type_mismatch"
+        elif str(row.get("candidate_fingerprint") or "") != candidate["candidate_fingerprint"]:
+            reason = "candidate_fingerprint_mismatch"
+        elif str(row.get("decision") or "") not in {"pass", "reject"}:
+            reason = "invalid_decision"
+        if reason:
+            invalid_reasons[reason] = invalid_reasons.get(reason, 0) + 1
+            continue
+        latest[case_id] = row
+
+    reviewed = {key: 0 for key in CASE_LIMIT_KEYS.values()}
+    passed = {key: 0 for key in CASE_LIMIT_KEYS.values()}
+    rejected = {key: 0 for key in CASE_LIMIT_KEYS.values()}
+    for case_id, row in latest.items():
+        candidate = candidates[case_id]
+        count_key = CASE_LIMIT_KEYS[candidate["case_type"]]
+        decision = str(row["decision"])
+        reviewed[count_key] += 1
+        if decision == "pass":
+            passed[count_key] += 1
+        else:
+            rejected[count_key] += 1
+        candidate["manual_review_status"] = decision
+        candidate["manually_reviewed"] = True
+        candidate["manually_passed"] = decision == "pass"
+        candidate["reviewed_at"] = row.get("reviewed_at")
+        candidate["reviewer"] = row.get("reviewer")
+    return {
+        "reviewed_counts": reviewed,
+        "passed_counts": passed,
+        "rejected_counts": rejected,
+        "invalid_row_count": sum(invalid_reasons.values()),
+        "invalid_reasons": invalid_reasons,
     }
 
 

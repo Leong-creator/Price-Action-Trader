@@ -28,6 +28,13 @@ from scripts.m15_longbridge_realtime_session_supervisor_lib import (
 
 
 class M15OpeningTradeReadinessTest(unittest.TestCase):
+    def test_missing_explicit_config_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "missing.json"
+
+            with self.assertRaises(FileNotFoundError):
+                load_config(missing)
+
     def test_default_readiness_config_targets_active_sdk_paper_runtime(self) -> None:
         config = load_config()
 

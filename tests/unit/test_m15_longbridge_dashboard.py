@@ -44,6 +44,9 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertTrue(inventory["strategy_contracts_required"])
         self.assertTrue(all(row["contract_stage"] == "paper-v1" for row in inventory["contract_rows"]))
         self.assertTrue(all(len(str(row["contract_hash"])) == 64 for row in inventory["contract_rows"]))
+        self.assertEqual(inventory["executable_contract_count"], 8)
+        self.assertEqual(inventory["visual_contract_draft_count"], 3)
+        self.assertEqual(inventory["retired_simplified_count"], 6)
 
     def test_short_funnel_keeps_three_runtimes_and_capacity_failure_classes(self) -> None:
         runtimes = [
@@ -368,6 +371,9 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertIn("扣费后盈利因子", html)
         self.assertIn("做空信号诊断", html)
         self.assertIn("全部正式策略执行漏斗", html)
+        self.assertIn("正式测试四层证据", html)
+        self.assertIn("策略身份分类", html)
+        self.assertIn("SDK模拟账户硬门禁", html)
         self.assertIn("PA002双版本阶段", html)
 
     def test_dashboard_blocks_stale_statistics_and_dead_runtime(self) -> None:

@@ -13,6 +13,7 @@
     "execution_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_execution.json",
     "fill_attribution": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_fill_attribution_v2.json",
     "formal_epoch_marker": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
+    "formal_test_evidence": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_formal_test_evidence.json",
     "local_runtime_registry": "config/examples/m13_strategy_runtime_registry.json",
     "order_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_order_reconciliation.json",
     "pnl_reconciliation": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_account_pnl_reconciliation.json",

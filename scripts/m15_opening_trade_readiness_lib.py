@@ -73,7 +73,9 @@ def project_path(path: Path) -> str:
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadinessConfig:
     config_path = resolve_repo_path(path)
-    payload = read_json(config_path) if config_path.exists() else {}
+    if not config_path.exists():
+        raise FileNotFoundError(f"opening readiness config does not exist: {config_path}")
+    payload = read_json(config_path)
     inputs = payload.get("inputs", {})
     outputs = payload.get("outputs", {})
     return OpeningTradeReadinessConfig(

@@ -7,13 +7,15 @@
     "shadow_audit_jsonl": "reports/m15_visual_strategy_shadow/audit_events.jsonl",
     "historical_replay_bars": "reports/m15_visual_strategy_shadow/historical_replay_bars.jsonl",
     "realtime_shadow_ledger": "local_runtime/m15_visual_strategy_shadow/session_ledger.jsonl",
-    "session_daily_bars": "local_runtime/m15_visual_strategy_shadow/aggregated_daily_bars.jsonl"
+    "session_daily_bars": "local_runtime/m15_visual_strategy_shadow/aggregated_daily_bars.jsonl",
+    "human_review_ledger": "local_runtime/m15_visual_strategy_shadow/human_review_ledger.jsonl"
   },
   "outputs": {
     "acceptance_json": "reports/m15_visual_strategy_shadow/acceptance_evidence.json"
   },
   "proofs": {
-    "expected_symbol_count": 300,
+    "historical_expected_symbol_count": 300,
+    "realtime_required_symbol_count": 147,
     "expected_bars_per_symbol": 60,
     "segmented_chunk_size": 37,
     "negative_horizon_bars": 3,

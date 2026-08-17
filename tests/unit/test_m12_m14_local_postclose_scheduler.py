@@ -28,6 +28,7 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         scheduler_payload["output_dir"] = (root / "scheduler_output").as_posix()
         scheduler_payload["batch_config_path"] = batch_config_path.as_posix()
         scheduler_payload["visual_shadow_session_config_path"] = None
+        scheduler_payload["formal_test_evidence_config_path"] = None
         scheduler_config_path = root / "scheduler.json"
         scheduler_config_path.write_text(json.dumps(scheduler_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return scheduler_config_path
@@ -135,6 +136,42 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
                     ("2026-07-17", "2026-07-17T20:15:00Z"),
                 ],
             )
+
+    def test_formal_evidence_sidecar_runs_even_when_local_batch_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = self.make_scheduler_config(root)
+            scheduler_payload = json.loads(config_path.read_text(encoding="utf-8"))
+            evidence_path = root / "formal-evidence.json"
+            evidence_path.write_text(
+                json.dumps({"stage": "M15.formal_test_evidence"}),
+                encoding="utf-8",
+            )
+            scheduler_payload["formal_test_evidence_config_path"] = evidence_path.as_posix()
+            config_path.write_text(json.dumps(scheduler_payload), encoding="utf-8")
+            config = load_scheduler_config(config_path)
+            calls: list[str | None] = []
+
+            def failing_batch(_config_path: Path, _generated_at: str | None) -> dict[str, object]:
+                raise RuntimeError("local batch failed")
+
+            def evidence_runner(
+                _config_path: Path,
+                generated_at: str | None,
+            ) -> dict[str, object]:
+                calls.append(generated_at)
+                return {"layers": {"market_session": {"status": "complete"}}}
+
+            result = run_scheduler_once(
+                config,
+                generated_at="2026-07-16T20:15:00Z",
+                batch_runner=failing_batch,
+                formal_evidence_runner=evidence_runner,
+            )
+
+            self.assertEqual(result["scheduler_status"], "triggered_with_batch_failure")
+            self.assertEqual(result["formal_test_evidence_status"], "complete")
+            self.assertEqual(calls, ["2026-07-16T20:15:00Z"])
 
     def test_daemon_status_stop_are_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
