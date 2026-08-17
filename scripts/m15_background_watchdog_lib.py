@@ -43,6 +43,7 @@ class BackgroundWatchdogConfig:
     check_interval_seconds: int
     command_timeout_seconds: int
     analytics_refresh_interval_seconds: int
+    analytics_failure_retry_seconds: int
     analytics_command_timeout_seconds: int
     runtime_recovery_grace_seconds: int
     m15_realtime_supervisor_config_path: Path
@@ -79,6 +80,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         check_interval_seconds=int(watchdog.get("check_interval_seconds", 60)),
         command_timeout_seconds=int(watchdog.get("command_timeout_seconds", 30)),
         analytics_refresh_interval_seconds=int(watchdog.get("analytics_refresh_interval_seconds", 300)),
+        analytics_failure_retry_seconds=int(
+            watchdog.get("analytics_failure_retry_seconds", 3600)
+        ),
         analytics_command_timeout_seconds=int(watchdog.get("analytics_command_timeout_seconds", 90)),
         runtime_recovery_grace_seconds=int(watchdog.get("runtime_recovery_grace_seconds", 20)),
         m15_realtime_supervisor_config_path=resolve_repo_path(
@@ -124,6 +128,10 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog command timeout must be positive")
     if config.analytics_refresh_interval_seconds <= 0:
         raise ValueError("M15 background watchdog analytics refresh interval must be positive")
+    if config.analytics_failure_retry_seconds < config.analytics_refresh_interval_seconds:
+        raise ValueError(
+            "M15 background watchdog analytics failure retry must not be shorter than the normal interval"
+        )
     if config.analytics_command_timeout_seconds <= 0:
         raise ValueError("M15 background watchdog analytics command timeout must be positive")
     if config.runtime_recovery_grace_seconds < 0:
@@ -197,7 +205,11 @@ def run_background_watchdog_once(
             runner,
         ),
     ]
-    failed_steps = [step for step in steps if step["returncode"] != 0]
+    failed_steps = [
+        step
+        for step in steps
+        if step["returncode"] != 0 and not step.get("non_blocking")
+    ]
     payload = {
         "schema_version": "m15.background-watchdog.v1",
         "stage": config.stage,
@@ -494,6 +506,44 @@ def analytics_refresh_step(
     previous: dict[str, Any],
 ) -> dict[str, Any]:
     previous_success_at = latest_step_generated_at(previous, "m15_account_state_full_refresh")
+    previous_attempt_at = latest_step_attempt_at(
+        previous,
+        "m15_account_state_full_refresh",
+    )
+    previous_step = next(
+        (
+            step
+            for step in previous.get("steps", [])
+            if isinstance(step, dict)
+            and step.get("step_id") == "m15_account_state_full_refresh"
+        ),
+        {},
+    )
+    if (
+        int(previous_step.get("returncode", 0)) != 0
+        and not analytics_refresh_due(
+            generated_at,
+            previous_attempt_at,
+            config.analytics_failure_retry_seconds,
+        )
+    ):
+        return {
+            "step_id": "m15_account_state_full_refresh",
+            "label": "M15 SDK 只读账户慢路径 analytics 刷新",
+            "returncode": 0,
+            "elapsed_ms": 0,
+            "command": "",
+            "stdout_tail": (
+                "statistics_stale; skipped_after_failure "
+                f"retry={config.analytics_failure_retry_seconds}s"
+            ),
+            "stderr_tail": "",
+            "skipped_due_to_throttle": True,
+            "skipped_due_to_failure_backoff": True,
+            "statistics_stale": True,
+            "last_attempt_generated_at": previous_attempt_at,
+            "last_success_generated_at": previous_success_at,
+        }
     if not analytics_refresh_due(generated_at, previous_success_at, config.analytics_refresh_interval_seconds):
         return {
             "step_id": "m15_account_state_full_refresh",
@@ -504,6 +554,7 @@ def analytics_refresh_step(
             "stdout_tail": f"skipped_until_due interval={config.analytics_refresh_interval_seconds}s",
             "stderr_tail": "",
             "skipped_due_to_throttle": True,
+            "last_attempt_generated_at": previous_attempt_at,
             "last_success_generated_at": previous_success_at,
         }
     if config.m15_runtime_engine == "sdk":
@@ -537,6 +588,10 @@ def analytics_refresh_step(
         timeout_seconds=config.analytics_command_timeout_seconds,
     )
     step["skipped_due_to_throttle"] = False
+    step["last_attempt_generated_at"] = generated_at
+    if int(step.get("returncode", 1)) != 0:
+        step["non_blocking"] = True
+        step["statistics_stale"] = True
     step["last_success_generated_at"] = (
         generated_at if int(step.get("returncode", 1)) == 0 else previous_success_at
     )
@@ -620,6 +675,20 @@ def latest_step_generated_at(payload: dict[str, Any], step_id: str) -> str:
         if persisted:
             return persisted
         if int(step.get("returncode", 1)) == 0 and not step.get("skipped_due_to_throttle"):
+            return str(payload.get("generated_at") or "")
+    return ""
+
+
+def latest_step_attempt_at(payload: dict[str, Any], step_id: str) -> str:
+    if not isinstance(payload.get("steps"), list):
+        return ""
+    for step in payload.get("steps", []):
+        if not isinstance(step, dict) or step.get("step_id") != step_id:
+            continue
+        persisted = str(step.get("last_attempt_generated_at") or "")
+        if persisted:
+            return persisted
+        if not step.get("skipped_due_to_throttle"):
             return str(payload.get("generated_at") or "")
     return ""
 

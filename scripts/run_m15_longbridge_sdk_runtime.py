@@ -1471,6 +1471,20 @@ def schedule_daily_context_retry(
         pending.append(retry_batch)
 
 
+def daily_context_retry_cycle_due(
+    state: str,
+    failed_symbols: list[str] | tuple[str, ...],
+    retry_not_before_monotonic: float,
+    now_monotonic: float,
+) -> bool:
+    """Retry a failed daily batch without requiring a process restart."""
+    return bool(
+        state == "failed"
+        and failed_symbols
+        and float(now_monotonic) >= float(retry_not_before_monotonic)
+    )
+
+
 def intraday_context_worker(
     config_path: str,
     symbols: list[str],
@@ -3497,6 +3511,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     daily_context_state = "complete" if cached_daily_rows else "waiting_for_subscription"
     daily_context_cache_reused = bool(cached_daily_rows)
     daily_context_persisted = bool(cached_daily_rows)
+    daily_context_retry_cycle_count = 0
+    daily_context_retry_not_before_monotonic = 0.0
     observed_regular_sessions: set[str] = set()
     observed_expansion_sessions: set[str] = set()
     postclose_daily_refresh_dates = completed_postclose_refresh_dates(cached_daily_rows, now_ny)
@@ -3848,6 +3864,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     for index in range(0, len(symbols), config.daily_context_batch_size)
                 )
                 daily_context_state = "loading"
+            if daily_context_retry_cycle_due(
+                daily_context_state,
+                daily_failed,
+                daily_context_retry_not_before_monotonic,
+                time.monotonic(),
+            ):
+                retry_symbols = list(dict.fromkeys(daily_failed))
+                daily_failed = []
+                for symbol in retry_symbols:
+                    daily_retry_counts[symbol] = 0
+                daily_pending.extend(
+                    retry_symbols[index:index + config.daily_context_batch_size]
+                    for index in range(
+                        0,
+                        len(retry_symbols),
+                        config.daily_context_batch_size,
+                    )
+                )
+                daily_context_state = "loading"
+                daily_context_retry_cycle_count += 1
             if daily_context_state == "loading":
                 while daily_pending and len(daily_workers) < config.daily_context_parallel_workers:
                     symbols = daily_pending.popleft()
@@ -3873,6 +3909,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         )
                 if not daily_pending and not daily_workers and daily_context_state == "loading":
                     daily_context_state = "complete" if daily_rows and not daily_failed else "failed"
+                    if daily_context_state == "failed":
+                        daily_context_retry_not_before_monotonic = (
+                            time.monotonic()
+                            + config.daily_context_retry_cycle_seconds
+                        )
                 if daily_context_is_complete(config, daily_context_state, len(daily_rows), daily_failed) and not daily_context_persisted:
                     write_daily_context_cache(config.daily_context_path, daily_rows)
                     daily_context_persisted = True
@@ -4923,6 +4964,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "readonly_expansion_gate_passed": expansion_gate_passed,
                     "daily_context_row_count": len(daily_rows), "daily_context_failed_symbols": daily_failed,
                     "daily_context_state": daily_context_state,
+                    "daily_context_retry_cycle_count": (
+                        daily_context_retry_cycle_count
+                    ),
+                    "daily_context_retry_cycle_seconds": (
+                        config.daily_context_retry_cycle_seconds
+                    ),
                     "trading_daily_context_ready": trading_daily_context_ready,
                     "trading_daily_context_row_count": daily_context_row_count_for_symbols(
                         config, daily_rows, configured_trading_symbols(config)

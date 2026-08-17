@@ -20,6 +20,7 @@
     "check_interval_seconds": 60,
     "command_timeout_seconds": 30,
     "analytics_refresh_interval_seconds": 300,
+    "analytics_failure_retry_seconds": 3600,
     "analytics_command_timeout_seconds": 90,
     "runtime_recovery_grace_seconds": 20
   },

@@ -10,6 +10,12 @@ from scripts.m15_visual_strategy_shadow_session_lib import load_config, run_visu
 
 
 class VisualStrategyShadowSessionTest(unittest.TestCase):
+    def test_production_shadow_session_follows_stable_147_realtime_universe(self) -> None:
+        config = load_config()
+
+        self.assertEqual(config.required_symbol_count, 147)
+        self.assertTrue(config.universe_path.name.endswith("snapshot_147.json"))
+
     def write_fixture(
         self,
         root: Path,

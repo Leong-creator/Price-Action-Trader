@@ -2,7 +2,7 @@
   "stage": "M15.visual_strategy_shadow_session",
   "inputs": {
     "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
-    "universe": "config/m15_us_liquid_universe_300.json",
+    "universe": "config/examples/m12_local_repaired_universe_snapshot_147.json",
     "shadow_config": "config/examples/m15_visual_strategy_shadow.json",
     "acceptance_config": "config/examples/m15_visual_strategy_acceptance.json"
   },
@@ -17,7 +17,7 @@
     "regular_close_time": "16:00",
     "timeframe_minutes": 5,
     "expected_bars_per_symbol": 78,
-    "required_symbol_count": 300,
+    "required_symbol_count": 147,
     "allowed_source_modes": [
       "longbridge_sdk_snapshot_poll",
       "longbridge_sdk_quote_push"

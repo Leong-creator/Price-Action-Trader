@@ -67,6 +67,7 @@ class SdkRuntimeConfig:
     daily_context_parallel_workers: int
     daily_context_batch_size: int
     daily_context_retry_count: int
+    daily_context_retry_cycle_seconds: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
     subscription_batch_size: int
@@ -152,6 +153,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         daily_context_parallel_workers=int(market_data.get("daily_context_parallel_workers", 3)),
         daily_context_batch_size=int(market_data.get("daily_context_batch_size", 10)),
         daily_context_retry_count=int(market_data.get("daily_context_retry_count", 5)),
+        daily_context_retry_cycle_seconds=int(
+            market_data.get("daily_context_retry_cycle_seconds", 60)
+        ),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
         subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
@@ -356,6 +360,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK daily context batch size must be between 1 and 25")
     if config.daily_context_retry_count < 0 or config.daily_context_retry_count > 10:
         raise ValueError("M15 SDK daily context retry count must be between 0 and 10")
+    if not 30 <= config.daily_context_retry_cycle_seconds <= 900:
+        raise ValueError(
+            "M15 SDK daily context retry cycle must be between 30 and 900 seconds"
+        )
     if config.account_snapshot_interval_seconds <= 0 or config.maximum_account_snapshot_age_seconds < config.account_snapshot_interval_seconds:
         raise ValueError("M15 SDK account snapshot timing is invalid")
     if config.account_snapshot_refresh_deadline_seconds <= 0:

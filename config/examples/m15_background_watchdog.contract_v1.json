@@ -25,6 +25,7 @@
   "title": "M15 后台看护器",
   "watchdog": {
     "analytics_command_timeout_seconds": 90,
+    "analytics_failure_retry_seconds": 3600,
     "analytics_refresh_interval_seconds": 300,
     "check_interval_seconds": 60,
     "command_timeout_seconds": 30,

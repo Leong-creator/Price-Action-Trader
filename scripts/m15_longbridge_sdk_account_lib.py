@@ -20,6 +20,9 @@ from scripts.m15_longbridge_realtime_execution_lib import to_iso
 from scripts.m15_longbridge_sdk_account_worker_lib import AccountWorkerConfig, SpawnAccountSnapshotWorker
 
 
+ACCOUNT_SNAPSHOT_AUDIT_INTERVAL_SECONDS = 300.0
+
+
 def sdk_plain(value: Any) -> Any:
     """Convert PyO3 SDK responses to stable JSON-compatible data."""
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -403,6 +406,7 @@ class SdkAccountProcessCoordinator:
         self._refresh_lock = threading.Lock()
         self._snapshot: dict[str, Any] = {}
         self._pending_open_orders: dict[str, dict[str, Any]] = {}
+        self._last_audit_write_monotonic = 0.0
         self._stop = threading.Event()
         self._worker = SpawnAccountSnapshotWorker(
             provider_factory,
@@ -480,6 +484,19 @@ class SdkAccountProcessCoordinator:
         temporary = self.output_path.with_name(f".{self.output_path.name}.{id(self)}.tmp")
         temporary.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(self.output_path)
+        now_monotonic = time.monotonic()
+        if (
+            self._last_audit_write_monotonic <= 0
+            or now_monotonic - self._last_audit_write_monotonic
+            >= ACCOUNT_SNAPSHOT_AUDIT_INTERVAL_SECONDS
+        ):
+            ledger_path = self.output_path.with_name(
+                "m15_longbridge_realtime_account_state_ledger.jsonl"
+            )
+            with ledger_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(snapshot, ensure_ascii=False) + "\n")
+                handle.flush()
+            self._last_audit_write_monotonic = now_monotonic
 
     def _run(self) -> None:
         while not self._stop.wait(self.interval_seconds):

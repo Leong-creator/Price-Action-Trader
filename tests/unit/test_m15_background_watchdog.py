@@ -259,6 +259,66 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(payload["watchdog_status"], "healthy")
             self.assertEqual(analytics_step["returncode"], 0)
 
+    def test_sdk_analytics_timeout_is_non_blocking_and_uses_failure_backoff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            analytics_calls = 0
+
+            def runner(command: list[str], _timeout: int):
+                nonlocal analytics_calls
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_analytics.py"):
+                    analytics_calls += 1
+                    return type(
+                        "Result",
+                        (),
+                        {"returncode": 124, "stdout": "", "stderr": "timeout after 90s"},
+                    )()
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                else:
+                    stdout = "ok"
+                return type(
+                    "Result",
+                    (),
+                    {"returncode": 0, "stdout": stdout, "stderr": ""},
+                )()
+
+            first = run_background_watchdog_once(
+                config,
+                generated_at="2026-08-17T01:00:00Z",
+                command_runner=runner,
+            )
+            second = run_background_watchdog_once(
+                config,
+                generated_at="2026-08-17T01:05:00Z",
+                command_runner=runner,
+            )
+
+            first_step = next(
+                step
+                for step in first["steps"]
+                if step["step_id"] == "m15_account_state_full_refresh"
+            )
+            second_step = next(
+                step
+                for step in second["steps"]
+                if step["step_id"] == "m15_account_state_full_refresh"
+            )
+            self.assertEqual(first["watchdog_status"], "healthy")
+            self.assertTrue(first_step["non_blocking"])
+            self.assertTrue(first_step["statistics_stale"])
+            self.assertEqual(second["watchdog_status"], "healthy")
+            self.assertTrue(second_step["skipped_due_to_failure_backoff"])
+            self.assertEqual(analytics_calls, 1)
+
     def test_watchdog_no_longer_runs_or_requires_m12_47_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -32,7 +32,12 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     market_event_is_tradable, trading_market_events,
     validate_formal_epoch_alignment,
 )
-from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAccountStateProvider, SdkTradeRequestGate
+from scripts.m15_longbridge_sdk_account_lib import (
+    SdkAccountCoordinator,
+    SdkAccountProcessCoordinator,
+    SdkAccountStateProvider,
+    SdkTradeRequestGate,
+)
 from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
     INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS,
@@ -51,6 +56,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     compact_hot_signal_rows,
     dispatch_completed_rows,
     daily_context_worker,
+    daily_context_retry_cycle_due,
     deferred_intraday_context_after_mid_session_start,
     event_rows_to_daily,
     event_rows_to_intraday_context,
@@ -647,11 +653,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
         config = load_config()
 
-        self.assertEqual(config.subscription_batch_size, 50)
+        self.assertEqual(config.subscription_batch_size, 147)
         self.assertEqual(config.subscription_deadline_seconds, 20)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 50)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 147)
         self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
+        self.assertEqual(config.daily_context_retry_cycle_seconds, 60)
         self.assertEqual(config.market_data_heartbeat_deadline_seconds, 8)
         self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
         self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
@@ -837,7 +844,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
 
         self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 50)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 147)
         self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
 
     def test_oversized_runtime_log_is_compressed_before_restart(self) -> None:
@@ -2286,25 +2293,26 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["short_test_epoch_id"], marker["short_test_epoch_id"])
         self.assertEqual(state["test_started_at"], marker["test_started_at"])
 
-    def test_default_runtime_config_promotes_verified_300_subscription_pool_to_trading(self) -> None:
+    def test_default_runtime_keeps_unverified_expansion_out_of_trading(self) -> None:
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
-        universe = load_m15_universe("config/m15_us_liquid_universe_300.json")
+        universe = load_m15_universe(
+            "config/examples/m12_local_repaired_universe_snapshot_147.json"
+        )
 
         self.assertFalse(payload["market_data"]["use_seed_universe"])
         self.assertEqual(
             payload["market_data"]["universe_path"],
-            "config/m15_us_liquid_universe_300.json",
+            "config/examples/m12_local_repaired_universe_snapshot_147.json",
         )
-        self.assertEqual(payload["market_data"]["symbol_limit"], 300)
-        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 300)
+        self.assertEqual(payload["market_data"]["symbol_limit"], 147)
+        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 147)
         self.assertEqual(
             payload["market_data"]["trading_universe_path"],
-            "config/m15_us_liquid_universe_300.json",
+            "config/examples/m12_local_repaired_universe_snapshot_147.json",
         )
-        self.assertIn("BNY", universe)
-        self.assertIn("MRSH", universe)
-        self.assertNotIn("BK", universe)
-        self.assertNotIn("MMC", universe)
+        self.assertEqual(len(universe), 147)
+        self.assertEqual(universe[0], "SPY")
+        self.assertEqual(universe[-1], "TSM")
 
     def test_formal_epoch_alignment_rejects_linked_config_drift(self) -> None:
         config = load_config()
@@ -4012,25 +4020,66 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(list(pending), [["AAPL.US", "BABA.US"]])
         self.assertEqual(failed, ["MSFT.US"])
 
+    def test_failed_daily_context_retries_after_cycle_cooldown(self) -> None:
+        self.assertFalse(
+            daily_context_retry_cycle_due("loading", ["AAPL.US"], 100.0, 120.0)
+        )
+        self.assertFalse(
+            daily_context_retry_cycle_due("failed", [], 100.0, 120.0)
+        )
+        self.assertFalse(
+            daily_context_retry_cycle_due("failed", ["AAPL.US"], 130.0, 120.0)
+        )
+        self.assertTrue(
+            daily_context_retry_cycle_due("failed", ["AAPL.US"], 100.0, 120.0)
+        )
+
+    def test_process_account_snapshot_appends_periodic_audit_rows(self) -> None:
+        with TemporaryDirectory() as directory:
+            output_path = Path(directory) / "m15_longbridge_realtime_account_state.json"
+            coordinator = SdkAccountProcessCoordinator(lambda: None, output_path)
+            with patch(
+                "scripts.m15_longbridge_sdk_account_lib.time.monotonic",
+                side_effect=[100.0, 200.0, 401.0],
+            ):
+                coordinator._write_snapshot({"generated_at": "first"})
+                coordinator._write_snapshot({"generated_at": "second"})
+                coordinator._write_snapshot({"generated_at": "third"})
+
+            ledger_path = output_path.with_name(
+                "m15_longbridge_realtime_account_state_ledger.jsonl"
+            )
+            rows = [json.loads(line) for line in ledger_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(
+                [row["generated_at"] for row in rows],
+                ["first", "third"],
+            )
+
     def test_installed_sdk_exposes_required_contexts(self) -> None:
         self.assertIsNotNone(require_sdk_contract())
 
-    def test_sdk_seed_universe_uses_active_paramount_symbol(self) -> None:
+    def test_production_universe_uses_frozen_147_snapshot(self) -> None:
         config = load_config()
         symbols = configured_symbols(config)
         trading_symbols = configured_trading_symbols(config)
 
         self.assertIn("PSKY.US", symbols)
         self.assertNotIn("PARA.US", symbols)
-        self.assertEqual(len(symbols), 300)
-        self.assertEqual(len(trading_symbols), 300)
+        self.assertEqual(len(symbols), 147)
+        self.assertEqual(len(trading_symbols), 147)
         self.assertIn("PSKY.US", trading_symbols)
 
     def test_expanded_trading_pool_requires_runtime_upgrade_gate(self) -> None:
         payload = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
+            Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(
                 encoding="utf-8"
             )
+        )
+        payload["routing"]["paper_order_dispatch_enabled"] = True
+        payload["runtime"]["two_day_readonly_gate"] = False
+        payload["market_data"]["trading_symbol_limit"] = 300
+        payload["market_data"]["trading_universe_path"] = (
+            "config/m15_us_liquid_universe_300.json"
         )
         payload["market_data"]["expansion_trade_pool_upgrade_gate"]["enabled"] = False
         with TemporaryDirectory() as temp_dir:
@@ -4110,7 +4159,9 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
     def test_reordering_subscription_universe_cannot_change_frozen_trading_universe(self) -> None:
         source = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
+            Path(
+                "config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json"
+            ).read_text(
                 encoding="utf-8"
             )
         )
@@ -4119,7 +4170,11 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        expected_trading = configured_trading_symbols(load_config())
+        expected_trading = configured_trading_symbols(
+            load_config(
+                "config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json"
+            )
+        )
         with TemporaryDirectory() as directory:
             root = Path(directory)
             reordered_universe = root / "reordered-300.json"
