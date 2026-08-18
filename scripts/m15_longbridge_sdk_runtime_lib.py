@@ -60,6 +60,7 @@ class SdkRuntimeConfig:
     trading_symbol_limit: int
     bar_minutes: int
     maximum_source_delivery_age_ms: int
+    maximum_bar_finalization_delay_ms: int
     event_keep_lines: int
     daily_context_path: Path
     daily_context_bars: int
@@ -146,6 +147,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         trading_symbol_limit=int(market_data.get("trading_symbol_limit", market_data.get("symbol_limit", 147))),
         bar_minutes=int(market_data.get("bar_minutes", 5)),
         maximum_source_delivery_age_ms=int(market_data.get("maximum_source_delivery_age_ms", 2000)),
+        maximum_bar_finalization_delay_ms=int(
+            market_data.get("maximum_bar_finalization_delay_ms", 5000)
+        ),
         event_keep_lines=int(market_data.get("event_keep_lines", 20000)),
         daily_context_path=resolve_path(market_data.get("daily_context", "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl")),
         daily_context_bars=int(market_data.get("daily_context_bars", 60)),
@@ -293,6 +297,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             )
     if config.bar_minutes != 5:
         raise ValueError("M15 SDK runtime currently supports only 5-minute bars")
+    if config.maximum_source_delivery_age_ms <= 0:
+        raise ValueError("M15 SDK source delivery age limit must be positive")
+    if config.maximum_bar_finalization_delay_ms <= 0:
+        raise ValueError("M15 SDK bar finalization delay limit must be positive")
     if config.account_maintenance_interval_seconds <= 0:
         raise ValueError("M15 SDK account maintenance interval must be positive")
     if config.stale_entry_order_ttl_seconds <= 0:
@@ -847,6 +855,16 @@ class FiveMinuteBarBuilder:
             "source_event_at": to_iso(source_at),
             "received_at": to_iso(received_at),
             "source_delivery_age_ms": max(0, int((received_at - source_at).total_seconds() * 1000)),
+            "bar_finalization_delay_ms": max(
+                0,
+                int(
+                    (
+                        received_at
+                        - bar["bar_close_at"].astimezone(UTC)
+                    ).total_seconds()
+                    * 1000
+                ),
+            ),
             "bar_final": True,
             "source_mode": str(bar.get("source_mode") or "longbridge_sdk_push"),
             "open": fmt(bar["open"]), "high": fmt(bar["high"]), "low": fmt(bar["low"]),
@@ -951,6 +969,7 @@ def five_minute_session_coverage(
     now: datetime,
     minutes: int = 5,
     completion_grace_seconds: int = 10,
+    maximum_finalization_delay_ms: int = 5000,
 ) -> dict[str, Any]:
     """Summarize real SDK bars for every completed regular-session boundary."""
     now_utc = now.astimezone(UTC)
@@ -978,6 +997,8 @@ def five_minute_session_coverage(
     }
     duplicates: list[str] = []
     invalid_rows = 0
+    late_finalization_rows: list[str] = []
+    maximum_observed_finalization_delay_ms = 0
     accepted_rows = 0
     for row in rows:
         if str(row.get("timeframe") or "") != "5m":
@@ -1002,6 +1023,30 @@ def five_minute_session_coverage(
         if str(row.get("market_data_blocked_reason") or ""):
             invalid_rows += 1
             continue
+        finalization_delay_ms = 0
+        if row.get("bar_finalization_delay_ms") is not None:
+            finalization_delay_ms = max(
+                0, int_like(row.get("bar_finalization_delay_ms"))
+            )
+        elif row.get("received_at"):
+            try:
+                received_at = datetime.fromisoformat(
+                    str(row.get("received_at") or "").replace("Z", "+00:00")
+                ).astimezone(UTC)
+                finalization_delay_ms = max(
+                    0, int((received_at - event_at).total_seconds() * 1000)
+                )
+            except ValueError:
+                invalid_rows += 1
+                continue
+        maximum_observed_finalization_delay_ms = max(
+            maximum_observed_finalization_delay_ms,
+            finalization_delay_ms,
+        )
+        if finalization_delay_ms > maximum_finalization_delay_ms:
+            late_finalization_rows.append(
+                f"{symbol}@{boundary_key}:{finalization_delay_ms}ms"
+            )
         source_mode = str(row.get("source_mode") or "")
         is_verified_recovery = bool(
             row.get("context_only") is True
@@ -1048,6 +1093,7 @@ def five_minute_session_coverage(
     complete_so_far = bool(
         not duplicates
         and invalid_rows == 0
+        and not late_finalization_rows
         and not partial
         and not missing
         and len(complete) == expected_boundary_count
@@ -1093,6 +1139,10 @@ def five_minute_session_coverage(
         "missing_boundary_count": len(missing),
         "duplicate_row_count": len(duplicates),
         "invalid_row_count": invalid_rows,
+        "maximum_allowed_finalization_delay_ms": maximum_finalization_delay_ms,
+        "late_finalization_row_count": len(late_finalization_rows),
+        "maximum_observed_finalization_delay_ms": maximum_observed_finalization_delay_ms,
+        "late_finalization_examples": late_finalization_rows[:20],
         "partial_boundaries": partial[:20],
         "missing_boundary_times": missing[:78],
         "duplicate_examples": duplicates[:20],
@@ -1226,6 +1276,7 @@ def fresh_market_events(
     rows: list[dict[str, Any]],
     maximum_age_ms: int,
     *,
+    maximum_finalization_delay_ms: int | None = None,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Reject delayed pushes without discarding a freshly finalized bar.
@@ -1233,10 +1284,17 @@ def fresh_market_events(
     A quote timestamp is evidence for the price within a five-minute bar, not
     the time at which the completed bar is delivered.  Liquid symbols can
     legitimately have no new quote in the final seconds of an interval.  SDK
-    bars are therefore checked against their finalization time, while raw and
-    non-SDK events retain the source-delivery-age guard.
+    bars therefore use two checks: the row must reach this process promptly,
+    and the bar itself must have been finalized soon after its close.  This
+    prevents a recovered old bar from becoming a new order while still
+    accepting a promptly finalized quiet symbol.
     """
     checked_at = (now or datetime.now(UTC)).astimezone(UTC)
+    finalization_limit_ms = int(
+        maximum_finalization_delay_ms
+        if maximum_finalization_delay_ms is not None
+        else maximum_age_ms
+    )
     fresh: list[dict[str, Any]] = []
     for row in rows:
         is_final_sdk_bar = (
@@ -1247,11 +1305,43 @@ def fresh_market_events(
         )
         if is_final_sdk_bar:
             try:
-                finalized_at = datetime.fromisoformat(str(row.get("received_at") or "").replace("Z", "+00:00"))
+                finalized_at = datetime.fromisoformat(
+                    str(row.get("received_at") or "").replace("Z", "+00:00")
+                )
             except ValueError:
                 continue
+            raw_bar_close = row.get("bar_close_at") or row.get("event_time")
+            if raw_bar_close:
+                try:
+                    bar_close_at = datetime.fromisoformat(
+                        str(raw_bar_close).replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    continue
+            else:
+                # Compatibility fixtures and legacy audit rows may not carry
+                # the close timestamp. New runtime rows always do.
+                bar_close_at = finalized_at
             finalization_age_ms = max(0, int((checked_at - finalized_at.astimezone(UTC)).total_seconds() * 1000))
-            if finalization_age_ms <= maximum_age_ms:
+            if "bar_finalization_delay_ms" in row:
+                bar_finalization_delay_ms = int_like(
+                    row.get("bar_finalization_delay_ms")
+                )
+            else:
+                bar_finalization_delay_ms = max(
+                    0,
+                    int(
+                        (
+                            finalized_at.astimezone(UTC)
+                            - bar_close_at.astimezone(UTC)
+                        ).total_seconds()
+                        * 1000
+                    ),
+                )
+            if (
+                finalization_age_ms <= maximum_age_ms
+                and bar_finalization_delay_ms <= finalization_limit_ms
+            ):
                 fresh.append(row)
             continue
         if int_like(row.get("source_delivery_age_ms")) <= maximum_age_ms:

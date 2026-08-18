@@ -202,6 +202,9 @@ def _market_session_layer(
         if coverage.get("invalid_row_count") is not None
         else coverage.get("invalid_count") or 0
     )
+    late_finalization_rows = int(
+        coverage.get("late_finalization_row_count") or 0
+    )
     partial = int(coverage.get("partial_boundary_count") or 0)
     missing = int(coverage.get("missing_boundary_count") or 0)
     final_window = expected_boundaries == config.required_boundary_count
@@ -225,6 +228,7 @@ def _market_session_layer(
         and accepted_rows == required_rows
         and duplicates == 0
         and invalid_rows == 0
+        and late_finalization_rows == 0
         and partial == 0
         and missing == 0
     )
@@ -234,6 +238,12 @@ def _market_session_layer(
     elif complete:
         status = "complete"
         plain = "147只标的的78个五分钟边界全部来自实时SDK行情，本交易日可计入正式测试。"
+    elif late_finalization_rows:
+        status = "incomplete_late_market_data"
+        plain = (
+            f"有{late_finalization_rows}条五分钟K线超过实时形成时限，"
+            "即使最终补齐也不能计为完整正式测试日。"
+        )
     elif not final_window:
         status = "waiting_for_session_close"
         plain = "常规交易时段尚未结束，等待78个五分钟边界全部形成。"
@@ -255,6 +265,16 @@ def _market_session_layer(
         "missing_boundary_count": missing,
         "duplicate_count": duplicates,
         "invalid_row_count": invalid_rows,
+        "late_finalization_row_count": late_finalization_rows,
+        "maximum_allowed_finalization_delay_ms": int(
+            coverage.get("maximum_allowed_finalization_delay_ms") or 0
+        ),
+        "maximum_observed_finalization_delay_ms": int(
+            coverage.get("maximum_observed_finalization_delay_ms") or 0
+        ),
+        "late_finalization_examples": list(
+            coverage.get("late_finalization_examples") or []
+        ),
         "missing_boundary_times": list(coverage.get("missing_boundary_times") or []),
         "recovered_data_is_realtime_evidence": False,
         "plain_language_result": plain,

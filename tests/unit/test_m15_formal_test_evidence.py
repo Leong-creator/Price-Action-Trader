@@ -41,6 +41,7 @@ class FormalTestEvidenceTest(unittest.TestCase):
         session_complete: bool = True,
         signal_ready_runtime: str = "",
         add_order: bool = False,
+        late_finalization_count: int = 0,
     ) -> Path:
         coverage = {
             "business_date": "2026-08-17",
@@ -52,6 +53,11 @@ class FormalTestEvidenceTest(unittest.TestCase):
             "duplicate_count": 0,
             "invalid_row_count": 0,
             "session_complete": session_complete,
+            "late_finalization_row_count": late_finalization_count,
+            "maximum_allowed_finalization_delay_ms": 5000,
+            "maximum_observed_finalization_delay_ms": (
+                8000 if late_finalization_count else 1000
+            ),
         }
         self.write_json(
             root / "runtime.json",
@@ -228,6 +234,20 @@ class FormalTestEvidenceTest(unittest.TestCase):
             self.assertEqual(result["layers"]["market_session"]["status"], "incomplete")
             self.assertEqual(result["progress"]["consecutive_clean_session_count"], 0)
             self.assertFalse(result["formal_performance_baseline"]["status"] == "eligible_to_start")
+
+    def test_late_market_data_is_not_counted_as_clean(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = generate_formal_test_evidence(
+                load_config(self.fixture(root, late_finalization_count=1)),
+                generated_at="2026-08-17T20:10:00Z",
+            )
+
+            market = result["layers"]["market_session"]
+            self.assertEqual(market["status"], "incomplete_late_market_data")
+            self.assertEqual(market["late_finalization_row_count"], 1)
+            self.assertFalse(market["complete"])
+            self.assertEqual(result["progress"]["consecutive_clean_session_count"], 0)
 
     def test_non_sdk_or_non_paper_runtime_is_not_counted_as_clean(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

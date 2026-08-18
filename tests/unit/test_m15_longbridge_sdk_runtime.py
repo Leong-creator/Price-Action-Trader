@@ -40,6 +40,7 @@ from scripts.m15_longbridge_sdk_account_lib import (
 )
 from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
+    account_position_symbols,
     INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS,
     REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED,
     account_snapshot_ready_for_orders,
@@ -71,6 +72,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_heartbeat_is_stale,
     pending_flatten_test_epoch_id,
     pop_deferred_worker_error,
+    primary_subscription_reprobe_date,
     preserve_partial_bar_suppression,
     rollover_snapshot_cycle,
     preserve_last_order_maintenance_action,
@@ -217,6 +219,34 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         self.assertTrue(result["complete_so_far"])
         self.assertEqual(result["invalid_row_count"], 0)
+
+    def test_late_finalized_rows_do_not_count_as_complete_session(self) -> None:
+        boundary = datetime(2026, 8, 10, 13, 35, tzinfo=UTC)
+        rows = [
+            {
+                "symbol": "A",
+                "timeframe": "5m",
+                "event_time": boundary.isoformat().replace("+00:00", "Z"),
+                "received_at": (boundary + timedelta(seconds=8)).isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "bar_final": True,
+                "source_mode": "longbridge_sdk_push",
+                "market_data_blocked_reason": "",
+            }
+        ]
+
+        result = five_minute_session_coverage(
+            rows,
+            ["A"],
+            now=datetime(2026, 8, 10, 13, 36, tzinfo=UTC),
+            maximum_finalization_delay_ms=5000,
+        )
+
+        self.assertFalse(result["complete_so_far"])
+        self.assertEqual(result["accepted_row_count_so_far"], 1)
+        self.assertEqual(result["late_finalization_row_count"], 1)
+        self.assertEqual(result["maximum_observed_finalization_delay_ms"], 8000)
 
     def test_account_snapshot_for_orders_requires_fresh_verified_worker(self) -> None:
         now = datetime(2026, 8, 10, 13, 30, tzinfo=UTC)
@@ -653,13 +683,14 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
         config = load_config()
 
-        self.assertEqual(config.subscription_batch_size, 147)
+        self.assertEqual(config.subscription_batch_size, 50)
+        self.assertEqual(config.subscription_retry_count, 1)
         self.assertEqual(config.subscription_deadline_seconds, 20)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
         self.assertEqual(config.snapshot_poll_request_batch_size, 147)
         self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
         self.assertEqual(config.daily_context_retry_cycle_seconds, 60)
-        self.assertEqual(config.market_data_heartbeat_deadline_seconds, 8)
+        self.assertEqual(config.market_data_heartbeat_deadline_seconds, 5)
         self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
         self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
         self.assertLess(
@@ -805,7 +836,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            45,
+            8,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
@@ -815,7 +846,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            60,
+            8,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
@@ -825,7 +856,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 44, 55, tzinfo=UTC),
                 5,
             ),
-            60,
+            8,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
@@ -835,7 +866,34 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            45,
+            8,
+        )
+
+    def test_snapshot_fallback_reprobes_push_once_each_market_date(self) -> None:
+        attempted = {"2026-08-17"}
+        self.assertEqual(
+            primary_subscription_reprobe_date(
+                True,
+                attempted,
+                datetime(2026, 8, 17, 13, 30, tzinfo=UTC),
+            ),
+            "",
+        )
+        self.assertEqual(
+            primary_subscription_reprobe_date(
+                True,
+                attempted,
+                datetime(2026, 8, 18, 13, 25, tzinfo=UTC),
+            ),
+            "2026-08-18",
+        )
+        self.assertEqual(
+            primary_subscription_reprobe_date(
+                False,
+                set(),
+                datetime(2026, 8, 18, 13, 25, tzinfo=UTC),
+            ),
+            "",
         )
 
     def test_contract_runtime_uses_longer_snapshot_recovery_deadline(self) -> None:
@@ -956,14 +1014,51 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         regular_session_targets = quote_subscription_targets(
             config,
             datetime(2026, 7, 28, 14, 0, tzinfo=UTC),
+            position_symbols=(),
         )
         premarket_targets = quote_subscription_targets(
             config,
             datetime(2026, 7, 28, 12, 0, tzinfo=UTC),
+            position_symbols=(),
         )
 
         self.assertEqual(regular_session_targets, configured_trading_symbols(config))
         self.assertEqual(premarket_targets, configured_symbols(config))
+
+    def test_quote_targets_add_held_symbols_without_expanding_trading_universe(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+
+        targets = quote_subscription_targets(
+            config,
+            datetime(2026, 7, 28, 14, 0, tzinfo=UTC),
+            position_symbols=("ZM.US", configured_trading_symbols(config)[0]),
+        )
+
+        self.assertEqual(
+            targets[: len(configured_trading_symbols(config))],
+            configured_trading_symbols(config),
+        )
+        self.assertEqual(targets[-1], "ZM.US")
+        self.assertNotIn("ZM.US", configured_trading_symbols(config))
+
+    def test_account_position_symbols_reads_only_nonzero_us_positions(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = replace(
+                load_config("config/examples/m15_longbridge_sdk_runtime.json"),
+                output_dir=Path(directory),
+            )
+            (config.output_dir / "m15_longbridge_realtime_account_state.json").write_text(
+                json.dumps({
+                    "positions": [
+                        {"symbol": "ZM.US", "quantity": "1"},
+                        {"symbol": "0700.HK", "quantity": "2"},
+                        {"symbol": "OLD.US", "quantity": "0"},
+                    ]
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(account_position_symbols(config), ("ZM.US",))
 
     def test_pipeline_observability_restores_only_same_new_york_session(self) -> None:
         with TemporaryDirectory() as directory:
@@ -1103,6 +1198,38 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         prepare.assert_not_called()
         self.assertIsInstance(environment, dict)
+
+    def test_daemon_does_not_wait_on_concurrent_start_lock(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = SimpleNamespace(
+                output_dir=root,
+                runtime_status_path=root / "runtime-status.json",
+                config_path=root / "runtime-config.json",
+            )
+            args = SimpleNamespace(dispatch=True, config=str(config.config_path))
+            with (
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.GLOBAL_RUNTIME_START_LOCK",
+                    root / "global-start.lock",
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.sdk_runtime_daemon_environment",
+                    return_value={"PATH": "/usr/bin"},
+                ) as prepare_environment,
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.fcntl.flock",
+                    side_effect=BlockingIOError,
+                ),
+                patch(
+                    "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
+                ) as popen,
+            ):
+                result = start_runtime_daemon(args, config)
+
+            self.assertEqual(result, 0)
+            prepare_environment.assert_called_once_with(config)
+            popen.assert_not_called()
 
     def test_daemon_does_not_spawn_when_another_config_holds_global_runtime_lock(self) -> None:
         with TemporaryDirectory() as directory:
@@ -1544,6 +1671,110 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         self.assertEqual(result["execution"]["status"], "blocked_outside_regular_session")
         self.assertEqual(result["execution"]["submitted_count"], 0)
+
+    def test_monitoring_only_symbol_can_exit_but_cannot_reach_entry_router(self) -> None:
+        class Account:
+            @staticmethod
+            def snapshot():
+                return {
+                    "generated_at": "2026-07-16T14:00:00Z",
+                    "paper_account_verified": True,
+                    "positions_ok": True,
+                    "orders_ok": True,
+                    "positions": [{"symbol": "ZM.US", "quantity": "1"}],
+                    "orders": [],
+                    "open_orders": [],
+                }
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker_path = root / "formal.json"
+            marker_path.write_text(json.dumps({
+                "status": "active",
+                "test_epoch_id": "formal-main",
+                "short_test_epoch_id": "formal-short",
+                "test_started_at": "2026-07-16T13:30:00Z",
+            }), encoding="utf-8")
+            config = SimpleNamespace(
+                market="US",
+                universe_path=None,
+                use_seed_universe=True,
+                symbol_limit=1,
+                trading_symbol_limit=1,
+                trading_universe_path=None,
+                maximum_source_delivery_age_ms=2000,
+                maximum_bar_finalization_delay_ms=5000,
+                market_events_path=root / "market.jsonl",
+                event_keep_lines=0,
+                router_config_path=Path("config/examples/m15_longbridge_realtime_signal_router.json"),
+                position_manager_config_path=Path("config/examples/m15_longbridge_realtime_position_manager.json"),
+                execution_config_path=Path("config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json"),
+                formal_test_marker_path=marker_path,
+                formal_test_transition_enabled=False,
+                formal_test_epoch_id="formal-main",
+                formal_short_test_epoch_id="formal-short",
+            )
+            row = {
+                "schema_version": "m15.realtime-market-event.v2",
+                "event_id": "sdk-5m|ZM|2026-07-16T14:00:00Z",
+                "symbol": "ZM",
+                "timeframe": "5m",
+                "event_time": "2026-07-16T14:00:00Z",
+                "bar_close_at": "2026-07-16T14:00:00Z",
+                "received_at": "2026-07-16T14:00:00Z",
+                "source_event_at": "2026-07-16T14:00:00Z",
+                "source_delivery_age_ms": 0,
+                "bar_finalization_delay_ms": 0,
+                "source_mode": "unit_test",
+                "bar_final": True,
+                "open": "107",
+                "high": "108",
+                "low": "105",
+                "close": "106",
+                "volume": "1000",
+            }
+            exit_signal = {
+                "signal_id": "exit-zm",
+                "symbol": "ZM",
+                "runtime_id": "legacy-position-exit",
+                "side": "sell",
+                "position_action": "close_long",
+                "exit_only_position_signal": True,
+            }
+            with (
+                patch(
+                    "scripts.m15_longbridge_realtime_signal_router_lib.run_realtime_signal_router",
+                    return_value={"signal_event_count": 0},
+                ) as router,
+                patch(
+                    "scripts.m15_longbridge_realtime_position_manager_lib.run_realtime_position_manager",
+                    return_value={"emitted_exit_signal_events": [exit_signal]},
+                ) as position_manager,
+                patch(
+                    "scripts.m15_longbridge_realtime_execution_lib.run_realtime_execution",
+                    return_value={"submitted_count": 1},
+                ) as execution,
+            ):
+                result = dispatch_completed_rows(
+                    config,
+                    [row],
+                    MarketEventContext(maximum_rows=100),
+                    Account(),
+                    object(),
+                    signal_event_cache=[],
+                    signal_id_cache=set(),
+                    execution_ledger_cache=[],
+                    fill_attribution_state_cache={},
+                )
+
+        routed_rows = router.call_args.kwargs["market_events_override"]
+        monitored_rows = position_manager.call_args.kwargs["market_events_override"]
+        self.assertFalse(any(row.get("symbol") == "ZM" for row in routed_rows))
+        self.assertTrue(any(row.get("symbol") == "ZM" for row in monitored_rows))
+        execution.assert_called_once()
+        self.assertEqual(result["execution"]["submitted_count"], 1)
+        self.assertEqual(result["trading_event_count"], 0)
+        self.assertEqual(result["monitoring_only_event_count"], 1)
 
     def test_pending_formal_epoch_suppresses_router_before_empty_epoch_replacement(self) -> None:
         with TemporaryDirectory() as directory:
@@ -2567,6 +2798,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(rows[0]["market_data_blocked_reason"], "")
         self.assertEqual(rows[0]["received_at"], "2026-07-14T13:35:01Z")
         self.assertEqual(rows[0]["source_delivery_age_ms"], 2000)
+        self.assertEqual(rows[0]["bar_finalization_delay_ms"], 1000)
 
     def test_first_quote_push_volume_is_not_counted_as_an_interval_increment(self) -> None:
         builder = FiveMinuteBarBuilder(minutes=5)
@@ -2787,6 +3019,55 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         }]
         self.assertEqual(
             [row["event_id"] for row in fresh_market_events(rows, 2000, now=finalized_at + timedelta(milliseconds=150))],
+            ["sdk-5m|AAPL|2026-07-15T14:35:00Z"],
+        )
+
+    def test_late_finalized_bar_is_blocked_even_when_just_received(self) -> None:
+        rows = [{
+            "event_id": "sdk-5m|AAPL|2026-07-15T14:35:00Z",
+            "timeframe": "5m",
+            "bar_final": True,
+            "source_mode": "longbridge_sdk_snapshot_poll",
+            "event_time": "2026-07-15T14:35:00Z",
+            "bar_close_at": "2026-07-15T14:35:00Z",
+            "received_at": "2026-07-15T14:44:00Z",
+            "source_delivery_age_ms": 541000,
+            "bar_finalization_delay_ms": 540000,
+        }]
+
+        self.assertEqual(
+            fresh_market_events(
+                rows,
+                2000,
+                maximum_finalization_delay_ms=5000,
+                now=datetime(2026, 7, 15, 14, 44, tzinfo=UTC),
+            ),
+            [],
+        )
+
+    def test_prompt_finalization_allows_quiet_symbol_with_old_last_quote(self) -> None:
+        rows = [{
+            "event_id": "sdk-5m|AAPL|2026-07-15T14:35:00Z",
+            "timeframe": "5m",
+            "bar_final": True,
+            "source_mode": "longbridge_sdk_snapshot_poll",
+            "event_time": "2026-07-15T14:35:00Z",
+            "bar_close_at": "2026-07-15T14:35:00Z",
+            "received_at": "2026-07-15T14:35:03Z",
+            "source_delivery_age_ms": 120000,
+            "bar_finalization_delay_ms": 3000,
+        }]
+
+        self.assertEqual(
+            [
+                row["event_id"]
+                for row in fresh_market_events(
+                    rows,
+                    2000,
+                    maximum_finalization_delay_ms=5000,
+                    now=datetime(2026, 7, 15, 14, 35, 3, 100000, tzinfo=UTC),
+                )
+            ],
             ["sdk-5m|AAPL|2026-07-15T14:35:00Z"],
         )
 

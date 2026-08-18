@@ -94,6 +94,7 @@ MARKET_DATA_HEALTH_LEDGER_JSONL = "m15_sdk_market_data_health_ledger.jsonl"
 PENDING_RUNTIME_RELOAD_JSON = "m15_sdk_pending_runtime_reload.json"
 AUTHORIZED_ACCOUNT_EXIT_FILE = "m15_authorized_account_exit.json"
 CAPITAL_BUCKET_MIGRATION_FILE = "m15_capital_bucket_migration_state.json"
+REALTIME_ACCOUNT_STATE_FILE = "m15_longbridge_realtime_account_state.json"
 TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
 TRADE_CONTEXT_RETRY_SECONDS = 5
 INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS = 90
@@ -778,11 +779,46 @@ def subscription_symbols(value: Any) -> set[str]:
     return set()
 
 
-def quote_subscription_targets(config: Any, now: datetime) -> tuple[str, ...]:
-    """Prioritize the frozen trading universe during a regular-session recovery."""
-    if in_regular_session(now):
-        return configured_trading_symbols(config)
-    return configured_symbols(config)
+def account_position_symbols(config: Any) -> tuple[str, ...]:
+    """Return broker-held US symbols that require quote and exit monitoring."""
+    path = config.output_dir / REALTIME_ACCOUNT_STATE_FILE
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return ()
+    symbols: set[str] = set()
+    for row in payload.get("positions") or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            quantity = Decimal(str(row.get("quantity") or "0"))
+        except (InvalidOperation, ValueError):
+            continue
+        symbol = str(row.get("symbol") or "").upper()
+        if quantity == 0 or not symbol.endswith(f".{config.market}"):
+            continue
+        symbols.add(symbol)
+    return tuple(sorted(symbols))
+
+
+def quote_subscription_targets(
+    config: Any,
+    now: datetime,
+    *,
+    position_symbols: tuple[str, ...] | list[str] | None = None,
+) -> tuple[str, ...]:
+    """Monitor held positions without adding them to the strategy universe."""
+    base = (
+        configured_trading_symbols(config)
+        if in_regular_session(now)
+        else configured_symbols(config)
+    )
+    held = (
+        tuple(position_symbols)
+        if position_symbols is not None
+        else account_position_symbols(config)
+    )
+    return tuple(dict.fromkeys((*base, *held)))
 
 
 def should_use_snapshot_fallback(
@@ -965,18 +1001,36 @@ def adaptive_market_data_deadline_seconds(
     now: datetime,
     bar_minutes: int,
 ) -> float:
-    """Back off a restart storm without killing a worker at a bar boundary."""
-    del now, bar_minutes
-    # Snapshot calls can legitimately take longer than the push-stream
-    # heartbeat.  Killing the isolated worker after eight seconds caused a
-    # reconnect storm and occasionally removed an entire five-minute boundary.
-    # The native SDK request timeout is about 30 seconds. The parent must let
-    # the isolated worker receive and handle that exception instead of killing
-    # it first and creating a restart storm.
-    base = max(float(base_deadline_seconds), 45.0)
-    if int(recent_restarts) < 3:
-        return base
-    return max(base, float(recovery_deadline_seconds))
+    """Keep snapshot failures within the realtime evidence deadline."""
+    del recovery_deadline_seconds, recent_restarts, now, bar_minutes
+    # The native SDK can wait about 30 seconds before returning a timeout. A
+    # completed bar delivered that late is no longer actionable, so terminate
+    # the isolated worker at the configured realtime deadline instead.
+    return max(1.0, float(base_deadline_seconds))
+
+
+def primary_subscription_reprobe_date(
+    snapshot_fallback_active: bool,
+    attempted_business_dates: set[str],
+    now: datetime,
+) -> str:
+    """Request one push-subscription retry before each US regular session."""
+    if not snapshot_fallback_active:
+        return ""
+    now_ny = now.astimezone(NEW_YORK)
+    if now_ny.weekday() >= 5:
+        return ""
+    session_probe_start = now_ny.replace(
+        hour=9, minute=25, second=0, microsecond=0
+    )
+    session_close = now_ny.replace(hour=16, minute=0, second=0, microsecond=0)
+    business_date = now_ny.date().isoformat()
+    if (
+        session_probe_start <= now_ny < session_close
+        and business_date not in attempted_business_dates
+    ):
+        return business_date
+    return ""
 
 
 def subscription_quote_stream_is_stale(
@@ -1091,11 +1145,11 @@ def quote_worker(
                 },
             )
 
-        all_symbols = list(configured_symbols(config))
-        trading_symbols = list(configured_trading_symbols(config))
         subscription_targets = list(
             quote_subscription_targets(config, datetime.now(UTC))
         )
+        all_symbols = list(subscription_targets)
+        trading_symbols = list(configured_trading_symbols(config))
         failed = subscribe_quote_and_trades(
             quote,
             subscription_targets,
@@ -1159,7 +1213,7 @@ def quote_snapshot_worker(
         target_symbols = list(
             quote_subscription_targets(config, datetime.now(UTC))
         )
-        all_symbols = set(configured_symbols(config))
+        all_symbols = set(target_symbols)
         trading_symbols = set(configured_trading_symbols(config))
         consecutive_failures = 0
         consecutive_slow_polls = 0
@@ -2720,12 +2774,18 @@ def dispatch_completed_rows(
             "ignored_context_only_count": len(ignored_context_rows),
         }
     rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {})
-    fresh = fresh_market_events(rows, config.maximum_source_delivery_age_ms)
+    fresh = fresh_market_events(
+        rows,
+        config.maximum_source_delivery_age_ms,
+        maximum_finalization_delay_ms=(
+            getattr(config, "maximum_bar_finalization_delay_ms", 5000)
+        ),
+    )
     append_market_events(config.market_events_path, fresh, config.event_keep_lines)
-    trading_fresh = trading_market_events(config, fresh)
-    new_rows = market_context.append(trading_fresh)
+    new_rows = market_context.append(fresh)
     if not new_rows:
         return {"event_count": 0, "signal_count": 0, "execution": {}}
+    new_trading_rows = trading_market_events(config, new_rows)
     from scripts.m15_longbridge_realtime_signal_router_lib import load_config as load_router_config, run_realtime_signal_router
     from scripts.m15_longbridge_realtime_position_manager_lib import load_config as load_position_config, run_realtime_position_manager
     from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config, run_realtime_execution
@@ -2745,8 +2805,8 @@ def dispatch_completed_rows(
     if marker_status == "pending_flatten" or validation_cutoff_reached:
         return {
             "event_count": len(fresh),
-            "trading_event_count": len(new_rows),
-            "readonly_expansion_event_count": len(fresh) - len(trading_fresh),
+            "trading_event_count": len(new_trading_rows),
+            "monitoring_only_event_count": len(new_rows) - len(new_trading_rows),
             "signal_count": 0,
             "live_daily_confirmation_count": 0,
             "router": {
@@ -2772,9 +2832,10 @@ def dispatch_completed_rows(
                 "total": int((time.perf_counter() - stage_started) * 1000),
             },
         }
-    trading_market_rows = market_context.rows()
+    monitoring_market_rows = market_context.rows()
+    trading_market_rows = trading_market_events(config, monitoring_market_rows)
     active_ids = active_event_ids_excluding_intraday_gaps(
-        new_rows,
+        new_trading_rows,
         intraday_context_blocked_symbols,
     )
     live_daily_rows = build_live_daily_confirmation_rows(
@@ -2783,7 +2844,7 @@ def dispatch_completed_rows(
         live_quote_session_state=live_quote_session_state,
         active_five_minute_event_ids={
             str(row.get("event_id") or "")
-            for row in new_rows
+            for row in new_trading_rows
             if str(row.get("timeframe") or "") == "5m" and row.get("bar_final") is True
         },
     )
@@ -2869,7 +2930,7 @@ def dispatch_completed_rows(
         position_config,
         generated_at=now,
         account_state_override=snapshot,
-        market_events_override=trading_market_rows,
+        market_events_override=monitoring_market_rows,
         execution_rows_override=execution_ledger_cache,
         signal_events_override=signal_event_cache,
         fill_attribution_state_cache=fill_attribution_state_cache,
@@ -2890,6 +2951,7 @@ def dispatch_completed_rows(
     out_of_scope_signals = [
         signal
         for signal in execution_signals
+        if signal.get("exit_only_position_signal") is not True
         if not market_event_is_tradable(config, signal)
     ]
     if out_of_scope_signals:
@@ -2959,8 +3021,8 @@ def dispatch_completed_rows(
         }
     return {
         "event_count": len(fresh),
-        "trading_event_count": len(new_rows),
-        "readonly_expansion_event_count": len(fresh) - len(trading_fresh),
+        "trading_event_count": len(new_trading_rows),
+        "monitoring_only_event_count": len(new_rows) - len(new_trading_rows),
         "signal_count": len(emitted),
         "live_daily_confirmation_count": len(live_daily_rows),
         "router": router_payload,
@@ -3479,7 +3541,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     worker_last_progress = 0.0
     worker_ready_since = 0.0
     subscription_progress_completed = 0
-    subscription_progress_total = len(configured_symbols(config))
+    subscription_progress_total = len(
+        quote_subscription_targets(config, datetime.now(UTC))
+    )
     restored_latency_samples, restored_last_result, restored_last_event_at = restore_pipeline_observability(
         config.runtime_status_path,
         now=datetime.now(UTC),
@@ -3530,7 +3594,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     last_subscription_failure_reason = ""
     snapshot_fallback_active = validated_snapshot_poll_is_reusable(
         previous_runtime_status,
-        len(configured_symbols(config)),
+        len(quote_subscription_targets(config, datetime.now(UTC))),
         now=datetime.now(UTC),
     )
     market_data_mode = (
@@ -3563,6 +3627,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     )
     last_subscription_quote_monotonic = 0.0
     subscription_quote_silence_fallback_count = 0
+    primary_subscription_reprobe_dates: set[str] = set()
+    last_primary_subscription_reprobe_at = ""
 
     def record_market_data_worker_restart(
         reason: str,
@@ -3602,6 +3668,36 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     signal.signal(signal.SIGTERM, stop_requested)
     try:
         while not shutdown_requested:
+            reprobe_business_date = primary_subscription_reprobe_date(
+                snapshot_fallback_active,
+                primary_subscription_reprobe_dates,
+                datetime.now(UTC),
+            )
+            if reprobe_business_date:
+                primary_subscription_reprobe_dates.add(reprobe_business_date)
+                last_primary_subscription_reprobe_at = to_iso(datetime.now(UTC))
+                append_runtime_health_event(
+                    config.output_dir / MARKET_DATA_HEALTH_LEDGER_JSONL,
+                    {
+                        "schema_version": "m15.sdk-market-data-health.v1",
+                        "event_type": "primary_subscription_reprobe",
+                        "at": last_primary_subscription_reprobe_at,
+                        "business_date": reprobe_business_date,
+                        "run_id": run_id,
+                        "runtime_pid": os.getpid(),
+                    },
+                )
+                if worker is not None:
+                    stop_spawned_process(worker, graceful=False)
+                worker = None
+                worker_ready = False
+                worker_ready_since = 0.0
+                snapshot_fallback_active = False
+                snapshot_bar_builder = None
+                market_data_mode = "sdk_subscription"
+                market_data_fallback_validated = False
+                attempts = 0
+                continue
             if (
                 postclose_recovery_status.get("status") != "running"
                 and (worker is None or not worker.is_alive())
@@ -3708,10 +3804,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_last_progress = worker_started
                 last_subscription_quote_monotonic = 0.0
                 subscription_progress_completed = 0
-                subscription_progress_total = (
-                    len(configured_trading_symbols(config))
-                    if in_regular_session(datetime.now(UTC))
-                    else len(configured_symbols(config))
+                subscription_progress_total = len(
+                    quote_subscription_targets(config, datetime.now(UTC))
                 )
                 worker_target = (
                     quote_snapshot_worker
@@ -4702,11 +4796,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         )
                     dispatch_enabled = True
             latency_metrics = summarize_latency_samples(list(pipeline_latency_samples))
+            configured_symbol_set = set(configured_symbols(config))
+            trading_symbol_set = set(configured_trading_symbols(config))
+            monitoring_target_set = set(
+                quote_subscription_targets(config, datetime.now(UTC))
+            )
+            position_monitoring_symbol_set = (
+                monitoring_target_set - trading_symbol_set
+            )
+            configured_subscription_failed = sorted(
+                configured_symbol_set & set(subscription_failed)
+            )
+            position_monitoring_failed = sorted(
+                position_monitoring_symbol_set & set(subscription_failed)
+            )
             expansion_symbol_count = (
                 len(configured_symbols(config)) - len(configured_trading_symbols(config))
             )
             expansion_subscription_failed = sorted(
-                set(subscription_failed) - set(trading_subscription_failed)
+                (configured_symbol_set - trading_symbol_set)
+                & set(subscription_failed)
             )
             expansion_daily_ready = daily_context_ready
             expansion_p95_ms = int(latency_metrics.get("p95_ms") or 0)
@@ -4768,7 +4877,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     config.output_dir / QUOTE_SNAPSHOT_JSON,
                     live_quote_session_state,
                     generated_at=quote_snapshot_generated_at,
-                    required_symbols=configured_symbols(config),
+                    required_symbols=quote_subscription_targets(
+                        config, quote_snapshot_generated_at
+                    ),
                 )
                 last_quote_snapshot_write = time.monotonic()
             session_coverage = five_minute_session_coverage(
@@ -4776,6 +4887,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 configured_trading_symbols(config),
                 now=datetime.now(UTC),
                 minutes=config.bar_minutes,
+                maximum_finalization_delay_ms=(
+                    config.maximum_bar_finalization_delay_ms
+                ),
             )
             if (
                 str(postclose_recovery_status.get("business_date") or "")
@@ -4836,6 +4950,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "complete": session_coverage["complete_boundary_count"],
                     "partial": session_coverage["partial_boundary_count"],
                     "missing": session_coverage["missing_boundary_times"],
+                    "late_finalization": session_coverage[
+                        "late_finalization_row_count"
+                    ],
                     "recovered_rows": session_coverage["recovered_row_count"],
                     "data_complete_after_recovery": session_coverage[
                         "data_complete_after_recovery"
@@ -4905,6 +5022,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "subscription_quote_silence_fallback_count": (
                         subscription_quote_silence_fallback_count
                     ),
+                    "last_primary_subscription_reprobe_at": (
+                        last_primary_subscription_reprobe_at
+                    ),
                     "subscription_quote_stream_age_seconds": (
                         max(
                             0,
@@ -4931,7 +5051,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "config_fingerprint": loaded_config_fingerprint,
                     "runtime_source_fingerprint": loaded_source_fingerprint,
                     "subscription_symbol_count": len(configured_symbols(config)),
-                    "subscription_coverage": f"{len(configured_symbols(config)) - len(subscription_failed) if worker_ready else 0}/{len(configured_symbols(config))}",
+                    "subscription_coverage": f"{len(configured_symbols(config)) - len(configured_subscription_failed) if worker_ready else 0}/{len(configured_symbols(config))}",
                     "trading_symbol_count": len(configured_trading_symbols(config)),
                     "trading_subscription_coverage": (
                         f"{len(configured_trading_symbols(config)) - len(trading_subscription_failed) if worker_ready and market_data_mode == 'sdk_subscription' else 0}"
@@ -4950,6 +5070,21 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "market_data_failed_symbols": market_data_failed,
                     "trading_market_data_failed_symbols": trading_market_data_failed,
+                    "position_monitoring_symbol_count": len(
+                        position_monitoring_symbol_set
+                    ),
+                    "position_monitoring_symbols": sorted(
+                        position_monitoring_symbol_set
+                    ),
+                    "position_monitoring_coverage": (
+                        f"{len(position_monitoring_symbol_set) - len(position_monitoring_failed)}"
+                        f"/{len(position_monitoring_symbol_set)}"
+                        if worker_ready
+                        else f"0/{len(position_monitoring_symbol_set)}"
+                    ),
+                    "position_monitoring_failed_symbols": (
+                        position_monitoring_failed
+                    ),
                     "readonly_expansion_symbol_count": expansion_symbol_count,
                     "readonly_expansion_subscription_coverage": (
                         f"{max(0, expansion_symbol_count - len(expansion_subscription_failed))}"
@@ -5254,8 +5389,19 @@ def sdk_runtime_daemon_environment(config: Any) -> dict[str, str]:
 def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     GLOBAL_RUNTIME_START_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    # DNS preparation can involve bounded network probes.  Do it before taking
+    # the global process lock so a simultaneous boot/watchdog recovery cannot
+    # wait behind unrelated network setup and time out.
+    child_environment = sdk_runtime_daemon_environment(config)
     with GLOBAL_RUNTIME_START_LOCK.open("a+", encoding="utf-8") as start_lock:
-        fcntl.flock(start_lock.fileno(), fcntl.LOCK_EX)
+        try:
+            fcntl.flock(start_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(
+                "SDK 实时运行层已有启动或恢复操作正在进行；"
+                "本次不重复等待，后台看护将在下一轮复查。"
+            )
+            return 0
         global_owner = read_pid(GLOBAL_QUOTE_SUBSCRIPTION_LOCK)
         local_owner = read_pid(config.output_dir / RUN_LOCK_FILE)
         lock_owner = global_owner or local_owner
@@ -5369,7 +5515,6 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
         command = [sys.executable, str(Path(__file__).resolve()), "--watch", "--config", str(args.config)]
         if args.dispatch:
             command.append("--dispatch")
-        child_environment = sdk_runtime_daemon_environment(config)
         with (config.output_dir / LOG_FILE).open("a", encoding="utf-8") as handle:
             process = subprocess.Popen(
                 command,
