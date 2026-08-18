@@ -287,10 +287,7 @@ def apply_aggregate_strategy_exit_fill_allocations(
     anomaly_code_by_order = {
         str(row.get("order_id") or ""): str(row.get("code") or "")
         for row in payload.get("anomalies", [])
-        if isinstance(row, Mapping)
-        and str(row.get("code") or "")
-        in {"exit_quantity_exceeds_open_batch", "exit_missing_source_batch"}
-        and str(row.get("order_id") or "")
+        if isinstance(row, Mapping) and str(row.get("order_id") or "")
     }
     exits_by_order: dict[str, dict[str, Any]] = {}
     for row in local_exit_rows:
@@ -298,16 +295,30 @@ def apply_aggregate_strategy_exit_fill_allocations(
             continue
         order_id = str(row.get("order_id") or "")
         anomaly_code = anomaly_code_by_order.get(order_id, "")
-        if not anomaly_code or str(row.get("position_action") or "") not in EXIT_ACTIONS:
+        legacy_aggregate_exit = anomaly_code == "exit_quantity_exceeds_open_batch"
+        if (
+            str(row.get("position_action") or "") not in EXIT_ACTIONS
+            or (
+                row.get("aggregate_strategy_exit") is not True
+                and not legacy_aggregate_exit
+            )
+            or _decimal(row.get("source_open_remaining_quantity")) <= ZERO
+        ):
             continue
-        if anomaly_code == "exit_missing_source_batch":
-            declared_batch_ids = row.get("source_batch_ids")
-            if not (
-                row.get("aggregate_strategy_exit") is True
-                and isinstance(declared_batch_ids, list)
-                and any(str(value) for value in declared_batch_ids)
-            ):
-                continue
+        declared_batch_ids = row.get("source_batch_ids")
+        has_declared_batch_ids = isinstance(declared_batch_ids, list) and any(
+            str(value) for value in declared_batch_ids
+        )
+        # Historical reconciliation normalized an absent batch list to ``[]``.
+        # Preserve compatibility only for the legacy over-quantity anomaly;
+        # new aggregate exits still require a non-empty exact batch declaration.
+        if declared_batch_ids is not None and not has_declared_batch_ids and not legacy_aggregate_exit:
+            continue
+        if (
+            anomaly_code == "exit_missing_source_batch"
+            and not has_declared_batch_ids
+        ):
+            continue
         exits_by_order[order_id] = dict(row)
     if not exits_by_order:
         return payload
@@ -356,11 +367,6 @@ def apply_aggregate_strategy_exit_fill_allocations(
             for value in (local_row.get("source_batch_ids") or [])
             if str(value)
         }
-        if (
-            anomaly_code_by_order.get(order_id) == "exit_missing_source_batch"
-            and not declared_batch_ids
-        ):
-            continue
         candidates = sorted(
             (
                 batch
@@ -914,6 +920,7 @@ def add_completed_trade_performance(
                 "estimated_fees": _fmt_money(estimated_fees),
                 "estimated_net_pnl": _fmt_money(estimated_net),
                 "fee_source": "configured_conservative_estimate",
+                "fees_are_estimated_not_actual": True,
                 "opened_at": opened_at,
                 "closed_at": closed_at,
                 "open_market_date": open_market_date,
@@ -1039,6 +1046,7 @@ def add_completed_trade_performance(
             ),
             "fee_source": "configured_conservative_estimate",
             "actual_broker_fee_field_available": False,
+            "fees_are_estimated_not_actual": True,
         }
     )
     payload["summary"] = summary
@@ -1047,6 +1055,7 @@ def add_completed_trade_performance(
         "regulatory_fee_per_sell_order": _fmt_money(regulatory_fee_per_sell_order),
         "source": "configured_conservative_estimate",
         "actual_broker_fee_field_available": False,
+        "fees_are_estimated_not_actual": True,
     }
     payload["fault_day_registry"] = normalized_fault_days
     payload["strategy_performance_scope"] = "completed_trades_excluding_fault_days"

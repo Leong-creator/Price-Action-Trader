@@ -123,11 +123,43 @@ def _tupled_strings(values: Any) -> tuple[str, ...]:
     return tuple(str(item).strip() for item in values if str(item).strip())
 
 
+def active_test_ids_from_sources(values: Any) -> tuple[str, ...]:
+    identifiers: set[str] = set()
+    if not isinstance(values, list):
+        return ()
+    for source in values:
+        if not isinstance(source, dict):
+            continue
+        configured_path = str(source.get("path") or "").strip()
+        if not configured_path:
+            continue
+        source_path = resolve_repo_path(configured_path)
+        payload = read_json(source_path) if source_path.exists() else {}
+        for field in _tupled_strings(
+            source.get(
+                "fields",
+                [
+                    "test_epoch_id",
+                    "short_test_epoch_id",
+                    "validation_test_epoch_id",
+                    "validation_short_test_epoch_id",
+                ],
+            )
+        ):
+            value = str(payload.get(field) or "").strip()
+            if value:
+                identifiers.add(value)
+    return tuple(sorted(identifiers))
+
+
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RetentionConfig:
     config_path = resolve_repo_path(path)
     payload = read_json(config_path) if config_path.exists() else {}
     rules = payload.get("jsonl_rules", [])
     snapshot_rules = payload.get("snapshot_rules", [])
+    dynamic_active_test_ids = active_test_ids_from_sources(
+        payload.get("active_test_id_sources", [])
+    )
     config = RetentionConfig(
         stage=str(payload.get("stage", "M15.artifact_retention")),
         title=str(payload.get("title", "M15 artifact retention")),
@@ -138,7 +170,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> RetentionConfig:
                 archive_dir_name=str(rule.get("archive_dir_name", "archive")),
                 active_trading_dates=_tupled_strings(rule.get("active_trading_dates", []))
                 or (datetime.now(NEW_YORK).date().isoformat(),),
-                active_test_ids=_tupled_strings(rule.get("active_test_ids", [])),
+                active_test_ids=tuple(
+                    sorted(
+                        set(_tupled_strings(rule.get("active_test_ids", [])))
+                        | set(dynamic_active_test_ids)
+                    )
+                ),
                 row_time_fields=_tupled_strings(rule.get("row_time_fields", [])),
                 row_trading_date_fields=_tupled_strings(rule.get("row_trading_date_fields", [])),
                 row_test_id_fields=_tupled_strings(rule.get("row_test_id_fields", [])),

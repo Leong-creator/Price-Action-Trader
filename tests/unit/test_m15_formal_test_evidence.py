@@ -42,6 +42,7 @@ class FormalTestEvidenceTest(unittest.TestCase):
         signal_ready_runtime: str = "",
         add_order: bool = False,
         late_finalization_count: int = 0,
+        duplicate_signal_rows: bool = False,
     ) -> Path:
         coverage = {
             "business_date": "2026-08-17",
@@ -103,17 +104,23 @@ class FormalTestEvidenceTest(unittest.TestCase):
                     "strategy_contract_hash": contract_hashes[runtime_id],
                     "candidate_emitted": emitted,
                     "no_candidate_reason": "structure_not_confirmed" if not emitted else "",
+                    "signal_id": f"signal-{runtime_id}" if emitted else "",
+                    "symbol": "AAPL.US",
                 }
             )
             if emitted:
-                decision_rows.append(
-                    {
-                        "runtime_id": runtime_id,
-                        "created_at": "2026-08-17T19:00:00Z",
-                        "strategy_contract_hash": contract_hashes[runtime_id],
-                        "router_decision_status": "signal_event_ready",
-                    }
-                )
+                decision = {
+                    "runtime_id": runtime_id,
+                    "created_at": "2026-08-17T19:00:00Z",
+                    "strategy_contract_hash": contract_hashes[runtime_id],
+                    "router_decision_status": "signal_event_ready",
+                    "signal_id": f"signal-{runtime_id}",
+                    "symbol": "AAPL.US",
+                }
+                decision_rows.append(decision)
+                if duplicate_signal_rows:
+                    detector_attempt_rows.append(dict(detector_attempt_rows[-1]))
+                    decision_rows.append(dict(decision))
         self.write_json(
             root / "diagnostics.json",
             {
@@ -217,11 +224,33 @@ class FormalTestEvidenceTest(unittest.TestCase):
             self.assertTrue(result["layers"]["market_session"]["complete"])
             self.assertTrue(result["layers"]["strategy_operation"]["complete"])
             self.assertTrue(result["layers"]["broker_execution"]["complete"])
+            self.assertEqual(result["layers"]["strategy_operation"]["attempt_count"], len(RUNTIMES))
             self.assertEqual(result["layers"]["performance_sample"]["status"], "insufficient")
             self.assertEqual(result["inventory"]["executable_contract_count"], 8)
             self.assertEqual(result["inventory"]["visual_contract_draft_count"], 3)
             self.assertEqual(result["progress"]["consecutive_clean_session_count"], 1)
             self.assertEqual(len((root / "ledger.jsonl").read_text().splitlines()), 1)
+
+    def test_strategy_operation_keeps_attempts_and_dedupes_distinct_candidate_and_ready_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = generate_formal_test_evidence(
+                load_config(self.fixture(root, signal_ready_runtime="M10-PA-002-5m", duplicate_signal_rows=True)),
+                generated_at="2026-08-17T20:10:00Z",
+            )
+
+            layer = result["layers"]["strategy_operation"]
+            row = {item["runtime_id"]: item for item in layer["runtime_rows"]}["M10-PA-002-5m"]
+            self.assertEqual(row["attempt_count"], 2)
+            self.assertEqual(row["candidate_count"], 2)
+            self.assertEqual(row["distinct_candidate_count"], 1)
+            self.assertEqual(row["signal_ready_count"], 2)
+            self.assertEqual(row["distinct_signal_ready_count"], 1)
+            self.assertEqual(layer["attempt_count"], len(RUNTIMES) + 1)
+            self.assertEqual(layer["candidate_count"], 2)
+            self.assertEqual(layer["distinct_candidate_count"], 1)
+            self.assertEqual(layer["signal_ready_count"], 2)
+            self.assertEqual(layer["distinct_signal_ready_count"], 1)
 
     def test_incomplete_market_session_is_not_counted_as_clean(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

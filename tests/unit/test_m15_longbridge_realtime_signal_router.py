@@ -875,6 +875,120 @@ class M15LongbridgeRealtimeSignalRouterTest(unittest.TestCase):
             self.assertEqual(signals[0]["market_confirmation_status"], "confirmed")
             self.assertEqual(signals[0]["market_confirmation_symbols"], "SPY")
 
+    def test_ftd_pullback_guard_confirm_emits_quality_fields_without_market_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self.make_config(
+                root,
+                session_started_at="2026-05-01T13:00:00Z",
+                enabled_detectors=["price_action_realtime_v1"],
+                allowed_runtime_ids=["M12-FTD-001-pullback-guard-confirm-1d"],
+                runtime_position_multipliers={"M12-FTD-001-pullback-guard-confirm-1d": "1.0"},
+                virtual_capital_buckets={
+                    "ftd_pullback_guard": {
+                        "label": "FTD pullback guard",
+                        "equity": "10000",
+                        "max_total_exposure": "6000",
+                        "max_symbol_exposure": "1500",
+                        "max_risk_per_order": "20",
+                        "min_cash_reserve": "4000",
+                        "runtime_ids": ["M12-FTD-001-pullback-guard-confirm-1d"],
+                    }
+                },
+            )
+            rows: list[dict[str, object]] = []
+            for day in range(1, 21):
+                rows.append(
+                    self.market_event(
+                        event_id=f"base-{day}",
+                        symbol="AAPL",
+                        event_time=f"2026-05-{day + 1:02d}T20:00:00Z",
+                        received_at=f"2026-05-{day + 1:02d}T20:00:01Z",
+                        open="99.5",
+                        high="100.5",
+                        low="99",
+                        close="100",
+                        volume="1000000",
+                        strategy_signal_intents=[],
+                    )
+                )
+            rows.extend(
+                [
+                    self.market_event(
+                        event_id="recent-high",
+                        symbol="AAPL",
+                        event_time="2026-05-22T20:00:00Z",
+                        received_at="2026-05-22T20:00:01Z",
+                        open="104",
+                        high="110",
+                        low="99.5",
+                        close="100",
+                        volume="1000000",
+                        strategy_signal_intents=[],
+                    ),
+                    self.market_event(
+                        event_id="setup-bar",
+                        symbol="AAPL",
+                        event_time="2026-05-23T20:00:00Z",
+                        received_at="2026-05-23T20:00:01Z",
+                        open="99.8",
+                        high="100.8",
+                        low="99.2",
+                        close="100",
+                        volume="1000000",
+                        strategy_signal_intents=[],
+                    ),
+                    self.market_event(
+                        event_id="signal-bar",
+                        symbol="AAPL",
+                        event_time="2026-05-24T20:00:00Z",
+                        received_at="2026-05-24T20:00:01Z",
+                        open="100",
+                        high="104",
+                        low="99",
+                        close="103",
+                        volume="1300000",
+                        strategy_signal_intents=[],
+                    ),
+                    self.market_event(
+                        event_id="confirm-bar",
+                        symbol="AAPL",
+                        event_time="2026-05-25T20:00:00Z",
+                        received_at="2026-05-25T20:00:01Z",
+                        open="103",
+                        high="105",
+                        low="102",
+                        close="104",
+                        volume="1250000",
+                        next_bar_first_quote_price="104.20",
+                        next_bar_first_quote_at="2026-05-24T20:00:00.100Z",
+                        next_bar_entry_source="longbridge_sdk_first_quote_after_bar_close",
+                        strategy_signal_intents=[],
+                    ),
+                ]
+            )
+            self.write_jsonl(root / "market_events.jsonl", rows)
+
+            payload = run_realtime_signal_router(config, generated_at="2026-05-24T20:00:02Z")
+            signals = self.read_jsonl(root / "signals.jsonl")
+            ledger_rows = self.read_jsonl(config.output_dir / LEDGER_JSONL)
+
+            self.assertEqual(payload["new_signal_event_count"], 1)
+            self.assertEqual(signals[0]["runtime_id"], "M12-FTD-001-pullback-guard-confirm-1d")
+            self.assertIn("quality_score", signals[0])
+            self.assertIn("signal_quality_score", signals[0])
+            self.assertIn("components", signals[0])
+            self.assertIn("quality_score_components", signals[0])
+            self.assertEqual(signals[0]["quality_score"], "100")
+            self.assertEqual(
+                signals[0]["components"]["quality_basis"],
+                "contract_conditions_passed_no_additional_strategy_gate",
+            )
+            self.assertEqual(signals[0]["components"], signals[0]["quality_score_components"])
+            self.assertEqual(signals[0]["market_confirmation_status"], "audit_not_confirmed")
+            self.assertEqual(signals[0]["contract_evidence"]["market_context_is_blocker"], False)
+            self.assertEqual(ledger_rows[0]["components"], ledger_rows[0]["quality_score_components"])
+
     def test_pa004_mbf_variants_emit_independent_single_bucket_signals(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

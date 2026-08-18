@@ -206,17 +206,39 @@ def build_app_display_metrics(
         and decimal_value(row.get("prev_close")) > 0
     }
     symbols = sorted(set(current_quantity) | set(buy_quantity) | set(sell_quantity))
-    missing_symbols = [symbol for symbol in symbols if symbol not in quotes_by_symbol]
+    missing_symbols: list[str] = []
     symbol_rows: list[dict[str, str]] = []
     today_profit = Decimal("0")
     market_value = Decimal("0")
     cent = Decimal("0.01")
     for symbol in symbols:
-        quote = quotes_by_symbol.get(symbol)
-        if not quote:
-            continue
         current = current_quantity.get(symbol, Decimal("0"))
         opening = current - buy_quantity.get(symbol, Decimal("0")) + sell_quantity.get(symbol, Decimal("0"))
+        quote = quotes_by_symbol.get(symbol)
+        quote_required = not (opening == 0 and current == 0)
+        if not quote and quote_required:
+            missing_symbols.append(symbol)
+            continue
+        if not quote:
+            symbol_profit = (
+                sell_amount.get(symbol, Decimal("0"))
+                - buy_amount.get(symbol, Decimal("0"))
+            ).quantize(cent, rounding=ROUND_HALF_UP)
+            today_profit += symbol_profit
+            symbol_rows.append(
+                {
+                    "symbol": symbol,
+                    "opening_quantity": str(opening),
+                    "current_quantity": str(current),
+                    "current_price": "",
+                    "previous_close": "",
+                    "buy_amount": str(buy_amount.get(symbol, Decimal("0"))),
+                    "sell_amount": str(sell_amount.get(symbol, Decimal("0"))),
+                    "today_pnl": str(symbol_profit),
+                    "price_phase": "round_trip_closed_without_quote",
+                }
+            )
+            continue
         latest = decimal_value(quote.get("current_price"))
         previous_close = decimal_value(quote.get("prev_close"))
         symbol_profit = (

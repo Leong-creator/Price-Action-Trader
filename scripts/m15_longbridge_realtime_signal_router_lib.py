@@ -2562,6 +2562,13 @@ def ftd_pullback_guard_confirm_signal(
         return None
     target_date = ny_event_date(latest)
     market_confirmed, market_symbols = market_follow_through_confirmed(grouped_events, target_date)
+    quality_components = ftd_pullback_guard_quality_components(
+        pullback_bars=pullback_bars,
+        max_pullback_bars=int(spec.get("max_pullback_bars", 20)),
+        follow_through_bar_count=confirmation_count,
+        follow_through_window_bars=int(spec.get("follow_through_window_bars", 2)),
+    )
+    quality_score = decimal(quality_components["quality_score"])
     signal.update(
         {
             "created_at": entry_at,
@@ -2581,9 +2588,39 @@ def ftd_pullback_guard_confirm_signal(
             "market_confirmation_status": "audit_confirmed" if market_confirmed else "audit_not_confirmed",
             "market_confirmation_symbols": market_symbols,
             "pre_gate_blockers": [],
+            "quality_score": fmt_decimal(quality_score),
+            "signal_quality_score": fmt_decimal(quality_score),
+            "components": quality_components,
+            "quality_score_components": quality_components,
+            "high_quality_signal": quality_score >= Decimal("80"),
         }
     )
     return signal
+
+
+def ftd_pullback_guard_quality_components(
+    *,
+    pullback_bars: int,
+    max_pullback_bars: int,
+    follow_through_bar_count: int,
+    follow_through_window_bars: int,
+) -> dict[str, Any]:
+    max_pullback = max(1, int(max_pullback_bars))
+    follow_window = max(1, int(follow_through_window_bars))
+    contract_conditions_passed = bool(
+        0 <= pullback_bars <= max_pullback
+        and 1 <= follow_through_bar_count <= follow_window
+    )
+    quality_score = Decimal("100") if contract_conditions_passed else ZERO
+    return {
+        "pullback_bar_count": pullback_bars,
+        "maximum_pullback_bars": max_pullback,
+        "follow_through_bar_count": follow_through_bar_count,
+        "follow_through_window_bars": follow_window,
+        "contract_conditions_passed": contract_conditions_passed,
+        "quality_basis": "contract_conditions_passed_no_additional_strategy_gate",
+        "quality_score": fmt_decimal(quality_score),
+    }
 
 
 def build_price_action_long_signal(
@@ -3119,6 +3156,9 @@ def build_signal_from_intent(
         "quality_score_components": intent.get("quality_score_components", {})
         if isinstance(intent.get("quality_score_components"), dict)
         else {},
+        "components": intent.get("components", intent.get("quality_score_components", {}))
+        if isinstance(intent.get("components", intent.get("quality_score_components", {})), dict)
+        else {},
         "market_confirmation_status": str(intent.get("market_confirmation_status") or ""),
         "market_confirmation_symbols": str(intent.get("market_confirmation_symbols") or ""),
         "repair_rule_id": str(intent.get("repair_rule_id") or ""),
@@ -3212,6 +3252,9 @@ def build_signal_from_intent(
         "industry_strength_scope": str(intent.get("industry_strength_scope") or ""),
         "quality_score_components": intent.get("quality_score_components", {})
         if isinstance(intent.get("quality_score_components"), dict)
+        else {},
+        "components": intent.get("components", intent.get("quality_score_components", {}))
+        if isinstance(intent.get("components", intent.get("quality_score_components", {})), dict)
         else {},
         "market_confirmation_status": str(intent.get("market_confirmation_status") or ""),
         "market_confirmation_symbols": str(intent.get("market_confirmation_symbols") or ""),

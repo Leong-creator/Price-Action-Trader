@@ -54,6 +54,7 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
             ),
         ]
         local_rows[-1]["source_open_remaining_quantity"] = "5"
+        local_rows[-1]["source_batch_ids"] = []
         broker_rows = [
             self.broker_row(order_id="open-a", trade_id="trade-a", symbol="HPQ.US", side="Buy", status="Filled", executed_quantity="2", executed_price="30", created_at="2026-08-05T14:00:00Z"),
             self.broker_row(order_id="open-b", trade_id="trade-b", symbol="HPQ.US", side="Buy", status="Filled", executed_quantity="3", executed_price="31", created_at="2026-08-05T14:05:00Z"),
@@ -231,6 +232,80 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
                         for row in result["events"]
                     )
                 )
+
+    def test_aggregate_exit_can_repair_without_legacy_anomaly_code_when_declared_complete(self) -> None:
+        payload = {
+            "batches": [
+                {
+                    "batch_id": "batch-a",
+                    "test_epoch_id": "formal",
+                    "capital_bucket": "bucket-a",
+                    "runtime_id": "RUNTIME-A",
+                    "symbol": "HPQ",
+                    "direction": "long",
+                    "remaining_quantity": "2",
+                    "open_price": "30",
+                    "open_order_id": "open-a",
+                    "trade_id": "trade-a",
+                    "metadata": {"submitted_at": "2026-08-05T14:00:00Z"},
+                },
+                {
+                    "batch_id": "batch-b",
+                    "test_epoch_id": "formal",
+                    "capital_bucket": "bucket-a",
+                    "runtime_id": "RUNTIME-A",
+                    "symbol": "HPQ",
+                    "direction": "long",
+                    "remaining_quantity": "3",
+                    "open_price": "31",
+                    "open_order_id": "open-b",
+                    "trade_id": "trade-b",
+                    "metadata": {"submitted_at": "2026-08-05T14:05:00Z"},
+                },
+            ],
+            "events": [],
+            "anomalies": [],
+            "summary": {"open_batch_count": 2, "anomaly_count": 0, "matched_event_count": 0},
+        }
+        local_rows = [
+            self.local_row(
+                order_id="exit-all",
+                signal_id="exit-all",
+                symbol="HPQ",
+                side="sell",
+                quantity="5",
+                runtime_id="RUNTIME-A",
+                capital_bucket="bucket-a",
+                test_epoch_id="formal",
+                position_action="close_long",
+            )
+        ]
+        local_rows[0]["aggregate_strategy_exit"] = True
+        local_rows[0]["source_open_remaining_quantity"] = "5"
+        broker_rows = [
+            self.broker_row(
+                order_id="exit-all",
+                trade_id="trade-exit",
+                symbol="HPQ.US",
+                side="Sell",
+                status="Filled",
+                executed_quantity="5",
+                executed_price="29",
+                created_at="2026-08-05T15:00:00Z",
+            )
+        ]
+
+        result = apply_aggregate_strategy_exit_fill_allocations(
+            payload,
+            local_rows,
+            broker_rows,
+            broker_net_positions={"HPQ": "0"},
+        )
+
+        exits = [row for row in result["events"] if row["event_type"] == "exit_fill"]
+        self.assertEqual(len(exits), 2)
+        self.assertEqual(result["summary"]["open_batch_count"], 0)
+        self.assertEqual(result["summary"]["anomaly_count"], 0)
 
     def test_account_flatten_fill_allocates_exactly_across_strategy_lots(self) -> None:
         result = rebuild_fill_attribution(
@@ -445,6 +520,9 @@ class M15LongbridgeFillAttributionTest(unittest.TestCase):
         self.assertEqual(result["summary"]["gross_realized_pnl"], "20.00")
         self.assertEqual(result["summary"]["estimated_fees"], "6.01")
         self.assertEqual(result["summary"]["estimated_net_realized_pnl"], "13.99")
+        self.assertTrue(result["summary"]["fees_are_estimated_not_actual"])
+        self.assertTrue(result["fee_model"]["fees_are_estimated_not_actual"])
+        self.assertTrue(result["completed_trades"][0]["fees_are_estimated_not_actual"])
         self.assertEqual(result["strategy_performance"][0]["completed_trade_count"], 1)
         self.assertEqual(result["strategy_performance"][0]["win_rate_after_estimated_fees_pct"], "100.0000")
 

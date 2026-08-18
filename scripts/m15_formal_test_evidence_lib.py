@@ -144,6 +144,45 @@ def _iso_market_date(value: Any) -> str:
     return observed.astimezone(NEW_YORK).date().isoformat()
 
 
+def _stable_distinct_key(row: dict[str, Any], *, kind: str) -> tuple[str, ...]:
+    explicit_id = next(
+        (
+            str(row.get(field) or "")
+            for field in (
+                "signal_id",
+                "candidate_id",
+                "decision_id",
+                "event_id",
+                "fingerprint",
+            )
+            if str(row.get(field) or "")
+        ),
+        "",
+    )
+    if explicit_id:
+        return (kind, explicit_id)
+    return (
+        kind,
+        str(row.get("runtime_id") or ""),
+        str(row.get("strategy_contract_hash") or ""),
+        str(row.get("symbol") or ""),
+        str(
+            row.get("market_event_time")
+            or row.get("source_event_at")
+            or row.get("created_at")
+            or row.get("submitted_at")
+            or ""
+        ),
+        str(
+            row.get("router_decision_status")
+            or row.get("position_action")
+            or row.get("side")
+            or row.get("direction")
+            or ""
+        ),
+    )
+
+
 def _runtime_inventory(execution_config: dict[str, Any]) -> dict[str, Any]:
     realtime = execution_config.get("longbridge_realtime") or {}
     layering = execution_config.get("runtime_layering") or {}
@@ -301,6 +340,11 @@ def _strategy_operation_layer(
         and _iso_market_date(row.get("created_at")) == business_date
     ]
     runtime_rows: list[dict[str, Any]] = []
+    total_attempt_count = 0
+    total_candidate_count = 0
+    total_distinct_candidate_count = 0
+    total_signal_ready_count = 0
+    total_distinct_signal_ready_count = 0
     for runtime_id in inventory["executable_contract_runtime_ids"]:
         runtime_attempts = [
             row for row in attempt_rows if str(row.get("runtime_id") or "") == runtime_id
@@ -335,21 +379,41 @@ def _strategy_operation_layer(
             status_code = str(row.get("router_decision_status") or "")
             if status_code and status_code != "signal_event_ready":
                 router_blockers[status_code] = router_blockers.get(status_code, 0) + 1
+        candidate_rows = [
+            row for row in runtime_attempts if row.get("candidate_emitted") is True
+        ]
+        signal_ready_rows = [
+            row
+            for row in runtime_decisions
+            if str(row.get("router_decision_status") or "") == "signal_event_ready"
+        ]
+        distinct_candidate_count = len(
+            {_stable_distinct_key(row, kind="candidate") for row in candidate_rows}
+        )
+        distinct_signal_ready_count = len(
+            {
+                _stable_distinct_key(row, kind="signal_ready")
+                for row in signal_ready_rows
+            }
+        )
+        total_attempt_count += attempts
+        total_candidate_count += len(candidate_rows)
+        total_distinct_candidate_count += distinct_candidate_count
+        total_signal_ready_count += len(signal_ready_rows)
+        total_distinct_signal_ready_count += distinct_signal_ready_count
         runtime_rows.append(
             {
                 "runtime_id": runtime_id,
                 "status": status,
+                "attempt_count": attempts,
                 "detector_attempted_count": attempts,
                 "no_candidate_count": sum(
                     row.get("candidate_emitted") is not True for row in runtime_attempts
                 ),
-                "candidate_count": sum(
-                    row.get("candidate_emitted") is True for row in runtime_attempts
-                ),
-                "signal_ready_count": sum(
-                    str(row.get("router_decision_status") or "") == "signal_event_ready"
-                    for row in runtime_decisions
-                ),
+                "candidate_count": len(candidate_rows),
+                "distinct_candidate_count": distinct_candidate_count,
+                "signal_ready_count": len(signal_ready_rows),
+                "distinct_signal_ready_count": distinct_signal_ready_count,
                 "current_contract_hash": expected_hash,
                 "contract_hash_mismatch_count": hash_mismatch_count,
                 "top_no_candidate_reasons": no_candidate_reasons,
@@ -364,6 +428,12 @@ def _strategy_operation_layer(
         "source_business_date": source_date,
         "expected_runtime_count": inventory["executable_contract_count"],
         "operational_runtime_count": operational_count,
+        "attempt_count": total_attempt_count,
+        "detector_attempted_count": total_attempt_count,
+        "candidate_count": total_candidate_count,
+        "distinct_candidate_count": total_distinct_candidate_count,
+        "signal_ready_count": total_signal_ready_count,
+        "distinct_signal_ready_count": total_distinct_signal_ready_count,
         "runtime_rows": runtime_rows,
         "plain_language_result": (
             "8条正式合同均完成了当天策略检测；没有候选不等于策略故障。"

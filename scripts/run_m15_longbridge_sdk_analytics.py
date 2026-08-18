@@ -16,7 +16,7 @@ from scripts.m15_longbridge_sdk_analytics_lib import run_sdk_analytics
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh Longbridge paper analytics through the SDK only.")
-    parser.add_argument("--sdk-config", default="config/examples/m15_longbridge_sdk_runtime.json")
+    parser.add_argument("--sdk-config", default="config/examples/m15_longbridge_sdk_runtime.contract_v1.json")
     parser.add_argument("--account-config", default="config/examples/m15_longbridge_realtime_account_state.json")
     parser.add_argument("--generated-at", default="")
     args = parser.parse_args()

@@ -2,6 +2,17 @@
   "stage": "M15.artifact_retention",
   "title": "M15/M14 artifact retention",
   "dry_run_default": true,
+  "active_test_id_sources": [
+    {
+      "path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
+      "fields": [
+        "test_epoch_id",
+        "short_test_epoch_id",
+        "validation_test_epoch_id",
+        "validation_short_test_epoch_id"
+      ]
+    }
+  ],
   "archived_file_globs": [
     "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/archive/*.archived.jsonl",
     "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/archive/*.archived.log"

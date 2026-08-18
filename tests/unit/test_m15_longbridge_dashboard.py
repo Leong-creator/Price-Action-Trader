@@ -74,9 +74,13 @@ class LongbridgeDashboardTest(unittest.TestCase):
                 "runtime_id": runtime_id,
                 "position_action": "open_short",
                 "short_capacity_check_status": "sdk_short_capacity",
+                "short_capacity_source": "broker_sdk_live",
+                "short_capacity_max_quantity": str(index * 10),
+                "short_capacity_query_ms": index * 5,
                 "short_capacity_blocker_class": failure_class,
                 "blockers": [f"blocked_short_capacity_{failure_class}"],
                 "order_id": f"SHORT-{index}",
+                "processed_at": f"2026-08-18T13:30:0{index}Z",
             }
             for index, (runtime_id, failure_class) in enumerate(zip(
                 runtimes,
@@ -99,8 +103,21 @@ class LongbridgeDashboardTest(unittest.TestCase):
             {"query_failed": 1, "no_borrow_inventory": 1, "insufficient": 1},
         )
         self.assertTrue(all(row["detector_attempted_count"] == 3 for row in payload["runtime_summaries"]))
+        self.assertEqual(payload["summary"]["broker_any_filled_order_count"], 2)
         self.assertEqual(payload["summary"]["broker_partially_filled_order_count"], 1)
         self.assertEqual(payload["summary"]["broker_fully_filled_order_count"], 1)
+        first_runtime = next(
+            row for row in payload["runtime_summaries"]
+            if row["runtime_id"] == "M10-PA-002-5m-short"
+        )
+        self.assertEqual(
+            first_runtime["latest_broker_capacity_check"]["maximum_quantity"],
+            "10",
+        )
+        self.assertEqual(
+            first_runtime["latest_broker_capacity_check"]["source"],
+            "broker_sdk_live",
+        )
 
     def test_strategy_funnel_joins_each_runtime_to_actual_broker_fill(self) -> None:
         diagnostics = {
@@ -129,6 +146,8 @@ class LongbridgeDashboardTest(unittest.TestCase):
         rows = {row["runtime_id"]: row for row in payload["runtime_summaries"]}
         self.assertEqual(rows["LONG"]["broker_fully_filled_order_count"], 1)
         self.assertEqual(rows["SHORT"]["broker_partially_filled_order_count"], 1)
+        self.assertEqual(rows["SHORT"]["broker_any_filled_order_count"], 1)
+        self.assertEqual(payload["summary"]["broker_any_filled_order_count"], 2)
         self.assertEqual(payload["summary"]["broker_order_id_count"], 2)
 
     def test_short_position_views_include_symbol_net_and_lot_lifecycle(self) -> None:
@@ -346,8 +365,10 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_capacity_checked_count"], 1)
         self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_capacity_cache_hit_count"], 1)
         self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_order_id_count"], 1)
+        self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_any_filled_order_count"], 1)
         self.assertEqual(payload["paper_short_diagnostics"]["summary"]["broker_filled_order_count"], 1)
         self.assertEqual(payload["fill_attribution"]["summary"]["completed_trade_count"], 2)
+        self.assertTrue(payload["fill_attribution"]["summary"]["fees_are_estimated_not_actual"])
         self.assertEqual(payload["fill_attribution"]["position_layers"]["actual_account_total"]["gross_market_value"], "810.00")
         self.assertEqual(payload["fill_attribution"]["position_layers"]["attributed_virtual_total"]["gross_market_value"], "550.00")
         self.assertEqual(payload["fill_attribution"]["position_layers"]["unreconciled_delta"]["gross_market_value"], "260.00")

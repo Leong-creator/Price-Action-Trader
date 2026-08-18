@@ -247,6 +247,51 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
             "longbridge_sdk_app_asset_daily_pnl_formula_v1",
         )
 
+    def test_round_trip_closed_today_without_quote_still_counts_in_app_pnl(self) -> None:
+        generated_at = datetime(2026, 7, 21, 20, 0, tzinfo=UTC)
+        metrics = build_app_display_metrics(
+            generated_at,
+            {
+                "usd_available_cash": "1000",
+                "usd_frozen_cash": "0",
+                "positions": [],
+            },
+            [
+                {"order_id": "buy-1", "symbol": "AAPL.US", "side": "Buy"},
+                {"order_id": "sell-1", "symbol": "AAPL.US", "side": "Sell"},
+            ],
+            [
+                {"order_id": "buy-1", "symbol": "AAPL.US", "quantity": "2", "price": "100", "trade_done_at": "2026-07-21T14:00:00Z"},
+                {"order_id": "sell-1", "symbol": "AAPL.US", "quantity": "2", "price": "105", "trade_done_at": "2026-07-21T18:00:00Z"},
+            ],
+            [],
+        )
+
+        self.assertEqual(metrics["status"], "fresh")
+        self.assertEqual(metrics["today_pnl"], "10.00")
+        self.assertEqual(metrics["missing_symbols"], [])
+        self.assertEqual(metrics["symbol_pnl_rows"][0]["price_phase"], "round_trip_closed_without_quote")
+
+    def test_open_or_overnight_symbol_without_quote_stays_incomplete(self) -> None:
+        generated_at = datetime(2026, 7, 21, 20, 0, tzinfo=UTC)
+        metrics = build_app_display_metrics(
+            generated_at,
+            {
+                "usd_available_cash": "1000",
+                "usd_frozen_cash": "0",
+                "positions": [{"symbol": "AAPL.US", "quantity": "2"}],
+            },
+            [{"order_id": "buy-1", "symbol": "AAPL.US", "side": "Buy"}],
+            [
+                {"order_id": "buy-1", "symbol": "AAPL.US", "quantity": "2", "price": "100", "trade_done_at": "2026-07-21T14:00:00Z"},
+            ],
+            [],
+        )
+
+        self.assertEqual(metrics["status"], "incomplete")
+        self.assertEqual(metrics["today_pnl"], "")
+        self.assertEqual(metrics["missing_symbols"], ["AAPL.US"])
+
     def test_runtime_quote_snapshot_supplies_app_formula_without_second_context(self) -> None:
         generated_at = datetime(2026, 7, 21, 15, 0, tzinfo=UTC)
         with tempfile.TemporaryDirectory() as tmp:

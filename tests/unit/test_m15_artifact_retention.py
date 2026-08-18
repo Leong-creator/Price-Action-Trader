@@ -26,6 +26,49 @@ class M15ArtifactRetentionTest(unittest.TestCase):
         self.assertEqual(config.stage, "M15.artifact_retention")
         self.assertGreaterEqual(len(config.jsonl_rules), 2)
 
+    def test_load_config_merges_active_test_ids_from_formal_epoch_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            marker = root / "formal_epoch.json"
+            marker.write_text(
+                json.dumps(
+                    {
+                        "test_epoch_id": "current-long",
+                        "short_test_epoch_id": "current-short",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config_path = root / "retention.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "stage": "M15.artifact_retention",
+                        "active_test_id_sources": [
+                            {
+                                "path": str(marker),
+                                "fields": ["test_epoch_id", "short_test_epoch_id"],
+                            }
+                        ],
+                        "jsonl_rules": [
+                            {
+                                "name": "events",
+                                "paths": [str(root / "events.jsonl")],
+                                "active_test_ids": ["static-id"],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = load_config(config_path)
+
+            self.assertEqual(
+                set(config.jsonl_rules[0].active_test_ids),
+                {"static-id", "current-long", "current-short"},
+            )
+
     def test_market_event_compaction_keeps_active_rows_and_buckets_closed_days(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
