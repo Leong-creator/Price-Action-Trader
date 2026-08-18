@@ -7,6 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from scripts.m15_visual_strategy_acceptance_lib import (
+    _build_candidate_pools,
     generate_acceptance_evidence,
     load_acceptance_config,
 )
@@ -14,6 +15,31 @@ from scripts.m15_visual_strategy_shadow_lib import ShadowConfig, run_visual_stra
 
 
 class M15VisualStrategyAcceptanceTest(unittest.TestCase):
+    def test_candidate_pool_reports_missing_source_bar_without_crashing(self) -> None:
+        pools, diagnostics = _build_candidate_pools(
+            audit_by_strategy_stream={
+                "PA004": {
+                    "US|AMZN|1d": [
+                        {
+                            "strategy_id": "PA004",
+                            "symbol": "AMZN",
+                            "market": "US",
+                            "timeframe": "1d",
+                            "event_time": "2026-08-17T20:00:00Z",
+                            "source_bar_id": "missing-bar",
+                            "conditions": {"boundary_failure": True},
+                        }
+                    ]
+                }
+            },
+            bars_by_stream={},
+            negative_horizon_bars=2,
+        )
+
+        self.assertEqual(diagnostics["status"], "incomplete_source_alignment")
+        self.assertEqual(diagnostics["missing_source_bar_count"], 1)
+        self.assertEqual(pools["PA004"]["positive"], [])
+
     def bar(
         self,
         symbol: str,
@@ -206,6 +232,11 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
         self.assertTrue(evidence["replay_proofs"]["no_future_data"]["passed"])
         self.assertTrue(evidence["replay_proofs"]["restart_parity"]["passed"])
         self.assertEqual(evidence["realtime_shadow_ledger_summary"]["completed_unique_business_dates"], 1)
+        self.assertEqual(evidence["realtime_shadow_ledger_summary"]["last_completed_business_date"], "2026-08-01")
+        self.assertEqual(evidence["realtime_shadow_ledger_summary"]["source_generated_at"], "")
+        self.assertEqual(evidence["human_review_ledger_status"]["status"], "missing")
+        self.assertFalse(evidence["paper_promotion_gate"]["paper_ready"])
+        self.assertIn("human_review_ledger_missing", evidence["paper_promotion_gate"]["blockers"])
         for strategy in ("PA004", "PA007", "PA008"):
             self.assertEqual(evidence[strategy]["positive_examples"], 0)
             self.assertEqual(evidence[strategy]["negative_examples"], 0)
@@ -294,6 +325,55 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
         self.assertTrue(second["replay_proofs"]["audit_matches_replay"]["passed"])
         self.assertTrue(second["replay_proofs"]["no_future_data"]["passed"])
 
+    def test_live_shadow_audit_does_not_pollute_frozen_historical_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bars = [self.bar("AAA", day, "10", "11", "9", "10", "100") for day in range(1, 7)]
+            bars += [self.bar("BBB", day, "20", "21", "19", "20", "100") for day in range(1, 7)]
+            self.write_jsonl(root / "bars.jsonl", bars)
+            self.write_shadow_config(root)
+            self.write_ledger(root, [])
+            run_visual_strategy_shadow(
+                self.make_shadow_config(root),
+                bars=bars,
+                generated_at="2026-08-05T11:20:00Z",
+            )
+            config = load_acceptance_config(self.write_acceptance_config(root))
+            generate_acceptance_evidence(config, generated_at="2026-08-05T11:30:00Z")
+
+            live_only_row = {
+                "event_id": "live-only",
+                "strategy_id": "PA004",
+                "runtime_id": "M10-PA-004-wide-channel-shadow-1d",
+                "symbol": "LIVE",
+                "market": "US",
+                "timeframe": "1d",
+                "event_time": "2026-08-17T20:00:00Z",
+                "source_bar_id": "live-only-bar",
+                "conditions": {"boundary_failure": True},
+                "order_generation": False,
+                "broker_connection": False,
+                "real_orders": False,
+                "live_execution": False,
+                "uses_future_data": False,
+                "backfilled": False,
+            }
+            self.write_jsonl(root / "audit.jsonl", [live_only_row])
+            evidence = generate_acceptance_evidence(
+                config,
+                generated_at="2026-08-17T21:00:00Z",
+            )
+
+        self.assertFalse(evidence["replay_proofs"]["audit_matches_replay"]["passed"])
+        self.assertEqual(
+            evidence["replay_proofs"]["audit_matches_replay"]["role"],
+            "live_shadow_alignment_diagnostic_only",
+        )
+        self.assertTrue(evidence["replay_proofs"]["historical_replay_symbol_count"]["passed"])
+        self.assertTrue(evidence["replay_proofs"]["no_future_data"]["passed"])
+        self.assertEqual(evidence["candidate_build_diagnostics"]["missing_source_bar_count"], 0)
+        self.assertNotIn("candidate_source_bar_missing", evidence["paper_promotion_gate"]["blockers"])
+
     def test_realtime_shadow_uses_production_147_separately_from_300_replay(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -307,6 +387,7 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
                     {
                         "schema_version": "m15.visual-strategy-shadow-session.v1",
                         "business_date": "2026-08-14",
+                        "generated_at": "2026-08-15T00:15:00Z",
                         "status": "completed",
                         "session_complete": True,
                         "required_symbol_count": 147,
@@ -339,6 +420,14 @@ class M15VisualStrategyAcceptanceTest(unittest.TestCase):
         self.assertEqual(
             evidence["realtime_shadow_ledger_summary"]["completed_unique_business_dates"],
             1,
+        )
+        self.assertEqual(
+            evidence["realtime_shadow_ledger_summary"]["last_completed_business_date"],
+            "2026-08-14",
+        )
+        self.assertEqual(
+            evidence["realtime_shadow_ledger_summary"]["source_generated_at"],
+            "2026-08-15T00:15:00Z",
         )
         self.assertEqual(
             evidence["replay_proofs"]["historical_replay_symbol_count"]["expected"],

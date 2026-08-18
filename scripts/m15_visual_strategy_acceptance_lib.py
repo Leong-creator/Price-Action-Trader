@@ -167,9 +167,14 @@ def generate_acceptance_evidence(
         if config.human_review_ledger_path and config.human_review_ledger_path.exists()
         else []
     )
-    realtime_shadow_sessions = _count_completed_shadow_sessions(
+    realtime_shadow_summary = _summarize_completed_shadow_sessions(
         realtime_shadow_rows,
         expected_symbol_count=config.realtime_required_symbol_count,
+    )
+    realtime_shadow_sessions = int(realtime_shadow_summary["completed_unique_business_dates"])
+    human_review_ledger_status = build_human_review_ledger_status(
+        config.human_review_ledger_path,
+        human_review_rows,
     )
 
     batch = _replay_events(shadow_config, bars, observed_at)
@@ -190,17 +195,25 @@ def generate_acceptance_evidence(
     historical_replay_ok = (
         historical_symbol_count == config.expected_symbol_count
         and historical_bar_count == expected_bar_count
-        and len(audit_rows) == expected_audit_event_count
+        and len(batch.events) == expected_audit_event_count
         and set(historical_counts.values()) == {config.expected_bars_per_symbol}
     )
-    all_audit_no_future = all(row.get("uses_future_data") is False for row in audit_rows)
+    all_replayed_events_no_future = all(
+        row.get("uses_future_data") is False for row in batch.events
+    )
     restart_parity_ok = _events_equal(batch.events, segmented.events) and batch.watermarks == segmented.watermarks
-    no_future_ok = audit_matches and prefix.prefix_checked_bar_count == len(bars) and all_audit_no_future
+    no_future_ok = (
+        prefix.prefix_checked_bar_count == len(bars)
+        and all_replayed_events_no_future
+    )
 
     bars_by_stream = _group_bars_by_stream(bars)
-    audit_by_strategy_stream = _group_audit_by_strategy_stream(audit_rows)
-    candidate_pools = _build_candidate_pools(
-        audit_by_strategy_stream=audit_by_strategy_stream,
+    # Historical proof candidates must come from the same frozen replay input.
+    # The live 147-symbol shadow audit is a separate session proof and can have
+    # a different date/universe without invalidating the 300-symbol replay.
+    replay_by_strategy_stream = _group_audit_by_strategy_stream(batch.events)
+    candidate_pools, candidate_build_diagnostics = _build_candidate_pools(
+        audit_by_strategy_stream=replay_by_strategy_stream,
         bars_by_stream=bars_by_stream,
         negative_horizon_bars=config.negative_horizon_bars,
     )
@@ -219,13 +232,14 @@ def generate_acceptance_evidence(
             "expected_bar_count": expected_bar_count,
             "expected_bars_per_symbol": config.expected_bars_per_symbol,
             "observed_bars_per_symbol_values": sorted(set(historical_counts.values())),
-            "observed_audit_event_count": len(audit_rows),
+            "observed_audit_event_count": len(batch.events),
             "expected_audit_event_count": expected_audit_event_count,
             "summary_stream_count": int(summary.get("stream_count", -1)),
             "state_stream_count": len(state.get("streams", {})),
         },
         "audit_matches_replay": {
             "passed": audit_matches,
+            "role": "live_shadow_alignment_diagnostic_only",
             "audit_event_count": len(audit_rows),
             "replayed_event_count": len(batch.events),
         },
@@ -243,7 +257,7 @@ def generate_acceptance_evidence(
         },
         "no_future_data": {
             "passed": no_future_ok,
-            "audit_uses_future_data_false": all_audit_no_future,
+            "replayed_events_use_future_data_false": all_replayed_events_no_future,
             "prefix_checked_bar_count": prefix.prefix_checked_bar_count,
             "expected_prefix_checked_bar_count": len(bars),
         },
@@ -281,18 +295,12 @@ def generate_acceptance_evidence(
             "session_daily_bars": str(config.session_daily_bars_path) if config.session_daily_bars_path else "",
             "human_review_ledger": str(config.human_review_ledger_path) if config.human_review_ledger_path else "",
         },
-        "realtime_shadow_ledger_summary": {
-            "completed_unique_business_dates": realtime_shadow_sessions,
-            "required_symbol_count": config.realtime_required_symbol_count,
-            "ledger_row_count": len(realtime_shadow_rows),
-            "counting_rule": (
-                "count unique business_date where status=completed, session_complete=true "
-                f"and required_symbol_count={config.realtime_required_symbol_count}"
-            ),
-            "source_modes": sorted({str(row.get('source_mode', '')) for row in realtime_shadow_rows if row.get('source_mode')}),
-        },
+        "realtime_shadow_ledger_summary": realtime_shadow_summary,
+        "human_review_ledger_status": human_review_ledger_status,
+        "candidate_build_diagnostics": candidate_build_diagnostics,
         "replay_proofs": replay_proofs,
     }
+    review_requirements_by_strategy: dict[str, dict[str, Any]] = {}
     for strategy in STRATEGIES:
         strategy_pool = candidate_pools[strategy]
         selected = {
@@ -311,6 +319,18 @@ def generate_acceptance_evidence(
             }
         )
         review = _apply_human_reviews(strategy, selected, human_review_rows)
+        requirement_counts = {
+            CASE_LIMIT_KEYS[case_type]: required_limits[case_type]
+            for case_type in ("positive", "negative", "boundary")
+        }
+        paper_review_ready = all(
+            review["passed_counts"][count_key] >= requirement_counts[count_key]
+            for count_key in CASE_LIMIT_KEYS.values()
+        )
+        review_requirements_by_strategy[strategy] = {
+            "required_counts": requirement_counts,
+            "paper_review_ready": paper_review_ready,
+        }
         payload[strategy] = {
             "runtime_id": RUNTIME_IDS[strategy],
             "positive_examples": review["passed_counts"]["positive_examples"],
@@ -321,7 +341,7 @@ def generate_acceptance_evidence(
                 config.expected_bars_per_symbol if historical_replay_ok else 0
             ),
             "historical_replay_bar_count": historical_bar_count,
-            "historical_replay_audit_event_count": len(audit_rows),
+            "historical_replay_audit_event_count": len(batch.events),
             "covered_regimes": covered_regimes,
             "no_future_data": no_future_ok,
             "restart_parity": restart_parity_ok,
@@ -332,6 +352,8 @@ def generate_acceptance_evidence(
             "human_review_rejected_counts": review["rejected_counts"],
             "human_review_invalid_row_count": review["invalid_row_count"],
             "human_review_invalid_reasons": review["invalid_reasons"],
+            "human_review_required_counts": requirement_counts,
+            "paper_review_ready": paper_review_ready,
             "machine_candidate_pool_counts": {
                 "positive_examples": len(strategy_pool["positive"]),
                 "negative_examples": len(strategy_pool["negative"]),
@@ -354,6 +376,35 @@ def generate_acceptance_evidence(
                 "boundary": selected["boundary"],
             },
         }
+    missing_review_strategies = sorted(
+        strategy
+        for strategy, review_state in review_requirements_by_strategy.items()
+        if review_state["paper_review_ready"] is not True
+    )
+    paper_promotion_blockers: list[str] = []
+    if not historical_replay_ok:
+        paper_promotion_blockers.append("historical_replay_incomplete")
+    if not no_future_ok:
+        paper_promotion_blockers.append("no_future_data_proof_failed")
+    if not restart_parity_ok:
+        paper_promotion_blockers.append("restart_parity_failed")
+    if candidate_build_diagnostics["missing_source_bar_count"]:
+        paper_promotion_blockers.append("candidate_source_bar_missing")
+    if realtime_shadow_sessions <= 0:
+        paper_promotion_blockers.append("realtime_shadow_completed_session_missing")
+    if human_review_ledger_status["status"] == "missing":
+        paper_promotion_blockers.append("human_review_ledger_missing")
+    if missing_review_strategies:
+        paper_promotion_blockers.append("human_review_examples_incomplete")
+    payload["paper_promotion_gate"] = {
+        "paper_ready": not paper_promotion_blockers,
+        "blockers": paper_promotion_blockers,
+        "missing_review_strategies": missing_review_strategies,
+        "requires_latest_completed_shadow_session": True,
+        "latest_completed_business_date": str(
+            realtime_shadow_summary.get("last_completed_business_date") or ""
+        ),
+    }
     atomic_write_json(config.output_path, payload)
     return payload
 
@@ -419,12 +470,13 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _count_completed_shadow_sessions(
+def _summarize_completed_shadow_sessions(
     rows: list[dict[str, Any]],
     *,
     expected_symbol_count: int,
-) -> int:
+) -> dict[str, Any]:
     completed_dates: set[str] = set()
+    latest_row: dict[str, Any] | None = None
     for row in rows:
         business_date = str(row.get("business_date", "")).strip()
         if not business_date:
@@ -444,7 +496,55 @@ def _count_completed_shadow_sessions(
         if required != expected_symbol_count or completed != required:
             continue
         completed_dates.add(business_date)
-    return len(completed_dates)
+        latest_key = (
+            business_date,
+            str(row.get("generated_at") or ""),
+        )
+        if latest_row is None or latest_key > (
+            str(latest_row.get("business_date") or ""),
+            str(latest_row.get("generated_at") or ""),
+        ):
+            latest_row = row
+    return {
+        "completed_unique_business_dates": len(completed_dates),
+        "required_symbol_count": expected_symbol_count,
+        "ledger_row_count": len(rows),
+        "counting_rule": (
+            "count unique business_date where status=completed, session_complete=true "
+            f"and required_symbol_count={expected_symbol_count}"
+        ),
+        "source_modes": sorted(
+            {str(row.get("source_mode", "")) for row in rows if row.get("source_mode")}
+        ),
+        "last_completed_business_date": str(latest_row.get("business_date") or "") if latest_row else "",
+        "source_generated_at": str(latest_row.get("generated_at") or "") if latest_row else "",
+    }
+
+
+def build_human_review_ledger_status(
+    path: Path | None,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    configured = path is not None
+    exists = bool(path and path.exists())
+    if not configured or not exists:
+        status = "missing"
+    elif rows:
+        status = "present"
+    else:
+        status = "present_empty"
+    return {
+        "status": status,
+        "configured": configured,
+        "exists": exists,
+        "row_count": len(rows),
+        "path": str(path) if path else "",
+        "paper_gate_message": (
+            "Human review ledger missing; paper promotion remains blocked."
+            if status == "missing"
+            else "Human review ledger present; paper promotion still depends on required reviewed examples."
+        ),
+    }
 
 
 def _replay_events(
@@ -572,18 +672,32 @@ def _build_candidate_pools(
     audit_by_strategy_stream: dict[str, dict[str, list[dict[str, Any]]]],
     bars_by_stream: dict[str, list[dict[str, Any]]],
     negative_horizon_bars: int,
-) -> dict[str, dict[str, list[dict[str, Any]]]]:
+) -> tuple[dict[str, dict[str, list[dict[str, Any]]]], dict[str, Any]]:
     pools = {strategy: {"positive": [], "negative": [], "boundary": []} for strategy in STRATEGIES}
+    missing_source_bars: list[dict[str, str]] = []
     for strategy in STRATEGIES:
         positive_flag = POSITIVE_FLAGS[strategy]
         negative_flag = NEGATIVE_FLAGS[strategy]
         boundary_flag = BOUNDARY_FLAGS[strategy]
         for key, events in audit_by_strategy_stream.get(strategy, {}).items():
             ordered = sorted(events, key=lambda row: str(row.get("event_time", "")))
-            index_by_bar_id = {row.get("source_bar_id"): idx for idx, row in enumerate(ordered)}
             bars = bars_by_stream.get(key, [])
             bar_lookup = {row_key(row): row for row in bars}
+            bar_index_by_key = {row_key(row): idx for idx, row in enumerate(bars)}
             for idx, row in enumerate(ordered):
+                event_bar_key = row_key_from_event(row)
+                if event_bar_key not in bar_lookup:
+                    missing_source_bars.append(
+                        {
+                            "strategy_id": strategy,
+                            "stream_key": key,
+                            "source_bar_key": event_bar_key,
+                            "source_bar_id": str(row.get("source_bar_id") or ""),
+                            "event_time": str(row.get("event_time") or ""),
+                        }
+                    )
+                    continue
+                event_index = bar_index_by_key[event_bar_key]
                 conditions = row.get("conditions", {})
                 if conditions.get(positive_flag) is True:
                     pools[strategy]["positive"].append(
@@ -593,7 +707,7 @@ def _build_candidate_pools(
                             event=row,
                             bars=bars,
                             bar_lookup=bar_lookup,
-                            event_index=index_by_bar_id[row.get("source_bar_id")],
+                            event_index=event_index,
                             reason=f"{positive_flag} observed on replayed historical bar",
                         )
                     )
@@ -605,7 +719,7 @@ def _build_candidate_pools(
                             event=row,
                             bars=bars,
                             bar_lookup=bar_lookup,
-                            event_index=index_by_bar_id[row.get("source_bar_id")],
+                            event_index=event_index,
                             reason=f"{boundary_flag} observed without terminal confirmation on the same bar",
                         )
                     )
@@ -619,11 +733,15 @@ def _build_candidate_pools(
                                 event=row,
                                 bars=bars,
                                 bar_lookup=bar_lookup,
-                                event_index=index_by_bar_id[row.get("source_bar_id")],
+                                event_index=event_index,
                                 reason=f"{negative_flag} observed and no {positive_flag} arrived within {negative_horizon_bars} bars",
                             )
                         )
-    return pools
+    return pools, {
+        "missing_source_bar_count": len(missing_source_bars),
+        "missing_source_bar_examples": missing_source_bars[:20],
+        "status": "complete" if not missing_source_bars else "incomplete_source_alignment",
+    }
 
 
 def _build_candidate(

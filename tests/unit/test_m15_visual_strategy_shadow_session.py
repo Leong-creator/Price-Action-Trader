@@ -206,6 +206,7 @@ class VisualStrategyShadowSessionTest(unittest.TestCase):
             self.assertEqual(result["accepted_five_minute_bar_count"], 5)
             self.assertEqual(result["missing_five_minute_bar_count"], 1)
             self.assertEqual(result["incomplete_symbol_count"], 1)
+            self.assertIn("2只标的", result["plain_language_result"])
             self.assertFalse((root / "shadow_state.json").exists())
 
     def test_duplicate_or_non_sdk_rows_are_fail_closed(self) -> None:

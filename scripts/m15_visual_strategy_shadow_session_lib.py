@@ -442,7 +442,10 @@ def run_visual_shadow_session(
             "invalid_source_count": diagnostics["invalid_source_count"],
             "blocked_row_count": diagnostics["blocked_row_count"],
             "diagnostics": diagnostics,
-            "plain_language_result": "当天300只标的的SDK常规时段五分钟数据不完整，本次不计入实时影子验收。",
+            "plain_language_result": (
+                f"当天{diagnostics['required_symbol_count']}只标的的SDK常规时段五分钟数据不完整，"
+                "本次不计入实时影子验收。"
+            ),
         }
         atomic_write_json(config.session_summary_path, result)
         append_jsonl(config.session_ledger_path, result)
@@ -463,7 +466,10 @@ def run_visual_shadow_session(
             "session_complete": False,
             "exact_state_row_count": exact_state_rows,
             "conflicting_state_row_count": conflicting_state_rows,
-            "plain_language_result": "影子状态已存在同交易日但内容不一致，本次不重复写入也不计入验收。",
+            "plain_language_result": (
+                f"影子状态已存在同交易日但内容不一致，本次不重复写入{config.required_symbol_count}只标的结果，"
+                "也不计入验收。"
+            ),
         }
         atomic_write_json(config.session_summary_path, result)
         append_jsonl(config.session_ledger_path, result)
@@ -504,9 +510,9 @@ def run_visual_shadow_session(
         "shadow_state_already_equivalent": existing_equivalent,
         "shadow_summary_path": str(load_shadow_config(config.shadow_config_path).summary_path),
         "plain_language_result": (
-            "当天300只标的完整SDK行情已形成一晚实时影子证据。"
+            f"当天{config.required_symbol_count}只标的完整SDK行情已形成一晚实时影子证据。"
             if completed
-            else "当天行情完整，但影子状态未推进300只标的；本次不计入验收。"
+            else f"当天行情完整，但影子状态未推进{config.required_symbol_count}只标的；本次不计入验收。"
         ),
     }
     atomic_write_json(config.session_summary_path, result)
