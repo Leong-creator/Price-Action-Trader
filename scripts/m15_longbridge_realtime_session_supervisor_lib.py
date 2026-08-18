@@ -34,13 +34,13 @@ from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import run_stale_or
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_longbridge_realtime_execution"
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.contract_v1.json"
 DEFAULT_INGESTOR_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_market_event_ingestor.json"
-DEFAULT_ROUTER_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_signal_router.json"
+DEFAULT_ROUTER_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_signal_router.contract_v1.json"
 DEFAULT_ACCOUNT_STATE_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_account_state.json"
 DEFAULT_STALE_ORDER_CLEANUP_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_stale_order_cleanup.json"
-DEFAULT_POSITION_MANAGER_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_position_manager.json"
-DEFAULT_EXECUTION_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.json"
+DEFAULT_POSITION_MANAGER_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_position_manager.contract_v1.json"
+DEFAULT_EXECUTION_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_contract_v1.json"
 SUMMARY_JSON = "m15_longbridge_realtime_session_supervisor.json"
 LEDGER_JSONL = "m15_longbridge_realtime_session_supervisor_ledger.jsonl"
 REPORT_MD = "m15_longbridge_realtime_session_supervisor.md"
@@ -158,7 +158,7 @@ def validate_config(config: RealtimeSessionSupervisorConfig) -> None:
         or config.run_stale_order_cleanup
         or config.run_position_manager
         or config.run_execution
-    ):
+    ) and config.hard_boundaries.get("sdk_only_compatibility_status") is not True:
         raise ValueError("M15 realtime session supervisor must run at least one step")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 realtime session supervisor must stay paper/simulated only")

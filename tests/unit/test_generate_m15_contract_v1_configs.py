@@ -63,15 +63,30 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
         )
 
     def test_readiness_and_watchdog_follow_the_contract_runtime(self) -> None:
+        supervisor = self.by_name["m15_longbridge_realtime_session_supervisor.contract_v1.json"]
         readiness = self.by_name["m15_opening_trade_readiness.paper_contract_v1.json"]
         watchdog = self.by_name["m15_background_watchdog.contract_v1.json"]
+        self.assertEqual(
+            supervisor["inputs"]["execution_config"],
+            "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
+        )
+        self.assertTrue(supervisor["hard_boundaries"]["sdk_only_compatibility_status"])
+        self.assertFalse(supervisor["realtime_session_supervisor"]["run_execution"])
         self.assertEqual(
             readiness["inputs"]["sdk_runtime_config"],
             "config/examples/m15_longbridge_sdk_runtime.contract_v1.json",
         )
         self.assertEqual(
+            readiness["inputs"]["realtime_supervisor_config"],
+            "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json",
+        )
+        self.assertEqual(
             readiness["inputs"]["execution_config"],
             "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
+        )
+        self.assertEqual(
+            watchdog["inputs"]["m15_realtime_supervisor_config"],
+            "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json",
         )
         self.assertEqual(
             watchdog["inputs"]["readiness_config"],

@@ -144,10 +144,46 @@ def account_snapshot_summary(account: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def stop_trading_processes() -> list[dict[str, Any]]:
+def project_cli_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path.resolve())
+
+
+def canonical_watchdog_config_path(runtime_config_path: Path) -> Path:
+    runtime_path = runtime_config_path.resolve()
+    suffix = ""
+    if runtime_path.name.startswith("m15_longbridge_sdk_runtime") and runtime_path.name.endswith(".json"):
+        suffix = runtime_path.name[len("m15_longbridge_sdk_runtime") : -len(".json")]
+    candidates = []
+    if suffix:
+        candidates.append(runtime_path.with_name(f"m15_background_watchdog{suffix}.json"))
+    candidates.append(ROOT / "config" / "examples" / "m15_background_watchdog.contract_v1.json")
+    candidates.append(ROOT / "config" / "examples" / "m15_background_watchdog.json")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def stop_trading_processes(runtime_config_path: Path) -> list[dict[str, Any]]:
+    watchdog_config_path = canonical_watchdog_config_path(runtime_config_path)
     commands = [
-        [sys.executable, "scripts/run_m15_background_watchdog.py", "--stop", "--config", "config/examples/m15_background_watchdog.json"],
-        [sys.executable, "scripts/run_m15_longbridge_sdk_runtime.py", "--stop", "--config", "config/examples/m15_longbridge_sdk_runtime.json"],
+        [
+            sys.executable,
+            "scripts/run_m15_background_watchdog.py",
+            "--stop",
+            "--config",
+            project_cli_path(watchdog_config_path),
+        ],
+        [
+            sys.executable,
+            "scripts/run_m15_longbridge_sdk_runtime.py",
+            "--stop",
+            "--config",
+            project_cli_path(runtime_config_path),
+        ],
     ]
     results: list[dict[str, Any]] = []
     for command in commands:
@@ -364,7 +400,7 @@ def main() -> int:
                 "quote_fallback_used": bool(quote_errors),
             })
         else:
-            payload["stopped_processes"] = stop_trading_processes()
+            payload["stopped_processes"] = stop_trading_processes(config.config_path)
             trading_stopped = True
             # M15 may have submitted an order between the first preflight
             # snapshot and its orderly shutdown. Re-read before canceling or

@@ -3232,6 +3232,89 @@ def close_spawn_queue(queue_out: Any) -> None:
         join_thread()
 
 
+def process_resource_snapshot(pid: int | None = None) -> dict[str, int]:
+    """Return bounded Linux process-resource telemetry for restart diagnostics."""
+    target_pid = int(pid or os.getpid())
+    fd_root = Path(f"/proc/{target_pid}/fd")
+    try:
+        fd_count = sum(1 for _ in fd_root.iterdir())
+    except OSError:
+        fd_count = -1
+    child_count = 0
+    resource_tracker_count = 0
+    try:
+        proc_entries = list(Path("/proc").iterdir())
+    except OSError:
+        proc_entries = []
+    for entry in proc_entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            status_lines = (entry / "status").read_text(
+                encoding="utf-8", errors="ignore"
+            ).splitlines()
+            parent_pid = int(
+                next(
+                    line.split(":", 1)[1].strip()
+                    for line in status_lines
+                    if line.startswith("PPid:")
+                )
+            )
+        except (OSError, StopIteration, ValueError):
+            continue
+        if parent_pid != target_pid:
+            continue
+        child_count += 1
+        try:
+            command = (entry / "cmdline").read_text(
+                encoding="utf-8", errors="ignore"
+            ).replace("\x00", " ")
+        except OSError:
+            command = ""
+        if "multiprocessing.resource_tracker" in command:
+            resource_tracker_count += 1
+    return {
+        "fd_count": fd_count,
+        "child_process_count": child_count,
+        "resource_tracker_child_count": resource_tracker_count,
+    }
+
+
+def session_requires_postclose_recovery(coverage: dict[str, Any]) -> bool:
+    """Recover missing data, not an otherwise complete but late realtime session."""
+    return bool(
+        int(coverage.get("missing_boundary_count") or 0) > 0
+        or int(coverage.get("partial_boundary_count") or 0) > 0
+        or int(coverage.get("invalid_row_count") or 0) > 0
+    )
+
+
+def finalize_postclose_recovery_status(
+    recovery_status: dict[str, Any],
+    coverage: dict[str, Any],
+) -> dict[str, Any]:
+    """Finalize recovery without hiding worker failures or inventing realtime evidence."""
+    result = dict(recovery_status)
+    complete = bool(coverage.get("data_complete_after_recovery"))
+    result["data_complete_after_recovery"] = complete
+    result["residual_missing_boundary_count"] = int(
+        coverage.get("recovered_missing_boundary_count") or 0
+    )
+    result["residual_partial_boundary_count"] = int(
+        coverage.get("recovered_partial_boundary_count") or 0
+    )
+    result["recovery_counts_as_realtime_evidence"] = False
+    if complete:
+        if result.get("failed_symbols"):
+            result["worker_failures_after_complete_coverage"] = list(
+                result.get("failed_symbols") or []
+            )
+        result["status"] = "completed"
+    else:
+        result["status"] = "completed_incomplete_data"
+    return result
+
+
 def request_runtime_shutdown(
     pid: int,
     *,
@@ -3381,6 +3464,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     run_lock.flush()
     pid_path(config).write_text(f"{os.getpid()}\n", encoding="utf-8")
     orphaned_runtime_children_cleaned = cleanup_orphaned_sdk_runtime_children(config)
+    process_resource_baseline = process_resource_snapshot()
     sdk = require_sdk_contract()
     run_id = f"sdk-{uuid.uuid4().hex[:12]}"
     loaded_config_fingerprint = config_fingerprint(config)
@@ -3531,6 +3615,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     }
     live_quote_session_state: dict[str, dict[str, Any]] = {}
     last_quote_snapshot_write = 0.0
+    process_resource_current = process_resource_baseline
+    last_process_resource_snapshot = 0.0
     # The live quote WebSocket also owns a fresh native runtime.
     message_queue: Any = process_context.Queue(maxsize=2048)
     stop_event: Any = process_context.Event()
@@ -4439,6 +4525,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             if time.monotonic() - last_compaction >= 60:
                 compact_market_events(config.market_events_path, config.event_keep_lines)
                 last_compaction = time.monotonic()
+            if time.monotonic() - last_process_resource_snapshot >= 60:
+                process_resource_current = process_resource_snapshot()
+                last_process_resource_snapshot = time.monotonic()
             maintenance_now = datetime.now(UTC)
             near_five_minute_boundary = (
                 maintenance_now.minute % 5 == 0
@@ -4637,7 +4726,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 now_ny.weekday() < 5
                 and (now_ny.hour, now_ny.minute) >= (16, 5)
                 and session_date not in postclose_recovery_attempted_dates
-                and not pre_recovery_coverage.get("session_complete")
+                and session_requires_postclose_recovery(pre_recovery_coverage)
             ):
                 # Recovery is deliberately post-close and context-only.  It
                 # repairs the audit dataset without reopening an SDK history
@@ -4898,19 +4987,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "completed"
                 )
             ):
-                postclose_recovery_status["data_complete_after_recovery"] = bool(
-                    session_coverage.get("data_complete_after_recovery")
+                postclose_recovery_status = finalize_postclose_recovery_status(
+                    postclose_recovery_status,
+                    session_coverage,
                 )
-                postclose_recovery_status["residual_missing_boundary_count"] = int(
-                    session_coverage.get("recovered_missing_boundary_count") or 0
-                )
-                postclose_recovery_status["residual_partial_boundary_count"] = int(
-                    session_coverage.get("recovered_partial_boundary_count") or 0
-                )
-                if not postclose_recovery_status["data_complete_after_recovery"]:
-                    postclose_recovery_status["status"] = (
-                        "completed_incomplete_data"
-                    )
             market_data_health = {
                 "schema_version": "m15.sdk-market-data-health.v1",
                 "generated_at": to_iso(datetime.now(UTC)),
@@ -5048,6 +5128,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "snapshot_completed_bar_count": snapshot_completed_bar_count,
                     "orphaned_runtime_children_cleaned": orphaned_runtime_children_cleaned,
+                    "process_resource_baseline": process_resource_baseline,
+                    "process_resource_current": process_resource_current,
                     "config_fingerprint": loaded_config_fingerprint,
                     "runtime_source_fingerprint": loaded_source_fingerprint,
                     "subscription_symbol_count": len(configured_symbols(config)),

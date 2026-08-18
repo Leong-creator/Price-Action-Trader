@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from scripts.m15_longbridge_realtime_session_supervisor_lib import (
+    DEFAULT_CONFIG_PATH,
     LEDGER_JSONL,
     SUMMARY_JSON,
     apply_dashboard_longbridge_panel_overlay,
@@ -25,6 +26,33 @@ from scripts.run_m15_longbridge_realtime_session_supervisor import (
 
 
 class M15LongbridgeRealtimeSessionSupervisorTest(unittest.TestCase):
+    def test_default_config_targets_contract_v1(self) -> None:
+        config = load_config()
+
+        self.assertEqual(
+            DEFAULT_CONFIG_PATH.name,
+            "m15_longbridge_realtime_session_supervisor.contract_v1.json",
+        )
+        self.assertEqual(
+            config.router_config_path.name,
+            "m15_longbridge_realtime_signal_router.contract_v1.json",
+        )
+        self.assertEqual(
+            config.position_manager_config_path.name,
+            "m15_longbridge_realtime_position_manager.contract_v1.json",
+        )
+        self.assertEqual(
+            config.execution_config_path.name,
+            "m15_longbridge_realtime_execution.paper_contract_v1.json",
+        )
+        self.assertFalse(config.run_ingestor)
+        self.assertFalse(config.run_router)
+        self.assertFalse(config.run_account_state)
+        self.assertFalse(config.run_stale_order_cleanup)
+        self.assertFalse(config.run_position_manager)
+        self.assertFalse(config.run_execution)
+        self.assertTrue(config.hard_boundaries["sdk_only_compatibility_status"])
+
     def test_write_json_replaces_status_without_tmp_leftover(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

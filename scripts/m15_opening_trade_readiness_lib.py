@@ -87,7 +87,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
         execution_config_path=resolve_repo_path(
             inputs.get(
                 "execution_config",
-                ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_orders_enabled.json",
+                ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_contract_v1.json",
             )
         ),
         realtime_account_state_path=resolve_repo_path(
@@ -98,7 +98,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
         ),
         realtime_runtime_engine=str(inputs.get("realtime_runtime_engine", "cli")).strip().lower(),
         sdk_runtime_config_path=resolve_repo_path(
-            inputs.get("sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+            inputs.get("sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.contract_v1.json")
         ),
         sdk_runtime_status_path=resolve_repo_path(
             inputs.get("sdk_runtime_status", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_sdk_runtime.json")

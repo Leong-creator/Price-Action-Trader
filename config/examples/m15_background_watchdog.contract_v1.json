@@ -12,7 +12,7 @@
   "inputs": {
     "m15_account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
     "m15_dashboard_config": "config/examples/m15_longbridge_dashboard.contract_v1.json",
-    "m15_realtime_supervisor_config": "config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
+    "m15_realtime_supervisor_config": "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json",
     "m15_runtime_engine": "sdk",
     "m15_sdk_runtime_config": "config/examples/m15_longbridge_sdk_runtime.contract_v1.json",
     "monday_acceptance_config": "config/examples/m15_monday_refresh_acceptance.json",

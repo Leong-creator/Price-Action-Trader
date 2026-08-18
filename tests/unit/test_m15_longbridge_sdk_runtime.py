@@ -64,6 +64,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     effective_runtime_dispatch_enabled,
     emit_worker,
     effective_worker_progress,
+    finalize_postclose_recovery_status,
     five_minute_contract_context_status,
     is_orphaned_sdk_runtime_child,
     latest_completed_intraday_close,
@@ -76,6 +77,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     preserve_partial_bar_suppression,
     rollover_snapshot_cycle,
     preserve_last_order_maintenance_action,
+    process_resource_snapshot,
     quote_worker,
     quote_snapshot_worker,
     quote_subscription_targets,
@@ -89,6 +91,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     runtime_owns_quote_connection,
     runtime_status_matches_config,
     schedule_daily_context_retry,
+    session_requires_postclose_recovery,
     run_sdk_order_maintenance,
     run_pending_flatten_cycle,
     run_authorized_account_exit_cycle,
@@ -108,6 +111,57 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_late_only_complete_session_does_not_trigger_postclose_recovery(self) -> None:
+        self.assertFalse(
+            session_requires_postclose_recovery(
+                {
+                    "session_complete": False,
+                    "missing_boundary_count": 0,
+                    "partial_boundary_count": 0,
+                    "invalid_row_count": 0,
+                    "late_finalization_row_count": 12,
+                }
+            )
+        )
+
+    def test_missing_partial_or_invalid_session_triggers_postclose_recovery(self) -> None:
+        for field in (
+            "missing_boundary_count",
+            "partial_boundary_count",
+            "invalid_row_count",
+        ):
+            with self.subTest(field=field):
+                self.assertTrue(session_requires_postclose_recovery({field: 1}))
+
+    def test_complete_recovery_clears_failure_status_but_preserves_worker_evidence(self) -> None:
+        result = finalize_postclose_recovery_status(
+            {
+                "status": "completed_with_failures",
+                "failed_symbols": ["AAPL"],
+            },
+            {
+                "data_complete_after_recovery": True,
+                "recovered_missing_boundary_count": 0,
+                "recovered_partial_boundary_count": 0,
+            },
+        )
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["worker_failures_after_complete_coverage"], ["AAPL"])
+        self.assertFalse(result["recovery_counts_as_realtime_evidence"])
+
+    def test_incomplete_recovery_remains_explicitly_incomplete(self) -> None:
+        result = finalize_postclose_recovery_status(
+            {"status": "completed"},
+            {
+                "data_complete_after_recovery": False,
+                "recovered_missing_boundary_count": 2,
+                "recovered_partial_boundary_count": 1,
+            },
+        )
+        self.assertEqual(result["status"], "completed_incomplete_data")
+        self.assertEqual(result["residual_missing_boundary_count"], 2)
+        self.assertEqual(result["residual_partial_boundary_count"], 1)
+
     def test_worker_drops_only_superseded_telemetry_when_queue_is_full(self) -> None:
         output = queue.Queue(maxsize=1)
         output.put({"kind": "occupied"})
@@ -2769,6 +2823,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         close_spawn_queue(Queue())
 
         self.assertEqual(calls, ["close", "join_thread"])
+
+    def test_process_resource_snapshot_reports_runtime_resource_counts(self) -> None:
+        snapshot = process_resource_snapshot()
+        self.assertGreaterEqual(snapshot["fd_count"], 0)
+        self.assertGreaterEqual(snapshot["child_process_count"], 0)
+        self.assertGreaterEqual(snapshot["resource_tracker_child_count"], 0)
+        self.assertLessEqual(
+            snapshot["resource_tracker_child_count"],
+            snapshot["child_process_count"],
+        )
 
     def test_runtime_shutdown_skips_dead_process_without_signaling(self) -> None:
         self.assertTrue(request_runtime_shutdown(99999999, timeout_seconds=0))

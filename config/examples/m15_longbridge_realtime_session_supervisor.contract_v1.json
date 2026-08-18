@@ -1,6 +1,6 @@
 {
   "stage": "M15.longbridge_realtime_session_supervisor",
-  "title": "长桥实时链路守护器（默认指向 contract_v1）",
+  "title": "长桥实时链路守护器（contract_v1）",
   "inputs": {
     "ingestor_config": "config/examples/m15_longbridge_realtime_market_event_ingestor.json",
     "router_config": "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json",
@@ -15,6 +15,8 @@
   "realtime_session_supervisor": {
     "check_interval_seconds": 5,
     "idle_check_interval_seconds": 60,
+    "hot_path_execution_first": true,
+    "maintenance_interval_seconds": 60,
     "market_timezone": "America/New_York",
     "regular_session_start_time": "09:30",
     "regular_session_end_time": "16:00",

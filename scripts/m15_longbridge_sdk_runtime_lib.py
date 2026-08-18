@@ -207,15 +207,17 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         account_snapshot_circuit_retry_seconds=int(runtime.get("account_snapshot_circuit_retry_seconds", 15)),
         maximum_account_snapshot_age_seconds=int(runtime.get("maximum_account_snapshot_age_seconds", 45)),
         two_day_readonly_gate=bool(runtime.get("two_day_readonly_gate", True)),
-        router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
+        router_config_path=resolve_path(
+            routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json")
+        ),
         execution_config_path=resolve_path(
-            routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json")
+            routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json")
         ),
         account_state_config_path=resolve_path(
             routing.get("account_state_config", "config/examples/m15_longbridge_realtime_account_state.json")
         ),
         position_manager_config_path=resolve_path(
-            routing.get("position_manager_config", "config/examples/m15_longbridge_realtime_position_manager.json")
+            routing.get("position_manager_config", "config/examples/m15_longbridge_realtime_position_manager.contract_v1.json")
         ),
         stale_order_cleanup_config_path=resolve_path(
             routing.get("stale_order_cleanup_config", "config/examples/m15_longbridge_realtime_stale_order_cleanup.json")

@@ -203,7 +203,7 @@ def build_configs(
         "runtime_ids": list(SHORT_RUNTIMES),
     }
 
-    runtime = read_json(ROOT / "config/examples/m15_longbridge_sdk_runtime.json")
+    runtime = read_json(ROOT / "config/examples/m15_longbridge_sdk_runtime.contract_v1.json")
     runtime["title"] = "长桥SDK完整策略合同模拟账户运行层"
     runtime["routing"]["router_config"] = "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json"
     runtime["routing"]["execution_config"] = "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json"
@@ -226,13 +226,35 @@ def build_configs(
         )
         runtime["formal_test_transition"]["validation_end_at"] = validation_end_at
 
-    readiness = read_json(ROOT / "config/examples/m15_opening_trade_readiness.paper_orders_enabled.json")
+    supervisor = read_json(ROOT / "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json")
+    supervisor["title"] = "长桥SDK完整策略合同实时会话守护器"
+    supervisor["inputs"]["router_config"] = "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json"
+    supervisor["inputs"]["position_manager_config"] = "config/examples/m15_longbridge_realtime_position_manager.contract_v1.json"
+    supervisor["inputs"]["execution_config"] = "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json"
+    for key in (
+        "run_ingestor",
+        "run_router",
+        "run_account_state",
+        "run_stale_order_cleanup",
+        "run_position_manager",
+        "run_execution",
+    ):
+        supervisor["realtime_session_supervisor"][key] = False
+    supervisor["hard_boundaries"]["sdk_only_compatibility_status"] = True
+
+    readiness = read_json(ROOT / "config/examples/m15_opening_trade_readiness.paper_contract_v1.json")
+    readiness["inputs"]["realtime_supervisor_config"] = (
+        "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json"
+    )
     readiness["inputs"]["sdk_runtime_config"] = "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
     readiness["inputs"]["execution_config"] = (
         "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json"
     )
 
-    watchdog = read_json(ROOT / "config/examples/m15_background_watchdog.json")
+    watchdog = read_json(ROOT / "config/examples/m15_background_watchdog.contract_v1.json")
+    watchdog["inputs"]["m15_realtime_supervisor_config"] = (
+        "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json"
+    )
     watchdog["inputs"]["m15_sdk_runtime_config"] = "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
     watchdog["inputs"]["readiness_config"] = (
         "config/examples/m15_opening_trade_readiness.paper_contract_v1.json"
@@ -251,6 +273,7 @@ def build_configs(
         ROOT / "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json": execution,
         ROOT / "config/examples/m15_longbridge_realtime_position_manager.contract_v1.json": position,
         ROOT / "config/examples/m15_longbridge_sdk_runtime.contract_v1.json": runtime,
+        ROOT / "config/examples/m15_longbridge_realtime_session_supervisor.contract_v1.json": supervisor,
         ROOT / "config/examples/m15_opening_trade_readiness.paper_contract_v1.json": readiness,
         ROOT / "config/examples/m15_background_watchdog.contract_v1.json": watchdog,
         ROOT / "config/examples/m15_longbridge_dashboard.contract_v1.json": dashboard,

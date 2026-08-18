@@ -88,12 +88,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         m15_realtime_supervisor_config_path=resolve_repo_path(
             inputs.get(
                 "m15_realtime_supervisor_config",
-                ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
+                ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.contract_v1.json",
             )
         ),
         m15_runtime_engine=str(inputs.get("m15_runtime_engine", "cli")).strip().lower(),
         m15_sdk_runtime_config_path=resolve_repo_path(
-            inputs.get("m15_sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+            inputs.get("m15_sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.contract_v1.json")
         ),
         m15_dashboard_config_path=resolve_repo_path(
             inputs.get("m15_dashboard_config", "config/examples/m15_longbridge_dashboard.json")
@@ -105,7 +105,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
             )
         ),
         readiness_config_path=resolve_repo_path(
-            inputs.get("readiness_config", ROOT / "config" / "examples" / "m15_opening_trade_readiness.json")
+            inputs.get("readiness_config", ROOT / "config" / "examples" / "m15_opening_trade_readiness.paper_contract_v1.json")
         ),
         monday_acceptance_config_path=resolve_repo_path(
             inputs.get(

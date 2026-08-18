@@ -30,6 +30,22 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             )
         )
 
+    def test_default_config_targets_contract_v1_stack(self) -> None:
+        config = load_config()
+
+        self.assertEqual(
+            config.m15_realtime_supervisor_config_path.name,
+            "m15_longbridge_realtime_session_supervisor.contract_v1.json",
+        )
+        self.assertEqual(
+            config.m15_sdk_runtime_config_path.name,
+            "m15_longbridge_sdk_runtime.contract_v1.json",
+        )
+        self.assertEqual(
+            config.readiness_config_path.name,
+            "m15_opening_trade_readiness.paper_contract_v1.json",
+        )
+
     def test_pa002_milestone_skips_when_fill_attribution_refresh_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp), runtime_engine="sdk")

@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
+from unittest.mock import patch
 
+from scripts.run_m15_sdk_validation_flatten import stop_trading_processes
 from scripts.m15_sdk_validation_flatten_lib import (
     activate_formal_epoch_payload,
     build_flatten_plan,
@@ -18,6 +21,33 @@ from scripts.m15_sdk_validation_flatten_lib import (
 
 
 class M15SdkValidationFlattenTest(unittest.TestCase):
+    def test_stop_trading_processes_uses_runtime_specific_watchdog_pair(self) -> None:
+        commands: list[list[str]] = []
+
+        def fake_run(command, cwd, capture_output, text, timeout, check):
+            commands.append(command)
+
+            class Result:
+                returncode = 0
+                stdout = "ok"
+                stderr = ""
+
+            return Result()
+
+        with patch("scripts.run_m15_sdk_validation_flatten.subprocess.run", side_effect=fake_run):
+            stop_trading_processes(
+                Path("config/examples/m15_longbridge_sdk_runtime.contract_v1.json")
+            )
+
+        self.assertEqual(
+            commands[0][-1],
+            "config/examples/m15_background_watchdog.contract_v1.json",
+        )
+        self.assertEqual(
+            commands[1][-1],
+            "config/examples/m15_longbridge_sdk_runtime.contract_v1.json",
+        )
+
     def test_builds_long_sell_and_short_cover_from_broker_positions(self) -> None:
         plan, blockers = build_flatten_plan(
             {
