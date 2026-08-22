@@ -1,0 +1,214 @@
+diff --git a/rust/src/quote/core.rs b/rust/src/quote/core.rs
+index e50a5b0..484644b 100644
+--- a/rust/src/quote/core.rs
++++ b/rust/src/quote/core.rs
+@@ -424,12 +424,12 @@ impl Core {
+ 
+         loop {
+             tokio::select! {
+-                item = self.event_rx.recv() => {
+-                    match item {
+-                        Some(event) => self.handle_ws_event(event).await?,
+-                        None => unreachable!(),
+-                    }
+-                }
++                biased;
++
++                // Control requests must not be starved by a continuously busy
++                // market-data stream. M15 prepares and subscribes hundreds of
++                // symbols during a session restart, while websocket events can
++                // remain ready on every loop iteration.
+                 item = self.command_rx.recv() => {
+                     match item {
+                         Some(command) => self.handle_command(command).await?,
+@@ -439,6 +439,12 @@ impl Core {
+                         }
+                     }
+                 }
++                item = self.event_rx.recv() => {
++                    match item {
++                        Some(event) => self.handle_ws_event(event).await?,
++                        None => unreachable!(),
++                    }
++                }
+                 _ = update_trading_days_interval.tick() => {
+                     if let Some(ws_cli) = &self.ws_cli {
+                         let markets: Vec<Market> =
+@@ -575,7 +581,10 @@ impl Core {
+         let req = SubscribeRequest {
+             symbol: symbols.clone(),
+             sub_type: sub_types.into(),
+-            is_first_push: true,
++            // M15 only needs updates that arrive after the subscription is
++            // confirmed. Avoid synchronously fanning out a full-universe
++            // snapshot in the subscribe response.
++            is_first_push: false,
+         };
+         self.ws_cli
+             .as_ref()
+@@ -680,10 +689,15 @@ impl Core {
+             return Ok(candlesticks.candlesticks.clone());
+         }
+ 
+-        tracing::info!(symbol = symbol, "fetch symbol board");
+-
+         let security_data = self.store.securities.entry(symbol.clone()).or_default();
+-        if security_data.board == SecurityBoard::Unknown {
++        if security_data.board == SecurityBoard::Unknown && symbol.ends_with(".US") {
++            // M15's realtime universe is limited to US stocks and ETFs. The
++            // candlestick merger only needs the board family to select its
++            // trade-based intraday algorithm; avoid one static-info request
++            // per symbol while the live feed is being prepared.
++            security_data.board = SecurityBoard::USMain;
++        } else if security_data.board == SecurityBoard::Unknown {
++            tracing::info!(symbol = symbol, "fetch symbol board");
+             // update board
+             let resp: SecurityStaticInfoResponse = self
+                 .ws_cli
+@@ -705,78 +719,19 @@ impl Core {
+             security_data.board = resp.secu_static_info[0].board.parse().unwrap_or_default();
+         }
+ 
+-        tracing::info!(symbol = symbol, board = ?security_data.board, "got the symbol board");
+-
+-        // pull candlesticks
+-        tracing::info!(symbol = symbol, period = ?period, "pull history candlesticks");
+-        let resp: SecurityCandlestickResponse = self
+-            .ws_cli
+-            .as_ref()
+-            .expect("ws_cli connected above")
+-            .request(
+-                cmd_code::GET_SECURITY_CANDLESTICKS,
+-                None,
+-                SecurityCandlestickRequest {
+-                    symbol: symbol.clone(),
+-                    period: period.into(),
+-                    count: 1000,
+-                    adjust_type: AdjustType::NoAdjust.into(),
+-                    trade_session: trade_sessions as i32,
+-                },
+-            )
+-            .await?;
+-        tracing::info!(symbol = symbol, period = ?period, len = resp.candlesticks.len(), "got history candlesticks");
+-
+-        let mut candlesticks = vec![];
+-        let mut tails = HashMap::new();
+-
+-        for candlestick in resp.candlesticks {
+-            let candlestick: Candlestick = candlestick.try_into()?;
+-            let index = candlesticks.len();
+-            candlesticks.push(candlestick);
+-            tails.insert(
+-                candlestick.trade_session,
+-                TailCandlestick { index, candlestick },
+-            );
+-        }
+-
+-        tracing::info!(symbol = symbol, period = ?period, count = candlesticks.len(), tails = ?tails, "candlesticks loaded");
+-
+         security_data
+             .candlesticks
+             .entry(period)
+             .or_insert_with(|| Candlesticks {
+                 trade_sessions,
+-                candlesticks: candlesticks.clone(),
+-                tails,
++                candlesticks: vec![],
++                tails: HashMap::new(),
+             });
+-
+-        // subscribe
+-        if self
+-            .subscriptions
+-            .get(&symbol)
+-            .copied()
+-            .unwrap_or_else(SubFlags::empty)
+-            .contains(SubFlags::QUOTE | SubFlags::TRADE)
+-        {
+-            return Ok(candlesticks);
+-        }
+-
+-        tracing::info!(symbol = symbol, period = ?period, "subscribe quote for candlesticks");
+-
+-        let req = SubscribeRequest {
+-            symbol: vec![symbol.clone()],
+-            sub_type: (SubFlags::QUOTE | SubFlags::TRADE).into(),
+-            is_first_push: true,
+-        };
+-        self.ws_cli
+-            .as_ref()
+-            .expect("ws_cli connected above")
+-            .request::<_, ()>(cmd_code::SUBSCRIBE, None, req)
+-            .await?;
+-
+-        tracing::info!(symbol = symbol, period = ?period, "subscribed quote for candlesticks");
+-        Ok(candlesticks)
++        // This project-specific build intentionally separates local
++        // candlestick state preparation from the server subscription. M15
++        // prepares every symbol first, then starts one batched Quote+Trade stream;
++        // otherwise the growing push stream starves later control requests.
++        Ok(vec![])
+     }
+ 
+     async fn handle_unsubscribe_candlesticks(
+@@ -887,14 +842,11 @@ impl Core {
+                 .insert(symbol.clone());
+         }
+ 
+-        for (symbol, data) in &self.store.securities {
+-            if !data.candlesticks.is_empty() {
+-                subscriptions
+-                    .entry(SubFlags::QUOTE | SubFlags::TRADE)
+-                    .or_default()
+-                    .insert(symbol.clone());
+-            }
+-        }
++        // Candlestick state is prepared locally by M15. The authoritative
++        // server subscriptions are already tracked in `self.subscriptions`.
++        // Re-adding prepared symbols here would duplicate the authoritative
++        // batched Quote+Trade subscription already tracked above.
++        // Keeping one source of truth also prevents reconnect drift.
+ 
+         tracing::info!(subscriptions = ?subscriptions, "resubscribe");
+ 
+@@ -1019,6 +971,20 @@ impl Core {
+                     }
+                     self.merge_candlesticks_by_quote(&event.symbol, push_quote);
+ 
++                    // M15 consumes SDK-confirmed candlesticks and reads the
++                    // latest quote state through realtime_quote(). Forwarding
++                    // every raw quote for those symbols into Python creates an
++                    // unbounded callback backlog and delays bar confirmation.
++                    if self
++                        .store
++                        .securities
++                        .get(&event.symbol)
++                        .map(|data| !data.candlesticks.is_empty())
++                        .unwrap_or_default()
++                    {
++                        return Ok(());
++                    }
++
+                     if !self
+                         .subscriptions
+                         .get(&event.symbol)
+@@ -1033,6 +999,19 @@ impl Core {
+                     }
+                     self.merge_candlesticks_by_trades(&event.symbol, trades);
+ 
++                    // M15 consumes only SDK-confirmed candlesticks. Keep the
++                    // high-volume raw trade stream inside Rust so Python never
++                    // becomes the realtime bottleneck.
++                    if self
++                        .store
++                        .securities
++                        .get(&event.symbol)
++                        .map(|data| !data.candlesticks.is_empty())
++                        .unwrap_or_default()
++                    {
++                        return Ok(());
++                    }
++
+                     if !self
+                         .subscriptions
+                         .get(&event.symbol)

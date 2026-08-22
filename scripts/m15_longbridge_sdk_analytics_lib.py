@@ -157,12 +157,56 @@ def load_runtime_quote_rows(
     return rows
 
 
+def load_previous_session_closes(
+    runtime_config: Any,
+    generated_at: datetime,
+) -> dict[str, Decimal]:
+    """Recover prior regular-session closes from broker SDK market events.
+
+    These values are only suitable for an intraday symbol that has been fully
+    exited.  They must never replace a live quote for an open position.
+    """
+    path = runtime_config.output_dir / "m15_realtime_market_events.jsonl"
+    current_market_date = generated_at.astimezone(NEW_YORK).date()
+    candidates: list[tuple[datetime, str, Decimal]] = []
+    latest_session_date = None
+    for row in read_jsonl(path):
+        if str(row.get("timeframe") or "") != "5m" or not bool(
+            row.get("bar_final")
+        ):
+            continue
+        try:
+            event_at = datetime.fromisoformat(
+                str(row.get("event_time") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except (TypeError, ValueError):
+            continue
+        session_date = event_at.astimezone(NEW_YORK).date()
+        close = decimal_value(row.get("close"))
+        symbol = str(row.get("symbol") or "").upper()
+        if not symbol or close <= 0 or session_date >= current_market_date:
+            continue
+        if latest_session_date is None or session_date > latest_session_date:
+            latest_session_date = session_date
+            candidates = []
+        if session_date == latest_session_date:
+            normalized = symbol if symbol.endswith(".US") else f"{symbol}.US"
+            candidates.append((event_at, normalized, close))
+    latest_by_symbol: dict[str, tuple[datetime, Decimal]] = {}
+    for event_at, symbol, close in candidates:
+        previous = latest_by_symbol.get(symbol)
+        if previous is None or event_at > previous[0]:
+            latest_by_symbol[symbol] = (event_at, close)
+    return {symbol: value[1] for symbol, value in latest_by_symbol.items()}
+
+
 def build_app_display_metrics(
     generated_at: datetime,
     account_state: dict[str, Any],
     historical_orders: list[dict[str, Any]],
     historical_executions: list[dict[str, Any]],
     quote_rows: list[dict[str, Any]],
+    previous_session_closes: dict[str, Decimal] | None = None,
 ) -> dict[str, Any]:
     """Reproduce the Longbridge asset-page values from broker positions, fills and quotes."""
     window_start = app_intraday_window_start(generated_at)
@@ -206,6 +250,7 @@ def build_app_display_metrics(
         and decimal_value(row.get("prev_close")) > 0
     }
     symbols = sorted(set(current_quantity) | set(buy_quantity) | set(sell_quantity))
+    previous_session_closes = previous_session_closes or {}
     missing_symbols: list[str] = []
     symbol_rows: list[dict[str, str]] = []
     today_profit = Decimal("0")
@@ -215,6 +260,18 @@ def build_app_display_metrics(
         current = current_quantity.get(symbol, Decimal("0"))
         opening = current - buy_quantity.get(symbol, Decimal("0")) + sell_quantity.get(symbol, Decimal("0"))
         quote = quotes_by_symbol.get(symbol)
+        if (
+            quote is None
+            and current == 0
+            and opening != 0
+            and previous_session_closes.get(symbol, Decimal("0")) > 0
+        ):
+            previous_close = previous_session_closes[symbol]
+            quote = {
+                "current_price": str(previous_close),
+                "prev_close": str(previous_close),
+                "price_phase": "previous_sdk_session_close_after_full_exit",
+            }
         quote_required = not (opening == 0 and current == 0)
         if not quote and quote_required:
             missing_symbols.append(symbol)
@@ -499,14 +556,19 @@ def require_live_sdk_runtime(runtime_config: Any, generated_at: datetime) -> Non
     status = str(runtime_status.get("status") or "")
     runtime_engine_ready = runtime_status.get("runtime_engine") == "sdk"
     fully_connected = status == "running" and runtime_status.get("sdk_connected") is True
-    quote_recovery_is_readonly_safe = (
-        status in {"connecting", "reconnecting_market_data_circuit"}
-        and runtime_status.get("market_data_mode") == "sdk_snapshot_poll"
+    if not runtime_engine_ready or not fully_connected:
+        raise RuntimeError("sdk_analytics_requires_live_sdk_runtime")
+    market_data_mode = str(runtime_status.get("market_data_mode") or "")
+    validated_snapshot_poll = bool(
+        market_data_mode == "sdk_snapshot_poll"
+        and runtime_status.get("market_data_fallback_validated") is True
+        and runtime_status.get("snapshot_poll_is_fast_and_complete") is True
+        and int(runtime_status.get("snapshot_poll_consecutive_failures") or 0) == 0
         and runtime_status.get("paper_simulated_only") is True
         and runtime_status.get("real_money_actions") is False
     )
-    if not runtime_engine_ready or not (fully_connected or quote_recovery_is_readonly_safe):
-        raise RuntimeError("sdk_analytics_requires_live_sdk_runtime")
+    if market_data_mode != "sdk_subscription" and not validated_snapshot_poll:
+        raise RuntimeError("sdk_analytics_requires_persistent_push_stream")
     if str(runtime_status.get("config_fingerprint") or "") != config_fingerprint(runtime_config):
         raise RuntimeError("sdk_analytics_requires_matching_runtime_config")
     try:
@@ -849,12 +911,17 @@ def run_sdk_analytics(
     # The live runtime owns the only quote connection and publishes a bounded
     # atomic snapshot for this slow App-metric reconciliation path.
     quote_rows = load_runtime_quote_rows(runtime_config, generated_at)
+    previous_session_closes = load_previous_session_closes(
+        runtime_config,
+        generated_at,
+    )
     app_display_metrics = build_app_display_metrics(
         generated_at,
         account_state,
         daily_orders,
         daily_execution_rows,
         quote_rows,
+        previous_session_closes,
     )
     if stale_reasons:
         history_refresh_mode += "_statistics_stale_" + "_".join(stale_reasons)

@@ -26,7 +26,7 @@
     "daily_context_bars": 60,
     "daily_context_deadline_seconds": 75,
     "daily_context_parallel_workers": 1,
-    "daily_context_batch_size": 25,
+    "daily_context_batch_size": 1,
     "expansion_trade_pool_upgrade_gate": {
       "enabled": true,
       "required_readonly_gate_passed": true,
@@ -48,7 +48,9 @@
   "runtime": {
     "heartbeat_interval_seconds": 1,
     "reconnect_backoff_seconds": 5,
-    "subscription_batch_size": 300,
+    "subscription_batch_size": 50,
+    "subscription_request_interval_seconds": 0.2,
+    "allow_snapshot_poll_fallback": false,
     "subscription_retry_count": 2,
     "subscription_deadline_seconds": 20,
     "maximum_consecutive_subscription_failures": 3,

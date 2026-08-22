@@ -6,6 +6,7 @@ import inspect
 import tempfile
 import unittest
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -20,6 +21,7 @@ from scripts.m15_longbridge_sdk_analytics_lib import (
     build_sdk_pnl_reconciliation,
     current_history_rows,
     incremental_history_start,
+    load_previous_session_closes,
     load_runtime_quote_rows,
     market_profit_query_dates,
     merge_history_rows,
@@ -322,6 +324,71 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["prev_close"], "205.0")
 
+    def test_fully_exited_symbol_uses_previous_sdk_session_close(self) -> None:
+        generated_at = datetime(2026, 8, 21, 17, 0, tzinfo=UTC)
+        metrics = build_app_display_metrics(
+            generated_at,
+            {"usd_available_cash": "1000", "usd_frozen_cash": "0", "positions": []},
+            [{"order_id": "sell-1", "symbol": "DASH.US", "side": "Sell"}],
+            [
+                {
+                    "order_id": "sell-1",
+                    "symbol": "DASH.US",
+                    "quantity": "2",
+                    "price": "224.41",
+                    "trade_done_at": "2026-08-21T14:45:03Z",
+                }
+            ],
+            [],
+            {"DASH.US": Decimal("222.42")},
+        )
+
+        self.assertEqual(metrics["status"], "fresh")
+        self.assertEqual(metrics["today_pnl"], "3.98")
+        self.assertEqual(metrics["missing_symbols"], [])
+        self.assertEqual(
+            metrics["symbol_pnl_rows"][0]["price_phase"],
+            "previous_sdk_session_close_after_full_exit",
+        )
+
+    def test_previous_session_close_loader_uses_last_bar_of_latest_prior_day(self) -> None:
+        generated_at = datetime(2026, 8, 21, 17, 0, tzinfo=UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rows = [
+                {
+                    "timeframe": "5m",
+                    "bar_final": True,
+                    "event_time": "2026-08-20T19:55:00Z",
+                    "symbol": "DASH",
+                    "close": "222.10",
+                },
+                {
+                    "timeframe": "5m",
+                    "bar_final": True,
+                    "event_time": "2026-08-20T20:00:00Z",
+                    "symbol": "DASH",
+                    "close": "222.42",
+                },
+                {
+                    "timeframe": "5m",
+                    "bar_final": True,
+                    "event_time": "2026-08-21T14:45:00Z",
+                    "symbol": "DASH",
+                    "close": "224.54",
+                },
+            ]
+            (root / "m15_realtime_market_events.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            closes = load_previous_session_closes(
+                SimpleNamespace(output_dir=root),
+                generated_at,
+            )
+
+        self.assertEqual(closes, {"DASH.US": Decimal("222.42")})
+
     def test_runtime_quote_snapshot_rejects_stale_or_wrong_contract_data(self) -> None:
         generated_at = datetime(2026, 7, 21, 15, 0, tzinfo=UTC)
         with tempfile.TemporaryDirectory() as tmp:
@@ -456,6 +523,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                         "status": "running",
                         "runtime_engine": "sdk",
                         "sdk_connected": True,
+                        "market_data_mode": "sdk_subscription",
                         "runtime_pid": __import__("os").getpid(),
                         "config_fingerprint": "expected",
                         "generated_at": "2026-07-18T05:00:00Z",
@@ -477,6 +545,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                         "status": "running",
                         "runtime_engine": "sdk",
                         "sdk_connected": True,
+                        "market_data_mode": "sdk_subscription",
                         "runtime_pid": 999999999,
                         "config_fingerprint": "expected",
                         "generated_at": "2026-07-18T05:00:00Z",
@@ -488,7 +557,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "live_sdk_runtime"):
                     require_live_sdk_runtime(runtime_config, datetime(2026, 7, 18, 5, 0, 5, tzinfo=UTC))
 
-    def test_sdk_analytics_accepts_paper_snapshot_runtime_during_quote_recovery(self) -> None:
+    def test_sdk_analytics_rejects_snapshot_runtime_during_quote_recovery(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             status_path = Path(tmp) / "runtime.json"
             runtime_config = SimpleNamespace(runtime_status_path=status_path, heartbeat_interval_seconds=1)
@@ -509,7 +578,43 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                 encoding="utf-8",
             )
             with patch("scripts.m15_longbridge_sdk_analytics_lib.config_fingerprint", return_value="expected"):
-                require_live_sdk_runtime(runtime_config, datetime(2026, 7, 18, 5, 0, 1, tzinfo=UTC))
+                with self.assertRaisesRegex(RuntimeError, "live_sdk_runtime"):
+                    require_live_sdk_runtime(runtime_config, datetime(2026, 7, 18, 5, 0, 1, tzinfo=UTC))
+
+    def test_sdk_analytics_accepts_validated_paper_snapshot_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            status_path = Path(tmp) / "runtime.json"
+            runtime_config = SimpleNamespace(
+                runtime_status_path=status_path,
+                heartbeat_interval_seconds=1,
+            )
+            status_path.write_text(
+                json.dumps(
+                    {
+                        "status": "running",
+                        "runtime_engine": "sdk",
+                        "sdk_connected": True,
+                        "runtime_pid": __import__("os").getpid(),
+                        "config_fingerprint": "expected",
+                        "generated_at": "2026-07-18T05:00:00Z",
+                        "market_data_mode": "sdk_snapshot_poll",
+                        "market_data_fallback_validated": True,
+                        "snapshot_poll_is_fast_and_complete": True,
+                        "snapshot_poll_consecutive_failures": 0,
+                        "paper_simulated_only": True,
+                        "real_money_actions": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch(
+                "scripts.m15_longbridge_sdk_analytics_lib.config_fingerprint",
+                return_value="expected",
+            ):
+                require_live_sdk_runtime(
+                    runtime_config,
+                    datetime(2026, 7, 18, 5, 0, 1, tzinfo=UTC),
+                )
 
     def test_sdk_analytics_rejects_non_paper_snapshot_runtime_during_quote_recovery(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -545,6 +650,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                         "status": "running",
                         "runtime_engine": "sdk",
                         "sdk_connected": True,
+                        "market_data_mode": "sdk_subscription",
                         "runtime_pid": __import__("os").getpid(),
                         "config_fingerprint": "expected",
                         "generated_at": "2026-07-18T04:59:00Z",
@@ -566,6 +672,7 @@ class M15LongbridgeSdkAnalyticsTest(unittest.TestCase):
                         "status": "running",
                         "runtime_engine": "sdk",
                         "sdk_connected": True,
+                        "market_data_mode": "sdk_subscription",
                         "runtime_pid": __import__("os").getpid(),
                         "config_fingerprint": "old",
                         "generated_at": "2026-07-18T05:00:00Z",

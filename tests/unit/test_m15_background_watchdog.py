@@ -275,6 +275,143 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(payload["watchdog_status"], "healthy")
             self.assertEqual(analytics_step["returncode"], 0)
 
+    def test_sdk_watchdog_does_not_restart_an_already_healthy_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            commands: list[list[str]] = []
+
+            def runner(command: list[str], _timeout: int):
+                commands.append(command)
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-08-18T17:35:00Z",
+                command_runner=runner,
+            )
+
+            daemon_step = next(
+                step for step in payload["steps"] if step["step_id"] == "m15_sdk_runtime_daemon"
+            )
+            self.assertTrue(daemon_step["recovery_start_skipped"])
+            self.assertFalse(
+                any(
+                    command[1].endswith("run_m15_longbridge_sdk_runtime.py")
+                    and "--daemon" in command
+                    for command in commands
+                )
+            )
+
+    def test_sdk_watchdog_starts_runtime_only_after_unhealthy_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            commands: list[list[str]] = []
+            status_calls = 0
+
+            def runner(command: list[str], _timeout: int):
+                nonlocal status_calls
+                commands.append(command)
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    status_calls += 1
+                    payload = (
+                        {
+                            "runtime_process_alive": False,
+                            "status": "stopped",
+                            "sdk_connected": False,
+                            "account_snapshot_healthy": False,
+                        }
+                        if status_calls == 1
+                        else {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                        }
+                    )
+                    stdout = json.dumps(payload)
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-08-18T17:36:00Z",
+                command_runner=runner,
+            )
+
+            daemon_step = next(
+                step for step in payload["steps"] if step["step_id"] == "m15_sdk_runtime_daemon"
+            )
+            self.assertFalse(daemon_step["recovery_start_skipped"])
+            self.assertTrue(
+                any(
+                    command[1].endswith("run_m15_longbridge_sdk_runtime.py")
+                    and "--daemon" in command
+                    for command in commands
+                )
+            )
+            self.assertEqual(payload["watchdog_status"], "healthy")
+
+    def test_sdk_watchdog_restarts_runtime_when_fingerprint_drift_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            commands: list[list[str]] = []
+            status_calls = 0
+
+            def runner(command: list[str], _timeout: int):
+                nonlocal status_calls
+                commands.append(command)
+                script = command[1] if len(command) > 1 else ""
+                if script.endswith("run_m15_longbridge_sdk_runtime.py") and "--status" in command:
+                    status_calls += 1
+                    runtime_fingerprint = "old" if status_calls == 1 else "expected"
+                    stdout = json.dumps(
+                        {
+                            "runtime_process_alive": True,
+                            "status": "running",
+                            "sdk_connected": True,
+                            "account_snapshot_healthy": True,
+                            "config_fingerprint": runtime_fingerprint,
+                            "expected_config_fingerprint": "expected",
+                            "runtime_source_fingerprint": "source",
+                            "expected_runtime_source_fingerprint": "source",
+                        }
+                    )
+                else:
+                    stdout = "ok"
+                return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+            payload = run_background_watchdog_once(
+                config,
+                generated_at="2026-08-18T17:37:00Z",
+                command_runner=runner,
+            )
+
+            daemon_step = next(
+                step for step in payload["steps"] if step["step_id"] == "m15_sdk_runtime_daemon"
+            )
+            self.assertFalse(daemon_step["recovery_start_skipped"])
+            self.assertTrue(
+                any(
+                    command[1].endswith("run_m15_longbridge_sdk_runtime.py")
+                    and "--daemon" in command
+                    for command in commands
+                )
+            )
+
     def test_sdk_analytics_timeout_is_non_blocking_and_uses_failure_backoff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp), runtime_engine="sdk")

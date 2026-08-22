@@ -38,6 +38,7 @@ class BoundaryConfig:
 
 @dataclass(frozen=True, slots=True)
 class LocalPostcloseSchedulerConfig:
+    config_path: Path
     title: str
     run_id: str
     stage: str
@@ -70,9 +71,11 @@ def now_utc_iso() -> str:
 
 
 def load_scheduler_config(path: str | Path = DEFAULT_CONFIG_PATH) -> LocalPostcloseSchedulerConfig:
-    payload = json.loads(resolve_repo_path(path).read_text(encoding="utf-8"))
+    config_path = resolve_repo_path(path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
     boundary = payload["boundary"]
     config = LocalPostcloseSchedulerConfig(
+        config_path=config_path,
         title=str(payload["title"]),
         run_id=str(payload.get("run_id", "m12_m14_local_postclose_scheduler")),
         stage=str(payload["stage"]),
@@ -497,13 +500,75 @@ def run_scheduler_once(
     return payload
 
 
+def run_scheduler_subprocess_once(
+    config: LocalPostcloseSchedulerConfig,
+    *,
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    """Run one heavy post-close cycle outside the long-lived scheduler.
+
+    The local batch imports and retains sizeable market/replay modules. Running
+    the complete cycle in a disposable process prevents those allocations from
+    becoming the scheduler daemon's permanent resident set.
+    """
+    command = [
+        sys.executable,
+        str(ROOT / "scripts" / "run_m12_m14_local_postclose_scheduler.py"),
+        "--config",
+        str(config.config_path),
+    ]
+    if generated_at:
+        command.extend(["--generated-at", generated_at])
+    with scheduler_log_path(config).open("a", encoding="utf-8") as log_handle:
+        result = subprocess.run(
+            command,
+            cwd=str(ROOT),
+            stdout=log_handle,
+            stderr=log_handle,
+            check=False,
+        )
+    payload = read_json(scheduler_status_path(config))
+    if payload:
+        payload["scheduler_child_exit_code"] = result.returncode
+        return payload
+    return {
+        "scheduler_status": "subprocess_failed_without_status",
+        "triggered": True,
+        "batch_status": "failed",
+        "error_message": (
+            "local postclose child exited without a status artifact:"
+            f"{result.returncode}"
+        ),
+        "scheduler_child_exit_code": result.returncode,
+        "plain_language_result": "本地盘后子进程退出且没有生成状态产物；该故障不影响 M15。",
+    }
+
+
+def scheduler_tick(
+    config: LocalPostcloseSchedulerConfig,
+    *,
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    """Keep waiting/idempotence checks light; isolate only an eligible run."""
+    generated_at = generated_at or now_utc_iso()
+    window = scheduler_window(config, generated_at)
+    state = read_json(scheduler_state_path(config))
+    already_triggered = (
+        str(state.get("last_triggered_business_date") or "")
+        == str(window.get("business_date") or "")
+    )
+    if bool(window.get("eligible_now")) and not already_triggered:
+        return run_scheduler_subprocess_once(config, generated_at=generated_at)
+    return run_scheduler_once(config, generated_at=generated_at)
+
+
 def watch_loop(config: LocalPostcloseSchedulerConfig) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     pid_file = scheduler_pid_path(config)
     pid_file.write_text(str(os.getpid()) + "\n", encoding="utf-8")
     try:
         while True:
-            payload = run_scheduler_once(config)
+            payload = scheduler_tick(config)
             print(project_path(scheduler_status_path(config)), flush=True)
             print(payload.get("plain_language_result", ""), flush=True)
             time.sleep(config.check_interval_seconds)

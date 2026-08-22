@@ -157,9 +157,37 @@ def run_background_watchdog_once(
     runner = command_runner or run_command
     previous = read_json(config.output_dir / SUMMARY_JSON)
     analytics_step = analytics_refresh_step(config, runner, generated_at, previous=previous)
+    initial_runtime_status = m15_runtime_status_step(config, runner)
+    if int(initial_runtime_status.get("returncode", 1)) == 0:
+        runtime_daemon_step = {
+            "step_id": (
+                "m15_sdk_runtime_daemon"
+                if config.m15_runtime_engine == "sdk"
+                else "m15_realtime_daemon"
+            ),
+            "label": (
+                "M15 长桥 SDK 实时运行层健康复用"
+                if config.m15_runtime_engine == "sdk"
+                else "M15 长桥实时守护器健康复用"
+            ),
+            "returncode": 0,
+            "elapsed_ms": 0,
+            "command": "",
+            "stdout_tail": "runtime already healthy; recovery start skipped",
+            "stderr_tail": "",
+            "recovery_start_skipped": True,
+        }
+        runtime_status_step = initial_runtime_status
+    else:
+        runtime_daemon_step = m15_runtime_daemon_step(config, runner)
+        runtime_status_step = m15_runtime_status_step(config, runner)
+        runtime_daemon_step["initial_status_returncode"] = int(
+            initial_runtime_status.get("returncode", 1)
+        )
+        runtime_daemon_step["recovery_start_skipped"] = False
     steps = [
-        m15_runtime_daemon_step(config, runner),
-        m15_runtime_status_step(config, runner),
+        runtime_daemon_step,
+        runtime_status_step,
         analytics_step,
         pa002_milestone_refresh_step(
             config,
@@ -295,6 +323,16 @@ def semantic_watchdog_failure(step_id: str, stdout: str) -> str:
     if step_id == "m15_sdk_runtime_status":
         if payload.get("runtime_process_alive") is not True:
             return "sdk_runtime_process_not_alive"
+        if (
+            payload.get("config_fingerprint")
+            != payload.get("expected_config_fingerprint")
+        ):
+            return "sdk_runtime_config_fingerprint_drift"
+        if (
+            payload.get("runtime_source_fingerprint")
+            != payload.get("expected_runtime_source_fingerprint")
+        ):
+            return "sdk_runtime_source_fingerprint_drift"
         if payload.get("status") != "running" or payload.get("sdk_connected") is not True:
             return f"sdk_runtime_not_ready:{payload.get('status') or 'unknown'}"
         if payload.get("account_snapshot_healthy") is not True:

@@ -9,6 +9,7 @@ from unittest.mock import patch
 from scripts.m12_m14_local_postclose_scheduler_lib import (
     load_scheduler_config,
     run_scheduler_once,
+    scheduler_tick,
     start_daemon,
     status,
     stop_daemon,
@@ -78,6 +79,44 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
             self.assertFalse(failed["m15_isolation"]["starts_or_stops_m15"])
             self.assertEqual(repeated["scheduler_status"], "already_triggered_today")
             self.assertEqual(repeated["last_outcome"], "failed")
+
+    def test_watch_tick_runs_eligible_heavy_cycle_in_disposable_process(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = load_scheduler_config(self.make_scheduler_config(Path(tmp)))
+            child_result = {
+                "scheduler_status": "triggered_successfully",
+                "triggered": True,
+            }
+
+            with patch(
+                "scripts.m12_m14_local_postclose_scheduler_lib.run_scheduler_subprocess_once",
+                return_value=child_result,
+            ) as child:
+                result = scheduler_tick(
+                    config,
+                    generated_at="2026-07-16T20:15:00Z",
+                )
+
+            self.assertEqual(result, child_result)
+            child.assert_called_once_with(
+                config,
+                generated_at="2026-07-16T20:15:00Z",
+            )
+
+    def test_watch_tick_does_not_spawn_child_before_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = load_scheduler_config(self.make_scheduler_config(Path(tmp)))
+
+            with patch(
+                "scripts.m12_m14_local_postclose_scheduler_lib.run_scheduler_subprocess_once"
+            ) as child:
+                result = scheduler_tick(
+                    config,
+                    generated_at="2026-07-16T19:59:00Z",
+                )
+
+            self.assertEqual(result["scheduler_status"], "waiting_for_window")
+            child.assert_not_called()
 
     def test_visual_shadow_sidecar_runs_once_and_does_not_block_local_batch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

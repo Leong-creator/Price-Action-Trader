@@ -14,6 +14,7 @@ from collections import Counter, deque
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from time import monotonic, perf_counter, sleep
 from typing import Any, Callable
@@ -25,6 +26,7 @@ from scripts.m15_universe_lib import load_m15_universe
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.contract_v1.json"
+LEGACY_CONFIG_ALIAS = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json"
 SUMMARY_JSON = "m15_longbridge_sdk_runtime.json"
 QUOTE_SNAPSHOT_JSON = "m15_longbridge_sdk_quote_snapshot.json"
 NEW_YORK = ZoneInfo("America/New_York")
@@ -71,12 +73,15 @@ class SdkRuntimeConfig:
     daily_context_retry_cycle_seconds: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
+    subscription_shard_count: int
     subscription_batch_size: int
     subscription_retry_count: int
     subscription_request_interval_seconds: float
     subscription_retry_backoff_seconds: float
     subscription_deadline_seconds: int
     maximum_consecutive_subscription_failures: int
+    prefer_snapshot_poll: bool
+    allow_snapshot_poll_fallback: bool
     snapshot_poll_interval_seconds: float
     snapshot_poll_request_batch_size: int
     snapshot_poll_request_interval_seconds: float
@@ -120,6 +125,11 @@ def resolve_path(value: str | Path) -> Path:
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     config_path = resolve_path(path)
+    if (
+        config_path.resolve() == LEGACY_CONFIG_ALIAS.resolve()
+        and DEFAULT_CONFIG_PATH.exists()
+    ):
+        config_path = DEFAULT_CONFIG_PATH
     payload = json.loads(config_path.read_text(encoding="utf-8"))
     outputs = payload.get("outputs", {})
     oauth = payload.get("oauth", {})
@@ -162,16 +172,21 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         ),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
-        subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
+        subscription_shard_count=int(runtime.get("subscription_shard_count", 1)),
+        subscription_batch_size=int(runtime.get("subscription_batch_size", 50)),
         subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
         subscription_request_interval_seconds=float(
-            runtime.get("subscription_request_interval_seconds", 0.5)
+            runtime.get("subscription_request_interval_seconds", 0.2)
         ),
         subscription_retry_backoff_seconds=float(
             runtime.get("subscription_retry_backoff_seconds", 2)
         ),
         subscription_deadline_seconds=int(runtime.get("subscription_deadline_seconds", 20)),
         maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
+        prefer_snapshot_poll=bool(runtime.get("prefer_snapshot_poll", False)),
+        allow_snapshot_poll_fallback=bool(
+            runtime.get("allow_snapshot_poll_fallback", False)
+        ),
         snapshot_poll_interval_seconds=float(
             runtime.get("snapshot_poll_interval_seconds", 1)
         ),
@@ -310,7 +325,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     if config.exit_order_reprice_seconds <= 0:
         raise ValueError("M15 SDK exit order reprice interval must be positive")
     if config.subscription_batch_size <= 0 or config.subscription_batch_size > 500:
-        raise ValueError("M15 SDK subscription batch size must be between 1 and 500")
+        raise ValueError(
+            "M15 SDK production subscription batch size must be between 1 and 500"
+        )
+    if config.subscription_shard_count != 1:
+        raise ValueError("M15 SDK runtime requires exactly one quote connection")
     if not 0 <= config.subscription_request_interval_seconds <= 5:
         raise ValueError("M15 SDK subscription request interval must be between 0 and 5 seconds")
     if not 0 <= config.subscription_retry_backoff_seconds <= 10:
@@ -321,6 +340,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK subscription deadline must be positive")
     if config.maximum_consecutive_subscription_failures <= 0:
         raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
+    if config.prefer_snapshot_poll and not config.allow_snapshot_poll_fallback:
+        raise ValueError(
+            "M15 SDK snapshot preference requires explicit fallback permission"
+        )
     if not 0.5 <= config.snapshot_poll_interval_seconds <= 5:
         raise ValueError("M15 SDK snapshot poll interval must be between 0.5 and 5 seconds")
     if not 1 <= config.snapshot_poll_request_batch_size <= 500:
@@ -711,6 +734,8 @@ class FiveMinuteBarBuilder:
         self._quote_last_source_at: dict[str, datetime] = {}
         self._snapshot_total_volume: dict[str, int] = {}
         self._session_quote_state: dict[str, dict[str, Any]] = {}
+        self._last_price: dict[str, Decimal] = {}
+        self._last_real_source_at: dict[str, datetime] = {}
 
     @property
     def open_bar_count(self) -> int:
@@ -723,6 +748,8 @@ class FiveMinuteBarBuilder:
             return []
         completed = self.flush(received_at)
         normalized_symbol = symbol.upper()
+        self._last_price[normalized_symbol] = price
+        self._last_real_source_at[normalized_symbol] = source_at
         volume, blocked_reason = self._quote_volume_delta(
             normalized_symbol,
             payload,
@@ -735,7 +762,7 @@ class FiveMinuteBarBuilder:
             received_at,
             price,
             volume,
-            source_mode="longbridge_sdk_push",
+            source_mode="longbridge_sdk_quote_push",
             blocked_reason=blocked_reason,
         ))
         return completed
@@ -774,23 +801,111 @@ class FiveMinuteBarBuilder:
         ))
         return completed
 
+    def seed_quote_snapshot(
+        self,
+        symbol: str,
+        payload: dict[str, Any],
+        *,
+        received_at: datetime,
+    ) -> bool:
+        """Seed carry-forward state without creating an executable partial bar."""
+        source_at = unix_to_utc(payload.get("timestamp"), received_at)
+        price = decimal(payload.get("last_done") or payload.get("close"))
+        if price <= Decimal("0"):
+            return False
+        normalized_symbol = symbol.upper()
+        self._last_price[normalized_symbol] = price
+        self._last_real_source_at[normalized_symbol] = source_at
+        self._update_session_quote_state(
+            normalized_symbol,
+            payload,
+            source_at=source_at,
+        )
+        return True
+
     def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
-        for trade in payload.get("trades", []) if isinstance(payload.get("trades"), list) else []:
+        trades = payload.get("trades", []) if isinstance(payload.get("trades"), list) else []
+        ordered_trades = sorted(
+            trades,
+            key=lambda trade: unix_to_utc(trade.get("timestamp"), received_at),
+        )
+        for trade in ordered_trades:
             source_at = unix_to_utc(trade.get("timestamp"), received_at)
             price = decimal(trade.get("price"))
             if price > Decimal("0"):
-                finished.extend(
-                    self._append(
-                        symbol,
-                        source_at,
-                        received_at,
-                        price,
-                        int_like(trade.get("volume")),
-                        source_mode="longbridge_sdk_push",
-                    )
+                normalized_symbol = symbol.upper()
+                volume = int_like(trade.get("volume"))
+                self._last_price[normalized_symbol] = price
+                self._last_real_source_at[normalized_symbol] = source_at
+                self._update_session_trade_state(
+                    normalized_symbol,
+                    price,
+                    volume,
+                    source_at=source_at,
                 )
+                completed = self._append(
+                    symbol,
+                    source_at,
+                    received_at,
+                    price,
+                    volume,
+                    source_mode="longbridge_sdk_trade_push",
+                )
+                for row in completed:
+                    try:
+                        bar_close_at = datetime.fromisoformat(
+                            str(row.get("bar_close_at") or "").replace("Z", "+00:00")
+                        ).astimezone(UTC)
+                    except ValueError:
+                        continue
+                    if source_at >= bar_close_at:
+                        row["next_bar_first_quote_price"] = fmt(price)
+                        row["next_bar_first_quote_at"] = to_iso(source_at)
+                        row["next_bar_entry_source"] = (
+                            "longbridge_sdk_first_trade_after_bar_close"
+                        )
+                finished.extend(completed)
         return finished
+
+    def ensure_zero_trade_bars(self, now: datetime) -> None:
+        """Open explicit non-tradable carry bars for subscribed quiet symbols."""
+        now_ny = now.astimezone(NEW_YORK)
+        if (
+            now_ny.weekday() >= 5
+            or (now_ny.hour, now_ny.minute) < (9, 30)
+            or now_ny.hour >= 16
+        ):
+            return
+        bar_open = floor_bar_open(now_ny, self.minutes)
+        if (
+            self.complete_bar_open_not_before is not None
+            and bar_open < self.complete_bar_open_not_before
+        ):
+            return
+        for symbol, price in self._last_price.items():
+            key = (symbol, bar_open)
+            if key in self._bars:
+                continue
+            self._bars[key] = {
+                "symbol": symbol,
+                "bar_open_at": bar_open,
+                "bar_close_at": bar_open + timedelta(minutes=self.minutes),
+                "open": price,
+                "high": price,
+                "low": price,
+                "close": price,
+                "volume": 0,
+                "source_event_at": bar_open.astimezone(UTC),
+                "received_at": now.astimezone(UTC),
+                "source_mode": "longbridge_sdk_quote_push",
+                "market_data_blocked_reasons": set(),
+                "synthetic_no_trade_bar": True,
+                "last_real_source_at": self._last_real_source_at.get(symbol),
+            }
+
+    def session_state(self, symbol: str) -> dict[str, Any]:
+        return dict(self._session_quote_state.get(symbol.upper()) or {})
 
     def flush(self, now: datetime) -> list[dict[str, Any]]:
         completed: list[dict[str, Any]] = []
@@ -826,12 +941,27 @@ class FiveMinuteBarBuilder:
                 "source_event_at": source_at, "received_at": received_at,
                 "source_mode": source_mode,
                 "market_data_blocked_reasons": set(),
+                "synthetic_no_trade_bar": False,
             }
             self._bars[key] = bar
         else:
-            bar["high"] = max(bar["high"], price)
-            bar["low"] = min(bar["low"], price)
-            bar["close"] = price
+            if bar.get("synthetic_no_trade_bar") is True:
+                bar.update(
+                    {
+                        "open": price,
+                        "high": price,
+                        "low": price,
+                        "close": price,
+                        "volume": 0,
+                        "source_event_at": source_at,
+                        "received_at": received_at,
+                        "synthetic_no_trade_bar": False,
+                    }
+                )
+            else:
+                bar["high"] = max(bar["high"], price)
+                bar["low"] = min(bar["low"], price)
+                bar["close"] = price
             bar["source_event_at"] = max(bar["source_event_at"], source_at)
             bar["received_at"] = max(bar["received_at"], received_at)
         bar["volume"] += max(0, volume)
@@ -874,6 +1004,16 @@ class FiveMinuteBarBuilder:
             "market_data_blocked_reason": ",".join(sorted(bar.get("market_data_blocked_reasons") or ())),
             "local_simulation_ignored": True,
         }
+        if bar.get("synthetic_no_trade_bar") is True:
+            result.update(
+                {
+                    "synthetic_no_trade_bar": True,
+                    "strategy_dispatch_eligible": False,
+                    "last_real_source_at": to_iso(bar["last_real_source_at"])
+                    if isinstance(bar.get("last_real_source_at"), datetime)
+                    else "",
+                }
+            )
         session_state = self._session_quote_state.get(str(bar["symbol"]).upper()) or {}
         if session_state:
             result.update(
@@ -887,6 +1027,7 @@ class FiveMinuteBarBuilder:
                 }
             )
         return result
+
 
     def _update_session_quote_state(
         self,
@@ -913,6 +1054,38 @@ class FiveMinuteBarBuilder:
             "source_event_at": to_iso(source_at),
         }
 
+    def _update_session_trade_state(
+        self,
+        symbol: str,
+        price: Decimal,
+        volume: int,
+        *,
+        source_at: datetime,
+    ) -> None:
+        state = self._session_quote_state.get(symbol)
+        if state is None:
+            self._session_quote_state[symbol] = {
+                "open": fmt(price),
+                "high": fmt(price),
+                "low": fmt(price),
+                "close": fmt(price),
+                "volume": str(max(0, volume)),
+                "source_event_at": to_iso(source_at),
+            }
+            return
+        state["high"] = fmt(max(decimal(state.get("high")), price))
+        state["low"] = fmt(min(decimal(state.get("low")), price))
+        try:
+            previous_source_at = datetime.fromisoformat(
+                str(state.get("source_event_at") or "").replace("Z", "+00:00")
+            ).astimezone(UTC)
+        except ValueError:
+            previous_source_at = source_at
+        if source_at >= previous_source_at:
+            state["close"] = fmt(price)
+            state["source_event_at"] = to_iso(source_at)
+        state["volume"] = str(int_like(state.get("volume")) + max(0, volume))
+
     def _quote_volume_delta(
         self,
         symbol: str,
@@ -935,6 +1108,289 @@ class FiveMinuteBarBuilder:
         if previous_total is None:
             return 0, ""
         return total_volume - previous_total, ""
+
+
+class ConfirmedCandlestickBarBuilder:
+    """Convert SDK-confirmed candlesticks into executable market events."""
+
+    def __init__(
+        self,
+        minutes: int = 5,
+        *,
+        complete_bar_open_not_before: datetime | None = None,
+    ) -> None:
+        self.minutes = minutes
+        self.complete_bar_open_not_before = (
+            complete_bar_open_not_before.astimezone(UTC)
+            if complete_bar_open_not_before is not None
+            else None
+        )
+        self._session: dict[str, dict[str, Any]] = {}
+
+    def on_candlestick(
+        self,
+        symbol: str,
+        payload: dict[str, Any],
+        *,
+        is_confirmed: bool,
+        received_at: datetime,
+    ) -> list[dict[str, Any]]:
+        if not is_confirmed:
+            return []
+        bar_open = unix_to_utc(payload.get("timestamp"), received_at)
+        if (
+            self.complete_bar_open_not_before is not None
+            and bar_open < self.complete_bar_open_not_before
+        ):
+            return []
+        bar_open_ny = bar_open.astimezone(NEW_YORK)
+        if (
+            bar_open_ny.weekday() >= 5
+            or (bar_open_ny.hour, bar_open_ny.minute) < (9, 30)
+            or bar_open_ny.hour >= 16
+        ):
+            return []
+        open_price = decimal(payload.get("open"))
+        high_price = decimal(payload.get("high"))
+        low_price = decimal(payload.get("low"))
+        close_price = decimal(payload.get("close"))
+        if min(open_price, high_price, low_price, close_price) <= Decimal("0"):
+            return []
+        volume = max(0, int_like(payload.get("volume")))
+        bar_close = bar_open + timedelta(minutes=self.minutes)
+        received_at = received_at.astimezone(UTC)
+        normalized_symbol = symbol.upper()
+        business_date = bar_open_ny.date().isoformat()
+        session = self._session.get(normalized_symbol)
+        if session is None or session.get("business_date") != business_date:
+            session = {
+                "business_date": business_date,
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+                "volume": volume,
+            }
+            self._session[normalized_symbol] = session
+        else:
+            session["high"] = max(decimal(session["high"]), high_price)
+            session["low"] = min(decimal(session["low"]), low_price)
+            session["close"] = close_price
+            session["volume"] = int(session["volume"]) + volume
+        event_id = f"sdk-5m|{normalized_symbol}|{to_iso(bar_close)}"
+        delay_ms = max(0, int((received_at - bar_close).total_seconds() * 1000))
+        return [{
+            "schema_version": "m15.realtime-market-event.v2",
+            "event_id": event_id,
+            "symbol": normalized_symbol.replace(".US", ""),
+            "timeframe": "5m",
+            "event_time": to_iso(bar_close),
+            "bar_open_at": to_iso(bar_open),
+            "bar_close_at": to_iso(bar_close),
+            "source_event_at": to_iso(bar_close),
+            "received_at": to_iso(received_at),
+            "source_delivery_age_ms": delay_ms,
+            "bar_finalization_delay_ms": delay_ms,
+            "bar_final": True,
+            "source_mode": "longbridge_sdk_confirmed_candlestick",
+            "open": fmt(open_price),
+            "high": fmt(high_price),
+            "low": fmt(low_price),
+            "close": fmt(close_price),
+            "volume": str(volume),
+            "market_data_blocked_reason": "",
+            "local_simulation_ignored": True,
+            "session_open_at_bar_close": fmt(decimal(session["open"])),
+            "session_high_at_bar_close": fmt(decimal(session["high"])),
+            "session_low_at_bar_close": fmt(decimal(session["low"])),
+            "session_close_at_bar_close": fmt(decimal(session["close"])),
+            "session_volume_at_bar_close": str(int(session["volume"])),
+            "session_quote_source_at_bar_close": to_iso(bar_close),
+        }]
+
+
+class ConfirmedBoundaryBatchGate:
+    """Release one confirmed boundary only after the full trading set arrives.
+
+    Monitoring-only symbols are released immediately for position exits.  A
+    partial or late trading boundary is also released for exit evaluation, but
+    is explicitly ineligible to create new positions.
+    """
+
+    def __init__(
+        self,
+        required_symbols: list[str] | tuple[str, ...],
+        *,
+        maximum_source_delivery_age_ms: int,
+        maximum_finalization_delay_ms: int,
+        retained_boundary_count: int = 512,
+    ) -> None:
+        self.required_symbols = {
+            self._normalize_symbol(symbol) for symbol in required_symbols
+        }
+        self.maximum_source_delivery_age_ms = maximum_source_delivery_age_ms
+        self.maximum_finalization_delay_ms = maximum_finalization_delay_ms
+        self.retained_boundary_count = max(16, retained_boundary_count)
+        self._pending: dict[str, dict[str, dict[str, Any]]] = {}
+        self._closed: set[str] = set()
+        self._closed_order: deque[str] = deque()
+
+    @staticmethod
+    def _normalize_symbol(value: Any) -> str:
+        return str(value or "").upper().replace(".US", "")
+
+    @staticmethod
+    def _boundary(row: dict[str, Any]) -> str:
+        return str(row.get("event_time") or row.get("bar_close_at") or "")
+
+    @staticmethod
+    def _parse_boundary(value: str) -> datetime | None:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+        except (TypeError, ValueError):
+            return None
+
+    def _close(self, boundary: str) -> None:
+        self._pending.pop(boundary, None)
+        if boundary in self._closed:
+            return
+        self._closed.add(boundary)
+        self._closed_order.append(boundary)
+        while len(self._closed_order) > self.retained_boundary_count:
+            self._closed.discard(self._closed_order.popleft())
+
+    def _batch(
+        self,
+        boundary: str,
+        rows: list[dict[str, Any]],
+        *,
+        status: str,
+        eligible: bool,
+        missing_symbols: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "rows": sorted(
+                rows,
+                key=lambda row: self._normalize_symbol(row.get("symbol")),
+            ),
+            "entry_batch_eligible": eligible,
+            "confirmed_boundary_gate": {
+                "status": status,
+                "boundary": boundary,
+                "required_symbol_count": len(self.required_symbols),
+                "received_symbol_count": len({
+                    self._normalize_symbol(row.get("symbol")) for row in rows
+                } & self.required_symbols),
+                "missing_symbols": missing_symbols or [],
+                "new_position_submission_enabled": eligible,
+            },
+        }
+
+    def _complete_batch(
+        self,
+        boundary: str,
+        by_symbol: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        rows = list(by_symbol.values())
+        def row_is_timely(row: dict[str, Any]) -> bool:
+            finalization_is_timely = (
+                int_like(row.get("bar_finalization_delay_ms"))
+                <= self.maximum_finalization_delay_ms
+            )
+            if str(row.get("source_mode") or "") == "longbridge_sdk_snapshot_poll":
+                # A quote snapshot carries the last trade timestamp. Quiet but
+                # liquid symbols can therefore have an old source timestamp
+                # even though the full quote request completed immediately
+                # after the five-minute boundary. Snapshot execution safety is
+                # determined by complete-batch finalization time; source age is
+                # retained separately for audit and must not reject the batch.
+                return finalization_is_timely
+            return (
+                int_like(row.get("source_delivery_age_ms"))
+                <= self.maximum_source_delivery_age_ms
+                and finalization_is_timely
+            )
+
+        timely = all(row_is_timely(row) for row in rows)
+        self._close(boundary)
+        return self._batch(
+            boundary,
+            rows,
+            status="complete_timely" if timely else "complete_but_late",
+            eligible=timely,
+        )
+
+    def add(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        now: datetime,
+    ) -> list[dict[str, Any]]:
+        outputs: list[dict[str, Any]] = []
+        touched: set[str] = set()
+        for row in rows:
+            symbol = self._normalize_symbol(row.get("symbol"))
+            boundary = self._boundary(row)
+            if not symbol or not boundary:
+                outputs.append(self._batch(
+                    boundary,
+                    [row],
+                    status="invalid_boundary_or_symbol",
+                    eligible=False,
+                ))
+                continue
+            if symbol not in self.required_symbols:
+                outputs.append(self._batch(
+                    boundary,
+                    [row],
+                    status="monitoring_only",
+                    eligible=False,
+                ))
+                continue
+            if boundary in self._closed:
+                outputs.append(self._batch(
+                    boundary,
+                    [row],
+                    status="late_after_boundary_closed",
+                    eligible=False,
+                ))
+                continue
+            self._pending.setdefault(boundary, {})[symbol] = row
+            touched.add(boundary)
+
+        for boundary in sorted(touched):
+            by_symbol = self._pending.get(boundary, {})
+            if set(by_symbol) == self.required_symbols:
+                outputs.append(self._complete_batch(boundary, by_symbol))
+        outputs.extend(self.flush_expired(now=now))
+        return outputs
+
+    def flush_expired(self, *, now: datetime) -> list[dict[str, Any]]:
+        now_utc = now.astimezone(UTC)
+        outputs: list[dict[str, Any]] = []
+        for boundary in sorted(self._pending):
+            boundary_at = self._parse_boundary(boundary)
+            if boundary_at is None:
+                expired = True
+            else:
+                expired = now_utc >= boundary_at + timedelta(
+                    milliseconds=self.maximum_finalization_delay_ms,
+                )
+            if not expired:
+                continue
+            by_symbol = self._pending.get(boundary, {})
+            missing = sorted(self.required_symbols - set(by_symbol))
+            rows = list(by_symbol.values())
+            self._close(boundary)
+            if rows:
+                outputs.append(self._batch(
+                    boundary,
+                    rows,
+                    status="incomplete_boundary_deadline_expired",
+                    eligible=False,
+                    missing_symbols=missing,
+                ))
+        return outputs
 
 
 class MarketEventContext:
@@ -1062,6 +1518,9 @@ def five_minute_session_coverage(
             continue
         if source_mode not in {
             "longbridge_sdk_push",
+            "longbridge_sdk_quote_push",
+            "longbridge_sdk_trade_push",
+            "longbridge_sdk_confirmed_candlestick",
             "longbridge_sdk_snapshot_poll",
         }:
             invalid_rows += 1
@@ -1217,6 +1676,8 @@ def load_current_sdk_intraday_context(
             str(row.get("source_mode") or "")
             not in {
                 "longbridge_sdk_push",
+                "longbridge_sdk_trade_push",
+                "longbridge_sdk_confirmed_candlestick",
                 "longbridge_sdk_snapshot_poll",
                 "longbridge_sdk_intraday_context",
                 "longbridge_sdk_intraday_recovery",
@@ -1302,7 +1763,12 @@ def fresh_market_events(
         is_final_sdk_bar = (
             bool(row.get("bar_final"))
             and str(row.get("source_mode") or "")
-            in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
+            in {
+                "longbridge_sdk_push",
+                "longbridge_sdk_trade_push",
+                "longbridge_sdk_confirmed_candlestick",
+                "longbridge_sdk_snapshot_poll",
+            }
             and str(row.get("timeframe") or "") == "5m"
         )
         if is_final_sdk_bar:
@@ -1397,10 +1863,19 @@ def build_status(
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
+    try:
+        sdk_version = package_version("longbridge")
+    except PackageNotFoundError:
+        sdk_version = ""
     payload = {
         "stage": "M15.longbridge_sdk_runtime", "generated_at": to_iso(now), "status": status,
         "reason": reason, "sdk_connected": connected, "last_event_at": last_event_at,
-        "source_mode": "longbridge_sdk_push", "configured_symbol_count": len(configured_symbols(config)),
+        "sdk_version": sdk_version,
+        "source_mode": (
+            "longbridge_sdk_snapshot_poll"
+            if config.prefer_snapshot_poll
+            else "longbridge_sdk_quote_push"
+        ), "configured_symbol_count": len(configured_symbols(config)),
         "trading_symbol_count": len(configured_trading_symbols(config)),
         "trading_universe_path": (
             str(config.trading_universe_path)
@@ -1428,7 +1903,14 @@ def build_status(
     }
     payload.update(extra or {})
     config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
-    config.runtime_status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = config.runtime_status_path.with_name(
+        f".{config.runtime_status_path.name}.{os.getpid()}.tmp"
+    )
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(config.runtime_status_path)
     return payload
 
 
@@ -1501,7 +1983,13 @@ def sdk_endpoint_overrides(region: str) -> dict[str, str]:
 
 
 def sdk_config_from_oauth(sdk: Any, oauth: Any, region: str) -> Any:
-    return sdk.Config.from_oauth(oauth, **sdk_endpoint_overrides(region))
+    return sdk.Config.from_oauth(
+        oauth,
+        **sdk_endpoint_overrides(region),
+        push_candlestick_mode=sdk.PushCandlestickMode.Confirmed,
+        enable_print_quote_packages=False,
+        enable_papertrading=True,
+    )
 
 
 def subscribe_quote_and_trades(
@@ -1541,15 +2029,27 @@ def subscribe_quote_and_trades(
             # when every symbol subscribes successfully on its own. Split a
             # failed batch and keep progress alive during recovery.
             for index, symbol in enumerate(batch, start=1):
-                try:
-                    quote_context.subscribe([symbol], subscription_types)
-                except Exception:
+                symbol_succeeded = False
+                for attempt in range(retry_count + 1):
+                    try:
+                        quote_context.subscribe([symbol], subscription_types)
+                        symbol_succeeded = True
+                        break
+                    except Exception:
+                        if attempt < retry_count and retry_backoff_seconds:
+                            sleep(retry_backoff_seconds)
+                if not symbol_succeeded:
                     failed_symbols.append(symbol)
                 if progress_callback is not None:
                     progress_callback(
                         min(offset + index, total_symbols),
                         total_symbols,
                     )
+                if (
+                    request_interval_seconds
+                    and index < len(batch)
+                ):
+                    sleep(request_interval_seconds)
         elif not batch_succeeded:
             failed_symbols.extend(batch)
             if progress_callback is not None:
@@ -1562,6 +2062,42 @@ def subscribe_quote_and_trades(
         if request_interval_seconds and offset + len(batch) < total_symbols:
             sleep(request_interval_seconds)
     return failed_symbols
+
+
+def warm_quote_context(
+    quote_context: Any,
+    anchor_symbol: str,
+    *,
+    retry_count: int = 2,
+    retry_backoff_seconds: float = 0,
+) -> dict[str, Any]:
+    """Finish the SDK quote handshake before enabling callbacks."""
+    if retry_count < 0:
+        raise ValueError("quote warm-up retry count cannot be negative")
+    if retry_backoff_seconds < 0:
+        raise ValueError("quote warm-up retry delay cannot be negative")
+    started = monotonic()
+    last_error: Exception | None = None
+    for attempt in range(1, retry_count + 2):
+        try:
+            rows = quote_context.quote([anchor_symbol])
+            if not rows:
+                raise RuntimeError("quote warm-up returned no rows")
+            return {
+                "anchor_symbol": anchor_symbol,
+                "attempt_count": attempt,
+                "elapsed_ms": round((monotonic() - started) * 1000),
+                "row_count": len(rows),
+            }
+        except Exception as exc:
+            last_error = exc
+            if attempt <= retry_count and retry_backoff_seconds:
+                sleep(retry_backoff_seconds)
+    assert last_error is not None
+    raise RuntimeError(
+        "sdk_quote_context_warmup_failed:"
+        f"{type(last_error).__name__}:{last_error}"
+    ) from last_error
 
 
 def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bool) -> bool:

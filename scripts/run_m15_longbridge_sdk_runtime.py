@@ -19,6 +19,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from collections import deque
@@ -26,6 +27,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import partial
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -43,7 +45,7 @@ from scripts.m15_longbridge_sdk_account_lib import (
     SdkTradeRequestGate,
 )
 from scripts.m15_longbridge_sdk_runtime_lib import (
-    DEFAULT_CONFIG_PATH, QUOTE_SNAPSHOT_JSON, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
+    DEFAULT_CONFIG_PATH, QUOTE_SNAPSHOT_JSON, ConfirmedBoundaryBatchGate, ConfirmedCandlestickBarBuilder, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
     append_market_events, attach_next_bar_first_quotes, build_status, compact_market_events, config_fingerprint, configured_symbols,
     configured_trading_symbols, daily_context_covers_symbols, daily_context_is_complete,
     daily_context_row_count_for_symbols, floor_bar_open, fresh_market_events, load_config,
@@ -53,7 +55,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     market_event_is_tradable, trading_market_events,
     sdk_config_from_oauth, sdk_object_to_dict, sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, to_iso, five_minute_session_coverage,
-    unix_to_utc,
+    unix_to_utc, warm_quote_context,
 )
 from scripts.m15_sdk_validation_flatten_lib import (
     activate_formal_epoch_payload,
@@ -68,6 +70,7 @@ from scripts.m15_sdk_validation_flatten_lib import (
 from scripts.prepare_m15_sdk_dns_override import (
     DEFAULT_CACHE_DIR as SDK_DNS_OVERRIDE_CACHE_DIR,
     DEFAULT_ENV_FILE as SDK_DNS_OVERRIDE_ENV_FILE,
+    environment_without_m15_dns_override,
     prepare as prepare_sdk_dns_override,
     process_local_environment,
 )
@@ -91,14 +94,25 @@ EXECUTION_LEDGER_FILE = "m15_longbridge_realtime_execution_ledger.jsonl"
 ORDER_MAINTENANCE_FILE = "m15_sdk_order_maintenance.json"
 MARKET_DATA_HEALTH_JSON = "m15_sdk_market_data_health.json"
 MARKET_DATA_HEALTH_LEDGER_JSONL = "m15_sdk_market_data_health_ledger.jsonl"
+POSTCLOSE_RECOVERY_STATE_JSON = "m15_sdk_postclose_recovery_state.json"
 PENDING_RUNTIME_RELOAD_JSON = "m15_sdk_pending_runtime_reload.json"
 AUTHORIZED_ACCOUNT_EXIT_FILE = "m15_authorized_account_exit.json"
 CAPITAL_BUCKET_MIGRATION_FILE = "m15_capital_bucket_migration_state.json"
 REALTIME_ACCOUNT_STATE_FILE = "m15_longbridge_realtime_account_state.json"
 TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS = 60
 TRADE_CONTEXT_RETRY_SECONDS = 5
-INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS = 90
-POSTCLOSE_INTRADAY_RECOVERY_DEADLINE_SECONDS = 240
+SNAPSHOT_FALLBACK_HANDOFF_COOLDOWN_SECONDS = 30
+INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS = 300
+POSTCLOSE_INTRADAY_RECOVERY_DEADLINE_SECONDS = 120
+HISTORICAL_CANDLESTICK_REQUEST_INTERVAL_SECONDS = 0.60
+MINIMUM_LONGBRIDGE_SDK_VERSION = (4, 5, 0)
+PATCHED_LONGBRIDGE_SDK_MARKER = (
+    ROOT / ".venv" / ".m15-longbridge-sdk-no-first-push.json"
+)
+PATCHED_LONGBRIDGE_SDK_PATCH = (
+    ROOT / "patches" / "longbridge-4.5.0-disable-subscribe-first-push.patch"
+)
+PATCHED_LONGBRIDGE_SDK_COMMIT = "266d9230c05208e2b9b6f0e1ebba7eb34fc7e8a2"
 REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED = False
 RUNTIME_LOG_ROTATE_BYTES = 10 * 1024 * 1024
 RUNTIME_SOURCE_FILES = (
@@ -222,9 +236,50 @@ def parse_args() -> argparse.Namespace:
 
 def require_sdk_contract() -> Any:
     import longbridge.openapi as lb
-    missing = [name for name in ("QuoteContext", "TradeContext", "PortfolioContext") if not getattr(lb, name, None)]
+    try:
+        installed = package_version("longbridge")
+    except PackageNotFoundError as exc:
+        raise RuntimeError("longbridge_sdk_not_installed") from exc
+    numeric_version = tuple(
+        int(part) for part in installed.split("+", 1)[0].split(".")[:3]
+    )
+    if numeric_version < MINIMUM_LONGBRIDGE_SDK_VERSION:
+        raise RuntimeError(
+            "longbridge_sdk_too_old:"
+            f"installed={installed}:required=4.5.0"
+        )
+    try:
+        marker = json.loads(
+            PATCHED_LONGBRIDGE_SDK_MARKER.read_text(encoding="utf-8")
+        )
+        installed_patch_sha256 = str(marker.get("patch_sha256") or "")
+        expected_patch_sha256 = hashlib.sha256(
+            PATCHED_LONGBRIDGE_SDK_PATCH.read_bytes()
+        ).hexdigest()
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("longbridge_sdk_first_push_patch_missing") from exc
+    if (
+        str(marker.get("sdk_version") or "") != installed
+        or str(marker.get("upstream_commit") or "")
+        != PATCHED_LONGBRIDGE_SDK_COMMIT
+        or installed_patch_sha256 != expected_patch_sha256
+    ):
+        raise RuntimeError("longbridge_sdk_first_push_patch_mismatch")
+    missing = [
+        name
+        for name in (
+            "QuoteContext",
+            "TradeContext",
+            "PortfolioContext",
+            "PushCandlestickMode",
+        )
+        if not getattr(lb, name, None)
+    ]
     if missing:
         raise RuntimeError(f"sdk_contract_missing:{','.join(missing)}")
+    for method in ("set_on_quote", "set_on_trades", "subscribe", "subscriptions"):
+        if not hasattr(lb.QuoteContext, method):
+            raise RuntimeError(f"sdk_quote_contract_missing:{method}")
     return lb
 
 
@@ -432,6 +487,7 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
 
 WORKER_MESSAGES_ALLOWED_TO_DROP = {
     "heartbeat",
+    "quote_states",
     "subscription_progress",
 }
 
@@ -441,9 +497,9 @@ def emit_worker(queue_out: Any, payload: dict[str, Any]) -> bool:
 
     A full multiprocessing queue used to silently discard complete bars and
     snapshot batches.  That made an otherwise healthy 300-symbol cycle lose a
-    whole five-minute boundary.  Only heartbeats and subscription progress may
-    be superseded by the next update; quote state, bars, snapshots and
-    lifecycle messages may not.
+    whole five-minute boundary.  Heartbeats, subscription progress and a
+    coalesced quote-state batch may be superseded by a newer update; bars,
+    snapshots and lifecycle messages may not.
     """
     kind = str(payload.get("kind") or "")
     if kind in WORKER_MESSAGES_ALLOWED_TO_DROP:
@@ -726,12 +782,65 @@ def write_trusted_sdk_quote_snapshot(
             "required_symbol_count": len(expected_symbols),
             "missing_symbols": missing_symbols,
         }
+
+    # Keep same-day quotes for symbols that were held or traded earlier in the
+    # session but are no longer part of the active subscription targets.  The
+    # App daily-PNL reconciliation still needs their previous close after an
+    # intraday exit.  Current required symbols must be complete before these
+    # retained rows are considered, so stale data can never mask a feed gap.
+    retained_row_count = 0
+    if path.exists():
+        try:
+            previous_snapshot = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            previous_snapshot = {}
+        if (
+            str(previous_snapshot.get("metric_contract_id") or "")
+            == str(snapshot.get("metric_contract_id") or "")
+            and str(previous_snapshot.get("market_date") or "")
+            == str(snapshot.get("market_date") or "")
+        ):
+            current_symbols = {
+                str(row.get("symbol") or "").upper()
+                for row in snapshot["rows"]
+            }
+            for previous_row in previous_snapshot.get("rows", []):
+                symbol = str(previous_row.get("symbol") or "").upper()
+                if not symbol or symbol in current_symbols:
+                    continue
+                try:
+                    current_price = Decimal(
+                        str(previous_row.get("current_price") or "0")
+                    )
+                    previous_close = Decimal(
+                        str(previous_row.get("prev_close") or "0")
+                    )
+                except (InvalidOperation, ValueError):
+                    continue
+                if current_price <= 0 or previous_close <= 0:
+                    continue
+                retained_row = dict(previous_row)
+                retained_row["retained_after_intraday_exit"] = True
+                snapshot["rows"].append(retained_row)
+                current_symbols.add(symbol)
+                retained_row_count += 1
+            snapshot["rows"].sort(key=lambda row: str(row.get("symbol") or ""))
+            snapshot["row_count"] = len(snapshot["rows"])
+            snapshot["latest_quote_received_at"] = max(
+                (
+                    str(row.get("received_at") or "")
+                    for row in snapshot["rows"]
+                ),
+                default="",
+            )
+    snapshot["retained_same_day_row_count"] = retained_row_count
     write_json_atomic(path, snapshot)
     return {
         "written": True,
         "row_count": int(snapshot.get("row_count") or 0),
         "required_symbol_count": len(expected_symbols),
         "missing_symbols": [],
+        "retained_same_day_row_count": retained_row_count,
     }
 
 
@@ -740,15 +849,19 @@ def fetch_daily_context_rows(
     sdk: Any,
     symbols: tuple[str, ...],
     bars: int,
+    *,
+    request_interval_seconds: float = 0,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     failures: list[str] = []
     all_rows: list[dict[str, Any]] = []
-    for symbol in symbols:
+    for index, symbol in enumerate(symbols):
         try:
             candles = quote.candlesticks(symbol, sdk.Period.Day, bars, sdk.AdjustType.NoAdjust)
             all_rows.extend(event_rows_to_daily(symbol, list(candles), datetime.now(UTC)))
         except Exception:
             failures.append(symbol)
+        if request_interval_seconds and index + 1 < len(symbols):
+            time.sleep(request_interval_seconds)
     return all_rows, failures
 
 
@@ -845,6 +958,60 @@ def snapshot_poll_should_idle(ready_emitted: bool, now: datetime) -> bool:
     return bool(ready_emitted and not in_regular_session(now))
 
 
+def regular_session_close_flush_action(
+    now: datetime,
+    attempted_business_dates: set[str],
+    *,
+    maximum_finalization_delay_ms: int,
+) -> tuple[str, str]:
+    """Return the one-shot action for the 15:55-16:00 New York bar.
+
+    Snapshot polling intentionally idles at 16:00. Without a parent-owned
+    timer, the last open bar has no later quote with which to finalize itself.
+    A late wake-up is recorded instead of routing a stale bar as executable.
+    """
+    now_utc = now.astimezone(UTC)
+    now_ny = now_utc.astimezone(NEW_YORK)
+    business_date = now_ny.date().isoformat()
+    if now_ny.weekday() >= 5 or business_date in attempted_business_dates:
+        return business_date, "not_due"
+    close_ny = now_ny.replace(hour=16, minute=0, second=0, microsecond=0)
+    if now_ny < close_ny:
+        return business_date, "not_due"
+    deadline = close_ny + timedelta(
+        milliseconds=max(0, int(maximum_finalization_delay_ms))
+    )
+    return (
+        business_date,
+        "flush" if now_ny <= deadline else "missed_deadline",
+    )
+
+
+def restored_postclose_recovery_state(
+    previous_runtime_status: dict[str, Any],
+) -> tuple[set[str], dict[str, Any]]:
+    """Preserve one terminal post-close recovery attempt across restarts."""
+    previous = dict(
+        previous_runtime_status.get("postclose_intraday_recovery") or {}
+    )
+    business_date = str(previous.get("business_date") or "")
+    status = str(previous.get("status") or "")
+    terminal_statuses = {
+        "completed",
+        "completed_with_failures",
+        "completed_incomplete_data",
+    }
+    if business_date and status in terminal_statuses:
+        return {business_date}, previous
+    return set(), {
+        "status": "not_started",
+        "recovered_row_count": 0,
+        "failed_symbols": [],
+        "historical_signal_replayed": False,
+        "historical_order_replayed": False,
+    }
+
+
 def validated_snapshot_poll_is_reusable(
     previous_status: dict[str, Any],
     expected_symbol_count: int,
@@ -868,6 +1035,7 @@ MARKET_DATA_PROGRESS_KINDS = frozenset(
         "subscription_progress",
         "ready",
         "quote_state",
+        "quote_states",
         "snapshots",
         "bars",
         "heartbeat",
@@ -945,6 +1113,25 @@ def market_data_mode_qualifies_for_subscription_gate(mode: str) -> bool:
     return str(mode) == "sdk_subscription"
 
 
+def market_data_ready_for_dispatch(
+    *,
+    worker_ready: bool,
+    market_data_mode: str,
+    snapshot_fallback_validated: bool,
+) -> bool:
+    """Require either SDK push or a currently validated SDK snapshot cycle."""
+    return bool(
+        worker_ready
+        and (
+            market_data_mode_qualifies_for_subscription_gate(market_data_mode)
+            or (
+                market_data_mode == "sdk_snapshot_poll"
+                and snapshot_fallback_validated
+            )
+        )
+    )
+
+
 def market_data_heartbeat_is_stale(
     last_progress_monotonic: float,
     now_monotonic: float,
@@ -1001,12 +1188,70 @@ def adaptive_market_data_deadline_seconds(
     now: datetime,
     bar_minutes: int,
 ) -> float:
-    """Keep snapshot failures within the realtime evidence deadline."""
-    del recovery_deadline_seconds, recent_restarts, now, bar_minutes
-    # The native SDK can wait about 30 seconds before returning a timeout. A
-    # completed bar delivered that late is no longer actionable, so terminate
-    # the isolated worker at the configured realtime deadline instead.
-    return max(1.0, float(base_deadline_seconds))
+    """Let the SDK return its timeout without admitting stale market events."""
+    del now, bar_minutes
+    # Longbridge's native quote request can remain blocked for roughly 30
+    # seconds. Killing the isolated worker at the five-second signal freshness
+    # limit creates a reconnect storm. Bar delivery still has its own strict
+    # maximum_bar_finalization_delay_ms gate before routing or dispatch.
+    base = max(float(base_deadline_seconds), 45.0)
+    if int(recent_restarts) < 3:
+        return base
+    return max(base, float(recovery_deadline_seconds))
+
+
+def active_market_data_progress_deadline_seconds(
+    market_data_mode: str,
+    worker_ready: bool,
+    *,
+    base_deadline_seconds: float,
+    recovery_deadline_seconds: float,
+    recent_restarts: int,
+    now: datetime,
+    bar_minutes: int,
+    snapshot_dispatch_max_elapsed_ms: int,
+) -> float:
+    """Bound a ready snapshot request independently from connection recovery.
+
+    A snapshot worker may need a long startup/recovery window, but once it has
+    declared ready, one native quote request must not occupy an entire bar-close
+    deadline. The parent can terminate the isolated worker and retain its bar
+    state while a fresh worker reconnects.
+    """
+    if worker_ready and market_data_mode == "sdk_snapshot_poll":
+        return max(
+            float(base_deadline_seconds),
+            float(snapshot_dispatch_max_elapsed_ms) / 1000.0,
+        )
+    return adaptive_market_data_deadline_seconds(
+        base_deadline_seconds,
+        recovery_deadline_seconds,
+        recent_restarts,
+        now,
+        bar_minutes,
+    )
+
+
+def market_data_worker_startup_deadline_seconds(
+    snapshot_fallback_active: bool,
+    subscription_deadline_seconds: float,
+    snapshot_poll_recovery_deadline_seconds: float,
+    *,
+    snapshot_was_previously_ready: bool = False,
+    snapshot_dispatch_max_elapsed_ms: int = 0,
+) -> float:
+    """Keep SDK connection startup separate from the realtime heartbeat SLA."""
+    if snapshot_fallback_active:
+        if snapshot_was_previously_ready and snapshot_dispatch_max_elapsed_ms > 0:
+            return max(
+                5.0,
+                float(snapshot_dispatch_max_elapsed_ms) / 1000.0,
+            )
+        return max(
+            float(subscription_deadline_seconds),
+            float(snapshot_poll_recovery_deadline_seconds),
+        )
+    return float(subscription_deadline_seconds)
 
 
 def primary_subscription_reprobe_date(
@@ -1023,10 +1268,12 @@ def primary_subscription_reprobe_date(
     session_probe_start = now_ny.replace(
         hour=9, minute=25, second=0, microsecond=0
     )
-    session_close = now_ny.replace(hour=16, minute=0, second=0, microsecond=0)
+    session_probe_end = now_ny.replace(
+        hour=9, minute=35, second=0, microsecond=0
+    )
     business_date = now_ny.date().isoformat()
     if (
-        session_probe_start <= now_ny < session_close
+        session_probe_start <= now_ny < session_probe_end
         and business_date not in attempted_business_dates
     ):
         return business_date
@@ -1046,6 +1293,26 @@ def subscription_quote_stream_is_stale(
         float(last_quote_monotonic),
     )
     return float(now_monotonic) - last_real_quote > float(deadline_seconds)
+
+
+def subscription_quote_stream_deadline_seconds(
+    market_data_heartbeat_deadline_seconds: float,
+) -> float:
+    """Keep transport liveness independent from the five-second bar SLA."""
+    return max(float(market_data_heartbeat_deadline_seconds), 45.0)
+
+
+def partition_subscription_targets(
+    symbols: list[str],
+    shard_count: int,
+) -> list[list[str]]:
+    """Spread liquid symbols across a bounded number of SDK connections."""
+    if shard_count <= 0:
+        raise ValueError("subscription shard count must be positive")
+    if not symbols:
+        return []
+    count = min(int(shard_count), len(symbols))
+    return [symbols[index::count] for index in range(count)]
 
 
 def deferred_intraday_context_after_mid_session_start(
@@ -1086,52 +1353,36 @@ def quote_worker(
     stop_event: Any,
     progress_value: Any | None = None,
 ) -> None:
-    """Own the one SDK quote connection and never run history, routing or orders."""
+    """Own one raw SDK stream and aggregate exact five-minute bars in Python.
+
+    The patched native candlestick aggregator stalls once the local symbol set
+    grows beyond roughly one hundred instruments.  Raw Trade pushes remain
+    healthy for the complete universe, so callbacks only enqueue plain payloads
+    and this worker's main loop performs the deterministic aggregation.
+    """
+    quote_contexts: list[Any] = []
     try:
         config = load_config(config_path)
         silence_sdk_worker_console()
         sdk = require_sdk_contract()
-        oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-        quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
-        worker_started_at = datetime.now(UTC)
-        first_complete_bar_open = floor_bar_open(worker_started_at, config.bar_minutes) + timedelta(
-            minutes=config.bar_minutes
-        )
+        pending_market_events: deque[tuple[str, str, dict[str, Any], datetime]] = deque()
+        pending_quote_states: dict[str, dict[str, Any]] = {}
+
+        aggregation_started_at = datetime.now(UTC)
+        first_complete_bar_open = floor_bar_open(
+            aggregation_started_at,
+            config.bar_minutes,
+        ) + timedelta(minutes=config.bar_minutes)
         builder = FiveMinuteBarBuilder(
             config.bar_minutes,
             complete_bar_open_not_before=first_complete_bar_open,
         )
+        boundary_gate: ConfirmedBoundaryBatchGate | None = None
 
-        # The Python SDK may deliver the initial quote burst from the subscribe
-        # call itself.  The callback must be live before that call;
-        # otherwise the parent sees an acknowledged subscription with no quote
-        # heartbeat and incorrectly falls back to snapshot polling.
-        aggregation_enabled = True
-
-        def on_quote(symbol: str, event: Any) -> None:
-            if not aggregation_enabled:
-                return
-            received_at = datetime.now(UTC)
-            payload = sdk_object_to_dict(event)
-            emit_worker(
-                queue_out,
-                {
-                    "kind": "quote_state",
-                    "symbol": symbol,
-                    "payload": payload,
-                    "received_at": to_iso(received_at),
-                    "source_mode": "longbridge_sdk_push",
-                },
+        def on_trades(symbol: str, event: Any) -> None:
+            pending_market_events.append(
+                ("trade", symbol, sdk_object_to_dict(event), datetime.now(UTC))
             )
-            completed = builder.on_quote(symbol, payload, received_at=received_at)
-            if completed:
-                emit_worker(queue_out, {"kind": "bars", "rows": completed})
-
-        # Register the SDK callback exactly once. Replacing it after all
-        # subscriptions are acknowledged can block the quote connection.
-        # FiveMinuteBarBuilder suppresses the partial startup bar, so the
-        # initial quote burst is safe and is required to seed stream health.
-        quote.set_on_quote(on_quote)
 
         def report_subscription_progress(completed: int, total: int) -> None:
             if progress_value is not None:
@@ -1150,47 +1401,155 @@ def quote_worker(
         )
         all_symbols = list(subscription_targets)
         trading_symbols = list(configured_trading_symbols(config))
-        failed = subscribe_quote_and_trades(
+        boundary_gate = ConfirmedBoundaryBatchGate(
+            trading_symbols,
+            maximum_source_delivery_age_ms=config.maximum_source_delivery_age_ms,
+            maximum_finalization_delay_ms=(
+                config.maximum_bar_finalization_delay_ms
+            ),
+        )
+        heartbeat_symbols = [
+            symbol
+            for symbol in ("SPY.US", "QQQ.US")
+            if symbol in set(trading_symbols)
+        ]
+        monitoring_symbols = list(dict.fromkeys([
+            *heartbeat_symbols,
+            *(symbol for symbol in all_symbols if symbol not in set(trading_symbols)),
+        ]))
+        oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
+        quote = sdk.QuoteContext(
+            sdk_config_from_oauth(sdk, oauth, config.quote_region)
+        )
+        quote_contexts = [quote]
+        warmup = {
+            "status": "raw_trade_aggregation_context_ready",
+            "attempt_count": 1,
+            "symbol": "ALL",
+            "row_count": 0,
+            "elapsed_ms": 0,
+            "subscription_shard": 0,
+            "subscription_symbol_count": len(all_symbols),
+        }
+        emit_worker(queue_out, {"kind": "quote_context_warmup", **warmup})
+
+        quote.set_on_trades(on_trades)
+        trade_failed = subscribe_quote_and_trades(
             quote,
-            subscription_targets,
-            [sdk.SubType.Quote],
+            all_symbols,
+            [sdk.SubType.Trade],
             batch_size=config.subscription_batch_size,
             retry_count=config.subscription_retry_count,
             progress_callback=report_subscription_progress,
             request_interval_seconds=config.subscription_request_interval_seconds,
             retry_backoff_seconds=config.subscription_retry_backoff_seconds,
-            recover_failed_batch_symbols=False,
+            recover_failed_batch_symbols=True,
         )
+        failed = sorted(set(trade_failed))
         expected = set(all_symbols)
         trading_expected = set(trading_symbols)
-        # Each subscribe call above is already acknowledged before progress is
-        # reported.  Calling quote.subscriptions() here adds no safety and can
-        # block the only quote connection after all 147 batches succeeded.
-        # Treat the acknowledged batch results as authoritative.
-        subscribed = expected - set(failed)
-        missing = sorted((expected - subscribed) | set(failed))
+        subscribed_trade: set[str] = set()
+        for item in quote.subscriptions():
+            symbol = str(getattr(item, "symbol", "") or "").upper()
+            subscription_types = {
+                str(value) for value in (getattr(item, "sub_types", None) or [])
+            }
+            if symbol and "SubType.Trade" in subscription_types:
+                subscribed_trade.add(symbol)
+        missing = sorted((expected - subscribed_trade) | set(failed))
+
         emit_worker(queue_out, {
             "kind": "ready", "subscribed_symbols": sorted(expected - set(missing)),
             "subscription_failed_symbols": missing, "daily_context_failed_symbols": [],
             "trading_subscription_failed_symbols": sorted(trading_expected & set(missing)),
             "partial_bar_suppressed_until": to_iso(first_complete_bar_open.astimezone(UTC)),
             "subscription_target_count": len(subscription_targets),
-            "initial_quote_callbacks_enabled": True,
+            "initial_quote_callbacks_enabled": False,
+            "initial_trade_callbacks_enabled": True,
+            "confirmed_candlestick_callbacks_enabled": False,
+            "confirmed_candlestick_target_count": len(all_symbols),
+            "confirmed_candlestick_failed_symbols": missing,
+            "confirmed_candlestick_coverage": (
+                f"{len(all_symbols) - len(set(missing))}"
+                f"/{len(all_symbols)}"
+            ),
+            "market_data_aggregation_mode": "python_raw_trade_push",
+            "monitoring_quote_failed_symbols": [],
+            "initial_snapshot_seed_count": 0,
+            "initial_snapshot_seed_symbol_count": 0,
+            "quote_context_warmups": [warmup],
+            "quote_subscription_shard_count": 1,
         })
+        worker_ready_monotonic = time.monotonic()
+        regular_session_started_monotonic = 0.0
+        regular_session_business_date = ""
+        last_market_monotonic = 0.0
         last_heartbeat = 0.0
         while not stop_event.is_set():
-            completed = builder.flush(datetime.now(UTC))
-            if completed:
-                emit_worker(queue_out, {"kind": "bars", "rows": completed})
+            now_utc = datetime.now(UTC)
+            monotonic_now = time.monotonic()
+            rows: list[dict[str, Any]] = []
+            processed_events = 0
+            while pending_market_events and processed_events < 20000:
+                kind, symbol, payload, received_at = pending_market_events.popleft()
+                processed_events += 1
+                last_market_monotonic = monotonic_now
+                if kind == "trade":
+                    rows.extend(builder.on_trade(symbol, payload, received_at=received_at))
+            builder.ensure_zero_trade_bars(now_utc)
+            rows.extend(builder.flush(now_utc))
+            batches = boundary_gate.add(rows, now=now_utc) if rows and boundary_gate else []
+            for batch in batches:
+                emit_worker(queue_out, {"kind": "bars", **batch})
+            expired_batches = boundary_gate.flush_expired(now=now_utc) if boundary_gate else []
+            for batch in expired_batches:
+                emit_worker(queue_out, {"kind": "bars", **batch})
+            quote_state_batch = list(pending_quote_states.values())
+            if in_regular_session(now_utc):
+                business_date = market_date(now_utc)
+                if business_date != regular_session_business_date:
+                    regular_session_business_date = business_date
+                    regular_session_started_monotonic = monotonic_now
+                silent = monotonic_now - max(
+                    regular_session_started_monotonic,
+                    worker_ready_monotonic,
+                    last_market_monotonic,
+                ) > subscription_quote_stream_deadline_seconds(
+                    config.market_data_heartbeat_deadline_seconds
+                )
+            else:
+                regular_session_started_monotonic = 0.0
+                regular_session_business_date = ""
+                silent = False
+            if silent:
+                raise RuntimeError(
+                    "sdk_raw_trade_stream_silent:0"
+                )
+            if quote_state_batch:
+                delivered = emit_worker(
+                    queue_out,
+                    {"kind": "quote_states", "rows": quote_state_batch},
+                )
+                if delivered:
+                    for row in quote_state_batch:
+                        symbol = str(row.get("symbol") or "").upper()
+                        latest = pending_quote_states.get(symbol)
+                        if latest is not None and latest.get("received_at") == row.get("received_at"):
+                            pending_quote_states.pop(symbol, None)
             now = time.monotonic()
             if now - last_heartbeat >= 1:
                 if progress_value is not None:
                     progress_value.value = now
-                emit_worker(queue_out, {"kind": "heartbeat", "at": to_iso(datetime.now(UTC))})
+                emit_worker(queue_out, {"kind": "heartbeat", "at": to_iso(now_utc)})
                 last_heartbeat = now
             stop_event.wait(0.2)
     except BaseException as exc:
         emit_worker(queue_out, {"kind": "error", "reason": f"sdk_quote_worker_failed:{type(exc).__name__}:{exc}"})
+    finally:
+        for quote in quote_contexts:
+            close = getattr(quote, "close", None)
+            if callable(close):
+                close()
 
 
 def quote_snapshot_worker(
@@ -1204,8 +1563,6 @@ def quote_snapshot_worker(
         config = load_config(config_path)
         silence_sdk_worker_console()
         sdk = require_sdk_contract()
-        oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-        quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
         worker_started_at = datetime.now(UTC)
         first_complete_bar_open = floor_bar_open(
             worker_started_at, config.bar_minutes
@@ -1218,6 +1575,13 @@ def quote_snapshot_worker(
         consecutive_failures = 0
         consecutive_slow_polls = 0
         successful_fast_polls = 0
+        total_poll_count = 0
+        failed_poll_count = 0
+        last_success_at = ""
+        last_failure_at = ""
+        last_first_batch_returned_at = ""
+        last_first_batch_latency_ms = 0
+        last_first_batch_symbol_count = 0
         ready_emitted = False
         while not stop_event.is_set():
             idle_now = datetime.now(UTC)
@@ -1236,6 +1600,14 @@ def quote_snapshot_worker(
                         "poll_covered_count": len(target_symbols),
                         "poll_missing_count": 0,
                         "successful_fast_polls": successful_fast_polls,
+                        "total_poll_count": total_poll_count,
+                        "failed_poll_count": failed_poll_count,
+                        "consecutive_failures": consecutive_failures,
+                        "last_success_at": last_success_at,
+                        "last_failure_at": last_failure_at,
+                        "first_batch_returned_at": last_first_batch_returned_at,
+                        "first_batch_latency_ms": last_first_batch_latency_ms,
+                        "first_batch_symbol_count": last_first_batch_symbol_count,
                         "off_hours_idle": True,
                     },
                 )
@@ -1245,7 +1617,22 @@ def quote_snapshot_worker(
             poll_started = time.monotonic()
             received_at = datetime.now(UTC)
             poll_cycle_id = to_iso(received_at)
+            total_poll_count += 1
+            quote = None
+            oauth = None
             try:
+                # In this environment a reused QuoteContext commonly stalls on
+                # its second full-universe quote request. Keep each request in
+                # the already isolated worker but give it a fresh SDK context;
+                # the parent enforces an independent liveness cutoff. The
+                # tighter dispatch target remains a performance metric and
+                # does not kill an otherwise healthy SDK process.
+                oauth = sdk.OAuthBuilder(read_client_id(config)).build(
+                    lambda _url: None
+                )
+                quote = sdk.QuoteContext(
+                    sdk_config_from_oauth(sdk, oauth, config.quote_region)
+                )
                 snapshot_rows = []
                 for index in range(
                     0,
@@ -1261,6 +1648,12 @@ def quote_snapshot_worker(
                         )
                     )
                     snapshot_rows.extend(batch_rows)
+                    if index == 0:
+                        last_first_batch_returned_at = to_iso(datetime.now(UTC))
+                        last_first_batch_latency_ms = int(
+                            (time.monotonic() - poll_started) * 1000
+                        )
+                        last_first_batch_symbol_count = len(batch_rows)
                     if progress_value is not None:
                         progress_value.value = time.monotonic()
                     # After the full-universe fallback has been validated,
@@ -1299,8 +1692,11 @@ def quote_snapshot_worker(
                             config.snapshot_poll_request_interval_seconds
                         )
                 consecutive_failures = 0
+                last_success_at = to_iso(datetime.now(UTC))
             except Exception as exc:
                 consecutive_failures += 1
+                failed_poll_count += 1
+                last_failure_at = to_iso(datetime.now(UTC))
                 failure_at = time.monotonic()
                 if progress_value is not None:
                     progress_value.value = failure_at
@@ -1309,6 +1705,13 @@ def quote_snapshot_worker(
                     {
                         "kind": "snapshot_poll_failure",
                         "consecutive_failures": consecutive_failures,
+                        "total_poll_count": total_poll_count,
+                        "failed_poll_count": failed_poll_count,
+                        "last_success_at": last_success_at,
+                        "last_failure_at": last_failure_at,
+                        "first_batch_returned_at": last_first_batch_returned_at,
+                        "first_batch_latency_ms": last_first_batch_latency_ms,
+                        "first_batch_symbol_count": last_first_batch_symbol_count,
                         "reason": (
                             "sdk_quote_snapshot_poll_failed:"
                             f"{type(exc).__name__}:{exc}"
@@ -1323,12 +1726,25 @@ def quote_snapshot_worker(
                         "market_data_mode": "sdk_snapshot_poll",
                         "snapshot_retry_in_progress": True,
                         "consecutive_failures": consecutive_failures,
+                        "total_poll_count": total_poll_count,
+                        "failed_poll_count": failed_poll_count,
+                        "last_success_at": last_success_at,
+                        "last_failure_at": last_failure_at,
+                        "first_batch_returned_at": last_first_batch_returned_at,
+                        "first_batch_latency_ms": last_first_batch_latency_ms,
+                        "first_batch_symbol_count": last_first_batch_symbol_count,
                     },
                 )
-                # The native context is not reliable after a request timeout.
-                # Exit once and let the parent replace this isolated process
-                # while retaining its five-minute bar builder.
+                # The parent retains bar state and replaces this isolated
+                # worker with another clean connection.
                 raise
+            finally:
+                close_quote = getattr(quote, "close", None)
+                if callable(close_quote):
+                    try:
+                        close_quote()
+                    except Exception:
+                        pass
             rows_by_symbol = {
                 str(getattr(row, "symbol", "") or "").upper(): row
                 for row in snapshot_rows
@@ -1425,6 +1841,14 @@ def quote_snapshot_worker(
                     "poll_covered_count": len(covered),
                     "poll_missing_count": len(missing),
                     "successful_fast_polls": successful_fast_polls,
+                    "total_poll_count": total_poll_count,
+                    "failed_poll_count": failed_poll_count,
+                    "consecutive_failures": consecutive_failures,
+                    "last_success_at": last_success_at,
+                    "last_failure_at": last_failure_at,
+                    "first_batch_returned_at": last_first_batch_returned_at,
+                    "first_batch_latency_ms": last_first_batch_latency_ms,
+                    "first_batch_symbol_count": last_first_batch_symbol_count,
                 },
             )
             remaining = (
@@ -1432,7 +1856,19 @@ def quote_snapshot_worker(
                 - (time.monotonic() - poll_started)
             )
             if remaining > 0:
-                stop_event.wait(remaining)
+                # The parent uses progress_value to distinguish a blocked SDK
+                # call from a healthy worker.  Keep that progress fresh while
+                # this worker is intentionally sleeping between polls; once the
+                # next quote() starts, updates stop and the independent
+                # liveness deadline still terminates a blocked native call.
+                wait_deadline = time.monotonic() + remaining
+                while not stop_event.is_set():
+                    wait_remaining = wait_deadline - time.monotonic()
+                    if wait_remaining <= 0:
+                        break
+                    if progress_value is not None:
+                        progress_value.value = time.monotonic()
+                    stop_event.wait(min(wait_remaining, 0.5))
     except BaseException as exc:
         emit_worker(
             queue_out,
@@ -1468,6 +1904,9 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
                 sdk,
                 tuple(symbols),
                 config.daily_context_bars,
+                request_interval_seconds=(
+                    HISTORICAL_CANDLESTICK_REQUEST_INTERVAL_SECONDS
+                ),
             )
             for retry_delay in (2, 5):
                 if not failures:
@@ -1478,6 +1917,9 @@ def daily_context_worker(config_path: str, symbols: list[str], task_id: str, que
                     sdk,
                     tuple(failures),
                     config.daily_context_bars,
+                    request_interval_seconds=(
+                        HISTORICAL_CANDLESTICK_REQUEST_INTERVAL_SECONDS
+                    ),
                 )
                 rows.extend(retry_rows)
             emit_daily_context_result(
@@ -1561,9 +2003,10 @@ def intraday_context_worker(
             80,
             max(1, int((expected_close - session_start).total_seconds() // 300) + 2),
         )
-        rows: list[dict[str, Any]] = []
         failures: list[str] = []
-        for symbol in symbols:
+        for index, symbol in enumerate(symbols):
+            symbol_rows: list[dict[str, Any]] = []
+            symbol_failures: list[str] = []
             try:
                 candles = quote.candlesticks(
                     symbol,
@@ -1571,7 +2014,7 @@ def intraday_context_worker(
                     requested_bars,
                     sdk.AdjustType.NoAdjust,
                 )
-                rows.extend(
+                symbol_rows.extend(
                     event_rows_to_intraday_context(
                         symbol,
                         list(candles),
@@ -1583,15 +2026,19 @@ def intraday_context_worker(
                 )
             except Exception:
                 failures.append(symbol)
-        emit_worker(
-            queue_out,
-            {
-                "kind": "intraday_context",
-                "task_id": task_id,
-                "rows": rows,
-                "failures": failures,
-            },
-        )
+                symbol_failures.append(symbol)
+            emit_worker(
+                queue_out,
+                {
+                    "kind": "intraday_context",
+                    "task_id": task_id,
+                    "rows": symbol_rows,
+                    "failures": symbol_failures,
+                    "completed_symbol": symbol,
+                },
+            )
+            if index + 1 < len(symbols):
+                time.sleep(HISTORICAL_CANDLESTICK_REQUEST_INTERVAL_SECONDS)
         emit_worker(
             queue_out,
             {
@@ -1623,15 +2070,15 @@ def fetch_intraday_context_backfill(
     if not symbols:
         return [], []
     queue_out: Any = process_context.Queue(maxsize=2048)
-    pending: deque[list[str]] = deque(
-        symbols[index:index + 25]
-        for index in range(0, len(symbols), 25)
-    )
+    pending: deque[list[str]] = deque([symbol] for symbol in symbols)
     active: dict[str, tuple[mp.Process, float, list[str]]] = {}
     rows: list[dict[str, Any]] = []
     failures: set[str] = set()
     completed: set[str] = set()
-    maximum_workers = min(4, max(1, len(pending)))
+    completed_symbols: set[str] = set()
+    # Longbridge permits one quote long connection per account. Each child owns
+    # one QuoteContext, so history restoration must remain strictly serial.
+    maximum_workers = 1
     overall_started_at = time.monotonic()
     try:
         while pending or active:
@@ -1672,6 +2119,9 @@ def fetch_intraday_context_backfill(
             if kind == "intraday_context":
                 rows.extend(list(message.get("rows") or []))
                 failures.update(str(value) for value in (message.get("failures") or []))
+                completed_symbol = str(message.get("completed_symbol") or "")
+                if completed_symbol:
+                    completed_symbols.add(completed_symbol)
             elif kind == "intraday_context_task_complete":
                 task = active.pop(task_id, None)
                 if task is not None:
@@ -1689,7 +2139,7 @@ def fetch_intraday_context_backfill(
                     continue
                 stop_spawned_process(process, graceful=False)
                 active.pop(current_task_id, None)
-                failures.update(task_symbols)
+                failures.update(set(task_symbols) - completed_symbols)
                 completed.add(current_task_id)
     finally:
         for process, _started_at, _symbols in active.values():
@@ -1729,7 +2179,11 @@ def verified_postclose_recovery_rows(
         and not str(row.get("market_data_blocked_reason") or "")
         and (
             str(row.get("source_mode") or "")
-            in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
+            in {
+                "longbridge_sdk_push",
+                "longbridge_sdk_confirmed_candlestick",
+                "longbridge_sdk_snapshot_poll",
+            }
             or (
                 row.get("context_only") is True
                 and row.get("recovery_verified") is True
@@ -2752,6 +3206,7 @@ def dispatch_completed_rows(
     execution_ledger_cache: list[dict[str, Any]] | None = None,
     fill_attribution_state_cache: dict[str, Any] | None = None,
     intraday_context_blocked_symbols: set[str] | None = None,
+    allow_new_entries: bool = True,
 ) -> dict[str, Any]:
     stage_started = time.perf_counter()
     ignored_context_rows = [
@@ -2898,16 +3353,22 @@ def dispatch_completed_rows(
         )
     emitted: list[dict[str, Any]] = []
     router_started = time.perf_counter()
-    router_payload = run_realtime_signal_router(
-        router, generated_at=now, market_events_override=router_market_rows,
-        active_market_event_ids=active_ids, emitted_signal_events=emitted,
-        existing_signal_ids_override=signal_id_cache,
-        existing_structure_ids_override={
-            str(row.get("structure_instance_id") or "")
-            for row in signal_event_cache
-            if str(row.get("structure_instance_id") or "")
-        },
-    )
+    if allow_new_entries:
+        router_payload = run_realtime_signal_router(
+            router, generated_at=now, market_events_override=router_market_rows,
+            active_market_event_ids=active_ids, emitted_signal_events=emitted,
+            existing_signal_ids_override=signal_id_cache,
+            existing_structure_ids_override={
+                str(row.get("structure_instance_id") or "")
+                for row in signal_event_cache
+                if str(row.get("structure_instance_id") or "")
+            },
+        )
+    else:
+        router_payload = {
+            "status": "blocked_incomplete_or_late_market_data_batch",
+            "emitted_signal_count": 0,
+        }
     router_elapsed_ms = int((time.perf_counter() - router_started) * 1000)
     if emitted:
         signal_event_cache.extend(emitted)
@@ -2951,7 +3412,10 @@ def dispatch_completed_rows(
     out_of_scope_signals = [
         signal
         for signal in execution_signals
-        if signal.get("exit_only_position_signal") is not True
+        if not (
+            signal.get("exit_only_position_signal") is True
+            or signal.get("longbridge_position_exit_source") is True
+        )
         if not market_event_is_tradable(config, signal)
     ]
     if out_of_scope_signals:
@@ -3029,6 +3493,14 @@ def dispatch_completed_rows(
         "execution": execution,
         "formal_test_epoch_id": str(formal_marker.get("test_epoch_id") or ""),
         "active_test_epoch_id": active_test_epoch_id,
+        "new_entry_market_data_gate": {
+            "eligible": allow_new_entries,
+            "status": (
+                "complete_timely"
+                if allow_new_entries
+                else "blocked_incomplete_or_late_market_data_batch"
+            ),
+        },
         "stage_latency_ms": {
             "router": router_elapsed_ms,
             "position_manager": position_elapsed_ms,
@@ -3497,6 +3969,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             "startup_context_restore_in_progress": True,
         },
     )
+
+    def publish_startup_stage(stage: str) -> None:
+        build_status(
+            config,
+            status="starting_context_restore",
+            reason=stage,
+            sdk_installed=True,
+            oauth_client_id_present=True,
+            extra={
+                "run_id": run_id,
+                "runtime_pid": os.getpid(),
+                "dispatch_enabled": False,
+                "dispatch_requested": dispatch_requested,
+                "config_fingerprint": loaded_config_fingerprint,
+                "runtime_source_fingerprint": loaded_source_fingerprint,
+                "startup_context_restore_in_progress": True,
+                "startup_stage": stage,
+            },
+        )
+
     execution_request_gate = SdkTradeRequestGate()
     from scripts.m15_longbridge_realtime_signal_router_lib import (
         load_config as load_router_config,
@@ -3537,6 +4029,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     process_context = mp.get_context("spawn")
     market_data_worker_progress = process_context.Value("d", time.monotonic())
 
+    publish_startup_stage("starting_account_context")
     account = SdkAccountProcessCoordinator(
         partial(build_sdk_account_provider_for_worker, str(config.config_path)),
         config.output_dir / "m15_longbridge_realtime_account_state.json",
@@ -3545,6 +4038,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         circuit_retry_cooldown_seconds=config.account_snapshot_circuit_retry_seconds,
     )
     account.start()
+    publish_startup_stage("starting_trade_context")
     # Keep the full 60-day cache for all subscribed symbols plus a bounded
     # intraday tail.  The old 4096-row cap silently discarded daily context
     # before the daily strategies could consume it.
@@ -3594,6 +4088,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         account.note_submission,
         dispatch_enabled=dispatch_enabled,
     )
+    publish_startup_stage("restoring_market_data_context")
     context = MarketEventContext(
         maximum_rows=(
             len(configured_trading_symbols(config)) * config.daily_context_bars
@@ -3630,6 +4125,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     subscription_progress_total = len(
         quote_subscription_targets(config, datetime.now(UTC))
     )
+    quote_context_warmups: list[dict[str, Any]] = []
     restored_latency_samples, restored_last_result, restored_last_event_at = restore_pipeline_observability(
         config.runtime_status_path,
         now=datetime.now(UTC),
@@ -3637,13 +4133,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     last_event_at = restored_last_event_at
     last_compaction = 0.0
     last_order_maintenance = 0.0
-    last_trade_context_healthcheck = 0.0
+    last_trade_context_healthcheck = time.monotonic()
     next_trade_context_retry = 0.0
     trade_context_health: dict[str, Any] = {
-        "ok": False,
-        "status": "waiting_for_first_healthcheck",
+        "ok": paper_client is not None,
+        "status": (
+            "trade_context_initialized"
+            if paper_client is not None
+            else "trade_context_missing"
+        ),
+        "trade_context_refresh_required": paper_client is None,
     }
     last_result: dict[str, Any] = restored_last_result
+    confirmed_boundary_gate: dict[str, Any] = {
+        "status": "not_applicable_outside_regular_session",
+        "boundary": "",
+        "required_symbol_count": len(configured_trading_symbols(config)),
+        "received_symbol_count": 0,
+        "missing_symbols": [],
+        "new_position_submission_enabled": None,
+    }
     order_maintenance: dict[str, Any] = {}
     flatten_transition: dict[str, Any] = {}
     authorized_account_exit: dict[str, Any] = {}
@@ -3652,6 +4161,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     daily_rows: list[dict[str, Any]] = list(cached_daily_rows)
     subscription_failed: list[str] = []
     trading_subscription_failed: list[str] = []
+    confirmed_candlestick_failed: list[str] = []
+    confirmed_candlestick_coverage = (
+        f"0/{len(quote_subscription_targets(config, datetime.now(UTC)))}"
+    )
     daily_failed: list[str] = []
     daily_workers: dict[str, tuple[mp.Process, float, list[str]]] = {}
     daily_pending: deque[list[str]] = deque()
@@ -3666,22 +4179,117 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     observed_regular_sessions: set[str] = set()
     observed_expansion_sessions: set[str] = set()
     postclose_daily_refresh_dates = completed_postclose_refresh_dates(cached_daily_rows, now_ny)
-    postclose_recovery_attempted_dates: set[str] = set()
+    persisted_postclose_recovery = read_json_object(
+        config.output_dir / POSTCLOSE_RECOVERY_STATE_JSON
+    )
+    postclose_recovery_source = previous_runtime_status
+    if persisted_postclose_recovery:
+        postclose_recovery_source = {
+            "postclose_intraday_recovery": persisted_postclose_recovery
+        }
+    (
+        postclose_recovery_attempted_dates,
+        postclose_recovery_status,
+    ) = restored_postclose_recovery_state(postclose_recovery_source)
+    last_persisted_postclose_recovery = (
+        json.dumps(
+            persisted_postclose_recovery,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        if persisted_postclose_recovery
+        else ""
+    )
     postclose_recovery_workers: dict[str, tuple[mp.Process, float, list[str]]] = {}
-    postclose_recovery_status: dict[str, Any] = {
-        "status": "not_started",
-        "recovered_row_count": 0,
-        "failed_symbols": [],
-        "historical_signal_replayed": False,
-        "historical_order_replayed": False,
-    }
+    postclose_recovery_pending: deque[list[str]] = deque()
+    postclose_recovery_task_sequence = 0
+
+    def start_next_postclose_recovery_batch() -> bool:
+        nonlocal postclose_recovery_task_sequence
+        if postclose_recovery_workers or not postclose_recovery_pending:
+            return False
+        batch = postclose_recovery_pending.popleft()
+        session_started_at = parse_utc_datetime(
+            str(postclose_recovery_status.get("session_started_at") or "")
+        )
+        expected_last_close = parse_utc_datetime(
+            str(postclose_recovery_status.get("expected_last_close") or "")
+        )
+        if session_started_at is None or expected_last_close is None:
+            postclose_recovery_status["status"] = "completed_with_failures"
+            postclose_recovery_status["last_error"] = (
+                "postclose_recovery_session_boundary_missing"
+            )
+            return False
+        postclose_recovery_task_sequence += 1
+        task_id = (
+            f"postclose-recovery-"
+            f"{postclose_recovery_status.get('business_date') or 'unknown'}-"
+            f"{postclose_recovery_task_sequence:02d}"
+        )
+        recovery_worker = process_context.Process(
+            target=intraday_context_worker,
+            args=(
+                str(config.config_path),
+                batch,
+                task_id,
+                to_iso(session_started_at),
+                to_iso(expected_last_close),
+                message_queue,
+            ),
+            daemon=True,
+        )
+        recovery_worker.start()
+        postclose_recovery_workers[task_id] = (
+            recovery_worker,
+            time.monotonic(),
+            batch,
+        )
+        postclose_recovery_status["active_task_id"] = task_id
+        postclose_recovery_status["pending_batch_count"] = len(
+            postclose_recovery_pending
+        )
+        return True
+
+    def advance_postclose_recovery() -> None:
+        if postclose_recovery_workers:
+            return
+        if postclose_recovery_pending:
+            start_next_postclose_recovery_batch()
+            return
+        failed_symbols = sorted(
+            set(postclose_recovery_status.get("failed_symbols") or [])
+        )
+        if (
+            failed_symbols
+            and int(postclose_recovery_status.get("retry_round") or 0) < 1
+        ):
+            postclose_recovery_status["retry_round"] = 1
+            postclose_recovery_pending.extend(
+                [symbol]
+                for symbol in failed_symbols
+            )
+            start_next_postclose_recovery_batch()
+            return
+        postclose_recovery_status["status"] = (
+            "completed_with_failures" if failed_symbols else "completed"
+        )
+        postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
+        postclose_recovery_status["active_task_id"] = ""
+        postclose_recovery_status["pending_batch_count"] = 0
     deferred_messages: deque[dict[str, Any]] = deque()
     partial_bar_suppressed_until = ""
     last_subscription_failure_reason = ""
-    snapshot_fallback_active = validated_snapshot_poll_is_reusable(
-        previous_runtime_status,
-        len(quote_subscription_targets(config, datetime.now(UTC))),
-        now=datetime.now(UTC),
+    snapshot_fallback_active = bool(
+        config.allow_snapshot_poll_fallback
+        and (
+            config.prefer_snapshot_poll
+            or validated_snapshot_poll_is_reusable(
+                previous_runtime_status,
+                len(quote_subscription_targets(config, datetime.now(UTC))),
+                now=datetime.now(UTC),
+            )
+        )
     )
     market_data_mode = (
         "sdk_snapshot_poll" if snapshot_fallback_active else "sdk_subscription"
@@ -3693,6 +4301,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_poll_elapsed_ms = 0
     market_data_fallback_validated = snapshot_fallback_active
     snapshot_bar_builder: FiveMinuteBarBuilder | None = None
+    snapshot_boundary_gate: ConfirmedBoundaryBatchGate | None = None
     snapshot_batch_count = 0
     snapshot_row_count = 0
     snapshot_completed_bar_count = 0
@@ -3702,6 +4311,21 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_poll_missing_count = 0
     snapshot_poll_successful_fast_polls = 0
     snapshot_poll_is_fast_and_complete = False
+    snapshot_poll_total_count = 0
+    snapshot_poll_failure_count = 0
+    snapshot_poll_consecutive_failures = 0
+    snapshot_poll_last_success_at = ""
+    snapshot_poll_last_failure_at = ""
+    snapshot_poll_first_batch_returned_at = ""
+    snapshot_poll_first_batch_latency_ms = 0
+    snapshot_poll_first_batch_symbol_count = 0
+    snapshot_was_previously_ready = False
+    session_close_flush_dates: set[str] = set()
+    session_close_flush_status: dict[str, Any] = {
+        "status": "waiting_for_session_close",
+        "historical_signal_replayed": False,
+        "historical_order_replayed": False,
+    }
     last_market_data_worker_error = ""
     market_data_worker_restart_events: deque[dict[str, Any]] = deque(maxlen=20)
     market_data_worker_restart_times: deque[float] = deque(maxlen=100)
@@ -3715,6 +4339,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     subscription_quote_silence_fallback_count = 0
     primary_subscription_reprobe_dates: set[str] = set()
     last_primary_subscription_reprobe_at = ""
+    snapshot_fallback_not_before_monotonic = 0.0
 
     def record_market_data_worker_restart(
         reason: str,
@@ -3739,6 +4364,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             config.output_dir / MARKET_DATA_HEALTH_LEDGER_JSONL,
             event,
         )
+    publish_startup_stage("starting_market_data_worker")
     intraday_repair_status: dict[str, Any] = {
         "status": "not_required",
         "row_count": 0,
@@ -3754,10 +4380,48 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     signal.signal(signal.SIGTERM, stop_requested)
     try:
         while not shutdown_requested:
-            reprobe_business_date = primary_subscription_reprobe_date(
-                snapshot_fallback_active,
-                primary_subscription_reprobe_dates,
-                datetime.now(UTC),
+            gate_now = datetime.now(UTC)
+            gate_now_ny = gate_now.astimezone(NEW_YORK)
+            gate_boundary = str(confirmed_boundary_gate.get("boundary") or "")
+            try:
+                gate_boundary_date = (
+                    datetime.fromisoformat(gate_boundary.replace("Z", "+00:00"))
+                    .astimezone(NEW_YORK)
+                    .date()
+                    .isoformat()
+                )
+            except ValueError:
+                gate_boundary_date = ""
+            if not in_regular_session(gate_now):
+                confirmed_boundary_gate = {
+                    "status": "not_applicable_outside_regular_session",
+                    "boundary": "",
+                    "required_symbol_count": len(
+                        configured_trading_symbols(config)
+                    ),
+                    "received_symbol_count": 0,
+                    "missing_symbols": [],
+                    "new_position_submission_enabled": None,
+                }
+            elif gate_boundary_date != gate_now_ny.date().isoformat():
+                confirmed_boundary_gate = {
+                    "status": "waiting_for_first_complete_boundary",
+                    "boundary": "",
+                    "required_symbol_count": len(
+                        configured_trading_symbols(config)
+                    ),
+                    "received_symbol_count": 0,
+                    "missing_symbols": [],
+                    "new_position_submission_enabled": None,
+                }
+            reprobe_business_date = (
+                ""
+                if config.prefer_snapshot_poll
+                else primary_subscription_reprobe_date(
+                    snapshot_fallback_active,
+                    primary_subscription_reprobe_dates,
+                    datetime.now(UTC),
+                )
             )
             if reprobe_business_date:
                 primary_subscription_reprobe_dates.add(reprobe_business_date)
@@ -3780,14 +4444,28 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_ready_since = 0.0
                 snapshot_fallback_active = False
                 snapshot_bar_builder = None
+                snapshot_boundary_gate = None
                 market_data_mode = "sdk_subscription"
                 market_data_fallback_validated = False
                 attempts = 0
                 continue
             if (
                 postclose_recovery_status.get("status") != "running"
+                and daily_context_state == "complete"
                 and (worker is None or not worker.is_alive())
             ):
+                if (
+                    snapshot_fallback_active
+                    and time.monotonic() < snapshot_fallback_not_before_monotonic
+                ):
+                    stop_event.wait(
+                        min(
+                            1.0,
+                            snapshot_fallback_not_before_monotonic
+                            - time.monotonic(),
+                        )
+                    )
+                    continue
                 if worker is not None:
                     worker.join(timeout=0.2)
                     buffer_pending_market_data_progress(
@@ -3810,12 +4488,17 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     attempts += 1
                 if (
                     not snapshot_fallback_active
+                    and config.allow_snapshot_poll_fallback
                     and should_use_snapshot_fallback(
                         attempts,
                         config.subscription_failures_before_snapshot_fallback,
                     )
                 ):
                     snapshot_fallback_active = True
+                    snapshot_fallback_not_before_monotonic = (
+                        time.monotonic()
+                        + SNAPSHOT_FALLBACK_HANDOFF_COOLDOWN_SECONDS
+                    )
                     subscription_recovery_failures += attempts
                     attempts = 0
                 if attempts >= config.maximum_consecutive_subscription_failures:
@@ -3873,6 +4556,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     snapshot_bar_builder = FiveMinuteBarBuilder(
                         config.bar_minutes,
                         complete_bar_open_not_before=snapshot_first_complete_bar_open,
+                    )
+                    snapshot_boundary_gate = ConfirmedBoundaryBatchGate(
+                        configured_trading_symbols(config),
+                        maximum_source_delivery_age_ms=(
+                            config.maximum_source_delivery_age_ms
+                        ),
+                        maximum_finalization_delay_ms=(
+                            config.maximum_bar_finalization_delay_ms
+                        ),
                     )
                     partial_bar_suppressed_until = to_iso(
                         snapshot_first_complete_bar_open.astimezone(UTC)
@@ -3934,28 +4626,38 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 120,
             )
             market_data_applied_heartbeat_deadline_seconds = (
-                adaptive_market_data_deadline_seconds(
-                    config.market_data_heartbeat_deadline_seconds,
-                    config.snapshot_poll_recovery_deadline_seconds,
-                    market_data_worker_recent_restart_count,
-                    datetime.now(UTC),
-                    config.bar_minutes,
+                active_market_data_progress_deadline_seconds(
+                    market_data_mode,
+                    worker_ready,
+                    base_deadline_seconds=(
+                        config.market_data_heartbeat_deadline_seconds
+                    ),
+                    recovery_deadline_seconds=(
+                        config.snapshot_poll_recovery_deadline_seconds
+                    ),
+                    recent_restarts=market_data_worker_recent_restart_count,
+                    now=datetime.now(UTC),
+                    bar_minutes=config.bar_minutes,
+                    snapshot_dispatch_max_elapsed_ms=(
+                        config.snapshot_poll_dispatch_max_elapsed_ms
+                    ),
                 )
             )
+            startup_deadline_seconds = market_data_worker_startup_deadline_seconds(
+                snapshot_fallback_active,
+                config.subscription_deadline_seconds,
+                config.snapshot_poll_recovery_deadline_seconds,
+                snapshot_was_previously_ready=snapshot_was_previously_ready,
+                snapshot_dispatch_max_elapsed_ms=(
+                    config.snapshot_poll_dispatch_max_elapsed_ms
+                ),
+            )
             if (
-                not worker_ready
+                worker is not None
+                and not worker_ready
                 and time.monotonic() - worker_last_progress
-                > (
-                    market_data_applied_heartbeat_deadline_seconds
-                    if snapshot_fallback_active
-                    else config.subscription_deadline_seconds
-                )
+                > startup_deadline_seconds
             ):
-                startup_deadline_seconds = (
-                    market_data_applied_heartbeat_deadline_seconds
-                    if snapshot_fallback_active
-                    else config.subscription_deadline_seconds
-                )
                 last_subscription_failure_reason = (
                     "sdk_quote_subscription_deadline_exceeded:"
                     f"{startup_deadline_seconds}s_without_progress:"
@@ -3970,12 +4672,17 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker = None
                 if (
                     not snapshot_fallback_active
+                    and config.allow_snapshot_poll_fallback
                     and should_use_snapshot_fallback(
                         attempts,
                         config.subscription_failures_before_snapshot_fallback,
                     )
                 ):
                     snapshot_fallback_active = True
+                    snapshot_fallback_not_before_monotonic = (
+                        time.monotonic()
+                        + SNAPSHOT_FALLBACK_HANDOFF_COOLDOWN_SECONDS
+                    )
                     subscription_recovery_failures += attempts
                     attempts = 0
                 continue
@@ -3987,19 +4694,33 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     worker_ready_since,
                     last_subscription_quote_monotonic,
                     time.monotonic(),
-                    config.market_data_heartbeat_deadline_seconds,
+                    subscription_quote_stream_deadline_seconds(
+                        config.market_data_heartbeat_deadline_seconds
+                    ),
                 )
             ):
+                quote_stream_deadline_seconds = (
+                    subscription_quote_stream_deadline_seconds(
+                        config.market_data_heartbeat_deadline_seconds
+                    )
+                )
                 last_subscription_failure_reason = (
                     "sdk_quote_stream_silent_after_acknowledged_subscription:"
-                    f"{config.market_data_heartbeat_deadline_seconds}s"
+                    f"{quote_stream_deadline_seconds}s"
                 )
                 record_market_data_worker_restart(
                     last_subscription_failure_reason,
                     exit_code=worker.exitcode if worker else None,
                 )
                 subscription_quote_silence_fallback_count += 1
-                snapshot_fallback_active = True
+                attempts += 1
+                snapshot_fallback_active = bool(
+                    config.allow_snapshot_poll_fallback
+                    and should_use_snapshot_fallback(
+                        attempts,
+                        config.subscription_failures_before_snapshot_fallback,
+                    )
+                )
                 market_data_fallback_validated = False
                 worker_ready = False
                 worker_ready_since = 0.0
@@ -4037,7 +4758,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 stop_spawned_process(worker, graceful=False)
                 worker = None
                 continue
-            if worker_ready and daily_context_state == "waiting_for_subscription":
+            if daily_context_state == "waiting_for_subscription":
                 symbols = list(configured_symbols(config))
                 daily_pending = deque(
                     symbols[index:index + config.daily_context_batch_size]
@@ -4097,10 +4818,67 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 if daily_context_is_complete(config, daily_context_state, len(daily_rows), daily_failed) and not daily_context_persisted:
                     write_daily_context_cache(config.daily_context_path, daily_rows)
                     daily_context_persisted = True
-            try:
-                message = deferred_messages.popleft() if deferred_messages else message_queue.get(timeout=config.heartbeat_interval_seconds)
-            except queue.Empty:
-                message = {"kind": "idle"}
+                    postclose_daily_refresh_dates.update(
+                        completed_postclose_refresh_dates(
+                            daily_rows,
+                            datetime.now(NEW_YORK),
+                        )
+                    )
+            close_flush_date, close_flush_action = regular_session_close_flush_action(
+                datetime.now(UTC),
+                session_close_flush_dates,
+                maximum_finalization_delay_ms=(
+                    config.maximum_bar_finalization_delay_ms
+                ),
+            )
+            close_flush_rows: list[dict[str, Any]] = []
+            if (
+                snapshot_bar_builder is not None
+                and close_flush_action in {"flush", "missed_deadline"}
+            ):
+                close_flush_now = datetime.now(UTC)
+                close_flush_rows = snapshot_bar_builder.flush(close_flush_now)
+                session_close_flush_dates.add(close_flush_date)
+                if close_flush_action == "flush":
+                    snapshot_completed_bar_count += len(close_flush_rows)
+                    session_close_flush_status = {
+                        "status": (
+                            "completed"
+                            if close_flush_rows
+                            else "completed_without_open_bars"
+                        ),
+                        "business_date": close_flush_date,
+                        "flushed_at": to_iso(close_flush_now),
+                        "row_count": len(close_flush_rows),
+                        "historical_signal_replayed": False,
+                        "historical_order_replayed": False,
+                    }
+                else:
+                    close_flush_status = (
+                        "missed_finalization_deadline"
+                        if close_flush_rows
+                        else "not_applicable_no_open_bars"
+                    )
+                    session_close_flush_status = {
+                        "status": close_flush_status,
+                        "business_date": close_flush_date,
+                        "detected_at": to_iso(close_flush_now),
+                        "discarded_stale_row_count": len(close_flush_rows),
+                        "historical_signal_replayed": False,
+                        "historical_order_replayed": False,
+                    }
+                    close_flush_rows = []
+            if close_flush_rows:
+                message = {
+                    "kind": "bars",
+                    "rows": close_flush_rows,
+                    "session_close_timer_flush": True,
+                }
+            else:
+                try:
+                    message = deferred_messages.popleft() if deferred_messages else message_queue.get(timeout=config.heartbeat_interval_seconds)
+                except queue.Empty:
+                    message = {"kind": "idle"}
             kind = str(message.get("kind") or "")
             if (
                 kind == "snapshots"
@@ -4155,11 +4933,24 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     snapshot_poll_cycle_completed_bars = []
                 snapshot_completed_bar_count += len(completed_snapshot_bars)
                 if completed_snapshot_bars:
-                    message = {
-                        "kind": "bars",
-                        "rows": completed_snapshot_bars,
-                    }
-                    kind = "bars"
+                    boundary_batches = (
+                        snapshot_boundary_gate.add(
+                            completed_snapshot_bars,
+                            now=snapshot_received_at,
+                        )
+                        if snapshot_boundary_gate is not None
+                        else []
+                    )
+                    if boundary_batches:
+                        first_batch, *remaining_batches = boundary_batches
+                        for batch in reversed(remaining_batches):
+                            deferred_messages.appendleft(
+                                {"kind": "bars", **batch}
+                            )
+                        message = {"kind": "bars", **first_batch}
+                        kind = "bars"
+                    else:
+                        kind = "snapshot_batch"
                 else:
                     kind = "snapshot_batch"
             if kind == "subscription_progress":
@@ -4168,24 +4959,42 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 subscription_progress_total = int(
                     message.get("total") or subscription_progress_total
                 )
-            elif kind == "quote_state":
+            elif kind in {"quote_state", "quote_states"}:
                 last_subscription_quote_monotonic = time.monotonic()
-                try:
-                    quote_received_at = datetime.fromisoformat(
-                        str(message.get("received_at") or "").replace("Z", "+00:00")
-                    ).astimezone(UTC)
-                except ValueError:
-                    quote_received_at = datetime.now(UTC)
-                update_live_quote_session_state(
-                    live_quote_session_state,
-                    str(message.get("symbol") or ""),
-                    dict(message.get("payload") or {}),
-                    received_at=quote_received_at,
-                    source_mode=str(message.get("source_mode") or "longbridge_sdk_push"),
+                quote_rows = (
+                    list(message.get("rows") or [])
+                    if kind == "quote_states"
+                    else [message]
                 )
+                for quote_row in quote_rows:
+                    try:
+                        quote_received_at = datetime.fromisoformat(
+                            str(quote_row.get("received_at") or "").replace("Z", "+00:00")
+                        ).astimezone(UTC)
+                    except ValueError:
+                        quote_received_at = datetime.now(UTC)
+                    update_live_quote_session_state(
+                        live_quote_session_state,
+                        str(quote_row.get("symbol") or ""),
+                        dict(quote_row.get("payload") or {}),
+                        received_at=quote_received_at,
+                        source_mode=str(
+                            quote_row.get("source_mode")
+                            or "longbridge_sdk_push"
+                        ),
+                    )
             elif kind == "ready":
+                quote_context_warmups = list(
+                    message.get("quote_context_warmups") or []
+                )
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
+                confirmed_candlestick_failed = list(
+                    message.get("confirmed_candlestick_failed_symbols") or []
+                )
+                confirmed_candlestick_coverage = str(
+                    message.get("confirmed_candlestick_coverage") or ""
+                )
                 market_data_mode = str(
                     message.get("market_data_mode") or "sdk_subscription"
                 )
@@ -4234,6 +5043,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     continue
                 attempts = 0
                 if market_data_mode == "sdk_snapshot_poll":
+                    snapshot_was_previously_ready = True
                     last_subscription_failure_reason = (
                         "sdk_subscription_unavailable_using_snapshot_poll"
                     )
@@ -4258,27 +5068,44 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     postclose_recovery_status["recovered_row_count"] = int(
                         postclose_recovery_status.get("recovered_row_count") or 0
                     ) + len(recovered_rows)
-                postclose_recovery_status.setdefault("completed_tasks", []).append(task_id)
+                completed_symbol = str(message.get("completed_symbol") or "")
+                if completed_symbol:
+                    completed_symbols = set(
+                        postclose_recovery_status.get("completed_symbols") or []
+                    )
+                    completed_symbols.add(completed_symbol)
+                    postclose_recovery_status["completed_symbols"] = sorted(
+                        completed_symbols
+                    )
+                    postclose_recovery_status["completed_symbol_count"] = len(
+                        completed_symbols
+                    )
+                    postclose_recovery_status["last_progress_at"] = to_iso(
+                        datetime.now(UTC)
+                    )
+                failed_symbols = set(
+                    postclose_recovery_status.get("failed_symbols") or []
+                )
+                message_failures = {
+                    str(value) for value in (message.get("failures") or [])
+                }
+                failed_symbols.update(message_failures)
+                if completed_symbol and completed_symbol not in message_failures:
+                    failed_symbols.discard(completed_symbol)
                 postclose_recovery_status["failed_symbols"] = sorted(
-                    set(postclose_recovery_status.get("failed_symbols") or [])
-                    | {str(value) for value in (message.get("failures") or [])}
+                    failed_symbols
                 )
             elif kind == "intraday_context_task_complete" and str(message.get("task_id") or "").startswith("postclose-recovery-"):
                 task_id = str(message.get("task_id") or "")
                 task = postclose_recovery_workers.pop(task_id, None)
                 if task is not None:
                     stop_spawned_process(task[0], graceful=True)
+                postclose_recovery_status.setdefault("completed_tasks", []).append(task_id)
                 postclose_recovery_status["failed_symbols"] = sorted(
                     set(postclose_recovery_status.get("failed_symbols") or [])
                     | {str(value) for value in (message.get("failures") or [])}
                 )
-                if not postclose_recovery_workers:
-                    postclose_recovery_status["status"] = (
-                        "completed_with_failures"
-                        if postclose_recovery_status.get("failed_symbols")
-                        else "completed"
-                    )
-                    postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
+                advance_postclose_recovery()
             elif kind == "intraday_context_error" and str(message.get("task_id") or "").startswith("postclose-recovery-"):
                 task_id = str(message.get("task_id") or "")
                 task = postclose_recovery_workers.pop(task_id, None)
@@ -4290,9 +5117,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     | {str(value) for value in task_symbols}
                 )
                 postclose_recovery_status["last_error"] = str(message.get("reason") or "")
-                if not postclose_recovery_workers:
-                    postclose_recovery_status["status"] = "completed_with_failures"
-                    postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
+                advance_postclose_recovery()
             elif kind == "daily_context":
                 rows = list(message.get("rows") or [])
                 daily_rows.extend(rows)
@@ -4334,21 +5159,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     daily_failed,
                 )
             elif kind == "bars" and worker_ready:
-                # Quotes arrive one symbol at a time at a bar boundary.  Give
-                # the queue a very short coalescing window, then evaluate all
-                # just-closed bars together once instead of rerunning every
-                # strategy for each of the 147 symbols.
                 rows = list(message.get("rows") or [])
-                time.sleep(0.15)
-                while True:
-                    try:
-                        queued = message_queue.get_nowait()
-                    except queue.Empty:
-                        break
-                    if str(queued.get("kind") or "") == "bars":
-                        rows.extend(list(queued.get("rows") or []))
-                    else:
-                        deferred_messages.append(queued)
+                confirmed_boundary_gate = dict(
+                    message.get("confirmed_boundary_gate") or {}
+                )
+                entry_batch_eligible = bool(
+                    message.get("entry_batch_eligible") is True
+                )
                 started = time.perf_counter()
                 trading_daily_context_ready = daily_context_covers_symbols(
                     config, daily_rows, configured_trading_symbols(config), daily_failed
@@ -4387,6 +5204,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     intraday_context_blocked_symbols=set(
                         residual_intraday_context_gaps
                     ),
+                    allow_new_entries=entry_batch_eligible,
                 )
                 five_minute_strategy_context = five_minute_contract_context_status(
                     context.rows(),
@@ -4465,9 +5283,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 elapsed = int((time.perf_counter() - started) * 1000)
                 last_result["pipeline_elapsed_ms"] = elapsed
                 pipeline_latency_samples.append(elapsed)
-                expected_symbols = set(
-                    quote_subscription_targets(config, datetime.now(UTC))
-                )
+                expected_symbols = {
+                    f"{symbol.upper().replace('.US', '')}.US"
+                    for symbol in configured_trading_symbols(config)
+                }
                 batch_symbols = {
                     f"{str(row.get('symbol') or '').upper().replace('.US', '')}.US"
                     for row in rows
@@ -4491,6 +5310,38 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 snapshot_poll_successful_fast_polls = int(
                     message.get("successful_fast_polls") or 0
                 )
+                if "total_poll_count" in message:
+                    snapshot_poll_total_count = int(
+                        message.get("total_poll_count") or 0
+                    )
+                if "failed_poll_count" in message:
+                    snapshot_poll_failure_count = int(
+                        message.get("failed_poll_count") or 0
+                    )
+                if "consecutive_failures" in message:
+                    snapshot_poll_consecutive_failures = int(
+                        message.get("consecutive_failures") or 0
+                    )
+                if message.get("last_success_at"):
+                    snapshot_poll_last_success_at = str(
+                        message.get("last_success_at")
+                    )
+                if message.get("last_failure_at"):
+                    snapshot_poll_last_failure_at = str(
+                        message.get("last_failure_at")
+                    )
+                if message.get("first_batch_returned_at"):
+                    snapshot_poll_first_batch_returned_at = str(
+                        message.get("first_batch_returned_at")
+                    )
+                if "first_batch_latency_ms" in message:
+                    snapshot_poll_first_batch_latency_ms = int(
+                        message.get("first_batch_latency_ms") or 0
+                    )
+                if "first_batch_symbol_count" in message:
+                    snapshot_poll_first_batch_symbol_count = int(
+                        message.get("first_batch_symbol_count") or 0
+                    )
                 snapshot_poll_is_fast_and_complete = bool(
                     message.get("poll_is_fast_and_complete")
                 )
@@ -4498,10 +5349,43 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     market_data_mode == "sdk_snapshot_poll"
                     and message.get("poll_is_fast_and_complete") is True
                 ):
+                    market_data_fallback_validated = True
                     last_subscription_failure_reason = (
                         "sdk_subscription_unavailable_using_snapshot_poll"
                     )
             elif kind == "snapshot_poll_failure":
+                snapshot_poll_is_fast_and_complete = False
+                snapshot_poll_successful_fast_polls = 0
+                market_data_fallback_validated = False
+                snapshot_poll_total_count = int(
+                    message.get("total_poll_count") or snapshot_poll_total_count
+                )
+                snapshot_poll_failure_count = int(
+                    message.get("failed_poll_count") or snapshot_poll_failure_count
+                )
+                snapshot_poll_consecutive_failures = int(
+                    message.get("consecutive_failures") or 0
+                )
+                snapshot_poll_last_success_at = str(
+                    message.get("last_success_at")
+                    or snapshot_poll_last_success_at
+                )
+                snapshot_poll_last_failure_at = str(
+                    message.get("last_failure_at")
+                    or snapshot_poll_last_failure_at
+                )
+                snapshot_poll_first_batch_returned_at = str(
+                    message.get("first_batch_returned_at")
+                    or snapshot_poll_first_batch_returned_at
+                )
+                snapshot_poll_first_batch_latency_ms = int(
+                    message.get("first_batch_latency_ms")
+                    or snapshot_poll_first_batch_latency_ms
+                )
+                snapshot_poll_first_batch_symbol_count = int(
+                    message.get("first_batch_symbol_count")
+                    or snapshot_poll_first_batch_symbol_count
+                )
                 last_subscription_failure_reason = str(
                     message.get("reason")
                     or "sdk_quote_snapshot_poll_transient_failure"
@@ -4536,10 +5420,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             monotonic_now = time.monotonic()
             healthcheck_due = (
                 dispatch_enabled
+                and paper_client is None
                 and not near_five_minute_boundary
                 and (
-                    paper_client is None
-                    or monotonic_now - last_trade_context_healthcheck
+                    monotonic_now - last_trade_context_healthcheck
                     >= TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS
                 )
                 and monotonic_now >= next_trade_context_retry
@@ -4725,6 +5609,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             if (
                 now_ny.weekday() < 5
                 and (now_ny.hour, now_ny.minute) >= (16, 5)
+                and daily_context_state == "complete"
+                and not daily_workers
+                and not daily_pending
                 and session_date not in postclose_recovery_attempted_dates
                 and session_requires_postclose_recovery(pre_recovery_coverage)
             ):
@@ -4747,32 +5634,23 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "status": "running",
                     "business_date": session_date,
                     "started_at": to_iso(datetime.now(UTC)),
+                    "session_started_at": to_iso(recovery_session_start),
+                    "expected_last_close": to_iso(recovery_session_close),
                     "requested_symbol_count": len(recovery_symbols),
                     "recovered_row_count": 0,
                     "failed_symbols": [],
+                    "completed_symbols": [],
+                    "completed_symbol_count": 0,
+                    "retry_round": 0,
                     "historical_signal_replayed": False,
                     "historical_order_replayed": False,
                     "recovery_counts_as_realtime_evidence": False,
                 }
-                task_id = f"postclose-recovery-{session_date}-00"
-                recovery_worker = process_context.Process(
-                    target=intraday_context_worker,
-                    args=(
-                        str(config.config_path),
-                        recovery_symbols,
-                        task_id,
-                        to_iso(recovery_session_start),
-                        to_iso(recovery_session_close),
-                        message_queue,
-                    ),
-                    daemon=True,
+                postclose_recovery_pending.clear()
+                postclose_recovery_pending.extend(
+                    [symbol] for symbol in recovery_symbols
                 )
-                recovery_worker.start()
-                postclose_recovery_workers[task_id] = (
-                    recovery_worker,
-                    time.monotonic(),
-                    recovery_symbols,
-                )
+                start_next_postclose_recovery_batch()
             for task_id, (recovery_worker, started_at, task_symbols) in list(
                 postclose_recovery_workers.items()
             ):
@@ -4783,9 +5661,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     continue
                 stop_spawned_process(recovery_worker, graceful=False)
                 postclose_recovery_workers.pop(task_id, None)
+                completed_symbols = set(
+                    postclose_recovery_status.get("completed_symbols") or []
+                )
                 postclose_recovery_status["failed_symbols"] = sorted(
                     set(postclose_recovery_status.get("failed_symbols") or [])
-                    | set(task_symbols)
+                    | (set(task_symbols) - completed_symbols)
                 )
                 postclose_recovery_status["last_error"] = (
                     "postclose_intraday_recovery_deadline_exceeded"
@@ -4794,12 +5675,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 postclose_recovery_status.get("status") == "running"
                 and not postclose_recovery_workers
             ):
-                postclose_recovery_status["status"] = (
-                    "completed_with_failures"
-                    if postclose_recovery_status.get("failed_symbols")
-                    else "completed"
-                )
-                postclose_recovery_status["completed_at"] = to_iso(datetime.now(UTC))
+                advance_postclose_recovery()
             if (
                 worker_ready
                 and daily_context_ready
@@ -4811,6 +5687,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 # Refresh the completed daily bar after close so tomorrow's
                 # session never starts with yesterday's stale context.
                 postclose_daily_refresh_dates.add(session_date)
+                stop_spawned_process(worker, graceful=True)
+                worker = None
+                worker_ready = False
+                worker_ready_since = 0.0
                 retained_intraday_rows = [
                     row
                     for row in context.rows()
@@ -4991,6 +5871,28 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     postclose_recovery_status,
                     session_coverage,
                 )
+            postclose_recovery_signature = json.dumps(
+                postclose_recovery_status,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if (
+                str(postclose_recovery_status.get("status") or "")
+                in {
+                    "completed",
+                    "completed_with_failures",
+                    "completed_incomplete_data",
+                }
+                and postclose_recovery_signature
+                != last_persisted_postclose_recovery
+            ):
+                write_json_atomic(
+                    config.output_dir / POSTCLOSE_RECOVERY_STATE_JSON,
+                    postclose_recovery_status,
+                )
+                last_persisted_postclose_recovery = (
+                    postclose_recovery_signature
+                )
             market_data_health = {
                 "schema_version": "m15.sdk-market-data-health.v1",
                 "generated_at": to_iso(datetime.now(UTC)),
@@ -5010,11 +5912,37 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     else f"0/{len(configured_trading_symbols(config))}"
                 ),
                 "worker_ready": worker_ready,
+                "quote_subscription_connection_count": (
+                    config.subscription_shard_count
+                    if worker_ready and market_data_mode == "sdk_subscription"
+                    else 0
+                ),
                 "worker_restart_count_this_run": market_data_worker_restart_total,
                 "worker_recent_restart_count": market_data_worker_recent_restart_count,
                 "last_worker_error": last_market_data_worker_error,
+                "snapshot_poll_total_count": snapshot_poll_total_count,
+                "snapshot_poll_failure_count": snapshot_poll_failure_count,
+                "snapshot_poll_consecutive_failures": (
+                    snapshot_poll_consecutive_failures
+                ),
+                "snapshot_poll_last_success_at": snapshot_poll_last_success_at,
+                "snapshot_poll_last_failure_at": snapshot_poll_last_failure_at,
+                "snapshot_poll_first_batch_returned_at": (
+                    snapshot_poll_first_batch_returned_at
+                ),
+                "snapshot_poll_first_batch_latency_ms": (
+                    snapshot_poll_first_batch_latency_ms
+                ),
+                "snapshot_poll_first_batch_symbol_count": (
+                    snapshot_poll_first_batch_symbol_count
+                ),
+                "session_close_flush": session_close_flush_status,
                 "five_minute_session_coverage": session_coverage,
+                "confirmed_boundary_gate": confirmed_boundary_gate,
             }
+            current_market_data_targets = set(
+                quote_subscription_targets(config, datetime.now(UTC))
+            )
             write_json_atomic(
                 config.output_dir / MARKET_DATA_HEALTH_JSON,
                 market_data_health,
@@ -5063,6 +5991,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 extra={
                     "run_id": run_id, "runtime_pid": os.getpid(), "quote_worker_pid": worker.pid if worker else "",
                     "quote_subscription_worker_count": 1 if worker is not None and worker.is_alive() else 0,
+                    "quote_subscription_connection_count": (
+                        config.subscription_shard_count
+                        if worker is not None
+                        and worker.is_alive()
+                        and market_data_mode == "sdk_subscription"
+                        else 0
+                    ),
+                    "quote_context_warmups": quote_context_warmups,
                     "last_subscription_failure_reason": last_subscription_failure_reason,
                     "subscription_progress": (
                         f"{subscription_progress_completed}/{subscription_progress_total}"
@@ -5074,7 +6010,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "source_mode": (
                         "longbridge_sdk_snapshot_poll"
                         if market_data_mode == "sdk_snapshot_poll"
-                        else "longbridge_sdk_push"
+                        else "longbridge_sdk_confirmed_candlestick"
                     ),
                     "snapshot_poll_interval_seconds": (
                         config.snapshot_poll_interval_seconds
@@ -5086,6 +6022,23 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_poll_missing_count": snapshot_poll_missing_count,
                     "snapshot_poll_successful_fast_polls": snapshot_poll_successful_fast_polls,
                     "snapshot_poll_is_fast_and_complete": snapshot_poll_is_fast_and_complete,
+                    "snapshot_poll_total_count": snapshot_poll_total_count,
+                    "snapshot_poll_failure_count": snapshot_poll_failure_count,
+                    "snapshot_poll_consecutive_failures": (
+                        snapshot_poll_consecutive_failures
+                    ),
+                    "snapshot_poll_last_success_at": snapshot_poll_last_success_at,
+                    "snapshot_poll_last_failure_at": snapshot_poll_last_failure_at,
+                    "snapshot_poll_first_batch_returned_at": (
+                        snapshot_poll_first_batch_returned_at
+                    ),
+                    "snapshot_poll_first_batch_latency_ms": (
+                        snapshot_poll_first_batch_latency_ms
+                    ),
+                    "snapshot_poll_first_batch_symbol_count": (
+                        snapshot_poll_first_batch_symbol_count
+                    ),
+                    "session_close_flush": session_close_flush_status,
                     "last_market_data_worker_error": last_market_data_worker_error,
                     "market_data_worker_restart_count": (
                         market_data_worker_restart_total
@@ -5139,10 +6092,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         f"{len(configured_trading_symbols(config)) - len(trading_subscription_failed) if worker_ready and market_data_mode == 'sdk_subscription' else 0}"
                         f"/{len(configured_trading_symbols(config))}"
                     ),
+                    "confirmed_candlestick_coverage": (
+                        confirmed_candlestick_coverage
+                    ),
+                    "confirmed_candlestick_failed_symbols": (
+                        confirmed_candlestick_failed
+                    ),
                     "market_data_coverage": (
-                        f"{len(market_data_symbols)}/{len(quote_subscription_targets(config, datetime.now(UTC)))}"
+                        f"{len(current_market_data_targets & market_data_symbols)}/{len(current_market_data_targets)}"
                         if worker_ready
-                        else f"0/{len(quote_subscription_targets(config, datetime.now(UTC)))}"
+                        else f"0/{len(current_market_data_targets)}"
                     ),
                     "trading_market_data_coverage": (
                         f"{len(set(configured_trading_symbols(config)) & market_data_symbols)}"
@@ -5208,6 +6167,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "intraday_context_gap_blocks_new_entries_globally": False,
                     "five_minute_strategy_context": five_minute_strategy_context,
                     "five_minute_session_coverage": session_coverage,
+                    "confirmed_boundary_gate": confirmed_boundary_gate,
+                    "new_position_market_data_gate_ready": (
+                        confirmed_boundary_gate.get(
+                            "new_position_submission_enabled"
+                        )
+                    ),
                     "postclose_intraday_recovery": postclose_recovery_status,
                     "partial_bar_suppressed_until": partial_bar_suppressed_until,
                     "daily_context_worker_pids": [worker.pid for worker, _started_at, _symbols in daily_workers.values()],
@@ -5224,7 +6189,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         dispatch_requested=dispatch_enabled,
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
-                        market_data_ready=worker_ready,
+                        market_data_ready=(
+                            market_data_ready_for_dispatch(
+                                worker_ready=worker_ready,
+                                market_data_mode=market_data_mode,
+                                snapshot_fallback_validated=(
+                                    market_data_fallback_validated
+                                ),
+                            )
+                            and confirmed_boundary_gate.get(
+                                "new_position_submission_enabled"
+                            ) is True
+                        ),
                         trading_daily_context_ready=trading_daily_context_ready,
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
@@ -5239,7 +6215,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         ),
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
-                        market_data_ready=worker_ready,
+                        market_data_ready=(
+                            market_data_ready_for_dispatch(
+                                worker_ready=worker_ready,
+                                market_data_mode=market_data_mode,
+                                snapshot_fallback_validated=(
+                                    market_data_fallback_validated
+                                ),
+                            )
+                            and confirmed_boundary_gate.get(
+                                "new_position_submission_enabled"
+                            ) is True
+                        ),
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
                         trading_daily_context_ready=trading_daily_context_ready,
@@ -5459,11 +6446,28 @@ def rotate_runtime_log(
 def sdk_runtime_daemon_environment(config: Any) -> dict[str, str]:
     """Prepare the same child-only DNS environment for every daemon entrypoint."""
     environment = dict(os.environ)
+    if any(
+        str(environment.get(key) or "").strip()
+        for key in (
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+        )
+    ):
+        # The user's configured proxy is already the selected network route.
+        # A fixed-address fallback would have to add Longbridge to NO_PROXY,
+        # silently bypassing that route and reproducing the daemon-only timeout.
+        return environment_without_m15_dns_override(environment)
     if str(getattr(config, "quote_region", "")).lower() != "cn":
         return environment
+    config_path = Path(getattr(config, "config_path", DEFAULT_CONFIG_PATH))
     payload = prepare_sdk_dns_override(
         SDK_DNS_OVERRIDE_CACHE_DIR,
         SDK_DNS_OVERRIDE_ENV_FILE,
+        runtime_config_path=config_path,
     )
     return process_local_environment(payload, base_environment=environment)
 
@@ -5516,12 +6520,12 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
             )
             status_runtime_pid = str(status.get("runtime_pid") or "")
             startup_age = process_age_seconds(existing)
+            # A full 147-symbol SDK history refresh is deliberately serialized
+            # to honor the broker's single quote-connection boundary. Allow it
+            # to finish instead of restarting a healthy, progressing loader.
             startup_grace_seconds = max(
-                600,
-                min(
-                    900,
-                    int(getattr(config, "daily_context_deadline_seconds", 75)) * 8,
-                ),
+                3600,
+                int(getattr(config, "daily_context_deadline_seconds", 75)) * 8,
             )
             health_replacement_required = runtime_requires_health_replacement(
                 status,

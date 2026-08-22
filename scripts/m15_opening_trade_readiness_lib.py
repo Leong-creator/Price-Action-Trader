@@ -303,6 +303,8 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         and not pending_formal_flatten
         and not authorized_cleanup_waiting
         and execution_epoch_consistent
+        and realtime_status.get("new_position_market_data_gate_ready")
+        is not False
     )
     readonly_gate_waiting = bool(
         sdk_config is not None
@@ -696,6 +698,29 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
     )
     if expected_coverage and actual_trading_coverage != expected_coverage:
         issues.append("sdk_trading_market_data_coverage_incomplete")
+    confirmed_candlestick_coverage = str(
+        status.get("confirmed_candlestick_coverage") or ""
+    )
+    if confirmed_candlestick_coverage and expected_coverage:
+        try:
+            confirmed_count, confirmed_total = (
+                int(value)
+                for value in confirmed_candlestick_coverage.split("/", 1)
+            )
+        except (TypeError, ValueError):
+            issues.append("sdk_confirmed_candlestick_coverage_invalid")
+        else:
+            if confirmed_count < expected_count or confirmed_total < expected_count:
+                issues.append("sdk_confirmed_candlestick_coverage_incomplete")
+    market_data_mode = str(status.get("market_data_mode") or "")
+    validated_snapshot_poll = bool(
+        market_data_mode == "sdk_snapshot_poll"
+        and status.get("market_data_fallback_validated") is True
+        and status.get("snapshot_poll_is_fast_and_complete") is True
+        and int(status.get("snapshot_poll_consecutive_failures") or 0) == 0
+    )
+    if market_data_mode != "sdk_subscription" and not validated_snapshot_poll:
+        issues.append("sdk_persistent_push_stream_not_active")
     trading_daily_ready = status.get("trading_daily_context_ready")
     if trading_daily_ready is None and sdk_config is not None:
         trading_daily_ready = sdk_daily_context_is_complete(
@@ -710,11 +735,21 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
         issues.append("sdk_account_snapshot_stale")
     if status.get("account_snapshot_circuit_open") is True:
         issues.append("sdk_account_snapshot_circuit_open")
-    if (
-        str(status.get("market_data_mode") or "") == "sdk_snapshot_poll"
-        and int(status.get("market_data_worker_recent_restart_count") or 0) >= 3
-    ):
+    if int(status.get("market_data_worker_recent_restart_count") or 0) >= 3:
         issues.append("sdk_market_data_worker_restart_storm")
+    boundary_gate = status.get("confirmed_boundary_gate")
+    if isinstance(boundary_gate, dict) and str(
+        boundary_gate.get("status") or ""
+    ) in {
+        "complete_but_late",
+        "incomplete_boundary_deadline_expired",
+        "late_after_boundary_closed",
+        "invalid_boundary_or_symbol",
+    }:
+        issues.append(
+            "sdk_confirmed_boundary_gate="
+            + str(boundary_gate.get("status") or "blocked")
+        )
     worker_status = str(status.get("account_snapshot_worker_status") or "")
     if worker_status and worker_status not in {"healthy", "healthy_circuit_probe", "healthy_circuit_recovered"}:
         issues.append(f"sdk_account_worker_status={worker_status}")

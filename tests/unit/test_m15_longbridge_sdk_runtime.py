@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
-    FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
+    ConfirmedBoundaryBatchGate, ConfirmedCandlestickBarBuilder, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
     config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
     daily_context_is_complete, fresh_market_events, load_config,
     five_minute_session_coverage,
@@ -30,7 +30,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
     market_event_is_tradable, trading_market_events,
-    validate_formal_epoch_alignment,
+    validate_formal_epoch_alignment, warm_quote_context,
 )
 from scripts.m15_longbridge_sdk_account_lib import (
     SdkAccountCoordinator,
@@ -47,6 +47,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     acquire_runtime_run_lock,
     active_event_ids_excluding_intraday_gaps,
     adaptive_market_data_deadline_seconds,
+    active_market_data_progress_deadline_seconds,
     clear_restart_burst_after_stable_polls,
     buffer_pending_market_data_progress,
     build_sdk_quote_snapshot,
@@ -64,16 +65,23 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     effective_runtime_dispatch_enabled,
     emit_worker,
     effective_worker_progress,
+    fetch_daily_context_rows,
     finalize_postclose_recovery_status,
     five_minute_contract_context_status,
+    intraday_context_worker,
     is_orphaned_sdk_runtime_child,
     latest_completed_intraday_close,
     market_data_mode_qualifies_for_subscription_gate,
+    market_data_ready_for_dispatch,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
+    market_data_worker_startup_deadline_seconds,
     pending_flatten_test_epoch_id,
+    partition_subscription_targets,
     pop_deferred_worker_error,
     primary_subscription_reprobe_date,
+    regular_session_close_flush_action,
+    restored_postclose_recovery_state,
     preserve_partial_bar_suppression,
     rollover_snapshot_cycle,
     preserve_last_order_maintenance_action,
@@ -93,6 +101,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     schedule_daily_context_retry,
     session_requires_postclose_recovery,
     run_sdk_order_maintenance,
+    run_watch,
     run_pending_flatten_cycle,
     run_authorized_account_exit_cycle,
     run_sdk_preflight,
@@ -102,6 +111,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     snapshot_poll_should_idle,
     sdk_runtime_daemon_environment,
     start_runtime_daemon,
+    subscription_quote_stream_deadline_seconds,
     subscription_quote_stream_is_stale,
     trade_context_health_requires_rebuild,
     validated_snapshot_poll_is_reusable,
@@ -111,6 +121,32 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_subscription_timeout_does_not_run_before_worker_exists(self) -> None:
+        source = inspect.getsource(run_watch)
+        timeout_gate = source.index(
+            "time.monotonic() - worker_last_progress"
+        )
+        preceding = source[max(0, timeout_gate - 180):timeout_gate]
+        self.assertIn("worker is not None", preceding)
+        self.assertIn("and not worker_ready", preceding)
+
+    def test_completed_daily_load_marks_postclose_refresh_date(self) -> None:
+        source = inspect.getsource(run_watch)
+        persisted = source.index("daily_context_persisted = True")
+        following = source[persisted:persisted + 300]
+        self.assertIn("postclose_daily_refresh_dates.update", following)
+        self.assertIn("completed_postclose_refresh_dates", following)
+
+    def test_postclose_recovery_waits_for_daily_context_connection(self) -> None:
+        source = inspect.getsource(run_watch)
+        recovery_gate = source.index(
+            'and session_date not in postclose_recovery_attempted_dates'
+        )
+        preceding = source[max(0, recovery_gate - 300):recovery_gate]
+        self.assertIn('daily_context_state == "complete"', preceding)
+        self.assertIn('and not daily_workers', preceding)
+        self.assertIn('and not daily_pending', preceding)
+
     def test_late_only_complete_session_does_not_trigger_postclose_recovery(self) -> None:
         self.assertFalse(
             session_requires_postclose_recovery(
@@ -166,6 +202,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         output = queue.Queue(maxsize=1)
         output.put({"kind": "occupied"})
         self.assertFalse(emit_worker(output, {"kind": "heartbeat"}))
+        self.assertFalse(emit_worker(output, {"kind": "quote_states"}))
         self.assertFalse(emit_worker(output, {"kind": "subscription_progress"}))
 
     def test_worker_never_silently_drops_trading_or_quote_state_when_queue_is_full(self) -> None:
@@ -447,18 +484,218 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
 
     def test_intraday_backfill_has_bounded_total_startup_budget(self) -> None:
-        self.assertEqual(INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS, 90)
+        self.assertEqual(INTRADAY_CONTEXT_BACKFILL_TOTAL_DEADLINE_SECONDS, 300)
 
     def test_realtime_runtime_never_opens_history_connection_before_live_quotes(self) -> None:
         self.assertFalse(REALTIME_INTRADAY_HISTORY_BACKFILL_ENABLED)
 
-    def test_quote_callback_is_enabled_before_the_subscribe_call(self) -> None:
+    def test_quote_connection_uses_raw_trade_stream_for_large_universe(self) -> None:
         source = inspect.getsource(quote_worker)
-        enabled = source.index("aggregation_enabled = True")
-        callback = source.index("quote.set_on_quote(on_quote)")
-        subscribe = source.index("failed = subscribe_quote_and_trades(")
-        self.assertLess(enabled, callback)
-        self.assertLess(callback, subscribe)
+        trade_callback = source.index("quote.set_on_trades(on_trades)")
+        subscribe = source.index("subscribe_quote_and_trades(")
+        self.assertLess(trade_callback, subscribe)
+        self.assertNotIn("quote.quote(", source)
+        self.assertIn("aggregation_started_at = datetime.now(UTC)", source)
+        self.assertIn("[sdk.SubType.Trade]", source)
+        self.assertIn("builder.on_trade", source)
+        self.assertIn("builder.ensure_zero_trade_bars", source)
+        self.assertNotIn("subscribe_candlesticks", source)
+        self.assertNotIn("realtime_quote", source)
+        self.assertNotIn("warmup = warm_quote_context(", source)
+        self.assertNotIn("ThreadPoolExecutor", source)
+
+    @staticmethod
+    def confirmed_boundary_row(
+        symbol: str,
+        boundary: datetime,
+        *,
+        delay_ms: int = 100,
+    ) -> dict[str, Any]:
+        event_time = boundary.isoformat().replace("+00:00", "Z")
+        return {
+            "event_id": f"sdk-5m|{symbol}|{event_time}",
+            "symbol": symbol,
+            "timeframe": "5m",
+            "event_time": event_time,
+            "bar_close_at": event_time,
+            "received_at": event_time,
+            "source_event_at": event_time,
+            "source_delivery_age_ms": delay_ms,
+            "bar_finalization_delay_ms": delay_ms,
+            "bar_final": True,
+        }
+
+    def test_confirmed_boundary_gate_releases_only_complete_timely_batch(self) -> None:
+        boundary = datetime(2026, 8, 20, 14, 0, tzinfo=UTC)
+        gate = ConfirmedBoundaryBatchGate(
+            ["AAPL.US", "MSFT.US"],
+            maximum_source_delivery_age_ms=2000,
+            maximum_finalization_delay_ms=5000,
+        )
+        self.assertEqual(
+            gate.add(
+                [self.confirmed_boundary_row("AAPL", boundary)],
+                now=boundary + timedelta(seconds=1),
+            ),
+            [],
+        )
+        outputs = gate.add(
+            [self.confirmed_boundary_row("MSFT", boundary)],
+            now=boundary + timedelta(seconds=1),
+        )
+        self.assertEqual(len(outputs), 1)
+        self.assertTrue(outputs[0]["entry_batch_eligible"])
+        self.assertEqual(
+            outputs[0]["confirmed_boundary_gate"]["status"],
+            "complete_timely",
+        )
+
+    def test_confirmed_boundary_gate_blocks_partial_boundary_at_deadline(self) -> None:
+        boundary = datetime(2026, 8, 20, 14, 0, tzinfo=UTC)
+        gate = ConfirmedBoundaryBatchGate(
+            ["AAPL.US", "MSFT.US"],
+            maximum_source_delivery_age_ms=2000,
+            maximum_finalization_delay_ms=5000,
+        )
+        gate.add(
+            [self.confirmed_boundary_row("AAPL", boundary)],
+            now=boundary + timedelta(seconds=1),
+        )
+        outputs = gate.flush_expired(now=boundary + timedelta(seconds=5))
+        self.assertEqual(len(outputs), 1)
+        self.assertFalse(outputs[0]["entry_batch_eligible"])
+        self.assertEqual(
+            outputs[0]["confirmed_boundary_gate"]["status"],
+            "incomplete_boundary_deadline_expired",
+        )
+        self.assertEqual(
+            outputs[0]["confirmed_boundary_gate"]["missing_symbols"],
+            ["MSFT"],
+        )
+
+    def test_confirmed_boundary_gate_does_not_mix_boundaries_or_monitor_symbols(self) -> None:
+        first = datetime(2026, 8, 20, 14, 0, tzinfo=UTC)
+        second = first + timedelta(minutes=5)
+        gate = ConfirmedBoundaryBatchGate(
+            ["AAPL.US", "MSFT.US"],
+            maximum_source_delivery_age_ms=2000,
+            maximum_finalization_delay_ms=5000,
+        )
+        monitoring = gate.add(
+            [self.confirmed_boundary_row("ZM", first)],
+            now=first + timedelta(seconds=1),
+        )
+        self.assertEqual(
+            monitoring[0]["confirmed_boundary_gate"]["status"],
+            "monitoring_only",
+        )
+        self.assertFalse(monitoring[0]["entry_batch_eligible"])
+        self.assertEqual(
+            gate.add(
+                [
+                    self.confirmed_boundary_row("AAPL", first),
+                    self.confirmed_boundary_row("MSFT", second),
+                ],
+                now=first + timedelta(seconds=1),
+            ),
+            [],
+        )
+
+    def test_confirmed_boundary_gate_blocks_complete_but_late_batch(self) -> None:
+        boundary = datetime(2026, 8, 20, 14, 0, tzinfo=UTC)
+        gate = ConfirmedBoundaryBatchGate(
+            ["AAPL.US", "MSFT.US"],
+            maximum_source_delivery_age_ms=2000,
+            maximum_finalization_delay_ms=5000,
+        )
+        outputs = gate.add(
+            [
+                self.confirmed_boundary_row("AAPL", boundary),
+                self.confirmed_boundary_row("MSFT", boundary, delay_ms=2500),
+            ],
+            now=boundary + timedelta(seconds=3),
+        )
+        self.assertEqual(
+            outputs[0]["confirmed_boundary_gate"]["status"],
+            "complete_but_late",
+        )
+        self.assertFalse(outputs[0]["entry_batch_eligible"])
+
+    def test_confirmed_boundary_gate_uses_finalization_age_for_snapshot_batch(self) -> None:
+        boundary = datetime(2026, 8, 20, 14, 0, tzinfo=UTC)
+        gate = ConfirmedBoundaryBatchGate(
+            ["AAPL.US", "MSFT.US"],
+            maximum_source_delivery_age_ms=2000,
+            maximum_finalization_delay_ms=5000,
+        )
+        rows = [
+            self.confirmed_boundary_row("AAPL", boundary, delay_ms=14_000),
+            self.confirmed_boundary_row("MSFT", boundary, delay_ms=8_000),
+        ]
+        for row in rows:
+            row["source_mode"] = "longbridge_sdk_snapshot_poll"
+            row["bar_finalization_delay_ms"] = 369
+
+        outputs = gate.add(rows, now=boundary + timedelta(milliseconds=369))
+
+        self.assertEqual(
+            outputs[0]["confirmed_boundary_gate"]["status"],
+            "complete_timely",
+        )
+        self.assertTrue(outputs[0]["entry_batch_eligible"])
+
+    def test_subscription_targets_are_spread_across_bounded_shards(self) -> None:
+        shards = partition_subscription_targets(
+            [f"S{index}.US" for index in range(10)],
+            4,
+        )
+        self.assertEqual([len(row) for row in shards], [3, 3, 2, 2])
+        self.assertEqual(shards[0], ["S0.US", "S4.US", "S8.US"])
+        self.assertEqual(
+            sorted(symbol for shard in shards for symbol in shard),
+            sorted(f"S{index}.US" for index in range(10)),
+        )
+
+    def test_quote_connection_warmup_reuses_context_until_success(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.attempts = 0
+
+            def quote(self, symbols):
+                self.attempts += 1
+                self.symbols = symbols
+                if self.attempts < 3:
+                    raise TimeoutError("cold context")
+                return [object()]
+
+        quote = QuoteContext()
+        result = warm_quote_context(
+            quote,
+            "SPY.US",
+            retry_count=2,
+            retry_backoff_seconds=0,
+        )
+        self.assertEqual(quote.attempts, 3)
+        self.assertEqual(quote.symbols, ["SPY.US"])
+        self.assertEqual(result["attempt_count"], 3)
+        self.assertEqual(result["row_count"], 1)
+
+    def test_quote_connection_warmup_fails_after_bounded_attempts(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.attempts = 0
+
+            def quote(self, _symbols):
+                self.attempts += 1
+                raise TimeoutError("still cold")
+
+        quote = QuoteContext()
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "sdk_quote_context_warmup_failed:TimeoutError:still cold",
+        ):
+            warm_quote_context(quote, "SPY.US", retry_count=2)
+        self.assertEqual(quote.attempts, 3)
 
     def test_mid_session_context_defers_without_replaying_signals_or_orders(self) -> None:
         affected, status = deferred_intraday_context_after_mid_session_start(
@@ -622,6 +859,45 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 trusted_payload,
             )
 
+    def test_sdk_quote_snapshot_retains_same_day_exited_symbol_for_app_pnl(self) -> None:
+        state = {
+            symbol: {
+                "close": price,
+                "prev_close": str(Decimal(price) - Decimal("1")),
+                "source_event_at": "2026-08-11T14:00:00Z",
+                "received_at": "2026-08-11T14:00:01Z",
+                "source_mode": "longbridge_sdk_snapshot_poll",
+                "market_data_blocked_reason": "",
+            }
+            for symbol, price in (
+                ("AAPL", "210.50"),
+                ("MSFT", "510.25"),
+                ("DASH", "225.00"),
+            )
+        }
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "quote_snapshot.json"
+            write_trusted_sdk_quote_snapshot(
+                path,
+                state,
+                generated_at=datetime(2026, 8, 11, 14, 0, 2, tzinfo=UTC),
+                required_symbols=("AAPL.US", "MSFT.US", "DASH.US"),
+            )
+
+            result = write_trusted_sdk_quote_snapshot(
+                path,
+                {key: state[key] for key in ("AAPL", "MSFT")},
+                generated_at=datetime(2026, 8, 11, 14, 0, 17, tzinfo=UTC),
+                required_symbols=("AAPL.US", "MSFT.US"),
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            rows = {row["symbol"]: row for row in payload["rows"]}
+
+            self.assertTrue(result["written"])
+            self.assertEqual(result["retained_same_day_row_count"], 1)
+            self.assertEqual(payload["row_count"], 3)
+            self.assertTrue(rows["DASH.US"]["retained_after_intraday_exit"])
+
     def test_only_oauth_or_missing_trade_context_triggers_rebuild(self) -> None:
         self.assertTrue(
             trade_context_health_requires_rebuild(
@@ -688,7 +964,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "waiting_for_formal_test_activation",
         )
 
-    def test_quote_worker_does_not_requery_subscriptions_after_acknowledged_batches(self) -> None:
+    def test_quote_worker_audits_raw_trade_subscription(self) -> None:
         tree = ast.parse(textwrap.dedent(inspect.getsource(quote_worker)))
         called_methods = [
             node.func.attr
@@ -696,8 +972,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
         ]
 
-        self.assertNotIn("subscriptions", called_methods)
-        self.assertEqual(called_methods.count("set_on_quote"), 1)
+        self.assertIn("subscriptions", called_methods)
+        self.assertEqual(called_methods.count("quote"), 0)
+        self.assertEqual(called_methods.count("set_on_quote"), 0)
+        self.assertEqual(called_methods.count("set_on_trades"), 1)
+        self.assertEqual(called_methods.count("set_on_candlestick"), 0)
+        self.assertEqual(called_methods.count("subscribe_candlesticks"), 0)
 
     def test_snapshot_fallback_requires_configured_subscription_failures(self) -> None:
         self.assertFalse(should_use_snapshot_fallback(0, 1))
@@ -708,14 +988,35 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertFalse(snapshot_poll_cycle_is_healthy(146, 147, 100, 1000))
         self.assertFalse(snapshot_poll_cycle_is_healthy(147, 147, 1001, 1000))
 
-    def test_snapshot_sdk_timeout_refreshes_progress_then_exits_worker(self) -> None:
+    def test_snapshot_sdk_timeout_refreshes_progress_and_retries_clean_context(self) -> None:
         source = inspect.getsource(quote_snapshot_worker)
         failure_branch = source[source.index("except Exception as exc:") :]
 
         self.assertIn("progress_value.value = failure_at", failure_branch)
         self.assertIn('"snapshot_retry_in_progress": True', failure_branch)
+        self.assertNotIn("sdk_snapshot_validated_context_failed", failure_branch)
         self.assertIn("raise", failure_branch)
         self.assertNotIn("snapshot_connection_rebuilt", failure_branch)
+
+    def test_snapshot_poll_uses_a_fresh_context_per_two_second_cycle(self) -> None:
+        source = inspect.getsource(quote_snapshot_worker)
+        loop = source.index("while not stop_event.is_set():")
+        context = source.index("quote = sdk.QuoteContext(")
+        request = source.index("quote.quote(")
+
+        self.assertLess(loop, context)
+        self.assertLess(context, request)
+        self.assertIn('getattr(quote, "close", None)', source)
+        failure_branch = source[source.index("except Exception as exc:") :]
+        self.assertIn("raise", failure_branch)
+        self.assertNotIn("stop_event.wait(0.5)", failure_branch)
+
+    def test_snapshot_poll_marks_intentional_interval_wait_as_progress(self) -> None:
+        source = inspect.getsource(quote_snapshot_worker)
+        interval_wait = source[source.index("wait_deadline =") :]
+
+        self.assertIn("progress_value.value = time.monotonic()", interval_wait)
+        self.assertIn("stop_event.wait(min(wait_remaining, 0.5))", interval_wait)
 
     def test_dead_worker_error_is_removed_without_dropping_other_messages(self) -> None:
         messages = deque(
@@ -734,15 +1035,20 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             [{"kind": "bars", "rows": [1]}, {"kind": "heartbeat"}],
         )
 
-    def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
+    def test_snapshot_poll_is_bounded_for_full_universe_recovery(self) -> None:
         config = load_config()
 
         self.assertEqual(config.subscription_batch_size, 50)
-        self.assertEqual(config.subscription_retry_count, 1)
-        self.assertEqual(config.subscription_deadline_seconds, 20)
+        self.assertEqual(config.subscription_shard_count, 1)
+        self.assertTrue(config.prefer_snapshot_poll)
+        self.assertTrue(config.allow_snapshot_poll_fallback)
+        self.assertEqual(config.subscription_request_interval_seconds, 0.2)
+        self.assertEqual(config.subscription_retry_count, 2)
+        self.assertEqual(config.subscription_deadline_seconds, 120)
         self.assertEqual(config.snapshot_poll_interval_seconds, 3)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 147)
-        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
+        self.assertEqual(config.snapshot_poll_dispatch_max_elapsed_ms, 2500)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 500)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0)
         self.assertEqual(config.daily_context_retry_cycle_seconds, 60)
         self.assertEqual(config.market_data_heartbeat_deadline_seconds, 5)
         self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
@@ -751,6 +1057,15 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             config.snapshot_poll_interval_seconds,
             config.market_data_heartbeat_deadline_seconds,
         )
+
+    def test_legacy_sdk_runtime_config_alias_uses_canonical_contract(self) -> None:
+        alias_config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        canonical_config = load_config(
+            "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
+        )
+
+        self.assertEqual(alias_config.config_path, canonical_config.config_path)
+        self.assertEqual(config_fingerprint(alias_config), config_fingerprint(canonical_config))
 
     def test_snapshot_worker_restart_preserves_existing_bar_boundary(self) -> None:
         self.assertEqual(
@@ -877,8 +1192,60 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             )
         )
 
+    def test_snapshot_dispatch_fails_closed_after_latest_poll_failure(self) -> None:
+        self.assertFalse(
+            market_data_ready_for_dispatch(
+                worker_ready=True,
+                market_data_mode="sdk_snapshot_poll",
+                snapshot_fallback_validated=False,
+            )
+        )
+        self.assertTrue(
+            market_data_ready_for_dispatch(
+                worker_ready=True,
+                market_data_mode="sdk_snapshot_poll",
+                snapshot_fallback_validated=True,
+            )
+        )
+        self.assertTrue(
+            market_data_ready_for_dispatch(
+                worker_ready=True,
+                market_data_mode="sdk_subscription",
+                snapshot_fallback_validated=False,
+            )
+        )
+
     def test_ready_market_data_worker_is_stale_after_heartbeat_deadline(self) -> None:
         self.assertFalse(market_data_heartbeat_is_stale(10.0, 15.0, 5.0))
+        self.assertTrue(market_data_heartbeat_is_stale(10.0, 15.001, 5.0))
+
+    def test_snapshot_worker_startup_uses_recovery_deadline(self) -> None:
+        self.assertEqual(
+            market_data_worker_startup_deadline_seconds(True, 20, 90),
+            90,
+        )
+        self.assertEqual(
+            market_data_worker_startup_deadline_seconds(False, 20, 90),
+            20,
+        )
+
+    def test_replacement_snapshot_worker_keeps_liveness_tolerance(self) -> None:
+        self.assertEqual(
+            market_data_worker_startup_deadline_seconds(
+                True,
+                120,
+                90,
+                snapshot_was_previously_ready=True,
+                snapshot_dispatch_max_elapsed_ms=2500,
+            ),
+            5.0,
+        )
+
+    def test_snapshot_startup_deadline_does_not_change_ready_heartbeat_sla(self) -> None:
+        self.assertEqual(
+            market_data_worker_startup_deadline_seconds(True, 20, 90),
+            90,
+        )
         self.assertTrue(market_data_heartbeat_is_stale(10.0, 15.001, 5.0))
 
     def test_restart_burst_uses_recovery_deadline_away_from_bar_boundary(self) -> None:
@@ -890,7 +1257,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            8,
+            45,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
@@ -900,7 +1267,37 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            8,
+            60,
+        )
+
+    def test_ready_snapshot_liveness_is_not_tighter_than_base_deadline(self) -> None:
+        self.assertEqual(
+            active_market_data_progress_deadline_seconds(
+                "sdk_snapshot_poll",
+                True,
+                base_deadline_seconds=5,
+                recovery_deadline_seconds=90,
+                recent_restarts=7,
+                now=datetime(2026, 8, 20, 18, 45, tzinfo=UTC),
+                bar_minutes=5,
+                snapshot_dispatch_max_elapsed_ms=2500,
+            ),
+            5.0,
+        )
+
+    def test_snapshot_startup_keeps_long_recovery_window(self) -> None:
+        self.assertEqual(
+            active_market_data_progress_deadline_seconds(
+                "sdk_snapshot_poll",
+                False,
+                base_deadline_seconds=5,
+                recovery_deadline_seconds=90,
+                recent_restarts=3,
+                now=datetime(2026, 8, 20, 18, 45, tzinfo=UTC),
+                bar_minutes=5,
+                snapshot_dispatch_max_elapsed_ms=2500,
+            ),
+            90,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
@@ -910,7 +1307,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 44, 55, tzinfo=UTC),
                 5,
             ),
-            8,
+            60,
         )
         self.assertEqual(
             adaptive_market_data_deadline_seconds(
@@ -920,7 +1317,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 datetime(2026, 8, 7, 14, 42, 30, tzinfo=UTC),
                 5,
             ),
-            8,
+            45,
         )
 
     def test_snapshot_fallback_reprobes_push_once_each_market_date(self) -> None:
@@ -949,6 +1346,14 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             ),
             "",
         )
+        self.assertEqual(
+            primary_subscription_reprobe_date(
+                True,
+                set(),
+                datetime(2026, 8, 18, 15, 30, tzinfo=UTC),
+            ),
+            "",
+        )
 
     def test_contract_runtime_uses_longer_snapshot_recovery_deadline(self) -> None:
         config = load_config(
@@ -956,8 +1361,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
 
         self.assertEqual(config.snapshot_poll_recovery_deadline_seconds, 90)
-        self.assertEqual(config.snapshot_poll_request_batch_size, 147)
-        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0.10)
+        self.assertEqual(config.snapshot_poll_request_batch_size, 500)
+        self.assertEqual(config.snapshot_poll_request_interval_seconds, 0)
 
     def test_oversized_runtime_log_is_compressed_before_restart(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -1002,6 +1407,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
 
     def test_acknowledged_subscription_requires_real_quote_progress(self) -> None:
+        self.assertEqual(subscription_quote_stream_deadline_seconds(5), 45)
         self.assertFalse(subscription_quote_stream_is_stale(10.0, 0.0, 18.0, 8.0))
         self.assertTrue(subscription_quote_stream_is_stale(10.0, 0.0, 18.001, 8.0))
         self.assertFalse(subscription_quote_stream_is_stale(10.0, 17.0, 24.0, 8.0))
@@ -1214,8 +1620,11 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 finally:
                     first.close()
 
-    def test_daemon_environment_always_prepares_cn_quote_dns_override(self) -> None:
-        config = SimpleNamespace(quote_region="cn")
+    def test_daemon_environment_preserves_configured_proxy_without_dns_override(self) -> None:
+        config = SimpleNamespace(
+            quote_region="cn",
+            config_path=Path("/tmp/runtime.json"),
+        )
         payload = {
             "library": "/tmp/libm15.so",
             "overrides": {
@@ -1237,10 +1646,45 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         ):
             environment = sdk_runtime_daemon_environment(config)
 
-        prepare.assert_called_once()
+        prepare.assert_not_called()
         self.assertEqual(environment["HTTP_PROXY"], "http://127.0.0.1:10808")
-        self.assertEqual(environment["LD_PRELOAD"], "/tmp/libm15.so")
-        self.assertIn("openapi.longbridge.cn", environment["NO_PROXY"])
+        self.assertNotIn("LD_PRELOAD", environment)
+        self.assertNotIn("NO_PROXY", environment)
+
+    def test_daemon_environment_prefers_real_sdk_system_dns_probe(self) -> None:
+        config = SimpleNamespace(
+            quote_region="cn",
+            config_path=Path("/tmp/runtime.json"),
+        )
+        payload = {
+            "library": "",
+            "overrides": {},
+            "source": "system_dns_sdk_validated",
+            "override_enabled": False,
+        }
+        with (
+            patch(
+                "scripts.run_m15_longbridge_sdk_runtime.prepare_sdk_dns_override",
+                return_value=payload,
+            ) as prepare,
+            patch.dict(
+                "scripts.run_m15_longbridge_sdk_runtime.os.environ",
+                {
+                    "HTTP_PROXY": "http://127.0.0.1:10808",
+                    "LD_PRELOAD": "/tmp/libm15_sdk_dns_override.so",
+                    "M15_LONGBRIDGE_DNS_OVERRIDES": "quote=203.0.113.1",
+                },
+                clear=True,
+            ),
+        ):
+            environment = sdk_runtime_daemon_environment(config)
+
+        prepare.assert_not_called()
+        self.assertEqual(environment["HTTP_PROXY"], "http://127.0.0.1:10808")
+        self.assertNotIn("LD_PRELOAD", environment)
+        self.assertNotIn("M15_LONGBRIDGE_DNS_OVERRIDES", environment)
+        self.assertNotIn("LD_PRELOAD", environment)
+        self.assertNotIn("M15_LONGBRIDGE_DNS_OVERRIDES", environment)
 
     def test_global_quote_daemon_does_not_prepare_cn_override(self) -> None:
         with patch(
@@ -1552,7 +1996,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 ),
                 patch(
                     "scripts.run_m15_longbridge_sdk_runtime.process_age_seconds",
-                    return_value=540,
+                    return_value=1800,
                 ),
                 patch(
                     "scripts.run_m15_longbridge_sdk_runtime.request_runtime_shutdown"
@@ -1793,7 +2237,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 "runtime_id": "legacy-position-exit",
                 "side": "sell",
                 "position_action": "close_long",
-                "exit_only_position_signal": True,
+                "longbridge_position_exit_source": True,
             }
             with (
                 patch(
@@ -1819,16 +2263,17 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     signal_id_cache=set(),
                     execution_ledger_cache=[],
                     fill_attribution_state_cache={},
+                    allow_new_entries=False,
                 )
 
-        routed_rows = router.call_args.kwargs["market_events_override"]
+        router.assert_not_called()
         monitored_rows = position_manager.call_args.kwargs["market_events_override"]
-        self.assertFalse(any(row.get("symbol") == "ZM" for row in routed_rows))
         self.assertTrue(any(row.get("symbol") == "ZM" for row in monitored_rows))
         execution.assert_called_once()
         self.assertEqual(result["execution"]["submitted_count"], 1)
         self.assertEqual(result["trading_event_count"], 0)
         self.assertEqual(result["monitoring_only_event_count"], 1)
+        self.assertFalse(result["new_entry_market_data_gate"]["eligible"])
 
     def test_pending_formal_epoch_suppresses_router_before_empty_epoch_replacement(self) -> None:
         with TemporaryDirectory() as directory:
@@ -2728,6 +3173,75 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(completed[0]["session_high_at_bar_close"], "102")
         self.assertEqual(completed[0]["session_volume_at_bar_close"], "300")
 
+    def test_confirmed_candlestick_builder_emits_broker_ohlcv_and_session_state(self) -> None:
+        builder = ConfirmedCandlestickBarBuilder(
+            complete_bar_open_not_before=datetime(2026, 7, 15, 13, 35, tzinfo=UTC)
+        )
+        first = builder.on_candlestick(
+            "AAPL.US",
+            {
+                "timestamp": datetime(2026, 7, 15, 13, 35, tzinfo=UTC),
+                "open": "100",
+                "high": "103",
+                "low": "99",
+                "close": "102",
+                "volume": 500,
+            },
+            is_confirmed=True,
+            received_at=datetime(2026, 7, 15, 13, 40, 0, 200000, tzinfo=UTC),
+        )
+        second = builder.on_candlestick(
+            "AAPL.US",
+            {
+                "timestamp": datetime(2026, 7, 15, 13, 40, tzinfo=UTC),
+                "open": "102",
+                "high": "104",
+                "low": "101",
+                "close": "103",
+                "volume": 300,
+            },
+            is_confirmed=True,
+            received_at=datetime(2026, 7, 15, 13, 45, 0, 150000, tzinfo=UTC),
+        )
+        self.assertEqual(first[0]["source_mode"], "longbridge_sdk_confirmed_candlestick")
+        self.assertEqual(first[0]["bar_finalization_delay_ms"], 200)
+        self.assertEqual(second[0]["session_open_at_bar_close"], "100")
+        self.assertEqual(second[0]["session_high_at_bar_close"], "104")
+        self.assertEqual(second[0]["session_low_at_bar_close"], "99")
+        self.assertEqual(second[0]["session_volume_at_bar_close"], "800")
+
+    def test_confirmed_candlestick_builder_suppresses_partial_and_unconfirmed_bars(self) -> None:
+        builder = ConfirmedCandlestickBarBuilder(
+            complete_bar_open_not_before=datetime(2026, 7, 15, 13, 40, tzinfo=UTC)
+        )
+        payload = {
+            "timestamp": datetime(2026, 7, 15, 13, 35, tzinfo=UTC),
+            "open": "100",
+            "high": "101",
+            "low": "99",
+            "close": "100.5",
+            "volume": 10,
+        }
+        self.assertEqual(
+            builder.on_candlestick(
+                "AAPL.US",
+                payload,
+                is_confirmed=True,
+                received_at=datetime(2026, 7, 15, 13, 40, 1, tzinfo=UTC),
+            ),
+            [],
+        )
+        payload["timestamp"] = datetime(2026, 7, 15, 13, 40, tzinfo=UTC)
+        self.assertEqual(
+            builder.on_candlestick(
+                "AAPL.US",
+                payload,
+                is_confirmed=False,
+                received_at=datetime(2026, 7, 15, 13, 44, 59, tzinfo=UTC),
+            ),
+            [],
+        )
+
     def test_live_daily_confirmation_prefers_bar_boundary_snapshot(self) -> None:
         row = {
             "event_id": "aapl-boundary", "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
@@ -2854,7 +3368,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(last.timestamp()), "last_done": "202", "current_volume": 20, "volume": 1020}, received_at=last), [])
         rows = builder.flush(datetime(2026, 7, 14, 13, 35, 1, tzinfo=UTC))
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_push")
+        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_quote_push")
         self.assertTrue(rows[0]["bar_final"])
         self.assertEqual(rows[0]["open"], "200")
         self.assertEqual(rows[0]["close"], "202")
@@ -2863,6 +3377,236 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(rows[0]["received_at"], "2026-07-14T13:35:01Z")
         self.assertEqual(rows[0]["source_delivery_age_ms"], 2000)
         self.assertEqual(rows[0]["bar_finalization_delay_ms"], 1000)
+
+    def test_sdk_trade_push_builds_true_interval_ohlcv(self) -> None:
+        builder = FiveMinuteBarBuilder()
+        first = datetime(2026, 8, 18, 13, 31, tzinfo=UTC)
+        second = datetime(2026, 8, 18, 13, 32, tzinfo=UTC)
+        third = datetime(2026, 8, 18, 13, 34, 59, tzinfo=UTC)
+
+        builder.on_trade(
+            "AAPL.US",
+            {
+                "trades": [
+                    {"timestamp": first, "price": "200", "volume": 10},
+                    {"timestamp": second, "price": "203", "volume": 7},
+                    {"timestamp": third, "price": "199", "volume": 5},
+                ]
+            },
+            received_at=third,
+        )
+        rows = builder.flush(datetime(2026, 8, 18, 13, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_trade_push")
+        self.assertEqual(rows[0]["open"], "200")
+        self.assertEqual(rows[0]["high"], "203")
+        self.assertEqual(rows[0]["low"], "199")
+        self.assertEqual(rows[0]["close"], "199")
+        self.assertEqual(rows[0]["volume"], "22")
+        self.assertEqual(rows[0]["market_data_blocked_reason"], "")
+
+    def test_snapshot_seed_emits_nontradable_zero_trade_bar(self) -> None:
+        builder = FiveMinuteBarBuilder(
+            minutes=5,
+            complete_bar_open_not_before=datetime(
+                2026, 8, 19, 13, 30, tzinfo=UTC
+            ),
+        )
+        self.assertTrue(
+            builder.seed_quote_snapshot(
+                "AAPL.US",
+                {
+                    "last_done": "100",
+                    "open": "98",
+                    "high": "101",
+                    "low": "97",
+                    "volume": "1000",
+                },
+                received_at=datetime(2026, 8, 19, 13, 29, 50, tzinfo=UTC),
+            )
+        )
+
+        builder.ensure_zero_trade_bars(
+            datetime(2026, 8, 19, 13, 30, 1, tzinfo=UTC)
+        )
+        rows = builder.flush(datetime(2026, 8, 19, 13, 35, 1, tzinfo=UTC))
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["open"], "100")
+        self.assertEqual(row["close"], "100")
+        self.assertEqual(row["volume"], "0")
+        self.assertTrue(row["synthetic_no_trade_bar"])
+        self.assertFalse(row["strategy_dispatch_eligible"])
+        self.assertEqual(row["session_volume_at_bar_close"], "1000")
+
+    def test_real_trade_replaces_synthetic_bar_and_sets_next_entry(self) -> None:
+        builder = FiveMinuteBarBuilder(
+            minutes=5,
+            complete_bar_open_not_before=datetime(
+                2026, 8, 19, 13, 30, tzinfo=UTC
+            ),
+        )
+        builder.seed_quote_snapshot(
+            "AAPL.US",
+            {
+                "last_done": "100",
+                "open": "98",
+                "high": "101",
+                "low": "97",
+                "volume": "1000",
+            },
+            received_at=datetime(2026, 8, 19, 13, 29, 50, tzinfo=UTC),
+        )
+        builder.ensure_zero_trade_bars(
+            datetime(2026, 8, 19, 13, 30, 1, tzinfo=UTC)
+        )
+        self.assertEqual(
+            builder.on_trade(
+                "AAPL.US",
+                {
+                    "trades": [
+                        {
+                            "timestamp": datetime(
+                                2026, 8, 19, 13, 31, tzinfo=UTC
+                            ),
+                            "price": "101",
+                            "volume": "3",
+                        },
+                        {
+                            "timestamp": datetime(
+                                2026, 8, 19, 13, 34, tzinfo=UTC
+                            ),
+                            "price": "102",
+                            "volume": "4",
+                        },
+                    ]
+                },
+                received_at=datetime(2026, 8, 19, 13, 34, 1, tzinfo=UTC),
+            ),
+            [],
+        )
+
+        rows = builder.on_trade(
+            "AAPL.US",
+            {
+                "trades": [
+                    {
+                        "timestamp": datetime(
+                            2026, 8, 19, 13, 35, 2, tzinfo=UTC
+                        ),
+                        "price": "103",
+                        "volume": "2",
+                    }
+                ]
+            },
+            received_at=datetime(2026, 8, 19, 13, 35, 3, tzinfo=UTC),
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["open"], "101")
+        self.assertEqual(row["high"], "102")
+        self.assertEqual(row["low"], "101")
+        self.assertEqual(row["close"], "102")
+        self.assertEqual(row["volume"], "7")
+        self.assertNotIn("synthetic_no_trade_bar", row)
+        self.assertEqual(row["next_bar_first_quote_price"], "103")
+        self.assertEqual(
+            row["next_bar_entry_source"],
+            "longbridge_sdk_first_trade_after_bar_close",
+        )
+
+    def test_historical_candlestick_requests_are_explicitly_paced(self) -> None:
+        class Quote:
+            def candlesticks(self, *_args):
+                return []
+
+        sdk = SimpleNamespace(
+            Period=SimpleNamespace(Day="day"),
+            AdjustType=SimpleNamespace(NoAdjust="none"),
+        )
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.time.sleep"
+        ) as mocked_sleep:
+            rows, failures = fetch_daily_context_rows(
+                Quote(),
+                sdk,
+                ("AAPL.US", "MSFT.US", "NVDA.US"),
+                60,
+                request_interval_seconds=0.60,
+            )
+
+        self.assertEqual(rows, [])
+        self.assertEqual(failures, [])
+        self.assertEqual(mocked_sleep.call_count, 2)
+        mocked_sleep.assert_called_with(0.60)
+
+    def test_postclose_intraday_worker_publishes_each_symbol_before_later_failure(self) -> None:
+        class Quote:
+            def candlesticks(self, symbol, *_args):
+                if symbol == "MSFT.US":
+                    raise TimeoutError("simulated native timeout")
+                return [symbol]
+
+        class OAuthBuilder:
+            def __init__(self, _client_id):
+                pass
+
+            def build(self, _callback):
+                return object()
+
+        output = queue.Queue()
+        sdk = SimpleNamespace(
+            OAuthBuilder=OAuthBuilder,
+            QuoteContext=lambda _config: Quote(),
+            Period=SimpleNamespace(Min_5="5m"),
+            AdjustType=SimpleNamespace(NoAdjust="none"),
+        )
+        config = SimpleNamespace(quote_region="cn", bar_minutes=5)
+
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.load_config",
+            return_value=config,
+        ), patch(
+            "scripts.run_m15_longbridge_sdk_runtime.require_sdk_contract",
+            return_value=sdk,
+        ), patch(
+            "scripts.run_m15_longbridge_sdk_runtime.read_client_id",
+            return_value="client-id",
+        ), patch(
+            "scripts.run_m15_longbridge_sdk_runtime.sdk_config_from_oauth",
+            return_value=object(),
+        ), patch(
+            "scripts.run_m15_longbridge_sdk_runtime.event_rows_to_intraday_context",
+            side_effect=lambda symbol, *_args, **_kwargs: [{"symbol": symbol}],
+        ), patch(
+            "scripts.run_m15_longbridge_sdk_runtime.silence_sdk_worker_console"
+        ), patch(
+            "scripts.run_m15_longbridge_sdk_runtime.time.sleep"
+        ) as pacing:
+            intraday_context_worker(
+                "config.json",
+                ["AAPL.US", "MSFT.US", "NVDA.US"],
+                "postclose-recovery-test-01",
+                "2026-08-18T13:30:00Z",
+                "2026-08-18T20:00:00Z",
+                output,
+            )
+
+        messages = list(output.queue)
+        progress = [row for row in messages if row["kind"] == "intraday_context"]
+        self.assertEqual(
+            [row["completed_symbol"] for row in progress],
+            ["AAPL.US", "MSFT.US", "NVDA.US"],
+        )
+        self.assertEqual(progress[0]["rows"], [{"symbol": "AAPL.US"}])
+        self.assertEqual(progress[1]["failures"], ["MSFT.US"])
+        self.assertEqual(progress[2]["rows"], [{"symbol": "NVDA.US"}])
+        self.assertEqual(messages[-1]["kind"], "intraday_context_task_complete")
+        self.assertEqual(messages[-1]["failures"], ["MSFT.US"])
+        self.assertEqual(pacing.call_count, 2)
 
     def test_first_quote_push_volume_is_not_counted_as_an_interval_increment(self) -> None:
         builder = FiveMinuteBarBuilder(minutes=5)
@@ -3025,6 +3769,81 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             ),
             [row],
         )
+
+    def test_regular_session_close_flush_runs_once_inside_freshness_window(self) -> None:
+        attempted: set[str] = set()
+        business_date, action = regular_session_close_flush_action(
+            datetime(2026, 8, 18, 20, 0, 4, tzinfo=UTC),
+            attempted,
+            maximum_finalization_delay_ms=5000,
+        )
+
+        self.assertEqual(business_date, "2026-08-18")
+        self.assertEqual(action, "flush")
+        attempted.add(business_date)
+        self.assertEqual(
+            regular_session_close_flush_action(
+                datetime(2026, 8, 18, 20, 0, 4, tzinfo=UTC),
+                attempted,
+                maximum_finalization_delay_ms=5000,
+            ),
+            ("2026-08-18", "not_due"),
+        )
+
+    def test_regular_session_close_flush_marks_late_wakeup_without_routing(self) -> None:
+        self.assertEqual(
+            regular_session_close_flush_action(
+                datetime(2026, 8, 18, 20, 0, 6, tzinfo=UTC),
+                set(),
+                maximum_finalization_delay_ms=5000,
+            ),
+            ("2026-08-18", "missed_deadline"),
+        )
+
+    def test_regular_session_close_flush_is_not_due_before_close_or_weekend(self) -> None:
+        self.assertEqual(
+            regular_session_close_flush_action(
+                datetime(2026, 8, 18, 19, 59, 59, tzinfo=UTC),
+                set(),
+                maximum_finalization_delay_ms=5000,
+            )[1],
+            "not_due",
+        )
+        self.assertEqual(
+            regular_session_close_flush_action(
+                datetime(2026, 8, 22, 20, 0, 1, tzinfo=UTC),
+                set(),
+                maximum_finalization_delay_ms=5000,
+            )[1],
+            "not_due",
+        )
+
+    def test_terminal_postclose_recovery_is_not_repeated_after_restart(self) -> None:
+        attempted, state = restored_postclose_recovery_state(
+            {
+                "postclose_intraday_recovery": {
+                    "business_date": "2026-08-18",
+                    "status": "completed_incomplete_data",
+                    "last_error": "postclose_intraday_recovery_deadline_exceeded",
+                }
+            }
+        )
+
+        self.assertEqual(attempted, {"2026-08-18"})
+        self.assertEqual(state["status"], "completed_incomplete_data")
+
+    def test_interrupted_postclose_recovery_can_be_retried_after_restart(self) -> None:
+        attempted, state = restored_postclose_recovery_state(
+            {
+                "postclose_intraday_recovery": {
+                    "business_date": "2026-08-18",
+                    "status": "running",
+                }
+            }
+        )
+
+        self.assertEqual(attempted, set())
+        self.assertEqual(state["status"], "not_started")
 
     def test_sdk_restart_suppresses_the_first_partial_five_minute_bar(self) -> None:
         builder = FiveMinuteBarBuilder(
@@ -3465,6 +4284,45 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(quote.calls, [["BKNG.US", "EXPE.US", "LYFT.US"]])
         self.assertEqual(progress, [(3, 3)])
 
+    def test_failed_subscription_batch_retries_each_symbol_before_rejecting(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+                self.single_attempts = {}
+
+            def subscribe(self, symbols, _subscription_types) -> None:
+                self.calls.append(symbols)
+                if len(symbols) > 1:
+                    raise TimeoutError("batch request timed out")
+                symbol = symbols[0]
+                self.single_attempts[symbol] = self.single_attempts.get(symbol, 0) + 1
+                if symbol == "BKR.US" and self.single_attempts[symbol] == 1:
+                    raise TimeoutError("cold single request timed out")
+
+        quote = QuoteContext()
+        failures = subscribe_quote_and_trades(
+            quote,
+            ["BKR.US", "DVN.US"],
+            ["Quote"],
+            batch_size=2,
+            retry_count=1,
+            retry_backoff_seconds=0,
+            request_interval_seconds=0,
+            recover_failed_batch_symbols=True,
+        )
+
+        self.assertEqual(failures, [])
+        self.assertEqual(
+            quote.calls,
+            [
+                ["BKR.US", "DVN.US"],
+                ["BKR.US", "DVN.US"],
+                ["BKR.US"],
+                ["BKR.US"],
+                ["DVN.US"],
+            ],
+        )
+
     def test_sdk_region_endpoints_are_explicit(self) -> None:
         self.assertEqual(
             sdk_endpoint_overrides("cn"),
@@ -3485,6 +4343,9 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 return {"oauth": oauth, **kwargs}
 
         class Sdk:
+            class PushCandlestickMode:
+                Confirmed = "confirmed"
+
             class TopicType:
                 Private = "Private"
 
@@ -3494,6 +4355,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             sdk_config_from_oauth(Sdk, "token", "cn")["quote_ws_url"],
             "wss://openapi-quote.longbridge.cn/v2",
         )
+        self.assertTrue(sdk_config_from_oauth(Sdk, "token", "cn")["enable_papertrading"])
 
         class Trade:
             def __init__(self) -> None:

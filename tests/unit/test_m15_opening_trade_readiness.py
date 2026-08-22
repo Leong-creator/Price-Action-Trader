@@ -321,6 +321,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             "trading_daily_context_row_count": expected_rows,
             "daily_context_failed_symbols": [],
             "account_snapshot_healthy": True,
+            "market_data_mode": "sdk_subscription",
         }
         self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
         status["market_data_mode"] = "sdk_snapshot_poll"
@@ -332,7 +333,19 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
         status["market_data_worker_recent_restart_count"] = 0
         status["trading_market_data_coverage"] = f"{trading_count}/{trading_count}"
         status["trading_subscription_coverage"] = f"0/{trading_count}"
-        self.assertEqual(sdk_runtime_health_issues(status, sdk_config, True), [])
+        status["market_data_fallback_validated"] = True
+        status["snapshot_poll_is_fast_and_complete"] = True
+        status["snapshot_poll_consecutive_failures"] = 0
+        self.assertNotIn(
+            "sdk_persistent_push_stream_not_active",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
+        status["snapshot_poll_consecutive_failures"] = 1
+        self.assertIn(
+            "sdk_persistent_push_stream_not_active",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
+        status["snapshot_poll_consecutive_failures"] = 0
         status["daily_context_state"] = "loading"
         status["trading_daily_context_ready"] = False
         self.assertIn("sdk_daily_context_incomplete", sdk_runtime_health_issues(status, sdk_config, True))
@@ -348,6 +361,33 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
         status["trading_universe_fingerprint"] = "drift"
         self.assertIn(
             "sdk_trading_universe_fingerprint_drift",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
+
+    def test_sdk_readiness_blocks_only_entries_after_incomplete_boundary(self) -> None:
+        sdk_config = load_sdk_runtime_config()
+        trading_count = len(sdk_configured_trading_symbols(sdk_config))
+        status = {
+            "status": "running",
+            "sdk_connected": True,
+            "runtime_engine": "sdk",
+            "config_fingerprint": sdk_config_fingerprint(sdk_config),
+            "trading_universe_fingerprint": trading_universe_fingerprint(
+                sdk_config
+            ),
+            "trading_market_data_coverage": f"{trading_count}/{trading_count}",
+            "confirmed_candlestick_coverage": f"{trading_count}/{trading_count}",
+            "market_data_mode": "sdk_subscription",
+            "trading_daily_context_ready": True,
+            "account_snapshot_healthy": True,
+            "confirmed_boundary_gate": {
+                "status": "incomplete_boundary_deadline_expired",
+                "new_position_submission_enabled": False,
+            },
+        }
+
+        self.assertIn(
+            "sdk_confirmed_boundary_gate=incomplete_boundary_deadline_expired",
             sdk_runtime_health_issues(status, sdk_config, True),
         )
 

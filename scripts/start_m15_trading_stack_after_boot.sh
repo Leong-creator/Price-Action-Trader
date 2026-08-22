@@ -46,10 +46,18 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 
 DNS_ENV_FILE="$OUTPUT_DIR/m15_sdk_dns_override.env"
-"$PYTHON_BIN" scripts/prepare_m15_sdk_dns_override.py --env-file "$DNS_ENV_FILE"
-# This environment affects only this bootstrap and the M15 children it owns.
-# It does not edit Windows/WSL proxy, resolver or hosts settings.
-source "$DNS_ENV_FILE"
+if "$PYTHON_BIN" scripts/prepare_m15_sdk_dns_override.py \
+  --env-file "$DNS_ENV_FILE" \
+  --runtime-config config/examples/m15_longbridge_sdk_runtime.contract_v1.json; then
+  # This environment affects only this bootstrap and the M15 children it owns.
+  # It does not edit Windows/WSL proxy, resolver or hosts settings.
+  source "$DNS_ENV_FILE"
+else
+  # The resolver shim is only a fallback.  A temporary preparation failure
+  # must not prevent the watchdog and post-close scheduler from starting.
+  echo "Longbridge optional DNS fallback preparation failed; continue with system DNS and let the watchdog retry the SDK runtime."
+  unset M15_LONGBRIDGE_DNS_OVERRIDES
+fi
 
 run_step() {
   local label="$1"
