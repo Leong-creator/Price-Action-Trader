@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import multiprocessing as mp
 import os
@@ -16,6 +17,7 @@ import queue
 import signal
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from collections import deque
@@ -522,6 +524,25 @@ def active_reference_quotes_are_stale(
             for timestamp in timestamps
         )
     )
+
+
+def process_resource_snapshot() -> dict[str, int]:
+    try:
+        file_descriptors = len(list(Path("/proc/self/fd").iterdir()))
+    except OSError:
+        file_descriptors = -1
+    try:
+        status = Path("/proc/self/status").read_text(encoding="utf-8")
+        memory_kib = int(
+            next(line.split()[1] for line in status.splitlines() if line.startswith("VmRSS:"))
+        )
+    except (OSError, StopIteration, ValueError):
+        memory_kib = -1
+    return {
+        "thread_count": threading.active_count(),
+        "file_descriptor_count": file_descriptors,
+        "resident_memory_kib": memory_kib,
+    }
 
 
 def realtime_boundary_is_complete(
@@ -1917,7 +1938,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     except (OSError, IndexError):
         runtime_process_start_ticks = ""
     loaded_config_fingerprint = config_fingerprint(config)
-    readonly_gate_passed_now, readonly_sessions_passed, readonly_sessions_required = readonly_gate_passed(config.readonly_gate_path)
+    readonly_gate_passed_now, readonly_sessions_passed, readonly_sessions_required = readonly_gate_passed(
+        config.readonly_gate_path,
+        required_sessions=1,
+    )
     expansion_gate_path = config.output_dir / "m15_sdk_expansion_readonly_gate.json"
     expansion_gate_passed, expansion_sessions_passed, expansion_sessions_required = readonly_gate_passed(
         expansion_gate_path,
@@ -2015,6 +2039,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     worker_generation = 0
     next_worker_start_monotonic = 0.0
     last_push_by_symbol: dict[str, float] = {}
+    last_push_at_by_symbol: dict[str, str] = {}
+    complete_boundary_count = 0
+    incomplete_boundary_count = 0
+    late_boundary_count = 0
+    realtime_tradable_bar_count = 0
+    no_trade_carry_forward_count = 0
+    last_complete_boundary = ""
+    last_incomplete_boundary = ""
+    last_boundary_missing_symbols: list[str] = []
     subscription_progress_completed = 0
     subscription_progress_total = len(configured_symbols(config))
     restored_latency_samples, restored_last_result, restored_last_event_at = restore_pipeline_observability(
@@ -2383,7 +2416,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     received_at=quote_received_at,
                     source_mode=str(message.get("source_mode") or "longbridge_sdk_push"),
                 )
-                last_push_by_symbol[str(message.get("symbol") or "").upper()] = time.monotonic()
+                normalized_push_symbol = str(message.get("symbol") or "").upper()
+                last_push_by_symbol[normalized_push_symbol] = time.monotonic()
+                last_push_at_by_symbol[normalized_push_symbol] = to_iso(quote_received_at)
             elif kind == "ready":
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
@@ -2492,10 +2527,40 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     config, daily_rows, configured_trading_symbols(config), daily_failed
                 )
                 active_client = paper_client if trading_daily_context_ready else None
-                if not realtime_boundary_is_complete(
+                boundary_complete = realtime_boundary_is_complete(
                     rows,
                     configured_trading_symbols(config),
-                ):
+                )
+                expected_boundary_symbols = {
+                    symbol.upper().removesuffix(".US")
+                    for symbol in configured_trading_symbols(config)
+                }
+                actual_boundary_symbols = {
+                    str(row.get("symbol") or "").upper().removesuffix(".US")
+                    for row in rows
+                    if row.get("symbol")
+                }
+                boundary_name = str((rows or [{}])[0].get("event_time") or "")
+                last_boundary_missing_symbols = sorted(
+                    expected_boundary_symbols - actual_boundary_symbols
+                )
+                if boundary_complete:
+                    complete_boundary_count += 1
+                    last_complete_boundary = boundary_name
+                else:
+                    incomplete_boundary_count += 1
+                    last_incomplete_boundary = boundary_name
+                    if rows and not last_boundary_missing_symbols:
+                        late_boundary_count += 1
+                realtime_tradable_bar_count += sum(
+                    not bool(row.get("market_data_blocked_reason")) for row in rows
+                )
+                no_trade_carry_forward_count += sum(
+                    "no_trade_carry_forward"
+                    in str(row.get("market_data_blocked_reason") or "")
+                    for row in rows
+                )
+                if not boundary_complete:
                     active_client = None
                 if market_data_mode != "sdk_subscription":
                     active_client = None
@@ -2845,6 +2910,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 daily_context_persisted = False
                 daily_context_ready = False
             is_after_regular_session = now_ny.weekday() < 5 and (now_ny.hour >= 16)
+            expected_regular_boundaries = 78
+            expected_regular_bars = (
+                len(configured_trading_symbols(config)) * expected_regular_boundaries
+            )
+            realtime_session_acceptance_ready = bool(
+                complete_boundary_count == expected_regular_boundaries
+                and incomplete_boundary_count == 0
+                and late_boundary_count == 0
+                and realtime_tradable_bar_count + no_trade_carry_forward_count
+                == expected_regular_bars
+                and worker_generation == 1
+                and int(summarize_latency_samples(list(pipeline_latency_samples)).get("p95_ms") or 0)
+                <= 1000
+            )
             if (
                 config.two_day_readonly_gate
                 and is_after_regular_session
@@ -2855,6 +2934,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and age is not None
                 and age <= config.maximum_account_snapshot_age_seconds
                 and last_event_at
+                and realtime_session_acceptance_ready
             ):
                 gate = record_readonly_session(config.readonly_gate_path, session_date, {
                     "subscription_coverage": (
@@ -2864,7 +2944,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "last_event_at": last_event_at,
                     "account_snapshot_age_seconds": age,
                     "runtime_engine": "sdk",
-                }) if market_data_mode_qualifies_for_subscription_gate(
+                    "complete_boundary_count": complete_boundary_count,
+                    "expected_boundary_count": expected_regular_boundaries,
+                    "realtime_bar_count": realtime_tradable_bar_count + no_trade_carry_forward_count,
+                    "expected_realtime_bar_count": expected_regular_bars,
+                    "incomplete_boundary_count": incomplete_boundary_count,
+                    "late_boundary_count": late_boundary_count,
+                    "quote_worker_generation": worker_generation,
+                }, required_sessions=1) if market_data_mode_qualifies_for_subscription_gate(
                     market_data_mode
                 ) else {
                     "passed": False,
@@ -2956,6 +3043,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 expansion_acceptance_status = "latency_above_target"
             else:
                 expansion_acceptance_status = "readonly_observing"
+            subscription_set_hash = hashlib.sha256(
+                "\n".join(sorted(market_data_symbols)).encode("utf-8")
+            ).hexdigest()
+            resources = process_resource_snapshot()
             build_status(
                 config,
                 status=(
@@ -2995,6 +3086,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "subscription_recovery_failures": subscription_recovery_failures,
                     "market_data_mode": market_data_mode,
+                    "market_data_transport": "official_sdk_persistent_websocket",
                     "market_data_fallback_validated": market_data_fallback_validated,
                     "source_mode": (
                         "longbridge_sdk_snapshot_poll"
@@ -3013,6 +3105,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_poll_is_fast_and_complete": snapshot_poll_is_fast_and_complete,
                     "last_market_data_worker_error": last_market_data_worker_error,
                     "market_data_circuit_open": market_data_circuit_open,
+                    "subscription_set_sha256": subscription_set_hash,
+                    "last_push_at_by_symbol": dict(sorted(last_push_at_by_symbol.items())),
+                    "reference_push_heartbeat": {
+                        symbol: last_push_at_by_symbol.get(symbol, "")
+                        for symbol in ("SPY.US", "QQQ.US")
+                    },
+                    "complete_boundary_count": complete_boundary_count,
+                    "incomplete_boundary_count": incomplete_boundary_count,
+                    "late_boundary_count": late_boundary_count,
+                    "last_complete_boundary": last_complete_boundary,
+                    "last_incomplete_boundary": last_incomplete_boundary,
+                    "last_boundary_missing_symbols": last_boundary_missing_symbols,
+                    "realtime_tradable_bar_count": realtime_tradable_bar_count,
+                    "no_trade_carry_forward_count": no_trade_carry_forward_count,
+                    "postclose_repair_bar_count": 0,
+                    "realtime_order_evidence_only": True,
+                    "realtime_session_acceptance_ready": realtime_session_acceptance_ready,
+                    "expected_regular_boundary_count": expected_regular_boundaries,
+                    "expected_regular_bar_count": expected_regular_bars,
+                    **resources,
                     "snapshot_batch_count": snapshot_batch_count,
                     "snapshot_row_count": snapshot_row_count,
                     "snapshot_open_bar_count": (

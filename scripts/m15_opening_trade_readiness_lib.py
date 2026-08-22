@@ -554,6 +554,16 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
         issues.append(f"runtime_status={status.get('status') or 'missing'}")
     if status.get("sdk_connected") is not True:
         issues.append("sdk_not_connected")
+    if status.get("deployment_manifest_verified") is not True:
+        issues.append("sdk_deployment_manifest_invalid")
+    if status.get("deployment_worktree_clean") is not True:
+        issues.append("sdk_deployment_worktree_dirty")
+    if status.get("market_data_transport") != "official_sdk_persistent_websocket":
+        issues.append("sdk_market_data_transport_invalid")
+    if status.get("market_data_mode") not in {"", "sdk_subscription"}:
+        issues.append("sdk_market_data_mode_not_subscription")
+    if status.get("market_data_circuit_open") is True:
+        issues.append("sdk_market_data_circuit_open")
     if status.get("runtime_engine") not in {"", "sdk"}:
         issues.append("runtime_engine_not_sdk")
     expected_fingerprint = sdk_config_fingerprint(sdk_config) if sdk_config is not None else ""

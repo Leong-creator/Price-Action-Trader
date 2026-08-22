@@ -188,6 +188,11 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
         status = {
             "status": "running",
             "sdk_connected": True,
+            "deployment_manifest_verified": True,
+            "deployment_worktree_clean": True,
+            "market_data_transport": "official_sdk_persistent_websocket",
+            "market_data_mode": "sdk_subscription",
+            "market_data_circuit_open": False,
             "runtime_engine": "sdk",
             "config_fingerprint": sdk_config_fingerprint(sdk_config),
             "trading_universe_fingerprint": trading_universe_fingerprint(

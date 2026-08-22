@@ -5,7 +5,7 @@
     "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
     "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
     "runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json",
-    "readonly_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_readonly_gate.json"
+    "readonly_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_marketdata_integrity_gate_v1.json"
   },
   "oauth": {
     "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
@@ -67,7 +67,7 @@
     "account_snapshot_refresh_deadline_seconds": 8,
     "account_snapshot_circuit_retry_seconds": 15,
     "maximum_account_snapshot_age_seconds": 45,
-    "two_day_readonly_gate": false,
+    "two_day_readonly_gate": true,
     "paper_trading_only": true,
     "live_execution": false,
     "real_money_actions": false,

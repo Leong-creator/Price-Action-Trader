@@ -153,6 +153,13 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "runtime_engine": "sdk",
             "sdk_connected": True,
             "market_data_mode": "sdk_snapshot_poll",
+            "market_data_transport": "official_sdk_persistent_websocket",
+            "complete_boundary_count": 12,
+            "incomplete_boundary_count": 2,
+            "late_boundary_count": 1,
+            "postclose_repair_bar_count": 147,
+            "deployment_manifest_verified": True,
+            "deployment_worktree_clean": True,
             "market_data_coverage": "300/300",
             "trading_market_data_coverage": "147/147",
             "configured_symbol_count": 300,
@@ -325,6 +332,10 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["runtime"]["market_data_coverage"], "300/300")
         self.assertEqual(payload["runtime"]["trading_market_data_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["readonly_expansion_subscription_coverage"], "153/153")
+        self.assertEqual(payload["runtime"]["complete_boundary_count"], 12)
+        self.assertEqual(payload["runtime"]["incomplete_boundary_count"], 2)
+        self.assertEqual(payload["runtime"]["postclose_repair_bar_count"], 147)
+        self.assertTrue(payload["runtime"]["deployment_manifest_verified"])
         self.assertFalse(payload["pa004_migration"]["enabled"])
         self.assertEqual(payload["pa002_dual_version_milestone"]["milestone_phase"], "technical_review_only")
         self.assertTrue(payload["pa002_dual_version_milestone"]["data_available"])
@@ -336,6 +347,8 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertIn("分仓实际成交成绩", html)
         self.assertIn("扣费后盈利因子", html)
         self.assertIn("做空信号诊断", html)
+        self.assertIn("按时完整边界", html)
+        self.assertIn("盘后补录K线", html)
         self.assertIn("PA002双版本阶段", html)
 
     def test_dashboard_blocks_stale_statistics_and_dead_runtime(self) -> None:
