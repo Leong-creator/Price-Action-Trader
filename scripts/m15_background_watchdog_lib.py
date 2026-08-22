@@ -293,9 +293,34 @@ def semantic_watchdog_failure(step_id: str, stdout: str) -> str:
             return f"opening_readiness_blocked:{status_value}"
     if step_id == "m15_monday_acceptance":
         status_value = str(payload.get("acceptance_status") or "")
-        if status_value.startswith("blocked"):
+        if status_value.startswith("blocked") and not acceptance_is_expected_readonly_wait(payload):
             return f"monday_acceptance_blocked:{status_value}"
     return ""
+
+
+def acceptance_is_expected_readonly_wait(payload: dict[str, Any]) -> bool:
+    checks = [row for row in payload.get("checks", []) if isinstance(row, dict)]
+    failed = {
+        str(row.get("check") or "")
+        for row in checks
+        if str(row.get("status") or "") == "fail"
+    }
+    waiting_for_session = any(
+        str(row.get("check") or "") == "regular_us_market_window"
+        and str(row.get("status") or "").startswith("waiting")
+        for row in checks
+    )
+    dispatch_wait = any(
+        str(row.get("check") or "") == "paper_dispatch_armed"
+        and "enabled=False" in str(row.get("actual") or "")
+        and "requested=True" in str(row.get("actual") or "")
+        for row in checks
+    )
+    return bool(
+        waiting_for_session
+        and dispatch_wait
+        and failed <= {"paper_dispatch_armed"}
+    )
 
 
 def m15_runtime_daemon_step(config: BackgroundWatchdogConfig, runner: CommandRunner) -> dict[str, Any]:

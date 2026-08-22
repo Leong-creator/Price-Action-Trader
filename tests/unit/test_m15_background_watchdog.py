@@ -7,11 +7,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.m15_background_watchdog_lib import (
+    acceptance_is_expected_readonly_wait,
     analytics_refresh_due,
     load_config,
     run_background_watchdog_once,
     m15_runtime_status_step,
     pa002_milestone_refresh_step,
+    semantic_watchdog_failure,
     should_append_watchdog_ledger,
     start_daemon,
     status,
@@ -19,6 +21,28 @@ from scripts.m15_background_watchdog_lib import (
 
 
 class M15BackgroundWatchdogTest(unittest.TestCase):
+    def test_readonly_gate_wait_is_not_a_watchdog_failure(self) -> None:
+        payload = {
+            "acceptance_status": "blocked_monday_acceptance",
+            "checks": [
+                {
+                    "check": "paper_dispatch_armed",
+                    "status": "fail",
+                    "actual": "enabled=False, requested=True",
+                },
+                {
+                    "check": "regular_us_market_window",
+                    "status": "waiting_for_regular_session",
+                    "actual": "等待下一交易日",
+                },
+            ],
+        }
+        self.assertTrue(acceptance_is_expected_readonly_wait(payload))
+        self.assertEqual(
+            semantic_watchdog_failure("m15_monday_acceptance", json.dumps(payload)),
+            "",
+        )
+
     def test_pa002_milestone_skips_when_fill_attribution_refresh_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp), runtime_engine="sdk")
