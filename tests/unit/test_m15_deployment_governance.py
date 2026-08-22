@@ -14,6 +14,25 @@ from scripts.m15_deployment_governance_lib import (
 
 
 class M15DeploymentGovernanceTest(unittest.TestCase):
+    def test_direct_cli_entrypoint_loads_repository_modules(self) -> None:
+        completed = subprocess.run(
+            [
+                "python3",
+                "scripts/run_m15_deployment_gate.py",
+                "--verify",
+                "--config",
+                "config/examples/m15_longbridge_sdk_runtime.json",
+                "--manifest",
+                "/tmp/nonexistent-m15-manifest.json",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 3)
+        self.assertNotIn("ModuleNotFoundError", completed.stderr)
+
     def git(self, root: Path, *args: str) -> None:
         subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
 

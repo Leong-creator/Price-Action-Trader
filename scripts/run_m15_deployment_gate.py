@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.m15_deployment_governance_lib import (
     DEFAULT_MANIFEST_PATH,
@@ -19,6 +24,7 @@ def main() -> int:
     parser.add_argument("--config", required=True)
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST_PATH))
     parser.add_argument("--issue", action="store_true")
+    parser.add_argument("--verify", action="store_true")
     parser.add_argument("--check-development", action="store_true")
     args = parser.parse_args()
     if args.check_development:
