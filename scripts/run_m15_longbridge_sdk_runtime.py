@@ -526,6 +526,17 @@ def active_reference_quotes_are_stale(
     )
 
 
+def signals_allowed_by_entry_gate(
+    entry_signals: list[dict[str, Any]],
+    exit_signals: list[dict[str, Any]],
+    *,
+    new_entry_submission_enabled: bool,
+) -> list[dict[str, Any]]:
+    return (
+        list(entry_signals) if new_entry_submission_enabled else []
+    ) + list(exit_signals)
+
+
 def process_resource_snapshot() -> dict[str, int]:
     try:
         file_descriptors = len(list(Path("/proc/self/fd").iterdir()))
@@ -1432,6 +1443,7 @@ def dispatch_completed_rows(
     signal_id_cache: set[str] | None = None,
     execution_ledger_cache: list[dict[str, Any]] | None = None,
     fill_attribution_state_cache: dict[str, Any] | None = None,
+    new_entry_submission_enabled: bool = True,
 ) -> dict[str, Any]:
     stage_started = time.perf_counter()
     rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {})
@@ -1538,7 +1550,11 @@ def dispatch_completed_rows(
             for row in exit_signals
             if row.get("signal_id")
         )
-    execution_signals = emitted + exit_signals
+    execution_signals = signals_allowed_by_entry_gate(
+        emitted,
+        exit_signals,
+        new_entry_submission_enabled=new_entry_submission_enabled,
+    )
     out_of_scope_signals = [
         signal
         for signal in execution_signals
@@ -1592,9 +1608,18 @@ def dispatch_completed_rows(
         execution_ledger_cache.extend(execution_rows_emitted)
     elif paper_client is not None and not flatten_pending and dispatch_in_regular_session:
         execution = {
-            "status": "no_new_realtime_signal",
+            "status": (
+                "blocked_new_entries_exit_path_ready"
+                if emitted and not new_entry_submission_enabled
+                else "no_new_realtime_signal"
+            ),
             "submitted_count": 0,
-            "blocked_signal_count": 0,
+            "blocked_signal_count": len(emitted) if not new_entry_submission_enabled else 0,
+            "blocked_by_reason": (
+                {"new_entry_gate_not_passed": len(emitted)}
+                if emitted and not new_entry_submission_enabled
+                else {}
+            ),
             "hot_path_elapsed_ms": 0,
         }
     elif flatten_pending:
@@ -2526,7 +2551,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 trading_daily_context_ready = daily_context_covers_symbols(
                     config, daily_rows, configured_trading_symbols(config), daily_failed
                 )
-                active_client = paper_client if trading_daily_context_ready else None
+                active_client = (
+                    paper_client
+                    or (
+                        flatten_client
+                        if dispatch_requested and config.paper_order_dispatch_enabled
+                        else None
+                    )
+                ) if trading_daily_context_ready else None
                 boundary_complete = realtime_boundary_is_complete(
                     rows,
                     configured_trading_symbols(config),
@@ -2576,6 +2608,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     signal_id_cache=signal_id_cache,
                     execution_ledger_cache=execution_ledger_cache,
                     fill_attribution_state_cache=fill_attribution_state_cache,
+                    new_entry_submission_enabled=paper_client is not None,
                 )
                 current_market_date = (
                     datetime.now(NEW_YORK).date().isoformat()

@@ -62,12 +62,29 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     reconnect_delay_seconds,
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
+    signals_allowed_by_entry_gate,
     start_runtime_daemon,
     trade_context_health_requires_rebuild,
 )
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_readonly_entry_gate_keeps_exit_signals_executable(self) -> None:
+        entry = {"signal_id": "entry", "position_action": "open_long"}
+        exit_signal = {"signal_id": "exit", "position_action": "close_long"}
+        self.assertEqual(
+            signals_allowed_by_entry_gate(
+                [entry], [exit_signal], new_entry_submission_enabled=False
+            ),
+            [exit_signal],
+        )
+        self.assertEqual(
+            signals_allowed_by_entry_gate(
+                [entry], [exit_signal], new_entry_submission_enabled=True
+            ),
+            [entry, exit_signal],
+        )
+
     def test_reconnect_backoff_and_active_quote_silence(self) -> None:
         schedule = (5, 15, 30, 60)
         self.assertEqual([reconnect_delay_seconds(schedule, value) for value in range(1, 6)], [5, 15, 30, 60, 60])
