@@ -68,6 +68,7 @@ class SdkRuntimeConfig:
     daily_context_retry_count: int
     heartbeat_interval_seconds: int
     reconnect_backoff_seconds: int
+    reconnect_backoff_schedule_seconds: tuple[int, ...]
     subscription_batch_size: int
     subscription_retry_count: int
     subscription_request_interval_seconds: float
@@ -80,6 +81,7 @@ class SdkRuntimeConfig:
     snapshot_poll_min_successful_cycles: int
     allow_snapshot_poll_fallback: bool
     market_data_heartbeat_deadline_seconds: int
+    active_symbol_silence_seconds: int
     account_snapshot_interval_seconds: int
     account_snapshot_refresh_deadline_seconds: int
     account_snapshot_circuit_retry_seconds: int
@@ -149,6 +151,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         daily_context_retry_count=int(market_data.get("daily_context_retry_count", 5)),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
         reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
+        reconnect_backoff_schedule_seconds=tuple(
+            int(value)
+            for value in runtime.get("reconnect_backoff_schedule_seconds", [5, 15, 30, 60])
+        ),
         subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
         subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
         subscription_request_interval_seconds=float(
@@ -174,6 +180,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         allow_snapshot_poll_fallback=bool(runtime.get("allow_snapshot_poll_fallback", False)),
         market_data_heartbeat_deadline_seconds=int(
             runtime.get("market_data_heartbeat_deadline_seconds", 5)
+        ),
+        active_symbol_silence_seconds=int(
+            runtime.get("active_symbol_silence_seconds", 30)
         ),
         account_snapshot_interval_seconds=int(runtime.get("account_snapshot_interval_seconds", 15)),
         account_snapshot_refresh_deadline_seconds=int(runtime.get("account_snapshot_refresh_deadline_seconds", 8)),
@@ -286,6 +295,11 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK subscription deadline must be positive")
     if config.maximum_consecutive_subscription_failures <= 0:
         raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
+    if (
+        not config.reconnect_backoff_schedule_seconds
+        or any(value <= 0 for value in config.reconnect_backoff_schedule_seconds)
+    ):
+        raise ValueError("M15 SDK reconnect backoff schedule must contain positive seconds")
     if not 0.5 <= config.snapshot_poll_interval_seconds <= 5:
         raise ValueError("M15 SDK snapshot poll interval must be between 0.5 and 5 seconds")
     if (
@@ -313,6 +327,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError(
             "M15 SDK market data heartbeat deadline must exceed the snapshot interval"
         )
+    if not 15 <= config.active_symbol_silence_seconds <= 120:
+        raise ValueError("M15 SDK active symbol silence threshold must be between 15 and 120 seconds")
     if config.daily_context_bars < 2:
         raise ValueError("M15 SDK daily context needs at least two bars")
     if config.daily_context_deadline_seconds <= 0:

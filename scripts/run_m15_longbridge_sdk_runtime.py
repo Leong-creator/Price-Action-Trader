@@ -39,6 +39,7 @@ from scripts.m15_longbridge_sdk_account_lib import (
     SdkAccountStateProvider,
     SdkTradeRequestGate,
 )
+from scripts.m15_deployment_governance_lib import verify_manifest
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient,
     append_market_events, attach_next_bar_first_quotes, build_status, compact_market_events, config_fingerprint, configured_symbols,
@@ -178,6 +179,7 @@ def effective_runtime_dispatch_enabled(
     trading_daily_context_ready: bool,
     flatten_blocks_new_entries: bool,
     account_snapshot_ready: bool,
+    deployment_ready: bool = True,
 ) -> bool:
     return bool(
         dispatch_requested
@@ -187,6 +189,7 @@ def effective_runtime_dispatch_enabled(
         and trading_daily_context_ready
         and not flatten_blocks_new_entries
         and account_snapshot_ready
+        and deployment_ready
     )
 
 
@@ -200,11 +203,14 @@ def runtime_dispatch_block_reason(
     flatten_blocks_new_entries: bool,
     account_snapshot_ready: bool,
     trading_daily_context_ready: bool,
+    deployment_ready: bool = True,
 ) -> str:
     if not paper_order_dispatch_enabled:
         return "paper_order_dispatch_disabled"
     if readonly_gate_blocked:
         return "two_day_readonly_gate"
+    if not deployment_ready:
+        return "deployment_manifest_invalid"
     if not paper_client_ready or not trade_context_ready:
         return "trade_context_recovering"
     if not market_data_ready:
@@ -491,6 +497,30 @@ def market_data_heartbeat_grace_elapsed(
         float(worker_ready_since_monotonic) > 0
         and float(now_monotonic) - float(worker_ready_since_monotonic)
         > float(grace_seconds)
+    )
+
+
+def reconnect_delay_seconds(schedule: tuple[int, ...], attempt: int) -> int:
+    if not schedule:
+        return 5
+    return schedule[min(max(1, int(attempt)) - 1, len(schedule) - 1)]
+
+
+def active_reference_quotes_are_stale(
+    last_push_by_symbol: dict[str, float],
+    *,
+    now_monotonic: float,
+    maximum_silence_seconds: float,
+    reference_symbols: tuple[str, ...] = ("SPY.US", "QQQ.US"),
+) -> bool:
+    timestamps = [last_push_by_symbol.get(symbol, 0.0) for symbol in reference_symbols]
+    return bool(
+        timestamps
+        and all(
+            timestamp <= 0
+            or now_monotonic - timestamp > maximum_silence_seconds
+            for timestamp in timestamps
+        )
     )
 
 
@@ -1867,6 +1897,7 @@ def completed_postclose_refresh_dates(
 
 
 def run_watch(config: Any, *, dispatch_requested: bool) -> int:
+    config.output_dir.mkdir(parents=True, exist_ok=True)
     run_lock = acquire_runtime_run_lock(config.output_dir)
     if run_lock is None:
         owner_pid = read_pid(GLOBAL_QUOTE_SUBSCRIPTION_LOCK)
@@ -1880,6 +1911,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     orphaned_runtime_children_cleaned = cleanup_orphaned_sdk_runtime_children(config)
     sdk = require_sdk_contract()
     run_id = f"sdk-{uuid.uuid4().hex[:12]}"
+    runtime_started_at = to_iso(datetime.now(UTC))
+    try:
+        runtime_process_start_ticks = Path("/proc/self/stat").read_text(encoding="utf-8").split()[21]
+    except (OSError, IndexError):
+        runtime_process_start_ticks = ""
     loaded_config_fingerprint = config_fingerprint(config)
     readonly_gate_passed_now, readonly_sessions_passed, readonly_sessions_required = readonly_gate_passed(config.readonly_gate_path)
     expansion_gate_path = config.output_dir / "m15_sdk_expansion_readonly_gate.json"
@@ -1887,10 +1923,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         expansion_gate_path,
         required_sessions=1,
     )
+    deployment = verify_manifest(config.config_path)
+    deployment_ready = bool(deployment.get("verified"))
     dispatch_enabled = bool(
         dispatch_requested
         and config.paper_order_dispatch_enabled
         and (not config.two_day_readonly_gate or readonly_gate_passed_now)
+        and deployment_ready
     )
     execution_request_gate = SdkTradeRequestGate()
     from scripts.m15_longbridge_realtime_signal_router_lib import (
@@ -1973,6 +2012,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     worker_started = 0.0
     worker_last_progress = 0.0
     worker_ready_since = 0.0
+    worker_generation = 0
+    next_worker_start_monotonic = 0.0
+    last_push_by_symbol: dict[str, float] = {}
     subscription_progress_completed = 0
     subscription_progress_total = len(configured_symbols(config))
     restored_latency_samples, restored_last_result, restored_last_event_at = restore_pipeline_observability(
@@ -2029,15 +2071,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_poll_successful_fast_polls = 0
     snapshot_poll_is_fast_and_complete = False
     last_market_data_worker_error = ""
+    market_data_circuit_open = False
+    shutdown_requested = False
     previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
 
     def stop_requested(_signum: int, _frame: Any) -> None:
-        raise KeyboardInterrupt
+        nonlocal shutdown_requested
+        shutdown_requested = True
+        stop_event.set()
 
     signal.signal(signal.SIGTERM, stop_requested)
     try:
-        while True:
-            if worker is None or not worker.is_alive():
+        while not shutdown_requested:
+            if not market_data_circuit_open and (worker is None or not worker.is_alive()):
                 if worker is not None:
                     last_subscription_failure_reason = (
                         "sdk_quote_worker_exited_before_ready:"
@@ -2045,6 +2091,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     )
                     worker.join(timeout=0.2)
                     attempts += 1
+                    next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
+                        config.reconnect_backoff_schedule_seconds,
+                        attempts,
+                    )
+                if time.monotonic() < next_worker_start_monotonic:
+                    stop_event.wait(min(0.2, next_worker_start_monotonic - time.monotonic()))
+                    continue
                 if (
                     config.allow_snapshot_poll_fallback
                     and not snapshot_fallback_active
@@ -2100,7 +2153,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                             "last_subscription_failure_reason": last_subscription_failure_reason,
                         },
                     )
-                    return 2
+                    market_data_circuit_open = True
+                    worker_ready = False
+                    worker = None
+                    continue
                 if snapshot_fallback_active and snapshot_bar_builder is None:
                     snapshot_started_at = datetime.now(UTC)
                     snapshot_first_complete_bar_open = floor_bar_open(
@@ -2133,6 +2189,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     daemon=True,
                 )
                 worker.start()
+                worker_generation += 1
                 worker_ready_since = 0.0
             if (
                 not worker_ready
@@ -2156,6 +2213,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 attempts += 1
                 stop_spawned_process(worker, graceful=False)
                 worker = None
+                next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
+                    config.reconnect_backoff_schedule_seconds, attempts
+                )
                 if (
                     config.allow_snapshot_poll_fallback
                     and not snapshot_fallback_active
@@ -2194,6 +2254,33 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 attempts += 1
                 stop_spawned_process(worker, graceful=False)
                 worker = None
+                next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
+                    config.reconnect_backoff_schedule_seconds, attempts
+                )
+                continue
+            if (
+                worker_ready
+                and in_regular_session(datetime.now(UTC))
+                and market_data_heartbeat_grace_elapsed(
+                    worker_ready_since,
+                    time.monotonic(),
+                    config.active_symbol_silence_seconds,
+                )
+                and active_reference_quotes_are_stale(
+                    last_push_by_symbol,
+                    now_monotonic=time.monotonic(),
+                    maximum_silence_seconds=config.active_symbol_silence_seconds,
+                )
+            ):
+                worker_ready = False
+                worker_ready_since = 0.0
+                last_subscription_failure_reason = "sdk_active_reference_quotes_silent"
+                attempts += 1
+                stop_spawned_process(worker, graceful=False)
+                worker = None
+                next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
+                    config.reconnect_backoff_schedule_seconds, attempts
+                )
                 continue
             if worker_ready and daily_context_state == "waiting_for_subscription":
                 symbols = list(configured_symbols(config))
@@ -2296,6 +2383,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     received_at=quote_received_at,
                     source_mode=str(message.get("source_mode") or "longbridge_sdk_push"),
                 )
+                last_push_by_symbol[str(message.get("symbol") or "").upper()] = time.monotonic()
             elif kind == "ready":
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
@@ -2336,6 +2424,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     attempts += 1
                     stop_spawned_process(worker, graceful=False)
                     worker = None
+                    next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
+                        config.reconnect_backoff_schedule_seconds, attempts
+                    )
                     continue
                 attempts = 0
                 if market_data_mode == "sdk_snapshot_poll":
@@ -2546,6 +2637,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 if worker is not None:
                     stop_spawned_process(worker, graceful=False)
                     worker = None
+                next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
+                    config.reconnect_backoff_schedule_seconds, attempts
+                )
             if time.monotonic() - last_compaction >= 60:
                 compact_market_events(config.market_events_path, config.event_keep_lines)
                 last_compaction = time.monotonic()
@@ -2779,7 +2873,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 readonly_gate_passed_now = bool(gate.get("passed"))
                 readonly_sessions_passed = len(gate.get("completed_sessions", []))
                 observed_regular_sessions.add(session_date)
-                if dispatch_requested and config.paper_order_dispatch_enabled and readonly_gate_passed_now and paper_client is None:
+                if (
+                    dispatch_requested
+                    and config.paper_order_dispatch_enabled
+                    and readonly_gate_passed_now
+                    and deployment_ready
+                    and paper_client is None
+                ):
                     (
                         execution_trade,
                         paper_client,
@@ -2858,8 +2958,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 expansion_acceptance_status = "readonly_observing"
             build_status(
                 config,
-                status="running" if worker_ready else "connecting",
-                reason="" if worker_ready else "waiting_for_full_sdk_subscription",
+                status=(
+                    "running"
+                    if worker_ready
+                    else "halted_market_data_circuit"
+                    if market_data_circuit_open
+                    else "connecting"
+                ),
+                reason=(
+                    ""
+                    if worker_ready
+                    else "sdk_subscription_recovery_limit_reached"
+                    if market_data_circuit_open
+                    else "waiting_for_full_sdk_subscription"
+                ),
                 connected=worker_ready,
                 last_event_at=last_event_at,
                 sdk_installed=True,
@@ -2868,12 +2980,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 subscription_failed_symbols=subscription_failed,
                 extra={
                     "run_id": run_id, "runtime_pid": os.getpid(), "quote_worker_pid": worker.pid if worker else "",
+                    "runtime_started_at": runtime_started_at,
+                    "runtime_process_start_ticks": runtime_process_start_ticks,
+                    "runtime_command_line": " ".join(sys.argv),
                     "quote_subscription_worker_count": 1 if worker is not None and worker.is_alive() else 0,
                     "last_subscription_failure_reason": last_subscription_failure_reason,
                     "subscription_progress": (
                         f"{subscription_progress_completed}/{subscription_progress_total}"
                     ),
                     "worker_attempts": attempts,
+                    "quote_worker_generation": worker_generation,
+                    "next_reconnect_delay_seconds": max(
+                        0, int(next_worker_start_monotonic - time.monotonic())
+                    ),
                     "subscription_recovery_failures": subscription_recovery_failures,
                     "market_data_mode": market_data_mode,
                     "market_data_fallback_validated": market_data_fallback_validated,
@@ -2893,6 +3012,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_poll_successful_fast_polls": snapshot_poll_successful_fast_polls,
                     "snapshot_poll_is_fast_and_complete": snapshot_poll_is_fast_and_complete,
                     "last_market_data_worker_error": last_market_data_worker_error,
+                    "market_data_circuit_open": market_data_circuit_open,
                     "snapshot_batch_count": snapshot_batch_count,
                     "snapshot_row_count": snapshot_row_count,
                     "snapshot_open_bar_count": (
@@ -2903,6 +3023,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_completed_bar_count": snapshot_completed_bar_count,
                     "orphaned_runtime_children_cleaned": orphaned_runtime_children_cleaned,
                     "config_fingerprint": loaded_config_fingerprint,
+                    "deployment_manifest_verified": deployment_ready,
+                    "deployment_manifest_issues": list(deployment.get("issues") or []),
+                    "deployment_branch": str(deployment.get("branch") or ""),
+                    "deployment_commit": str(deployment.get("head_sha") or ""),
+                    "deployment_worktree_clean": bool(deployment.get("worktree_clean")),
                     "subscription_symbol_count": len(configured_symbols(config)),
                     "subscription_coverage": f"{len(configured_symbols(config)) - len(subscription_failed) if worker_ready else 0}/{len(configured_symbols(config))}",
                     "trading_symbol_count": len(configured_trading_symbols(config)),
@@ -2966,6 +3091,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         trading_daily_context_ready=trading_daily_context_ready,
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
+                        deployment_ready=deployment_ready,
                     ),
                     "dispatch_requested": dispatch_requested,
                     "trade_context_health": trade_context_health,
@@ -2981,6 +3107,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
                         trading_daily_context_ready=trading_daily_context_ready,
+                        deployment_ready=deployment_ready,
                     ),
                     "two_day_readonly_gate": config.two_day_readonly_gate,
                     "readonly_gate_path": str(config.readonly_gate_path),
@@ -3041,6 +3168,25 @@ def process_alive(pid: int) -> bool:
         return True
     except OSError:
         return False
+
+
+def process_start_ticks(pid: int) -> str:
+    try:
+        return Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").split()[21]
+    except (OSError, IndexError):
+        return ""
+
+
+def runtime_status_process_matches(pid: int, payload: dict[str, Any]) -> bool:
+    return bool(
+        pid > 0
+        and process_alive(pid)
+        and is_expected_sdk_runtime_process(pid)
+        and str(payload.get("runtime_pid") or "") == str(pid)
+        and str(payload.get("runtime_process_start_ticks") or "")
+        == process_start_ticks(pid)
+        and str(payload.get("config_fingerprint") or "")
+    )
 
 
 def is_orphaned_sdk_runtime_child(
@@ -3159,6 +3305,7 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
             if (
                 str(status.get("config_fingerprint") or "") == expected_fingerprint
                 and same_invocation
+                and runtime_status_process_matches(existing, status)
                 and not runtime_requires_health_replacement(status, config)
             ):
                 print(f"SDK 实时运行层已在运行，PID={existing}")
@@ -3195,13 +3342,15 @@ def main() -> int:
         except (OSError, json.JSONDecodeError):
             pass
         pid = read_pid(pid_path(config))
-        alive = bool(pid and process_alive(pid))
+        alive = bool(pid and runtime_status_process_matches(pid, payload))
         payload.update({
             "runtime_process_alive": alive,
             "runtime_pid": pid or "",
             "expected_config_fingerprint": config_fingerprint(config),
         })
         if not alive:
+            if pid and not process_alive(pid):
+                pid_path(config).unlink(missing_ok=True)
             payload.update({
                 "status": "stopped",
                 "sdk_connected": False,

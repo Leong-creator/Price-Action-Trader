@@ -32,6 +32,7 @@ from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAcc
 from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
     acquire_runtime_run_lock,
+    active_reference_quotes_are_stale,
     build_live_daily_confirmation_rows,
     close_spawn_queue,
     completed_postclose_refresh_dates,
@@ -58,6 +59,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     run_sdk_preflight,
     runtime_dispatch_block_reason,
     realtime_boundary_is_complete,
+    reconnect_delay_seconds,
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
     start_runtime_daemon,
@@ -66,6 +68,52 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_reconnect_backoff_and_active_quote_silence(self) -> None:
+        schedule = (5, 15, 30, 60)
+        self.assertEqual([reconnect_delay_seconds(schedule, value) for value in range(1, 6)], [5, 15, 30, 60, 60])
+        self.assertTrue(
+            active_reference_quotes_are_stale(
+                {"SPY.US": 10, "QQQ.US": 20},
+                now_monotonic=60,
+                maximum_silence_seconds=30,
+            )
+        )
+        self.assertFalse(
+            active_reference_quotes_are_stale(
+                {"SPY.US": 40, "QQQ.US": 20},
+                now_monotonic=60,
+                maximum_silence_seconds=30,
+            )
+        )
+
+    def test_invalid_deployment_manifest_blocks_dispatch(self) -> None:
+        self.assertFalse(
+            effective_runtime_dispatch_enabled(
+                dispatch_requested=True,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=True,
+                trading_daily_context_ready=True,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+                deployment_ready=False,
+            )
+        )
+        self.assertEqual(
+            runtime_dispatch_block_reason(
+                paper_order_dispatch_enabled=True,
+                readonly_gate_blocked=False,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=True,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+                trading_daily_context_ready=True,
+                deployment_ready=False,
+            ),
+            "deployment_manifest_invalid",
+        )
+
     def test_no_trade_boundary_row_is_complete_but_not_tradable(self) -> None:
         builder = FiveMinuteBarBuilder(
             complete_bar_open_not_before=datetime(2026, 8, 21, 13, 30, tzinfo=UTC)
@@ -487,6 +535,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "generated_at": datetime.now(UTC).isoformat(),
                     "status": "reconnecting_market_data_circuit",
                     "runtime_pid": current_pid,
+                    "runtime_process_start_ticks": Path(f"/proc/{current_pid}/stat").read_text(encoding="utf-8").split()[21],
                     "config_fingerprint": "expected-fingerprint",
                     "dispatch_requested": True,
                 }),
