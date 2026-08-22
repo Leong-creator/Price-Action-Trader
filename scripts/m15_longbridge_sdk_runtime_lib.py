@@ -24,7 +24,7 @@ from scripts.m15_longbridge_realtime_market_event_ingestor_lib import US_LIQUID_
 from scripts.m15_universe_lib import load_m15_universe
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.contract_v1.json"
 SUMMARY_JSON = "m15_longbridge_sdk_runtime.json"
 NEW_YORK = ZoneInfo("America/New_York")
 RUNTIME_CODE_PATHS = (
@@ -78,6 +78,7 @@ class SdkRuntimeConfig:
     subscription_failures_before_snapshot_fallback: int
     snapshot_poll_dispatch_max_elapsed_ms: int
     snapshot_poll_min_successful_cycles: int
+    allow_snapshot_poll_fallback: bool
     market_data_heartbeat_deadline_seconds: int
     account_snapshot_interval_seconds: int
     account_snapshot_refresh_deadline_seconds: int
@@ -170,6 +171,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         snapshot_poll_min_successful_cycles=int(
             runtime.get("snapshot_poll_min_successful_cycles", 5)
         ),
+        allow_snapshot_poll_fallback=bool(runtime.get("allow_snapshot_poll_fallback", False)),
         market_data_heartbeat_deadline_seconds=int(
             runtime.get("market_data_heartbeat_deadline_seconds", 5)
         ),
@@ -300,6 +302,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError(
             "M15 SDK snapshot poll validation cycles must be between 1 and 30"
         )
+    if runtime.get("prefer_snapshot_poll") is True:
+        raise ValueError("M15 production runtime forbids prefer_snapshot_poll")
+    if config.paper_order_dispatch_enabled and config.allow_snapshot_poll_fallback:
+        raise ValueError("M15 paper dispatch runtime forbids snapshot fallback eligibility")
     if (
         config.market_data_heartbeat_deadline_seconds
         <= config.snapshot_poll_interval_seconds

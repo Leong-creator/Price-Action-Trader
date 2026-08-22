@@ -527,7 +527,13 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
                     "source_mode": "longbridge_sdk_push",
                 },
             )
-            completed = builder.on_quote(symbol, payload, received_at=received_at)
+
+        def on_trades(symbol: str, event: Any) -> None:
+            if not aggregation_enabled:
+                return
+            received_at = datetime.now(UTC)
+            payload = sdk_object_to_dict(event)
+            completed = builder.on_trade(symbol, payload, received_at=received_at)
             if completed:
                 emit_worker(queue_out, {"kind": "bars", "rows": completed})
 
@@ -536,6 +542,7 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         # The in-memory gate drains the initial snapshot burst without doing
         # bar aggregation and does not make another SDK call.
         quote.set_on_quote(on_quote)
+        quote.set_on_trades(on_trades)
 
         def report_subscription_progress(completed: int, total: int) -> None:
             emit_worker(
@@ -555,7 +562,7 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         failed = subscribe_quote_and_trades(
             quote,
             subscription_targets,
-            [sdk.SubType.Quote],
+            [sdk.SubType.Quote, sdk.SubType.Trade],
             batch_size=config.subscription_batch_size,
             retry_count=config.subscription_retry_count,
             progress_callback=report_subscription_progress,
@@ -564,12 +571,25 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         )
         expected = set(all_symbols)
         trading_expected = set(trading_symbols)
-        # Each subscribe call above is already acknowledged before progress is
-        # reported.  Calling quote.subscriptions() here adds no safety and can
-        # block the only quote connection after all 147 batches succeeded.
-        # Treat the acknowledged batch results as authoritative.
-        subscribed = expected - set(failed)
+        subscribed = subscription_symbols(quote.subscriptions())
         missing = sorted((expected - subscribed) | set(failed))
+        initial_snapshot = list(quote.quote(subscription_targets))
+        initial_snapshot_symbols = set()
+        snapshot_received_at = datetime.now(UTC)
+        for row in initial_snapshot:
+            payload = sdk_object_to_dict(row)
+            symbol = str(payload.get("symbol") or "").upper()
+            if not symbol:
+                continue
+            initial_snapshot_symbols.add(symbol)
+            emit_worker(queue_out, {
+                "kind": "quote_state",
+                "symbol": symbol,
+                "payload": payload,
+                "received_at": to_iso(snapshot_received_at),
+                "source_mode": "longbridge_sdk_initial_snapshot",
+            })
+        missing = sorted(set(missing) | (expected - initial_snapshot_symbols))
         aggregation_enabled = True
         emit_worker(queue_out, {
             "kind": "ready", "subscribed_symbols": sorted(expected - set(missing)),
@@ -577,6 +597,8 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
             "trading_subscription_failed_symbols": sorted(trading_expected & set(missing)),
             "partial_bar_suppressed_until": to_iso(first_complete_bar_open.astimezone(UTC)),
             "subscription_target_count": len(subscription_targets),
+            "market_data_transport": "official_sdk_persistent_websocket",
+            "initial_snapshot_coverage": f"{len(initial_snapshot_symbols & expected)}/{len(expected)}",
         })
         last_heartbeat = 0.0
         while not stop_event.is_set():
@@ -1996,7 +2018,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     worker.join(timeout=0.2)
                     attempts += 1
                 if (
-                    not snapshot_fallback_active
+                    config.allow_snapshot_poll_fallback
+                    and not snapshot_fallback_active
                     and should_use_snapshot_fallback(
                         attempts,
                         config.subscription_failures_before_snapshot_fallback,
@@ -2106,7 +2129,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 stop_spawned_process(worker, graceful=False)
                 worker = None
                 if (
-                    not snapshot_fallback_active
+                    config.allow_snapshot_poll_fallback
+                    and not snapshot_fallback_active
                     and should_use_snapshot_fallback(
                         attempts,
                         config.subscription_failures_before_snapshot_fallback,
@@ -2349,10 +2373,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     config, daily_rows, configured_trading_symbols(config), daily_failed
                 )
                 active_client = paper_client if trading_daily_context_ready else None
-                if (
-                    market_data_mode == "sdk_snapshot_poll"
-                    and not market_data_fallback_validated
-                ):
+                if market_data_mode != "sdk_subscription":
                     active_client = None
                 last_result = dispatch_completed_rows(
                     config,

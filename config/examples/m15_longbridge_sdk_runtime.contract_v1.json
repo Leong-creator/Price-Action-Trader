@@ -17,7 +17,7 @@
     "daily_context_retry_count": 5,
     "event_keep_lines": 0,
     "expansion_trade_pool_upgrade_gate": {
-      "enabled": true,
+      "enabled": false,
       "maximum_source_delivery_age_ms": 2000,
       "required_complete_subscribed_daily_context": true,
       "required_complete_trading_daily_context": true,
@@ -27,9 +27,9 @@
     },
     "market": "US",
     "maximum_source_delivery_age_ms": 2000,
-    "symbol_limit": 300,
-    "trading_symbol_limit": 300,
-    "trading_universe_path": "config/m15_us_liquid_universe_300.json",
+    "symbol_limit": 147,
+    "trading_symbol_limit": 147,
+    "trading_universe_path": null,
     "universe_path": "config/m15_us_liquid_universe_300.json",
     "use_seed_universe": false
   },
@@ -54,6 +54,7 @@
   },
   "runtime": {
     "account_maintenance_interval_seconds": 15,
+    "allow_snapshot_poll_fallback": false,
     "account_snapshot_circuit_retry_seconds": 15,
     "account_snapshot_interval_seconds": 15,
     "account_snapshot_refresh_deadline_seconds": 8,

@@ -16,9 +16,9 @@
     "market": "US",
     "use_seed_universe": false,
     "universe_path": "config/m15_us_liquid_universe_300.json",
-    "symbol_limit": 300,
-    "trading_symbol_limit": 300,
-    "trading_universe_path": "config/m15_us_liquid_universe_300.json",
+    "symbol_limit": 147,
+    "trading_symbol_limit": 147,
+    "trading_universe_path": null,
     "bar_minutes": 5,
     "maximum_source_delivery_age_ms": 2000,
     "event_keep_lines": 0,
@@ -29,7 +29,7 @@
     "daily_context_batch_size": 10,
     "daily_context_retry_count": 5,
     "expansion_trade_pool_upgrade_gate": {
-      "enabled": true,
+      "enabled": false,
       "required_readonly_gate_passed": true,
       "required_complete_trading_daily_context": true,
       "required_complete_subscribed_daily_context": true,
@@ -47,6 +47,7 @@
     "paper_order_dispatch_enabled": true
   },
   "runtime": {
+    "allow_snapshot_poll_fallback": false,
     "heartbeat_interval_seconds": 1,
     "reconnect_backoff_seconds": 5,
     "subscription_batch_size": 10,

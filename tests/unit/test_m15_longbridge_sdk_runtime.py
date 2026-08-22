@@ -25,6 +25,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
     market_event_is_tradable, trading_market_events,
+    trading_universe_fingerprint,
     validate_formal_epoch_alignment,
 )
 from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAccountStateProvider, SdkTradeRequestGate
@@ -136,7 +137,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "market_data_recovering",
         )
 
-    def test_quote_worker_does_not_requery_subscriptions_after_acknowledged_batches(self) -> None:
+    def test_quote_worker_registers_both_callbacks_and_verifies_subscription(self) -> None:
         tree = ast.parse(textwrap.dedent(inspect.getsource(quote_worker)))
         called_methods = [
             node.func.attr
@@ -144,8 +145,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
         ]
 
-        self.assertNotIn("subscriptions", called_methods)
+        self.assertIn("subscriptions", called_methods)
+        self.assertIn("quote", called_methods)
         self.assertEqual(called_methods.count("set_on_quote"), 1)
+        self.assertEqual(called_methods.count("set_on_trades"), 1)
 
     def test_snapshot_fallback_requires_configured_subscription_failures(self) -> None:
         self.assertFalse(should_use_snapshot_fallback(0, 1))
@@ -884,7 +887,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["short_test_epoch_id"], marker["short_test_epoch_id"])
         self.assertEqual(state["test_started_at"], marker["test_started_at"])
 
-    def test_default_runtime_config_promotes_verified_300_subscription_pool_to_trading(self) -> None:
+    def test_default_runtime_config_freezes_production_to_147_symbols(self) -> None:
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
         universe = load_m15_universe("config/m15_us_liquid_universe_300.json")
 
@@ -893,12 +896,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             payload["market_data"]["universe_path"],
             "config/m15_us_liquid_universe_300.json",
         )
-        self.assertEqual(payload["market_data"]["symbol_limit"], 300)
-        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 300)
-        self.assertEqual(
-            payload["market_data"]["trading_universe_path"],
-            "config/m15_us_liquid_universe_300.json",
-        )
+        self.assertEqual(payload["market_data"]["symbol_limit"], 147)
+        self.assertEqual(payload["market_data"]["trading_symbol_limit"], 147)
+        self.assertIsNone(payload["market_data"]["trading_universe_path"])
+        self.assertFalse(payload["runtime"]["allow_snapshot_poll_fallback"])
         self.assertIn("BNY", universe)
         self.assertIn("MRSH", universe)
         self.assertNotIn("BK", universe)
@@ -2227,16 +2228,18 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         self.assertIn("PSKY.US", symbols)
         self.assertNotIn("PARA.US", symbols)
-        self.assertEqual(len(symbols), 300)
-        self.assertEqual(len(trading_symbols), 300)
+        self.assertEqual(len(symbols), 147)
+        self.assertEqual(len(trading_symbols), 147)
         self.assertIn("PSKY.US", trading_symbols)
 
     def test_expanded_trading_pool_requires_runtime_upgrade_gate(self) -> None:
         payload = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
+            Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(
                 encoding="utf-8"
             )
         )
+        payload["market_data"]["trading_symbol_limit"] = 300
+        payload["market_data"]["trading_universe_path"] = "config/m15_us_liquid_universe_300.json"
         payload["market_data"]["expansion_trade_pool_upgrade_gate"]["enabled"] = False
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "runtime.json"
@@ -2313,7 +2316,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(symbols[0], "SPY.US")
         self.assertEqual(symbols[-1], "SHW.US")
 
-    def test_reordering_subscription_universe_cannot_change_frozen_trading_universe(self) -> None:
+    def test_reordering_production_universe_changes_fingerprint_and_is_detectable(self) -> None:
         source = json.loads(
             Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
                 encoding="utf-8"
@@ -2339,11 +2342,25 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             config_path.write_text(json.dumps(source), encoding="utf-8")
 
             reordered_config = load_config(config_path)
+            reordered_trading = configured_trading_symbols(reordered_config)
+            self.assertNotEqual(reordered_trading, expected_trading)
+            self.assertNotEqual(
+                trading_universe_fingerprint(reordered_config),
+                trading_universe_fingerprint(load_config()),
+            )
 
-        self.assertEqual(
-            configured_trading_symbols(reordered_config),
-            expected_trading,
+    def test_paper_dispatch_config_rejects_snapshot_fallback(self) -> None:
+        payload = json.loads(
+            Path("config/examples/m15_longbridge_sdk_runtime.contract_v1.json").read_text(
+                encoding="utf-8"
+            )
         )
+        payload["runtime"]["allow_snapshot_poll_fallback"] = True
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "forbids snapshot fallback"):
+                load_config(path)
 
     def test_expansion_symbols_are_audited_but_never_routed_to_strategies(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
