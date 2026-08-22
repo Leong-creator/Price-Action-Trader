@@ -86,7 +86,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
         execution_config_path=resolve_repo_path(
             inputs.get(
                 "execution_config",
-                ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_orders_enabled.json",
+                ROOT / "config" / "examples" / "m15_longbridge_realtime_execution.paper_contract_v1.json",
             )
         ),
         realtime_account_state_path=resolve_repo_path(
@@ -305,7 +305,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             (
                 "已武装长桥模拟账户订单提交；当前 SDK 运行配置不启用额外只读门禁"
                 if sdk_config is not None and not sdk_config.two_day_readonly_gate
-                else "已武装长桥模拟账户订单提交；两日只读验收完成前必须等待"
+                else "已武装长桥模拟账户订单提交；完整交易日行情验收完成前必须等待"
             ),
             "waiting" if readonly_gate_waiting else ("pass" if effective_paper_orders_enabled else "fail"),
             actual=execution_config_error

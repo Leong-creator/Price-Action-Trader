@@ -6,7 +6,7 @@
     "sdk_runtime_config": "config/examples/m15_longbridge_sdk_runtime.json",
     "sdk_runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json",
     "realtime_supervisor_config": "config/examples/m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
-    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
     "realtime_account_state": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state.json",
     "realtime_supervisor_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_session_supervisor.json"
   },

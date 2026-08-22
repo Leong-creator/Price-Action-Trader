@@ -35,7 +35,7 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
         self.assertEqual(config.realtime_runtime_engine, "sdk")
         self.assertEqual(
             config.execution_config_path.name,
-            "m15_longbridge_realtime_execution.paper_orders_enabled.json",
+            "m15_longbridge_realtime_execution.paper_contract_v1.json",
         )
 
     def test_sdk_run_overwrites_legacy_readiness_with_canonical_pointer(self) -> None:
