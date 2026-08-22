@@ -631,6 +631,7 @@ class FiveMinuteBarBuilder:
         minutes: int = 5,
         *,
         complete_bar_open_not_before: datetime | None = None,
+        boundary_batch_mode: bool = False,
     ) -> None:
         self.minutes = minutes
         self.complete_bar_open_not_before = (
@@ -638,10 +639,14 @@ class FiveMinuteBarBuilder:
             if complete_bar_open_not_before is not None
             else None
         )
+        self.boundary_batch_mode = boundary_batch_mode
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
         self._quote_total_volume: dict[str, int] = {}
         self._quote_last_source_at: dict[str, datetime] = {}
         self._snapshot_total_volume: dict[str, int] = {}
+        self._latest_quote_price: dict[str, Decimal] = {}
+        self._latest_quote_at: dict[str, datetime] = {}
+        self._emitted_boundaries: set[datetime] = set()
 
     @property
     def open_bar_count(self) -> int:
@@ -652,6 +657,7 @@ class FiveMinuteBarBuilder:
         price = decimal(payload.get("last_done"))
         if price <= Decimal("0"):
             return []
+        self.seed_quote(symbol, payload, received_at=received_at)
         normalized_symbol = symbol.upper()
         volume, blocked_reason = self._quote_volume_delta(
             normalized_symbol,
@@ -667,6 +673,63 @@ class FiveMinuteBarBuilder:
             source_mode="longbridge_sdk_push",
             blocked_reason=blocked_reason,
         )
+
+    def seed_quote(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> None:
+        price = decimal(payload.get("last_done"))
+        if price <= Decimal("0"):
+            return
+        normalized_symbol = symbol.upper()
+        self._latest_quote_price[normalized_symbol] = price
+        self._latest_quote_at[normalized_symbol] = unix_to_utc(
+            payload.get("timestamp"), received_at
+        )
+
+    def complete_boundary(self, symbols: list[str] | tuple[str, ...], now: datetime) -> list[dict[str, Any]]:
+        """Emit one complete boundary batch, marking no-trade rows non-tradable."""
+        now_ny = now.astimezone(NEW_YORK)
+        boundary_close = floor_bar_open(now_ny, self.minutes)
+        boundary_open = boundary_close - timedelta(minutes=self.minutes)
+        if (
+            boundary_open in self._emitted_boundaries
+            or boundary_open.weekday() >= 5
+            or boundary_open.hour < 9
+            or (boundary_open.hour == 9 and boundary_open.minute < 30)
+            or boundary_open.hour >= 16
+            or (
+                self.complete_bar_open_not_before is not None
+                and boundary_open < self.complete_bar_open_not_before
+            )
+        ):
+            return []
+        rows: list[dict[str, Any]] = []
+        for symbol in symbols:
+            normalized = symbol.upper()
+            key = (normalized, boundary_open)
+            bar = self._bars.get(key)
+            if bar is not None:
+                rows.append(self._finalize(key, bar, emitted_at=now))
+                continue
+            price = self._latest_quote_price.get(normalized)
+            if price is None:
+                continue
+            source_at = self._latest_quote_at.get(normalized, now.astimezone(UTC))
+            synthetic = {
+                "symbol": normalized,
+                "bar_open_at": boundary_open,
+                "bar_close_at": boundary_close,
+                "open": price,
+                "high": price,
+                "low": price,
+                "close": price,
+                "volume": 0,
+                "source_event_at": source_at,
+                "received_at": now,
+                "source_mode": "longbridge_sdk_no_trade_carry_forward",
+                "market_data_blocked_reasons": {"no_trade_carry_forward"},
+            }
+            rows.append(self._finalize(key, synthetic, emitted_at=now))
+        self._emitted_boundaries.add(boundary_open)
+        return rows
 
     def on_snapshot(
         self,
@@ -762,6 +825,11 @@ class FiveMinuteBarBuilder:
         bar["volume"] += max(0, volume)
         if blocked_reason:
             bar["market_data_blocked_reasons"].add(blocked_reason)
+        # The production stream closes all symbols as one boundary batch.  A
+        # trade from the next bar must not emit the previous symbol early and
+        # leave the boundary batch incomplete.
+        if self.boundary_batch_mode:
+            return []
         return self.flush(received_at)
 
     def _finalize(self, key: tuple[str, datetime], bar: dict[str, Any], *, emitted_at: datetime) -> dict[str, Any]:

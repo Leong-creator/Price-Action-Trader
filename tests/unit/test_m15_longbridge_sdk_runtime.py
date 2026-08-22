@@ -57,6 +57,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     run_authorized_account_exit_cycle,
     run_sdk_preflight,
     runtime_dispatch_block_reason,
+    realtime_boundary_is_complete,
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
     start_runtime_daemon,
@@ -65,6 +66,62 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_no_trade_boundary_row_is_complete_but_not_tradable(self) -> None:
+        builder = FiveMinuteBarBuilder(
+            complete_bar_open_not_before=datetime(2026, 8, 21, 13, 30, tzinfo=UTC)
+        )
+        builder.seed_quote(
+            "SPY.US",
+            {"last_done": "650", "timestamp": int(datetime(2026, 8, 21, 13, 31, tzinfo=UTC).timestamp())},
+            received_at=datetime(2026, 8, 21, 13, 31, tzinfo=UTC),
+        )
+        rows = builder.complete_boundary(
+            ["SPY.US"],
+            datetime(2026, 8, 21, 13, 35, 1, tzinfo=UTC),
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_data_blocked_reason"], "no_trade_carry_forward")
+        self.assertEqual(rows[0]["volume"], "0")
+        self.assertTrue(realtime_boundary_is_complete(rows, ["SPY.US"]))
+
+    def test_boundary_batch_mode_does_not_emit_previous_bar_early(self) -> None:
+        builder = FiveMinuteBarBuilder(
+            complete_bar_open_not_before=datetime(2026, 8, 21, 13, 30, tzinfo=UTC),
+            boundary_batch_mode=True,
+        )
+        first = {
+            "trades": [{"price": "650", "volume": 10, "timestamp": 1787319060}],
+        }
+        next_bar = {
+            "trades": [{"price": "651", "volume": 5, "timestamp": 1787319360}],
+        }
+        self.assertEqual(
+            builder.on_trade(
+                "SPY.US", first, received_at=datetime(2026, 8, 21, 13, 31, tzinfo=UTC)
+            ),
+            [],
+        )
+        self.assertEqual(
+            builder.on_trade(
+                "SPY.US", next_bar, received_at=datetime(2026, 8, 21, 13, 36, tzinfo=UTC)
+            ),
+            [],
+        )
+        rows = builder.complete_boundary(
+            ["SPY.US"], datetime(2026, 8, 21, 13, 35, 1, tzinfo=UTC)
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open"], "650")
+
+    def test_incomplete_or_late_boundary_cannot_dispatch(self) -> None:
+        row = {
+            "symbol": "SPY",
+            "event_time": "2026-08-21T13:35:00Z",
+            "received_at": "2026-08-21T13:35:06Z",
+            "bar_final": True,
+        }
+        self.assertFalse(realtime_boundary_is_complete([row], ["SPY.US", "QQQ.US"]))
+        self.assertFalse(realtime_boundary_is_complete([row], ["SPY.US"]))
     def test_sdk_quote_payload_converts_unpicklable_trade_session_enum(self) -> None:
         class UnpicklableTradeSession(int):
             def __new__(cls):

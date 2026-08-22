@@ -494,6 +494,32 @@ def market_data_heartbeat_grace_elapsed(
     )
 
 
+def realtime_boundary_is_complete(
+    rows: list[dict[str, Any]],
+    expected_symbols: list[str] | tuple[str, ...],
+    *,
+    maximum_finalization_seconds: float = 5,
+) -> bool:
+    expected = {symbol.upper().removesuffix(".US") for symbol in expected_symbols}
+    if not expected or not rows:
+        return False
+    boundary_times = {str(row.get("event_time") or "") for row in rows}
+    actual = {str(row.get("symbol") or "").upper().removesuffix(".US") for row in rows}
+    if len(boundary_times) != 1 or actual != expected:
+        return False
+    for row in rows:
+        if row.get("bar_final") is not True:
+            return False
+        try:
+            boundary = datetime.fromisoformat(str(row["event_time"]).replace("Z", "+00:00"))
+            received = datetime.fromisoformat(str(row["received_at"]).replace("Z", "+00:00"))
+        except (KeyError, ValueError):
+            return False
+        if (received - boundary).total_seconds() > maximum_finalization_seconds:
+            return False
+    return True
+
+
 def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
     """Own the one SDK quote connection and never run history, routing or orders."""
     config = load_config(config_path)
@@ -508,6 +534,7 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         builder = FiveMinuteBarBuilder(
             config.bar_minutes,
             complete_bar_open_not_before=first_complete_bar_open,
+            boundary_batch_mode=True,
         )
 
         aggregation_enabled = False
@@ -517,6 +544,7 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
                 return
             received_at = datetime.now(UTC)
             payload = sdk_object_to_dict(event)
+            builder.seed_quote(symbol, payload, received_at=received_at)
             emit_worker(
                 queue_out,
                 {
@@ -602,7 +630,7 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         })
         last_heartbeat = 0.0
         while not stop_event.is_set():
-            completed = builder.flush(datetime.now(UTC))
+            completed = builder.complete_boundary(all_symbols, datetime.now(UTC))
             if completed:
                 emit_worker(queue_out, {"kind": "bars", "rows": completed})
             now = time.monotonic()
@@ -2373,6 +2401,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     config, daily_rows, configured_trading_symbols(config), daily_failed
                 )
                 active_client = paper_client if trading_daily_context_ready else None
+                if not realtime_boundary_is_complete(
+                    rows,
+                    configured_trading_symbols(config),
+                ):
+                    active_client = None
                 if market_data_mode != "sdk_subscription":
                     active_client = None
                 last_result = dispatch_completed_rows(
