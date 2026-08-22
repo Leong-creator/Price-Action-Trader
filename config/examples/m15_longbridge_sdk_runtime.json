@@ -39,10 +39,10 @@
     }
   },
   "routing": {
-    "router_config": "config/examples/m15_longbridge_realtime_signal_router.json",
-    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json",
+    "router_config": "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json",
+    "execution_config": "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
     "account_state_config": "config/examples/m15_longbridge_realtime_account_state.json",
-    "position_manager_config": "config/examples/m15_longbridge_realtime_position_manager.json",
+    "position_manager_config": "config/examples/m15_longbridge_realtime_position_manager.contract_v1.json",
     "stale_order_cleanup_config": "config/examples/m15_longbridge_realtime_stale_order_cleanup.json",
     "paper_order_dispatch_enabled": true
   },
@@ -78,8 +78,8 @@
   },
   "formal_test_transition": {
     "enabled": true,
-    "test_epoch_id": "m15-sdk-formal-single-strategy-20260716",
-    "short_test_epoch_id": "m15-sdk-formal-short-strategy-20260716",
+    "test_epoch_id": "m15-sdk-contract-v1-20260806",
+    "short_test_epoch_id": "m15-sdk-contract-v1-short-20260806",
     "marker_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_formal_test_epoch.json",
     "epoch_state_path": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_virtual_account_epoch.json"
   }

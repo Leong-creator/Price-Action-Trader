@@ -69,6 +69,14 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_production_runtime_uses_frozen_contract_v1_configs(self) -> None:
+        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        self.assertTrue(str(config.router_config_path).endswith("m15_longbridge_realtime_signal_router.contract_v1.json"))
+        self.assertTrue(str(config.execution_config_path).endswith("m15_longbridge_realtime_execution.paper_contract_v1.json"))
+        self.assertTrue(str(config.position_manager_config_path).endswith("m15_longbridge_realtime_position_manager.contract_v1.json"))
+        self.assertEqual(config.formal_test_epoch_id, "m15-sdk-contract-v1-20260806")
+        self.assertEqual(config.formal_short_test_epoch_id, "m15-sdk-contract-v1-short-20260806")
+
     def test_readonly_entry_gate_keeps_exit_signals_executable(self) -> None:
         entry = {"signal_id": "entry", "position_action": "open_long"}
         exit_signal = {"signal_id": "exit", "position_action": "close_long"}
