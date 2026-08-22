@@ -1,70 +1,43 @@
-# 架构边界
+# 当前架构
 
-## 2026-08-22 M15 当前唯一生效行情架构
+## 盘中主系统
 
-- 一个官方 SDK 长期行情连接，每批10只订阅147只生产标的的 `Quote + Trade`。
-- `Quote` 只维护最新价格与连接健康；`Trade` 生成真实五分钟开高低收和成交量。
-- 启动时只查询一次服务端订阅集合并拉一次初始快照。快照、历史K线和盘后补录不具备开仓资格。
-- 订阅、推送或账户状态不可信时停止新开仓，已有持仓退出继续使用独立交易连接。
-- 下方2026-08-20/21的快照临时生产和自定义 SDK 方案均为历史故障记录，不再代表生产架构；后续将迁入 `docs/decisions/` 归档。
+M15 是唯一盘中交易系统：
 
-## 1. 当前阶段定位
+`官方长桥SDK单一行情长连接 -> 有界内存队列 -> 顺序五分钟聚合 -> 冻结策略合同 -> 快速风控 -> 长桥模拟账户SDK订单`
 
-当前处于轻资产验证阶段，基础设施优先，正式券商 API、自动下单、真实资金账户都不作为前置条件。
+- 行情连接：一个独立可终止子进程持有唯一 `QuoteContext`，回调先注册再订阅。
+- 报价推送：只更新最新价格、推送时间和连接健康。
+- 逐笔成交：生成真实五分钟开高低收和成交量。
+- 顺序处理器：统一在边界后五秒内封口完整147只批次，再运行策略和风控。
+- 交易连接：账户、订单和退出使用独立持久 SDK 上下文，不在行情回调内执行网络请求或文件统计。
 
-## 2. 分层原则
+## 数据资格
 
-- `knowledge/`：原始资料、wiki 知识页与 schema。
-- `knowledge/wiki/strategy_cards/`：面向策略提炼与测试计划的知识页层，继续受 wiki frontmatter 与 `source_refs` 约束。
-- `src/data/`：数据导入、清洗、schema、回放。
-- `src/strategy/`：PA context、bar-by-bar、setup、信号生成。
-- `src/backtest/`：历史回测与结果统计。
-- `src/review/`：复盘与报告整理。
-- `src/risk/`：风控、熔断、暂停与恢复条件。
-- `src/execution/`：模拟执行与后续 adapter 抽象。
-- `src/broker/`：broker adapters 与浏览器只读验证路径。
-- `src/news/`：新闻、事件、财报等辅助过滤信息。
-- `src/shared/`：跨模块共享结构。
-- `reports/strategy_lab/`：策略提炼支线的快照、来源盘点、提炼日志、测试计划、comparison 与用户摘要；当前 M10 产物位于 `reports/strategy_lab/m10_price_action_strategy_refresh/`。
+- 可开仓：仅盘中按时形成、边界完整、来源为官方 SDK 推送的实时K线。
+- 仅退出：行情不明、账户不明、配置漂移、部署清单失效或恢复熔断时。
+- 不可开仓：初始快照、轮询快照、人工诊断、历史K线、盘后补录、无成交平K线和本地模拟数据。
 
-## 3. 数据源优先级
+## 进程与恢复
 
-1. P0：静态 CSV/JSON 历史数据回放。
-2. P1：用户手动导出的 CSV/JSON。
-3. P2：无需复杂认证的免费公共行情源或交易所公开接口。
-4. P3：浏览器 DOM / 截图 / 图表识别。
-5. P4：正式券商 API。
+- 行情状态：连接中、已订阅、正常推送、正在重连、仅允许退出、熔断停止新开仓。
+- 连接上限30秒；真实活跃标的静默阈值30秒；K线边界完成上限5秒。
+- 重连退避为5、15、30、60秒，三次失败后熔断；禁止切回快照轮询。
+- 健康身份同时校验PID、命令行、进程启动标识、提交号、配置哈希、部署清单和状态年龄。
 
-## 4. Adapter 边界
+## 部署治理
 
-所有数据源和后续执行能力都必须通过 adapter 接入。策略、风控、回测不得直接依赖某个浏览器页面、某个 API SDK 或某个导出格式。
+- `main` 是唯一稳定基线，禁止直接开发。
+- 每个改动从最新 `main` 建独立 `codex/*` 分支，首次可运行即推送，验收后再合并。
+- 新开仓要求工作区干净、提交已存在远端、部署清单与配置及运行源码一致。
+- 交易时段禁止编辑生产源码；紧急故障先停止新开仓，退出维护继续运行。
 
-## 5. M10 Strategy Refresh 边界
+## 本地研究系统
 
-- M10 clean-room catalog 使用 `M10-PA-*` namespace，不复用旧 `PA-SC-*` 或 `SF-*` 作为提炼先验。
-- Brooks v2 manual transcript、方方土 YouTube transcript、方方土 notes 是 M10 策略证据来源；ChatGPT share 与 Codex thread 只作为 reference-only comparison。
-- M10 catalog、source ledger、visual gap ledger、visual golden case pack 和 backtest eligibility 不直接等于 executable strategy rule。
-- M10.3 backtest specs 只冻结 Wave A historical pilot 的事件识别、entry/stop/target、skip 规则、成本敏感性和样本门槛；它们不代表已回测结论、盈利结论、promoted strategy 或 live execution 能力。
-- M10.5 read-only observation plan 只定义观察候选、事件 schema、质量复核和 paper gate handoff；它不启动实时观察 runner，不接真实 broker，不写入真实订单路径。
-- M10.6 read-only observation replay 只用本地 cached OHLCV 生成 recorded replay ledger；它不是实时行情订阅，不生成执行、仓位、现金或盈亏结论，也不进入 `src/risk/`、`src/execution/`、`src/broker/` 的 live 行为。
-- M10.8 Wave A capital backtest 只把 M10.4 candidate events 按 M10.7 capital model 转成 historical simulation 成绩单；它可以输出模拟本金、权益、净利润、胜率、回撤和交易明细，但不代表策略升级、paper trading 批准、broker 接入或真实订单能力。
-- M10.9 definition tightening 只对 `M10-PA-005` 做结构性去重与触发密度复测；它不得按收益调参，也不能在缺少 range geometry 字段时解除 `needs_definition_fix`。
-- M10.10 visual Wave B gate 只判断强图形策略是否具备进入后续模拟规格/回测的条件；它不运行回测、不证明策略有效，也不把 visual pack ready 解释为自动可交易。
-- M10.11 Wave B capital backtest 只对 M10.10 queue 中的策略做 OHLCV 近似 historical simulation；视觉策略结果必须保留 proxy/review 边界，不得解释为策略批准或 paper trading 准入。
-- M10.12 all-strategy scorecard 只汇总既有 Wave A/Wave B 资金测试、definition-fix、supporting 和 research-only 状态；portfolio proxy 不是按真实时间戳合并订单的可执行组合回测，也不进入 broker、risk 或 execution。
-- M10.13 read-only observation runbook 只定义未来观察队列、周报模板、暂停条件和人工复核节奏；它不启动 observation runner，不接实时行情，不接 broker，不下单，也不批准 paper trading。
-- M11 paper gate 只把 M10.12/M10.13 的结果整理成候选分级、准入阻塞项和风险暂停规则；当前 gate decision 固定为 `not_approved`，`M10-PA-001/002/012` 只是 Tier A 核心观察候选，`M10-PA-008/009` 只是 Tier B 视觉条件候选，二者都不是 paper trading approval evidence。
-- M10.2 visual pack 只记录 Brooks v2 evidence image logical path 与 checksum；图片资产继续 local-only，不进入普通 Git 跟踪。
-- 本层仍属于 `paper / simulated` 研究能力，不进入 `src/risk/`、`src/execution/`、`src/broker/`。
+本地研究与修复系统只做盘后研究、未进入长桥的策略观察和参考统计。它与 M15 的行情、信号、订单、持仓和盈亏完全隔离，不是长桥下单上游。
 
-## 6. 高风险边界
+## 扩展边界
 
-以下内容属于高风险边界，必须走独立分支、独立测试、独立复核：
+生产池当前固定147只。连续三个完整交易日稳定后，300只扩展只能在独立分支先只读运行一个完整交易日，不能直接替换147只生产池。
 
-- 真实下单
-- 账户连接
-- 实盘开关
-- 风控阈值
-- 仓位与杠杆
-- 止损止盈
-- 凭证与密钥
+历史架构与失效方案保存在 `docs/archive/2026-08-22/architecture-before-marketdata-governance.md` 和 `docs/decisions/`。
