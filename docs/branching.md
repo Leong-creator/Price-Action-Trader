@@ -11,12 +11,15 @@
 
 ## 2. 分支命名
 
-- `feature/m<编号>-<slug>`
-- `fix/<module>-<slug>`
+- Codex 自动化分支统一增加 `codex/` 前缀，例如 `codex/fix/<module>-<slug>`；人工分支可不带此前缀。
+- `feature/m<编号>-<slug>` 或 `codex/feature/m<编号>-<slug>`
+- `fix/<module>-<slug>` 或 `codex/fix/<module>-<slug>`
 - `refactor/<module>-<slug>`
 - `test/<module>-<slug>`
 - `docs/<module>-<slug>`
 - `integration/m<编号>-<slug>`
+
+禁止使用无法识别主题的长期混合分支。部署前必须运行 `scripts/run_m15_deployment_gate.py --issue`，确认提交已推送远端、工作区干净并签发本地部署清单。
 
 ## 3. subagent 并行规则
 
