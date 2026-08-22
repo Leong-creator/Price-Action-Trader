@@ -69,6 +69,36 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(checks["paper_dispatch_armed"]["status"], "waiting_for_flatten")
             self.assertEqual(checks["formal_epoch_active"]["status"], "waiting_for_flatten")
 
+    def test_marketdata_readonly_gate_is_safe_waiting_not_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime.update(
+                {
+                    "dispatch_enabled": False,
+                    "dispatch_block_reason": "two_day_readonly_gate",
+                    "readonly_sessions_passed": 0,
+                    "readonly_sessions_required": 1,
+                }
+            )
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-22T03:41:39Z",
+            )
+
+            self.assertEqual(
+                payload["acceptance_status"],
+                "armed_waiting_marketdata_acceptance",
+            )
+            self.assertEqual(payload["fail_count"], 0)
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(
+                checks["paper_dispatch_armed"]["status"],
+                "waiting_for_marketdata_acceptance",
+            )
+
     def test_watchdog_previous_result_does_not_create_acceptance_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=True)

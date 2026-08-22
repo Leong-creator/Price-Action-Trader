@@ -114,6 +114,13 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         and formal_epoch.get("blocks_new_entries") is True
         and readiness_status == "armed_waiting_flatten_session"
     )
+    readonly_gate_waiting = (
+        runtime.get("dispatch_requested") is True
+        and runtime.get("dispatch_enabled") is False
+        and str(runtime.get("dispatch_block_reason") or "") == "two_day_readonly_gate"
+        and int(runtime.get("readonly_sessions_passed") or 0)
+        < int(runtime.get("readonly_sessions_required") or 1)
+    )
     formal_consistent = (
         formal_active
         and str(formal_epoch.get("test_epoch_id") or "")
@@ -163,8 +170,13 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "paper_dispatch_armed",
             "模拟账户下单通道已武装",
             runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True,
-            pending_flatten and runtime.get("dispatch_requested") is True,
+            (pending_flatten or readonly_gate_waiting) and runtime.get("dispatch_requested") is True,
             f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}",
+            waiting_status=(
+                "waiting_for_marketdata_acceptance"
+                if readonly_gate_waiting
+                else "waiting_for_flatten"
+            ),
         ),
         transition_check_row(
             "formal_epoch_active",
@@ -202,6 +214,8 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         status = "blocked_monday_acceptance"
     elif pending_flatten:
         status = "armed_waiting_flatten_session"
+    elif readonly_gate_waiting:
+        status = "armed_waiting_marketdata_acceptance"
     elif session_should_run:
         status = "ready_regular_session"
     else:
@@ -247,8 +261,9 @@ def transition_check_row(
     passed: bool,
     waiting: bool,
     actual: str,
+    waiting_status: str = "waiting_for_flatten",
 ) -> dict[str, Any]:
-    status = "pass" if passed else "waiting_for_flatten" if waiting else "fail"
+    status = "pass" if passed else waiting_status if waiting else "fail"
     return {"check": check, "required_result": required_result, "status": status, "actual": actual}
 
 
@@ -259,6 +274,8 @@ def plain_result(status: str, fail_count: int) -> str:
         return "M15 SDK 模拟交易链路已武装；当前只是在等待美股常规交易时段。"
     if status == "armed_waiting_flatten_session":
         return "M15 SDK 清仓链路已武装；清仓确认完成前保持停止新开仓。"
+    if status == "armed_waiting_marketdata_acceptance":
+        return "M15 SDK 链路健康；完整交易日行情验收完成前保持停止新开仓。"
     return f"M15 SDK 周一验收被阻断：{fail_count} 个检查失败。"
 
 
