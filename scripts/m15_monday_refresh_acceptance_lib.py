@@ -198,7 +198,12 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             pending_flatten and int(readiness.get("fail_count") or 0) == 0,
             readiness_status or "missing",
         ),
-        check_row("dashboard_sdk_source", "长桥看板只使用 SDK 和长桥账户事实源", dashboard.get("source_of_truth") == "longbridge_sdk_paper_account" and dashboard.get("data_status") in {"trustworthy", "trading_ready_statistics_stale"}, f"source={dashboard.get('source_of_truth')}, status={dashboard.get('data_status')}"),
+        check_row(
+            "dashboard_sdk_source",
+            "长桥看板只使用 SDK 和长桥账户事实源；统计暂不可用不阻断交易链路",
+            dashboard.get("source_of_truth") == "longbridge_sdk_paper_account",
+            f"source={dashboard.get('source_of_truth')}, status={dashboard.get('data_status')}",
+        ),
         check_row("paper_only_boundaries", "不接实盘、真实资金或本地模拟信号", paper_only, str(boundaries)),
         {
             "check": "regular_us_market_window",

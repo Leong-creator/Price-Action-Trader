@@ -141,6 +141,28 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(checks["account_snapshot_fresh"]["status"], "pass")
             self.assertEqual(payload["fail_count"], 0)
 
+    def test_temporarily_unavailable_dashboard_statistics_do_not_block_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            config.dashboard_path.write_text(
+                json.dumps(
+                    {
+                        "source_of_truth": "longbridge_sdk_paper_account",
+                        "data_status": "temporarily_unavailable",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-22T03:45:00Z",
+            )
+
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["dashboard_sdk_source"]["status"], "pass")
+            self.assertEqual(payload["fail_count"], 0)
+
     def test_negative_account_snapshot_age_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)
