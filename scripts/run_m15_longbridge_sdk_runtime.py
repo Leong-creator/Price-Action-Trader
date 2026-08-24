@@ -1985,10 +1985,10 @@ def close_spawn_queue(queue_out: Any) -> None:
 def request_runtime_shutdown(
     pid: int,
     *,
-    timeout_seconds: float = 5.0,
+    timeout_seconds: float = 15.0,
     force_timeout_seconds: float = 2.0,
 ) -> bool:
-    """Stop the SDK runtime, escalating only for the expected runtime process."""
+    """Stop the SDK runtime after giving spawned SDK workers time to close."""
     if not process_alive(pid):
         return True
     os.kill(pid, signal.SIGTERM)
@@ -2161,7 +2161,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         refresh_deadline_seconds=config.account_snapshot_refresh_deadline_seconds,
         circuit_retry_cooldown_seconds=config.account_snapshot_circuit_retry_seconds,
     )
-    account.start()
+    # Read one trusted account snapshot for paper-account and held-position
+    # discovery, then pause periodic account traffic until the quote stream is
+    # fully subscribed. Concurrent SDK cold-start requests can otherwise stall
+    # a quote subscribe call and trigger a false recovery loop.
+    account.start(background_refresh=False)
     startup_account_snapshot = account.snapshot()
     position_monitoring_symbols = held_position_monitoring_symbols(
         config,
@@ -2381,6 +2385,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         snapshot_first_complete_bar_open.astimezone(UTC)
                     )
                 worker_ready = False
+                account.pause_background_refresh()
                 worker_started = time.monotonic()
                 worker_last_progress = worker_started
                 subscription_progress_completed = 0
@@ -2656,6 +2661,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     )
                     continue
                 attempts = 0
+                account.resume_background_refresh()
                 if market_data_mode == "sdk_snapshot_poll":
                     last_subscription_failure_reason = (
                         "sdk_subscription_unavailable_using_snapshot_poll"
@@ -3447,6 +3453,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "account_snapshot_worker_restart_count": snapshot.get("worker_restart_count"),
                     "account_snapshot_worker_timeout_count": snapshot.get("worker_consecutive_timeouts"),
                     "account_snapshot_circuit_open": bool(snapshot.get("worker_circuit_open")),
+                    "account_snapshot_background_refresh_enabled": (
+                        account.background_refresh_enabled
+                    ),
                     "dispatch_enabled": effective_runtime_dispatch_enabled(
                         dispatch_requested=dispatch_enabled,
                         paper_client_ready=paper_client is not None,

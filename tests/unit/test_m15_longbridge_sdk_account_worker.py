@@ -2,11 +2,13 @@ import json
 import os
 import signal
 import tempfile
+import threading
 import time
 import unittest
 from functools import partial
 from pathlib import Path
 
+from scripts.m15_longbridge_sdk_account_lib import SdkAccountProcessCoordinator
 from scripts.m15_longbridge_sdk_account_worker_lib import (
     AccountWorkerConfig,
     SpawnAccountSnapshotWorker,
@@ -131,6 +133,62 @@ def trusted_snapshot(timestamp, marker):
 
 
 class M15LongbridgeSdkAccountWorkerTest(unittest.TestCase):
+    def test_periodic_refresh_can_wait_for_quote_subscription(self) -> None:
+        class FakeWorker:
+            def __init__(self):
+                self.started = False
+                self.stopped = False
+
+            def start(self):
+                self.started = True
+
+            def stop(self):
+                self.stopped = True
+
+            def refresh(self, *, total_deadline_seconds=None):
+                return {
+                    "generated_at": "2026-08-24T17:00:00Z",
+                    "orders": [],
+                    "open_orders": [],
+                }
+
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        coordinator = SdkAccountProcessCoordinator(
+            lambda: None,
+            Path(temp_dir.name) / "account.json",
+            interval_seconds=60,
+        )
+        fake_worker = FakeWorker()
+        coordinator._worker = fake_worker
+        try:
+            coordinator.start(background_refresh=False)
+            self.assertTrue(fake_worker.started)
+            self.assertFalse(coordinator.background_refresh_enabled)
+
+            coordinator.resume_background_refresh()
+            self.assertTrue(coordinator.background_refresh_enabled)
+
+            coordinator._refresh_lock.acquire()
+            paused = threading.Event()
+            pause_thread = threading.Thread(
+                target=lambda: (
+                    coordinator.pause_background_refresh(),
+                    paused.set(),
+                )
+            )
+            pause_thread.start()
+            try:
+                self.assertFalse(paused.wait(timeout=0.05))
+            finally:
+                coordinator._refresh_lock.release()
+            pause_thread.join(timeout=1)
+            self.assertTrue(paused.is_set())
+            self.assertFalse(coordinator.background_refresh_enabled)
+        finally:
+            coordinator.stop()
+        self.assertTrue(fake_worker.stopped)
+
     def test_startup_grace_is_separate_from_regular_refresh_deadline(self) -> None:
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
