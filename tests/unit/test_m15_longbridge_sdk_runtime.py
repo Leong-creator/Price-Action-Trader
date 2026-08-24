@@ -67,12 +67,41 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
     signals_allowed_by_entry_gate,
+    should_emit_reference_market_activity,
     start_runtime_daemon,
     trade_context_health_requires_rebuild,
 )
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_reference_trade_activity_is_throttled_without_ignoring_trades(self) -> None:
+        last_emit = {}
+        self.assertTrue(
+            should_emit_reference_market_activity(
+                "SPY.US", now_monotonic=10.0, last_emit_by_symbol=last_emit
+            )
+        )
+        self.assertFalse(
+            should_emit_reference_market_activity(
+                "SPY.US", now_monotonic=10.5, last_emit_by_symbol=last_emit
+            )
+        )
+        self.assertTrue(
+            should_emit_reference_market_activity(
+                "SPY.US", now_monotonic=11.0, last_emit_by_symbol=last_emit
+            )
+        )
+        self.assertFalse(
+            should_emit_reference_market_activity(
+                "AAPL.US", now_monotonic=11.0, last_emit_by_symbol=last_emit
+            )
+        )
+
+    def test_quote_worker_reports_reference_trade_activity(self) -> None:
+        source = inspect.getsource(quote_worker)
+        self.assertIn('"kind": "market_activity"', source)
+        self.assertIn('"longbridge_sdk_trade_push"', source)
+
     def test_runtime_keeps_account_refresh_independent_during_quote_subscription(self) -> None:
         source = inspect.getsource(__import__(
             "scripts.run_m15_longbridge_sdk_runtime",
