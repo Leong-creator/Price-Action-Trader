@@ -90,6 +90,24 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         config = load_config()
         self.assertTrue(str(config.config_path).endswith("m15_longbridge_sdk_runtime.json"))
         self.assertFalse(str(config.config_path).endswith(".contract_v1.json"))
+        self.assertEqual(config.subscription_deadline_seconds, 30)
+        self.assertEqual(config.subscription_progress_deadline_seconds, 90)
+        self.assertEqual(config.subscription_circuit_retry_seconds, 300)
+
+    def test_runtime_subscription_circuit_recovers_without_parent_restart(self) -> None:
+        source = inspect.getsource(__import__(
+            "scripts.run_m15_longbridge_sdk_runtime",
+            fromlist=["run_watch"],
+        ).run_watch)
+        self.assertIn("config.subscription_progress_deadline_seconds", source)
+        self.assertIn("config.subscription_circuit_retry_seconds", source)
+        self.assertIn("sdk_subscription_circuit_cooldown_elapsed", source)
+        self.assertIn("account.resume_background_refresh()", source)
+        self.assertIn(
+            "not market_data_circuit_open\n                and not worker_ready",
+            source,
+        )
+        self.assertGreaterEqual(source.count("account.resume_background_refresh()"), 6)
 
     def test_production_runtime_uses_frozen_contract_v1_configs(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
@@ -780,6 +798,20 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 {
                     "generated_at": datetime.now(UTC).isoformat(),
                     "account_snapshot_age_seconds": 8,
+                },
+                config,
+            )
+        )
+
+    def test_market_data_circuit_with_fresh_account_keeps_same_parent_runtime(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertFalse(
+            runtime_requires_health_replacement(
+                {
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "account_snapshot_age_seconds": 8,
+                    "market_data_circuit_open": True,
+                    "market_data_retry_after_seconds": 240,
                 },
                 config,
             )

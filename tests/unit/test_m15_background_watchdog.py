@@ -382,6 +382,52 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(step["recovery_check_attempts"], 3)
             self.assertTrue(step["recovered_within_grace"])
 
+    def test_sdk_runtime_status_waits_for_planned_market_data_circuit_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(
+                Path(tmp), runtime_engine="sdk", runtime_recovery_grace_seconds=20
+            )
+            responses = iter(
+                [
+                    {
+                        "runtime_process_alive": True,
+                        "status": "halted_market_data_circuit",
+                        "sdk_connected": False,
+                        "account_snapshot_healthy": True,
+                        "market_data_circuit_open": True,
+                        "market_data_retry_after_seconds": 300,
+                    },
+                    {
+                        "runtime_process_alive": True,
+                        "status": "running",
+                        "sdk_connected": True,
+                        "account_snapshot_healthy": True,
+                    },
+                ]
+            )
+            clock = [0.0]
+
+            def runner(_command: list[str], _timeout: int):
+                return type(
+                    "Result",
+                    (),
+                    {"returncode": 0, "stdout": json.dumps(next(responses)), "stderr": ""},
+                )()
+
+            def sleep(seconds: float) -> None:
+                clock[0] += seconds
+
+            step = m15_runtime_status_step(
+                config,
+                runner,
+                sleep=sleep,
+                monotonic=lambda: clock[0],
+            )
+
+            self.assertEqual(step["returncode"], 0)
+            self.assertEqual(step["recovery_check_attempts"], 2)
+            self.assertTrue(step["recovered_within_grace"])
+
     def test_watchdog_reports_logically_blocked_acceptance_as_needs_attention(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(Path(tmp), runtime_engine="sdk")

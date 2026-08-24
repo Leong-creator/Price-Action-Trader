@@ -56,6 +56,8 @@
     "subscription_request_interval_seconds": 0.5,
     "subscription_retry_backoff_seconds": 2,
     "subscription_deadline_seconds": 30,
+    "subscription_progress_deadline_seconds": 90,
+    "subscription_circuit_retry_seconds": 300,
     "maximum_consecutive_subscription_failures": 3,
     "snapshot_poll_interval_seconds": 3,
     "subscription_failures_before_snapshot_fallback": 1,
