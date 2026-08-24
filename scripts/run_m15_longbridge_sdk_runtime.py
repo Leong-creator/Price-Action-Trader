@@ -567,6 +567,59 @@ def active_reference_quotes_are_stale(
     )
 
 
+def market_data_recovery_is_stable(
+    *,
+    attempts: int,
+    worker_ready_since_monotonic: float,
+    now_monotonic: float,
+    last_push_by_symbol: dict[str, float],
+    first_live_push_by_symbol: dict[str, float],
+    last_live_push_by_symbol: dict[str, float],
+    stabilization_seconds: float,
+) -> bool:
+    return bool(
+        attempts > 0
+        and market_data_heartbeat_grace_elapsed(
+            worker_ready_since_monotonic,
+            now_monotonic,
+            stabilization_seconds,
+        )
+        and not active_reference_quotes_are_stale(
+            last_push_by_symbol,
+            now_monotonic=now_monotonic,
+            maximum_silence_seconds=stabilization_seconds,
+        )
+        and reference_live_push_span_is_stable(
+            first_live_push_by_symbol,
+            last_live_push_by_symbol,
+            now_monotonic=now_monotonic,
+            stabilization_seconds=stabilization_seconds,
+        )
+    )
+
+
+def reference_live_push_span_is_stable(
+    first_live_push_by_symbol: dict[str, float],
+    last_live_push_by_symbol: dict[str, float],
+    *,
+    now_monotonic: float,
+    stabilization_seconds: float,
+    reference_symbols: tuple[str, ...] = ("SPY.US", "QQQ.US"),
+) -> bool:
+    minimum_span = max(1.0, float(stabilization_seconds) - 2.0)
+    for symbol in reference_symbols:
+        first = float(first_live_push_by_symbol.get(symbol, 0.0))
+        last = float(last_live_push_by_symbol.get(symbol, 0.0))
+        if (
+            first > 0
+            and last >= first
+            and last - first >= minimum_span
+            and now_monotonic - last <= float(stabilization_seconds)
+        ):
+            return True
+    return False
+
+
 def should_emit_reference_market_activity(
     symbol: str,
     *,
@@ -2252,6 +2305,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     worker_generation = 0
     next_worker_start_monotonic = 0.0
     last_push_by_symbol: dict[str, float] = {}
+    first_live_push_by_symbol: dict[str, float] = {}
+    last_live_push_by_symbol: dict[str, float] = {}
     last_push_at_by_symbol: dict[str, str] = {}
     last_push_source_by_symbol: dict[str, str] = {}
     complete_boundary_count = 0
@@ -2463,6 +2518,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker.start()
                 worker_generation += 1
                 worker_ready_since = 0.0
+                first_live_push_by_symbol.clear()
+                last_live_push_by_symbol.clear()
             if (
                 not market_data_circuit_open
                 and not worker_ready
@@ -2558,6 +2615,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     config.reconnect_backoff_schedule_seconds, attempts
                 )
                 continue
+            if worker_ready and market_data_recovery_is_stable(
+                attempts=attempts,
+                worker_ready_since_monotonic=worker_ready_since,
+                now_monotonic=time.monotonic(),
+                last_push_by_symbol=last_push_by_symbol,
+                first_live_push_by_symbol=first_live_push_by_symbol,
+                last_live_push_by_symbol=last_live_push_by_symbol,
+                stabilization_seconds=config.active_symbol_silence_seconds,
+            ):
+                attempts = 0
             if worker_ready and daily_context_state == "waiting_for_subscription":
                 symbols = list(configured_symbols(config))
                 daily_pending = deque(
@@ -2660,11 +2727,17 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     source_mode=str(message.get("source_mode") or "longbridge_sdk_push"),
                 )
                 normalized_push_symbol = str(message.get("symbol") or "").upper()
-                last_push_by_symbol[normalized_push_symbol] = time.monotonic()
+                push_monotonic = time.monotonic()
+                last_push_by_symbol[normalized_push_symbol] = push_monotonic
                 last_push_at_by_symbol[normalized_push_symbol] = to_iso(quote_received_at)
-                last_push_source_by_symbol[normalized_push_symbol] = str(
-                    message.get("source_mode") or "longbridge_sdk_push"
-                )
+                push_source = str(message.get("source_mode") or "longbridge_sdk_push")
+                last_push_source_by_symbol[normalized_push_symbol] = push_source
+                if (
+                    normalized_push_symbol in {"SPY.US", "QQQ.US"}
+                    and push_source != "longbridge_sdk_initial_snapshot"
+                ):
+                    first_live_push_by_symbol.setdefault(normalized_push_symbol, push_monotonic)
+                    last_live_push_by_symbol[normalized_push_symbol] = push_monotonic
             elif kind == "market_activity":
                 try:
                     activity_received_at = datetime.fromisoformat(
@@ -2673,13 +2746,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 except ValueError:
                     activity_received_at = datetime.now(UTC)
                 normalized_activity_symbol = str(message.get("symbol") or "").upper()
-                last_push_by_symbol[normalized_activity_symbol] = time.monotonic()
+                activity_monotonic = time.monotonic()
+                last_push_by_symbol[normalized_activity_symbol] = activity_monotonic
                 last_push_at_by_symbol[normalized_activity_symbol] = to_iso(
                     activity_received_at
                 )
                 last_push_source_by_symbol[normalized_activity_symbol] = str(
                     message.get("source_mode") or "longbridge_sdk_trade_push"
                 )
+                if normalized_activity_symbol in {"SPY.US", "QQQ.US"}:
+                    first_live_push_by_symbol.setdefault(
+                        normalized_activity_symbol,
+                        activity_monotonic,
+                    )
+                    last_live_push_by_symbol[normalized_activity_symbol] = activity_monotonic
             elif kind == "ready":
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
@@ -2734,7 +2814,6 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         config.reconnect_backoff_schedule_seconds, attempts
                     )
                     continue
-                attempts = 0
                 account.resume_background_refresh()
                 if market_data_mode == "sdk_snapshot_poll":
                     last_subscription_failure_reason = (
