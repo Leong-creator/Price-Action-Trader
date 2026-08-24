@@ -73,13 +73,13 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
-    def test_runtime_serializes_account_refresh_and_quote_subscription_startup(self) -> None:
+    def test_runtime_keeps_account_refresh_independent_during_quote_subscription(self) -> None:
         source = inspect.getsource(__import__(
             "scripts.run_m15_longbridge_sdk_runtime",
             fromlist=["run_watch"],
         ).run_watch)
-        self.assertIn("account.start(background_refresh=False)", source)
-        self.assertIn("account.pause_background_refresh()", source)
+        self.assertIn("account.start(background_refresh=True)", source)
+        self.assertNotIn("account.pause_background_refresh()", source)
         self.assertIn("account.resume_background_refresh()", source)
 
     def test_runtime_shutdown_allows_spawned_workers_to_close(self) -> None:
