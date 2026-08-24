@@ -223,19 +223,26 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         )
     else:
         effective_paper_orders_enabled = paper_orders_enabled
-    new_position_submission_enabled = (
-        effective_paper_orders_enabled
-        and not pending_formal_flatten
-        and execution_epoch_consistent
-    )
     readonly_gate_waiting = bool(
         sdk_config is not None
         and sdk_config.two_day_readonly_gate
         and realtime_status.get("readonly_gate_passed") is not True
     )
+    new_position_submission_enabled = (
+        effective_paper_orders_enabled
+        and not pending_formal_flatten
+        and not readonly_gate_waiting
+        and execution_epoch_consistent
+    )
     paper_account_ready = paper_account_verified(account_state)
     realtime_health_issues = (
-        sdk_runtime_health_issues(realtime_status, sdk_config, realtime_alive)
+        sdk_runtime_health_issues(
+            realtime_status,
+            sdk_config,
+            realtime_alive,
+            generated_at=generated_at,
+            require_live_push=window["market_phase"] == "regular_session",
+        )
         if sdk_config is not None
         else supervisor_health_issues(
             realtime_config,
@@ -400,14 +407,13 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     waiting_count = sum(1 for row in checks if row["status"] == "waiting")
     pass_count = sum(1 for row in checks if row["status"] == "pass")
     informational_count = sum(1 for row in checks if row["status"] == "informational")
-    if fail_count:
-        readiness_status = "blocked_opening_trade_watch"
-    elif pending_formal_flatten:
-        readiness_status = "ready_for_paper_exit_only" if window["market_phase"] == "regular_session" else "armed_waiting_flatten_session"
-    elif window["market_phase"] == "regular_session":
-        readiness_status = "ready_for_longbridge_paper_orders"
-    else:
-        readiness_status = "armed_waiting_regular_session"
+    readiness_status = resolve_readiness_status(
+        fail_count=fail_count,
+        pending_formal_flatten=pending_formal_flatten,
+        market_phase=str(window["market_phase"]),
+        new_position_submission_enabled=new_position_submission_enabled,
+        readonly_gate_waiting=readonly_gate_waiting,
+    )
     return {
         "schema_version": "m15.opening-trade-readiness.v1",
         "stage": config.stage,
@@ -546,7 +552,14 @@ def sdk_runtime_boundaries(sdk_config: Any, realtime_config: Any) -> dict[str, b
     }
 
 
-def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_alive_now: bool) -> list[str]:
+def sdk_runtime_health_issues(
+    status: dict[str, Any],
+    sdk_config: Any,
+    process_alive_now: bool,
+    *,
+    generated_at: str = "",
+    require_live_push: bool = False,
+) -> list[str]:
     issues: list[str] = []
     if not process_alive_now:
         issues.append("process_not_alive")
@@ -566,6 +579,28 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
         issues.append("sdk_market_data_mode_not_subscription")
     if status.get("market_data_circuit_open") is True:
         issues.append("sdk_market_data_circuit_open")
+    try:
+        quote_worker_generation = int(status.get("quote_worker_generation", 0) or 0)
+    except (TypeError, ValueError):
+        quote_worker_generation = -1
+        issues.append("sdk_quote_worker_generation_invalid")
+    if quote_worker_generation > 3:
+        issues.append("sdk_quote_worker_reconnect_loop")
+    if generated_at:
+        status_age = artifact_age_seconds(str(status.get("generated_at") or ""), generated_at)
+        if status_age is None or status_age > 45:
+            issues.append("sdk_runtime_status_stale")
+    if require_live_push and generated_at:
+        runtime_age = artifact_age_seconds(str(status.get("runtime_started_at") or ""), generated_at)
+        silence_seconds = int(getattr(sdk_config, "active_symbol_silence_seconds", 30) or 30)
+        if runtime_age is None:
+            issues.append("sdk_runtime_started_at_invalid")
+        elif runtime_age >= silence_seconds and not reference_market_push_is_fresh(
+            status,
+            generated_at=generated_at,
+            maximum_age_seconds=silence_seconds,
+        ):
+            issues.append("sdk_reference_market_push_stale")
     if status.get("runtime_engine") not in {"", "sdk"}:
         issues.append("runtime_engine_not_sdk")
     expected_fingerprint = sdk_config_fingerprint(sdk_config) if sdk_config is not None else ""
@@ -610,6 +645,47 @@ def sdk_runtime_health_issues(status: dict[str, Any], sdk_config: Any, process_a
     return issues
 
 
+def reference_market_push_is_fresh(
+    status: dict[str, Any],
+    *,
+    generated_at: str,
+    maximum_age_seconds: int,
+) -> bool:
+    reference_activity = status.get("reference_market_activity")
+    if not isinstance(reference_activity, dict):
+        return False
+    for symbol in ("SPY.US", "QQQ.US"):
+        activity = reference_activity.get(symbol)
+        if not isinstance(activity, dict):
+            continue
+        source = str(activity.get("source") or "")
+        if not source or source == "longbridge_sdk_initial_snapshot":
+            continue
+        age = artifact_age_seconds(str(activity.get("at") or ""), generated_at)
+        if age is not None and age <= maximum_age_seconds:
+            return True
+    return False
+
+
+def resolve_readiness_status(
+    *,
+    fail_count: int,
+    pending_formal_flatten: bool,
+    market_phase: str,
+    new_position_submission_enabled: bool,
+    readonly_gate_waiting: bool,
+) -> str:
+    if fail_count:
+        return "blocked_opening_trade_watch"
+    if pending_formal_flatten:
+        return "ready_for_paper_exit_only" if market_phase == "regular_session" else "armed_waiting_flatten_session"
+    if readonly_gate_waiting:
+        return "waiting_for_marketdata_acceptance"
+    if market_phase == "regular_session" and new_position_submission_enabled:
+        return "ready_for_longbridge_paper_orders"
+    return "armed_waiting_regular_session"
+
+
 def local_simulation_isolated(realtime_status: dict[str, Any]) -> bool:
     if not realtime_status:
         return True
@@ -639,6 +715,8 @@ def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[
         return "长桥模拟账户仅允许平仓：先清除 SDK 验收持仓，清仓确认完成后才启用新开仓。"
     if status == "armed_waiting_flatten_session":
         return f"清仓链路已武装：当前是{window.get('market_status')}，下个常规交易时段只处理验收持仓退出。"
+    if status == "waiting_for_marketdata_acceptance":
+        return "长桥模拟账户新开仓仍被禁止：实时行情完整交易日验收尚未通过；当前只保留账户监控和已有持仓退出能力。"
     return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"
 
 
