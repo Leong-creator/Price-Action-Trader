@@ -90,6 +90,7 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
         self.assertEqual(runtime["runtime"]["subscription_deadline_seconds"], 30)
         self.assertEqual(runtime["runtime"]["subscription_progress_deadline_seconds"], 90)
         self.assertEqual(runtime["runtime"]["subscription_circuit_retry_seconds"], 300)
+        self.assertEqual(runtime["runtime"]["subscription_batch_size"], 500)
         self.assertEqual(runtime["runtime"]["maximum_consecutive_subscription_failures"], 3)
         self.assertTrue(
             runtime["outputs"]["readonly_gate"].endswith(

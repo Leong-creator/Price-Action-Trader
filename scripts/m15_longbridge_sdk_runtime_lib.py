@@ -157,7 +157,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             int(value)
             for value in runtime.get("reconnect_backoff_schedule_seconds", [5, 15, 30, 60])
         ),
-        subscription_batch_size=int(runtime.get("subscription_batch_size", 10)),
+        subscription_batch_size=int(runtime.get("subscription_batch_size", 500)),
         subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
         subscription_request_interval_seconds=float(
             runtime.get("subscription_request_interval_seconds", 0.5)
@@ -294,8 +294,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK stale entry order TTL must be positive")
     if config.exit_order_reprice_seconds <= 0:
         raise ValueError("M15 SDK exit order reprice interval must be positive")
-    if config.subscription_batch_size <= 0 or config.subscription_batch_size > 50:
-        raise ValueError("M15 SDK subscription batch size must be between 1 and 50")
+    if config.subscription_batch_size <= 0 or config.subscription_batch_size > 500:
+        raise ValueError("M15 SDK subscription batch size must be between 1 and 500")
     if not 0 <= config.subscription_request_interval_seconds <= 5:
         raise ValueError("M15 SDK subscription request interval must be between 0 and 5 seconds")
     if not 0 <= config.subscription_retry_backoff_seconds <= 10:
@@ -1235,13 +1235,14 @@ def subscribe_quote_and_trades(
     symbols: list[str],
     subscription_types: list[Any],
     *,
-    batch_size: int = 10,
+    batch_size: int = 500,
     retry_count: int = 2,
     progress_callback: Callable[[int, int], None] | None = None,
     request_interval_seconds: float = 0,
     retry_backoff_seconds: float = 0,
+    diagnose_failed_symbols: bool = True,
 ) -> list[str]:
-    """Subscribe in bounded requests and identify every failed symbol."""
+    """Subscribe in bounded requests and optionally isolate failed symbols."""
     if batch_size <= 0:
         raise ValueError("subscription batch size must be positive")
     if retry_count < 0:
@@ -1258,11 +1259,12 @@ def subscribe_quote_and_trades(
                 break
             except Exception:
                 if attempt == retry_count:
-                    for symbol in batch:
-                        try:
-                            quote_context.subscribe([symbol], subscription_types)
-                        except Exception:
-                            failed_symbols.append(symbol)
+                    if diagnose_failed_symbols:
+                        for symbol in batch:
+                            try:
+                                quote_context.subscribe([symbol], subscription_types)
+                            except Exception:
+                                failed_symbols.append(symbol)
                 elif retry_backoff_seconds:
                     sleep(retry_backoff_seconds)
                 continue

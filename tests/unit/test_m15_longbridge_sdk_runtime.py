@@ -93,6 +93,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(config.subscription_deadline_seconds, 30)
         self.assertEqual(config.subscription_progress_deadline_seconds, 90)
         self.assertEqual(config.subscription_circuit_retry_seconds, 300)
+        self.assertEqual(config.subscription_batch_size, 500)
 
     def test_runtime_subscription_circuit_recovers_without_parent_restart(self) -> None:
         source = inspect.getsource(__import__(
@@ -1701,6 +1702,26 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         subscribe_quote_and_trades(quote, ["AAPL.US"], ["Quote", "Trade"])
         self.assertEqual(quote.calls, [(["AAPL.US"], ["Quote", "Trade"])])
 
+    def test_default_subscription_sends_a_large_universe_in_one_request(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, subscription_types) -> None:
+                self.calls.append((symbols, subscription_types))
+
+        quote = QuoteContext()
+        symbols = [f"TEST{index}.US" for index in range(156)]
+        progress = []
+        subscribe_quote_and_trades(
+            quote,
+            symbols,
+            ["Quote", "Trade"],
+            progress_callback=lambda completed, total: progress.append((completed, total)),
+        )
+        self.assertEqual(quote.calls, [(symbols, ["Quote", "Trade"])])
+        self.assertEqual(progress, [(156, 156)])
+
     def test_subscription_batches_large_universe_without_a_single_large_request(self) -> None:
         class QuoteContext:
             def __init__(self) -> None:
@@ -1741,6 +1762,31 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
         self.assertEqual(failures, ["BAD.US"])
         self.assertIn(["AAPL.US"], quote.calls)
+
+    def test_production_subscription_failure_defers_to_server_subscription_state(self) -> None:
+        class QuoteContext:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def subscribe(self, symbols, _subscription_types) -> None:
+                self.calls.append(symbols)
+                raise RuntimeError("request timeout")
+
+        quote = QuoteContext()
+        symbols = ["AAPL.US", "MSFT.US", "NVDA.US"]
+        failures = subscribe_quote_and_trades(
+            quote,
+            symbols,
+            ["Quote", "Trade"],
+            retry_count=0,
+            diagnose_failed_symbols=False,
+        )
+        self.assertEqual(quote.calls, [symbols])
+        self.assertEqual(failures, [])
+
+    def test_runtime_disables_per_symbol_diagnosis_on_production_connection(self) -> None:
+        source = inspect.getsource(quote_worker)
+        self.assertIn("diagnose_failed_symbols=False", source)
 
     def test_sdk_region_endpoints_are_explicit(self) -> None:
         self.assertEqual(

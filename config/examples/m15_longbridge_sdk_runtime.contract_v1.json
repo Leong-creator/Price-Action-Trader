@@ -73,7 +73,7 @@
     "snapshot_poll_interval_seconds": 3,
     "snapshot_poll_min_successful_cycles": 1,
     "stale_entry_order_ttl_seconds": 900,
-    "subscription_batch_size": 10,
+    "subscription_batch_size": 500,
     "subscription_deadline_seconds": 30,
     "subscription_progress_deadline_seconds": 90,
     "subscription_circuit_retry_seconds": 300,
