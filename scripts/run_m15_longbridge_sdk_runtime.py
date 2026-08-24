@@ -2165,7 +2165,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     # discovery, then pause periodic account traffic until the quote stream is
     # fully subscribed. Concurrent SDK cold-start requests can otherwise stall
     # a quote subscribe call and trigger a false recovery loop.
-    account.start(background_refresh=False)
+    account.start(background_refresh=True)
     startup_account_snapshot = account.snapshot()
     position_monitoring_symbols = held_position_monitoring_symbols(
         config,
@@ -2403,7 +2403,6 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         snapshot_first_complete_bar_open.astimezone(UTC)
                     )
                 worker_ready = False
-                account.pause_background_refresh()
                 worker_started = time.monotonic()
                 worker_last_progress = worker_started
                 subscription_progress_completed = 0
