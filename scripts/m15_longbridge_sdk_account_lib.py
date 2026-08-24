@@ -404,6 +404,8 @@ class SdkAccountProcessCoordinator:
         self._snapshot: dict[str, Any] = {}
         self._pending_open_orders: dict[str, dict[str, Any]] = {}
         self._stop = threading.Event()
+        self._background_refresh_enabled = threading.Event()
+        self._thread_started = False
         self._worker = SpawnAccountSnapshotWorker(
             provider_factory,
             config=AccountWorkerConfig(
@@ -416,14 +418,37 @@ class SdkAccountProcessCoordinator:
         )
         self._thread = threading.Thread(target=self._run, name="m15-sdk-account-process-coordinator", daemon=True)
 
-    def start(self) -> None:
+    @property
+    def background_refresh_enabled(self) -> bool:
+        return self._background_refresh_enabled.is_set()
+
+    def start(self, *, background_refresh: bool = True) -> None:
         self._worker.start()
         self.refresh()
-        self._thread.start()
+        if background_refresh:
+            self.resume_background_refresh()
+
+    def resume_background_refresh(self) -> None:
+        """Resume periodic account calls after the quote stream is ready."""
+        if not self._thread_started:
+            self._thread.start()
+            self._thread_started = True
+        self._background_refresh_enabled.set()
+
+    def pause_background_refresh(self) -> None:
+        """Pause new refreshes and wait for any active SDK request to finish."""
+        self._background_refresh_enabled.clear()
+        # Clearing the event prevents the coordinator thread from starting a
+        # new refresh. Taking the same lock used by refresh() also drains a
+        # request that was already in flight before the pause was requested.
+        with self._refresh_lock:
+            pass
 
     def stop(self) -> None:
         self._stop.set()
-        self._thread.join(timeout=self.refresh_deadline_seconds + 1.0)
+        self._background_refresh_enabled.set()
+        if self._thread_started:
+            self._thread.join(timeout=self.refresh_deadline_seconds + 1.0)
         self._worker.stop()
 
     def refresh(self) -> dict[str, Any]:
@@ -482,7 +507,13 @@ class SdkAccountProcessCoordinator:
         temporary.replace(self.output_path)
 
     def _run(self) -> None:
-        while not self._stop.wait(self.interval_seconds):
+        while not self._stop.is_set():
+            if not self._background_refresh_enabled.wait(timeout=0.2):
+                continue
+            if self._stop.wait(self.interval_seconds):
+                break
+            if not self._background_refresh_enabled.is_set():
+                continue
             try:
                 self.refresh()
             except Exception:
