@@ -51,7 +51,7 @@
     "heartbeat_interval_seconds": 1,
     "reconnect_backoff_seconds": 5,
     "reconnect_backoff_schedule_seconds": [5, 15, 30, 60],
-    "subscription_batch_size": 10,
+    "subscription_batch_size": 500,
     "subscription_retry_count": 2,
     "subscription_request_interval_seconds": 0.5,
     "subscription_retry_backoff_seconds": 2,

@@ -719,6 +719,7 @@ def quote_worker(
             progress_callback=report_subscription_progress,
             request_interval_seconds=config.subscription_request_interval_seconds,
             retry_backoff_seconds=config.subscription_retry_backoff_seconds,
+            diagnose_failed_symbols=False,
         )
         expected = set(base_subscription_targets)
         trading_expected = set(trading_symbols)
