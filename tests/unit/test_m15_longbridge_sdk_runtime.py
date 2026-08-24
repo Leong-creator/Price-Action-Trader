@@ -46,6 +46,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_mode_qualifies_for_subscription_gate,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
+    market_data_recovery_is_stable,
     preserve_last_order_maintenance_action,
     opening_signal_outside_trading_universe,
     quote_worker,
@@ -180,6 +181,63 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 maximum_silence_seconds=30,
             )
         )
+
+    def test_recovery_attempts_reset_only_after_sustained_live_pushes(self) -> None:
+        self.assertFalse(
+            market_data_recovery_is_stable(
+                attempts=1,
+                worker_ready_since_monotonic=100.0,
+                now_monotonic=120.0,
+                last_push_by_symbol={"SPY.US": 119.0, "QQQ.US": 119.0},
+                first_live_push_by_symbol={"SPY.US": 101.0},
+                last_live_push_by_symbol={"SPY.US": 119.0},
+                stabilization_seconds=30.0,
+            )
+        )
+        self.assertFalse(
+            market_data_recovery_is_stable(
+                attempts=1,
+                worker_ready_since_monotonic=100.0,
+                now_monotonic=131.0,
+                last_push_by_symbol={"SPY.US": 100.0, "QQQ.US": 100.0},
+                first_live_push_by_symbol={"SPY.US": 101.0},
+                last_live_push_by_symbol={"SPY.US": 130.0},
+                stabilization_seconds=30.0,
+            )
+        )
+        self.assertTrue(
+            market_data_recovery_is_stable(
+                attempts=1,
+                worker_ready_since_monotonic=100.0,
+                now_monotonic=131.0,
+                last_push_by_symbol={"SPY.US": 130.0, "QQQ.US": 100.0},
+                first_live_push_by_symbol={"SPY.US": 101.0},
+                last_live_push_by_symbol={"SPY.US": 130.0},
+                stabilization_seconds=30.0,
+            )
+        )
+
+        self.assertFalse(
+            market_data_recovery_is_stable(
+                attempts=1,
+                worker_ready_since_monotonic=100.0,
+                now_monotonic=131.0,
+                last_push_by_symbol={"SPY.US": 130.0},
+                first_live_push_by_symbol={"SPY.US": 129.0},
+                last_live_push_by_symbol={"SPY.US": 130.0},
+                stabilization_seconds=30.0,
+            )
+        )
+
+    def test_successful_subscription_receipt_does_not_clear_recovery_attempts(self) -> None:
+        source = inspect.getsource(__import__(
+            "scripts.run_m15_longbridge_sdk_runtime",
+            fromlist=["run_watch"],
+        ).run_watch)
+        ready_branch = source.split('elif kind == "ready":', 1)[1].split('elif kind == "daily_context":', 1)[0]
+
+        self.assertNotIn("attempts = 0", ready_branch)
+        self.assertIn("market_data_recovery_is_stable", source)
 
     def test_invalid_deployment_manifest_blocks_dispatch(self) -> None:
         self.assertFalse(
