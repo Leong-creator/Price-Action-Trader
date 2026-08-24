@@ -414,6 +414,7 @@ def sdk_runtime_step_is_transient_recovery(step: dict[str, Any]) -> bool:
     return reason.startswith("sdk_runtime_not_ready:") and reason.split(":", 1)[1] in {
         "connecting",
         "reconnecting_market_data_circuit",
+        "halted_market_data_circuit",
     }
 
 

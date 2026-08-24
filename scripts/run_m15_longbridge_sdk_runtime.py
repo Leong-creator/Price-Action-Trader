@@ -2287,6 +2287,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     snapshot_poll_is_fast_and_complete = False
     last_market_data_worker_error = ""
     market_data_circuit_open = False
+    market_data_circuit_retry_at = 0.0
     shutdown_requested = False
     previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
 
@@ -2298,6 +2299,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     signal.signal(signal.SIGTERM, stop_requested)
     try:
         while not shutdown_requested:
+            if (
+                market_data_circuit_open
+                and market_data_circuit_retry_at > 0
+                and time.monotonic() >= market_data_circuit_retry_at
+            ):
+                market_data_circuit_open = False
+                market_data_circuit_retry_at = 0.0
+                attempts = 0
+                next_worker_start_monotonic = time.monotonic()
+                last_subscription_failure_reason = (
+                    "sdk_subscription_circuit_cooldown_elapsed"
+                )
             if not market_data_circuit_open and (worker is None or not worker.is_alive()):
                 if worker is not None:
                     last_subscription_failure_reason = (
@@ -2305,6 +2318,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         f"exit_code={worker.exitcode}"
                     )
                     worker.join(timeout=0.2)
+                    account.resume_background_refresh()
                     attempts += 1
                     next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
                         config.reconnect_backoff_schedule_seconds,
@@ -2369,8 +2383,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         },
                     )
                     market_data_circuit_open = True
+                    market_data_circuit_retry_at = (
+                        time.monotonic() + config.subscription_circuit_retry_seconds
+                    )
                     worker_ready = False
                     worker = None
+                    account.resume_background_refresh()
                     continue
                 if snapshot_fallback_active and snapshot_bar_builder is None:
                     snapshot_started_at = datetime.now(UTC)
@@ -2413,18 +2431,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_generation += 1
                 worker_ready_since = 0.0
             if (
-                not worker_ready
+                not market_data_circuit_open
+                and not worker_ready
                 and time.monotonic() - worker_last_progress
                 > (
                     config.market_data_heartbeat_deadline_seconds
                     if snapshot_fallback_active
-                    else config.subscription_deadline_seconds
+                    else config.subscription_progress_deadline_seconds
                 )
             ):
                 startup_deadline_seconds = (
                     config.market_data_heartbeat_deadline_seconds
                     if snapshot_fallback_active
-                    else config.subscription_deadline_seconds
+                    else config.subscription_progress_deadline_seconds
                 )
                 last_subscription_failure_reason = (
                     "sdk_quote_subscription_deadline_exceeded:"
@@ -2434,6 +2453,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 attempts += 1
                 stop_spawned_process(worker, graceful=False)
                 worker = None
+                account.resume_background_refresh()
                 next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
                     config.reconnect_backoff_schedule_seconds, attempts
                 )
@@ -2475,6 +2495,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 attempts += 1
                 stop_spawned_process(worker, graceful=False)
                 worker = None
+                account.resume_background_refresh()
                 next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
                     config.reconnect_backoff_schedule_seconds, attempts
                 )
@@ -2499,6 +2520,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 attempts += 1
                 stop_spawned_process(worker, graceful=False)
                 worker = None
+                account.resume_background_refresh()
                 next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
                     config.reconnect_backoff_schedule_seconds, attempts
                 )
@@ -2656,6 +2678,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     attempts += 1
                     stop_spawned_process(worker, graceful=False)
                     worker = None
+                    account.resume_background_refresh()
                     next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
                         config.reconnect_backoff_schedule_seconds, attempts
                     )
@@ -2923,6 +2946,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 if worker is not None:
                     stop_spawned_process(worker, graceful=False)
                     worker = None
+                account.resume_background_refresh()
                 next_worker_start_monotonic = time.monotonic() + reconnect_delay_seconds(
                     config.reconnect_backoff_schedule_seconds, attempts
                 )
@@ -3354,6 +3378,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "snapshot_poll_is_fast_and_complete": snapshot_poll_is_fast_and_complete,
                     "last_market_data_worker_error": last_market_data_worker_error,
                     "market_data_circuit_open": market_data_circuit_open,
+                    "market_data_retry_after_seconds": (
+                        max(0, int(market_data_circuit_retry_at - time.monotonic()))
+                        if market_data_circuit_open
+                        else 0
+                    ),
                     "subscription_set_sha256": subscription_set_hash,
                     "last_push_at_by_symbol": dict(sorted(last_push_at_by_symbol.items())),
                     "reference_push_heartbeat": {

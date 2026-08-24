@@ -74,6 +74,8 @@ class SdkRuntimeConfig:
     subscription_request_interval_seconds: float
     subscription_retry_backoff_seconds: float
     subscription_deadline_seconds: int
+    subscription_progress_deadline_seconds: int
+    subscription_circuit_retry_seconds: int
     maximum_consecutive_subscription_failures: int
     snapshot_poll_interval_seconds: float
     subscription_failures_before_snapshot_fallback: int
@@ -164,6 +166,15 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             runtime.get("subscription_retry_backoff_seconds", 2)
         ),
         subscription_deadline_seconds=int(runtime.get("subscription_deadline_seconds", 20)),
+        subscription_progress_deadline_seconds=int(
+            runtime.get(
+                "subscription_progress_deadline_seconds",
+                runtime.get("subscription_deadline_seconds", 20),
+            )
+        ),
+        subscription_circuit_retry_seconds=int(
+            runtime.get("subscription_circuit_retry_seconds", 300)
+        ),
         maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
         snapshot_poll_interval_seconds=float(
             runtime.get("snapshot_poll_interval_seconds", 1)
@@ -293,6 +304,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK subscription retry count must be between 0 and 5")
     if config.subscription_deadline_seconds <= 0:
         raise ValueError("M15 SDK subscription deadline must be positive")
+    if config.subscription_progress_deadline_seconds < config.subscription_deadline_seconds:
+        raise ValueError(
+            "M15 SDK subscription progress deadline must not be shorter than the steady deadline"
+        )
+    if config.subscription_circuit_retry_seconds <= 0:
+        raise ValueError("M15 SDK subscription circuit retry must be positive")
     if config.maximum_consecutive_subscription_failures <= 0:
         raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
     if (
