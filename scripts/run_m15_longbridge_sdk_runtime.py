@@ -567,6 +567,24 @@ def active_reference_quotes_are_stale(
     )
 
 
+def should_emit_reference_market_activity(
+    symbol: str,
+    *,
+    now_monotonic: float,
+    last_emit_by_symbol: dict[str, float],
+    minimum_interval_seconds: float = 1.0,
+    reference_symbols: tuple[str, ...] = ("SPY.US", "QQQ.US"),
+) -> bool:
+    normalized = str(symbol or "").upper()
+    if normalized not in reference_symbols:
+        return False
+    previous = float(last_emit_by_symbol.get(normalized, 0.0))
+    if previous > 0 and now_monotonic - previous < minimum_interval_seconds:
+        return False
+    last_emit_by_symbol[normalized] = now_monotonic
+    return True
+
+
 def signals_allowed_by_entry_gate(
     entry_signals: list[dict[str, Any]],
     exit_signals: list[dict[str, Any]],
@@ -654,6 +672,7 @@ def quote_worker(
         )
 
         aggregation_enabled = False
+        last_trade_activity_emit_by_symbol: dict[str, float] = {}
 
         def on_quote(symbol: str, event: Any) -> None:
             if not aggregation_enabled:
@@ -676,6 +695,20 @@ def quote_worker(
             if not aggregation_enabled:
                 return
             received_at = datetime.now(UTC)
+            if should_emit_reference_market_activity(
+                symbol,
+                now_monotonic=time.monotonic(),
+                last_emit_by_symbol=last_trade_activity_emit_by_symbol,
+            ):
+                emit_worker(
+                    queue_out,
+                    {
+                        "kind": "market_activity",
+                        "symbol": symbol,
+                        "received_at": to_iso(received_at),
+                        "source_mode": "longbridge_sdk_trade_push",
+                    },
+                )
             payload = sdk_object_to_dict(event)
             completed = builder.on_trade(symbol, payload, received_at=received_at)
             if completed:
@@ -2163,9 +2196,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         circuit_retry_cooldown_seconds=config.account_snapshot_circuit_retry_seconds,
     )
     # Read one trusted account snapshot for paper-account and held-position
-    # discovery, then pause periodic account traffic until the quote stream is
-    # fully subscribed. Concurrent SDK cold-start requests can otherwise stall
-    # a quote subscribe call and trigger a false recovery loop.
+    # discovery. Account refresh remains independent from quote startup so a
+    # quote retry cannot make the account state stale.
     account.start(background_refresh=True)
     startup_account_snapshot = account.snapshot()
     position_monitoring_symbols = held_position_monitoring_symbols(
@@ -2221,6 +2253,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     next_worker_start_monotonic = 0.0
     last_push_by_symbol: dict[str, float] = {}
     last_push_at_by_symbol: dict[str, str] = {}
+    last_push_source_by_symbol: dict[str, str] = {}
     complete_boundary_count = 0
     incomplete_boundary_count = 0
     late_boundary_count = 0
@@ -2629,6 +2662,24 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 normalized_push_symbol = str(message.get("symbol") or "").upper()
                 last_push_by_symbol[normalized_push_symbol] = time.monotonic()
                 last_push_at_by_symbol[normalized_push_symbol] = to_iso(quote_received_at)
+                last_push_source_by_symbol[normalized_push_symbol] = str(
+                    message.get("source_mode") or "longbridge_sdk_push"
+                )
+            elif kind == "market_activity":
+                try:
+                    activity_received_at = datetime.fromisoformat(
+                        str(message.get("received_at") or "").replace("Z", "+00:00")
+                    ).astimezone(UTC)
+                except ValueError:
+                    activity_received_at = datetime.now(UTC)
+                normalized_activity_symbol = str(message.get("symbol") or "").upper()
+                last_push_by_symbol[normalized_activity_symbol] = time.monotonic()
+                last_push_at_by_symbol[normalized_activity_symbol] = to_iso(
+                    activity_received_at
+                )
+                last_push_source_by_symbol[normalized_activity_symbol] = str(
+                    message.get("source_mode") or "longbridge_sdk_trade_push"
+                )
             elif kind == "ready":
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
@@ -3387,6 +3438,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "last_push_at_by_symbol": dict(sorted(last_push_at_by_symbol.items())),
                     "reference_push_heartbeat": {
                         symbol: last_push_at_by_symbol.get(symbol, "")
+                        for symbol in ("SPY.US", "QQQ.US")
+                    },
+                    "reference_market_activity": {
+                        symbol: {
+                            "at": last_push_at_by_symbol.get(symbol, ""),
+                            "source": last_push_source_by_symbol.get(symbol, ""),
+                        }
                         for symbol in ("SPY.US", "QQQ.US")
                     },
                     "complete_boundary_count": complete_boundary_count,
