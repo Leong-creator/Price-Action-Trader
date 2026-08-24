@@ -21,6 +21,18 @@ def _write(path: Path, payload: dict) -> str:
 
 
 class LongbridgeDashboardTest(unittest.TestCase):
+    def test_production_dashboard_uses_active_contract_inventory(self) -> None:
+        config = json.loads(
+            Path("config/examples/m15_longbridge_dashboard.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(
+            config["inputs"]["execution_config"],
+            "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
+        )
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.tmp_path = Path(self.temporary.name)
