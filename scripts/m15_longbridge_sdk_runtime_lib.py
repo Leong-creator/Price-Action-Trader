@@ -394,6 +394,47 @@ def configured_trading_symbols(config: SdkRuntimeConfig) -> tuple[str, ...]:
     return configured_symbols(config)[: config.trading_symbol_limit]
 
 
+def held_position_monitoring_symbols(
+    config: SdkRuntimeConfig,
+    account_snapshot: dict[str, Any],
+) -> tuple[str, ...]:
+    """Return non-zero US holdings outside the frozen strategy universe.
+
+    These symbols are subscribed on the existing quote connection only so the
+    position manager can evaluate exits.  They never enter strategy routing.
+    """
+    configured = {symbol.upper() for symbol in configured_trading_symbols(config)}
+    monitoring: set[str] = set()
+    for row in account_snapshot.get("positions") or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            quantity = Decimal(str(row.get("quantity") or "0"))
+        except Exception:
+            continue
+        if quantity <= 0:
+            continue
+        symbol = longbridge_symbol(str(row.get("symbol") or "")).upper()
+        if not symbol.endswith(f".{config.market.upper()}"):
+            continue
+        if symbol not in configured:
+            monitoring.add(symbol)
+    return tuple(sorted(monitoring))
+
+
+def new_held_position_monitoring_symbols(
+    config: SdkRuntimeConfig,
+    account_snapshot: dict[str, Any],
+    already_monitored: tuple[str, ...] | list[str] | set[str],
+) -> tuple[str, ...]:
+    monitored = {str(symbol).upper() for symbol in already_monitored}
+    return tuple(
+        symbol
+        for symbol in held_position_monitoring_symbols(config, account_snapshot)
+        if symbol not in monitored
+    )
+
+
 def trading_universe_fingerprint(config: SdkRuntimeConfig) -> str:
     payload = "\n".join(configured_trading_symbols(config)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()

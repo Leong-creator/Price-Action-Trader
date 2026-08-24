@@ -20,6 +20,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
     config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
     daily_context_is_complete, fresh_market_events, load_config,
+    held_position_monitoring_symbols, new_held_position_monitoring_symbols,
     load_current_sdk_intraday_context,
     load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, sdk_object_to_dict, subscribe_private_trade_updates,
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
@@ -46,8 +47,11 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
     preserve_last_order_maintenance_action,
+    opening_signal_outside_trading_universe,
     quote_worker,
+    quote_subscription_ready,
     quote_subscription_targets,
+    reconcile_position_monitoring_worker,
     require_sdk_contract,
     request_runtime_shutdown,
     restore_pipeline_observability,
@@ -161,6 +165,146 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(rows[0]["market_data_blocked_reason"], "no_trade_carry_forward")
         self.assertEqual(rows[0]["volume"], "0")
         self.assertTrue(realtime_boundary_is_complete(rows, ["SPY.US"]))
+
+    def test_boundary_completeness_ignores_exit_only_monitoring_rows(self) -> None:
+        received = "2026-08-21T13:35:01Z"
+        rows = [
+            {
+                "symbol": symbol,
+                "event_time": "2026-08-21T13:35:00Z",
+                "received_at": received,
+                "bar_final": True,
+            }
+            for symbol in ("SPY", "QQQ", "ZM")
+        ]
+
+        self.assertTrue(
+            realtime_boundary_is_complete(rows, ["SPY.US", "QQQ.US"])
+        )
+
+    def test_existing_holdings_outside_strategy_universe_are_exit_only_monitored(self) -> None:
+        config = load_config()
+        configured = configured_symbols(config)[0]
+        snapshot = {
+            "positions": [
+                {"symbol": configured, "quantity": "1"},
+                {"symbol": "ZZZZ.US", "quantity": "2"},
+                {"symbol": "ZERO.US", "quantity": "0"},
+                {"symbol": "SHORT.US", "quantity": "-2"},
+                {"symbol": "0700.HK", "quantity": "3"},
+                {"symbol": "BAD.US", "quantity": "not-a-number"},
+            ]
+        }
+
+        self.assertEqual(
+            held_position_monitoring_symbols(config, snapshot),
+            ("ZZZZ.US",),
+        )
+        self.assertTrue(
+            opening_signal_outside_trading_universe(
+                config,
+                {"symbol": "ZZZZ", "side": "buy", "position_action": "open_long"},
+            )
+        )
+        self.assertFalse(
+            opening_signal_outside_trading_universe(
+                config,
+                {"symbol": "ZZZZ", "side": "sell", "position_action": "close_long"},
+            )
+        )
+        self.assertEqual(
+            new_held_position_monitoring_symbols(
+                config,
+                snapshot,
+                {"ZZZZ.US"},
+            ),
+            (),
+        )
+        changed_snapshot = {
+            "positions": list(snapshot["positions"])
+            + [{"symbol": "NEWHOLD.US", "quantity": "1"}]
+        }
+        self.assertEqual(
+            new_held_position_monitoring_symbols(
+                config,
+                changed_snapshot,
+                {"ZZZZ.US"},
+            ),
+            ("NEWHOLD.US",),
+        )
+
+    def test_runtime_restarts_only_worker_when_new_exit_only_holding_appears(self) -> None:
+        config = load_config()
+        snapshot = {"positions": [{"symbol": "NEWHOLD.US", "quantity": "1"}]}
+        worker = SimpleNamespace(pid=1234)
+
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.stop_spawned_process"
+        ) as stop_worker:
+            updated, additions, reason = reconcile_position_monitoring_worker(
+                config,
+                snapshot,
+                ("OLDHOLD.US",),
+                worker,
+            )
+
+        stop_worker.assert_called_once_with(worker, graceful=False)
+        self.assertEqual(updated, ("NEWHOLD.US", "OLDHOLD.US"))
+        self.assertEqual(additions, ("NEWHOLD.US",))
+        self.assertEqual(
+            reason,
+            "position_monitoring_set_changed_restarting_quote_worker:NEWHOLD.US",
+        )
+
+    def test_runtime_does_not_restart_when_monitoring_set_is_unchanged(self) -> None:
+        config = load_config()
+        snapshot = {"positions": [{"symbol": "OLDHOLD.US", "quantity": "1"}]}
+        worker = SimpleNamespace(pid=1234)
+
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.stop_spawned_process"
+        ) as stop_worker:
+            updated, additions, reason = reconcile_position_monitoring_worker(
+                config,
+                snapshot,
+                ("OLDHOLD.US",),
+                worker,
+            )
+
+        stop_worker.assert_not_called()
+        self.assertEqual(updated, ("OLDHOLD.US",))
+        self.assertEqual(additions, ())
+        self.assertEqual(reason, "")
+
+    def test_monitoring_failure_keeps_core_ready_but_blocks_new_entries(self) -> None:
+        self.assertTrue(quote_subscription_ready([], [], []))
+        self.assertFalse(quote_subscription_ready(["SPY.US"], [], []))
+        self.assertFalse(
+            effective_runtime_dispatch_enabled(
+                dispatch_requested=True,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=True,
+                trading_daily_context_ready=True,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+                position_monitoring_ready=False,
+            )
+        )
+        self.assertEqual(
+            runtime_dispatch_block_reason(
+                paper_order_dispatch_enabled=True,
+                readonly_gate_blocked=False,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=True,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+                trading_daily_context_ready=True,
+                position_monitoring_ready=False,
+            ),
+            "position_monitoring_incomplete_exit_only",
+        )
 
     def test_boundary_batch_mode_does_not_emit_previous_bar_early(self) -> None:
         builder = FiveMinuteBarBuilder(

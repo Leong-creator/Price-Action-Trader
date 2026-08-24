@@ -166,6 +166,12 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "subscription_coverage": "300/300",
             "trading_symbol_count": 147,
             "trading_subscription_coverage": "147/147",
+            "position_monitoring_symbol_count": 9,
+            "position_monitoring_symbols": ["ADM.US", "ZM.US"],
+            "position_monitoring_subscription_coverage": "9/9",
+            "position_monitoring_failed_symbols": [],
+            "position_monitoring_exit_only": True,
+            "position_monitoring_new_entries_allowed": False,
             "readonly_expansion_symbol_count": 153,
             "readonly_expansion_subscription_coverage": "153/153",
             "readonly_expansion_acceptance_status": "daily_context_incomplete",
@@ -331,6 +337,9 @@ class LongbridgeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["runtime"]["trading_subscription_coverage"], "147/147")
         self.assertEqual(payload["runtime"]["market_data_coverage"], "300/300")
         self.assertEqual(payload["runtime"]["trading_market_data_coverage"], "147/147")
+        self.assertEqual(payload["runtime"]["position_monitoring_subscription_coverage"], "9/9")
+        self.assertTrue(payload["runtime"]["position_monitoring_exit_only"])
+        self.assertFalse(payload["runtime"]["position_monitoring_new_entries_allowed"])
         self.assertEqual(payload["runtime"]["readonly_expansion_subscription_coverage"], "153/153")
         self.assertEqual(payload["runtime"]["complete_boundary_count"], 12)
         self.assertEqual(payload["runtime"]["incomplete_boundary_count"], 2)
@@ -342,6 +351,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
         html = (tmp_path / "out.html").read_text(encoding="utf-8")
         self.assertIn("交易核心正常，统计待刷新", html)
         self.assertIn("账户净资产", html)
+        self.assertIn("已有持仓额外监控", html)
         self.assertIn("当前持仓三层口径", html)
         self.assertIn("策略实际成交成绩", html)
         self.assertIn("分仓实际成交成绩", html)

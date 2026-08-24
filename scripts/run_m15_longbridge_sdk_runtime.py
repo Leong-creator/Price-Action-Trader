@@ -47,6 +47,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     append_market_events, attach_next_bar_first_quotes, build_status, compact_market_events, config_fingerprint, configured_symbols,
     configured_trading_symbols, daily_context_covers_symbols, daily_context_is_complete,
     daily_context_row_count_for_symbols, floor_bar_open, fresh_market_events, load_config,
+    held_position_monitoring_symbols, new_held_position_monitoring_symbols,
     load_valid_daily_context_cache, read_client_id,
     load_current_sdk_intraday_context, load_formal_test_marker, readonly_gate_passed, record_readonly_session,
     market_event_is_tradable, trading_market_events,
@@ -182,6 +183,7 @@ def effective_runtime_dispatch_enabled(
     flatten_blocks_new_entries: bool,
     account_snapshot_ready: bool,
     deployment_ready: bool = True,
+    position_monitoring_ready: bool = True,
 ) -> bool:
     return bool(
         dispatch_requested
@@ -192,6 +194,7 @@ def effective_runtime_dispatch_enabled(
         and not flatten_blocks_new_entries
         and account_snapshot_ready
         and deployment_ready
+        and position_monitoring_ready
     )
 
 
@@ -206,6 +209,7 @@ def runtime_dispatch_block_reason(
     account_snapshot_ready: bool,
     trading_daily_context_ready: bool,
     deployment_ready: bool = True,
+    position_monitoring_ready: bool = True,
 ) -> str:
     if not paper_order_dispatch_enabled:
         return "paper_order_dispatch_disabled"
@@ -213,6 +217,8 @@ def runtime_dispatch_block_reason(
         return "two_day_readonly_gate"
     if not deployment_ready:
         return "deployment_manifest_invalid"
+    if not position_monitoring_ready:
+        return "position_monitoring_incomplete_exit_only"
     if not paper_client_ready or not trade_context_ready:
         return "trade_context_recovering"
     if not market_data_ready:
@@ -456,6 +462,41 @@ def quote_subscription_targets(config: Any, now: datetime) -> tuple[str, ...]:
     return configured_symbols(config)
 
 
+def reconcile_position_monitoring_worker(
+    config: Any,
+    account_snapshot: dict[str, Any],
+    monitored_symbols: tuple[str, ...],
+    worker: Any,
+) -> tuple[tuple[str, ...], tuple[str, ...], str]:
+    additions = new_held_position_monitoring_symbols(
+        config,
+        account_snapshot,
+        monitored_symbols,
+    )
+    if not additions:
+        return monitored_symbols, (), ""
+    if worker is not None:
+        stop_spawned_process(worker, graceful=False)
+    updated = tuple(sorted(set(monitored_symbols) | set(additions)))
+    reason = (
+        "position_monitoring_set_changed_restarting_quote_worker:"
+        + ",".join(additions)
+    )
+    return updated, additions, reason
+
+
+def quote_subscription_ready(
+    trading_market_data_failed: list[str],
+    trading_subscription_failed: list[str],
+    daily_failed: list[str],
+) -> bool:
+    return not any((
+        trading_market_data_failed,
+        trading_subscription_failed,
+        daily_failed,
+    ))
+
+
 def should_use_snapshot_fallback(
     subscription_failures: int,
     failure_threshold: int,
@@ -565,11 +606,19 @@ def realtime_boundary_is_complete(
     expected = {symbol.upper().removesuffix(".US") for symbol in expected_symbols}
     if not expected or not rows:
         return False
-    boundary_times = {str(row.get("event_time") or "") for row in rows}
-    actual = {str(row.get("symbol") or "").upper().removesuffix(".US") for row in rows}
+    expected_rows = [
+        row
+        for row in rows
+        if str(row.get("symbol") or "").upper().removesuffix(".US") in expected
+    ]
+    boundary_times = {str(row.get("event_time") or "") for row in expected_rows}
+    actual = {
+        str(row.get("symbol") or "").upper().removesuffix(".US")
+        for row in expected_rows
+    }
     if len(boundary_times) != 1 or actual != expected:
         return False
-    for row in rows:
+    for row in expected_rows:
         if row.get("bar_final") is not True:
             return False
         try:
@@ -582,7 +631,12 @@ def realtime_boundary_is_complete(
     return True
 
 
-def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
+def quote_worker(
+    config_path: str,
+    queue_out: Any,
+    stop_event: Any,
+    position_monitoring_symbols: tuple[str, ...] = (),
+) -> None:
     """Own the one SDK quote connection and never run history, routing or orders."""
     config = load_config(config_path)
     try:
@@ -644,11 +698,18 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
                 },
             )
 
-        all_symbols = list(configured_symbols(config))
         trading_symbols = list(configured_trading_symbols(config))
-        subscription_targets = list(
+        base_subscription_targets = list(
             quote_subscription_targets(config, datetime.now(UTC))
         )
+        monitoring_symbols = sorted({
+            str(symbol).upper()
+            for symbol in position_monitoring_symbols
+            if str(symbol).upper() not in set(base_subscription_targets)
+        })
+        subscription_targets = list(dict.fromkeys(
+            base_subscription_targets + monitoring_symbols
+        ))
         failed = subscribe_quote_and_trades(
             quote,
             subscription_targets,
@@ -659,10 +720,15 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
             request_interval_seconds=config.subscription_request_interval_seconds,
             retry_backoff_seconds=config.subscription_retry_backoff_seconds,
         )
-        expected = set(all_symbols)
+        expected = set(base_subscription_targets)
         trading_expected = set(trading_symbols)
+        monitoring_expected = set(monitoring_symbols)
         subscribed = subscription_symbols(quote.subscriptions())
-        missing = sorted((expected - subscribed) | set(failed))
+        failed_symbols = set(failed)
+        missing = sorted((expected - subscribed) | (failed_symbols & expected))
+        monitoring_missing = sorted(
+            (monitoring_expected - subscribed) | (failed_symbols & monitoring_expected)
+        )
         initial_snapshot = list(quote.quote(subscription_targets))
         initial_snapshot_symbols = set()
         snapshot_received_at = datetime.now(UTC)
@@ -680,19 +746,30 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
                 "source_mode": "longbridge_sdk_initial_snapshot",
             })
         missing = sorted(set(missing) | (expected - initial_snapshot_symbols))
+        monitoring_missing = sorted(
+            set(monitoring_missing) | (monitoring_expected - initial_snapshot_symbols)
+        )
         aggregation_enabled = True
         emit_worker(queue_out, {
             "kind": "ready", "subscribed_symbols": sorted(expected - set(missing)),
             "subscription_failed_symbols": missing, "daily_context_failed_symbols": [],
             "trading_subscription_failed_symbols": sorted(trading_expected & set(missing)),
+            "position_monitoring_symbols": monitoring_symbols,
+            "position_monitoring_subscribed_symbols": sorted(
+                monitoring_expected - set(monitoring_missing)
+            ),
+            "position_monitoring_failed_symbols": monitoring_missing,
             "partial_bar_suppressed_until": to_iso(first_complete_bar_open.astimezone(UTC)),
             "subscription_target_count": len(subscription_targets),
             "market_data_transport": "official_sdk_persistent_websocket",
             "initial_snapshot_coverage": f"{len(initial_snapshot_symbols & expected)}/{len(expected)}",
+            "position_monitoring_initial_snapshot_coverage": (
+                f"{len(initial_snapshot_symbols & monitoring_expected)}/{len(monitoring_expected)}"
+            ),
         })
         last_heartbeat = 0.0
         while not stop_event.is_set():
-            completed = builder.complete_boundary(all_symbols, datetime.now(UTC))
+            completed = builder.complete_boundary(subscription_targets, datetime.now(UTC))
             if completed:
                 emit_worker(queue_out, {"kind": "bars", "rows": completed})
             now = time.monotonic()
@@ -704,7 +781,12 @@ def quote_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
         emit_worker(queue_out, {"kind": "error", "reason": f"sdk_quote_worker_failed:{type(exc).__name__}:{exc}"})
 
 
-def quote_snapshot_worker(config_path: str, queue_out: Any, stop_event: Any) -> None:
+def quote_snapshot_worker(
+    config_path: str,
+    queue_out: Any,
+    stop_event: Any,
+    position_monitoring_symbols: tuple[str, ...] = (),
+) -> None:
     """Fetch bounded SDK snapshots; the parent owns bar state across worker restarts."""
     config = load_config(config_path)
     try:
@@ -715,10 +797,18 @@ def quote_snapshot_worker(config_path: str, queue_out: Any, stop_event: Any) -> 
         first_complete_bar_open = floor_bar_open(
             worker_started_at, config.bar_minutes
         ) + timedelta(minutes=config.bar_minutes)
-        target_symbols = list(
+        base_target_symbols = list(
             quote_subscription_targets(config, datetime.now(UTC))
         )
-        all_symbols = set(configured_symbols(config))
+        monitoring_symbols = {
+            str(symbol).upper()
+            for symbol in position_monitoring_symbols
+            if str(symbol).upper() not in set(base_target_symbols)
+        }
+        target_symbols = list(dict.fromkeys(
+            base_target_symbols + sorted(monitoring_symbols)
+        ))
+        all_symbols = set(base_target_symbols)
         trading_symbols = set(configured_trading_symbols(config))
         consecutive_failures = 0
         consecutive_slow_polls = 0
@@ -789,6 +879,13 @@ def quote_snapshot_worker(config_path: str, queue_out: Any, stop_event: Any) -> 
                             "subscribed_symbols": [],
                             "subscription_failed_symbols": sorted(
                                 all_symbols - covered
+                            ),
+                            "position_monitoring_symbols": sorted(monitoring_symbols),
+                            "position_monitoring_subscribed_symbols": sorted(
+                                monitoring_symbols & covered
+                            ),
+                            "position_monitoring_failed_symbols": sorted(
+                                monitoring_symbols - covered
                             ),
                             "daily_context_failed_symbols": [],
                             "trading_subscription_failed_symbols": [],
@@ -1430,6 +1527,19 @@ def historical_daily_context_before_session(
     return result
 
 
+def opening_signal_outside_trading_universe(
+    config: Any,
+    signal: dict[str, Any],
+) -> bool:
+    """Block only new positions outside the frozen strategy universe."""
+    from scripts.m15_longbridge_realtime_execution_lib import ledger_row_opens_position
+
+    return bool(
+        ledger_row_opens_position(signal)
+        and not market_event_is_tradable(config, signal)
+    )
+
+
 def dispatch_completed_rows(
     config: Any,
     rows: list[dict[str, Any]],
@@ -1437,6 +1547,7 @@ def dispatch_completed_rows(
     account_coordinator: SdkAccountCoordinator,
     paper_client: SdkRealtimePaperClient | None,
     *,
+    position_market_context: MarketEventContext | None = None,
     daily_context_rows: list[dict[str, Any]] | None = None,
     live_quote_session_state: dict[str, dict[str, Any]] | None = None,
     signal_event_cache: list[dict[str, Any]] | None = None,
@@ -1451,15 +1562,25 @@ def dispatch_completed_rows(
     append_market_events(config.market_events_path, fresh, config.event_keep_lines)
     trading_fresh = trading_market_events(config, fresh)
     new_rows = market_context.append(trading_fresh)
-    if not new_rows:
+    position_new_rows = (
+        position_market_context.append(fresh)
+        if position_market_context is not None
+        else new_rows
+    )
+    if not new_rows and not position_new_rows:
         return {"event_count": 0, "signal_count": 0, "execution": {}}
     from scripts.m15_longbridge_realtime_signal_router_lib import load_config as load_router_config, run_realtime_signal_router
     from scripts.m15_longbridge_realtime_position_manager_lib import load_config as load_position_config, run_realtime_position_manager
     from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config, run_realtime_execution
 
-    now = str(new_rows[-1]["received_at"])
+    now = str((new_rows or position_new_rows)[-1]["received_at"])
     now_dt = datetime.fromisoformat(now.replace("Z", "+00:00"))
     trading_market_rows = market_context.rows()
+    position_market_rows = (
+        position_market_context.rows()
+        if position_market_context is not None
+        else trading_market_rows
+    )
     active_ids = {str(row["event_id"]) for row in new_rows}
     live_daily_rows = build_live_daily_confirmation_rows(
         trading_market_rows,
@@ -1533,7 +1654,7 @@ def dispatch_completed_rows(
         position_config,
         generated_at=now,
         account_state_override=snapshot,
-        market_events_override=trading_market_rows,
+        market_events_override=position_market_rows,
         execution_rows_override=execution_ledger_cache,
         signal_events_override=signal_event_cache,
         fill_attribution_state_cache=fill_attribution_state_cache,
@@ -1558,19 +1679,18 @@ def dispatch_completed_rows(
     out_of_scope_signals = [
         signal
         for signal in execution_signals
-        if not market_event_is_tradable(config, signal)
+        if opening_signal_outside_trading_universe(config, signal)
+    ]
+    execution_signals = [
+        signal for signal in execution_signals if signal not in out_of_scope_signals
     ]
     if out_of_scope_signals:
-        execution = {
-            "status": "blocked_signal_symbol_outside_trading_universe",
-            "submitted_count": 0,
-            "blocked_signal_count": len(out_of_scope_signals),
-            "blocked_symbols": sorted({
-                str(signal.get("symbol") or "")
-                for signal in out_of_scope_signals
-            }),
-        }
-    elif (
+        execution["scope_blocked_opening_signal_count"] = len(out_of_scope_signals)
+        execution["scope_blocked_opening_symbols"] = sorted({
+            str(signal.get("symbol") or "")
+            for signal in out_of_scope_signals
+        })
+    if (
         paper_client is not None
         and not flatten_pending
         and dispatch_in_regular_session
@@ -1605,7 +1725,23 @@ def dispatch_completed_rows(
         execution["hot_path_elapsed_ms"] = int(
             (time.perf_counter() - execution_started) * 1000
         )
+        if out_of_scope_signals:
+            execution["scope_blocked_opening_signal_count"] = len(out_of_scope_signals)
+            execution["scope_blocked_opening_symbols"] = sorted({
+                str(signal.get("symbol") or "")
+                for signal in out_of_scope_signals
+            })
         execution_ledger_cache.extend(execution_rows_emitted)
+    elif out_of_scope_signals and not execution_signals:
+        execution = {
+            "status": "blocked_signal_symbol_outside_trading_universe",
+            "submitted_count": 0,
+            "blocked_signal_count": len(out_of_scope_signals),
+            "blocked_symbols": sorted({
+                str(signal.get("symbol") or "")
+                for signal in out_of_scope_signals
+            }),
+        }
     elif paper_client is not None and not flatten_pending and dispatch_in_regular_session:
         execution = {
             "status": (
@@ -1634,6 +1770,9 @@ def dispatch_completed_rows(
     return {
         "event_count": len(fresh),
         "trading_event_count": len(new_rows),
+        "position_monitoring_event_count": max(
+            0, len(position_new_rows) - len(new_rows)
+        ),
         "readonly_expansion_event_count": len(fresh) - len(trading_fresh),
         "signal_count": len(emitted),
         "live_daily_confirmation_count": len(live_daily_rows),
@@ -2023,6 +2162,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         circuit_retry_cooldown_seconds=config.account_snapshot_circuit_retry_seconds,
     )
     account.start()
+    startup_account_snapshot = account.snapshot()
+    position_monitoring_symbols = held_position_monitoring_symbols(
+        config,
+        startup_account_snapshot,
+    )
     execution_trade, paper_client, flatten_client = build_sdk_trade_clients(
         config,
         sdk,
@@ -2048,6 +2192,13 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     )
     context.append(trading_market_events(config, cached_daily_rows))
     context.append(trading_market_events(config, cached_intraday_rows))
+    position_context = MarketEventContext(
+        maximum_rows=(
+            len(configured_trading_symbols(config))
+            + len(position_monitoring_symbols)
+        ) * 32
+    )
+    position_context.append(cached_intraday_rows)
     live_quote_session_state: dict[str, dict[str, Any]] = {}
     # PyO3 SDK contexts must not be inherited through fork.  A fresh spawned
     # interpreter gives the quote WebSocket its own native runtime and makes
@@ -2097,6 +2248,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     daily_rows: list[dict[str, Any]] = list(cached_daily_rows)
     subscription_failed: list[str] = []
     trading_subscription_failed: list[str] = []
+    position_monitoring_subscribed: list[str] = []
+    position_monitoring_failed: list[str] = []
     daily_failed: list[str] = []
     daily_workers: dict[str, tuple[mp.Process, float, list[str]]] = {}
     daily_pending: deque[list[str]] = deque()
@@ -2235,7 +2388,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     len(configured_trading_symbols(config))
                     if in_regular_session(datetime.now(UTC))
                     else len(configured_symbols(config))
-                )
+                ) + len(position_monitoring_symbols)
                 worker_target = (
                     quote_snapshot_worker
                     if snapshot_fallback_active
@@ -2243,7 +2396,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
                 worker = process_context.Process(
                     target=worker_target,
-                    args=(str(config.config_path), message_queue, stop_event),
+                    args=(
+                        str(config.config_path),
+                        message_queue,
+                        stop_event,
+                        position_monitoring_symbols,
+                    ),
                     daemon=True,
                 )
                 worker.start()
@@ -2447,6 +2605,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             elif kind == "ready":
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
+                position_monitoring_subscribed = list(
+                    message.get("position_monitoring_subscribed_symbols") or []
+                )
+                position_monitoring_failed = list(
+                    message.get("position_monitoring_failed_symbols") or []
+                )
                 market_data_mode = str(
                     message.get("market_data_mode") or "sdk_subscription"
                 )
@@ -2470,16 +2634,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
                 daily_failed = list(message.get("daily_context_failed_symbols") or [])
                 partial_bar_suppressed_until = str(message.get("partial_bar_suppressed_until") or "")
-                worker_ready = (
-                    not trading_market_data_failed
-                    and not trading_subscription_failed
-                    and not daily_failed
+                worker_ready = quote_subscription_ready(
+                    trading_market_data_failed,
+                    trading_subscription_failed,
+                    daily_failed,
                 )
                 if not worker_ready:
                     worker_ready_since = 0.0
                     last_subscription_failure_reason = (
                         "sdk_quote_subscription_incomplete:"
-                        + ",".join(trading_subscription_failed or daily_failed)
+                        + ",".join(
+                            trading_subscription_failed
+                            or daily_failed
+                        )
                     )
                     attempts += 1
                     stop_spawned_process(worker, graceful=False)
@@ -2559,6 +2726,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         else None
                     )
                 ) if trading_daily_context_ready else None
+                if position_monitoring_failed:
+                    active_client = (
+                        flatten_client
+                        if dispatch_requested and config.paper_order_dispatch_enabled
+                        else None
+                    )
                 boundary_complete = realtime_boundary_is_complete(
                     rows,
                     configured_trading_symbols(config),
@@ -2585,11 +2758,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     if rows and not last_boundary_missing_symbols:
                         late_boundary_count += 1
                 realtime_tradable_bar_count += sum(
-                    not bool(row.get("market_data_blocked_reason")) for row in rows
+                    not bool(row.get("market_data_blocked_reason"))
+                    and str(row.get("symbol") or "").upper().removesuffix(".US")
+                    in expected_boundary_symbols
+                    for row in rows
                 )
                 no_trade_carry_forward_count += sum(
                     "no_trade_carry_forward"
                     in str(row.get("market_data_blocked_reason") or "")
+                    and str(row.get("symbol") or "").upper().removesuffix(".US")
+                    in expected_boundary_symbols
                     for row in rows
                 )
                 if not boundary_complete:
@@ -2602,13 +2780,17 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     context,
                     account,
                     active_client,
+                    position_market_context=position_context,
                     daily_context_rows=daily_rows,
                     live_quote_session_state=live_quote_session_state,
                     signal_event_cache=signal_event_cache,
                     signal_id_cache=signal_id_cache,
                     execution_ledger_cache=execution_ledger_cache,
                     fill_attribution_state_cache=fill_attribution_state_cache,
-                    new_entry_submission_enabled=paper_client is not None,
+                    new_entry_submission_enabled=(
+                        paper_client is not None
+                        and not position_monitoring_failed
+                    ),
                 )
                 current_market_date = (
                     datetime.now(NEW_YORK).date().isoformat()
@@ -2897,6 +3079,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
                 last_order_maintenance = time.monotonic()
             snapshot = account.snapshot()
+            (
+                updated_position_monitoring_symbols,
+                new_position_monitoring_symbols,
+                position_monitoring_recovery_reason,
+            ) = reconcile_position_monitoring_worker(
+                config,
+                snapshot,
+                position_monitoring_symbols,
+                worker,
+            )
+            if new_position_monitoring_symbols:
+                position_monitoring_symbols = updated_position_monitoring_symbols
+                position_monitoring_subscribed = []
+                position_monitoring_failed = list(new_position_monitoring_symbols)
+                worker_ready = False
+                worker_ready_since = 0.0
+                last_subscription_failure_reason = position_monitoring_recovery_reason
+                worker = None
+                next_worker_start_monotonic = time.monotonic()
+                continue
             age = account_age_seconds(snapshot)
             account_snapshot_ready = bool(
                 age is not None
@@ -2930,6 +3132,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         * config.daily_context_bars
                     )
                     + 4096
+                )
+                position_context = MarketEventContext(
+                    maximum_rows=(
+                        len(configured_trading_symbols(config))
+                        + len(position_monitoring_symbols)
+                    ) * 32
                 )
                 daily_rows = []
                 daily_failed = []
@@ -3077,7 +3285,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             else:
                 expansion_acceptance_status = "readonly_observing"
             subscription_set_hash = hashlib.sha256(
-                "\n".join(sorted(market_data_symbols)).encode("utf-8")
+                "\n".join(sorted(
+                    market_data_symbols | set(position_monitoring_subscribed)
+                )).encode("utf-8")
             ).hexdigest()
             resources = process_resource_snapshot()
             build_status(
@@ -3191,6 +3401,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         if worker_ready
                         else f"0/{len(configured_trading_symbols(config))}"
                     ),
+                    "position_monitoring_symbols": list(position_monitoring_symbols),
+                    "position_monitoring_symbol_count": len(position_monitoring_symbols),
+                    "position_monitoring_subscription_coverage": (
+                        f"{len(position_monitoring_subscribed)}"
+                        f"/{len(position_monitoring_symbols)}"
+                    ),
+                    "position_monitoring_failed_symbols": position_monitoring_failed,
+                    "position_monitoring_new_entries_allowed": False,
+                    "position_monitoring_exit_only": True,
                     "market_data_failed_symbols": market_data_failed,
                     "trading_market_data_failed_symbols": trading_market_data_failed,
                     "readonly_expansion_symbol_count": expansion_symbol_count,
@@ -3237,6 +3456,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
                         deployment_ready=deployment_ready,
+                        position_monitoring_ready=not position_monitoring_failed,
                     ),
                     "dispatch_requested": dispatch_requested,
                     "trade_context_health": trade_context_health,
@@ -3253,6 +3473,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         account_snapshot_ready=account_snapshot_ready,
                         trading_daily_context_ready=trading_daily_context_ready,
                         deployment_ready=deployment_ready,
+                        position_monitoring_ready=not position_monitoring_failed,
                     ),
                     "two_day_readonly_gate": config.two_day_readonly_gate,
                     "readonly_gate_path": str(config.readonly_gate_path),
