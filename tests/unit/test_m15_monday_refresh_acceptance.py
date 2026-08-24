@@ -48,6 +48,58 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             self.assertEqual(payload["acceptance_status"], "ready_regular_session")
             self.assertEqual(payload["fail_count"], 0)
 
+    def test_canonical_ready_status_cannot_hide_disabled_new_positions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness.update(
+                {
+                    "readiness_status": "waiting_for_marketdata_acceptance",
+                    "new_position_submission_enabled": False,
+                }
+            )
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime.update(
+                {
+                    "dispatch_enabled": False,
+                    "dispatch_block_reason": "two_day_readonly_gate",
+                    "readonly_sessions_passed": 0,
+                    "readonly_sessions_required": 1,
+                }
+            )
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-24T14:00:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "armed_waiting_marketdata_acceptance")
+            self.assertFalse(payload["new_position_submission_enabled"])
+            self.assertEqual(payload["fail_count"], 0)
+
+    def test_inconsistent_ready_status_is_blocked_when_new_positions_are_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=True)
+            readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
+            readiness.update(
+                {
+                    "readiness_status": "ready_for_longbridge_paper_orders",
+                    "new_position_submission_enabled": False,
+                }
+            )
+            config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-24T14:00:00Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "blocked_monday_acceptance")
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["opening_readiness"]["status"], "fail")
+
     def test_pending_flatten_is_safe_waiting_not_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)
@@ -231,6 +283,8 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
                 {
                     "fail_count": 0,
                     "readiness_status": "ready_for_regular_session" if session_should_run else "armed_waiting_regular_session",
+                    "paper_order_submission_enabled": True,
+                    "new_position_submission_enabled": True,
                     "runtime_whitelist": [f"R{index}" for index in range(18)],
                     "formal_test_transition": {"test_epoch_id": epoch},
                     "market_window": {

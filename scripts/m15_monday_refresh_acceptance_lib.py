@@ -189,14 +189,32 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "opening_readiness",
             "开盘验收没有失败项",
             int(readiness.get("fail_count") or 0) == 0
-            and readiness_status
-            in {
-                "armed_waiting_regular_session",
-                "ready_for_regular_session",
-                "ready_for_longbridge_paper_orders",
-            },
-            pending_flatten and int(readiness.get("fail_count") or 0) == 0,
+            and (
+                (
+                    readiness_status == "armed_waiting_regular_session"
+                    and readiness.get("paper_order_submission_enabled") is True
+                )
+                or (
+                    readiness_status
+                    in {"ready_for_regular_session", "ready_for_longbridge_paper_orders"}
+                    and readiness.get("paper_order_submission_enabled") is True
+                    and readiness.get("new_position_submission_enabled") is True
+                )
+            ),
+            (
+                pending_flatten
+                or (
+                    readonly_gate_waiting
+                    and readiness_status == "waiting_for_marketdata_acceptance"
+                )
+            )
+            and int(readiness.get("fail_count") or 0) == 0,
             readiness_status or "missing",
+            waiting_status=(
+                "waiting_for_marketdata_acceptance"
+                if readonly_gate_waiting
+                else "waiting_for_flatten"
+            ),
         ),
         check_row(
             "dashboard_sdk_source",
@@ -237,6 +255,8 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         "checks": checks,
         "runtime_whitelist_count": len(readiness.get("runtime_whitelist") or []),
         "paper_account_verified": bool(account.get("paper_account_verified")),
+        "paper_order_submission_enabled": readiness.get("paper_order_submission_enabled") is True,
+        "new_position_submission_enabled": readiness.get("new_position_submission_enabled") is True,
         "formal_test_epoch_id": formal_epoch.get("test_epoch_id"),
         "broker_connection": paper_account_connected,
         "paper_simulated_only": True,

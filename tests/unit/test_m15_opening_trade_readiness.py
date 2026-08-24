@@ -11,6 +11,8 @@ from unittest.mock import patch
 from scripts.m15_opening_trade_readiness_lib import (
     DEFAULT_CONFIG_PATH,
     load_config,
+    plain_result,
+    resolve_readiness_status,
     run_m15_opening_trade_readiness,
     sdk_runtime_health_issues,
 )
@@ -44,6 +46,25 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             config.execution_config_path.name,
             "m15_longbridge_realtime_execution.paper_contract_v1.json",
         )
+
+    def test_marketdata_acceptance_wait_does_not_claim_orders_are_enabled(self) -> None:
+        status = resolve_readiness_status(
+            fail_count=0,
+            pending_formal_flatten=False,
+            market_phase="regular_session",
+            new_position_submission_enabled=False,
+            readonly_gate_waiting=True,
+        )
+        result = plain_result(
+            status,
+            0,
+            1,
+            {"market_status": "美股常规交易时段"},
+        )
+
+        self.assertEqual(status, "waiting_for_marketdata_acceptance")
+        self.assertIn("新开仓仍被禁止", result)
+        self.assertNotIn("订单提交已启用", result)
 
     def test_sdk_run_overwrites_legacy_readiness_with_canonical_pointer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -230,11 +251,69 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
         self.assertIn("sdk_account_worker_status=timeout_circuit_open", issues)
         status["account_snapshot_circuit_open"] = False
         status["account_snapshot_worker_status"] = "healthy"
+        status["quote_worker_generation"] = 4
+        self.assertIn(
+            "sdk_quote_worker_reconnect_loop",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
+        status["quote_worker_generation"] = "unknown"
+        self.assertIn(
+            "sdk_quote_worker_generation_invalid",
+            sdk_runtime_health_issues(status, sdk_config, True),
+        )
+        status["quote_worker_generation"] = 1
         status["trading_universe_fingerprint"] = "drift"
         self.assertIn(
             "sdk_trading_universe_fingerprint_drift",
             sdk_runtime_health_issues(status, sdk_config, True),
         )
+
+    def test_sdk_runtime_health_requires_sustained_reference_push_in_regular_session(self) -> None:
+        sdk_config = load_sdk_runtime_config()
+        trading_count = len(sdk_configured_trading_symbols(sdk_config))
+        status = {
+            "status": "running",
+            "generated_at": "2026-08-24T14:01:00Z",
+            "runtime_started_at": "2026-08-24T13:30:00Z",
+            "sdk_connected": True,
+            "deployment_manifest_verified": True,
+            "deployment_worktree_clean": True,
+            "market_data_transport": "official_sdk_persistent_websocket",
+            "market_data_mode": "sdk_subscription",
+            "market_data_circuit_open": False,
+            "runtime_engine": "sdk",
+            "config_fingerprint": sdk_config_fingerprint(sdk_config),
+            "trading_universe_fingerprint": trading_universe_fingerprint(sdk_config),
+            "trading_subscription_coverage": f"{trading_count}/{trading_count}",
+            "trading_daily_context_ready": True,
+            "account_snapshot_healthy": True,
+            "quote_worker_generation": 1,
+            "reference_market_activity": {
+                "SPY.US": {
+                    "at": "2026-08-24T14:00:55Z",
+                    "source": "longbridge_sdk_initial_snapshot",
+                }
+            },
+        }
+
+        issues = sdk_runtime_health_issues(
+            status,
+            sdk_config,
+            True,
+            generated_at="2026-08-24T14:01:00Z",
+            require_live_push=True,
+        )
+        self.assertIn("sdk_reference_market_push_stale", issues)
+
+        status["reference_market_activity"]["SPY.US"]["source"] = "longbridge_sdk_trade_push"
+        issues = sdk_runtime_health_issues(
+            status,
+            sdk_config,
+            True,
+            generated_at="2026-08-24T14:01:00Z",
+            require_live_push=True,
+        )
+        self.assertNotIn("sdk_reference_market_push_stale", issues)
 
     def test_m12_47_status_is_informational_only_when_daemon_is_down(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
