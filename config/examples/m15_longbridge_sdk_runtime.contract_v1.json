@@ -41,7 +41,7 @@
   "outputs": {
     "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
     "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
-    "readonly_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_readonly_gate.json",
+    "readonly_gate": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_marketdata_integrity_gate_v1.json",
     "runtime_status": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_sdk_runtime.json"
   },
   "routing": {
@@ -68,17 +68,19 @@
     "paper_trading_only": true,
     "real_money_actions": false,
     "reconnect_backoff_seconds": 5,
+    "reconnect_backoff_schedule_seconds": [5, 15, 30, 60],
     "snapshot_poll_dispatch_max_elapsed_ms": 2500,
     "snapshot_poll_interval_seconds": 3,
     "snapshot_poll_min_successful_cycles": 1,
     "stale_entry_order_ttl_seconds": 900,
     "subscription_batch_size": 10,
-    "subscription_deadline_seconds": 20,
+    "subscription_deadline_seconds": 30,
+    "maximum_consecutive_subscription_failures": 3,
     "subscription_failures_before_snapshot_fallback": 1,
     "subscription_request_interval_seconds": 0.5,
     "subscription_retry_backoff_seconds": 2,
     "subscription_retry_count": 2,
-    "two_day_readonly_gate": false
+    "two_day_readonly_gate": true
   },
   "stage": "M15.longbridge_sdk_runtime",
   "title": "长桥SDK完整策略合同模拟账户运行层"

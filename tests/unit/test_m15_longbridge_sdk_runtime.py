@@ -69,6 +69,11 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_default_runtime_uses_canonical_production_config(self) -> None:
+        config = load_config()
+        self.assertTrue(str(config.config_path).endswith("m15_longbridge_sdk_runtime.json"))
+        self.assertFalse(str(config.config_path).endswith(".contract_v1.json"))
+
     def test_production_runtime_uses_frozen_contract_v1_configs(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
         self.assertTrue(str(config.router_config_path).endswith("m15_longbridge_realtime_signal_router.contract_v1.json"))

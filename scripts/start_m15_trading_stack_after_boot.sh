@@ -58,12 +58,12 @@ start_stack() {
     "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
     --daemon \
     --dispatch \
-    --config config/examples/m15_longbridge_sdk_runtime.contract_v1.json || failed=1
+    --config config/examples/m15_longbridge_sdk_runtime.json || failed=1
 
   run_step "start M15 background watchdog" \
     "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
     --daemon \
-    --config config/examples/m15_background_watchdog.contract_v1.json || failed=1
+    --config config/examples/m15_background_watchdog.json || failed=1
 
   run_step "start local postclose scheduler" \
     "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
@@ -82,12 +82,12 @@ fi
 run_step "check M15 Longbridge SDK realtime status" \
   "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
   --status \
-  --config config/examples/m15_longbridge_sdk_runtime.contract_v1.json
+  --config config/examples/m15_longbridge_sdk_runtime.json
 
 run_step "check M15 background watchdog status" \
   "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
   --status \
-  --config config/examples/m15_background_watchdog.contract_v1.json
+  --config config/examples/m15_background_watchdog.json
 
 run_step "check local postclose scheduler status" \
   "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
