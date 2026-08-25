@@ -300,6 +300,12 @@ def semantic_watchdog_failure(step_id: str, stdout: str) -> str:
 
 def acceptance_is_expected_readonly_wait(payload: dict[str, Any]) -> bool:
     checks = [row for row in payload.get("checks", []) if isinstance(row, dict)]
+    marketdata_gate = payload.get("marketdata_integrity_gate")
+    artifacts_healthy = bool(
+        isinstance(marketdata_gate, dict)
+        and marketdata_gate.get("artifacts_healthy") is True
+        and marketdata_gate.get("status") == "blocked"
+    )
     failed = {
         str(row.get("check") or "")
         for row in checks
@@ -317,7 +323,8 @@ def acceptance_is_expected_readonly_wait(payload: dict[str, Any]) -> bool:
         for row in checks
     )
     return bool(
-        waiting_for_session
+        artifacts_healthy
+        and waiting_for_session
         and dispatch_wait
         and failed <= {"paper_dispatch_armed"}
     )
@@ -457,7 +464,11 @@ def clean_text(value: str) -> str:
 def plain_language_result(failed_steps: list[dict[str, Any]], runtime_engine: str) -> str:
     runtime_label = "M15 SDK 实时运行层" if runtime_engine == "sdk" else "M15 实时守护器"
     if not failed_steps:
-        return f"后台看护已完成：{runtime_label}、账户快照慢路径和开盘验收已检查；M12.47 仅保留本地 research 状态，不作为看护前置。"
+        return (
+            f"后台看护已完成：{runtime_label}、账户快照慢路径和开盘验收已检查；"
+            "完整交易日行情门禁未通过时只会关闭新开仓，不会把已有持仓退出误判为可脱离实时行情；"
+            "M12.47 仅保留本地 research 状态，不作为看护前置。"
+        )
     failed_labels = "、".join(str(step["label"]) for step in failed_steps)
     return f"后台看护发现异常：{failed_labels} 未通过；不会手动跑 M12.37 once，也不会直接提交订单。"
 

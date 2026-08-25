@@ -151,6 +151,25 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
                 "waiting_for_marketdata_acceptance",
             )
 
+    def test_corrupt_runtime_artifact_is_not_treated_as_safe_waiting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            config.sdk_runtime_status_path.write_text("{", encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-22T03:41:39Z",
+            )
+
+            self.assertEqual(payload["acceptance_status"], "blocked_monday_acceptance")
+            self.assertEqual(
+                payload["input_artifacts"]["sdk_runtime_status"]["status"],
+                "corrupt",
+            )
+            self.assertFalse(payload["marketdata_integrity_gate"]["artifacts_healthy"])
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["json_gate_artifacts_healthy"]["status"], "fail")
+
     def test_watchdog_previous_result_does_not_create_acceptance_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=True)

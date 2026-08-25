@@ -92,11 +92,11 @@ def run_m15_monday_refresh_acceptance(
 
 
 def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -> dict[str, Any]:
-    runtime = read_json(config.sdk_runtime_status_path)
-    readiness = read_json(config.opening_readiness_path)
-    account = read_json(config.account_state_path)
-    dashboard = read_json(config.dashboard_path)
-    formal_epoch = read_json(config.formal_epoch_path)
+    runtime, runtime_artifact = read_json_artifact(config.sdk_runtime_status_path)
+    readiness, readiness_artifact = read_json_artifact(config.opening_readiness_path)
+    account, account_artifact = read_json_artifact(config.account_state_path)
+    dashboard, dashboard_artifact = read_json_artifact(config.dashboard_path)
+    formal_epoch, formal_epoch_artifact = read_json_artifact(config.formal_epoch_path)
     configured = int(runtime.get("trading_symbol_count") or runtime.get("configured_symbol_count") or 0)
     coverage = str(
         runtime.get("trading_market_data_coverage")
@@ -121,6 +121,7 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         and int(runtime.get("readonly_sessions_passed") or 0)
         < int(runtime.get("readonly_sessions_required") or 1)
     )
+    marketdata_gate = marketdata_gate_truth(runtime, readiness, runtime_artifact, readiness_artifact)
     formal_consistent = (
         formal_active
         and str(formal_epoch.get("test_epoch_id") or "")
@@ -146,6 +147,29 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     except (TypeError, ValueError):
         account_snapshot_age_seconds = 999999
     checks = [
+        check_row(
+            "json_gate_artifacts_healthy",
+            "所有关键 JSON 状态/门禁文件必须存在且可解析，缺失与损坏要明确区分",
+            all(
+                artifact.get("status") == "ok"
+                for artifact in (
+                    runtime_artifact,
+                    readiness_artifact,
+                    account_artifact,
+                    dashboard_artifact,
+                    formal_epoch_artifact,
+                )
+            ),
+            render_artifact_statuses(
+                [
+                    ("runtime", runtime_artifact),
+                    ("readiness", readiness_artifact),
+                    ("account", account_artifact),
+                    ("dashboard", dashboard_artifact),
+                    ("formal_epoch", formal_epoch_artifact),
+                ]
+            ),
+        ),
         check_row("sdk_runtime_alive", "M15 SDK 常驻进程存活", runtime_alive, f"pid={runtime.get('runtime_pid')}, engine={runtime.get('runtime_engine')}"),
         check_row("sdk_connected", "SDK 行情和账户连接正常", runtime.get("sdk_connected") is True, str(runtime.get("sdk_connected"))),
         check_row("market_data_complete", "交易股票池实时行情覆盖完整", configured > 0 and coverage == f"{configured}/{configured}", coverage or "missing"),
@@ -170,7 +194,7 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "paper_dispatch_armed",
             "模拟账户下单通道已武装",
             runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True,
-            (pending_flatten or readonly_gate_waiting) and runtime.get("dispatch_requested") is True,
+            (pending_flatten or readonly_gate_waiting) and runtime.get("dispatch_requested") is True and marketdata_gate["artifacts_healthy"],
             f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}",
             waiting_status=(
                 "waiting_for_marketdata_acceptance"
@@ -208,13 +232,22 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
                     and readiness_status == "waiting_for_marketdata_acceptance"
                 )
             )
-            and int(readiness.get("fail_count") or 0) == 0,
+            and int(readiness.get("fail_count") or 0) == 0
+            and marketdata_gate["artifacts_healthy"],
             readiness_status or "missing",
             waiting_status=(
                 "waiting_for_marketdata_acceptance"
                 if readonly_gate_waiting
                 else "waiting_for_flatten"
             ),
+        ),
+        transition_check_row(
+            "marketdata_integrity_gate",
+            "完整交易日行情门禁必须明确给出结果；未通过时关闭新开仓，并展示完整边界与实时 K 线事实",
+            marketdata_gate["gate_passed"],
+            marketdata_gate["waiting"] and marketdata_gate["artifacts_healthy"],
+            marketdata_gate["summary"],
+            waiting_status="waiting_for_marketdata_acceptance",
         ),
         check_row(
             "dashboard_sdk_source",
@@ -272,7 +305,15 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "longbridge_dashboard": project_path(config.dashboard_path),
             "formal_epoch": project_path(config.formal_epoch_path),
         },
-        "plain_language_result": plain_result(status, fail_count),
+        "input_artifacts": {
+            "sdk_runtime_status": runtime_artifact,
+            "opening_readiness": readiness_artifact,
+            "account_state": account_artifact,
+            "longbridge_dashboard": dashboard_artifact,
+            "formal_epoch": formal_epoch_artifact,
+        },
+        "marketdata_integrity_gate": marketdata_gate,
+        "plain_language_result": plain_result(status, fail_count, marketdata_gate),
     }
 
 
@@ -292,7 +333,7 @@ def transition_check_row(
     return {"check": check, "required_result": required_result, "status": status, "actual": actual}
 
 
-def plain_result(status: str, fail_count: int) -> str:
+def plain_result(status: str, fail_count: int, marketdata_gate: dict[str, Any]) -> str:
     if status == "ready_regular_session":
         return "M15 SDK 模拟交易链路已通过当前交易窗口验收。"
     if status == "armed_waiting_regular_session":
@@ -300,7 +341,7 @@ def plain_result(status: str, fail_count: int) -> str:
     if status == "armed_waiting_flatten_session":
         return "M15 SDK 清仓链路已武装；清仓确认完成前保持停止新开仓。"
     if status == "armed_waiting_marketdata_acceptance":
-        return "M15 SDK 链路健康；完整交易日行情验收完成前保持停止新开仓。"
+        return f"M15 SDK 链路健康；{marketdata_gate.get('summary')}"
     return f"M15 SDK 周一验收被阻断：{fail_count} 个检查失败。"
 
 
@@ -321,6 +362,71 @@ def read_json(path: Path) -> dict[str, Any]:
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def read_json_artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}, {"path": project_path(path), "status": "missing"}
+    except (OSError, json.JSONDecodeError) as exc:
+        return {}, {"path": project_path(path), "status": "corrupt", "detail": str(exc)}
+    if not isinstance(payload, dict):
+        return {}, {"path": project_path(path), "status": "corrupt", "detail": "top_level_not_object"}
+    return payload, {"path": project_path(path), "status": "ok"}
+
+
+def render_artifact_statuses(rows: list[tuple[str, dict[str, Any]]]) -> str:
+    return "; ".join(f"{label}={artifact.get('status')}" for label, artifact in rows)
+
+
+def marketdata_gate_truth(
+    runtime: dict[str, Any],
+    readiness: dict[str, Any],
+    runtime_artifact: dict[str, Any],
+    readiness_artifact: dict[str, Any],
+) -> dict[str, Any]:
+    artifacts_healthy = runtime_artifact.get("status") == "ok" and readiness_artifact.get("status") == "ok"
+    complete_boundary_count = safe_int(runtime.get("complete_boundary_count"))
+    realtime_tradable_bar_count = safe_int(runtime.get("realtime_tradable_bar_count"))
+    readonly_waiting = str(readiness.get("readiness_status") or "") == "waiting_for_marketdata_acceptance"
+    gate_passed = not readonly_waiting
+    if not artifacts_healthy:
+        summary = (
+            f"行情门禁工件异常：runtime={runtime_artifact.get('status')}，readiness={readiness_artifact.get('status')}；"
+            f"完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}；关闭新开仓，已有持仓退出仍需要实时行情。"
+        )
+        status = "corrupt" if "corrupt" in {runtime_artifact.get('status'), readiness_artifact.get('status')} else "missing"
+        return {
+            "status": status,
+            "artifacts_healthy": False,
+            "gate_passed": False,
+            "waiting": False,
+            "complete_boundary_count": complete_boundary_count,
+            "realtime_tradable_bar_count": realtime_tradable_bar_count,
+            "summary": summary,
+        }
+    return {
+        "status": "passed" if gate_passed else "blocked",
+        "artifacts_healthy": True,
+        "gate_passed": gate_passed,
+        "waiting": readonly_waiting,
+        "complete_boundary_count": complete_boundary_count,
+        "realtime_tradable_bar_count": realtime_tradable_bar_count,
+        "summary": (
+            f"完整交易日行情门禁未通过，完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}；"
+            "关闭新开仓，已有持仓退出仍需要实时行情。"
+            if not gate_passed
+            else f"完整交易日行情门禁已通过，完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}。"
+        ),
+    }
+
+
+def safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
