@@ -19,6 +19,7 @@ ALLOWED_DEVELOPMENT_BRANCH = re.compile(
 )
 DEFAULT_RUNTIME_FILES = (
     "scripts/run_m15_longbridge_sdk_runtime.py",
+    "scripts/m15_longbridge_serve_transport_lib.py",
     "scripts/m15_longbridge_sdk_runtime_lib.py",
     "scripts/m15_longbridge_sdk_account_lib.py",
     "scripts/m15_longbridge_realtime_signal_router_lib.py",
