@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from scripts.m15_deployment_governance_lib import (
+    DEFAULT_RUNTIME_FILES,
     branch_allowed_for_development,
     issue_manifest,
     verify_manifest,
@@ -14,6 +15,12 @@ from scripts.m15_deployment_governance_lib import (
 
 
 class M15DeploymentGovernanceTest(unittest.TestCase):
+    def test_default_manifest_covers_live_quote_transport(self) -> None:
+        self.assertIn(
+            "scripts/m15_longbridge_serve_transport_lib.py",
+            DEFAULT_RUNTIME_FILES,
+        )
+
     def test_direct_cli_entrypoint_loads_repository_modules(self) -> None:
         completed = subprocess.run(
             [
