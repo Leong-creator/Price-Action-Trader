@@ -28,7 +28,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, choices=(3, 147), required=True)
     parser.add_argument("--fields", choices=("quote", "trade", "quote,trade"), required=True)
     parser.add_argument("--duration-seconds", type=float, default=1800)
-    parser.add_argument("--batch-size", type=int, default=50)
+    parser.add_argument("--batch-size", type=int)
     parser.add_argument("--client-id-file", default="~/.config/price-action-trader/longbridge_sdk_client_id")
     parser.add_argument("--region", choices=("cn", "global"), default="cn")
     parser.add_argument("--cli-binary", default="longbridge")
@@ -48,7 +48,7 @@ def main() -> int:
             symbols=symbols,
             fields=fields,
             duration_seconds=args.duration_seconds,
-            batch_size=args.batch_size,
+            batch_size=args.batch_size if args.batch_size is not None else 50,
         )
     else:
         payload = run_cli_serve_canary(
@@ -56,6 +56,8 @@ def main() -> int:
             symbols=symbols,
             fields=fields,
             duration_seconds=args.duration_seconds,
+            batch_size=args.batch_size if args.batch_size is not None else 10,
+            region=args.region,
         )
     destination = Path(args.output)
     destination.parent.mkdir(parents=True, exist_ok=True)
