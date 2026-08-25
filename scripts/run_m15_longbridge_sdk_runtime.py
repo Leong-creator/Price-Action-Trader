@@ -470,6 +470,70 @@ def update_live_quote_session_state(
     return state
 
 
+def apply_quote_state_worker_message(
+    message: dict[str, Any],
+    *,
+    live_quote_session_state: dict[str, dict[str, Any]],
+    last_push_by_symbol: dict[str, float],
+    last_push_at_by_symbol: dict[str, str],
+    last_push_source_by_symbol: dict[str, str],
+    first_live_push_by_symbol: dict[str, float],
+    last_live_push_by_symbol: dict[str, float],
+    now_monotonic: float | None = None,
+) -> int:
+    kind = str(message.get("kind") or "")
+    quote_state_rows = (
+        [message]
+        if kind == "quote_state"
+        else list(message.get("rows") or [])
+    )
+    applied = 0
+    for quote_state in quote_state_rows:
+        try:
+            quote_received_at = datetime.fromisoformat(
+                str(quote_state.get("received_at") or "").replace(
+                    "Z", "+00:00"
+                )
+            ).astimezone(UTC)
+        except (TypeError, ValueError):
+            quote_received_at = datetime.now(UTC)
+        update_live_quote_session_state(
+            live_quote_session_state,
+            str(quote_state.get("symbol") or ""),
+            dict(quote_state.get("payload") or {}),
+            received_at=quote_received_at,
+            source_mode=str(
+                quote_state.get("source_mode") or "longbridge_sdk_push"
+            ),
+        )
+        normalized_push_symbol = str(quote_state.get("symbol") or "").upper()
+        if not normalized_push_symbol:
+            continue
+        push_monotonic = (
+            time.monotonic() if now_monotonic is None else now_monotonic
+        )
+        last_push_by_symbol[normalized_push_symbol] = push_monotonic
+        last_push_at_by_symbol[normalized_push_symbol] = to_iso(quote_received_at)
+        push_source = str(
+            quote_state.get("source_mode") or "longbridge_sdk_push"
+        )
+        last_push_source_by_symbol[normalized_push_symbol] = push_source
+        if (
+            normalized_push_symbol in {"SPY.US", "QQQ.US"}
+            and push_source
+            not in {
+                "longbridge_sdk_initial_snapshot",
+                "longbridge_serve_initial_snapshot",
+            }
+        ):
+            first_live_push_by_symbol.setdefault(
+                normalized_push_symbol, push_monotonic
+            )
+            last_live_push_by_symbol[normalized_push_symbol] = push_monotonic
+        applied += 1
+    return applied
+
+
 def load_daily_context(
     quote: Any,
     sdk: Any,
@@ -2826,36 +2890,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 subscription_progress_total = int(
                     message.get("total") or subscription_progress_total
                 )
-            elif kind == "quote_state":
-                try:
-                    quote_received_at = datetime.fromisoformat(
-                        str(message.get("received_at") or "").replace("Z", "+00:00")
-                    ).astimezone(UTC)
-                except ValueError:
-                    quote_received_at = datetime.now(UTC)
-                update_live_quote_session_state(
-                    live_quote_session_state,
-                    str(message.get("symbol") or ""),
-                    dict(message.get("payload") or {}),
-                    received_at=quote_received_at,
-                    source_mode=str(message.get("source_mode") or "longbridge_sdk_push"),
+            elif kind in {"quote_state", "quote_state_batch"}:
+                apply_quote_state_worker_message(
+                    message,
+                    live_quote_session_state=live_quote_session_state,
+                    last_push_by_symbol=last_push_by_symbol,
+                    last_push_at_by_symbol=last_push_at_by_symbol,
+                    last_push_source_by_symbol=last_push_source_by_symbol,
+                    first_live_push_by_symbol=first_live_push_by_symbol,
+                    last_live_push_by_symbol=last_live_push_by_symbol,
                 )
-                normalized_push_symbol = str(message.get("symbol") or "").upper()
-                push_monotonic = time.monotonic()
-                last_push_by_symbol[normalized_push_symbol] = push_monotonic
-                last_push_at_by_symbol[normalized_push_symbol] = to_iso(quote_received_at)
-                push_source = str(message.get("source_mode") or "longbridge_sdk_push")
-                last_push_source_by_symbol[normalized_push_symbol] = push_source
-                if (
-                    normalized_push_symbol in {"SPY.US", "QQQ.US"}
-                    and push_source
-                    not in {
-                        "longbridge_sdk_initial_snapshot",
-                        "longbridge_serve_initial_snapshot",
-                    }
-                ):
-                    first_live_push_by_symbol.setdefault(normalized_push_symbol, push_monotonic)
-                    last_live_push_by_symbol[normalized_push_symbol] = push_monotonic
             elif kind == "market_activity":
                 try:
                     activity_received_at = datetime.fromisoformat(

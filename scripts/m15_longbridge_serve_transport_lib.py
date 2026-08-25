@@ -42,23 +42,15 @@ ALLOWED_SERVE_METHODS = frozenset(
 )
 MAX_SERVE_INFLIGHT_REQUESTS = 8
 REQUIRED_SUBSCRIPTION_TYPES = frozenset({1, 4})
+QUOTE_STATE_FLUSH_INTERVAL_SECONDS = 0.25
 
 
-def emit_worker(queue_out: Any, payload: dict[str, Any]) -> None:
+def emit_worker(queue_out: Any, payload: dict[str, Any]) -> bool:
     try:
-        if payload.get("kind") in {
-            "bars",
-            "ready",
-            "error",
-            "heartbeat",
-            "market_activity",
-            "subscription_progress",
-        }:
-            queue_out.put(payload, timeout=1)
-        else:
-            queue_out.put_nowait(payload)
+        queue_out.put_nowait(payload)
+        return True
     except queue.Full:
-        return
+        return False
 
 
 def symbol_batches(symbols: list[str], batch_size: int) -> list[list[str]]:
@@ -495,10 +487,47 @@ def longbridge_serve_quote_worker(
         initial_quote_symbols: set[str] = set()
         quote_payload_by_symbol: dict[str, dict[str, Any]] = {}
         quote_source_by_symbol: dict[str, str] = {}
+        pending_quote_state_by_symbol: dict[str, dict[str, Any]] = {}
+        pending_critical_messages: deque[dict[str, Any]] = deque()
         quote_pushed_symbols: set[str] = set()
         trade_pushed_symbols: set[str] = set()
         last_reference_activity_emit: dict[str, float] = {}
-        last_quote_state_emit: dict[str, float] = {}
+        last_quote_state_flush = 0.0
+
+        def flush_critical_messages() -> None:
+            while pending_critical_messages:
+                if not emit_worker(queue_out, pending_critical_messages[0]):
+                    return
+                pending_critical_messages.popleft()
+
+        def emit_critical(payload: dict[str, Any]) -> None:
+            pending_critical_messages.append(payload)
+            flush_critical_messages()
+
+        def flush_quote_states(*, force: bool = False) -> None:
+            nonlocal last_quote_state_flush
+            if not pending_quote_state_by_symbol or pending_critical_messages:
+                return
+            now_monotonic = time.monotonic()
+            if (
+                not force
+                and now_monotonic - last_quote_state_flush
+                < QUOTE_STATE_FLUSH_INTERVAL_SECONDS
+            ):
+                return
+            rows = [
+                pending_quote_state_by_symbol[symbol]
+                for symbol in sorted(pending_quote_state_by_symbol)
+            ]
+            if emit_worker(
+                queue_out,
+                {
+                    "kind": "quote_state_batch",
+                    "rows": rows,
+                },
+            ):
+                pending_quote_state_by_symbol.clear()
+                last_quote_state_flush = now_monotonic
 
         def emit_reference_activity(symbol: str, received_at: datetime) -> None:
             normalized = normalize_symbol(symbol)
@@ -508,8 +537,7 @@ def longbridge_serve_quote_worker(
             previous = last_reference_activity_emit.get(normalized, 0.0)
             if previous and now_monotonic - previous < 1.0:
                 return
-            last_reference_activity_emit[normalized] = now_monotonic
-            emit_worker(
+            emitted = emit_worker(
                 queue_out,
                 {
                     "kind": "market_activity",
@@ -518,6 +546,8 @@ def longbridge_serve_quote_worker(
                     "source_mode": "longbridge_serve_trade_push",
                 },
             )
+            if emitted:
+                last_reference_activity_emit[normalized] = now_monotonic
 
         def handle_quote_payload(
             payload: dict[str, Any],
@@ -542,25 +572,12 @@ def longbridge_serve_quote_worker(
             quote_source_by_symbol[symbol] = effective_source_mode
             initial_quote_symbols.add(symbol)
             builder.seed_quote(symbol, merged_payload, received_at=received_at)
-            now_monotonic = time.monotonic()
-            previous_emit = last_quote_state_emit.get(symbol, 0.0)
-            if (
-                source_mode == "longbridge_serve_push"
-                and previous_emit
-                and now_monotonic - previous_emit < 0.25
-            ):
-                return
-            last_quote_state_emit[symbol] = now_monotonic
-            emit_worker(
-                queue_out,
-                {
-                    "kind": "quote_state",
-                    "symbol": symbol,
-                    "payload": merged_payload,
-                    "received_at": to_iso(received_at),
-                    "source_mode": effective_source_mode,
-                },
-            )
+            pending_quote_state_by_symbol[symbol] = {
+                "symbol": symbol,
+                "payload": merged_payload,
+                "received_at": to_iso(received_at),
+                "source_mode": effective_source_mode,
+            }
 
         def handle_notification(message: dict[str, Any]) -> None:
             method = str(message.get("method") or "")
@@ -586,7 +603,7 @@ def longbridge_serve_quote_worker(
                     received_at=received_at,
                 )
                 if completed:
-                    emit_worker(queue_out, {"kind": "bars", "rows": completed})
+                    emit_critical({"kind": "bars", "rows": completed})
 
         session = LongbridgeServeSession(
             config.longbridge_serve_binary,
@@ -769,8 +786,7 @@ def longbridge_serve_quote_worker(
             (monitoring_expected - subscribed)
             | (monitoring_expected - initial_quote_symbols)
         )
-        emit_worker(
-            queue_out,
+        emit_critical(
             {
                 "kind": "ready",
                 "market_data_mode": "longbridge_serve_subscription",
@@ -801,6 +817,8 @@ def longbridge_serve_quote_worker(
                 "longbridge_serve_pid": session.process.pid,
             },
         )
+        flush_critical_messages()
+        flush_quote_states(force=True)
 
         last_heartbeat = 0.0
         while not stop_event.is_set():
@@ -827,12 +845,14 @@ def longbridge_serve_quote_worker(
             for message in messages:
                 if isinstance(message, dict) and "method" in message:
                     handle_notification(message)
+            flush_critical_messages()
+            flush_quote_states()
             completed = builder.complete_boundary(targets, datetime.now(UTC))
             if completed:
-                emit_worker(queue_out, {"kind": "bars", "rows": completed})
+                emit_critical({"kind": "bars", "rows": completed})
             now_monotonic = time.monotonic()
             if now_monotonic - last_heartbeat >= 1:
-                emit_worker(
+                emitted = emit_worker(
                     queue_out,
                     {
                         "kind": "heartbeat",
@@ -847,7 +867,8 @@ def longbridge_serve_quote_worker(
                         ),
                     },
                 )
-                last_heartbeat = now_monotonic
+                if emitted:
+                    last_heartbeat = now_monotonic
     except BaseException as exc:
         emit_worker(
             queue_out,
