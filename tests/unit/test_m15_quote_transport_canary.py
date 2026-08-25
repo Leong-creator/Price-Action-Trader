@@ -7,8 +7,11 @@ from types import SimpleNamespace
 
 from scripts.m15_quote_transport_canary_lib import (
     EventRecorder,
+    cli_serve_subscription_fields,
     load_symbols,
+    run_cli_serve_canary,
     run_sdk_canary,
+    symbol_batches,
 )
 
 
@@ -70,6 +73,36 @@ class M15QuoteTransportCanaryTest(unittest.TestCase):
         recorder = EventRecorder(["SPY.US"])
         recorder.record("QQQ.US", "quote")
         self.assertEqual(recorder.snapshot()["quote_event_count"], 0)
+
+    def test_cli_serve_uses_plural_trades_wire_field(self) -> None:
+        self.assertEqual(
+            cli_serve_subscription_fields(("quote", "trade")),
+            ["quote", "trades"],
+        )
+
+    def test_cli_serve_rejects_unknown_wire_field(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unsupported_cli_serve_field:depth"):
+            cli_serve_subscription_fields(("depth",))
+
+    def test_cli_serve_batches_large_universe(self) -> None:
+        symbols = [f"SYM{index}.US" for index in range(147)]
+        batches = symbol_batches(symbols, 50)
+        self.assertEqual([len(batch) for batch in batches], [50, 50, 47])
+        self.assertEqual([symbol for batch in batches for symbol in batch], symbols)
+
+    def test_cli_serve_rejects_invalid_batch_size(self) -> None:
+        with self.assertRaisesRegex(ValueError, "invalid_batch_size:0"):
+            symbol_batches(["SPY.US"], 0)
+
+    def test_cli_serve_rejects_unknown_region_before_starting_process(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unsupported_longbridge_region:invalid"):
+            run_cli_serve_canary(
+                binary="unused",
+                symbols=["SPY.US"],
+                fields=("quote",),
+                duration_seconds=0,
+                region="invalid",
+            )
 
     def test_subscription_failure_is_reported_instead_of_crashing(self) -> None:
         sdk = SimpleNamespace(

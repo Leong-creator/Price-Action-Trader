@@ -112,6 +112,24 @@ def subscription_symbols(rows: Any) -> set[str]:
     return result
 
 
+def cli_serve_subscription_fields(fields: tuple[str, ...]) -> list[str]:
+    """Translate the project's event names to longbridge serve wire names."""
+    field_map = {
+        "quote": "quote",
+        "trade": "trades",
+    }
+    try:
+        return [field_map[field] for field in fields]
+    except KeyError as exc:
+        raise ValueError(f"unsupported_cli_serve_field:{exc.args[0]}") from exc
+
+
+def symbol_batches(symbols: list[str], batch_size: int) -> list[list[str]]:
+    if batch_size <= 0:
+        raise ValueError(f"invalid_batch_size:{batch_size}")
+    return [symbols[offset : offset + batch_size] for offset in range(0, len(symbols), batch_size)]
+
+
 def run_sdk_canary(
     *,
     sdk: Any,
@@ -192,7 +210,11 @@ def run_cli_serve_canary(
     symbols: list[str],
     fields: tuple[str, ...],
     duration_seconds: float,
+    batch_size: int = 10,
+    region: str = "cn",
 ) -> dict[str, Any]:
+    if region not in {"cn", "global"}:
+        raise ValueError(f"unsupported_longbridge_region:{region}")
     process = subprocess.Popen(
         [str(binary), "serve"],
         stdin=subprocess.PIPE,
@@ -200,6 +222,7 @@ def run_cli_serve_canary(
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
+        env={**os.environ, "LONGBRIDGE_REGION": region},
     )
     if process.stdin is None or process.stdout is None:
         raise RuntimeError("longbridge_serve_pipe_unavailable")
@@ -218,17 +241,78 @@ def run_cli_serve_canary(
 
     thread = threading.Thread(target=reader, name="longbridge-serve-reader", daemon=True)
     thread.start()
-    request = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "quote.subscribe",
-        "params": {"symbols": symbols, "fields": list(fields)},
-    }
-    process.stdin.write(json.dumps(request, separators=(",", ":")) + "\n")
-    process.stdin.flush()
+    batches = symbol_batches(symbols, batch_size)
     recorder = EventRecorder(symbols)
     subscribed: set[str] = set()
+    subscription_errors: list[dict[str, Any]] = []
+    initialization_error = ""
     started = utc_now()
+
+    def record_notification(message: dict[str, Any]) -> None:
+        method = str(message.get("method") or "")
+        params = message.get("params") or {}
+        symbol = str(params.get("symbol") or "")
+        if method == "quote.updated":
+            recorder.record(symbol, "quote")
+        elif method == "quote.trades":
+            recorder.record(symbol, "trade")
+
+    def send_request(request: dict[str, Any]) -> None:
+        process.stdin.write(json.dumps(request, separators=(",", ":")) + "\n")
+        process.stdin.flush()
+
+    def wait_for_response(request_id: int, timeout_seconds: float) -> dict[str, Any] | None:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                message = messages.get(timeout=min(0.5, max(0.01, deadline - time.monotonic())))
+            except queue.Empty:
+                if process.poll() is not None:
+                    return None
+                continue
+            record_notification(message)
+            if message.get("id") == request_id:
+                return message
+        return None
+
+    send_request({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+    initialization = wait_for_response(1, 30.0)
+    if initialization is None:
+        initialization_error = "initialize_response_timeout"
+    elif isinstance(initialization.get("error"), dict):
+        initialization_error = str(initialization["error"].get("message") or initialization["error"])
+
+    for request_id, batch in enumerate(batches, start=2):
+        if initialization_error:
+            break
+        request = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": "quote.subscribe",
+            "params": {
+                "symbols": batch,
+                "fields": cli_serve_subscription_fields(fields),
+            },
+        }
+        send_request(request)
+        response = wait_for_response(request_id, 30.0)
+        if response is None:
+            subscription_errors.append({
+                "request_id": request_id,
+                "message": "subscription_response_timeout",
+            })
+            continue
+        error = response.get("error")
+        if isinstance(error, dict):
+            subscription_errors.append({
+                "request_id": request_id,
+                "message": str(error.get("message") or error),
+            })
+        for row in (response.get("result") or {}).get("subscribed", []):
+            if row.get("symbol"):
+                subscribed.add(us_symbol(str(row["symbol"])))
+
+    observation_started_at = utc_now()
     deadline = time.monotonic() + duration_seconds
     while time.monotonic() < deadline:
         try:
@@ -237,19 +321,12 @@ def run_cli_serve_canary(
             if process.poll() is not None:
                 break
             continue
-        if message.get("id") == 1:
-            for row in (message.get("result") or {}).get("subscribed", []):
-                if row.get("symbol"):
-                    subscribed.add(us_symbol(str(row["symbol"])))
-        method = str(message.get("method") or "")
-        params = message.get("params") or {}
-        symbol = str(params.get("symbol") or "")
-        if method == "quote.updated":
-            recorder.record(symbol, "quote")
-        elif method == "quote.trades":
-            recorder.record(symbol, "trade")
+        record_notification(message)
     try:
-        process.stdin.write('{"jsonrpc":"2.0","id":2,"method":"shutdown"}\n')
+        shutdown_id = len(batches) + 2
+        process.stdin.write(
+            json.dumps({"jsonrpc": "2.0", "id": shutdown_id, "method": "shutdown"}) + "\n"
+        )
         process.stdin.flush()
     except (BrokenPipeError, OSError):
         reader_errors.append("serve_stdin_closed_before_shutdown")
@@ -268,13 +345,20 @@ def run_cli_serve_canary(
         "schema_version": "m15.quote-transport-canary.v1",
         "transport": "longbridge_serve",
         "started_at": started,
+        "observation_started_at": observation_started_at,
         "finished_at": utc_now(),
         "duration_seconds": duration_seconds,
         "requested_fields": list(fields),
+        "wire_fields": cli_serve_subscription_fields(fields),
+        "region": region,
+        "batch_size": batch_size,
+        "subscription_request_count": len(batches),
         "requested_symbol_count": len(symbols),
         "actual_subscription_count": len(subscribed & set(symbols)),
         "missing_subscriptions": sorted(set(symbols) - subscribed),
         "events": recorder.snapshot(),
+        "initialization_error": initialization_error,
+        "subscription_errors": subscription_errors,
         "reader_errors": reader_errors,
         "stderr_tail": stderr_tail,
         "process_returncode": process.returncode,
