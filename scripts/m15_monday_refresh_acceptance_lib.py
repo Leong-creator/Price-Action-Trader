@@ -117,9 +117,20 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     readonly_gate_waiting = (
         runtime.get("dispatch_requested") is True
         and runtime.get("dispatch_enabled") is False
-        and str(runtime.get("dispatch_block_reason") or "") == "two_day_readonly_gate"
-        and int(runtime.get("readonly_sessions_passed") or 0)
-        < int(runtime.get("readonly_sessions_required") or 1)
+        and str(runtime.get("dispatch_block_reason") or "")
+        in {"complete_market_session_gate", "two_day_readonly_gate"}
+        and int(
+            runtime.get(
+                "complete_sessions_passed",
+                runtime.get("readonly_sessions_passed") or 0,
+            )
+        )
+        < int(
+            runtime.get(
+                "complete_sessions_required",
+                runtime.get("readonly_sessions_required") or 1,
+            )
+        )
     )
     marketdata_gate = marketdata_gate_truth(runtime, readiness, runtime_artifact, readiness_artifact)
     formal_consistent = (
@@ -289,7 +300,14 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         "runtime_whitelist_count": len(readiness.get("runtime_whitelist") or []),
         "paper_account_verified": bool(account.get("paper_account_verified")),
         "paper_order_submission_enabled": readiness.get("paper_order_submission_enabled") is True,
-        "new_position_submission_enabled": readiness.get("new_position_submission_enabled") is True,
+        "new_position_submission_enabled": bool(
+            readiness.get("new_position_submission_enabled") is True
+            and not pending_flatten
+            and not readonly_gate_waiting
+            and marketdata_gate["artifacts_healthy"]
+            and marketdata_gate["gate_passed"]
+            and fail_count == 0
+        ),
         "formal_test_epoch_id": formal_epoch.get("test_epoch_id"),
         "broker_connection": paper_account_connected,
         "paper_simulated_only": True,

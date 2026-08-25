@@ -388,7 +388,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(
             runtime_dispatch_block_reason(
                 paper_order_dispatch_enabled=True,
-                readonly_gate_blocked=False,
+                complete_session_gate_blocked=False,
                 paper_client_ready=True,
                 trade_context_ready=True,
                 market_data_ready=True,
@@ -546,7 +546,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(
             runtime_dispatch_block_reason(
                 paper_order_dispatch_enabled=True,
-                readonly_gate_blocked=False,
+                complete_session_gate_blocked=False,
                 paper_client_ready=True,
                 trade_context_ready=True,
                 market_data_ready=True,
@@ -657,7 +657,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(
             runtime_dispatch_block_reason(
                 paper_order_dispatch_enabled=True,
-                readonly_gate_blocked=False,
+                complete_session_gate_blocked=False,
                 paper_client_ready=True,
                 trade_context_ready=True,
                 market_data_ready=False,
@@ -2848,21 +2848,31 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         upgrade_gate = expanded["market_data"]["expansion_trade_pool_upgrade_gate"]
 
         self.assertFalse(expanded["routing"]["paper_order_dispatch_enabled"])
-        self.assertTrue(expanded["runtime"]["two_day_readonly_gate"])
+        self.assertTrue(expanded["runtime"]["complete_session_gate_enabled"])
+        self.assertEqual(expanded["runtime"]["required_complete_sessions"], 1)
         self.assertFalse(runtime_config.paper_order_dispatch_enabled)
-        self.assertTrue(runtime_config.two_day_readonly_gate)
+        self.assertTrue(runtime_config.complete_session_gate_enabled)
+        self.assertEqual(runtime_config.required_complete_sessions, 1)
+        self.assertEqual(
+            runtime_config.market_data_transport,
+            "longbridge_serve_persistent_jsonrpc",
+        )
+        self.assertFalse(runtime_config.allow_snapshot_poll_fallback)
         dispatch_requested = True
-        readonly_gate_passed_now = True
+        complete_session_gate_passed_now = True
         self.assertFalse(
             dispatch_requested
             and runtime_config.paper_order_dispatch_enabled
-            and (not runtime_config.two_day_readonly_gate or readonly_gate_passed_now)
+            and (
+                not runtime_config.complete_session_gate_enabled
+                or complete_session_gate_passed_now
+            )
         )
         self.assertFalse(expanded["market_data"]["use_seed_universe"])
         self.assertEqual(expanded["market_data"]["universe_path"], "config/m15_us_liquid_universe_300.json")
         self.assertEqual(expanded["market_data"]["symbol_limit"], 300)
         self.assertEqual(expanded["market_data"]["trading_symbol_limit"], 147)
-        self.assertTrue(upgrade_gate["required_readonly_gate_passed"])
+        self.assertTrue(upgrade_gate["required_complete_session_gate_passed"])
         self.assertTrue(upgrade_gate["required_complete_trading_daily_context"])
         self.assertTrue(upgrade_gate["required_complete_subscribed_daily_context"])
         self.assertEqual(upgrade_gate["required_subscription_coverage"], "300/300")
@@ -2880,6 +2890,23 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             default["formal_test_transition"]["epoch_state_path"],
         )
 
+    def test_complete_session_gate_new_key_takes_priority_over_legacy_key(self) -> None:
+        payload = json.loads(
+            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        payload["runtime"]["complete_session_gate_enabled"] = False
+        payload["runtime"]["two_day_readonly_gate"] = True
+        payload["runtime"]["required_complete_sessions"] = 3
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "runtime.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            loaded = load_config(path)
+
+        self.assertFalse(loaded.complete_session_gate_enabled)
+        self.assertEqual(loaded.required_complete_sessions, 3)
+
     def test_expanded_universe_file_keeps_declared_order_and_limit(self) -> None:
         payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(encoding="utf-8"))
         symbols = load_m15_universe(payload["market_data"]["universe_path"])
@@ -2891,7 +2918,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertLessEqual(payload["market_data"]["symbol_limit"], len(symbols))
         self.assertEqual(symbols[:5], tuple(raw_symbols[:5]))
         self.assertEqual(symbols[-5:], tuple(raw_symbols[-5:]))
-        self.assertTrue(upgrade_gate["required_readonly_gate_passed"])
+        self.assertTrue(upgrade_gate["required_complete_session_gate_passed"])
         self.assertEqual(upgrade_gate["required_subscription_coverage"], "300/300")
         self.assertEqual(upgrade_gate["target_trading_symbol_limit"], 300)
 
@@ -2998,36 +3025,57 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "symbol_limit exceeds universe file length"):
                 load_config(config_path)
 
-    def test_two_readonly_sessions_are_required_before_dispatch(self) -> None:
+    def test_one_complete_market_session_is_required_before_dispatch(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "gate.json"
-            self.assertEqual(readonly_gate_passed(path), (False, 0, 2))
+            self.assertEqual(readonly_gate_passed(path), (False, 0, 1))
             record_readonly_session(path, "2026-07-13", {"daily_context_row_count": 8820})
-            self.assertEqual(readonly_gate_passed(path), (False, 1, 2))
-            record_readonly_session(path, "2026-07-14", {"daily_context_row_count": 8820})
-            self.assertEqual(readonly_gate_passed(path), (True, 2, 2))
+            self.assertEqual(readonly_gate_passed(path), (True, 1, 1))
+
+    def test_complete_session_gate_reads_legacy_v1_history(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "gate.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "m15.sdk-readonly-gate.v1",
+                        "required_sessions": 2,
+                        "completed_sessions": [
+                            {"session_date": "2026-07-13"}
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                readonly_gate_passed(path, required_complete_sessions=1),
+                (True, 1, 1),
+            )
 
     def test_expansion_readonly_gate_can_require_one_complete_session(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "expansion-gate.json"
             self.assertEqual(
-                readonly_gate_passed(path, required_sessions=1),
+                readonly_gate_passed(path, required_complete_sessions=1),
                 (False, 0, 1),
             )
             record_readonly_session(
                 path,
                 "2026-07-28",
                 {"subscription_coverage": "300/300"},
-                required_sessions=1,
+                required_complete_sessions=1,
             )
             self.assertEqual(
-                readonly_gate_passed(path, required_sessions=1),
+                readonly_gate_passed(path, required_complete_sessions=1),
                 (True, 1, 1),
             )
 
     def test_runtime_fingerprint_changes_when_dispatch_gate_changes(self) -> None:
         config = load_config()
-        changed = replace(config, two_day_readonly_gate=not config.two_day_readonly_gate)
+        changed = replace(
+            config,
+            complete_session_gate_enabled=not config.complete_session_gate_enabled,
+        )
         self.assertNotEqual(config_fingerprint(config), config_fingerprint(changed))
 
     def test_daily_context_must_cover_every_symbol_before_dispatch(self) -> None:

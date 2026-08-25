@@ -229,8 +229,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         effective_paper_orders_enabled = paper_orders_enabled
     readonly_gate_waiting = bool(
         sdk_config is not None
-        and sdk_config.two_day_readonly_gate
-        and realtime_status.get("readonly_gate_passed") is not True
+        and sdk_config.complete_session_gate_enabled
+        and realtime_status.get(
+            "complete_session_gate_passed",
+            realtime_status.get("readonly_gate_passed"),
+        ) is not True
     )
     marketdata_gate = marketdata_gate_truth(realtime_status, sdk_config)
     critical_artifacts = {
@@ -351,7 +354,8 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "paper_orders_enabled",
             (
                 "已武装长桥模拟账户订单提交；当前 SDK 运行配置不启用额外只读门禁"
-                if sdk_config is not None and not sdk_config.two_day_readonly_gate
+                if sdk_config is not None
+                and not sdk_config.complete_session_gate_enabled
                 else "已武装长桥模拟账户订单提交；完整交易日行情验收完成前必须等待"
             ),
             "waiting" if readonly_gate_waiting and marketdata_gate["artifacts_healthy"] else ("pass" if effective_paper_orders_enabled else "fail"),
@@ -359,7 +363,9 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             or (
                 f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}, "
                 f"runtime_dispatch_enabled={runtime_dispatch_enabled}, runtime_dispatch_requested={runtime_dispatch_requested}, "
-                f"readonly_sessions={realtime_status.get('readonly_sessions_passed', 0)}/{realtime_status.get('readonly_sessions_required', 2)}"
+                "complete_sessions="
+                f"{realtime_status.get('complete_sessions_passed', realtime_status.get('readonly_sessions_passed', 0))}/"
+                f"{realtime_status.get('complete_sessions_required', realtime_status.get('readonly_sessions_required', 1))}"
             ),
         ),
         check_row(
@@ -934,7 +940,10 @@ def render_artifact_statuses(rows: list[tuple[str, dict[str, Any]]]) -> str:
 
 
 def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any | None) -> dict[str, Any]:
-    gate_enabled = bool(sdk_config is not None and getattr(sdk_config, "two_day_readonly_gate", False))
+    gate_enabled = bool(
+        sdk_config is not None
+        and getattr(sdk_config, "complete_session_gate_enabled", False)
+    )
     if not status:
         return {
             "status": "missing",
@@ -947,27 +956,43 @@ def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any | None) -> dic
         }
     complete_boundary_count = safe_int(status.get("complete_boundary_count"))
     realtime_tradable_bar_count = safe_int(status.get("realtime_tradable_bar_count"))
-    readonly_passed = (not gate_enabled) or status.get("readonly_gate_passed") is True
-    status_name = "not_required" if not gate_enabled else ("passed" if readonly_passed else "blocked")
+    complete_session_passed = (
+        (not gate_enabled)
+        or status.get(
+            "complete_session_gate_passed",
+            status.get("readonly_gate_passed"),
+        ) is True
+    )
+    status_name = "not_required" if not gate_enabled else ("passed" if complete_session_passed else "blocked")
     return {
         "status": status_name,
         "artifacts_healthy": True,
-        "gate_passed": readonly_passed,
+        "gate_passed": complete_session_passed,
         "enforced": gate_enabled,
         "complete_boundary_count": complete_boundary_count,
         "realtime_tradable_bar_count": realtime_tradable_bar_count,
         "summary": (
-            f"完整交易日行情门禁未通过={not readonly_passed}，完整边界 {complete_boundary_count}，"
+            f"完整交易日行情门禁未通过={not complete_session_passed}，完整边界 {complete_boundary_count}，"
             f"实时 K 线 {realtime_tradable_bar_count}；关闭新开仓，已有持仓退出仍需要实时行情。"
-            if gate_enabled and not readonly_passed
+            if gate_enabled and not complete_session_passed
             else (
                 f"完整交易日行情门禁已通过，完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}。"
                 if gate_enabled
                 else f"当前运行配置未启用额外完整交易日行情门禁；完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}。"
             )
         ),
-        "readonly_sessions_passed": safe_int(status.get("readonly_sessions_passed")),
-        "readonly_sessions_required": safe_int(status.get("readonly_sessions_required")),
+        "complete_sessions_passed": safe_int(
+            status.get(
+                "complete_sessions_passed",
+                status.get("readonly_sessions_passed"),
+            )
+        ),
+        "complete_sessions_required": safe_int(
+            status.get(
+                "complete_sessions_required",
+                status.get("readonly_sessions_required"),
+            )
+        ),
         "trading_market_data_coverage": str(
             status.get("trading_market_data_coverage")
             or status.get("trading_subscription_coverage")
