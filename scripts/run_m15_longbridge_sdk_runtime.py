@@ -54,6 +54,12 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     sdk_config_from_oauth, sdk_object_to_dict, sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     subscribe_quote_and_trades, to_iso,
     unix_to_utc,
+    validate_market_data_transport_runtime,
+)
+from scripts.m15_longbridge_serve_transport_lib import (
+    cleanup_orphaned_longbridge_serve_processes,
+    longbridge_serve_quote_worker,
+    probe_longbridge_serve_transport,
 )
 from scripts.m15_sdk_validation_flatten_lib import (
     activate_formal_epoch_payload,
@@ -239,34 +245,75 @@ def trade_context_health_requires_rebuild(health: dict[str, Any]) -> bool:
     )
 
 
-def run_sdk_preflight(config: Any) -> dict[str, Any]:
-    """Verify every SDK endpoint used by M15 without sending an order."""
-    sdk = require_sdk_contract()
-    oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-    trade = sdk.TradeContext(sdk_config_from_oauth(sdk, oauth, config.trade_region))
-    portfolio = sdk.PortfolioContext(sdk_config_from_oauth(sdk, oauth, config.trade_region))
-    provider = SdkAccountStateProvider(trade, portfolio, request_gate=SdkTradeRequestGate())
-    account = provider.refresh()
+def run_market_data_preflight(
+    config: Any,
+    sdk: Any,
+    oauth: Any,
+) -> dict[str, Any]:
+    """Probe the configured market-data transport without creating a second owner."""
     quote_error = ""
-    quote_probe_source = "direct_sdk_quote_probe"
+    quote_probe_source = ""
+    probe_details: dict[str, Any] = {}
     try:
         runtime_status = json.loads(config.runtime_status_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         runtime_status = {}
     quote_connection_owned = runtime_owns_quote_connection(config, runtime_status)
     if quote_connection_owned:
-        quote_probe_source = "active_sdk_runtime_status"
-        if runtime_status.get("sdk_connected") is not True:
-            quote_error = "sdk_quote_runtime_not_connected"
+        quote_probe_source = "active_runtime_status"
+        expected_mode = configured_market_data_mode(config)
+        if (
+            runtime_status.get("sdk_connected") is not True
+            or runtime_status.get("market_data_transport")
+            != config.market_data_transport
+            or runtime_status.get("market_data_mode") != expected_mode
+        ):
+            quote_error = "active_market_data_runtime_not_ready"
+        probe_details = {
+            "market_data_mode": str(runtime_status.get("market_data_mode") or ""),
+            "subscription_coverage": str(
+                runtime_status.get("subscription_coverage") or ""
+            ),
+        }
+    elif config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
+        quote_probe_source = "direct_longbridge_serve_preflight"
+        try:
+            probe_details = probe_longbridge_serve_transport(
+                config,
+                tuple(configured_symbols(config)[:3]),
+            )
+        except Exception as exc:
+            quote_error = (
+                f"longbridge_serve_probe_failed:{type(exc).__name__}:{exc}"
+            )
     else:
+        quote_probe_source = "direct_sdk_quote_probe"
         try:
             quote = sdk.QuoteContext(sdk_config_from_oauth(sdk, oauth, config.quote_region))
             quote.quote([configured_symbols(config)[0]])
         except Exception as exc:
             quote_error = f"sdk_quote_probe_failed:{type(exc).__name__}:{exc}"
+    return {
+        "quote_ok": not quote_error,
+        "quote_probe_source": quote_probe_source,
+        "quote_error": quote_error,
+        "market_data_transport": config.market_data_transport,
+        "market_data_probe": probe_details,
+    }
+
+
+def run_sdk_preflight(config: Any) -> dict[str, Any]:
+    """Verify every read-only transport and SDK endpoint without sending an order."""
+    sdk = require_sdk_contract()
+    oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
+    trade = sdk.TradeContext(sdk_config_from_oauth(sdk, oauth, config.trade_region))
+    portfolio = sdk.PortfolioContext(sdk_config_from_oauth(sdk, oauth, config.trade_region))
+    provider = SdkAccountStateProvider(trade, portfolio, request_gate=SdkTradeRequestGate())
+    account = provider.refresh()
+    market_data = run_market_data_preflight(config, sdk, oauth)
     errors = list(account.get("errors") or [])
-    if quote_error:
-        errors.append(quote_error)
+    if market_data["quote_error"]:
+        errors.append(market_data["quote_error"])
     short_capacity_error = ""
     short_capacity = "0"
     short_capacity_cash = "0"
@@ -286,8 +333,10 @@ def run_sdk_preflight(config: Any) -> dict[str, Any]:
         short_capacity_error = f"sdk_short_capacity_probe_failed:{type(exc).__name__}:{exc}"
         errors.append(short_capacity_error)
     return {
-        "quote_ok": not quote_error,
-        "quote_probe_source": quote_probe_source,
+        "quote_ok": market_data["quote_ok"],
+        "quote_probe_source": market_data["quote_probe_source"],
+        "market_data_transport": market_data["market_data_transport"],
+        "market_data_probe": market_data["market_data_probe"],
         "assets_ok": bool(account.get("assets_ok")),
         "positions_ok": bool(account.get("positions_ok")),
         "orders_ok": bool(account.get("orders_ok")),
@@ -386,7 +435,7 @@ def update_live_quote_session_state(
         except ValueError:
             previous_source_at = None
         if previous_source_at is not None and source_at < previous_source_at:
-            blocked_reason = "quote_timestamp_regressed"
+            return previous
     open_price = str(payload.get("open") or "")
     high = str(payload.get("high") or "")
     low = str(payload.get("low") or "")
@@ -517,7 +566,22 @@ def snapshot_poll_cycle_is_healthy(
 
 
 def market_data_mode_qualifies_for_subscription_gate(mode: str) -> bool:
-    return str(mode) == "sdk_subscription"
+    return str(mode) in {
+        "sdk_subscription",
+        "longbridge_serve_subscription",
+    }
+
+
+def configured_market_data_mode(config: Any) -> str:
+    if config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
+        return "longbridge_serve_subscription"
+    return "sdk_subscription"
+
+
+def configured_quote_worker(config: Any) -> Any:
+    if config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
+        return longbridge_serve_quote_worker
+    return quote_worker
 
 
 def market_data_heartbeat_is_stale(
@@ -2181,6 +2245,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     run_lock.flush()
     pid_path(config).write_text(f"{os.getpid()}\n", encoding="utf-8")
     orphaned_runtime_children_cleaned = cleanup_orphaned_sdk_runtime_children(config)
+    orphaned_serve_processes_cleaned = (
+        cleanup_orphaned_longbridge_serve_processes()
+        if config.market_data_transport == "longbridge_serve_persistent_jsonrpc"
+        else []
+    )
     sdk = require_sdk_contract()
     run_id = f"sdk-{uuid.uuid4().hex[:12]}"
     runtime_started_at = to_iso(datetime.now(UTC))
@@ -2343,6 +2412,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     trading_subscription_failed: list[str] = []
     position_monitoring_subscribed: list[str] = []
     position_monitoring_failed: list[str] = []
+    transport_child_pid = 0
+    transport_queue_depth = 0
+    transport_reader_errors: list[str] = []
+    transport_resources: dict[str, int] = {}
+    initial_snapshot_coverage = "0/0"
+    position_monitoring_initial_snapshot_coverage = "0/0"
     daily_failed: list[str] = []
     daily_workers: dict[str, tuple[mp.Process, float, list[str]]] = {}
     daily_pending: deque[list[str]] = deque()
@@ -2358,7 +2433,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     deferred_messages: deque[dict[str, Any]] = deque()
     partial_bar_suppressed_until = ""
     last_subscription_failure_reason = ""
-    market_data_mode = "sdk_subscription"
+    market_data_mode = configured_market_data_mode(config)
     snapshot_fallback_active = False
     subscription_recovery_failures = 0
     market_data_symbols: set[str] = set()
@@ -2494,6 +2569,23 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_ready = False
                 worker_started = time.monotonic()
                 worker_last_progress = worker_started
+                transport_child_pid = 0
+                transport_queue_depth = 0
+                transport_reader_errors = []
+                transport_resources = {}
+                initial_snapshot_coverage = "0/0"
+                position_monitoring_initial_snapshot_coverage = "0/0"
+                subscription_failed = []
+                trading_subscription_failed = []
+                position_monitoring_subscribed = []
+                position_monitoring_failed = []
+                market_data_symbols = set()
+                market_data_failed = []
+                trading_market_data_failed = []
+                if config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
+                    orphaned_serve_processes_cleaned.extend(
+                        cleanup_orphaned_longbridge_serve_processes()
+                    )
                 subscription_progress_completed = 0
                 subscription_progress_total = (
                     len(configured_trading_symbols(config))
@@ -2503,7 +2595,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_target = (
                     quote_snapshot_worker
                     if snapshot_fallback_active
-                    else quote_worker
+                    else configured_quote_worker(config)
                 )
                 worker = process_context.Process(
                     target=worker_target,
@@ -2734,7 +2826,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_push_source_by_symbol[normalized_push_symbol] = push_source
                 if (
                     normalized_push_symbol in {"SPY.US", "QQQ.US"}
-                    and push_source != "longbridge_sdk_initial_snapshot"
+                    and push_source
+                    not in {
+                        "longbridge_sdk_initial_snapshot",
+                        "longbridge_serve_initial_snapshot",
+                    }
                 ):
                     first_live_push_by_symbol.setdefault(normalized_push_symbol, push_monotonic)
                     last_live_push_by_symbol[normalized_push_symbol] = push_monotonic
@@ -2761,6 +2857,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     )
                     last_live_push_by_symbol[normalized_activity_symbol] = activity_monotonic
             elif kind == "ready":
+                transport_child_pid = int(message.get("longbridge_serve_pid") or 0)
+                initial_snapshot_coverage = str(
+                    message.get("initial_snapshot_coverage") or "0/0"
+                )
+                position_monitoring_initial_snapshot_coverage = str(
+                    message.get("position_monitoring_initial_snapshot_coverage")
+                    or "0/0"
+                )
                 subscription_failed = list(message.get("subscription_failed_symbols") or [])
                 trading_subscription_failed = list(message.get("trading_subscription_failed_symbols") or [])
                 position_monitoring_subscribed = list(
@@ -2770,11 +2874,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     message.get("position_monitoring_failed_symbols") or []
                 )
                 market_data_mode = str(
-                    message.get("market_data_mode") or "sdk_subscription"
+                    message.get("market_data_mode")
+                    or configured_market_data_mode(config)
                 )
                 market_data_fallback_validated = bool(
                     message.get("market_data_fallback_validated")
-                    or market_data_mode == "sdk_subscription"
+                    or market_data_mode_qualifies_for_subscription_gate(
+                        market_data_mode
+                    )
                 )
                 market_data_symbols = {
                     str(value)
@@ -2931,7 +3038,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 )
                 if not boundary_complete:
                     active_client = None
-                if market_data_mode != "sdk_subscription":
+                if not market_data_mode_qualifies_for_subscription_gate(
+                    market_data_mode
+                ):
                     active_client = None
                 last_result = dispatch_completed_rows(
                     config,
@@ -3037,6 +3146,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_event_at = str((rows or [{}])[-1].get("received_at") or last_event_at)
             elif kind == "heartbeat":
                 worker_last_progress = time.monotonic()
+                transport_queue_depth = int(
+                    message.get("transport_queue_depth") or 0
+                )
+                transport_reader_errors = [
+                    str(value)
+                    for value in message.get("transport_reader_errors") or []
+                ]
+                transport_resources = {
+                    str(key): int(value)
+                    for key, value in dict(
+                        message.get("transport_resources") or {}
+                    ).items()
+                }
                 snapshot_poll_elapsed_ms = int(
                     message.get("poll_elapsed_ms") or snapshot_poll_elapsed_ms
                 )
@@ -3462,9 +3584,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 reason=(
                     ""
                     if worker_ready
-                    else "sdk_subscription_recovery_limit_reached"
+                    else "market_data_subscription_recovery_limit_reached"
                     if market_data_circuit_open
-                    else "waiting_for_full_sdk_subscription"
+                    else "waiting_for_full_realtime_subscription"
                 ),
                 connected=worker_ready,
                 last_event_at=last_event_at,
@@ -3489,12 +3611,37 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "subscription_recovery_failures": subscription_recovery_failures,
                     "market_data_mode": market_data_mode,
-                    "market_data_transport": "official_sdk_persistent_websocket",
+                    "market_data_transport": config.market_data_transport,
+                    "account_order_transport": "official_sdk_persistent_context",
                     "market_data_fallback_validated": market_data_fallback_validated,
                     "source_mode": (
                         "longbridge_sdk_snapshot_poll"
                         if market_data_mode == "sdk_snapshot_poll"
-                        else "longbridge_sdk_push"
+                        else (
+                            "longbridge_serve_push"
+                            if market_data_mode == "longbridge_serve_subscription"
+                            else "longbridge_sdk_push"
+                        )
+                    ),
+                    "longbridge_serve_binary": (
+                        str(config.longbridge_serve_binary)
+                        if config.market_data_transport
+                        == "longbridge_serve_persistent_jsonrpc"
+                        else ""
+                    ),
+                    "longbridge_serve_binary_sha256": (
+                        config.longbridge_serve_binary_sha256
+                        if config.market_data_transport
+                        == "longbridge_serve_persistent_jsonrpc"
+                        else ""
+                    ),
+                    "market_data_transport_child_pid": transport_child_pid,
+                    "market_data_transport_queue_depth": transport_queue_depth,
+                    "market_data_transport_reader_errors": transport_reader_errors,
+                    "market_data_transport_resources": transport_resources,
+                    "initial_snapshot_coverage": initial_snapshot_coverage,
+                    "position_monitoring_initial_snapshot_coverage": (
+                        position_monitoring_initial_snapshot_coverage
                     ),
                     "snapshot_poll_interval_seconds": (
                         config.snapshot_poll_interval_seconds
@@ -3549,6 +3696,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "snapshot_completed_bar_count": snapshot_completed_bar_count,
                     "orphaned_runtime_children_cleaned": orphaned_runtime_children_cleaned,
+                    "orphaned_longbridge_serve_processes_cleaned": (
+                        orphaned_serve_processes_cleaned
+                    ),
                     "config_fingerprint": loaded_config_fingerprint,
                     "deployment_manifest_verified": deployment_ready,
                     "deployment_manifest_issues": list(deployment.get("issues") or []),
@@ -3559,7 +3709,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "subscription_coverage": f"{len(configured_symbols(config)) - len(subscription_failed) if worker_ready else 0}/{len(configured_symbols(config))}",
                     "trading_symbol_count": len(configured_trading_symbols(config)),
                     "trading_subscription_coverage": (
-                        f"{len(configured_trading_symbols(config)) - len(trading_subscription_failed) if worker_ready and market_data_mode == 'sdk_subscription' else 0}"
+                        f"{len(configured_trading_symbols(config)) - len(trading_subscription_failed) if worker_ready and market_data_mode_qualifies_for_subscription_gate(market_data_mode) else 0}"
                         f"/{len(configured_trading_symbols(config))}"
                     ),
                     "market_data_coverage": (
@@ -3909,6 +4059,7 @@ def main() -> int:
         pid_path(config).unlink(missing_ok=True)
         return 0
     try:
+        validate_market_data_transport_runtime(config)
         require_sdk_contract()
         read_client_id(config)
     except Exception as exc:

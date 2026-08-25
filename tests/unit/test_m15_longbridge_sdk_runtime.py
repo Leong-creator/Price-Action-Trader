@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import inspect
 import json
 import pickle
@@ -28,6 +29,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     market_event_is_tradable, trading_market_events,
     trading_universe_fingerprint,
     validate_formal_epoch_alignment,
+    validate_market_data_transport_runtime,
 )
 from scripts.m15_longbridge_sdk_account_lib import SdkAccountCoordinator, SdkAccountStateProvider, SdkTradeRequestGate
 from scripts.m15_universe_lib import load_m15_universe
@@ -39,11 +41,14 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     completed_postclose_refresh_dates,
     compact_hot_execution_rows,
     compact_hot_signal_rows,
+    configured_market_data_mode,
+    configured_quote_worker,
     dispatch_completed_rows,
     event_rows_to_daily,
     effective_runtime_dispatch_enabled,
     is_orphaned_sdk_runtime_child,
     market_data_mode_qualifies_for_subscription_gate,
+    run_market_data_preflight,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
     market_data_recovery_is_stable,
@@ -71,10 +76,68 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     should_emit_reference_market_activity,
     start_runtime_daemon,
     trade_context_health_requires_rebuild,
+    update_live_quote_session_state,
 )
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_production_transport_selects_longbridge_serve_worker(self) -> None:
+        config = load_config()
+        self.assertEqual(
+            configured_market_data_mode(config),
+            "longbridge_serve_subscription",
+        )
+        self.assertEqual(
+            configured_quote_worker(config).__name__,
+            "longbridge_serve_quote_worker",
+        )
+        self.assertTrue(
+            market_data_mode_qualifies_for_subscription_gate(
+                "longbridge_serve_subscription"
+            )
+        )
+
+    def test_preflight_uses_serve_transport_instead_of_sdk_quote(self) -> None:
+        config = load_config()
+        with (
+            patch(
+                "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
+                return_value=False,
+            ),
+            patch(
+                "scripts.run_m15_longbridge_sdk_runtime.probe_longbridge_serve_transport",
+                return_value={
+                    "market_data_mode": "longbridge_serve_subscription",
+                    "subscription_coverage": "3/3",
+                },
+            ) as serve_probe,
+        ):
+            result = run_market_data_preflight(config, SimpleNamespace(), object())
+
+        self.assertTrue(result["quote_ok"])
+        self.assertEqual(
+            result["quote_probe_source"],
+            "direct_longbridge_serve_preflight",
+        )
+        serve_probe.assert_called_once()
+
+    def test_preflight_fails_when_serve_authorization_or_initialize_fails(self) -> None:
+        config = load_config()
+        with (
+            patch(
+                "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
+                return_value=False,
+            ),
+            patch(
+                "scripts.run_m15_longbridge_sdk_runtime.probe_longbridge_serve_transport",
+                side_effect=RuntimeError("authorization_required"),
+            ),
+        ):
+            result = run_market_data_preflight(config, SimpleNamespace(), object())
+
+        self.assertFalse(result["quote_ok"])
+        self.assertIn("authorization_required", result["quote_error"])
+
     def test_reference_trade_activity_is_throttled_without_ignoring_trades(self) -> None:
         last_emit = {}
         self.assertTrue(
@@ -97,6 +160,42 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 "AAPL.US", now_monotonic=11.0, last_emit_by_symbol=last_emit
             )
         )
+
+    def test_live_quote_state_keeps_newer_push_when_snapshot_arrives_late(self) -> None:
+        state: dict[str, dict] = {}
+        received_at = datetime(2026, 8, 25, 13, 31, tzinfo=UTC)
+        newer = update_live_quote_session_state(
+            state,
+            "SPY.US",
+            {
+                "timestamp": "2026-08-25T13:31:00Z",
+                "open": "500",
+                "high": "502",
+                "low": "499",
+                "last_done": "501",
+                "volume": 100,
+            },
+            received_at=received_at,
+            source_mode="longbridge_serve_push",
+        )
+        retained = update_live_quote_session_state(
+            state,
+            "SPY.US",
+            {
+                "timestamp": "2026-08-25T13:30:59Z",
+                "open": "500",
+                "high": "500",
+                "low": "498",
+                "last_done": "499",
+                "volume": 90,
+            },
+            received_at=received_at,
+            source_mode="longbridge_serve_initial_snapshot",
+        )
+
+        self.assertIs(retained, newer)
+        self.assertEqual(state["SPY"]["close"], "501")
+        self.assertEqual(state["SPY"]["source_mode"], "longbridge_serve_push")
 
     def test_quote_worker_reports_reference_trade_activity(self) -> None:
         source = inspect.getsource(quote_worker)
@@ -124,6 +223,30 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(config.subscription_progress_deadline_seconds, 90)
         self.assertEqual(config.subscription_circuit_retry_seconds, 300)
         self.assertEqual(config.subscription_batch_size, 500)
+        self.assertEqual(
+            config.market_data_transport,
+            "longbridge_serve_persistent_jsonrpc",
+        )
+        self.assertEqual(config.longbridge_serve_batch_size, 10)
+        self.assertEqual(config.longbridge_serve_response_timeout_seconds, 30)
+
+    def test_serve_transport_binary_must_match_pinned_checksum(self) -> None:
+        with TemporaryDirectory() as tmp:
+            binary = Path(tmp) / "longbridge"
+            binary.write_bytes(b"pinned-serve-binary")
+            binary.chmod(0o700)
+            digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+            config = replace(
+                load_config(),
+                longbridge_serve_binary=binary,
+                longbridge_serve_binary_sha256=digest,
+            )
+            validate_market_data_transport_runtime(config)
+
+            with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+                validate_market_data_transport_runtime(
+                    replace(config, longbridge_serve_binary_sha256="0" * 64)
+                )
 
     def test_runtime_subscription_circuit_recovers_without_parent_restart(self) -> None:
         source = inspect.getsource(__import__(
@@ -139,6 +262,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             source,
         )
         self.assertGreaterEqual(source.count("account.resume_background_refresh()"), 6)
+
+    def test_runtime_cleans_owned_serve_orphans_before_every_worker_start(self) -> None:
+        source = inspect.getsource(__import__(
+            "scripts.run_m15_longbridge_sdk_runtime",
+            fromlist=["run_watch"],
+        ).run_watch)
+        cleanup = "cleanup_orphaned_longbridge_serve_processes()"
+        self.assertGreaterEqual(source.count(cleanup), 2)
+        self.assertIn("orphaned_serve_processes_cleaned.extend", source)
+        self.assertLess(source.index(cleanup), source.index("worker_target = ("))
 
     def test_production_runtime_uses_frozen_contract_v1_configs(self) -> None:
         config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
