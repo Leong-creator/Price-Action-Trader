@@ -24,6 +24,10 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
     def test_readonly_gate_wait_is_not_a_watchdog_failure(self) -> None:
         payload = {
             "acceptance_status": "blocked_monday_acceptance",
+            "marketdata_integrity_gate": {
+                "status": "blocked",
+                "artifacts_healthy": True,
+            },
             "checks": [
                 {
                     "check": "paper_dispatch_armed",
