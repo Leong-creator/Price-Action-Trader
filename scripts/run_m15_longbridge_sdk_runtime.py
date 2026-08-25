@@ -631,6 +631,16 @@ def active_reference_quotes_are_stale(
     )
 
 
+def regular_session_open_grace_elapsed(
+    now: datetime,
+    grace_seconds: float,
+) -> bool:
+    """Avoid treating the normal pre-open-to-open lull as a dead connection."""
+    local = now.astimezone(NEW_YORK)
+    session_open = local.replace(hour=9, minute=30, second=0, microsecond=0)
+    return local >= session_open + timedelta(seconds=float(grace_seconds))
+
+
 def market_data_recovery_is_stable(
     *,
     attempts: int,
@@ -2192,6 +2202,11 @@ def runtime_status_age_seconds(status: dict[str, Any], now: datetime | None = No
 
 def runtime_requires_health_replacement(status: dict[str, Any], config: Any) -> bool:
     """Identify a live runtime whose own health outputs have stopped advancing."""
+    if str(status.get("status") or "") in {
+        "halted_market_data_circuit",
+        "halted_account_snapshot_circuit",
+    }:
+        return True
     status_age = runtime_status_age_seconds(status)
     account_age = status.get("account_snapshot_age_seconds")
     try:
@@ -2688,6 +2703,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             if (
                 worker_ready
                 and in_regular_session(datetime.now(UTC))
+                and regular_session_open_grace_elapsed(
+                    datetime.now(UTC),
+                    config.active_symbol_silence_seconds,
+                )
                 and market_data_heartbeat_grace_elapsed(
                     worker_ready_since,
                     time.monotonic(),

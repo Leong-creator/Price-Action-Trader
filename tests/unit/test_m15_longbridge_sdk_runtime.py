@@ -70,6 +70,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     runtime_dispatch_block_reason,
     realtime_boundary_is_complete,
     reconnect_delay_seconds,
+    regular_session_open_grace_elapsed,
     should_use_snapshot_fallback,
     snapshot_poll_cycle_is_healthy,
     signals_allowed_by_entry_gate,
@@ -759,6 +760,21 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(market_data_heartbeat_grace_elapsed(10.0, 30.001, 20.0))
         self.assertFalse(market_data_heartbeat_grace_elapsed(0.0, 100.0, 20.0))
 
+    def test_active_symbol_silence_waits_for_regular_open_grace(self) -> None:
+        market_zone = ZoneInfo("America/New_York")
+        self.assertFalse(
+            regular_session_open_grace_elapsed(
+                datetime(2026, 8, 25, 9, 30, 29, tzinfo=market_zone),
+                30,
+            )
+        )
+        self.assertTrue(
+            regular_session_open_grace_elapsed(
+                datetime(2026, 8, 25, 9, 30, 30, tzinfo=market_zone),
+                30,
+            )
+        )
+
     def test_orphan_cleanup_only_targets_detached_children_from_the_sdk_log(self) -> None:
         runtime_log = Path("/tmp/m15_longbridge_sdk_runtime.log")
         self.assertTrue(
@@ -1033,6 +1049,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "account_snapshot_age_seconds": 8,
                     "market_data_circuit_open": True,
                     "market_data_retry_after_seconds": 240,
+                },
+                config,
+            )
+        )
+
+    def test_halted_market_data_runtime_is_replaced_even_with_fresh_account(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertTrue(
+            runtime_requires_health_replacement(
+                {
+                    "status": "halted_market_data_circuit",
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "account_snapshot_age_seconds": 8,
                 },
                 config,
             )

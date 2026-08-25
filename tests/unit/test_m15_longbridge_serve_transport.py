@@ -42,11 +42,40 @@ class _FakeSession:
     def send(self, request):
         self.sent.append(request)
 
-    def wait_for_response(self, request_id, on_notification):
+    def _response(self, request_id, on_notification):
         if request_id == 1:
             return {"id": 1, "result": {"protocolVersion": "1"}}
-        request = self.sent[-1]
-        symbols = request["params"]["symbols"]
+        request = next(row for row in self.sent if row.get("id") == request_id)
+        method = request["method"]
+        if method == "quote.subscriptions":
+            symbols = [
+                symbol
+                for row in self.sent
+                if row.get("method") == "quote.subscribe"
+                for symbol in row["params"]["symbols"]
+            ]
+            return {
+                "id": request_id,
+                "result": {
+                    "sub_list": [
+                        {"symbol": symbol, "sub_type": [1, 4]}
+                        for symbol in symbols
+                    ]
+                },
+            }
+        symbols = request.get("params", {}).get("symbols", [])
+        if method == "quote.quote":
+            return {
+                "id": request_id,
+                "result": [
+                    {
+                        "symbol": symbol,
+                        "last_done": "100",
+                        "timestamp": "2026-08-25T13:30:00Z",
+                    }
+                    for symbol in symbols
+                ],
+            }
         if request_id == 2:
             on_notification(
                 {
@@ -91,6 +120,18 @@ class _FakeSession:
             },
         }
 
+    def wait_for_response(self, request_id, on_notification):
+        return self._response(request_id, on_notification)
+
+    def wait_for_responses(
+        self, request_ids, on_notification, *, timeout_seconds=None
+    ):
+        del timeout_seconds
+        return {
+            request_id: self._response(request_id, on_notification)
+            for request_id in request_ids
+        }
+
     def close(self, _request_id):
         self.closed = True
 
@@ -99,6 +140,35 @@ class _ReaderErrorSession(_FakeSession):
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
         self.reader_errors = ["invalid_json_stdout"]
+
+
+class _MonitoringTimeoutSession(_FakeSession):
+    def _response(self, request_id, on_notification):
+        request = next(row for row in self.sent if row.get("id") == request_id)
+        if request.get("method") == "quote.subscribe" and "EXTRA.US" in request[
+            "params"
+        ]["symbols"]:
+            return None
+        if request.get("method") == "quote.subscriptions":
+            return {
+                "id": request_id,
+                "result": {
+                    "sub_list": [
+                        {"symbol": "SPY.US", "sub_type": [1, 4]},
+                    ]
+                },
+            }
+        return super()._response(request_id, on_notification)
+
+    def wait_for_responses(
+        self, request_ids, on_notification, *, timeout_seconds=None
+    ):
+        del timeout_seconds
+        return {
+            request_id: response
+            for request_id in request_ids
+            if (response := self._response(request_id, on_notification)) is not None
+        }
 
 
 class _FakeStopEvent:
@@ -187,6 +257,22 @@ class LongbridgeServeTransportTest(unittest.TestCase):
                     "params": {},
                 }
             )
+
+    def test_market_data_session_preserves_out_of_order_responses(self) -> None:
+        session = object.__new__(LongbridgeServeSession)
+        session.response_timeout_seconds = 1
+        session.messages = queue.Queue()
+        session.pending_responses = {}
+        session.process = _FakeProcess()
+        session.messages.put({"id": 2, "result": "second"})
+        session.messages.put({"id": 1, "result": "first"})
+
+        first = session.wait_for_response(1, lambda _message: None)
+        second = session.wait_for_response(2, lambda _message: None)
+
+        self.assertEqual(first["result"], "first")
+        self.assertEqual(second["result"], "second")
+        self.assertEqual(session.pending_responses, {})
 
     def test_preflight_initializes_and_checks_subscription_and_quotes(self) -> None:
         config = SimpleNamespace(
@@ -386,6 +472,58 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(len(subscribe_requests), 2)
         self.assertEqual(subscribe_requests[0]["params"]["fields"], ["quote", "trades"])
         self.assertTrue(session.closed)
+
+    def test_monitoring_subscription_timeout_keeps_base_worker_ready(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=1,
+            longbridge_serve_batch_size=2,
+            subscription_progress_deadline_seconds=1,
+            subscription_request_interval_seconds=0,
+            subscription_retry_count=0,
+            subscription_retry_backoff_seconds=0,
+            quote_region="cn",
+        )
+        output = queue.Queue()
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US",),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US",),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _MonitoringTimeoutSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker(
+                "unused.json",
+                output,
+                _FakeStopEvent(),
+                ("EXTRA.US",),
+            )
+
+        rows = []
+        while not output.empty():
+            rows.append(output.get_nowait())
+        ready = next(row for row in rows if row["kind"] == "ready")
+        self.assertEqual(ready["subscription_failed_symbols"], [])
+        self.assertEqual(
+            ready["position_monitoring_failed_symbols"], ["EXTRA.US"]
+        )
+        self.assertFalse(any(row["kind"] == "error" for row in rows))
 
 
 if __name__ == "__main__":
