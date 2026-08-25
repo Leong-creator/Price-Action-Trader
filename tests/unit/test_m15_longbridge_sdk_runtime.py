@@ -36,6 +36,7 @@ from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
     acquire_runtime_run_lock,
     active_reference_quotes_are_stale,
+    apply_quote_state_worker_message,
     build_live_daily_confirmation_rows,
     close_spawn_queue,
     completed_postclose_refresh_dates,
@@ -197,6 +198,64 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertIs(retained, newer)
         self.assertEqual(state["SPY"]["close"], "501")
         self.assertEqual(state["SPY"]["source_mode"], "longbridge_serve_push")
+
+    def test_parent_applies_batched_quote_state_and_reference_heartbeat(self) -> None:
+        state: dict[str, dict] = {}
+        last_push: dict[str, float] = {}
+        last_push_at: dict[str, str] = {}
+        last_push_source: dict[str, str] = {}
+        first_live: dict[str, float] = {}
+        last_live: dict[str, float] = {}
+
+        applied = apply_quote_state_worker_message(
+            {
+                "kind": "quote_state_batch",
+                "rows": [
+                    {
+                        "symbol": "SPY.US",
+                        "payload": {
+                            "timestamp": "2026-08-25T13:31:00Z",
+                            "open": "500",
+                            "high": "502",
+                            "low": "499",
+                            "last_done": "501",
+                            "volume": 100,
+                        },
+                        "received_at": "2026-08-25T13:31:00Z",
+                        "source_mode": "longbridge_serve_push",
+                    },
+                    {
+                        "symbol": "AAPL.US",
+                        "payload": {
+                            "timestamp": "2026-08-25T13:31:00Z",
+                            "open": "225",
+                            "high": "226",
+                            "low": "224",
+                            "last_done": "225.5",
+                            "volume": 50,
+                        },
+                        "received_at": "2026-08-25T13:31:00Z",
+                        "source_mode": "longbridge_serve_push",
+                    },
+                ],
+            },
+            live_quote_session_state=state,
+            last_push_by_symbol=last_push,
+            last_push_at_by_symbol=last_push_at,
+            last_push_source_by_symbol=last_push_source,
+            first_live_push_by_symbol=first_live,
+            last_live_push_by_symbol=last_live,
+            now_monotonic=123.0,
+        )
+
+        self.assertEqual(applied, 2)
+        self.assertEqual(state["SPY"]["close"], "501")
+        self.assertEqual(state["AAPL"]["close"], "225.5")
+        self.assertEqual(last_push["SPY.US"], 123.0)
+        self.assertEqual(last_push_source["AAPL.US"], "longbridge_serve_push")
+        self.assertEqual(first_live["SPY.US"], 123.0)
+        self.assertEqual(last_live["SPY.US"], 123.0)
+        self.assertNotIn("AAPL.US", first_live)
 
     def test_quote_worker_reports_reference_trade_activity(self) -> None:
         source = inspect.getsource(quote_worker)

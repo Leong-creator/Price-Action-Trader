@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import queue
 import os
+import time
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 from scripts.m15_longbridge_serve_transport_lib import (
     LongbridgeServeSession,
+    emit_worker,
     longbridge_serve_quote_worker,
     merge_quote_payload,
     normalize_symbol,
@@ -171,6 +173,55 @@ class _MonitoringTimeoutSession(_FakeSession):
         }
 
 
+class _BurstSession(_FakeSession):
+    def _response(self, request_id, on_notification):
+        request = next(row for row in self.sent if row.get("id") == request_id)
+        if request.get("method") == "quote.subscribe" and request_id == 2:
+            for index in range(500):
+                on_notification(
+                    {
+                        "method": "quote.updated",
+                        "params": {
+                            "symbol": "SPY.US",
+                            "last_done": str(500 + index / 1000),
+                            "timestamp": "2026-08-25T13:30:01Z",
+                        },
+                    }
+                )
+            symbols = request["params"]["symbols"]
+            return {
+                "id": request_id,
+                "result": {
+                    "subscribed": [
+                        {"symbol": symbol, "fields": ["quote", "trades"]}
+                        for symbol in symbols
+                    ],
+                    "quotes": [
+                        {
+                            "symbol": symbol,
+                            "last_done": "100",
+                            "timestamp": "2026-08-25T13:30:00Z",
+                        }
+                        for symbol in symbols
+                    ],
+                },
+            }
+        return super()._response(request_id, on_notification)
+
+
+class _FailOnceByKindQueue(queue.Queue):
+    def __init__(self, *kinds: str):
+        super().__init__()
+        self.fail_once = set(kinds)
+
+    def put_nowait(self, item):
+        kind = str(item.get("kind") or "") if isinstance(item, dict) else ""
+        if kind in self.fail_once:
+            self.fail_once.remove(kind)
+            raise queue.Full
+        return super().put_nowait(item)
+
+
 class _FakeStopEvent:
     def __init__(self):
         self.check_count = 0
@@ -219,6 +270,14 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertGreater(resources["rss_kb"], 0)
         self.assertGreater(resources["thread_count"], 0)
         self.assertGreater(resources["file_descriptor_count"], 0)
+
+    def test_emit_worker_never_waits_when_cross_process_queue_is_full(self) -> None:
+        output = queue.Queue(maxsize=1)
+        output.put_nowait({"kind": "occupied"})
+        started = time.monotonic()
+
+        self.assertFalse(emit_worker(output, {"kind": "heartbeat"}))
+        self.assertLess(time.monotonic() - started, 0.05)
 
     def test_quote_tick_and_snapshot_merge_without_timestamp_regression(self) -> None:
         received_at = datetime(2026, 8, 25, 13, 31, tzinfo=UTC)
@@ -447,7 +506,7 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertTrue(
             {
                 "subscription_progress",
-                "quote_state",
+                "quote_state_batch",
                 "market_activity",
                 "bars",
                 "ready",
@@ -459,9 +518,11 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(ready["market_data_mode"], "longbridge_serve_subscription")
         self.assertEqual(ready["subscription_failed_symbols"], [])
         spy_quotes = [
-            row
+            quote
             for row in rows
-            if row["kind"] == "quote_state" and row["symbol"] == "SPY.US"
+            if row["kind"] == "quote_state_batch"
+            for quote in row["rows"]
+            if quote["symbol"] == "SPY.US"
         ]
         self.assertEqual(spy_quotes[-1]["payload"]["last_done"], "500")
         self.assertEqual(spy_quotes[-1]["source_mode"], "longbridge_serve_push")
@@ -472,6 +533,135 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(len(subscribe_requests), 2)
         self.assertEqual(subscribe_requests[0]["params"]["fields"], ["quote", "trades"])
         self.assertTrue(session.closed)
+
+    def test_worker_coalesces_quote_burst_before_cross_process_delivery(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=2,
+            quote_region="cn",
+        )
+        output = queue.Queue()
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _BurstSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker(
+                "unused.json",
+                output,
+                _FakeStopEvent(),
+            )
+
+        rows = []
+        while not output.empty():
+            rows.append(output.get_nowait())
+        quote_batches = [row for row in rows if row["kind"] == "quote_state_batch"]
+        self.assertEqual(len(quote_batches), 1)
+        spy_rows = [
+            row
+            for row in quote_batches[0]["rows"]
+            if row["symbol"] == "SPY.US"
+        ]
+        self.assertEqual(len(spy_rows), 1)
+        self.assertEqual(spy_rows[0]["payload"]["last_done"], "500.499")
+
+    def test_worker_retries_critical_bar_after_temporary_queue_pressure(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=2,
+            quote_region="cn",
+        )
+        output = _FailOnceByKindQueue("bars")
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _FakeSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker("unused.json", output, _FakeStopEvent())
+
+        rows = []
+        while not output.empty():
+            rows.append(output.get_nowait())
+        self.assertTrue(any(row["kind"] == "bars" for row in rows))
+        self.assertTrue(any(row["kind"] == "ready" for row in rows))
+
+    def test_worker_retries_reference_activity_after_queue_pressure(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=2,
+            quote_region="cn",
+        )
+        output = _FailOnceByKindQueue("market_activity")
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _FakeSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker("unused.json", output, _FakeStopEvent())
+
+        rows = []
+        while not output.empty():
+            rows.append(output.get_nowait())
+        activities = [row for row in rows if row["kind"] == "market_activity"]
+        self.assertEqual(len(activities), 1)
+        self.assertEqual(activities[0]["symbol"], "SPY.US")
 
     def test_monitoring_subscription_timeout_keeps_base_worker_ready(self) -> None:
         config = SimpleNamespace(
