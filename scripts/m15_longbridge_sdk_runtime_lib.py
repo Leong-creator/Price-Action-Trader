@@ -94,7 +94,8 @@ class SdkRuntimeConfig:
     account_snapshot_refresh_deadline_seconds: int
     account_snapshot_circuit_retry_seconds: int
     maximum_account_snapshot_age_seconds: int
-    two_day_readonly_gate: bool
+    complete_session_gate_enabled: bool
+    required_complete_sessions: int
     router_config_path: Path
     execution_config_path: Path
     account_state_config_path: Path
@@ -223,7 +224,15 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         account_snapshot_refresh_deadline_seconds=int(runtime.get("account_snapshot_refresh_deadline_seconds", 8)),
         account_snapshot_circuit_retry_seconds=int(runtime.get("account_snapshot_circuit_retry_seconds", 15)),
         maximum_account_snapshot_age_seconds=int(runtime.get("maximum_account_snapshot_age_seconds", 45)),
-        two_day_readonly_gate=bool(runtime.get("two_day_readonly_gate", True)),
+        complete_session_gate_enabled=bool(
+            runtime.get(
+                "complete_session_gate_enabled",
+                runtime.get("two_day_readonly_gate", True),
+            )
+        ),
+        required_complete_sessions=int(
+            runtime.get("required_complete_sessions", 1)
+        ),
         router_config_path=resolve_path(routing.get("router_config", "config/examples/m15_longbridge_realtime_signal_router.json")),
         execution_config_path=resolve_path(
             routing.get("execution_config", "config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json")
@@ -279,7 +288,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         required_coverage = f"{config.symbol_limit}/{config.symbol_limit}"
         if (
             upgrade_gate.get("enabled") is not True
-            or upgrade_gate.get("required_readonly_gate_passed") is not True
+            or upgrade_gate.get(
+                "required_complete_session_gate_passed",
+                upgrade_gate.get("required_readonly_gate_passed"),
+            ) is not True
             or upgrade_gate.get("required_complete_trading_daily_context") is not True
             or upgrade_gate.get("required_complete_subscribed_daily_context") is not True
             or str(upgrade_gate.get("required_subscription_coverage") or "")
@@ -400,6 +412,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK account snapshot refresh deadline must stay below the maximum snapshot age")
     if config.account_snapshot_circuit_retry_seconds <= 0:
         raise ValueError("M15 SDK account snapshot circuit retry interval must be positive")
+    if not 1 <= config.required_complete_sessions <= 10:
+        raise ValueError(
+            "M15 complete market session requirement must be between 1 and 10"
+        )
     if config.formal_test_transition_enabled and (
         not config.formal_test_epoch_id or not config.formal_short_test_epoch_id
     ):
@@ -672,15 +688,23 @@ def config_fingerprint(config: SdkRuntimeConfig) -> str:
     return hashlib.sha256(encoded).hexdigest()[:16]
 
 
-def load_readonly_gate(path: Path, *, required_sessions: int = 2) -> dict[str, Any]:
+def load_readonly_gate(
+    path: Path,
+    *,
+    required_complete_sessions: int = 1,
+    required_sessions: int | None = None,
+) -> dict[str, Any]:
+    """Load the complete-session gate while accepting the retired v1 schema."""
+    if required_sessions is not None:
+        required_complete_sessions = int(required_sessions)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         payload = {}
     completed = payload.get("completed_sessions", [])
     return {
-        "schema_version": "m15.sdk-readonly-gate.v1",
-        "required_sessions": required_sessions,
+        "schema_version": "m15.complete-session-gate.v2",
+        "required_complete_sessions": required_complete_sessions,
         "completed_sessions": [item for item in completed if isinstance(item, dict)],
     }
 
@@ -690,25 +714,43 @@ def record_readonly_session(
     session_date: str,
     evidence: dict[str, Any],
     *,
-    required_sessions: int = 2,
+    required_complete_sessions: int = 1,
+    required_sessions: int | None = None,
 ) -> dict[str, Any]:
-    """Persist one completed regular-session SDK validation, once per date."""
-    gate = load_readonly_gate(path, required_sessions=required_sessions)
+    """Persist one completed regular-session validation, once per market date."""
+    if required_sessions is not None:
+        required_complete_sessions = int(required_sessions)
+    gate = load_readonly_gate(
+        path,
+        required_complete_sessions=required_complete_sessions,
+    )
     sessions = [item for item in gate["completed_sessions"] if item.get("session_date") != session_date]
     sessions.append({"session_date": session_date, **evidence})
     sessions.sort(key=lambda item: str(item.get("session_date") or ""))
     gate["completed_sessions"] = sessions[-10:]
-    gate["passed"] = len(gate["completed_sessions"]) >= int(gate["required_sessions"])
+    gate["passed"] = len(gate["completed_sessions"]) >= int(
+        gate["required_complete_sessions"]
+    )
     gate["generated_at"] = to_iso(datetime.now(UTC))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(gate, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return gate
 
 
-def readonly_gate_passed(path: Path, *, required_sessions: int = 2) -> tuple[bool, int, int]:
-    gate = load_readonly_gate(path, required_sessions=required_sessions)
+def readonly_gate_passed(
+    path: Path,
+    *,
+    required_complete_sessions: int = 1,
+    required_sessions: int | None = None,
+) -> tuple[bool, int, int]:
+    if required_sessions is not None:
+        required_complete_sessions = int(required_sessions)
+    gate = load_readonly_gate(
+        path,
+        required_complete_sessions=required_complete_sessions,
+    )
     completed = len(gate["completed_sessions"])
-    required = int(gate["required_sessions"])
+    required = int(gate["required_complete_sessions"])
     return completed >= required, completed, required
 
 

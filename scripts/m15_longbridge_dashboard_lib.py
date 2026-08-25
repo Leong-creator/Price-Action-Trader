@@ -677,7 +677,10 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
     )
     marketdata_gate_passed = bool(
         (not marketdata_gate_enforced)
-        or runtime.get("readonly_gate_passed") is True
+        or runtime.get(
+            "complete_session_gate_passed",
+            runtime.get("readonly_gate_passed"),
+        ) is True
     )
 
     source_checks = {

@@ -63,9 +63,9 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
             runtime.update(
                 {
                     "dispatch_enabled": False,
-                    "dispatch_block_reason": "two_day_readonly_gate",
-                    "readonly_sessions_passed": 0,
-                    "readonly_sessions_required": 1,
+                    "dispatch_block_reason": "complete_market_session_gate",
+                    "complete_sessions_passed": 0,
+                    "complete_sessions_required": 1,
                 }
             )
             config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
@@ -125,12 +125,15 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)
             runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime.pop("complete_session_gate_passed", None)
+            runtime.pop("complete_sessions_passed", None)
+            runtime.pop("complete_sessions_required", None)
             runtime.update(
                 {
                     "dispatch_enabled": False,
-                    "dispatch_block_reason": "two_day_readonly_gate",
-                    "readonly_sessions_passed": 0,
-                    "readonly_sessions_required": 1,
+                    "dispatch_block_reason": "complete_market_session_gate",
+                    "complete_sessions_passed": 0,
+                    "complete_sessions_required": 1,
                 }
             )
             config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
@@ -150,6 +153,34 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
                 checks["paper_dispatch_armed"]["status"],
                 "waiting_for_marketdata_acceptance",
             )
+
+    def test_legacy_gate_status_remains_safe_waiting_during_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_fixture(Path(tmp), session_should_run=False)
+            runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+            runtime.pop("complete_session_gate_passed", None)
+            runtime.pop("complete_sessions_passed", None)
+            runtime.pop("complete_sessions_required", None)
+            runtime.update(
+                {
+                    "dispatch_enabled": False,
+                    "dispatch_block_reason": "two_day_readonly_gate",
+                    "readonly_sessions_passed": 0,
+                    "readonly_sessions_required": 1,
+                }
+            )
+            config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+            payload = run_m15_monday_refresh_acceptance(
+                config,
+                generated_at="2026-08-22T03:41:39Z",
+            )
+
+            self.assertEqual(
+                payload["acceptance_status"],
+                "armed_waiting_marketdata_acceptance",
+            )
+            self.assertFalse(payload["new_position_submission_enabled"])
 
     def test_corrupt_runtime_artifact_is_not_treated_as_safe_waiting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

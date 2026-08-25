@@ -81,7 +81,16 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
 
     def test_compatibility_runtime_inherits_marketdata_safety_gate(self) -> None:
         runtime = self.by_name["m15_longbridge_sdk_runtime.contract_v1.json"]
-        self.assertTrue(runtime["runtime"]["two_day_readonly_gate"])
+        self.assertTrue(runtime["runtime"]["complete_session_gate_enabled"])
+        self.assertEqual(runtime["runtime"]["required_complete_sessions"], 1)
+        self.assertEqual(
+            runtime["runtime"]["market_data_transport"],
+            "longbridge_serve_persistent_jsonrpc",
+        )
+        self.assertEqual(
+            runtime["runtime"]["longbridge_serve_binary_sha256"],
+            "acfeefd6be07f871d03158054c79ad5a950af3a17fd89aca5c90563f448a04d8",
+        )
         self.assertFalse(runtime["runtime"]["allow_snapshot_poll_fallback"])
         self.assertEqual(
             runtime["runtime"]["reconnect_backoff_schedule_seconds"],

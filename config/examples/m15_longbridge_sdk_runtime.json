@@ -30,7 +30,7 @@
     "daily_context_retry_count": 5,
     "expansion_trade_pool_upgrade_gate": {
       "enabled": false,
-      "required_readonly_gate_passed": true,
+      "required_complete_session_gate_passed": true,
       "required_complete_trading_daily_context": true,
       "required_complete_subscribed_daily_context": true,
       "required_subscription_coverage": "300/300",
@@ -74,7 +74,8 @@
     "account_snapshot_refresh_deadline_seconds": 8,
     "account_snapshot_circuit_retry_seconds": 15,
     "maximum_account_snapshot_age_seconds": 45,
-    "two_day_readonly_gate": true,
+    "complete_session_gate_enabled": true,
+    "required_complete_sessions": 1,
     "paper_trading_only": true,
     "live_execution": false,
     "real_money_actions": false,

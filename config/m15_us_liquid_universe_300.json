@@ -4,7 +4,7 @@
   "activation_mode": "readonly_acceptance_first",
   "base_universe_count": 147,
   "trade_pool_upgrade_gate": {
-    "required_readonly_gate_passed": true,
+    "required_complete_session_gate_passed": true,
     "required_complete_trading_daily_context": true,
     "required_complete_subscribed_daily_context": true,
     "required_subscription_coverage": "300/300",

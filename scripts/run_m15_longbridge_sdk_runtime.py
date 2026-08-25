@@ -207,7 +207,7 @@ def effective_runtime_dispatch_enabled(
 def runtime_dispatch_block_reason(
     *,
     paper_order_dispatch_enabled: bool,
-    readonly_gate_blocked: bool,
+    complete_session_gate_blocked: bool,
     paper_client_ready: bool,
     trade_context_ready: bool,
     market_data_ready: bool,
@@ -219,8 +219,8 @@ def runtime_dispatch_block_reason(
 ) -> str:
     if not paper_order_dispatch_enabled:
         return "paper_order_dispatch_disabled"
-    if readonly_gate_blocked:
-        return "two_day_readonly_gate"
+    if complete_session_gate_blocked:
+        return "complete_market_session_gate"
     if not deployment_ready:
         return "deployment_manifest_invalid"
     if not position_monitoring_ready:
@@ -2258,21 +2258,24 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     except (OSError, IndexError):
         runtime_process_start_ticks = ""
     loaded_config_fingerprint = config_fingerprint(config)
-    readonly_gate_passed_now, readonly_sessions_passed, readonly_sessions_required = readonly_gate_passed(
+    complete_session_gate_passed_now, complete_sessions_passed, complete_sessions_required = readonly_gate_passed(
         config.readonly_gate_path,
-        required_sessions=1,
+        required_complete_sessions=config.required_complete_sessions,
     )
     expansion_gate_path = config.output_dir / "m15_sdk_expansion_readonly_gate.json"
     expansion_gate_passed, expansion_sessions_passed, expansion_sessions_required = readonly_gate_passed(
         expansion_gate_path,
-        required_sessions=1,
+        required_complete_sessions=1,
     )
     deployment = verify_manifest(config.config_path)
     deployment_ready = bool(deployment.get("verified"))
     dispatch_enabled = bool(
         dispatch_requested
         and config.paper_order_dispatch_enabled
-        and (not config.two_day_readonly_gate or readonly_gate_passed_now)
+        and (
+            not config.complete_session_gate_enabled
+            or complete_session_gate_passed_now
+        )
         and deployment_ready
     )
     execution_request_gate = SdkTradeRequestGate()
@@ -3448,7 +3451,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 <= 1000
             )
             if (
-                config.two_day_readonly_gate
+                config.complete_session_gate_enabled
                 and is_after_regular_session
                 and session_date not in observed_regular_sessions
                 and worker_ready
@@ -3474,19 +3477,19 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "incomplete_boundary_count": incomplete_boundary_count,
                     "late_boundary_count": late_boundary_count,
                     "quote_worker_generation": worker_generation,
-                }, required_sessions=1) if market_data_mode_qualifies_for_subscription_gate(
+                }, required_complete_sessions=config.required_complete_sessions) if market_data_mode_qualifies_for_subscription_gate(
                     market_data_mode
                 ) else {
                     "passed": False,
                     "completed_sessions": [],
                 }
-                readonly_gate_passed_now = bool(gate.get("passed"))
-                readonly_sessions_passed = len(gate.get("completed_sessions", []))
+                complete_session_gate_passed_now = bool(gate.get("passed"))
+                complete_sessions_passed = len(gate.get("completed_sessions", []))
                 observed_regular_sessions.add(session_date)
                 if (
                     dispatch_requested
                     and config.paper_order_dispatch_enabled
-                    and readonly_gate_passed_now
+                    and complete_session_gate_passed_now
                     and deployment_ready
                     and paper_client is None
                 ):
@@ -3549,7 +3552,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         "pipeline_p95_ms": expansion_p95_ms,
                         "runtime_engine": "sdk",
                     },
-                    required_sessions=1,
+                    required_complete_sessions=1,
                 )
                 expansion_gate_passed = bool(expansion_gate.get("passed"))
                 expansion_sessions_passed = len(expansion_gate.get("completed_sessions", []))
@@ -3787,9 +3790,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "trade_context_health": trade_context_health,
                     "dispatch_block_reason": runtime_dispatch_block_reason(
                         paper_order_dispatch_enabled=config.paper_order_dispatch_enabled,
-                        readonly_gate_blocked=(
-                            config.two_day_readonly_gate
-                            and not readonly_gate_passed_now
+                        complete_session_gate_blocked=(
+                            config.complete_session_gate_enabled
+                            and not complete_session_gate_passed_now
                         ),
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
@@ -3800,11 +3803,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         deployment_ready=deployment_ready,
                         position_monitoring_ready=not position_monitoring_failed,
                     ),
-                    "two_day_readonly_gate": config.two_day_readonly_gate,
-                    "readonly_gate_path": str(config.readonly_gate_path),
-                    "readonly_sessions_passed": readonly_sessions_passed,
-                    "readonly_sessions_required": readonly_sessions_required,
-                    "readonly_gate_passed": readonly_gate_passed_now,
+                    "complete_session_gate_enabled": (
+                        config.complete_session_gate_enabled
+                    ),
+                    "complete_session_gate_path": str(config.readonly_gate_path),
+                    "complete_sessions_passed": complete_sessions_passed,
+                    "complete_sessions_required": complete_sessions_required,
+                    "complete_session_gate_passed": (
+                        complete_session_gate_passed_now
+                    ),
                     "pipeline_latency_samples_ms": list(pipeline_latency_samples),
                     "hot_state": {
                         "signal_id_count": len(signal_id_cache),
