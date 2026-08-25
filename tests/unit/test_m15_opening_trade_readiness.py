@@ -352,6 +352,29 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             self.assertFalse(payload["m12_47_daemon_alive"])
             self.assertEqual(payload["fail_count"], 0)
 
+    def test_corrupt_runtime_artifact_blocks_new_entries_and_is_identified(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = load_config(
+                self.write_fixture(root, paper_enabled=True, live_execution=False)
+            )
+            config.realtime_supervisor_status_path.write_text("{", encoding="utf-8")
+
+            payload = run_m15_opening_trade_readiness(
+                config,
+                generated_at="2026-06-04T12:20:00Z",
+            )
+
+            self.assertFalse(payload["new_position_submission_enabled"])
+            self.assertEqual(payload["readiness_status"], "blocked_opening_trade_watch")
+            self.assertEqual(
+                payload["input_artifacts"]["realtime_status"]["status"],
+                "corrupt",
+            )
+            self.assertFalse(payload["marketdata_integrity_gate"]["artifacts_healthy"])
+            checks = {row["check"]: row for row in payload["checks"]}
+            self.assertEqual(checks["json_gate_artifacts_healthy"]["status"], "fail")
+
     def write_fixture(self, root: Path, *, paper_enabled: bool, live_execution: bool) -> Path:
         output_dir = root / "realtime"
         output_dir.mkdir(parents=True)

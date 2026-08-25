@@ -57,6 +57,18 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _read_json_artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}, {"path": str(path), "status": "missing"}
+    except (json.JSONDecodeError, OSError) as exc:
+        return {}, {"path": str(path), "status": "corrupt", "detail": str(exc)}
+    if not isinstance(payload, dict):
+        return {}, {"path": str(path), "status": "corrupt", "detail": "top_level_not_object"}
+    return payload, {"path": str(path), "status": "ok"}
+
+
 def _read_optional_json(path: Path | None) -> dict[str, Any]:
     if path is None:
         return {}
@@ -538,22 +550,36 @@ def _apply_pa004_migration_views(
 
 def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> dict[str, Any]:
     inputs = config["inputs"]
-    runtime = _read_json(_resolve(inputs["sdk_runtime_status"]))
-    account = _read_json(_resolve(inputs["account_state"]))
-    account_summary = _read_json(_resolve(inputs["account_state_summary"]))
-    execution = _read_json(_resolve(inputs["execution_status"]))
+    runtime_path = _resolve(inputs["sdk_runtime_status"])
+    account_path = _resolve(inputs["account_state"])
+    account_summary_path = _resolve(inputs["account_state_summary"])
+    execution_path = _resolve(inputs["execution_status"])
+    epoch_path = _resolve(inputs["epoch_state"])
+    formal_epoch_path = _resolve(inputs["formal_epoch_marker"])
+    reconciliation_path = _resolve(inputs["order_reconciliation"])
+    fill_attribution_path = _resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH)
+    pnl_path = _resolve(inputs["pnl_reconciliation"])
+    execution_config_path = _resolve(inputs["execution_config"])
+    runtime, runtime_artifact = _read_json_artifact(runtime_path)
+    account, account_artifact = _read_json_artifact(account_path)
+    account_summary, account_summary_artifact = _read_json_artifact(account_summary_path)
+    execution, execution_artifact = _read_json_artifact(execution_path)
     execution_ledger = (
         _read_recent_jsonl(_resolve(inputs["execution_ledger"]))
         if inputs.get("execution_ledger")
         else []
     )
-    epoch = _read_json(_resolve(inputs["epoch_state"]))
-    formal_epoch = _read_json(_resolve(inputs["formal_epoch_marker"]))
-    reconciliation = _read_json(_resolve(inputs["order_reconciliation"]))
-    fill_attribution = _read_json(_resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH))
-    short_diagnostics = _read_json(_resolve(inputs["short_signal_diagnostics"])) if inputs.get("short_signal_diagnostics") else {}
-    pnl = _read_json(_resolve(inputs["pnl_reconciliation"]))
-    execution_config = _read_json(_resolve(inputs["execution_config"]))
+    epoch, epoch_artifact = _read_json_artifact(epoch_path)
+    formal_epoch, formal_epoch_artifact = _read_json_artifact(formal_epoch_path)
+    reconciliation, reconciliation_artifact = _read_json_artifact(reconciliation_path)
+    fill_attribution, fill_attribution_artifact = _read_json_artifact(fill_attribution_path)
+    short_diagnostics, short_diagnostics_artifact = (
+        _read_json_artifact(_resolve(inputs["short_signal_diagnostics"]))
+        if inputs.get("short_signal_diagnostics")
+        else ({}, {"path": "", "status": "missing"})
+    )
+    pnl, pnl_artifact = _read_json_artifact(pnl_path)
+    execution_config, execution_config_artifact = _read_json_artifact(execution_config_path)
     inventory = _inventory(execution_config)
     expected_short_runtime_ids = [
         runtime_id
@@ -561,7 +587,6 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         if bucket["direction"] == "short"
         for runtime_id in bucket["runtime_ids"]
     ]
-    fill_attribution_path = _resolve(inputs.get("fill_attribution") or DEFAULT_FILL_ATTRIBUTION_PATH)
     migration_status = _read_optional_json(_derive_migration_status_path(config, fill_attribution_path))
     pa002_milestone = _read_optional_json(
         _resolve(inputs.get("pa002_dual_version_milestone") or DEFAULT_PA002_MILESTONE_STATUS)
@@ -644,15 +669,25 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         entries_enabled = bool(runtime.get("dispatch_enabled") and runtime.get("dispatch_requested", True))
     if epoch_status != "active":
         entries_enabled = False
+    marketdata_gate_enforced = bool(
+        runtime.get(
+            "complete_session_gate_enabled",
+            runtime.get("two_day_readonly_gate", True),
+        )
+    )
+    marketdata_gate_passed = bool(
+        (not marketdata_gate_enforced)
+        or runtime.get("readonly_gate_passed") is True
+    )
 
     source_checks = {
-        "sdk_runtime": bool(runtime) and runtime_process_alive and runtime_fresh and runtime.get("sdk_connected") is True,
-        "account": bool(account) and account_fresh,
-        "execution": bool(execution),
-        "account_statistics": bool(account_summary) and account_summary_fresh,
-        "orders": bool(reconciliation) and orders_fresh,
-        "pnl": bool(pnl) and pnl_fresh,
-        "fill_attribution": bool(fill_attribution) and fill_attribution_fresh,
+        "sdk_runtime": runtime_artifact.get("status") == "ok" and runtime_process_alive and runtime_fresh and runtime.get("sdk_connected") is True,
+        "account": account_artifact.get("status") == "ok" and account_fresh,
+        "execution": execution_artifact.get("status") == "ok",
+        "account_statistics": account_summary_artifact.get("status") == "ok" and account_summary_fresh,
+        "orders": reconciliation_artifact.get("status") == "ok" and orders_fresh,
+        "pnl": pnl_artifact.get("status") == "ok" and pnl_fresh,
+        "fill_attribution": fill_attribution_artifact.get("status") == "ok" and fill_attribution_fresh,
     }
     trading_sources_trustworthy = (
         source_checks["sdk_runtime"]
@@ -679,6 +714,9 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         )
     )
     data_status = (
+        "marketdata_gate_artifact_error"
+        if runtime_artifact.get("status") != "ok"
+        else
         "sdk_starting_daily_context"
         if trading_sources_trustworthy and daily_context_loading
         else
@@ -735,7 +773,43 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         "legacy_queue_used": False,
         "legacy_cli_used": False,
         "data_status": data_status,
+        "input_artifacts": {
+            "sdk_runtime_status": runtime_artifact,
+            "account_state": account_artifact,
+            "account_state_summary": account_summary_artifact,
+            "execution_status": execution_artifact,
+            "epoch_state": epoch_artifact,
+            "formal_epoch_marker": formal_epoch_artifact,
+            "order_reconciliation": reconciliation_artifact,
+            "fill_attribution": fill_attribution_artifact,
+            "short_signal_diagnostics": short_diagnostics_artifact,
+            "pnl_reconciliation": pnl_artifact,
+            "execution_config": execution_config_artifact,
+        },
         "source_checks": source_checks,
+        "marketdata_integrity_gate": {
+            "status": (
+                runtime_artifact.get("status")
+                if runtime_artifact.get("status") != "ok"
+                else ("passed" if marketdata_gate_passed else "blocked")
+            ),
+            "artifacts_healthy": runtime_artifact.get("status") == "ok",
+            "gate_passed": marketdata_gate_passed,
+            "new_position_submission_enabled": entries_enabled,
+            "complete_boundary_count": int(runtime.get("complete_boundary_count") or 0),
+            "realtime_tradable_bar_count": int(runtime.get("realtime_tradable_bar_count") or 0),
+            "summary": (
+                f"行情门禁状态文件 {runtime_artifact.get('status')}；完整边界 {int(runtime.get('complete_boundary_count') or 0)}，"
+                f"实时 K 线 {int(runtime.get('realtime_tradable_bar_count') or 0)}；关闭新开仓，已有持仓退出仍需要实时行情。"
+                if runtime_artifact.get("status") != "ok"
+                else (
+                    f"完整交易日行情门禁未通过，完整边界 {int(runtime.get('complete_boundary_count') or 0)}，"
+                    f"实时 K 线 {int(runtime.get('realtime_tradable_bar_count') or 0)}；关闭新开仓，已有持仓退出仍需要实时行情。"
+                    if not marketdata_gate_passed
+                    else f"完整交易日行情门禁已通过，完整边界 {int(runtime.get('complete_boundary_count') or 0)}，实时 K 线 {int(runtime.get('realtime_tradable_bar_count') or 0)}。"
+                )
+            ),
+        },
         "runtime": {
             "runtime_engine": runtime.get("runtime_engine"),
             "status": runtime.get("status"),
@@ -751,15 +825,15 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "quote_worker_generation": runtime.get("quote_worker_generation"),
             "subscription_set_sha256": runtime.get("subscription_set_sha256"),
             "reference_push_heartbeat": runtime.get("reference_push_heartbeat") or {},
-            "complete_boundary_count": runtime.get("complete_boundary_count"),
-            "incomplete_boundary_count": runtime.get("incomplete_boundary_count"),
-            "late_boundary_count": runtime.get("late_boundary_count"),
+            "complete_boundary_count": int(runtime.get("complete_boundary_count") or 0),
+            "incomplete_boundary_count": int(runtime.get("incomplete_boundary_count") or 0),
+            "late_boundary_count": int(runtime.get("late_boundary_count") or 0),
             "last_complete_boundary": runtime.get("last_complete_boundary"),
             "last_incomplete_boundary": runtime.get("last_incomplete_boundary"),
             "last_boundary_missing_symbols": runtime.get("last_boundary_missing_symbols") or [],
-            "realtime_tradable_bar_count": runtime.get("realtime_tradable_bar_count"),
-            "no_trade_carry_forward_count": runtime.get("no_trade_carry_forward_count"),
-            "postclose_repair_bar_count": runtime.get("postclose_repair_bar_count"),
+            "realtime_tradable_bar_count": int(runtime.get("realtime_tradable_bar_count") or 0),
+            "no_trade_carry_forward_count": int(runtime.get("no_trade_carry_forward_count") or 0),
+            "postclose_repair_bar_count": int(runtime.get("postclose_repair_bar_count") or 0),
             "thread_count": runtime.get("thread_count"),
             "file_descriptor_count": runtime.get("file_descriptor_count"),
             "resident_memory_kib": runtime.get("resident_memory_kib"),
@@ -908,6 +982,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "所有长桥成绩只统计长桥实际订单、成交和持仓。",
             "看板不读取本地模拟账本或本地策略 registry，只展示长桥事实源与归因层。",
             "正式测试未激活时，配置中的运行单元全部禁止新开仓。",
+            "完整交易日行情门禁未通过时只关闭新开仓；已有持仓退出仍需要实时行情，不能把无实时推送当作退出可用。",
         ],
     }
 
@@ -921,14 +996,14 @@ body{{font-family:system-ui,sans-serif;margin:0;background:#f5f6f8;color:#17202a
 <body><header><h1>长桥模拟账户</h1></header><main><div id=\"app\"></div><script>
 const d={data}; const v=x=>x===null||x===undefined||x===''?'暂不可计算':x;
 const cls=d.data_status==='trustworthy'?'ok':'bad';
-const statusText={{trustworthy:'全部数据正常',sdk_starting_daily_context:'日线装载中，暂不允许新开仓',trading_ready_statistics_stale:'交易核心正常，统计待刷新',temporarily_unavailable:'数据暂不可用',pending_flatten:'等待清理旧持仓',active:'正式测试运行中'}};
+const statusText={{trustworthy:'全部数据正常',sdk_starting_daily_context:'日线装载中，暂不允许新开仓',trading_ready_statistics_stale:'交易核心正常，统计待刷新',temporarily_unavailable:'数据暂不可用',marketdata_gate_artifact_error:'行情门禁状态文件缺失或损坏',pending_flatten:'等待清理旧持仓',active:'正式测试运行中'}};
 const money=(value,currency)=>value===null||value===undefined||value===''?'暂不可计算':`${{value}} ${{currency||''}}`.trim();
 const positionLayers=d.fill_attribution.position_layers||{{}};
 const displaySummary=d.fill_attribution.display_summary||{{}};
 const archivedSummary=d.fill_attribution.archived_summary||{{}};
 const migrationSummary=Object.entries(d.pa004_migration.active_bucket_baselines||{{}}).map(([bucket,startedAt])=>`${{bucket}}: ${{startedAt}}`).join('；')||'未启用';
 const pa002Milestone=d.pa002_dual_version_milestone||{{}};
-const cards=[['数据状态',statusText[d.data_status]||d.data_status],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['行情传输',v(d.runtime.market_data_transport)],['行情模式',v(d.runtime.market_data_mode)],['全部行情覆盖',v(d.runtime.market_data_coverage)],['交易池行情覆盖',v(d.runtime.trading_market_data_coverage)],['已有持仓额外监控',v(d.runtime.position_monitoring_subscription_coverage)],['额外监控失败',v(d.runtime.position_monitoring_failed_symbols?.length||0)],['按时完整边界',v(d.runtime.complete_boundary_count)],['不完整边界',v(d.runtime.incomplete_boundary_count)],['迟到边界',v(d.runtime.late_boundary_count)],['盘后补录K线',v(d.runtime.postclose_repair_bar_count)],['部署清单',d.runtime.deployment_manifest_verified?'已验证':'未验证'],['工作区',d.runtime.deployment_worktree_clean?'干净':'有改动'],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['PA002双版本阶段',v(pa002Milestone.milestone_phase)],['PA002有效交易日',v(pa002Milestone.aggregate?.effective_trading_day_count)],['PA002完整交易',v(pa002Milestone.aggregate?.completed_trade_count)],['PA002当前建议',v(pa002Milestone.recommendation?.plain_text)],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
+const cards=[['数据状态',statusText[d.data_status]||d.data_status],['行情门禁',v(d.marketdata_integrity_gate?.status)],['门禁说明',v(d.marketdata_integrity_gate?.summary)],['SDK连接',d.runtime.sdk_connected?'已连接':'未连接'],['行情传输',v(d.runtime.market_data_transport)],['行情模式',v(d.runtime.market_data_mode)],['全部行情覆盖',v(d.runtime.market_data_coverage)],['交易池行情覆盖',v(d.runtime.trading_market_data_coverage)],['已有持仓额外监控',v(d.runtime.position_monitoring_subscription_coverage)],['额外监控失败',v(d.runtime.position_monitoring_failed_symbols?.length||0)],['按时完整边界',v(d.runtime.complete_boundary_count)],['不完整边界',v(d.runtime.incomplete_boundary_count)],['迟到边界',v(d.runtime.late_boundary_count)],['实时K线',v(d.runtime.realtime_tradable_bar_count)],['盘后补录K线',v(d.runtime.postclose_repair_bar_count)],['部署清单',d.runtime.deployment_manifest_verified?'已验证':'未验证'],['工作区',d.runtime.deployment_worktree_clean?'干净':'有改动'],['账户快照进程',d.runtime.account_worker_circuit_open?'熔断':v(d.runtime.account_worker_status)],['账户快照重启',d.runtime.account_worker_restart_count],['只读扩展池',v(d.runtime.readonly_expansion_subscription_coverage)],['扩展验收',v(d.runtime.readonly_expansion_acceptance_status)],['交易日线',`${{v(d.runtime.trading_daily_context_row_count)}}/${{v(d.runtime.trading_daily_context_expected_row_count)}}`],['正式测试',statusText[d.formal_test.status]||d.formal_test.status],['App口径当日盈亏',d.account.today_pnl],['纽约交易日收益分析',d.pnl.market_day_profit_analysis?.sum_profit],['账户净资产',money(d.account.total_equity,d.account.total_equity_currency)],['美元可用现金',money(d.account.usd_available_cash,'USD')],['真实账户持仓浮盈',positionLayers.actual_account_total?.unrealized_pnl],['虚拟归因持仓浮盈',positionLayers.attributed_virtual_total?.unrealized_pnl],['无法归因浮盈差额',positionLayers.unreconciled_delta?.unrealized_pnl],['真实持仓市值',positionLayers.actual_account_total?.gross_market_value],['虚拟归因市值',positionLayers.attributed_virtual_total?.gross_market_value],['对账差额市值',positionLayers.unreconciled_delta?.gross_market_value],['展示成绩完整交易',displaySummary.completed_trade_count],['展示成绩扣费后已实现',displaySummary.estimated_net_realized_pnl],['PA002双版本阶段',v(pa002Milestone.milestone_phase)],['PA002有效交易日',v(pa002Milestone.aggregate?.effective_trading_day_count)],['PA002完整交易',v(pa002Milestone.aggregate?.completed_trade_count)],['PA002当前建议',v(pa002Milestone.recommendation?.plain_text)],['归档成绩完整交易',archivedSummary.completed_trade_count],['迁移新基线',migrationSummary],['当天买入后已卖出',positionLayers.today_buy_flow?.bought_then_sold_count],['当天买入仍持有',positionLayers.today_buy_flow?.still_held_batch_count],['当天买入仍持有浮盈',positionLayers.today_buy_flow?.still_held_unrealized_pnl],['做空候选',d.paper_short_diagnostics.summary?.candidate_count],['做空路由通过',d.paper_short_diagnostics.summary?.signal_ready_count],['做空容量阻断',d.paper_short_diagnostics.summary?.broker_capacity_blocked_count],['做空取得订单号',d.paper_short_diagnostics.summary?.broker_order_id_count],['做空实际成交单',d.paper_short_diagnostics.summary?.broker_filled_order_count],['精确归因异常',d.fill_attribution.summary?.anomaly_count],['持仓归因不一致',d.fill_attribution.symbol_mismatch_count],['长桥运行单元',d.strategy_inventory.runtime_count],['长桥资金池',d.strategy_inventory.bucket_count]];
 cards.push(['做空检测尝试',d.paper_short_diagnostics.summary?.detector_attempted_count],['做空未形成候选',d.paper_short_diagnostics.summary?.no_candidate_count],['容量查询失败',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.query_failed],['无借券库存',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.no_borrow_inventory],['借券数量不足',d.paper_short_diagnostics.summary?.broker_capacity_failure_classes?.insufficient],['做空部分成交',d.paper_short_diagnostics.summary?.broker_partially_filled_order_count],['做空完全成交',d.paper_short_diagnostics.summary?.broker_fully_filled_order_count]);
 const shortRows=d.paper_short_diagnostics.runtime_summaries||[];
 const longShortNetRows=d.fill_attribution.same_symbol_long_short_net||[];

@@ -149,7 +149,7 @@ def run_m15_opening_trade_readiness(
 def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> dict[str, Any]:
     if config.realtime_runtime_engine not in {"cli", "sdk"}:
         raise ValueError("M15 opening readiness runtime engine must be cli or sdk")
-    m12_status = read_json(config.m12_47_status_path)
+    m12_status, m12_status_artifact = read_json_artifact(config.m12_47_status_path)
     realtime_config = load_realtime_supervisor_config(config.realtime_supervisor_config_path)
     sdk_config = None
     if config.realtime_runtime_engine == "sdk":
@@ -161,12 +161,16 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     except ValueError as exc:
         execution_config = None
         execution_config_error = str(exc)
-    execution_payload = read_json_payload(config.execution_config_path)
-    execution_summary = read_json(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else {}
-    account_state = read_json(config.realtime_account_state_path)
-    realtime_status = read_json(
+    execution_payload, execution_payload_artifact = read_json_artifact(config.execution_config_path)
+    execution_summary_path = execution_config.output_dir / EXECUTION_SUMMARY_JSON if execution_config else None
+    execution_summary, execution_summary_artifact = (
+        read_json_artifact(execution_summary_path) if execution_summary_path is not None else ({}, missing_artifact(""))
+    )
+    account_state, account_state_artifact = read_json_artifact(config.realtime_account_state_path)
+    realtime_status_path = (
         config.sdk_runtime_status_path if sdk_config is not None else config.realtime_supervisor_status_path
     )
+    realtime_status, realtime_status_artifact = read_json_artifact(realtime_status_path)
     window = build_window_state(realtime_config, generated_at=generated_at)
     cleanup_config = load_stale_order_cleanup_config(realtime_config.stale_order_cleanup_config_path)
     realtime_pid = read_pid(
@@ -228,11 +232,39 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         and sdk_config.two_day_readonly_gate
         and realtime_status.get("readonly_gate_passed") is not True
     )
+    marketdata_gate = marketdata_gate_truth(realtime_status, sdk_config)
+    critical_artifacts = {
+        "m15_account_state": account_state_artifact,
+        "m15_runtime_status": realtime_status_artifact,
+        "execution_config": execution_payload_artifact,
+        "execution_summary": execution_summary_artifact,
+    }
+    critical_artifacts_healthy = all(
+        artifact.get("status") == "ok"
+        for artifact in critical_artifacts.values()
+    )
+    if not critical_artifacts_healthy:
+        statuses = {str(row.get("status") or "missing") for row in critical_artifacts.values()}
+        marketdata_gate.update(
+            {
+                "status": "corrupt" if "corrupt" in statuses else "missing",
+                "artifacts_healthy": False,
+                "gate_passed": False,
+                "summary": (
+                    "关键状态工件异常："
+                    + render_artifact_statuses(list(critical_artifacts.items()))
+                    + f"；完整边界 {marketdata_gate['complete_boundary_count']}，"
+                    + f"实时 K 线 {marketdata_gate['realtime_tradable_bar_count']}；"
+                    + "关闭新开仓，已有持仓退出仍需要实时行情。"
+                ),
+            }
+        )
     new_position_submission_enabled = (
         effective_paper_orders_enabled
         and not pending_formal_flatten
-        and not readonly_gate_waiting
+        and not (marketdata_gate["enforced"] and not marketdata_gate["gate_passed"])
         and execution_epoch_consistent
+        and marketdata_gate["artifacts_healthy"]
     )
     paper_account_ready = paper_account_verified(account_state)
     realtime_health_issues = (
@@ -294,7 +326,13 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         informational_check_row(
             "m12_47_daemon_alive",
             "M12.47 只作为本地 research/watch 面信息展示，不影响 readiness",
-            actual=str(m12_alive),
+            actual=f"artifact={m12_status_artifact['status']}, alive={m12_alive}",
+        ),
+        check_row(
+            "json_gate_artifacts_healthy",
+            "所有关键 JSON 状态/门禁文件必须存在且可解析，缺失与损坏要明确区分",
+            "pass" if marketdata_gate["artifacts_healthy"] else "fail",
+            actual=render_artifact_statuses(list(critical_artifacts.items())),
         ),
         check_row(
             "m15_realtime_daemon_alive",
@@ -316,13 +354,21 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
                 if sdk_config is not None and not sdk_config.two_day_readonly_gate
                 else "已武装长桥模拟账户订单提交；完整交易日行情验收完成前必须等待"
             ),
-            "waiting" if readonly_gate_waiting else ("pass" if effective_paper_orders_enabled else "fail"),
+            "waiting" if readonly_gate_waiting and marketdata_gate["artifacts_healthy"] else ("pass" if effective_paper_orders_enabled else "fail"),
             actual=execution_config_error
             or (
                 f"execute_orders={execution_config.execute_orders}, paper_trading_approval={execution_config.paper_trading_approval}, "
                 f"runtime_dispatch_enabled={runtime_dispatch_enabled}, runtime_dispatch_requested={runtime_dispatch_requested}, "
                 f"readonly_sessions={realtime_status.get('readonly_sessions_passed', 0)}/{realtime_status.get('readonly_sessions_required', 2)}"
             ),
+        ),
+        check_row(
+            "marketdata_integrity_gate",
+            "完整交易日行情门禁必须明确给出结果；未通过时关闭新开仓，并展示完整边界与实时 K 线事实",
+            "pass"
+            if marketdata_gate["gate_passed"]
+            else ("waiting" if marketdata_gate["enforced"] and marketdata_gate["artifacts_healthy"] else "fail"),
+            actual=marketdata_gate["summary"],
         ),
         check_row(
             "paper_account_verified",
@@ -438,6 +484,14 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "informational_count": informational_count,
         "checks": checks,
         "runtime_whitelist": list(execution_config.allowed_runtime_ids) if execution_config else [],
+        "input_artifacts": {
+            "m12_47_status": m12_status_artifact,
+            "execution_config": execution_payload_artifact,
+            "execution_summary": execution_summary_artifact,
+            "realtime_account_state": account_state_artifact,
+            "realtime_status": realtime_status_artifact,
+        },
+        "marketdata_integrity_gate": marketdata_gate,
         "boundaries": {
             "paper_simulated_only": True,
             "live_execution": False,
@@ -467,7 +521,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "local_research_non_blocking": {
             "m12_47_status_only": True,
         },
-        "plain_language_result": plain_result(readiness_status, fail_count, waiting_count, window),
+        "plain_language_result": plain_result(readiness_status, fail_count, waiting_count, window, marketdata_gate),
     }
 
 
@@ -706,7 +760,14 @@ def repair_auxiliary_isolated(execution_payload: dict[str, Any]) -> bool:
     return bool(local_only and auxiliary) and not (candidates & forbidden)
 
 
-def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[str, Any]) -> str:
+def plain_result(
+    status: str,
+    fail_count: int,
+    waiting_count: int,
+    window: dict[str, Any],
+    marketdata_gate: dict[str, Any] | None = None,
+) -> str:
+    marketdata_gate = marketdata_gate or {}
     if status == "ready_for_longbridge_paper_orders":
         return "开盘值守已就绪：长桥模拟账户订单提交已启用，实时链路会在常规交易时段按风控提交模拟订单。"
     if status == "armed_waiting_regular_session":
@@ -716,7 +777,10 @@ def plain_result(status: str, fail_count: int, waiting_count: int, window: dict[
     if status == "armed_waiting_flatten_session":
         return f"清仓链路已武装：当前是{window.get('market_status')}，下个常规交易时段只处理验收持仓退出。"
     if status == "waiting_for_marketdata_acceptance":
-        return "长桥模拟账户新开仓仍被禁止：实时行情完整交易日验收尚未通过；当前只保留账户监控和已有持仓退出能力。"
+        return (
+            "长桥模拟账户新开仓仍被禁止："
+            f"{marketdata_gate.get('summary')}；当前只保留账户监控，已有持仓退出仍需要实时行情。"
+        )
     return f"开盘值守未就绪：{fail_count} 个检查失败，{waiting_count} 个检查等待交易窗口。"
 
 
@@ -731,6 +795,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"- Paper account verified: `{payload['paper_account_verified']}`",
         f"- Actual runtimes seen: `{','.join(payload.get('actual_runtime_ids_seen', [])) or 'none'}`",
         f"- Pass / waiting / fail / informational: `{payload['pass_count']}/{payload['waiting_count']}/{payload['fail_count']}/{payload.get('informational_count', 0)}`",
+        f"- Marketdata gate: `{payload['marketdata_integrity_gate']['status']}`",
+        f"- Marketdata summary: {payload['marketdata_integrity_gate']['summary']}",
         f"- Result: {payload['plain_language_result']}",
         "",
         "| Check | Status | Actual |",
@@ -819,3 +885,83 @@ def process_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def read_json_artifact(path: Path | None) -> tuple[dict[str, Any], dict[str, Any]]:
+    if path is None:
+        return {}, missing_artifact("")
+    if not path.exists():
+        return {}, missing_artifact(project_path(path))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {}, corrupt_artifact(project_path(path), exc)
+    if not isinstance(payload, dict):
+        return {}, corrupt_artifact(project_path(path), "top_level_not_object")
+    return payload, {"path": project_path(path), "status": "ok"}
+
+
+def missing_artifact(path: str) -> dict[str, Any]:
+    return {"path": path, "status": "missing"}
+
+
+def corrupt_artifact(path: str, exc: Any) -> dict[str, Any]:
+    return {"path": path, "status": "corrupt", "detail": str(exc)}
+
+
+def render_artifact_statuses(rows: list[tuple[str, dict[str, Any]]]) -> str:
+    return "; ".join(
+        f"{label}={artifact.get('status')}"
+        for label, artifact in rows
+    )
+
+
+def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any | None) -> dict[str, Any]:
+    gate_enabled = bool(sdk_config is not None and getattr(sdk_config, "two_day_readonly_gate", False))
+    if not status:
+        return {
+            "status": "missing",
+            "artifacts_healthy": False,
+            "gate_passed": False,
+            "enforced": gate_enabled,
+            "complete_boundary_count": 0,
+            "realtime_tradable_bar_count": 0,
+            "summary": "行情门禁状态文件 missing，完整边界 0，实时 K 线 0；关闭新开仓，已有持仓退出仍需要实时行情。",
+        }
+    complete_boundary_count = safe_int(status.get("complete_boundary_count"))
+    realtime_tradable_bar_count = safe_int(status.get("realtime_tradable_bar_count"))
+    readonly_passed = (not gate_enabled) or status.get("readonly_gate_passed") is True
+    status_name = "not_required" if not gate_enabled else ("passed" if readonly_passed else "blocked")
+    return {
+        "status": status_name,
+        "artifacts_healthy": True,
+        "gate_passed": readonly_passed,
+        "enforced": gate_enabled,
+        "complete_boundary_count": complete_boundary_count,
+        "realtime_tradable_bar_count": realtime_tradable_bar_count,
+        "summary": (
+            f"完整交易日行情门禁未通过={not readonly_passed}，完整边界 {complete_boundary_count}，"
+            f"实时 K 线 {realtime_tradable_bar_count}；关闭新开仓，已有持仓退出仍需要实时行情。"
+            if gate_enabled and not readonly_passed
+            else (
+                f"完整交易日行情门禁已通过，完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}。"
+                if gate_enabled
+                else f"当前运行配置未启用额外完整交易日行情门禁；完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}。"
+            )
+        ),
+        "readonly_sessions_passed": safe_int(status.get("readonly_sessions_passed")),
+        "readonly_sessions_required": safe_int(status.get("readonly_sessions_required")),
+        "trading_market_data_coverage": str(
+            status.get("trading_market_data_coverage")
+            or status.get("trading_subscription_coverage")
+            or ""
+        ),
+        "expected_trading_symbol_count": len(sdk_configured_trading_symbols(sdk_config)) if sdk_config is not None else 0,
+    }
+
+
+def safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
