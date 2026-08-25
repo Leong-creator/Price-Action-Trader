@@ -30,6 +30,7 @@ NEW_YORK = ZoneInfo("America/New_York")
 RUNTIME_CODE_PATHS = (
     ROOT / "scripts" / "m15_longbridge_sdk_runtime_lib.py",
     ROOT / "scripts" / "run_m15_longbridge_sdk_runtime.py",
+    ROOT / "scripts" / "m15_longbridge_serve_transport_lib.py",
     ROOT / "scripts" / "m15_longbridge_sdk_account_lib.py",
     ROOT / "scripts" / "m15_longbridge_sdk_account_worker_lib.py",
     ROOT / "scripts" / "m15_longbridge_fill_attribution_lib.py",
@@ -77,6 +78,11 @@ class SdkRuntimeConfig:
     subscription_progress_deadline_seconds: int
     subscription_circuit_retry_seconds: int
     maximum_consecutive_subscription_failures: int
+    market_data_transport: str
+    longbridge_serve_binary: Path
+    longbridge_serve_binary_sha256: str
+    longbridge_serve_batch_size: int
+    longbridge_serve_response_timeout_seconds: int
     snapshot_poll_interval_seconds: float
     subscription_failures_before_snapshot_fallback: int
     snapshot_poll_dispatch_max_elapsed_ms: int
@@ -176,6 +182,24 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             runtime.get("subscription_circuit_retry_seconds", 300)
         ),
         maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
+        market_data_transport=str(
+            runtime.get("market_data_transport", "official_sdk_persistent_websocket")
+        ),
+        longbridge_serve_binary=resolve_path(
+            runtime.get(
+                "longbridge_serve_binary",
+                "local_runtime/tools/longbridge-terminal-0.28.2/longbridge",
+            )
+        ),
+        longbridge_serve_binary_sha256=str(
+            runtime.get("longbridge_serve_binary_sha256", "")
+        ).lower(),
+        longbridge_serve_batch_size=int(
+            runtime.get("longbridge_serve_batch_size", 10)
+        ),
+        longbridge_serve_response_timeout_seconds=int(
+            runtime.get("longbridge_serve_response_timeout_seconds", 30)
+        ),
         snapshot_poll_interval_seconds=float(
             runtime.get("snapshot_poll_interval_seconds", 1)
         ),
@@ -312,6 +336,18 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK subscription circuit retry must be positive")
     if config.maximum_consecutive_subscription_failures <= 0:
         raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
+    if config.market_data_transport not in {
+        "official_sdk_persistent_websocket",
+        "longbridge_serve_persistent_jsonrpc",
+    }:
+        raise ValueError("M15 market data transport is unsupported")
+    if config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
+        if not 1 <= config.longbridge_serve_batch_size <= 50:
+            raise ValueError("M15 longbridge serve batch size must be between 1 and 50")
+        if not 5 <= config.longbridge_serve_response_timeout_seconds <= 60:
+            raise ValueError(
+                "M15 longbridge serve response timeout must be between 5 and 60 seconds"
+            )
     if (
         not config.reconnect_backoff_schedule_seconds
         or any(value <= 0 for value in config.reconnect_backoff_schedule_seconds)
@@ -370,6 +406,24 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK formal test transition requires both epoch ids")
     validate_formal_epoch_alignment(config)
     return config
+
+
+def validate_market_data_transport_runtime(config: SdkRuntimeConfig) -> None:
+    """Validate local transport artifacts only when a runtime will start."""
+    if config.market_data_transport != "longbridge_serve_persistent_jsonrpc":
+        return
+    if not config.longbridge_serve_binary.is_file() or not os.access(
+        config.longbridge_serve_binary, os.X_OK
+    ):
+        raise ValueError("M15 longbridge serve binary is missing or not executable")
+    actual_binary_sha256 = hashlib.sha256(
+        config.longbridge_serve_binary.read_bytes()
+    ).hexdigest()
+    if (
+        not config.longbridge_serve_binary_sha256
+        or actual_binary_sha256 != config.longbridge_serve_binary_sha256
+    ):
+        raise ValueError("M15 longbridge serve binary checksum mismatch")
 
 
 def validate_formal_epoch_alignment(config: SdkRuntimeConfig) -> None:
@@ -706,6 +760,9 @@ class FiveMinuteBarBuilder:
         *,
         complete_bar_open_not_before: datetime | None = None,
         boundary_batch_mode: bool = False,
+        push_source_mode: str = "longbridge_sdk_push",
+        no_trade_source_mode: str = "longbridge_sdk_no_trade_carry_forward",
+        event_id_prefix: str = "sdk-5m",
     ) -> None:
         self.minutes = minutes
         self.complete_bar_open_not_before = (
@@ -714,6 +771,9 @@ class FiveMinuteBarBuilder:
             else None
         )
         self.boundary_batch_mode = boundary_batch_mode
+        self.push_source_mode = push_source_mode
+        self.no_trade_source_mode = no_trade_source_mode
+        self.event_id_prefix = event_id_prefix
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
         self._quote_total_volume: dict[str, int] = {}
         self._quote_last_source_at: dict[str, datetime] = {}
@@ -753,10 +813,12 @@ class FiveMinuteBarBuilder:
         if price <= Decimal("0"):
             return
         normalized_symbol = symbol.upper()
+        source_at = unix_to_utc(payload.get("timestamp"), received_at)
+        previous_source_at = self._latest_quote_at.get(normalized_symbol)
+        if previous_source_at is not None and source_at < previous_source_at:
+            return
         self._latest_quote_price[normalized_symbol] = price
-        self._latest_quote_at[normalized_symbol] = unix_to_utc(
-            payload.get("timestamp"), received_at
-        )
+        self._latest_quote_at[normalized_symbol] = source_at
 
     def complete_boundary(self, symbols: list[str] | tuple[str, ...], now: datetime) -> list[dict[str, Any]]:
         """Emit one complete boundary batch, marking no-trade rows non-tradable."""
@@ -798,7 +860,7 @@ class FiveMinuteBarBuilder:
                 "volume": 0,
                 "source_event_at": source_at,
                 "received_at": now,
-                "source_mode": "longbridge_sdk_no_trade_carry_forward",
+                "source_mode": self.no_trade_source_mode,
                 "market_data_blocked_reasons": {"no_trade_carry_forward"},
             }
             rows.append(self._finalize(key, synthetic, emitted_at=now))
@@ -849,7 +911,7 @@ class FiveMinuteBarBuilder:
                         received_at,
                         price,
                         int_like(trade.get("volume")),
-                        source_mode="longbridge_sdk_push",
+                        source_mode=self.push_source_mode,
                     )
                 )
         return finished
@@ -912,7 +974,7 @@ class FiveMinuteBarBuilder:
         # A final bar is executable only once its interval has actually
         # closed. The last quote timestamp is source evidence, not delivery.
         received_at = emitted_at.astimezone(UTC)
-        event_id = f"sdk-5m|{bar['symbol']}|{to_iso(bar['bar_close_at'].astimezone(UTC))}"
+        event_id = f"{self.event_id_prefix}|{bar['symbol']}|{to_iso(bar['bar_close_at'].astimezone(UTC))}"
         return {
             "schema_version": "m15.realtime-market-event.v2",
             "event_id": event_id,
@@ -925,7 +987,7 @@ class FiveMinuteBarBuilder:
             "received_at": to_iso(received_at),
             "source_delivery_age_ms": max(0, int((received_at - source_at).total_seconds() * 1000)),
             "bar_final": True,
-            "source_mode": str(bar.get("source_mode") or "longbridge_sdk_push"),
+            "source_mode": str(bar.get("source_mode") or self.push_source_mode),
             "open": fmt(bar["open"]), "high": fmt(bar["high"]), "low": fmt(bar["low"]),
             "close": fmt(bar["close"]), "volume": str(bar["volume"]),
             "market_data_blocked_reason": ",".join(sorted(bar.get("market_data_blocked_reasons") or ())),
@@ -1028,7 +1090,11 @@ def load_current_sdk_intraday_context(
             continue
         if (
             str(row.get("source_mode") or "")
-            not in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
+            not in {
+                "longbridge_sdk_push",
+                "longbridge_serve_push",
+                "longbridge_sdk_snapshot_poll",
+            }
             or str(row.get("timeframe") or "") != "5m"
             or not bool(row.get("bar_final"))
             or str(row.get("market_data_blocked_reason") or "")
@@ -1065,7 +1131,11 @@ def fresh_market_events(
         is_final_sdk_bar = (
             bool(row.get("bar_final"))
             and str(row.get("source_mode") or "")
-            in {"longbridge_sdk_push", "longbridge_sdk_snapshot_poll"}
+            in {
+                "longbridge_sdk_push",
+                "longbridge_serve_push",
+                "longbridge_sdk_snapshot_poll",
+            }
             and str(row.get("timeframe") or "") == "5m"
         )
         if is_final_sdk_bar:
@@ -1695,6 +1765,15 @@ def unix_to_utc(value: Any, fallback: datetime) -> datetime:
             return datetime.fromtimestamp(value.timestamp(), UTC)
         except (ValueError, OSError):
             return fallback.astimezone(UTC)
+    if isinstance(value, str) and value.strip():
+        raw = value.strip()
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC)
+        except ValueError:
+            pass
     try:
         return datetime.fromtimestamp(int(str(value)), UTC)
     except Exception:

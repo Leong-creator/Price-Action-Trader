@@ -573,10 +573,24 @@ def sdk_runtime_health_issues(
         issues.append("sdk_deployment_manifest_invalid")
     if status.get("deployment_worktree_clean") is not True:
         issues.append("sdk_deployment_worktree_dirty")
-    if status.get("market_data_transport") != "official_sdk_persistent_websocket":
-        issues.append("sdk_market_data_transport_invalid")
-    if status.get("market_data_mode") not in {"", "sdk_subscription"}:
-        issues.append("sdk_market_data_mode_not_subscription")
+    expected_transport = str(
+        getattr(
+            sdk_config,
+            "market_data_transport",
+            "official_sdk_persistent_websocket",
+        )
+    )
+    if status.get("market_data_transport") != expected_transport:
+        issues.append("market_data_transport_config_drift")
+    if status.get("account_order_transport") != "official_sdk_persistent_context":
+        issues.append("account_order_transport_not_sdk")
+    expected_mode = (
+        "longbridge_serve_subscription"
+        if expected_transport == "longbridge_serve_persistent_jsonrpc"
+        else "sdk_subscription"
+    )
+    if status.get("market_data_mode") != expected_mode:
+        issues.append("market_data_mode_not_persistent_subscription")
     if status.get("market_data_circuit_open") is True:
         issues.append("sdk_market_data_circuit_open")
     try:
@@ -659,7 +673,10 @@ def reference_market_push_is_fresh(
         if not isinstance(activity, dict):
             continue
         source = str(activity.get("source") or "")
-        if not source or source == "longbridge_sdk_initial_snapshot":
+        if not source or source in {
+            "longbridge_sdk_initial_snapshot",
+            "longbridge_serve_initial_snapshot",
+        }:
             continue
         age = artifact_age_seconds(str(activity.get("at") or ""), generated_at)
         if age is not None and age <= maximum_age_seconds:

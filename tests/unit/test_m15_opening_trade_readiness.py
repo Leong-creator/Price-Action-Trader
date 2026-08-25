@@ -218,8 +218,14 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             "sdk_connected": True,
             "deployment_manifest_verified": True,
             "deployment_worktree_clean": True,
-            "market_data_transport": "official_sdk_persistent_websocket",
-            "market_data_mode": "sdk_subscription",
+            "market_data_transport": sdk_config.market_data_transport,
+            "account_order_transport": "official_sdk_persistent_context",
+            "market_data_mode": (
+                "longbridge_serve_subscription"
+                if sdk_config.market_data_transport
+                == "longbridge_serve_persistent_jsonrpc"
+                else "sdk_subscription"
+            ),
             "market_data_circuit_open": False,
             "runtime_engine": "sdk",
             "config_fingerprint": sdk_config_fingerprint(sdk_config),
@@ -278,8 +284,14 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             "sdk_connected": True,
             "deployment_manifest_verified": True,
             "deployment_worktree_clean": True,
-            "market_data_transport": "official_sdk_persistent_websocket",
-            "market_data_mode": "sdk_subscription",
+            "market_data_transport": sdk_config.market_data_transport,
+            "account_order_transport": "official_sdk_persistent_context",
+            "market_data_mode": (
+                "longbridge_serve_subscription"
+                if sdk_config.market_data_transport
+                == "longbridge_serve_persistent_jsonrpc"
+                else "sdk_subscription"
+            ),
             "market_data_circuit_open": False,
             "runtime_engine": "sdk",
             "config_fingerprint": sdk_config_fingerprint(sdk_config),
@@ -291,7 +303,12 @@ class M15OpeningTradeReadinessTest(unittest.TestCase):
             "reference_market_activity": {
                 "SPY.US": {
                     "at": "2026-08-24T14:00:55Z",
-                    "source": "longbridge_sdk_initial_snapshot",
+                    "source": (
+                        "longbridge_serve_initial_snapshot"
+                        if sdk_config.market_data_transport
+                        == "longbridge_serve_persistent_jsonrpc"
+                        else "longbridge_sdk_initial_snapshot"
+                    ),
                 }
             },
         }

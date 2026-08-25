@@ -1,0 +1,392 @@
+from __future__ import annotations
+
+import queue
+import os
+import unittest
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from scripts.m15_longbridge_serve_transport_lib import (
+    LongbridgeServeSession,
+    longbridge_serve_quote_worker,
+    merge_quote_payload,
+    normalize_symbol,
+    probe_longbridge_serve_transport,
+    process_resource_snapshot,
+    symbol_batches,
+)
+from scripts.m15_longbridge_sdk_runtime_lib import FiveMinuteBarBuilder
+
+
+class _FakeProcess:
+    pid = 4321
+    returncode = None
+
+    def poll(self):
+        return None
+
+
+class _FakeSession:
+    instances = []
+
+    def __init__(self, *_args, **_kwargs):
+        self.process = _FakeProcess()
+        self.messages = queue.Queue()
+        self.stderr_tail = []
+        self.sent = []
+        self.closed = False
+        self.__class__.instances.append(self)
+
+    def send(self, request):
+        self.sent.append(request)
+
+    def wait_for_response(self, request_id, on_notification):
+        if request_id == 1:
+            return {"id": 1, "result": {"protocolVersion": "1"}}
+        request = self.sent[-1]
+        symbols = request["params"]["symbols"]
+        if request_id == 2:
+            on_notification(
+                {
+                    "method": "quote.updated",
+                    "params": {
+                        "symbol": "SPY.US",
+                        "last_done": "500",
+                        "timestamp": "2026-08-25T13:30:01Z",
+                    },
+                }
+            )
+            on_notification(
+                {
+                    "method": "quote.trades",
+                    "params": {
+                        "symbol": "SPY.US",
+                        "trades": [
+                            {
+                                "price": "500",
+                                "volume": 2,
+                                "timestamp": "2026-08-25T13:30:01Z",
+                            }
+                        ],
+                    },
+                }
+            )
+        return {
+            "id": request_id,
+            "result": {
+                "subscribed": [
+                    {"symbol": symbol, "fields": ["quote", "trades"]}
+                    for symbol in symbols
+                ],
+                "quotes": [
+                    {
+                        "symbol": symbol,
+                        "last_done": "100",
+                        "timestamp": "2026-08-25T13:30:00Z",
+                    }
+                    for symbol in symbols
+                ],
+            },
+        }
+
+    def close(self, _request_id):
+        self.closed = True
+
+
+class _ReaderErrorSession(_FakeSession):
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(*_args, **_kwargs)
+        self.reader_errors = ["invalid_json_stdout"]
+
+
+class _FakeStopEvent:
+    def __init__(self):
+        self.check_count = 0
+
+    def is_set(self):
+        self.check_count += 1
+        return self.check_count > 1
+
+    def wait(self, _seconds):
+        return None
+
+
+class _FakeBuilder:
+    def __init__(self, *_args, **_kwargs):
+        self.seeded = []
+
+    def seed_quote(self, symbol, payload, *, received_at):
+        self.seeded.append((symbol, payload, received_at))
+
+    def on_trade(self, symbol, payload, *, received_at):
+        return [
+            {
+                "symbol": symbol,
+                "payload": payload,
+                "received_at": received_at.isoformat(),
+            }
+        ]
+
+    def complete_boundary(self, _symbols, _now):
+        return []
+
+
+class LongbridgeServeTransportTest(unittest.TestCase):
+    def setUp(self) -> None:
+        _FakeSession.instances.clear()
+
+    def test_symbol_helpers_are_deterministic(self) -> None:
+        self.assertEqual(normalize_symbol("spy"), "SPY.US")
+        self.assertEqual(
+            symbol_batches(["A.US", "B.US", "C.US"], 2),
+            [["A.US", "B.US"], ["C.US"]],
+        )
+
+    def test_process_resource_snapshot_reports_current_process(self) -> None:
+        resources = process_resource_snapshot(os.getpid())
+        self.assertGreater(resources["rss_kb"], 0)
+        self.assertGreater(resources["thread_count"], 0)
+        self.assertGreater(resources["file_descriptor_count"], 0)
+
+    def test_quote_tick_and_snapshot_merge_without_timestamp_regression(self) -> None:
+        received_at = datetime(2026, 8, 25, 13, 31, tzinfo=UTC)
+        merged, kept_newer = merge_quote_payload(
+            {
+                "symbol": "SPY.US",
+                "last_done": "501",
+                "timestamp": "2026-08-25T13:31:00Z",
+            },
+            {
+                "symbol": "SPY.US",
+                "last_done": "499",
+                "open": "498",
+                "high": "502",
+                "low": "497",
+                "volume": 1000,
+                "timestamp": "2026-08-25T13:30:59Z",
+            },
+            received_at=received_at,
+        )
+
+        self.assertTrue(kept_newer)
+        self.assertEqual(merged["last_done"], "501")
+        self.assertEqual(merged["timestamp"], "2026-08-25T13:31:00Z")
+        self.assertEqual(merged["open"], "498")
+        self.assertEqual(merged["volume"], 1000)
+
+    def test_market_data_session_rejects_trade_write_methods_locally(self) -> None:
+        session = object.__new__(LongbridgeServeSession)
+        with self.assertRaisesRegex(ValueError, "method_not_allowed"):
+            session.send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "trade.submit_order",
+                    "params": {},
+                }
+            )
+
+    def test_preflight_initializes_and_checks_subscription_and_quotes(self) -> None:
+        config = SimpleNamespace(
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            quote_region="cn",
+        )
+        with patch(
+            "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+            _FakeSession,
+        ):
+            result = probe_longbridge_serve_transport(
+                config, ("SPY.US", "QQQ.US")
+            )
+
+        self.assertEqual(result["subscription_coverage"], "2/2")
+        self.assertEqual(result["initial_quote_coverage"], "2/2")
+        methods = [row["method"] for row in _FakeSession.instances[0].sent]
+        self.assertEqual(methods, ["initialize", "quote.subscribe"])
+        self.assertTrue(_FakeSession.instances[0].closed)
+
+    def test_worker_stops_when_transport_reader_reports_corrupt_data(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=2,
+            quote_region="cn",
+        )
+        output = queue.Queue()
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US",),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US",),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _ReaderErrorSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker(
+                "unused.json",
+                output,
+                _FakeStopEvent(),
+            )
+
+        errors = []
+        while not output.empty():
+            row = output.get_nowait()
+            if row["kind"] == "error":
+                errors.append(row["reason"])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("longbridge_serve_reader_failed", errors[0])
+
+    def test_builder_preserves_serve_source_and_iso_timestamps(self) -> None:
+        bar_open = datetime(2026, 8, 25, 13, 30, tzinfo=UTC)
+        builder = FiveMinuteBarBuilder(
+            5,
+            complete_bar_open_not_before=bar_open,
+            boundary_batch_mode=True,
+            push_source_mode="longbridge_serve_push",
+            no_trade_source_mode="longbridge_serve_no_trade_carry_forward",
+            event_id_prefix="longbridge-serve-5m",
+        )
+        builder.seed_quote(
+            "SPY.US",
+            {"last_done": "500", "timestamp": "2026-08-25T13:30:00Z"},
+            received_at=bar_open,
+        )
+        builder.on_trade(
+            "SPY.US",
+            {
+                "trades": [
+                    {
+                        "price": "501",
+                        "volume": 3,
+                        "timestamp": "2026-08-25T13:31:00Z",
+                    }
+                ]
+            },
+            received_at=datetime(2026, 8, 25, 13, 31, 1, tzinfo=UTC),
+        )
+        rows = builder.complete_boundary(
+            ["SPY.US"],
+            datetime(2026, 8, 25, 13, 35, 1, tzinfo=UTC),
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source_mode"], "longbridge_serve_push")
+        self.assertTrue(rows[0]["event_id"].startswith("longbridge-serve-5m|"))
+
+    def test_older_initial_snapshot_cannot_replace_newer_push_price(self) -> None:
+        bar_open = datetime(2026, 8, 25, 13, 30, tzinfo=UTC)
+        builder = FiveMinuteBarBuilder(
+            5,
+            complete_bar_open_not_before=bar_open,
+            boundary_batch_mode=True,
+            push_source_mode="longbridge_serve_push",
+            no_trade_source_mode="longbridge_serve_no_trade_carry_forward",
+            event_id_prefix="longbridge-serve-5m",
+        )
+        builder.seed_quote(
+            "SPY.US",
+            {"last_done": "501", "timestamp": "2026-08-25T13:31:00Z"},
+            received_at=bar_open,
+        )
+        builder.seed_quote(
+            "SPY.US",
+            {"last_done": "499", "timestamp": "2026-08-25T13:30:59Z"},
+            received_at=bar_open,
+        )
+
+        rows = builder.complete_boundary(
+            ["SPY.US"],
+            datetime(2026, 8, 25, 13, 35, 1, tzinfo=UTC),
+        )
+
+        self.assertEqual(rows[0]["close"], "501")
+
+    def test_worker_emits_existing_parent_message_contract(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=2,
+            quote_region="cn",
+        )
+        output = queue.Queue()
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _FakeSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker(
+                "unused.json",
+                output,
+                _FakeStopEvent(),
+            )
+
+        rows = []
+        while not output.empty():
+            rows.append(output.get_nowait())
+        kinds = {row["kind"] for row in rows}
+        self.assertTrue(
+            {
+                "subscription_progress",
+                "quote_state",
+                "market_activity",
+                "bars",
+                "ready",
+                "heartbeat",
+            }
+            <= kinds
+        )
+        ready = next(row for row in rows if row["kind"] == "ready")
+        self.assertEqual(ready["market_data_mode"], "longbridge_serve_subscription")
+        self.assertEqual(ready["subscription_failed_symbols"], [])
+        spy_quotes = [
+            row
+            for row in rows
+            if row["kind"] == "quote_state" and row["symbol"] == "SPY.US"
+        ]
+        self.assertEqual(spy_quotes[-1]["payload"]["last_done"], "500")
+        self.assertEqual(spy_quotes[-1]["source_mode"], "longbridge_serve_push")
+        session = _FakeSession.instances[0]
+        subscribe_requests = [
+            request for request in session.sent if request.get("method") == "quote.subscribe"
+        ]
+        self.assertEqual(len(subscribe_requests), 2)
+        self.assertEqual(subscribe_requests[0]["params"]["fields"], ["quote", "trades"])
+        self.assertTrue(session.closed)
+
+
+if __name__ == "__main__":
+    unittest.main()
