@@ -17,6 +17,7 @@ from scripts.m15_longbridge_serve_transport_lib import (
     normalize_symbol,
     probe_longbridge_serve_transport,
     process_resource_snapshot,
+    subscription_symbols_from_result,
     symbol_batches,
 )
 from scripts.m15_longbridge_sdk_runtime_lib import FiveMinuteBarBuilder
@@ -38,6 +39,7 @@ class _FakeSession:
         self.messages = queue.Queue()
         self.stderr_tail = []
         self.sent = []
+        self.concurrent_request_counts = []
         self.closed = False
         self.__class__.instances.append(self)
 
@@ -129,6 +131,7 @@ class _FakeSession:
         self, request_ids, on_notification, *, timeout_seconds=None
     ):
         del timeout_seconds
+        self.concurrent_request_counts.append(len(request_ids))
         return {
             request_id: self._response(request_id, on_notification)
             for request_id in request_ids
@@ -263,6 +266,24 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(
             symbol_batches(["A.US", "B.US", "C.US"], 2),
             [["A.US", "B.US"], ["C.US"]],
+        )
+
+    def test_subscription_result_parser_covers_serve_response_shapes(self) -> None:
+        self.assertEqual(
+            subscription_symbols_from_result(
+                {
+                    "subscribed": [
+                        {"symbol": "SPY.US", "fields": ["quote", "trades"]}
+                    ]
+                }
+            ),
+            {"SPY.US"},
+        )
+        self.assertEqual(
+            subscription_symbols_from_result(
+                {"sub_list": [{"symbol": "QQQ.US", "sub_type": [1, 4]}]}
+            ),
+            {"QQQ.US"},
         )
 
     def test_process_resource_snapshot_reports_current_process(self) -> None:
@@ -532,6 +553,8 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         ]
         self.assertEqual(len(subscribe_requests), 2)
         self.assertEqual(subscribe_requests[0]["params"]["fields"], ["quote", "trades"])
+        self.assertTrue(session.concurrent_request_counts)
+        self.assertLessEqual(max(session.concurrent_request_counts), 1)
         self.assertTrue(session.closed)
 
     def test_worker_coalesces_quote_burst_before_cross_process_delivery(self) -> None:
@@ -662,6 +685,68 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         activities = [row for row in rows if row["kind"] == "market_activity"]
         self.assertEqual(len(activities), 1)
         self.assertEqual(activities[0]["symbol"], "SPY.US")
+
+    def test_worker_serially_subscribes_full_pool_and_monitoring_symbols(self) -> None:
+        base_symbols = tuple(
+            ["SPY.US"] + [f"S{index:03}.US" for index in range(146)]
+        )
+        monitoring_symbols = tuple(f"M{index:03}.US" for index in range(9))
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=10,
+            quote_region="cn",
+        )
+        output = queue.Queue()
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=base_symbols,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=base_symbols,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _FakeSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _FakeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker(
+                "unused.json",
+                output,
+                _FakeStopEvent(),
+                monitoring_symbols,
+            )
+
+        rows = []
+        while not output.empty():
+            rows.append(output.get_nowait())
+        ready = next(row for row in rows if row["kind"] == "ready")
+        self.assertEqual(len(ready["subscribed_symbols"]), 147)
+        self.assertEqual(len(ready["position_monitoring_subscribed_symbols"]), 9)
+        self.assertEqual(ready["subscription_failed_symbols"], [])
+        self.assertEqual(ready["position_monitoring_failed_symbols"], [])
+        session = _FakeSession.instances[0]
+        subscribe_requests = [
+            request
+            for request in session.sent
+            if request.get("method") == "quote.subscribe"
+        ]
+        self.assertEqual(len(subscribe_requests), 16)
+        self.assertTrue(
+            all(len(request["params"]["symbols"]) <= 10 for request in subscribe_requests)
+        )
+        self.assertLessEqual(max(session.concurrent_request_counts), 1)
 
     def test_monitoring_subscription_timeout_keeps_base_worker_ready(self) -> None:
         config = SimpleNamespace(

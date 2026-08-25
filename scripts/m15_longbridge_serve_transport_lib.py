@@ -40,7 +40,10 @@ ALLOWED_SERVE_METHODS = frozenset(
         "shutdown",
     }
 )
-MAX_SERVE_INFLIGHT_REQUESTS = 8
+# Longbridge accepts the requests quickly when they are sent in small serial
+# batches. Concurrent subscribe calls can leave later batches without a usable
+# response while high-frequency push notifications are already arriving.
+MAX_SERVE_INFLIGHT_REQUESTS = 1
 REQUIRED_SUBSCRIPTION_TYPES = frozenset({1, 4})
 QUOTE_STATE_FLUSH_INTERVAL_SECONDS = 0.25
 
