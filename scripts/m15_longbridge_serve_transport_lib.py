@@ -31,8 +31,17 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
 SERVE_OWNER_ENV = "M15_LONGBRIDGE_SERVE_OWNER"
 SERVE_OWNER_VALUE = "price-action-trader-m15"
 ALLOWED_SERVE_METHODS = frozenset(
-    {"initialize", "quote.subscribe", "quote.unsubscribe", "quote.quote", "shutdown"}
+    {
+        "initialize",
+        "quote.subscribe",
+        "quote.unsubscribe",
+        "quote.subscriptions",
+        "quote.quote",
+        "shutdown",
+    }
 )
+MAX_SERVE_INFLIGHT_REQUESTS = 8
+REQUIRED_SUBSCRIPTION_TYPES = frozenset({1, 4})
 
 
 def emit_worker(queue_out: Any, payload: dict[str, Any]) -> None:
@@ -70,6 +79,35 @@ def normalize_symbol(value: Any) -> str:
 
 def is_reference_symbol(symbol: str) -> bool:
     return normalize_symbol(symbol) in {"SPY.US", "QQQ.US"}
+
+
+def subscription_symbols_from_result(result: Any) -> set[str]:
+    """Normalize both subscribe and quote.subscriptions response shapes."""
+    rows: list[Any] = []
+    if isinstance(result, dict):
+        if isinstance(result.get("subscribed"), list):
+            rows = list(result["subscribed"])
+        elif isinstance(result.get("sub_list"), list):
+            rows = list(result["sub_list"])
+    elif isinstance(result, list):
+        rows = list(result)
+    subscribed: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        symbol = normalize_symbol(row.get("symbol"))
+        fields = set(row.get("fields") or [])
+        sub_types = {
+            int(value)
+            for value in row.get("sub_type") or []
+            if isinstance(value, (int, str)) and str(value).isdigit()
+        }
+        if symbol and (
+            {"quote", "trades"}.issubset(fields)
+            or REQUIRED_SUBSCRIPTION_TYPES.issubset(sub_types)
+        ):
+            subscribed.add(symbol)
+    return subscribed
 
 
 def process_resource_snapshot(pid: int) -> dict[str, int]:
@@ -125,6 +163,7 @@ class LongbridgeServeSession:
     ) -> None:
         self.response_timeout_seconds = response_timeout_seconds
         self.messages: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=100_000)
+        self.pending_responses: dict[int, dict[str, Any]] = {}
         self.stderr_tail: deque[str] = deque(maxlen=200)
         self.reader_errors: deque[str] = deque(maxlen=20)
         self.process = subprocess.Popen(
@@ -196,8 +235,36 @@ class LongbridgeServeSession:
         request_id: int,
         on_notification: Any,
     ) -> dict[str, Any]:
-        deadline = time.monotonic() + self.response_timeout_seconds
-        while time.monotonic() < deadline:
+        responses = self.wait_for_responses(
+            {request_id},
+            on_notification,
+            timeout_seconds=self.response_timeout_seconds,
+        )
+        if request_id in responses:
+            return responses[request_id]
+        raise TimeoutError(f"longbridge_serve_response_timeout:id={request_id}")
+
+    def wait_for_responses(
+        self,
+        request_ids: set[int],
+        on_notification: Any,
+        *,
+        timeout_seconds: float | None = None,
+    ) -> dict[int, dict[str, Any]]:
+        """Collect concurrent JSON-RPC responses without losing out-of-order IDs."""
+        waiting = set(request_ids)
+        responses: dict[int, dict[str, Any]] = {}
+        for request_id in tuple(waiting):
+            cached = self.pending_responses.pop(request_id, None)
+            if cached is not None:
+                responses[request_id] = cached
+                waiting.remove(request_id)
+        deadline = time.monotonic() + float(
+            self.response_timeout_seconds
+            if timeout_seconds is None
+            else timeout_seconds
+        )
+        while waiting and time.monotonic() < deadline:
             if self.process.poll() is not None:
                 raise RuntimeError(
                     f"longbridge_serve_process_exited:{self.process.returncode}"
@@ -211,9 +278,17 @@ class LongbridgeServeSession:
             if "method" in message:
                 on_notification(message)
                 continue
-            if message.get("id") == request_id:
-                return message
-        raise TimeoutError(f"longbridge_serve_response_timeout:id={request_id}")
+            response_id = message.get("id")
+            if not isinstance(response_id, int):
+                continue
+            if response_id in waiting:
+                responses[response_id] = message
+                waiting.remove(response_id)
+                continue
+            self.pending_responses[response_id] = message
+            if len(self.pending_responses) > 10_000:
+                self.pending_responses.pop(next(iter(self.pending_responses)))
+        return responses
 
     def close(self, request_id: int) -> None:
         if self.process.poll() is not None:
@@ -420,6 +495,8 @@ def longbridge_serve_quote_worker(
         initial_quote_symbols: set[str] = set()
         quote_payload_by_symbol: dict[str, dict[str, Any]] = {}
         quote_source_by_symbol: dict[str, str] = {}
+        quote_pushed_symbols: set[str] = set()
+        trade_pushed_symbols: set[str] = set()
         last_reference_activity_emit: dict[str, float] = {}
         last_quote_state_emit: dict[str, float] = {}
 
@@ -463,6 +540,7 @@ def longbridge_serve_quote_worker(
             )
             quote_payload_by_symbol[symbol] = merged_payload
             quote_source_by_symbol[symbol] = effective_source_mode
+            initial_quote_symbols.add(symbol)
             builder.seed_quote(symbol, merged_payload, received_at=received_at)
             now_monotonic = time.monotonic()
             previous_emit = last_quote_state_emit.get(symbol, 0.0)
@@ -492,9 +570,15 @@ def longbridge_serve_quote_worker(
             symbol = normalize_symbol(payload.get("symbol"))
             received_at = datetime.now(UTC)
             if method == "quote.updated":
+                quote_pushed_symbols.add(symbol)
+                if symbol in trade_pushed_symbols:
+                    subscribed.add(symbol)
                 handle_quote_payload(payload, source_mode="longbridge_serve_push")
                 emit_reference_activity(symbol, received_at)
             elif method == "quote.trades":
+                trade_pushed_symbols.add(symbol)
+                if symbol in quote_pushed_symbols:
+                    subscribed.add(symbol)
                 emit_reference_activity(symbol, received_at)
                 completed = builder.on_trade(
                     symbol,
@@ -516,78 +600,165 @@ def longbridge_serve_quote_worker(
                 f"longbridge_serve_initialize_failed:{initialization['error']}"
             )
 
-        for batch in symbol_batches(targets, config.longbridge_serve_batch_size):
-            request_id += 1
-            session.send(
-                {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "method": "quote.subscribe",
-                    "params": {
-                        "symbols": batch,
-                        "fields": ["quote", "trades"],
-                    },
-                }
+        request_interval_seconds = float(
+            getattr(config, "subscription_request_interval_seconds", 0.0)
+        )
+        retry_count = int(getattr(config, "subscription_retry_count", 0))
+        retry_backoff_seconds = float(
+            getattr(config, "subscription_retry_backoff_seconds", 0.0)
+        )
+        progress_deadline_seconds = float(
+            getattr(
+                config,
+                "subscription_progress_deadline_seconds",
+                config.longbridge_serve_response_timeout_seconds,
             )
-            response = session.wait_for_response(request_id, handle_notification)
+        )
+        subscription_started = time.monotonic()
+
+        def remaining_progress_seconds() -> float:
+            return max(
+                0.0,
+                subscription_started + progress_deadline_seconds - time.monotonic(),
+            )
+
+        def apply_subscribe_response(response: dict[str, Any]) -> None:
             if response.get("error"):
-                raise RuntimeError(
-                    f"longbridge_serve_subscribe_failed:{response['error']}"
-                )
+                return
             result = response.get("result") or {}
-            for row in result.get("subscribed") or []:
-                if isinstance(row, dict):
-                    symbol = normalize_symbol(row.get("symbol"))
-                    fields = set(row.get("fields") or [])
-                    if symbol and {"quote", "trades"}.issubset(fields):
-                        subscribed.add(symbol)
-            for quote in result.get("quotes") or []:
+            subscribed.update(subscription_symbols_from_result(result))
+            quotes = result.get("quotes") if isinstance(result, dict) else []
+            for quote in quotes or []:
                 if isinstance(quote, dict):
-                    initial_symbol = normalize_symbol(quote.get("symbol"))
-                    if initial_symbol:
-                        initial_quote_symbols.add(initial_symbol)
                     handle_quote_payload(
                         quote,
                         source_mode="longbridge_serve_initial_snapshot",
                     )
-            emit_worker(
-                queue_out,
-                {
-                    "kind": "subscription_progress",
-                    "completed": len(subscribed & target_set),
-                    "total": len(targets),
-                },
-            )
 
-        for batch in symbol_batches(
-            sorted(target_set - initial_quote_symbols),
-            config.longbridge_serve_batch_size,
-        ):
+        def apply_quote_response(response: dict[str, Any]) -> None:
+            if response.get("error"):
+                return
+            result = response.get("result") or []
+            for quote in result if isinstance(result, list) else []:
+                if isinstance(quote, dict):
+                    handle_quote_payload(
+                        quote,
+                        source_mode="longbridge_serve_initial_snapshot",
+                    )
+
+        def send_windowed_requests(
+            method: str,
+            batches: list[list[str]],
+            response_handler: Any,
+        ) -> None:
+            nonlocal request_id
+            for offset in range(0, len(batches), MAX_SERVE_INFLIGHT_REQUESTS):
+                if remaining_progress_seconds() <= 0:
+                    return
+                request_ids: set[int] = set()
+                for batch in batches[
+                    offset : offset + MAX_SERVE_INFLIGHT_REQUESTS
+                ]:
+                    request_id += 1
+                    params: dict[str, Any] = {"symbols": batch}
+                    if method == "quote.subscribe":
+                        params["fields"] = ["quote", "trades"]
+                    session.send(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": request_id,
+                            "method": method,
+                            "params": params,
+                        }
+                    )
+                    request_ids.add(request_id)
+                    if request_interval_seconds > 0:
+                        time.sleep(request_interval_seconds)
+                responses = session.wait_for_responses(
+                    request_ids,
+                    handle_notification,
+                    timeout_seconds=min(
+                        float(config.longbridge_serve_response_timeout_seconds),
+                        remaining_progress_seconds(),
+                    ),
+                )
+                for response in responses.values():
+                    response_handler(response)
+
+        def query_active_subscriptions() -> None:
+            nonlocal request_id
+            if remaining_progress_seconds() <= 0:
+                return
             request_id += 1
+            query_id = request_id
             session.send(
                 {
                     "jsonrpc": "2.0",
-                    "id": request_id,
-                    "method": "quote.quote",
-                    "params": {"symbols": batch},
+                    "id": query_id,
+                    "method": "quote.subscriptions",
                 }
             )
-            response = session.wait_for_response(request_id, handle_notification)
-            if response.get("error"):
-                raise RuntimeError(
-                    f"longbridge_serve_initial_quote_failed:{response['error']}"
+            responses = session.wait_for_responses(
+                {query_id},
+                handle_notification,
+                timeout_seconds=min(
+                    float(config.longbridge_serve_response_timeout_seconds),
+                    remaining_progress_seconds(),
+                ),
+            )
+            response = responses.get(query_id)
+            if response and not response.get("error"):
+                subscribed.update(
+                    subscription_symbols_from_result(response.get("result"))
                 )
-            result = response.get("result") or []
-            for quote in result if isinstance(result, list) else []:
-                if not isinstance(quote, dict):
-                    continue
-                initial_symbol = normalize_symbol(quote.get("symbol"))
-                if initial_symbol:
-                    initial_quote_symbols.add(initial_symbol)
-                handle_quote_payload(
-                    quote,
-                    source_mode="longbridge_serve_initial_snapshot",
+
+        def subscribe_group(group_targets: list[str]) -> set[str]:
+            expected = set(group_targets)
+            for attempt in range(retry_count + 1):
+                missing = sorted(expected - subscribed)
+                if not missing or remaining_progress_seconds() <= 0:
+                    break
+                send_windowed_requests(
+                    "quote.subscribe",
+                    symbol_batches(missing, config.longbridge_serve_batch_size),
+                    apply_subscribe_response,
                 )
+                if expected - subscribed:
+                    query_active_subscriptions()
+                emit_worker(
+                    queue_out,
+                    {
+                        "kind": "subscription_progress",
+                        "completed": len(subscribed & target_set),
+                        "total": len(targets),
+                    },
+                )
+                if expected <= subscribed:
+                    break
+                if attempt < retry_count and retry_backoff_seconds > 0:
+                    time.sleep(
+                        min(retry_backoff_seconds, remaining_progress_seconds())
+                    )
+            return expected - subscribed
+
+        def fetch_initial_quotes(group_targets: list[str]) -> set[str]:
+            expected = set(group_targets)
+            missing = sorted(expected - initial_quote_symbols)
+            if missing and remaining_progress_seconds() > 0:
+                send_windowed_requests(
+                    "quote.quote",
+                    symbol_batches(missing, config.longbridge_serve_batch_size),
+                    apply_quote_response,
+                )
+            return expected - initial_quote_symbols
+
+        # The 147-symbol strategy pool is mandatory. Existing out-of-pool
+        # positions are subscribed separately so a slow monitoring batch cannot
+        # destroy an otherwise healthy strategy feed.
+        subscribe_group(base_targets)
+        fetch_initial_quotes(base_targets)
+        subscribe_group(monitoring_targets)
+        fetch_initial_quotes(monitoring_targets)
 
         base_expected = set(base_targets)
         monitoring_expected = set(monitoring_targets)
