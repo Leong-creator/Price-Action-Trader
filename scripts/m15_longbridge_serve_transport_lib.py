@@ -260,6 +260,12 @@ class LongbridgeServeSession:
             else timeout_seconds
         )
         while waiting and time.monotonic() < deadline:
+            reader_errors = list(getattr(self, "reader_errors", ()))
+            if reader_errors:
+                raise RuntimeError(
+                    "longbridge_serve_reader_failed:"
+                    + "|".join(reader_errors)[-1000:]
+                )
             if self.process.poll() is not None:
                 raise RuntimeError(
                     f"longbridge_serve_process_exited:{self.process.returncode}"
