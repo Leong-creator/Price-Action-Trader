@@ -354,6 +354,21 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(second["result"], "second")
         self.assertEqual(session.pending_responses, {})
 
+    def test_market_data_session_fails_wait_when_reader_breaks_before_ready(self) -> None:
+        session = object.__new__(LongbridgeServeSession)
+        session.response_timeout_seconds = 30
+        session.messages = queue.Queue()
+        session.pending_responses = {}
+        session.process = _FakeProcess()
+        session.reader_errors = ["invalid_json_stdout"]
+
+        with self.assertRaisesRegex(RuntimeError, "longbridge_serve_reader_failed"):
+            session.wait_for_responses(
+                {1},
+                lambda _message: None,
+                timeout_seconds=30,
+            )
+
     def test_preflight_initializes_and_checks_subscription_and_quotes(self) -> None:
         config = SimpleNamespace(
             longbridge_serve_binary=Path("/tmp/longbridge"),

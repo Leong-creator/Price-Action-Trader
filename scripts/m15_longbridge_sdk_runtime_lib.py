@@ -90,6 +90,7 @@ class SdkRuntimeConfig:
     allow_snapshot_poll_fallback: bool
     market_data_heartbeat_deadline_seconds: int
     active_symbol_silence_seconds: int
+    reference_silence_restart_seconds: int
     account_snapshot_interval_seconds: int
     account_snapshot_refresh_deadline_seconds: int
     account_snapshot_circuit_retry_seconds: int
@@ -219,6 +220,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         ),
         active_symbol_silence_seconds=int(
             runtime.get("active_symbol_silence_seconds", 30)
+        ),
+        reference_silence_restart_seconds=int(
+            runtime.get("reference_silence_restart_seconds", 305)
         ),
         account_snapshot_interval_seconds=int(runtime.get("account_snapshot_interval_seconds", 15)),
         account_snapshot_refresh_deadline_seconds=int(runtime.get("account_snapshot_refresh_deadline_seconds", 8)),
@@ -394,6 +398,15 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         )
     if not 15 <= config.active_symbol_silence_seconds <= 120:
         raise ValueError("M15 SDK active symbol silence threshold must be between 15 and 120 seconds")
+    if not (
+        config.reference_silence_restart_seconds
+        > config.active_symbol_silence_seconds
+        and config.reference_silence_restart_seconds <= 600
+    ):
+        raise ValueError(
+            "M15 SDK reference silence restart threshold must be greater than "
+            "the exit-only threshold and no more than 600 seconds"
+        )
     if config.daily_context_bars < 2:
         raise ValueError("M15 SDK daily context needs at least two bars")
     if config.daily_context_deadline_seconds <= 0:

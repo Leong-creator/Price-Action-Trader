@@ -216,6 +216,7 @@ def runtime_dispatch_block_reason(
     trading_daily_context_ready: bool,
     deployment_ready: bool = True,
     position_monitoring_ready: bool = True,
+    reference_market_data_stale: bool = False,
 ) -> str:
     if not paper_order_dispatch_enabled:
         return "paper_order_dispatch_disabled"
@@ -225,6 +226,8 @@ def runtime_dispatch_block_reason(
         return "deployment_manifest_invalid"
     if not position_monitoring_ready:
         return "position_monitoring_incomplete_exit_only"
+    if reference_market_data_stale:
+        return "reference_market_data_stale_exit_only"
     if not paper_client_ready or not trade_context_ready:
         return "trade_context_recovering"
     if not market_data_ready:
@@ -695,6 +698,36 @@ def active_reference_quotes_are_stale(
     )
 
 
+def reference_silence_recovery_action(
+    *,
+    references_are_stale: bool,
+    silence_started_monotonic: float,
+    now_monotonic: float,
+    incomplete_boundary_count_at_silence: int,
+    current_incomplete_boundary_count: int,
+    restart_after_seconds: float,
+    recovery_boundary_required: bool,
+) -> str:
+    if not references_are_stale:
+        return (
+            "recovering_waiting_for_complete_boundary"
+            if recovery_boundary_required
+            else "healthy"
+        )
+    if float(silence_started_monotonic) <= 0:
+        return "exit_only"
+    if int(current_incomplete_boundary_count) > int(
+        incomplete_boundary_count_at_silence
+    ):
+        return "restart_required_after_incomplete_boundary"
+    if (
+        float(now_monotonic) - float(silence_started_monotonic)
+        > float(restart_after_seconds)
+    ):
+        return "restart_required_after_deadline"
+    return "exit_only"
+
+
 def regular_session_open_grace_elapsed(
     now: datetime,
     grace_seconds: float,
@@ -714,9 +747,11 @@ def market_data_recovery_is_stable(
     first_live_push_by_symbol: dict[str, float],
     last_live_push_by_symbol: dict[str, float],
     stabilization_seconds: float,
+    complete_boundary_observed: bool,
 ) -> bool:
     return bool(
         attempts > 0
+        and complete_boundary_observed
         and market_data_heartbeat_grace_elapsed(
             worker_ready_since_monotonic,
             now_monotonic,
@@ -774,6 +809,41 @@ def should_emit_reference_market_activity(
         return False
     last_emit_by_symbol[normalized] = now_monotonic
     return True
+
+
+def apply_reference_market_activity_message(
+    message: dict[str, Any],
+    *,
+    last_push_by_symbol: dict[str, float],
+    last_push_at_by_symbol: dict[str, str],
+    last_push_source_by_symbol: dict[str, str],
+    first_live_push_by_symbol: dict[str, float],
+    last_live_push_by_symbol: dict[str, float],
+    now_monotonic: float | None = None,
+) -> None:
+    try:
+        activity_received_at = datetime.fromisoformat(
+            str(message.get("received_at") or "").replace("Z", "+00:00")
+        ).astimezone(UTC)
+    except ValueError:
+        activity_received_at = datetime.now(UTC)
+    normalized_symbol = str(message.get("symbol") or "").upper()
+    activity_monotonic = (
+        float(now_monotonic)
+        if now_monotonic is not None
+        else time.monotonic()
+    )
+    last_push_by_symbol[normalized_symbol] = activity_monotonic
+    last_push_at_by_symbol[normalized_symbol] = to_iso(activity_received_at)
+    last_push_source_by_symbol[normalized_symbol] = str(
+        message.get("source_mode") or "longbridge_sdk_trade_push"
+    )
+    if normalized_symbol in {"SPY.US", "QQQ.US"}:
+        first_live_push_by_symbol.setdefault(
+            normalized_symbol,
+            activity_monotonic,
+        )
+        last_live_push_by_symbol[normalized_symbol] = activity_monotonic
 
 
 def signals_allowed_by_entry_gate(
@@ -838,6 +908,42 @@ def realtime_boundary_is_complete(
         if (received - boundary).total_seconds() > maximum_finalization_seconds:
             return False
     return True
+
+
+def realtime_boundary_is_trustworthy(
+    *,
+    boundary_complete: bool,
+    reference_quotes_fresh: bool,
+) -> bool:
+    """Require both full symbol coverage and live reference-market evidence."""
+    return bool(boundary_complete and reference_quotes_fresh)
+
+
+def realtime_boundary_integrity_state(
+    *,
+    boundary_complete: bool,
+    reference_quotes_fresh: bool,
+) -> str:
+    if not boundary_complete:
+        return "structurally_incomplete"
+    if not reference_quotes_fresh:
+        return "reference_quotes_stale"
+    return "trustworthy"
+
+
+def boundary_execution_client(
+    *,
+    candidate_client: Any,
+    exit_client: Any,
+    boundary_complete: bool,
+    reference_exit_only: bool,
+    trustworthy_boundary: bool,
+) -> Any:
+    if trustworthy_boundary:
+        return candidate_client
+    if boundary_complete and reference_exit_only:
+        return exit_client
+    return None
 
 
 def quote_worker(
@@ -2266,10 +2372,7 @@ def runtime_status_age_seconds(status: dict[str, Any], now: datetime | None = No
 
 def runtime_requires_health_replacement(status: dict[str, Any], config: Any) -> bool:
     """Identify a live runtime whose own health outputs have stopped advancing."""
-    if str(status.get("status") or "") in {
-        "halted_market_data_circuit",
-        "halted_account_snapshot_circuit",
-    }:
+    if str(status.get("status") or "") == "halted_account_snapshot_circuit":
         return True
     status_age = runtime_status_age_seconds(status)
     account_age = status.get("account_snapshot_age_seconds")
@@ -2462,12 +2565,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     last_push_source_by_symbol: dict[str, str] = {}
     complete_boundary_count = 0
     incomplete_boundary_count = 0
+    structural_incomplete_boundary_count = 0
+    reference_stale_boundary_count = 0
     late_boundary_count = 0
     realtime_tradable_bar_count = 0
     no_trade_carry_forward_count = 0
     last_complete_boundary = ""
     last_incomplete_boundary = ""
     last_boundary_missing_symbols: list[str] = []
+    worker_complete_boundary_observed = False
+    reference_silence_started_monotonic = 0.0
+    reference_silence_started_at = ""
+    reference_silence_incomplete_boundary_count = 0
+    reference_recovery_boundary_required = False
+    reference_market_data_state = "healthy"
     subscription_progress_completed = 0
     subscription_progress_total = len(configured_symbols(config))
     restored_latency_samples, restored_last_result, restored_last_event_at = restore_pipeline_observability(
@@ -2542,6 +2653,80 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         shutdown_requested = True
         stop_event.set()
 
+    def apply_transport_heartbeat_message(message: dict[str, Any]) -> None:
+        nonlocal worker_last_progress
+        nonlocal transport_queue_depth
+        nonlocal transport_reader_errors
+        nonlocal transport_resources
+        nonlocal snapshot_poll_elapsed_ms
+        nonlocal snapshot_poll_covered_count
+        nonlocal snapshot_poll_missing_count
+        nonlocal snapshot_poll_successful_fast_polls
+        nonlocal snapshot_poll_is_fast_and_complete
+        worker_last_progress = time.monotonic()
+        transport_queue_depth = int(
+            message.get("transport_queue_depth") or 0
+        )
+        transport_reader_errors = [
+            str(value)
+            for value in message.get("transport_reader_errors") or []
+        ]
+        transport_resources = {
+            str(key): int(value)
+            for key, value in dict(
+                message.get("transport_resources") or {}
+            ).items()
+        }
+        snapshot_poll_elapsed_ms = int(
+            message.get("poll_elapsed_ms") or snapshot_poll_elapsed_ms
+        )
+        snapshot_poll_covered_count = int(
+            message.get("poll_covered_count") or snapshot_poll_covered_count
+        )
+        snapshot_poll_missing_count = int(
+            message.get("poll_missing_count") or 0
+        )
+        snapshot_poll_successful_fast_polls = int(
+            message.get("successful_fast_polls") or 0
+        )
+        snapshot_poll_is_fast_and_complete = bool(
+            message.get("poll_is_fast_and_complete")
+        )
+
+    def apply_market_activity_message(message: dict[str, Any]) -> None:
+        apply_reference_market_activity_message(
+            message,
+            last_push_by_symbol=last_push_by_symbol,
+            last_push_at_by_symbol=last_push_at_by_symbol,
+            last_push_source_by_symbol=last_push_source_by_symbol,
+            first_live_push_by_symbol=first_live_push_by_symbol,
+            last_live_push_by_symbol=last_live_push_by_symbol,
+        )
+
+    def drain_pending_worker_health_messages() -> None:
+        for _ in range(2048):
+            try:
+                pending = message_queue.get_nowait()
+            except queue.Empty:
+                return
+            pending_kind = str(pending.get("kind") or "")
+            if pending_kind == "heartbeat":
+                apply_transport_heartbeat_message(pending)
+            elif pending_kind in {"quote_state", "quote_state_batch"}:
+                apply_quote_state_worker_message(
+                    pending,
+                    live_quote_session_state=live_quote_session_state,
+                    last_push_by_symbol=last_push_by_symbol,
+                    last_push_at_by_symbol=last_push_at_by_symbol,
+                    last_push_source_by_symbol=last_push_source_by_symbol,
+                    first_live_push_by_symbol=first_live_push_by_symbol,
+                    last_live_push_by_symbol=last_live_push_by_symbol,
+                )
+            elif pending_kind == "market_activity":
+                apply_market_activity_message(pending)
+            else:
+                deferred_messages.append(pending)
+
     signal.signal(signal.SIGTERM, stop_requested)
     try:
         while not shutdown_requested:
@@ -2552,7 +2737,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             ):
                 market_data_circuit_open = False
                 market_data_circuit_retry_at = 0.0
-                attempts = 0
+                attempts = max(
+                    0,
+                    config.maximum_consecutive_subscription_failures - 1,
+                )
                 next_worker_start_monotonic = time.monotonic()
                 last_subscription_failure_reason = (
                     "sdk_subscription_circuit_cooldown_elapsed"
@@ -2692,6 +2880,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker.start()
                 worker_generation += 1
                 worker_ready_since = 0.0
+                worker_complete_boundary_observed = False
+                reference_silence_started_monotonic = 0.0
+                reference_silence_started_at = ""
+                reference_silence_incomplete_boundary_count = 0
+                reference_recovery_boundary_required = False
+                reference_market_data_state = "healthy"
                 first_live_push_by_symbol.clear()
                 last_live_push_by_symbol.clear()
             if (
@@ -2733,6 +2927,27 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     subscription_recovery_failures += attempts
                     attempts = 0
                 continue
+            if worker_ready:
+                drain_pending_worker_health_messages()
+            if worker_ready and transport_reader_errors:
+                worker_ready = False
+                worker_ready_since = 0.0
+                last_subscription_failure_reason = (
+                    "sdk_market_data_reader_error:"
+                    f"{transport_reader_errors[-1]}"
+                )
+                attempts += 1
+                stop_spawned_process(worker, graceful=False)
+                worker = None
+                account.resume_background_refresh()
+                next_worker_start_monotonic = (
+                    time.monotonic()
+                    + reconnect_delay_seconds(
+                        config.reconnect_backoff_schedule_seconds,
+                        attempts,
+                    )
+                )
+                continue
             if (
                 worker_ready
                 and market_data_heartbeat_grace_elapsed(
@@ -2764,27 +2979,73 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     config.reconnect_backoff_schedule_seconds, attempts
                 )
                 continue
-            if (
+            reference_check_now = datetime.now(UTC)
+            reference_check_monotonic = time.monotonic()
+            references_are_stale = bool(
                 worker_ready
-                and in_regular_session(datetime.now(UTC))
+                and in_regular_session(reference_check_now)
                 and regular_session_open_grace_elapsed(
-                    datetime.now(UTC),
+                    reference_check_now,
                     config.active_symbol_silence_seconds,
                 )
                 and market_data_heartbeat_grace_elapsed(
                     worker_ready_since,
-                    time.monotonic(),
+                    reference_check_monotonic,
                     config.active_symbol_silence_seconds,
                 )
                 and active_reference_quotes_are_stale(
                     last_push_by_symbol,
-                    now_monotonic=time.monotonic(),
+                    now_monotonic=reference_check_monotonic,
                     maximum_silence_seconds=config.active_symbol_silence_seconds,
                 )
+            )
+            if references_are_stale and reference_silence_started_monotonic <= 0:
+                reference_silence_started_monotonic = reference_check_monotonic
+                reference_silence_started_at = to_iso(reference_check_now)
+                reference_silence_incomplete_boundary_count = (
+                    structural_incomplete_boundary_count
+                )
+                reference_recovery_boundary_required = True
+            reference_market_data_state = reference_silence_recovery_action(
+                references_are_stale=references_are_stale,
+                silence_started_monotonic=reference_silence_started_monotonic,
+                now_monotonic=reference_check_monotonic,
+                incomplete_boundary_count_at_silence=(
+                    reference_silence_incomplete_boundary_count
+                ),
+                current_incomplete_boundary_count=(
+                    structural_incomplete_boundary_count
+                ),
+                restart_after_seconds=config.reference_silence_restart_seconds,
+                recovery_boundary_required=reference_recovery_boundary_required,
+            )
+            if reference_market_data_state == "healthy":
+                reference_silence_started_monotonic = 0.0
+                reference_silence_started_at = ""
+                reference_silence_incomplete_boundary_count = 0
+                if last_subscription_failure_reason == (
+                    "sdk_active_reference_quotes_stale_exit_only"
+                ):
+                    last_subscription_failure_reason = ""
+            elif reference_market_data_state == "exit_only":
+                last_subscription_failure_reason = (
+                    "sdk_active_reference_quotes_stale_exit_only"
+                )
+            elif reference_market_data_state == (
+                "recovering_waiting_for_complete_boundary"
             ):
+                last_subscription_failure_reason = (
+                    "sdk_active_reference_quotes_recovered_waiting_for_complete_boundary"
+                )
+            else:
                 worker_ready = False
                 worker_ready_since = 0.0
-                last_subscription_failure_reason = "sdk_active_reference_quotes_silent"
+                last_subscription_failure_reason = (
+                    "sdk_active_reference_quotes_silent_past_incomplete_boundary"
+                    if reference_market_data_state
+                    == "restart_required_after_incomplete_boundary"
+                    else "sdk_active_reference_quotes_silent_past_deadline"
+                )
                 attempts += 1
                 stop_spawned_process(worker, graceful=False)
                 worker = None
@@ -2801,6 +3062,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 first_live_push_by_symbol=first_live_push_by_symbol,
                 last_live_push_by_symbol=last_live_push_by_symbol,
                 stabilization_seconds=config.active_symbol_silence_seconds,
+                complete_boundary_observed=worker_complete_boundary_observed,
             ):
                 attempts = 0
             if worker_ready and daily_context_state == "waiting_for_subscription":
@@ -2901,27 +3163,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     last_live_push_by_symbol=last_live_push_by_symbol,
                 )
             elif kind == "market_activity":
-                try:
-                    activity_received_at = datetime.fromisoformat(
-                        str(message.get("received_at") or "").replace("Z", "+00:00")
-                    ).astimezone(UTC)
-                except ValueError:
-                    activity_received_at = datetime.now(UTC)
-                normalized_activity_symbol = str(message.get("symbol") or "").upper()
-                activity_monotonic = time.monotonic()
-                last_push_by_symbol[normalized_activity_symbol] = activity_monotonic
-                last_push_at_by_symbol[normalized_activity_symbol] = to_iso(
-                    activity_received_at
-                )
-                last_push_source_by_symbol[normalized_activity_symbol] = str(
-                    message.get("source_mode") or "longbridge_sdk_trade_push"
-                )
-                if normalized_activity_symbol in {"SPY.US", "QQQ.US"}:
-                    first_live_push_by_symbol.setdefault(
-                        normalized_activity_symbol,
-                        activity_monotonic,
-                    )
-                    last_live_push_by_symbol[normalized_activity_symbol] = activity_monotonic
+                apply_market_activity_message(message)
             elif kind == "ready":
                 transport_child_pid = int(message.get("longbridge_serve_pid") or 0)
                 initial_snapshot_coverage = str(
@@ -3064,6 +3306,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         if dispatch_requested and config.paper_order_dispatch_enabled
                         else None
                     )
+                reference_market_data_exit_only = (
+                    reference_market_data_state != "healthy"
+                )
+                if reference_market_data_exit_only:
+                    active_client = (
+                        flatten_client
+                        if dispatch_requested and config.paper_order_dispatch_enabled
+                        else None
+                    )
                 boundary_complete = realtime_boundary_is_complete(
                     rows,
                     configured_trading_symbols(config),
@@ -3081,14 +3332,39 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_boundary_missing_symbols = sorted(
                     expected_boundary_symbols - actual_boundary_symbols
                 )
-                if boundary_complete:
+                reference_fresh_for_boundary = not active_reference_quotes_are_stale(
+                    last_push_by_symbol,
+                    now_monotonic=time.monotonic(),
+                    maximum_silence_seconds=config.active_symbol_silence_seconds,
+                )
+                trustworthy_boundary = realtime_boundary_is_trustworthy(
+                    boundary_complete=boundary_complete,
+                    reference_quotes_fresh=reference_fresh_for_boundary,
+                )
+                boundary_integrity_state = realtime_boundary_integrity_state(
+                    boundary_complete=boundary_complete,
+                    reference_quotes_fresh=reference_fresh_for_boundary,
+                )
+                if trustworthy_boundary:
                     complete_boundary_count += 1
                     last_complete_boundary = boundary_name
+                    worker_complete_boundary_observed = True
+                    if reference_recovery_boundary_required:
+                        reference_recovery_boundary_required = False
+                        reference_market_data_state = "healthy"
+                        reference_silence_started_monotonic = 0.0
+                        reference_silence_started_at = ""
+                        reference_silence_incomplete_boundary_count = 0
+                        last_subscription_failure_reason = ""
                 else:
                     incomplete_boundary_count += 1
                     last_incomplete_boundary = boundary_name
-                    if rows and not last_boundary_missing_symbols:
-                        late_boundary_count += 1
+                    if boundary_integrity_state == "reference_quotes_stale":
+                        reference_stale_boundary_count += 1
+                    else:
+                        structural_incomplete_boundary_count += 1
+                        if rows and not last_boundary_missing_symbols:
+                            late_boundary_count += 1
                 realtime_tradable_bar_count += sum(
                     not bool(row.get("market_data_blocked_reason"))
                     and str(row.get("symbol") or "").upper().removesuffix(".US")
@@ -3102,8 +3378,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     in expected_boundary_symbols
                     for row in rows
                 )
-                if not boundary_complete:
-                    active_client = None
+                active_client = boundary_execution_client(
+                    candidate_client=active_client,
+                    exit_client=(
+                        flatten_client
+                        if dispatch_requested
+                        and config.paper_order_dispatch_enabled
+                        else None
+                    ),
+                    boundary_complete=boundary_complete,
+                    reference_exit_only=reference_market_data_exit_only,
+                    trustworthy_boundary=trustworthy_boundary,
+                )
                 if not market_data_mode_qualifies_for_subscription_gate(
                     market_data_mode
                 ):
@@ -3124,6 +3410,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     new_entry_submission_enabled=(
                         paper_client is not None
                         and not position_monitoring_failed
+                        and not reference_market_data_exit_only
                     ),
                 )
                 current_market_date = (
@@ -3211,35 +3498,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_result["bar_batch_missing_symbols"] = sorted(expected_symbols - batch_symbols)
                 last_event_at = str((rows or [{}])[-1].get("received_at") or last_event_at)
             elif kind == "heartbeat":
-                worker_last_progress = time.monotonic()
-                transport_queue_depth = int(
-                    message.get("transport_queue_depth") or 0
-                )
-                transport_reader_errors = [
-                    str(value)
-                    for value in message.get("transport_reader_errors") or []
-                ]
-                transport_resources = {
-                    str(key): int(value)
-                    for key, value in dict(
-                        message.get("transport_resources") or {}
-                    ).items()
-                }
-                snapshot_poll_elapsed_ms = int(
-                    message.get("poll_elapsed_ms") or snapshot_poll_elapsed_ms
-                )
-                snapshot_poll_covered_count = int(
-                    message.get("poll_covered_count") or snapshot_poll_covered_count
-                )
-                snapshot_poll_missing_count = int(
-                    message.get("poll_missing_count") or 0
-                )
-                snapshot_poll_successful_fast_polls = int(
-                    message.get("successful_fast_polls") or 0
-                )
-                snapshot_poll_is_fast_and_complete = bool(
-                    message.get("poll_is_fast_and_complete")
-                )
+                apply_transport_heartbeat_message(message)
                 if (
                     market_data_mode == "sdk_snapshot_poll"
                     and message.get("poll_is_fast_and_complete") is True
@@ -3741,6 +4000,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     },
                     "complete_boundary_count": complete_boundary_count,
                     "incomplete_boundary_count": incomplete_boundary_count,
+                    "reference_stale_boundary_count": (
+                        reference_stale_boundary_count
+                    ),
+                    "structural_incomplete_boundary_count": (
+                        structural_incomplete_boundary_count
+                    ),
                     "late_boundary_count": late_boundary_count,
                     "last_complete_boundary": last_complete_boundary,
                     "last_incomplete_boundary": last_incomplete_boundary,
@@ -3838,11 +4103,30 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "account_snapshot_background_refresh_enabled": (
                         account.background_refresh_enabled
                     ),
+                    "reference_market_data_state": reference_market_data_state,
+                    "reference_silence_started_at": reference_silence_started_at,
+                    "reference_silence_seconds": (
+                        max(
+                            0,
+                            int(
+                                time.monotonic()
+                                - reference_silence_started_monotonic
+                            ),
+                        )
+                        if reference_silence_started_monotonic > 0
+                        else 0
+                    ),
+                    "reference_silence_restart_seconds": (
+                        config.reference_silence_restart_seconds
+                    ),
                     "dispatch_enabled": effective_runtime_dispatch_enabled(
                         dispatch_requested=dispatch_enabled,
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
-                        market_data_ready=worker_ready,
+                        market_data_ready=(
+                            worker_ready
+                            and reference_market_data_state == "healthy"
+                        ),
                         trading_daily_context_ready=trading_daily_context_ready,
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
@@ -3859,12 +4143,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         ),
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
-                        market_data_ready=worker_ready,
+                        market_data_ready=(
+                            worker_ready
+                            and reference_market_data_state == "healthy"
+                        ),
                         flatten_blocks_new_entries=flatten_blocks_new_entries,
                         account_snapshot_ready=account_snapshot_ready,
                         trading_daily_context_ready=trading_daily_context_ready,
                         deployment_ready=deployment_ready,
                         position_monitoring_ready=not position_monitoring_failed,
+                        reference_market_data_stale=(
+                            reference_market_data_state != "healthy"
+                        ),
                     ),
                     "complete_session_gate_enabled": (
                         config.complete_session_gate_enabled

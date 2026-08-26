@@ -36,7 +36,9 @@ from scripts.m15_universe_lib import load_m15_universe
 from scripts.run_m15_longbridge_sdk_runtime import (
     acquire_runtime_run_lock,
     active_reference_quotes_are_stale,
+    apply_reference_market_activity_message,
     apply_quote_state_worker_message,
+    boundary_execution_client,
     build_live_daily_confirmation_rows,
     close_spawn_queue,
     completed_postclose_refresh_dates,
@@ -53,6 +55,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
     market_data_recovery_is_stable,
+    reference_silence_recovery_action,
     preserve_last_order_maintenance_action,
     opening_signal_outside_trading_universe,
     quote_worker,
@@ -70,6 +73,8 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     run_sdk_preflight,
     runtime_dispatch_block_reason,
     realtime_boundary_is_complete,
+    realtime_boundary_integrity_state,
+    realtime_boundary_is_trustworthy,
     reconnect_delay_seconds,
     regular_session_open_grace_elapsed,
     should_use_snapshot_fallback,
@@ -385,6 +390,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 first_live_push_by_symbol={"SPY.US": 101.0},
                 last_live_push_by_symbol={"SPY.US": 119.0},
                 stabilization_seconds=30.0,
+                complete_boundary_observed=False,
             )
         )
         self.assertFalse(
@@ -396,6 +402,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 first_live_push_by_symbol={"SPY.US": 101.0},
                 last_live_push_by_symbol={"SPY.US": 130.0},
                 stabilization_seconds=30.0,
+                complete_boundary_observed=True,
             )
         )
         self.assertTrue(
@@ -407,6 +414,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 first_live_push_by_symbol={"SPY.US": 101.0},
                 last_live_push_by_symbol={"SPY.US": 130.0},
                 stabilization_seconds=30.0,
+                complete_boundary_observed=True,
             )
         )
 
@@ -419,7 +427,135 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 first_live_push_by_symbol={"SPY.US": 129.0},
                 last_live_push_by_symbol={"SPY.US": 130.0},
                 stabilization_seconds=30.0,
+                complete_boundary_observed=True,
             )
+        )
+
+    def test_reference_silence_is_exit_only_before_next_boundary(self) -> None:
+        self.assertEqual(
+            reference_silence_recovery_action(
+                references_are_stale=True,
+                silence_started_monotonic=100.0,
+                now_monotonic=140.0,
+                incomplete_boundary_count_at_silence=3,
+                current_incomplete_boundary_count=3,
+                restart_after_seconds=305.0,
+                recovery_boundary_required=True,
+            ),
+            "exit_only",
+        )
+
+    def test_reference_silence_restarts_after_incomplete_boundary(self) -> None:
+        self.assertEqual(
+            reference_silence_recovery_action(
+                references_are_stale=True,
+                silence_started_monotonic=100.0,
+                now_monotonic=140.0,
+                incomplete_boundary_count_at_silence=3,
+                current_incomplete_boundary_count=4,
+                restart_after_seconds=305.0,
+                recovery_boundary_required=True,
+            ),
+            "restart_required_after_incomplete_boundary",
+        )
+
+    def test_reference_silence_restarts_after_deadline_without_boundary(self) -> None:
+        self.assertEqual(
+            reference_silence_recovery_action(
+                references_are_stale=True,
+                silence_started_monotonic=100.0,
+                now_monotonic=405.001,
+                incomplete_boundary_count_at_silence=3,
+                current_incomplete_boundary_count=3,
+                restart_after_seconds=305.0,
+                recovery_boundary_required=True,
+            ),
+            "restart_required_after_deadline",
+        )
+
+    def test_fresh_reference_push_clears_exit_only_state(self) -> None:
+        self.assertEqual(
+            reference_silence_recovery_action(
+                references_are_stale=False,
+                silence_started_monotonic=100.0,
+                now_monotonic=140.0,
+                incomplete_boundary_count_at_silence=3,
+                current_incomplete_boundary_count=3,
+                restart_after_seconds=305.0,
+                recovery_boundary_required=True,
+            ),
+            "recovering_waiting_for_complete_boundary",
+        )
+
+    def test_fresh_reference_without_prior_silence_is_healthy(self) -> None:
+        self.assertEqual(
+            reference_silence_recovery_action(
+                references_are_stale=False,
+                silence_started_monotonic=0.0,
+                now_monotonic=140.0,
+                incomplete_boundary_count_at_silence=0,
+                current_incomplete_boundary_count=0,
+                restart_after_seconds=305.0,
+                recovery_boundary_required=False,
+            ),
+            "healthy",
+        )
+
+    def test_market_activity_updates_reference_freshness(self) -> None:
+        last_push: dict[str, float] = {}
+        last_push_at: dict[str, str] = {}
+        last_source: dict[str, str] = {}
+        first_live: dict[str, float] = {}
+        last_live: dict[str, float] = {}
+        apply_reference_market_activity_message(
+            {
+                "symbol": "SPY.US",
+                "received_at": "2026-08-25T17:45:01Z",
+                "source_mode": "longbridge_serve_trade_push",
+            },
+            last_push_by_symbol=last_push,
+            last_push_at_by_symbol=last_push_at,
+            last_push_source_by_symbol=last_source,
+            first_live_push_by_symbol=first_live,
+            last_live_push_by_symbol=last_live,
+            now_monotonic=123.0,
+        )
+        self.assertEqual(last_push["SPY.US"], 123.0)
+        self.assertEqual(first_live["SPY.US"], 123.0)
+        self.assertEqual(last_live["SPY.US"], 123.0)
+        self.assertEqual(last_source["SPY.US"], "longbridge_serve_trade_push")
+
+    def test_exit_only_reference_silence_does_not_stop_worker(self) -> None:
+        source = inspect.getsource(__import__(
+            "scripts.run_m15_longbridge_sdk_runtime",
+            fromlist=["run_watch"],
+        ).run_watch)
+        silence_branch = source.split(
+            'if reference_market_data_state == "healthy":', 1
+        )[1].split(
+            "if worker_ready and market_data_recovery_is_stable", 1
+        )[0]
+        exit_only_branch = silence_branch.split(
+            'elif reference_market_data_state == "exit_only":', 1
+        )[1].split("else:", 1)[0]
+
+        self.assertNotIn("stop_spawned_process", exit_only_branch)
+        self.assertIn("stop_spawned_process", silence_branch)
+
+    def test_reference_stale_has_specific_dispatch_block_reason(self) -> None:
+        self.assertEqual(
+            runtime_dispatch_block_reason(
+                paper_order_dispatch_enabled=True,
+                complete_session_gate_blocked=False,
+                paper_client_ready=True,
+                trade_context_ready=True,
+                market_data_ready=False,
+                flatten_blocks_new_entries=False,
+                account_snapshot_ready=True,
+                trading_daily_context_ready=True,
+                reference_market_data_stale=True,
+            ),
+            "reference_market_data_stale_exit_only",
         )
 
     def test_successful_subscription_receipt_does_not_clear_recovery_attempts(self) -> None:
@@ -819,6 +955,95 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(market_data_heartbeat_grace_elapsed(10.0, 30.001, 20.0))
         self.assertFalse(market_data_heartbeat_grace_elapsed(0.0, 100.0, 20.0))
 
+    def test_only_complete_boundary_with_fresh_reference_quotes_is_trustworthy(self) -> None:
+        self.assertTrue(
+            realtime_boundary_is_trustworthy(
+                boundary_complete=True,
+                reference_quotes_fresh=True,
+            )
+        )
+        self.assertFalse(
+            realtime_boundary_is_trustworthy(
+                boundary_complete=True,
+                reference_quotes_fresh=False,
+            )
+        )
+        self.assertFalse(
+            realtime_boundary_is_trustworthy(
+                boundary_complete=False,
+                reference_quotes_fresh=True,
+            )
+        )
+
+    def test_complete_boundary_with_stale_references_is_not_structurally_incomplete(self) -> None:
+        self.assertEqual(
+            realtime_boundary_integrity_state(
+                boundary_complete=True,
+                reference_quotes_fresh=False,
+            ),
+            "reference_quotes_stale",
+        )
+        self.assertEqual(
+            realtime_boundary_integrity_state(
+                boundary_complete=False,
+                reference_quotes_fresh=True,
+            ),
+            "structurally_incomplete",
+        )
+
+    def test_reference_exit_only_keeps_exit_client_on_complete_stale_boundary(self) -> None:
+        primary_client = object()
+        exit_client = object()
+        self.assertIs(
+            boundary_execution_client(
+                candidate_client=primary_client,
+                exit_client=exit_client,
+                boundary_complete=True,
+                reference_exit_only=True,
+                trustworthy_boundary=False,
+            ),
+            exit_client,
+        )
+        self.assertIsNone(
+            boundary_execution_client(
+                candidate_client=primary_client,
+                exit_client=exit_client,
+                boundary_complete=False,
+                reference_exit_only=True,
+                trustworthy_boundary=False,
+            )
+        )
+
+    def test_pending_worker_health_is_drained_before_stale_or_reader_checks(self) -> None:
+        source = inspect.getsource(
+            __import__(
+                "scripts.run_m15_longbridge_sdk_runtime",
+                fromlist=["run_watch"],
+            ).run_watch
+        )
+        drain = source.index("drain_pending_worker_health_messages()")
+        reader_error = source.index("if worker_ready and transport_reader_errors:")
+        heartbeat_stale = source.index("market_data_heartbeat_is_stale(")
+        self.assertLess(drain, reader_error)
+        self.assertLess(reader_error, heartbeat_stale)
+
+    def test_market_data_circuit_probe_preserves_failure_history(self) -> None:
+        source = inspect.getsource(
+            __import__(
+                "scripts.run_m15_longbridge_sdk_runtime",
+                fromlist=["run_watch"],
+            ).run_watch
+        )
+        cooldown = source.split(
+            "if (\n                market_data_circuit_open",
+            1,
+        )[1].split(
+            "if not market_data_circuit_open",
+            1,
+        )[0]
+        self.assertIn("maximum_consecutive_subscription_failures - 1", cooldown)
+        self.assertNotIn("attempts = 0", cooldown)
+
     def test_active_symbol_silence_waits_for_regular_open_grace(self) -> None:
         market_zone = ZoneInfo("America/New_York")
         self.assertFalse(
@@ -1113,12 +1338,25 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             )
         )
 
-    def test_halted_market_data_runtime_is_replaced_even_with_fresh_account(self) -> None:
+    def test_halted_market_data_runtime_with_fresh_account_keeps_parent(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertFalse(
+            runtime_requires_health_replacement(
+                {
+                    "status": "halted_market_data_circuit",
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "account_snapshot_age_seconds": 8,
+                },
+                config,
+            )
+        )
+
+    def test_halted_account_runtime_requires_parent_replacement(self) -> None:
         config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
         self.assertTrue(
             runtime_requires_health_replacement(
                 {
-                    "status": "halted_market_data_circuit",
+                    "status": "halted_account_snapshot_circuit",
                     "generated_at": datetime.now(UTC).isoformat(),
                     "account_snapshot_age_seconds": 8,
                 },
