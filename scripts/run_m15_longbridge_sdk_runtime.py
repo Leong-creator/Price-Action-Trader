@@ -2609,6 +2609,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     transport_queue_depth = 0
     transport_reader_errors: list[str] = []
     transport_resources: dict[str, int] = {}
+    transport_coalesced_quote_pending_count = 0
+    transport_coalesced_quote_replacement_count = 0
+    transport_raw_notification_count = 0
     initial_snapshot_coverage = "0/0"
     position_monitoring_initial_snapshot_coverage = "0/0"
     daily_failed: list[str] = []
@@ -2658,6 +2661,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         nonlocal transport_queue_depth
         nonlocal transport_reader_errors
         nonlocal transport_resources
+        nonlocal transport_coalesced_quote_pending_count
+        nonlocal transport_coalesced_quote_replacement_count
+        nonlocal transport_raw_notification_count
         nonlocal snapshot_poll_elapsed_ms
         nonlocal snapshot_poll_covered_count
         nonlocal snapshot_poll_missing_count
@@ -2677,6 +2683,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 message.get("transport_resources") or {}
             ).items()
         }
+        transport_coalesced_quote_pending_count = int(
+            message.get("coalesced_quote_pending_count") or 0
+        )
+        transport_coalesced_quote_replacement_count = int(
+            message.get("coalesced_quote_replacement_count") or 0
+        )
+        transport_raw_notification_count = int(
+            message.get("raw_notification_count") or 0
+        )
+        for activity in message.get("raw_reference_activity") or []:
+            if isinstance(activity, dict):
+                apply_market_activity_message(activity)
         snapshot_poll_elapsed_ms = int(
             message.get("poll_elapsed_ms") or snapshot_poll_elapsed_ms
         )
@@ -2843,6 +2861,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 transport_queue_depth = 0
                 transport_reader_errors = []
                 transport_resources = {}
+                transport_coalesced_quote_pending_count = 0
+                transport_coalesced_quote_replacement_count = 0
+                transport_raw_notification_count = 0
                 initial_snapshot_coverage = "0/0"
                 position_monitoring_initial_snapshot_coverage = "0/0"
                 subscription_failed = []
@@ -3964,6 +3985,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "market_data_transport_queue_depth": transport_queue_depth,
                     "market_data_transport_reader_errors": transport_reader_errors,
                     "market_data_transport_resources": transport_resources,
+                    "market_data_coalesced_quote_pending_count": (
+                        transport_coalesced_quote_pending_count
+                    ),
+                    "market_data_coalesced_quote_replacement_count": (
+                        transport_coalesced_quote_replacement_count
+                    ),
+                    "market_data_raw_notification_count": (
+                        transport_raw_notification_count
+                    ),
                     "initial_snapshot_coverage": initial_snapshot_coverage,
                     "position_monitoring_initial_snapshot_coverage": (
                         position_monitoring_initial_snapshot_coverage

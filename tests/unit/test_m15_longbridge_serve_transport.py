@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import queue
 import os
+import threading
 import time
 import unittest
 from datetime import UTC, datetime
@@ -45,6 +46,20 @@ class _FakeSession:
 
     def send(self, request):
         self.sent.append(request)
+
+    def drain_coalesced_quote_notifications(self):
+        return []
+
+    def transport_diagnostics(self):
+        return {
+            "coalesced_quote_pending_count": 0,
+            "coalesced_quote_replacement_count": 0,
+            "raw_notification_count": 0,
+            "raw_reference_activity": [],
+        }
+
+    def process_exit_detail(self):
+        return f"longbridge_serve_process_exited:{self.process.returncode}"
 
     def _response(self, request_id, on_notification):
         if request_id == 1:
@@ -212,6 +227,29 @@ class _BurstSession(_FakeSession):
         return super()._response(request_id, on_notification)
 
 
+class _TradeBurstSession(_FakeSession):
+    def _response(self, request_id, on_notification):
+        response = super()._response(request_id, on_notification)
+        if request_id == 2:
+            for index in range(200):
+                self.messages.put_nowait(
+                    {
+                        "method": "quote.trades",
+                        "params": {
+                            "symbol": "SPY.US",
+                            "trades": [
+                                {
+                                    "price": str(500 + index / 1000),
+                                    "volume": 1,
+                                    "timestamp": "2026-08-25T13:30:01Z",
+                                }
+                            ],
+                        },
+                    }
+                )
+        return response
+
+
 class _FailOnceByKindQueue(queue.Queue):
     def __init__(self, *kinds: str):
         super().__init__()
@@ -254,6 +292,21 @@ class _FakeBuilder:
         ]
 
     def complete_boundary(self, _symbols, _now):
+        return []
+
+
+class _SlowTradeBuilder(_FakeBuilder):
+    instance = None
+
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(*_args, **_kwargs)
+        self.trade_count = 0
+        self.__class__.instance = self
+
+    def on_trade(self, symbol, payload, *, received_at):
+        del symbol, payload, received_at
+        self.trade_count += 1
+        time.sleep(0.005)
         return []
 
 
@@ -353,6 +406,74 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(first["result"], "first")
         self.assertEqual(second["result"], "second")
         self.assertEqual(session.pending_responses, {})
+
+    def test_reader_coalesces_opening_quote_burst_before_queueing(self) -> None:
+        session = object.__new__(LongbridgeServeSession)
+        session.messages = queue.Queue(maxsize=10)
+        session._quote_lock = threading.Lock()
+        session._latest_quote_notifications = {}
+        session._raw_reference_activity = {}
+        session._raw_notification_count = 0
+        session._coalesced_quote_replacement_count = 0
+
+        symbols = ["SPY.US", "QQQ.US"] + [
+            f"S{index:03}.US" for index in range(145)
+        ]
+        for index in range(100_000):
+            symbol = symbols[index % len(symbols)]
+            session._route_stdout_message(
+                {
+                    "method": "quote.updated",
+                    "params": {
+                        "symbol": symbol,
+                        "last_done": str(index),
+                    },
+                }
+            )
+        session._route_stdout_message(
+            {
+                "method": "quote.trades",
+                "params": {"symbol": "SPY.US", "trades": []},
+            }
+        )
+        session._route_stdout_message({"id": 9, "result": {}})
+
+        self.assertEqual(session.messages.qsize(), 2)
+        quotes = session.drain_coalesced_quote_notifications()
+        self.assertEqual(len(quotes), 147)
+        self.assertTrue(all(row.get("_m15_received_at") for row in quotes))
+        diagnostics = session.transport_diagnostics()
+        self.assertEqual(diagnostics["coalesced_quote_pending_count"], 0)
+        self.assertEqual(
+            diagnostics["coalesced_quote_replacement_count"],
+            100_000 - 147,
+        )
+        self.assertEqual(diagnostics["raw_notification_count"], 100_001)
+        self.assertEqual(
+            {row["symbol"] for row in diagnostics["raw_reference_activity"]},
+            {"SPY.US", "QQQ.US"},
+        )
+
+    def test_close_waits_for_both_reader_threads_after_process_exit(self) -> None:
+        class _Reader:
+            def __init__(self):
+                self.joined = False
+
+            def is_alive(self):
+                return not self.joined
+
+            def join(self, timeout=None):
+                self.joined = timeout is not None
+
+        session = object.__new__(LongbridgeServeSession)
+        session.process = SimpleNamespace(poll=lambda: 0)
+        session._stdout_thread = _Reader()
+        session._stderr_thread = _Reader()
+
+        session.close(1)
+
+        self.assertTrue(session._stdout_thread.joined)
+        self.assertTrue(session._stderr_thread.joined)
 
     def test_market_data_session_fails_wait_when_reader_breaks_before_ready(self) -> None:
         session = object.__new__(LongbridgeServeSession)
@@ -621,6 +742,44 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         ]
         self.assertEqual(len(spy_rows), 1)
         self.assertEqual(spy_rows[0]["payload"]["last_done"], "500.499")
+
+    def test_worker_time_slices_slow_trade_burst_handling(self) -> None:
+        config = SimpleNamespace(
+            bar_minutes=5,
+            longbridge_serve_binary=Path("/tmp/longbridge"),
+            longbridge_serve_response_timeout_seconds=30,
+            longbridge_serve_batch_size=2,
+            quote_region="cn",
+        )
+        output = queue.Queue()
+        started = time.monotonic()
+        with (
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.load_config",
+                return_value=config,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_symbols",
+                return_value=("SPY.US",),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.configured_trading_symbols",
+                return_value=("SPY.US",),
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.LongbridgeServeSession",
+                _TradeBurstSession,
+            ),
+            patch(
+                "scripts.m15_longbridge_serve_transport_lib.FiveMinuteBarBuilder",
+                _SlowTradeBuilder,
+            ),
+        ):
+            longbridge_serve_quote_worker("unused.json", output, _FakeStopEvent())
+
+        self.assertGreater(_SlowTradeBuilder.instance.trade_count, 1)
+        self.assertLess(_SlowTradeBuilder.instance.trade_count, 40)
+        self.assertLess(time.monotonic() - started, 0.5)
 
     def test_worker_retries_critical_bar_after_temporary_queue_pressure(self) -> None:
         config = SimpleNamespace(

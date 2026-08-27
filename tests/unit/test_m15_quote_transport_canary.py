@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import queue
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from scripts.m15_quote_transport_canary_lib import (
     EventRecorder,
@@ -44,6 +46,69 @@ class FailingBatchQuoteContext(FakeQuoteContext):
         if len(symbols) > 1:
             raise RuntimeError("request timeout")
         super().subscribe(symbols, fields)
+
+
+class FakeServeProcess:
+    returncode = None
+
+    def poll(self):
+        return None
+
+
+class FakeServeSession:
+    instance = None
+
+    def __init__(self, *_args, **_kwargs):
+        self.process = FakeServeProcess()
+        self.messages = queue.Queue()
+        self.reader_errors = []
+        self.stderr_tail = []
+        self.sent = []
+        self.kwargs = dict(_kwargs)
+        self.__class__.instance = self
+
+    def send(self, request):
+        self.sent.append(request)
+
+    def wait_for_response(self, request_id, _callback):
+        request = next(row for row in self.sent if row["id"] == request_id)
+        if request["method"] == "initialize":
+            return {"id": request_id, "result": {"protocolVersion": "1"}}
+        symbols = request.get("params", {}).get("symbols", [])
+        if request["method"] == "quote.subscribe":
+            return {
+                "id": request_id,
+                "result": {
+                    "subscribed": [
+                        {"symbol": symbol, "fields": ["quote", "trades"]}
+                        for symbol in symbols
+                    ]
+                },
+            }
+        subscribed = [
+            symbol
+            for row in self.sent
+            if row["method"] == "quote.subscribe"
+            for symbol in row["params"]["symbols"]
+        ]
+        return {
+            "id": request_id,
+            "result": {
+                "sub_list": [
+                    {"symbol": symbol, "sub_type": [1, 4]}
+                    for symbol in subscribed
+                ]
+            },
+        }
+
+    def drain_coalesced_quote_notifications(self):
+        return []
+
+    def transport_diagnostics(self):
+        return {"coalesced_quote_pending_count": 0}
+
+    def close(self, _request_id):
+        self.process.returncode = 0
 
 
 class M15QuoteTransportCanaryTest(unittest.TestCase):
@@ -103,6 +168,36 @@ class M15QuoteTransportCanaryTest(unittest.TestCase):
                 duration_seconds=0,
                 region="invalid",
             )
+
+    def test_cli_serve_canary_reuses_bounded_production_transport(self) -> None:
+        with patch(
+            "scripts.m15_quote_transport_canary_lib.LongbridgeServeSession",
+            FakeServeSession,
+        ):
+            payload = run_cli_serve_canary(
+                binary="unused",
+                symbols=["SPY.US", "QQQ.US", "AAPL.US"],
+                fields=("quote", "trade"),
+                duration_seconds=0,
+                batch_size=2,
+            )
+
+        self.assertEqual(payload["actual_subscription_count"], 3)
+        self.assertEqual(payload["missing_subscriptions"], [])
+        self.assertEqual(payload["process_returncode"], 0)
+        self.assertEqual(
+            FakeServeSession.instance.kwargs["owner_value"],
+            "price-action-trader-m15-canary",
+        )
+        self.assertEqual(
+            [row["method"] for row in FakeServeSession.instance.sent],
+            [
+                "initialize",
+                "quote.subscribe",
+                "quote.subscribe",
+                "quote.subscriptions",
+            ],
+        )
 
     def test_subscription_failure_is_reported_instead_of_crashing(self) -> None:
         sdk = SimpleNamespace(

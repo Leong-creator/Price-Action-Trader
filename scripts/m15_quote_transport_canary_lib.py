@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import json
-import os
 import queue
-import subprocess
 import threading
 import time
 from collections import defaultdict
@@ -12,6 +10,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
+
+from scripts.m15_longbridge_serve_transport_lib import (
+    LongbridgeServeSession,
+    subscription_symbols_from_result,
+)
+
+
+CANARY_SERVE_OWNER_VALUE = "price-action-trader-m15-canary"
 
 
 def utc_now() -> str:
@@ -215,32 +221,12 @@ def run_cli_serve_canary(
 ) -> dict[str, Any]:
     if region not in {"cn", "global"}:
         raise ValueError(f"unsupported_longbridge_region:{region}")
-    process = subprocess.Popen(
-        [str(binary), "serve"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-        env={**os.environ, "LONGBRIDGE_REGION": region},
+    session = LongbridgeServeSession(
+        Path(binary),
+        region=region,
+        response_timeout_seconds=30,
+        owner_value=CANARY_SERVE_OWNER_VALUE,
     )
-    if process.stdin is None or process.stdout is None:
-        raise RuntimeError("longbridge_serve_pipe_unavailable")
-    messages: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=100_000)
-    reader_errors: list[str] = []
-
-    def reader() -> None:
-        try:
-            for line in process.stdout:
-                try:
-                    messages.put_nowait(json.loads(line))
-                except (json.JSONDecodeError, queue.Full) as exc:
-                    reader_errors.append(type(exc).__name__)
-        except OSError as exc:
-            reader_errors.append(str(exc))
-
-    thread = threading.Thread(target=reader, name="longbridge-serve-reader", daemon=True)
-    thread.start()
     batches = symbol_batches(symbols, batch_size)
     recorder = EventRecorder(symbols)
     subscribed: set[str] = set()
@@ -248,7 +234,7 @@ def run_cli_serve_canary(
     initialization_error = ""
     started = utc_now()
 
-    def record_notification(message: dict[str, Any]) -> None:
+    def record_message(message: dict[str, Any]) -> None:
         method = str(message.get("method") or "")
         params = message.get("params") or {}
         symbol = str(params.get("symbol") or "")
@@ -256,91 +242,104 @@ def run_cli_serve_canary(
             recorder.record(symbol, "quote")
         elif method == "quote.trades":
             recorder.record(symbol, "trade")
+        if not method and isinstance(message.get("id"), int):
+            subscribed.update(
+                subscription_symbols_from_result(message.get("result"))
+            )
 
-    def send_request(request: dict[str, Any]) -> None:
-        process.stdin.write(json.dumps(request, separators=(",", ":")) + "\n")
-        process.stdin.flush()
-
-    def wait_for_response(request_id: int, timeout_seconds: float) -> dict[str, Any] | None:
-        deadline = time.monotonic() + timeout_seconds
-        while time.monotonic() < deadline:
-            try:
-                message = messages.get(timeout=min(0.5, max(0.01, deadline - time.monotonic())))
-            except queue.Empty:
-                if process.poll() is not None:
-                    return None
-                continue
-            record_notification(message)
-            if message.get("id") == request_id:
-                return message
-        return None
-
-    send_request({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
-    initialization = wait_for_response(1, 30.0)
-    if initialization is None:
-        initialization_error = "initialize_response_timeout"
-    elif isinstance(initialization.get("error"), dict):
-        initialization_error = str(initialization["error"].get("message") or initialization["error"])
-
-    for request_id, batch in enumerate(batches, start=2):
-        if initialization_error:
-            break
-        request = {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "method": "quote.subscribe",
-            "params": {
-                "symbols": batch,
-                "fields": cli_serve_subscription_fields(fields),
-            },
-        }
-        send_request(request)
-        response = wait_for_response(request_id, 30.0)
-        if response is None:
-            subscription_errors.append({
-                "request_id": request_id,
-                "message": "subscription_response_timeout",
-            })
-            continue
-        error = response.get("error")
-        if isinstance(error, dict):
-            subscription_errors.append({
-                "request_id": request_id,
-                "message": str(error.get("message") or error),
-            })
-        for row in (response.get("result") or {}).get("subscribed", []):
-            if row.get("symbol"):
-                subscribed.add(us_symbol(str(row["symbol"])))
-
-    observation_started_at = utc_now()
-    deadline = time.monotonic() + duration_seconds
-    while time.monotonic() < deadline:
+    request_id = 1
+    observation_started_at = ""
+    try:
+        session.send({"jsonrpc": "2.0", "id": request_id, "method": "initialize"})
         try:
-            message = messages.get(timeout=min(0.5, max(0.01, deadline - time.monotonic())))
-        except queue.Empty:
-            if process.poll() is not None:
+            initialization = session.wait_for_response(request_id, record_message)
+        except TimeoutError:
+            initialization = None
+        if initialization is None:
+            initialization_error = "initialize_response_timeout"
+        elif isinstance(initialization.get("error"), dict):
+            initialization_error = str(
+                initialization["error"].get("message")
+                or initialization["error"]
+            )
+
+        for batch in batches:
+            if initialization_error:
                 break
-            continue
-        record_notification(message)
-    try:
-        shutdown_id = len(batches) + 2
-        process.stdin.write(
-            json.dumps({"jsonrpc": "2.0", "id": shutdown_id, "method": "shutdown"}) + "\n"
+            request_id += 1
+            session.send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "quote.subscribe",
+                    "params": {
+                        "symbols": batch,
+                        "fields": cli_serve_subscription_fields(fields),
+                    },
+                }
+            )
+            try:
+                response = session.wait_for_response(request_id, record_message)
+            except TimeoutError:
+                response = None
+            if response is None:
+                subscription_errors.append(
+                    {
+                        "request_id": request_id,
+                        "message": "subscription_response_timeout",
+                    }
+                )
+                continue
+            error = response.get("error")
+            if isinstance(error, dict):
+                subscription_errors.append(
+                    {
+                        "request_id": request_id,
+                        "message": str(error.get("message") or error),
+                    }
+                )
+            subscribed.update(
+                subscription_symbols_from_result(response.get("result"))
+            )
+
+        request_id += 1
+        session.send(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "quote.subscriptions",
+            }
         )
-        process.stdin.flush()
-    except (BrokenPipeError, OSError):
-        reader_errors.append("serve_stdin_closed_before_shutdown")
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        process.terminate()
-        process.wait(timeout=5)
-    stderr_tail = ""
-    if process.stderr is not None:
         try:
-            stderr_tail = process.stderr.read()[-2000:]
-        except OSError:
-            pass
+            response = session.wait_for_response(request_id, record_message)
+        except TimeoutError:
+            response = None
+        if response is not None:
+            subscribed.update(
+                subscription_symbols_from_result(response.get("result"))
+            )
+
+        observation_started_at = utc_now()
+        deadline = time.monotonic() + duration_seconds
+        while time.monotonic() < deadline:
+            for message in session.drain_coalesced_quote_notifications():
+                record_message(message)
+            try:
+                message = session.messages.get(
+                    timeout=min(0.5, max(0.01, deadline - time.monotonic()))
+                )
+            except queue.Empty:
+                if session.process.poll() is not None:
+                    break
+                continue
+            record_message(message)
+    finally:
+        for message in session.drain_coalesced_quote_notifications():
+            record_message(message)
+        transport_diagnostics = session.transport_diagnostics()
+        session.close(request_id + 1)
+    reader_errors = list(session.reader_errors)
+    stderr_tail = "|".join(session.stderr_tail)[-2000:]
     return {
         "schema_version": "m15.quote-transport-canary.v1",
         "transport": "longbridge_serve",
@@ -361,5 +360,6 @@ def run_cli_serve_canary(
         "subscription_errors": subscription_errors,
         "reader_errors": reader_errors,
         "stderr_tail": stderr_tail,
-        "process_returncode": process.returncode,
+        "process_returncode": session.process.returncode,
+        "transport_diagnostics": transport_diagnostics,
     }

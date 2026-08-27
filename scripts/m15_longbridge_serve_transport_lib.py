@@ -46,6 +46,8 @@ ALLOWED_SERVE_METHODS = frozenset(
 MAX_SERVE_INFLIGHT_REQUESTS = 1
 REQUIRED_SUBSCRIPTION_TYPES = frozenset({1, 4})
 QUOTE_STATE_FLUSH_INTERVAL_SECONDS = 0.25
+MAX_NOTIFICATION_BATCH_MESSAGES = 2048
+NOTIFICATION_TIME_SLICE_SECONDS = 0.05
 
 
 def emit_worker(queue_out: Any, payload: dict[str, Any]) -> bool:
@@ -155,12 +157,18 @@ class LongbridgeServeSession:
         *,
         region: str,
         response_timeout_seconds: int,
+        owner_value: str = SERVE_OWNER_VALUE,
     ) -> None:
         self.response_timeout_seconds = response_timeout_seconds
         self.messages: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=100_000)
         self.pending_responses: dict[int, dict[str, Any]] = {}
         self.stderr_tail: deque[str] = deque(maxlen=200)
         self.reader_errors: deque[str] = deque(maxlen=20)
+        self._quote_lock = threading.Lock()
+        self._latest_quote_notifications: dict[str, dict[str, Any]] = {}
+        self._raw_reference_activity: dict[str, str] = {}
+        self._raw_notification_count = 0
+        self._coalesced_quote_replacement_count = 0
         self.process = subprocess.Popen(
             [str(binary), "serve"],
             stdin=subprocess.PIPE,
@@ -172,7 +180,7 @@ class LongbridgeServeSession:
             env={
                 **os.environ,
                 "LONGBRIDGE_REGION": region,
-                SERVE_OWNER_ENV: SERVE_OWNER_VALUE,
+                SERVE_OWNER_ENV: owner_value,
             },
         )
         if self.process.stdin is None or self.process.stdout is None:
@@ -195,13 +203,95 @@ class LongbridgeServeSession:
         try:
             for line in self.process.stdout:
                 try:
-                    self.messages.put_nowait(json.loads(line))
+                    self._route_stdout_message(json.loads(line))
                 except json.JSONDecodeError:
                     self.reader_errors.append("invalid_json_stdout")
                 except queue.Full:
                     self.reader_errors.append("stdout_queue_full")
         except OSError as exc:
             self.reader_errors.append(f"stdout_error:{exc}")
+
+    def _route_stdout_message(self, message: dict[str, Any]) -> None:
+        """Coalesce quote updates before they can congest the shared queue."""
+        received_at = to_iso(datetime.now(UTC))
+        message["_m15_received_at"] = received_at
+        method = str(message.get("method") or "")
+        params = message.get("params")
+        symbol = normalize_symbol(
+            params.get("symbol") if isinstance(params, dict) else ""
+        )
+        with self._quote_lock:
+            self._raw_notification_count += int(bool(method))
+            if method and is_reference_symbol(symbol):
+                self._raw_reference_activity[symbol] = received_at
+            if method == "quote.updated" and symbol:
+                if symbol in self._latest_quote_notifications:
+                    self._coalesced_quote_replacement_count += 1
+                self._latest_quote_notifications[symbol] = message
+                return
+        self.messages.put_nowait(message)
+
+    def drain_coalesced_quote_notifications(self) -> list[dict[str, Any]]:
+        lock = getattr(self, "_quote_lock", None)
+        if lock is None:
+            return []
+        with lock:
+            rows = list(self._latest_quote_notifications.values())
+            self._latest_quote_notifications.clear()
+        return rows
+
+    def transport_diagnostics(self) -> dict[str, Any]:
+        lock = getattr(self, "_quote_lock", None)
+        if lock is None:
+            return {
+                "coalesced_quote_pending_count": 0,
+                "coalesced_quote_replacement_count": 0,
+                "raw_notification_count": 0,
+                "raw_reference_activity": [],
+            }
+        with lock:
+            raw_reference_activity = [
+                {
+                    "symbol": symbol,
+                    "received_at": received_at,
+                    "source_mode": "longbridge_serve_raw_push",
+                }
+                for symbol, received_at in sorted(
+                    self._raw_reference_activity.items()
+                )
+            ]
+            self._raw_reference_activity.clear()
+            return {
+                "coalesced_quote_pending_count": len(
+                    self._latest_quote_notifications
+                ),
+                "coalesced_quote_replacement_count": (
+                    self._coalesced_quote_replacement_count
+                ),
+                "raw_notification_count": self._raw_notification_count,
+                "raw_reference_activity": raw_reference_activity,
+            }
+
+    def _join_reader_threads(self, timeout: float = 1.0) -> None:
+        deadline = time.monotonic() + timeout
+        current = threading.current_thread()
+        for attribute in ("_stdout_thread", "_stderr_thread"):
+            reader = getattr(self, attribute, None)
+            if reader is None or reader is current or not reader.is_alive():
+                continue
+            reader.join(timeout=max(0.0, deadline - time.monotonic()))
+
+    def process_exit_detail(self) -> str:
+        self._join_reader_threads()
+        stderr = "|".join(getattr(self, "stderr_tail", ())).strip()
+        reader_errors = "|".join(getattr(self, "reader_errors", ())).strip()
+        details = ":".join(
+            value for value in (stderr[-1000:], reader_errors[-500:]) if value
+        )
+        return (
+            f"longbridge_serve_process_exited:{self.process.returncode}"
+            + (f":{details}" if details else "")
+        )
 
     def _read_stderr(self) -> None:
         if self.process.stderr is None:
@@ -217,9 +307,7 @@ class LongbridgeServeSession:
         if method not in ALLOWED_SERVE_METHODS:
             raise ValueError(f"longbridge_serve_method_not_allowed:{method or 'missing'}")
         if self.process.poll() is not None or self.process.stdin is None:
-            raise RuntimeError(
-                f"longbridge_serve_process_exited:{self.process.returncode}"
-            )
+            raise RuntimeError(self.process_exit_detail())
         self.process.stdin.write(
             json.dumps(request, ensure_ascii=True, separators=(",", ":")) + "\n"
         )
@@ -260,6 +348,8 @@ class LongbridgeServeSession:
             else timeout_seconds
         )
         while waiting and time.monotonic() < deadline:
+            for notification in self.drain_coalesced_quote_notifications():
+                on_notification(notification)
             reader_errors = list(getattr(self, "reader_errors", ()))
             if reader_errors:
                 raise RuntimeError(
@@ -267,9 +357,7 @@ class LongbridgeServeSession:
                     + "|".join(reader_errors)[-1000:]
                 )
             if self.process.poll() is not None:
-                raise RuntimeError(
-                    f"longbridge_serve_process_exited:{self.process.returncode}"
-                )
+                raise RuntimeError(self.process_exit_detail())
             try:
                 message = self.messages.get(
                     timeout=min(0.25, max(0.01, deadline - time.monotonic()))
@@ -289,27 +377,32 @@ class LongbridgeServeSession:
             self.pending_responses[response_id] = message
             if len(self.pending_responses) > 10_000:
                 self.pending_responses.pop(next(iter(self.pending_responses)))
+        for notification in self.drain_coalesced_quote_notifications():
+            on_notification(notification)
         return responses
 
     def close(self, request_id: int) -> None:
-        if self.process.poll() is not None:
-            return
         try:
-            self.send({"jsonrpc": "2.0", "id": request_id, "method": "shutdown"})
-            self.process.wait(timeout=10)
-        except (BrokenPipeError, OSError, RuntimeError, subprocess.TimeoutExpired):
-            try:
-                os.killpg(self.process.pid, signal.SIGTERM)
-            except ProcessLookupError:
+            if self.process.poll() is not None:
                 return
             try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
+                self.send({"jsonrpc": "2.0", "id": request_id, "method": "shutdown"})
+                self.process.wait(timeout=10)
+            except (BrokenPipeError, OSError, RuntimeError, subprocess.TimeoutExpired):
                 try:
-                    os.killpg(self.process.pid, signal.SIGKILL)
+                    os.killpg(self.process.pid, signal.SIGTERM)
                 except ProcessLookupError:
                     return
-                self.process.wait(timeout=5)
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(self.process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        return
+                    self.process.wait(timeout=5)
+        finally:
+            self._join_reader_threads()
 
 
 def cleanup_orphaned_longbridge_serve_processes() -> list[int]:
@@ -562,11 +655,12 @@ def longbridge_serve_quote_worker(
             payload: dict[str, Any],
             *,
             source_mode: str,
+            received_at: datetime | None = None,
         ) -> None:
             symbol = normalize_symbol(payload.get("symbol"))
             if not symbol or symbol not in target_set:
                 return
-            received_at = datetime.now(UTC)
+            received_at = received_at or datetime.now(UTC)
             merged_payload, kept_newer = merge_quote_payload(
                 quote_payload_by_symbol.get(symbol),
                 payload,
@@ -594,12 +688,23 @@ def longbridge_serve_quote_worker(
             if not isinstance(payload, dict):
                 return
             symbol = normalize_symbol(payload.get("symbol"))
-            received_at = datetime.now(UTC)
+            try:
+                received_at = datetime.fromisoformat(
+                    str(message.get("_m15_received_at") or "").replace(
+                        "Z", "+00:00"
+                    )
+                ).astimezone(UTC)
+            except (TypeError, ValueError):
+                received_at = datetime.now(UTC)
             if method == "quote.updated":
                 quote_pushed_symbols.add(symbol)
                 if symbol in trade_pushed_symbols:
                     subscribed.add(symbol)
-                handle_quote_payload(payload, source_mode="longbridge_serve_push")
+                handle_quote_payload(
+                    payload,
+                    source_mode="longbridge_serve_push",
+                    received_at=received_at,
+                )
                 emit_reference_activity(symbol, received_at)
             elif method == "quote.trades":
                 trade_pushed_symbols.add(symbol)
@@ -832,28 +937,42 @@ def longbridge_serve_quote_worker(
         last_heartbeat = 0.0
         while not stop_event.is_set():
             if session.process.poll() is not None:
-                raise RuntimeError(
-                    f"longbridge_serve_process_exited:{session.process.returncode}:"
-                    + "|".join(session.stderr_tail)[-1000:]
-                )
+                raise RuntimeError(session.process_exit_detail())
             reader_errors = list(getattr(session, "reader_errors", ()))
             if reader_errors:
                 raise RuntimeError(
                     "longbridge_serve_reader_failed:" + "|".join(reader_errors)[-1000:]
                 )
-            messages: list[dict[str, Any]] = []
-            try:
-                messages.append(session.messages.get(timeout=0.05))
-            except queue.Empty:
-                pass
-            while len(messages) < 10_000:
-                try:
-                    messages.append(session.messages.get_nowait())
-                except queue.Empty:
-                    break
-            for message in messages:
+            quote_messages = session.drain_coalesced_quote_notifications()
+            for message in quote_messages:
                 if isinstance(message, dict) and "method" in message:
                     handle_notification(message)
+
+            # Limit actual trade-notification handling time. Limiting only the
+            # queue drain still lets a large opening batch starve heartbeats
+            # and five-minute boundary completion while the batch is handled.
+            notification_processing_started = time.monotonic()
+            processed_notification_count = 0
+            while (
+                processed_notification_count < MAX_NOTIFICATION_BATCH_MESSAGES
+                and time.monotonic() - notification_processing_started
+                < NOTIFICATION_TIME_SLICE_SECONDS
+            ):
+                try:
+                    if quote_messages or processed_notification_count:
+                        message = session.messages.get_nowait()
+                    else:
+                        remaining = max(
+                            0.001,
+                            NOTIFICATION_TIME_SLICE_SECONDS
+                            - (time.monotonic() - notification_processing_started),
+                        )
+                        message = session.messages.get(timeout=remaining)
+                except queue.Empty:
+                    break
+                if isinstance(message, dict) and "method" in message:
+                    handle_notification(message)
+                processed_notification_count += 1
             flush_critical_messages()
             flush_quote_states()
             completed = builder.complete_boundary(targets, datetime.now(UTC))
@@ -861,6 +980,7 @@ def longbridge_serve_quote_worker(
                 emit_critical({"kind": "bars", "rows": completed})
             now_monotonic = time.monotonic()
             if now_monotonic - last_heartbeat >= 1:
+                transport_diagnostics = session.transport_diagnostics()
                 emitted = emit_worker(
                     queue_out,
                     {
@@ -874,6 +994,7 @@ def longbridge_serve_quote_worker(
                         "transport_resources": process_resource_snapshot(
                             session.process.pid
                         ),
+                        **transport_diagnostics,
                     },
                 )
                 if emitted:
