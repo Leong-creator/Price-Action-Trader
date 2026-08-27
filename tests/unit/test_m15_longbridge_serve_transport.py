@@ -13,6 +13,7 @@ from unittest.mock import patch
 from scripts.m15_longbridge_serve_transport_lib import (
     LongbridgeServeSession,
     emit_worker,
+    longbridge_serve_environment,
     longbridge_serve_quote_worker,
     merge_quote_payload,
     normalize_symbol,
@@ -338,12 +339,44 @@ class LongbridgeServeTransportTest(unittest.TestCase):
             ),
             {"QQQ.US"},
         )
+        self.assertEqual(
+            subscription_symbols_from_result(
+                [
+                    {
+                        "symbol": "AAPL.US",
+                        "sub_types": ["quote", "trades"],
+                        "candlesticks": [],
+                    }
+                ]
+            ),
+            {"AAPL.US"},
+        )
 
     def test_process_resource_snapshot_reports_current_process(self) -> None:
         resources = process_resource_snapshot(os.getpid())
         self.assertGreater(resources["rss_kb"], 0)
         self.assertGreater(resources["thread_count"], 0)
         self.assertGreater(resources["file_descriptor_count"], 0)
+
+    def test_serve_environment_pins_quote_endpoints_without_removing_proxy(self) -> None:
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://proxy.invalid:8080"}):
+            environment = longbridge_serve_environment(
+                region="cn",
+                http_url="https://openapi.longbridge.cn",
+                quote_ws_url="wss://openapi-quote.longbridge.cn/v2",
+                owner_value="test-owner",
+            )
+
+        self.assertEqual(environment["HTTPS_PROXY"], "http://proxy.invalid:8080")
+        self.assertEqual(environment["LONGBRIDGE_REGION"], "cn")
+        self.assertEqual(
+            environment["LONGBRIDGE_HTTP_URL"],
+            "https://openapi.longbridge.cn",
+        )
+        self.assertEqual(
+            environment["LONGBRIDGE_QUOTE_WS_URL"],
+            "wss://openapi-quote.longbridge.cn/v2",
+        )
 
     def test_emit_worker_never_waits_when_cross_process_queue_is_full(self) -> None:
         output = queue.Queue(maxsize=1)
@@ -860,7 +893,7 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertEqual(len(activities), 1)
         self.assertEqual(activities[0]["symbol"], "SPY.US")
 
-    def test_worker_serially_subscribes_full_pool_and_monitoring_symbols(self) -> None:
+    def test_worker_subscribes_full_pool_and_monitoring_symbols_once_each(self) -> None:
         base_symbols = tuple(
             ["SPY.US"] + [f"S{index:03}.US" for index in range(146)]
         )
@@ -869,7 +902,7 @@ class LongbridgeServeTransportTest(unittest.TestCase):
             bar_minutes=5,
             longbridge_serve_binary=Path("/tmp/longbridge"),
             longbridge_serve_response_timeout_seconds=30,
-            longbridge_serve_batch_size=10,
+            longbridge_serve_batch_size=500,
             quote_region="cn",
         )
         output = queue.Queue()
@@ -916,10 +949,9 @@ class LongbridgeServeTransportTest(unittest.TestCase):
             for request in session.sent
             if request.get("method") == "quote.subscribe"
         ]
-        self.assertEqual(len(subscribe_requests), 16)
-        self.assertTrue(
-            all(len(request["params"]["symbols"]) <= 10 for request in subscribe_requests)
-        )
+        self.assertEqual(len(subscribe_requests), 2)
+        self.assertEqual(len(subscribe_requests[0]["params"]["symbols"]), 147)
+        self.assertEqual(len(subscribe_requests[1]["params"]["symbols"]), 9)
         self.assertLessEqual(max(session.concurrent_request_counts), 1)
 
     def test_monitoring_subscription_timeout_keeps_base_worker_ready(self) -> None:

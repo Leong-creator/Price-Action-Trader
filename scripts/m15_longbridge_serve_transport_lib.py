@@ -94,6 +94,11 @@ def subscription_symbols_from_result(result: Any) -> set[str]:
             continue
         symbol = normalize_symbol(row.get("symbol"))
         fields = set(row.get("fields") or [])
+        named_sub_types = {
+            str(value).strip().lower()
+            for value in row.get("sub_types") or []
+            if str(value).strip()
+        }
         sub_types = {
             int(value)
             for value in row.get("sub_type") or []
@@ -101,6 +106,7 @@ def subscription_symbols_from_result(result: Any) -> set[str]:
         }
         if symbol and (
             {"quote", "trades"}.issubset(fields)
+            or {"quote", "trades"}.issubset(named_sub_types)
             or REQUIRED_SUBSCRIPTION_TYPES.issubset(sub_types)
         ):
             subscribed.add(symbol)
@@ -132,6 +138,26 @@ def process_resource_snapshot(pid: int) -> dict[str, int]:
     }
 
 
+def longbridge_serve_environment(
+    *,
+    region: str,
+    http_url: str,
+    quote_ws_url: str,
+    owner_value: str,
+) -> dict[str, str]:
+    """Pin official quote endpoints without changing the host proxy settings."""
+    environment = {
+        **os.environ,
+        "LONGBRIDGE_REGION": region,
+        SERVE_OWNER_ENV: owner_value,
+    }
+    if http_url:
+        environment["LONGBRIDGE_HTTP_URL"] = http_url
+    if quote_ws_url:
+        environment["LONGBRIDGE_QUOTE_WS_URL"] = quote_ws_url
+    return environment
+
+
 def merge_quote_payload(
     previous: dict[str, Any] | None,
     incoming: dict[str, Any],
@@ -157,6 +183,8 @@ class LongbridgeServeSession:
         *,
         region: str,
         response_timeout_seconds: int,
+        http_url: str = "",
+        quote_ws_url: str = "",
         owner_value: str = SERVE_OWNER_VALUE,
     ) -> None:
         self.response_timeout_seconds = response_timeout_seconds
@@ -177,11 +205,12 @@ class LongbridgeServeSession:
             text=True,
             bufsize=1,
             start_new_session=True,
-            env={
-                **os.environ,
-                "LONGBRIDGE_REGION": region,
-                SERVE_OWNER_ENV: owner_value,
-            },
+            env=longbridge_serve_environment(
+                region=region,
+                http_url=http_url,
+                quote_ws_url=quote_ws_url,
+                owner_value=owner_value,
+            ),
         )
         if self.process.stdin is None or self.process.stdout is None:
             raise RuntimeError("longbridge_serve_pipe_unavailable")
@@ -469,6 +498,8 @@ def probe_longbridge_serve_transport(
         session = LongbridgeServeSession(
             config.longbridge_serve_binary,
             region=config.quote_region,
+            http_url=getattr(config, "quote_http_url", ""),
+            quote_ws_url=getattr(config, "quote_ws_url", ""),
             response_timeout_seconds=config.longbridge_serve_response_timeout_seconds,
         )
         session.send({"jsonrpc": "2.0", "id": request_id, "method": "initialize"})
@@ -722,6 +753,8 @@ def longbridge_serve_quote_worker(
         session = LongbridgeServeSession(
             config.longbridge_serve_binary,
             region=config.quote_region,
+            http_url=getattr(config, "quote_http_url", ""),
+            quote_ws_url=getattr(config, "quote_ws_url", ""),
             response_timeout_seconds=config.longbridge_serve_response_timeout_seconds,
         )
         session.send({"jsonrpc": "2.0", "id": request_id, "method": "initialize"})

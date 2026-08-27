@@ -10,6 +10,8 @@
   "oauth": {
     "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
     "quote_region": "cn",
+    "quote_http_url": "https://openapi.longbridge.cn",
+    "quote_ws_url": "wss://openapi-quote.longbridge.cn/v2",
     "trade_region": "cn"
   },
   "market_data": {
@@ -49,13 +51,14 @@
     "market_data_transport": "longbridge_serve_persistent_jsonrpc",
     "longbridge_serve_binary": "local_runtime/tools/longbridge-terminal-0.28.2/longbridge",
     "longbridge_serve_binary_sha256": "acfeefd6be07f871d03158054c79ad5a950af3a17fd89aca5c90563f448a04d8",
-    "longbridge_serve_batch_size": 10,
+    "longbridge_serve_batch_size": 500,
     "longbridge_serve_response_timeout_seconds": 30,
     "allow_snapshot_poll_fallback": false,
     "heartbeat_interval_seconds": 1,
     "reconnect_backoff_seconds": 5,
     "subscription_batch_size": 500,
     "subscription_retry_count": 2,
+    "subscription_request_interval_seconds": 1.25,
     "subscription_deadline_seconds": 20,
     "subscription_progress_deadline_seconds": 90,
     "subscription_circuit_retry_seconds": 300,
