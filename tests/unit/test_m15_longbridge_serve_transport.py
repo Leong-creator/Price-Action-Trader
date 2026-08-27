@@ -428,10 +428,11 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         session = object.__new__(LongbridgeServeSession)
         session.response_timeout_seconds = 1
         session.messages = queue.Queue()
+        session.responses = queue.Queue()
         session.pending_responses = {}
         session.process = _FakeProcess()
-        session.messages.put({"id": 2, "result": "second"})
-        session.messages.put({"id": 1, "result": "first"})
+        session.responses.put({"id": 2, "result": "second"})
+        session.responses.put({"id": 1, "result": "first"})
 
         first = session.wait_for_response(1, lambda _message: None)
         second = session.wait_for_response(2, lambda _message: None)
@@ -443,6 +444,7 @@ class LongbridgeServeTransportTest(unittest.TestCase):
     def test_reader_coalesces_opening_quote_burst_before_queueing(self) -> None:
         session = object.__new__(LongbridgeServeSession)
         session.messages = queue.Queue(maxsize=10)
+        session.responses = queue.Queue(maxsize=10)
         session._quote_lock = threading.Lock()
         session._latest_quote_notifications = {}
         session._raw_reference_activity = {}
@@ -471,7 +473,8 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         )
         session._route_stdout_message({"id": 9, "result": {}})
 
-        self.assertEqual(session.messages.qsize(), 2)
+        self.assertEqual(session.messages.qsize(), 1)
+        self.assertEqual(session.responses.qsize(), 1)
         quotes = session.drain_coalesced_quote_notifications()
         self.assertEqual(len(quotes), 147)
         self.assertTrue(all(row.get("_m15_received_at") for row in quotes))
@@ -482,10 +485,40 @@ class LongbridgeServeTransportTest(unittest.TestCase):
             100_000 - 147,
         )
         self.assertEqual(diagnostics["raw_notification_count"], 100_001)
+        self.assertEqual(diagnostics["notification_queue_depth"], 1)
+        self.assertEqual(diagnostics["response_queue_depth"], 1)
         self.assertEqual(
             {row["symbol"] for row in diagnostics["raw_reference_activity"]},
             {"SPY.US", "QQQ.US"},
         )
+
+    def test_control_response_bypasses_trade_notification_backlog(self) -> None:
+        session = object.__new__(LongbridgeServeSession)
+        session.response_timeout_seconds = 1
+        session.messages = queue.Queue(maxsize=1000)
+        session.responses = queue.Queue(maxsize=10)
+        session.pending_responses = {}
+        session.process = _FakeProcess()
+        session.reader_errors = []
+        session._quote_lock = threading.Lock()
+        session._latest_quote_notifications = {}
+        session._raw_reference_activity = {}
+        session._raw_notification_count = 0
+        session._coalesced_quote_replacement_count = 0
+        for index in range(500):
+            session._route_stdout_message(
+                {
+                    "method": "quote.trades",
+                    "params": {"symbol": "AAPL.US", "trades": [index]},
+                }
+            )
+        session._route_stdout_message({"id": 7, "result": {"ok": True}})
+
+        response = session.wait_for_response(7, lambda _message: None)
+
+        self.assertEqual(response["result"], {"ok": True})
+        self.assertEqual(session.messages.qsize(), 500)
+        self.assertEqual(session.responses.qsize(), 0)
 
     def test_close_waits_for_both_reader_threads_after_process_exit(self) -> None:
         class _Reader:
@@ -512,6 +545,7 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         session = object.__new__(LongbridgeServeSession)
         session.response_timeout_seconds = 30
         session.messages = queue.Queue()
+        session.responses = queue.Queue()
         session.pending_responses = {}
         session.process = _FakeProcess()
         session.reader_errors = ["invalid_json_stdout"]

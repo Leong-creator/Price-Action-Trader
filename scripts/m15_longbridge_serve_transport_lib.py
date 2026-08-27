@@ -189,6 +189,7 @@ class LongbridgeServeSession:
     ) -> None:
         self.response_timeout_seconds = response_timeout_seconds
         self.messages: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=100_000)
+        self.responses: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=10_000)
         self.pending_responses: dict[int, dict[str, Any]] = {}
         self.stderr_tail: deque[str] = deque(maxlen=200)
         self.reader_errors: deque[str] = deque(maxlen=20)
@@ -245,6 +246,12 @@ class LongbridgeServeSession:
         received_at = to_iso(datetime.now(UTC))
         message["_m15_received_at"] = received_at
         method = str(message.get("method") or "")
+        if not method and isinstance(message.get("id"), int):
+            try:
+                self.responses.put_nowait(message)
+            except queue.Full:
+                self.reader_errors.append("response_queue_full")
+            return
         params = message.get("params")
         symbol = normalize_symbol(
             params.get("symbol") if isinstance(params, dict) else ""
@@ -298,6 +305,8 @@ class LongbridgeServeSession:
                     self._coalesced_quote_replacement_count
                 ),
                 "raw_notification_count": self._raw_notification_count,
+                "notification_queue_depth": self.messages.qsize(),
+                "response_queue_depth": self.responses.qsize(),
                 "raw_reference_activity": raw_reference_activity,
             }
 
@@ -377,6 +386,18 @@ class LongbridgeServeSession:
             else timeout_seconds
         )
         while waiting and time.monotonic() < deadline:
+            try:
+                message = self.responses.get_nowait()
+            except queue.Empty:
+                message = None
+            if message is not None:
+                response_id = message.get("id")
+                if response_id in waiting:
+                    responses[response_id] = message
+                    waiting.remove(response_id)
+                elif isinstance(response_id, int):
+                    self.pending_responses[response_id] = message
+                continue
             for notification in self.drain_coalesced_quote_notifications():
                 on_notification(notification)
             reader_errors = list(getattr(self, "reader_errors", ()))
@@ -387,23 +408,31 @@ class LongbridgeServeSession:
                 )
             if self.process.poll() is not None:
                 raise RuntimeError(self.process_exit_detail())
-            try:
-                message = self.messages.get(
-                    timeout=min(0.25, max(0.01, deadline - time.monotonic()))
-                )
-            except queue.Empty:
-                continue
-            if "method" in message:
-                on_notification(message)
-                continue
-            response_id = message.get("id")
-            if not isinstance(response_id, int):
-                continue
-            if response_id in waiting:
-                responses[response_id] = message
-                waiting.remove(response_id)
-                continue
-            self.pending_responses[response_id] = message
+            notification_deadline = min(deadline, time.monotonic() + 0.05)
+            processed_notifications = 0
+            while (
+                processed_notifications < MAX_NOTIFICATION_BATCH_MESSAGES
+                and time.monotonic() < notification_deadline
+            ):
+                try:
+                    notification = self.messages.get_nowait()
+                except queue.Empty:
+                    break
+                on_notification(notification)
+                processed_notifications += 1
+            if waiting:
+                try:
+                    message = self.responses.get(
+                        timeout=min(0.05, max(0.01, deadline - time.monotonic()))
+                    )
+                except queue.Empty:
+                    continue
+                response_id = message.get("id")
+                if response_id in waiting:
+                    responses[response_id] = message
+                    waiting.remove(response_id)
+                elif isinstance(response_id, int):
+                    self.pending_responses[response_id] = message
             if len(self.pending_responses) > 10_000:
                 self.pending_responses.pop(next(iter(self.pending_responses)))
         for notification in self.drain_coalesced_quote_notifications():
