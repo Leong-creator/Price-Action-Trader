@@ -338,6 +338,18 @@ class LongbridgeServeTransportTest(unittest.TestCase):
             ),
             {"QQQ.US"},
         )
+        self.assertEqual(
+            subscription_symbols_from_result(
+                [
+                    {
+                        "symbol": "AAPL.US",
+                        "sub_types": ["quote", "trades"],
+                        "candlesticks": [],
+                    }
+                ]
+            ),
+            {"AAPL.US"},
+        )
 
     def test_process_resource_snapshot_reports_current_process(self) -> None:
         resources = process_resource_snapshot(os.getpid())

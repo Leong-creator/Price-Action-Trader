@@ -168,7 +168,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         subscription_batch_size=int(runtime.get("subscription_batch_size", 500)),
         subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
         subscription_request_interval_seconds=float(
-            runtime.get("subscription_request_interval_seconds", 0.5)
+            runtime.get("subscription_request_interval_seconds", 1.25)
         ),
         subscription_retry_backoff_seconds=float(
             runtime.get("subscription_retry_backoff_seconds", 2)

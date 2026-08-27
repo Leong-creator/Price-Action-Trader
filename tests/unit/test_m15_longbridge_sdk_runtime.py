@@ -294,6 +294,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
         self.assertEqual(config.longbridge_serve_batch_size, 10)
         self.assertEqual(config.longbridge_serve_response_timeout_seconds, 30)
+        self.assertEqual(config.subscription_request_interval_seconds, 1.25)
 
     def test_serve_transport_binary_must_match_pinned_checksum(self) -> None:
         with TemporaryDirectory() as tmp:

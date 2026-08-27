@@ -91,7 +91,7 @@
     "subscription_deadline_seconds": 30,
     "subscription_failures_before_snapshot_fallback": 1,
     "subscription_progress_deadline_seconds": 90,
-    "subscription_request_interval_seconds": 0.5,
+    "subscription_request_interval_seconds": 1.25,
     "subscription_retry_backoff_seconds": 2,
     "subscription_retry_count": 2
   },

@@ -94,6 +94,11 @@ def subscription_symbols_from_result(result: Any) -> set[str]:
             continue
         symbol = normalize_symbol(row.get("symbol"))
         fields = set(row.get("fields") or [])
+        named_sub_types = {
+            str(value).strip().lower()
+            for value in row.get("sub_types") or []
+            if str(value).strip()
+        }
         sub_types = {
             int(value)
             for value in row.get("sub_type") or []
@@ -101,6 +106,7 @@ def subscription_symbols_from_result(result: Any) -> set[str]:
         }
         if symbol and (
             {"quote", "trades"}.issubset(fields)
+            or {"quote", "trades"}.issubset(named_sub_types)
             or REQUIRED_SUBSCRIPTION_TYPES.issubset(sub_types)
         ):
             subscribed.add(symbol)
