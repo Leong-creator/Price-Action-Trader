@@ -29,6 +29,13 @@ def main() -> int:
     parser.add_argument("--fields", choices=("quote", "trade", "quote,trade"), required=True)
     parser.add_argument("--duration-seconds", type=float, default=1800)
     parser.add_argument("--batch-size", type=int)
+    parser.add_argument(
+        "--subscription-mode",
+        choices=("split", "combined"),
+        default="split",
+        help="Send quote/trade fields in separate requests or one combined request per batch.",
+    )
+    parser.add_argument("--request-interval-seconds", type=float, default=0.0)
     parser.add_argument("--client-id-file", default="~/.config/price-action-trader/longbridge_sdk_client_id")
     parser.add_argument("--region", choices=("cn", "global"), default="cn")
     parser.add_argument("--cli-binary", default="longbridge")
@@ -58,6 +65,8 @@ def main() -> int:
             duration_seconds=args.duration_seconds,
             batch_size=args.batch_size if args.batch_size is not None else 10,
             region=args.region,
+            subscription_mode=args.subscription_mode,
+            request_interval_seconds=args.request_interval_seconds,
         )
     destination = Path(args.output)
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -202,6 +202,37 @@ class M15QuoteTransportCanaryTest(unittest.TestCase):
         )
         self.assertEqual(payload["subscription_request_count"], 4)
 
+    def test_cli_serve_canary_can_match_combined_throttled_production_requests(self) -> None:
+        sleeps = []
+        with patch(
+            "scripts.m15_quote_transport_canary_lib.LongbridgeServeSession",
+            FakeServeSession,
+        ):
+            payload = run_cli_serve_canary(
+                binary="unused",
+                symbols=["SPY.US", "QQQ.US", "AAPL.US"],
+                fields=("quote", "trade"),
+                duration_seconds=0,
+                batch_size=2,
+                subscription_mode="combined",
+                request_interval_seconds=1.25,
+                sleep=sleeps.append,
+            )
+
+        subscribe_requests = [
+            row
+            for row in FakeServeSession.instance.sent
+            if row["method"] == "quote.subscribe"
+        ]
+        self.assertEqual(len(subscribe_requests), 2)
+        self.assertEqual(
+            [row["params"]["fields"] for row in subscribe_requests],
+            [["quote", "trades"], ["quote", "trades"]],
+        )
+        self.assertEqual(sleeps, [1.25, 1.25])
+        self.assertEqual(payload["subscription_mode"], "combined")
+        self.assertEqual(payload["subscription_request_count"], 2)
+
     def test_subscription_failure_is_reported_instead_of_crashing(self) -> None:
         sdk = SimpleNamespace(
             QuoteContext=FailingBatchQuoteContext,
