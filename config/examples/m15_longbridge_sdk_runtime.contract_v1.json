@@ -66,7 +66,7 @@
     "exit_order_reprice_seconds": 60,
     "heartbeat_interval_seconds": 1,
     "live_execution": false,
-    "longbridge_serve_batch_size": 10,
+    "longbridge_serve_batch_size": 500,
     "longbridge_serve_binary": "local_runtime/tools/longbridge-terminal-0.28.2/longbridge",
     "longbridge_serve_binary_sha256": "acfeefd6be07f871d03158054c79ad5a950af3a17fd89aca5c90563f448a04d8",
     "longbridge_serve_response_timeout_seconds": 30,

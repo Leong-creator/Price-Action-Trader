@@ -201,7 +201,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             runtime.get("longbridge_serve_binary_sha256", "")
         ).lower(),
         longbridge_serve_batch_size=int(
-            runtime.get("longbridge_serve_batch_size", 10)
+            runtime.get("longbridge_serve_batch_size", 500)
         ),
         longbridge_serve_response_timeout_seconds=int(
             runtime.get("longbridge_serve_response_timeout_seconds", 30)
@@ -366,8 +366,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
             raise ValueError("M15 longbridge serve quote HTTP URL must use HTTPS")
         if not config.quote_ws_url.startswith("wss://"):
             raise ValueError("M15 longbridge serve quote WebSocket URL must use WSS")
-        if not 1 <= config.longbridge_serve_batch_size <= 50:
-            raise ValueError("M15 longbridge serve batch size must be between 1 and 50")
+        if not 1 <= config.longbridge_serve_batch_size <= 500:
+            raise ValueError("M15 longbridge serve batch size must be between 1 and 500")
         if not 5 <= config.longbridge_serve_response_timeout_seconds <= 60:
             raise ValueError(
                 "M15 longbridge serve response timeout must be between 5 and 60 seconds"
