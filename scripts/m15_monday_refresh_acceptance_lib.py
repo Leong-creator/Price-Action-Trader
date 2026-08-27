@@ -256,7 +256,8 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "marketdata_integrity_gate",
             "完整交易日行情门禁必须明确给出结果；未通过时关闭新开仓，并展示完整边界与实时 K 线事实",
             marketdata_gate["gate_passed"],
-            marketdata_gate["waiting"] and marketdata_gate["artifacts_healthy"],
+            (marketdata_gate["waiting"] or pending_flatten)
+            and marketdata_gate["artifacts_healthy"],
             marketdata_gate["summary"],
             waiting_status="waiting_for_marketdata_acceptance",
         ),
@@ -407,8 +408,30 @@ def marketdata_gate_truth(
     artifacts_healthy = runtime_artifact.get("status") == "ok" and readiness_artifact.get("status") == "ok"
     complete_boundary_count = safe_int(runtime.get("complete_boundary_count"))
     realtime_tradable_bar_count = safe_int(runtime.get("realtime_tradable_bar_count"))
-    readonly_waiting = str(readiness.get("readiness_status") or "") == "waiting_for_marketdata_acceptance"
-    gate_passed = not readonly_waiting
+    readiness_status = str(readiness.get("readiness_status") or "")
+    gate_block_reason = str(runtime.get("dispatch_block_reason") or "")
+    readonly_waiting = (
+        readiness_status == "waiting_for_marketdata_acceptance"
+        or gate_block_reason
+        in {"complete_market_session_gate", "two_day_readonly_gate"}
+    )
+    explicit_gate_passed = runtime.get(
+        "complete_session_gate_passed",
+        runtime.get("readonly_gate_passed"),
+    ) is True
+    active_dispatch_proves_gate = bool(
+        runtime.get("sdk_connected") is True
+        and runtime.get("dispatch_enabled") is True
+        and readiness.get("new_position_submission_enabled") is True
+        and readiness_status
+        in {
+            "armed_waiting_regular_session",
+            "ready_for_regular_session",
+            "ready_for_longbridge_paper_orders",
+            "ready_regular_session",
+        }
+    )
+    gate_passed = explicit_gate_passed or active_dispatch_proves_gate
     if not artifacts_healthy:
         summary = (
             f"行情门禁工件异常：runtime={runtime_artifact.get('status')}，readiness={readiness_artifact.get('status')}；"

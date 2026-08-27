@@ -8,11 +8,31 @@ from pathlib import Path
 
 from scripts.m15_monday_refresh_acceptance_lib import (
     MondayRefreshAcceptanceConfig,
+    marketdata_gate_truth,
     run_m15_monday_refresh_acceptance,
 )
 
 
 class M15MondayRefreshAcceptanceTest(unittest.TestCase):
+    def test_runtime_failure_cannot_be_reported_as_marketdata_gate_passed(self) -> None:
+        gate = marketdata_gate_truth(
+            {
+                "sdk_connected": False,
+                "dispatch_enabled": False,
+                "complete_boundary_count": 0,
+                "realtime_tradable_bar_count": 0,
+            },
+            {
+                "readiness_status": "blocked_opening_readiness",
+                "new_position_submission_enabled": False,
+            },
+            {"status": "ok"},
+            {"status": "ok"},
+        )
+
+        self.assertFalse(gate["gate_passed"])
+        self.assertEqual(gate["status"], "blocked")
+
     def test_sdk_chain_is_armed_while_waiting_for_regular_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)
