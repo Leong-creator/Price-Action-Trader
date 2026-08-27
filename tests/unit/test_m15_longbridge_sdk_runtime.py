@@ -88,59 +88,54 @@ from scripts.run_m15_longbridge_sdk_runtime import (
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
-    def test_production_transport_selects_longbridge_serve_worker(self) -> None:
+    def test_production_transport_selects_official_sdk_worker(self) -> None:
         config = load_config()
         self.assertEqual(
             configured_market_data_mode(config),
-            "longbridge_serve_subscription",
+            "sdk_subscription",
         )
         self.assertEqual(
             configured_quote_worker(config).__name__,
-            "longbridge_serve_quote_worker",
+            "quote_worker",
         )
         self.assertTrue(
             market_data_mode_qualifies_for_subscription_gate(
-                "longbridge_serve_subscription"
+                "sdk_subscription"
             )
         )
 
-    def test_preflight_uses_serve_transport_instead_of_sdk_quote(self) -> None:
+    def test_preflight_uses_official_sdk_quote(self) -> None:
         config = load_config()
-        with (
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
-                return_value=False,
-            ),
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.probe_longbridge_serve_transport",
-                return_value={
-                    "market_data_mode": "longbridge_serve_subscription",
-                    "subscription_coverage": "3/3",
-                },
-            ) as serve_probe,
+        quote = SimpleNamespace(quote=lambda _symbols: [])
+        sdk = SimpleNamespace(
+            Config=SimpleNamespace(from_oauth=lambda *_args, **_kwargs: object()),
+            QuoteContext=lambda _config: quote,
+        )
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
+            return_value=False,
         ):
-            result = run_market_data_preflight(config, SimpleNamespace(), object())
+            result = run_market_data_preflight(config, sdk, object())
 
         self.assertTrue(result["quote_ok"])
         self.assertEqual(
             result["quote_probe_source"],
-            "direct_longbridge_serve_preflight",
+            "direct_sdk_quote_probe",
         )
-        serve_probe.assert_called_once()
 
-    def test_preflight_fails_when_serve_authorization_or_initialize_fails(self) -> None:
+    def test_preflight_fails_when_sdk_quote_authorization_fails(self) -> None:
         config = load_config()
-        with (
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
-                return_value=False,
-            ),
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.probe_longbridge_serve_transport",
-                side_effect=RuntimeError("authorization_required"),
-            ),
+        sdk = SimpleNamespace(
+            Config=SimpleNamespace(from_oauth=lambda *_args, **_kwargs: object()),
+            QuoteContext=lambda _config: (_ for _ in ()).throw(
+                RuntimeError("authorization_required")
+            )
+        )
+        with patch(
+            "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
+            return_value=False,
         ):
-            result = run_market_data_preflight(config, SimpleNamespace(), object())
+            result = run_market_data_preflight(config, sdk, object())
 
         self.assertFalse(result["quote_ok"])
         self.assertIn("authorization_required", result["quote_error"])
@@ -262,10 +257,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(last_live["SPY.US"], 123.0)
         self.assertNotIn("AAPL.US", first_live)
 
-    def test_quote_worker_reports_reference_trade_activity(self) -> None:
+    def test_quote_worker_reports_reference_quote_activity(self) -> None:
         source = inspect.getsource(quote_worker)
         self.assertIn('"kind": "market_activity"', source)
-        self.assertIn('"longbridge_sdk_trade_push"', source)
+        self.assertIn('"longbridge_sdk_quote_push"', source)
 
     def test_runtime_keeps_account_refresh_independent_during_quote_subscription(self) -> None:
         source = inspect.getsource(__import__(
@@ -287,14 +282,14 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(config.subscription_deadline_seconds, 30)
         self.assertEqual(config.subscription_progress_deadline_seconds, 90)
         self.assertEqual(config.subscription_circuit_retry_seconds, 300)
-        self.assertEqual(config.subscription_batch_size, 500)
+        self.assertEqual(config.subscription_batch_size, 10)
         self.assertEqual(
             config.market_data_transport,
-            "longbridge_serve_persistent_jsonrpc",
+            "official_sdk_persistent_websocket",
         )
         self.assertEqual(config.longbridge_serve_batch_size, 500)
         self.assertEqual(config.longbridge_serve_response_timeout_seconds, 30)
-        self.assertEqual(config.subscription_request_interval_seconds, 1.25)
+        self.assertEqual(config.subscription_request_interval_seconds, 0.1)
         self.assertEqual(config.quote_http_url, "https://openapi.longbridge.cn")
         self.assertEqual(
             config.quote_ws_url,
@@ -309,6 +304,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             digest = hashlib.sha256(binary.read_bytes()).hexdigest()
             config = replace(
                 load_config(),
+                market_data_transport="longbridge_serve_persistent_jsonrpc",
                 longbridge_serve_binary=binary,
                 longbridge_serve_binary_sha256=digest,
             )
@@ -870,7 +866,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "market_data_recovering",
         )
 
-    def test_quote_worker_registers_both_callbacks_and_verifies_subscription(self) -> None:
+    def test_quote_worker_registers_quote_callback_and_verifies_subscription(self) -> None:
         tree = ast.parse(textwrap.dedent(inspect.getsource(quote_worker)))
         called_methods = [
             node.func.attr
@@ -881,7 +877,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertIn("subscriptions", called_methods)
         self.assertIn("quote", called_methods)
         self.assertEqual(called_methods.count("set_on_quote"), 1)
-        self.assertEqual(called_methods.count("set_on_trades"), 1)
+        self.assertEqual(called_methods.count("set_on_trades"), 0)
 
     def test_snapshot_fallback_requires_configured_subscription_failures(self) -> None:
         self.assertFalse(should_use_snapshot_fallback(0, 1))
@@ -3187,7 +3183,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(runtime_config.required_complete_sessions, 1)
         self.assertEqual(
             runtime_config.market_data_transport,
-            "longbridge_serve_persistent_jsonrpc",
+            "official_sdk_persistent_websocket",
         )
         self.assertFalse(runtime_config.allow_snapshot_poll_fallback)
         dispatch_requested = True

@@ -85,7 +85,7 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
         self.assertEqual(runtime["runtime"]["required_complete_sessions"], 1)
         self.assertEqual(
             runtime["runtime"]["market_data_transport"],
-            "longbridge_serve_persistent_jsonrpc",
+            "official_sdk_persistent_websocket",
         )
         self.assertEqual(
             runtime["runtime"]["longbridge_serve_binary_sha256"],
@@ -99,7 +99,7 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
         self.assertEqual(runtime["runtime"]["subscription_deadline_seconds"], 30)
         self.assertEqual(runtime["runtime"]["subscription_progress_deadline_seconds"], 90)
         self.assertEqual(runtime["runtime"]["subscription_circuit_retry_seconds"], 300)
-        self.assertEqual(runtime["runtime"]["subscription_batch_size"], 500)
+        self.assertEqual(runtime["runtime"]["subscription_batch_size"], 10)
         self.assertEqual(runtime["runtime"]["maximum_consecutive_subscription_failures"], 3)
         self.assertTrue(
             runtime["outputs"]["readonly_gate"].endswith(

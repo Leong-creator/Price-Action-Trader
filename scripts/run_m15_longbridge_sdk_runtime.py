@@ -969,14 +969,32 @@ def quote_worker(
         )
 
         aggregation_enabled = False
-        last_trade_activity_emit_by_symbol: dict[str, float] = {}
+        last_quote_activity_emit_by_symbol: dict[str, float] = {}
 
         def on_quote(symbol: str, event: Any) -> None:
             if not aggregation_enabled:
                 return
             received_at = datetime.now(UTC)
             payload = sdk_object_to_dict(event)
-            builder.seed_quote(symbol, payload, received_at=received_at)
+            if should_emit_reference_market_activity(
+                symbol,
+                now_monotonic=time.monotonic(),
+                last_emit_by_symbol=last_quote_activity_emit_by_symbol,
+            ):
+                emit_worker(
+                    queue_out,
+                    {
+                        "kind": "market_activity",
+                        "symbol": symbol,
+                        "received_at": to_iso(received_at),
+                        "source_mode": "longbridge_sdk_quote_push",
+                    },
+                )
+            completed = builder.on_quote(
+                symbol,
+                payload,
+                received_at=received_at,
+            )
             emit_worker(
                 queue_out,
                 {
@@ -987,27 +1005,6 @@ def quote_worker(
                     "source_mode": "longbridge_sdk_push",
                 },
             )
-
-        def on_trades(symbol: str, event: Any) -> None:
-            if not aggregation_enabled:
-                return
-            received_at = datetime.now(UTC)
-            if should_emit_reference_market_activity(
-                symbol,
-                now_monotonic=time.monotonic(),
-                last_emit_by_symbol=last_trade_activity_emit_by_symbol,
-            ):
-                emit_worker(
-                    queue_out,
-                    {
-                        "kind": "market_activity",
-                        "symbol": symbol,
-                        "received_at": to_iso(received_at),
-                        "source_mode": "longbridge_sdk_trade_push",
-                    },
-                )
-            payload = sdk_object_to_dict(event)
-            completed = builder.on_trade(symbol, payload, received_at=received_at)
             if completed:
                 emit_worker(queue_out, {"kind": "bars", "rows": completed})
 
@@ -1016,7 +1013,6 @@ def quote_worker(
         # The in-memory gate drains the initial snapshot burst without doing
         # bar aggregation and does not make another SDK call.
         quote.set_on_quote(on_quote)
-        quote.set_on_trades(on_trades)
 
         def report_subscription_progress(completed: int, total: int) -> None:
             emit_worker(
@@ -1043,7 +1039,7 @@ def quote_worker(
         failed = subscribe_quote_and_trades(
             quote,
             subscription_targets,
-            [sdk.SubType.Quote, sdk.SubType.Trade],
+            [sdk.SubType.Quote],
             batch_size=config.subscription_batch_size,
             retry_count=config.subscription_retry_count,
             progress_callback=report_subscription_progress,
