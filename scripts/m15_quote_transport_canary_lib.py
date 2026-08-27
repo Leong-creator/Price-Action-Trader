@@ -263,44 +263,46 @@ def run_cli_serve_canary(
                 or initialization["error"]
             )
 
-        for batch in batches:
-            if initialization_error:
-                break
-            request_id += 1
-            session.send(
-                {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "method": "quote.subscribe",
-                    "params": {
-                        "symbols": batch,
-                        "fields": cli_serve_subscription_fields(fields),
-                    },
-                }
-            )
-            try:
-                response = session.wait_for_response(request_id, record_message)
-            except TimeoutError:
-                response = None
-            if response is None:
-                subscription_errors.append(
+        wire_fields = cli_serve_subscription_fields(fields)
+        for field in wire_fields:
+            for batch in batches:
+                if initialization_error:
+                    break
+                request_id += 1
+                session.send(
                     {
-                        "request_id": request_id,
-                        "message": "subscription_response_timeout",
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "method": "quote.subscribe",
+                        "params": {
+                            "symbols": batch,
+                            "fields": [field],
+                        },
                     }
                 )
-                continue
-            error = response.get("error")
-            if isinstance(error, dict):
-                subscription_errors.append(
-                    {
-                        "request_id": request_id,
-                        "message": str(error.get("message") or error),
-                    }
+                try:
+                    response = session.wait_for_response(request_id, record_message)
+                except TimeoutError:
+                    response = None
+                if response is None:
+                    subscription_errors.append(
+                        {
+                            "request_id": request_id,
+                            "message": "subscription_response_timeout",
+                        }
+                    )
+                    continue
+                error = response.get("error")
+                if isinstance(error, dict):
+                    subscription_errors.append(
+                        {
+                            "request_id": request_id,
+                            "message": str(error.get("message") or error),
+                        }
+                    )
+                subscribed.update(
+                    subscription_symbols_from_result(response.get("result"))
                 )
-            subscribed.update(
-                subscription_symbols_from_result(response.get("result"))
-            )
 
         request_id += 1
         session.send(
@@ -351,7 +353,7 @@ def run_cli_serve_canary(
         "wire_fields": cli_serve_subscription_fields(fields),
         "region": region,
         "batch_size": batch_size,
-        "subscription_request_count": len(batches),
+        "subscription_request_count": len(batches) * len(wire_fields),
         "requested_symbol_count": len(symbols),
         "actual_subscription_count": len(subscribed & set(symbols)),
         "missing_subscriptions": sorted(set(symbols) - subscribed),
