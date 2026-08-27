@@ -814,6 +814,8 @@ def longbridge_serve_quote_worker(
             method: str,
             batches: list[list[str]],
             response_handler: Any,
+            *,
+            subscription_fields: list[str] | None = None,
         ) -> None:
             nonlocal request_id
             for offset in range(0, len(batches), MAX_SERVE_INFLIGHT_REQUESTS):
@@ -826,7 +828,9 @@ def longbridge_serve_quote_worker(
                     request_id += 1
                     params: dict[str, Any] = {"symbols": batch}
                     if method == "quote.subscribe":
-                        params["fields"] = ["quote", "trades"]
+                        params["fields"] = list(
+                            subscription_fields or ["quote", "trades"]
+                        )
                     session.send(
                         {
                             "jsonrpc": "2.0",
@@ -882,11 +886,20 @@ def longbridge_serve_quote_worker(
                 missing = sorted(expected - subscribed)
                 if not missing or remaining_progress_seconds() <= 0:
                     break
-                send_windowed_requests(
-                    "quote.subscribe",
-                    symbol_batches(missing, config.longbridge_serve_batch_size),
-                    apply_subscribe_response,
+                batches = symbol_batches(
+                    missing, config.longbridge_serve_batch_size
                 )
+                # A combined 147-symbol quote+trades request can wait until the
+                # CLI's 30-second timeout during the opening burst. Two field-
+                # specific requests on the same connection return promptly and
+                # preserve the one-account/one-long-link boundary.
+                for fields in (["quote"], ["trades"]):
+                    send_windowed_requests(
+                        "quote.subscribe",
+                        batches,
+                        apply_subscribe_response,
+                        subscription_fields=fields,
+                    )
                 if expected - subscribed:
                     query_active_subscriptions()
                 emit_worker(

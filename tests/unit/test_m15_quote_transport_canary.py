@@ -195,9 +195,12 @@ class M15QuoteTransportCanaryTest(unittest.TestCase):
                 "initialize",
                 "quote.subscribe",
                 "quote.subscribe",
+                "quote.subscribe",
+                "quote.subscribe",
                 "quote.subscriptions",
             ],
         )
+        self.assertEqual(payload["subscription_request_count"], 4)
 
     def test_subscription_failure_is_reported_instead_of_crashing(self) -> None:
         sdk = SimpleNamespace(
