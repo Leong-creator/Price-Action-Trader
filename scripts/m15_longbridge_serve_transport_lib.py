@@ -929,13 +929,13 @@ def longbridge_serve_quote_worker(
                 )
             return expected - initial_quote_symbols
 
-        # The 147-symbol strategy pool is mandatory. Existing out-of-pool
-        # positions are subscribed separately so a slow monitoring batch cannot
-        # destroy an otherwise healthy strategy feed.
-        subscribe_group(base_targets)
-        fetch_initial_quotes(base_targets)
-        subscribe_group(monitoring_targets)
-        fetch_initial_quotes(monitoring_targets)
+        # Subscribe the strategy pool and held-position monitoring symbols in
+        # the same two field-specific requests. Sending another pair after the
+        # 147-symbol pool can time out even though all targets fit below the
+        # broker's 500-symbol limit. Readiness still evaluates the strategy pool
+        # and monitoring-only symbols independently below.
+        subscribe_group(targets)
+        fetch_initial_quotes(targets)
 
         base_expected = set(base_targets)
         monitoring_expected = set(monitoring_targets)

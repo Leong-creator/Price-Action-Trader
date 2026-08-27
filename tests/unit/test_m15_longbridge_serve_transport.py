@@ -952,15 +952,11 @@ class LongbridgeServeTransportTest(unittest.TestCase):
             for request in session.sent
             if request.get("method") == "quote.subscribe"
         ]
-        self.assertEqual(len(subscribe_requests), 4)
-        self.assertEqual(len(subscribe_requests[0]["params"]["symbols"]), 147)
+        self.assertEqual(len(subscribe_requests), 2)
+        self.assertEqual(len(subscribe_requests[0]["params"]["symbols"]), 156)
         self.assertEqual(subscribe_requests[0]["params"]["fields"], ["quote"])
-        self.assertEqual(len(subscribe_requests[1]["params"]["symbols"]), 147)
+        self.assertEqual(len(subscribe_requests[1]["params"]["symbols"]), 156)
         self.assertEqual(subscribe_requests[1]["params"]["fields"], ["trades"])
-        self.assertEqual(len(subscribe_requests[2]["params"]["symbols"]), 9)
-        self.assertEqual(subscribe_requests[2]["params"]["fields"], ["quote"])
-        self.assertEqual(len(subscribe_requests[3]["params"]["symbols"]), 9)
-        self.assertEqual(subscribe_requests[3]["params"]["fields"], ["trades"])
         self.assertLessEqual(max(session.concurrent_request_counts), 1)
 
     def test_monitoring_subscription_timeout_keeps_base_worker_ready(self) -> None:
