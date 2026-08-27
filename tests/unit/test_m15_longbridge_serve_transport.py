@@ -13,6 +13,7 @@ from unittest.mock import patch
 from scripts.m15_longbridge_serve_transport_lib import (
     LongbridgeServeSession,
     emit_worker,
+    longbridge_serve_environment,
     longbridge_serve_quote_worker,
     merge_quote_payload,
     normalize_symbol,
@@ -356,6 +357,26 @@ class LongbridgeServeTransportTest(unittest.TestCase):
         self.assertGreater(resources["rss_kb"], 0)
         self.assertGreater(resources["thread_count"], 0)
         self.assertGreater(resources["file_descriptor_count"], 0)
+
+    def test_serve_environment_pins_quote_endpoints_without_removing_proxy(self) -> None:
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://proxy.invalid:8080"}):
+            environment = longbridge_serve_environment(
+                region="cn",
+                http_url="https://openapi.longbridge.cn",
+                quote_ws_url="wss://openapi-quote.longbridge.cn/v2",
+                owner_value="test-owner",
+            )
+
+        self.assertEqual(environment["HTTPS_PROXY"], "http://proxy.invalid:8080")
+        self.assertEqual(environment["LONGBRIDGE_REGION"], "cn")
+        self.assertEqual(
+            environment["LONGBRIDGE_HTTP_URL"],
+            "https://openapi.longbridge.cn",
+        )
+        self.assertEqual(
+            environment["LONGBRIDGE_QUOTE_WS_URL"],
+            "wss://openapi-quote.longbridge.cn/v2",
+        )
 
     def test_emit_worker_never_waits_when_cross_process_queue_is_full(self) -> None:
         output = queue.Queue(maxsize=1)

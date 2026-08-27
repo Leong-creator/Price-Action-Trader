@@ -36,6 +36,8 @@
   "oauth": {
     "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
     "quote_region": "cn",
+    "quote_http_url": "https://openapi.longbridge.cn",
+    "quote_ws_url": "wss://openapi-quote.longbridge.cn/v2",
     "trade_region": "cn"
   },
   "outputs": {

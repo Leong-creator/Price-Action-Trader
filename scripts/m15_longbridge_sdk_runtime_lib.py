@@ -52,6 +52,8 @@ class SdkRuntimeConfig:
     readonly_gate_path: Path
     client_id_file: Path
     quote_region: str
+    quote_http_url: str
+    quote_ws_url: str
     trade_region: str
     market: str
     use_seed_universe: bool
@@ -140,6 +142,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         readonly_gate_path=resolve_path(outputs.get("readonly_gate", "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_readonly_gate.json")),
         client_id_file=Path(str(oauth["client_id_file"])).expanduser(),
         quote_region=str(oauth.get("quote_region", "cn")),
+        quote_http_url=str(oauth.get("quote_http_url", "")).strip(),
+        quote_ws_url=str(oauth.get("quote_ws_url", "")).strip(),
         trade_region=str(oauth.get("trade_region", "cn")),
         market=str(market_data.get("market", "US")).upper(),
         use_seed_universe=bool(market_data.get("use_seed_universe", True)),
@@ -358,6 +362,10 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     }:
         raise ValueError("M15 market data transport is unsupported")
     if config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
+        if not config.quote_http_url.startswith("https://"):
+            raise ValueError("M15 longbridge serve quote HTTP URL must use HTTPS")
+        if not config.quote_ws_url.startswith("wss://"):
+            raise ValueError("M15 longbridge serve quote WebSocket URL must use WSS")
         if not 1 <= config.longbridge_serve_batch_size <= 50:
             raise ValueError("M15 longbridge serve batch size must be between 1 and 50")
         if not 5 <= config.longbridge_serve_response_timeout_seconds <= 60:
