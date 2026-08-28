@@ -17,6 +17,7 @@
 - `Trade` 推送生成真实五分钟开高低收和成交量；`Quote` 推送维护最新价格和行情健康。
 - 无成交标的可生成 `official_sdk_no_trade_carry_forward` 零成交平K线，但不得触发开仓。
 - 行情CLI、`longbridge serve`、快照轮询、历史补录和本地模拟数据均无开仓资格。
+- M15运行期间，本地盘后研究任务不得创建第二个长桥行情连接或调用长桥行情CLI。自动启动不再拉起本地盘后调度器；确需运行本地研究时必须先人工停止M15行情进程，完成后再按正式流程启动M15。
 
 ## 故障处理
 
@@ -48,6 +49,7 @@
   - `config/m15_longbridge_marketdata.production.json`
   - `config/m15_opening_trade_readiness.production.json`
   - `config/m15_background_watchdog.production.json`
+- 自动启动只拉起M15 SDK和M15看护器，不启动本地盘后研究调度器。
 - 新开仓前必须在干净、已推送远端的提交上签发部署清单。
 - 运行提交、配置哈希、源码哈希或部署清单不一致时只允许退出。
 - 每个主题执行编译、聚焦单测、敏感信息扫描、大文件检查和 `git diff --check` 后才可合并。

@@ -63,10 +63,6 @@ start_stack() {
     --daemon \
     --config config/m15_background_watchdog.production.json || failed=1
 
-  run_step "start local postclose scheduler" \
-    "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
-    --daemon \
-    --config config/examples/m12_m14_local_postclose_scheduler.json || failed=1
   return "$failed"
 }
 
@@ -84,10 +80,5 @@ run_step "check M15 background watchdog status" \
   "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
   --status \
   --config config/m15_background_watchdog.production.json
-
-run_step "check local postclose scheduler status" \
-  "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
-  --status \
-  --config config/examples/m12_m14_local_postclose_scheduler.json
 
 echo "==== $(date -u +%Y-%m-%dT%H:%M:%SZ) M15 startup bootstrap done ===="
