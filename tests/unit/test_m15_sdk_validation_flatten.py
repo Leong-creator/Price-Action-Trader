@@ -34,11 +34,12 @@ class M15SdkValidationFlattenTest(unittest.TestCase):
         self.assertEqual(plan[0]["position_action"], "close_long")
         self.assertEqual(plan[0]["order_type"], "market")
         self.assertEqual(plan[0]["limit_price"], "")
-        self.assertEqual(plan[0]["fallback_limit_price"], "109.45")
+        self.assertEqual(plan[0]["reference_price"], "110")
+        self.assertEqual(plan[0]["reference_price_source"], "official_sdk_quote")
         self.assertEqual(plan[1]["side"], "buy")
         self.assertEqual(plan[1]["position_action"], "close_short")
         self.assertEqual(plan[1]["order_type"], "market")
-        self.assertEqual(plan[1]["fallback_limit_price"], "190.95")
+        self.assertEqual(plan[1]["reference_price"], "190")
 
     def test_refuses_partial_flatten_when_a_position_direction_is_unknown(self) -> None:
         plan, blockers = build_flatten_plan(
@@ -85,15 +86,14 @@ class M15SdkValidationFlattenTest(unittest.TestCase):
         self.assertFalse(result["complete"])
         self.assertEqual(result["pending_confirmation_count"], 1)
 
-    def test_market_flatten_can_proceed_without_a_fallback_price(self) -> None:
+    def test_market_flatten_stops_when_official_sdk_quote_is_missing(self) -> None:
         plan, blockers = build_flatten_plan(
             {"positions": [{"symbol": "AAPL.US", "quantity": "1", "available": "1"}]},
             {},
         )
 
-        self.assertEqual(blockers, [])
-        self.assertEqual(plan[0]["order_type"], "market")
-        self.assertEqual(plan[0]["fallback_limit_price"], "0.00")
+        self.assertEqual(plan, [])
+        self.assertEqual(blockers, ["sdk_quote_missing:AAPL.US"])
 
     def test_runtime_flatten_payload_has_stable_request_id(self) -> None:
         intent = {

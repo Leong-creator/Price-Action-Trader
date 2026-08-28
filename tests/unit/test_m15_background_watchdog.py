@@ -130,7 +130,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
     def test_watchdog_skips_account_analytics_refresh_before_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = self.make_config(root, runtime_engine="cli")
+            config = self.make_config(root, runtime_engine="sdk")
             config.output_dir.mkdir(parents=True, exist_ok=True)
             (config.output_dir / "m15_background_watchdog_status.json").write_text(
                 json.dumps(
@@ -162,12 +162,12 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
 
             analytics_step = next(step for step in payload["steps"] if step["step_id"] == "m15_account_state_full_refresh")
             self.assertTrue(analytics_step["skipped_due_to_throttle"])
-            self.assertFalse(any(command[1] == "scripts/run_m15_longbridge_realtime_account_state.py" for command in commands))
+            self.assertFalse(any(command[1] == "scripts/run_m15_longbridge_sdk_analytics.py" for command in commands))
 
     def test_watchdog_preserves_analytics_throttle_across_consecutive_skips(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = self.make_config(root, runtime_engine="cli")
+            config = self.make_config(root, runtime_engine="sdk")
             config.output_dir.mkdir(parents=True, exist_ok=True)
             (config.output_dir / "m15_background_watchdog_status.json").write_text(
                 json.dumps(
@@ -181,7 +181,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             analytics_commands: list[list[str]] = []
 
             def runner(command: list[str], _timeout: int):
-                if "run_m15_longbridge_realtime_account_state.py" in command:
+                if "run_m15_longbridge_sdk_analytics.py" in command:
                     analytics_commands.append(command)
                 return type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
 
@@ -206,7 +206,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
     def test_watchdog_runs_account_analytics_refresh_after_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = self.make_config(root, runtime_engine="cli")
+            config = self.make_config(root, runtime_engine="sdk")
             commands: list[list[str]] = []
             timeouts: list[int] = []
 
@@ -223,7 +223,7 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
 
             analytics_step = next(step for step in payload["steps"] if step["step_id"] == "m15_account_state_full_refresh")
             self.assertFalse(analytics_step["skipped_due_to_throttle"])
-            self.assertTrue(any(command[1] == "scripts/run_m15_longbridge_realtime_account_state.py" for command in commands))
+            self.assertTrue(any(command[1] == "scripts/run_m15_longbridge_sdk_analytics.py" for command in commands))
             self.assertIn(90, timeouts)
 
     def test_sdk_watchdog_refreshes_analytics_without_legacy_cli_script(self) -> None:
@@ -282,6 +282,10 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
                             "status": "running",
                             "sdk_connected": True,
                             "account_snapshot_healthy": True,
+                            "market_data_transport": "official_sdk_persistent_websocket",
+                            "automatic_market_data_retry_enabled": False,
+                            "snapshot_fallback_enabled": False,
+                            "quote_subscription_worker_count": 1,
                         }
                     )
                 elif script.endswith("run_m15_pa002_dual_version_milestone.py"):
@@ -346,91 +350,66 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(status_step["returncode"], 3)
             self.assertIn("sdk_runtime_not_ready:connecting", status_step["stderr_tail"])
 
-    def test_sdk_runtime_status_waits_for_transient_recovery(self) -> None:
+    def test_sdk_runtime_status_reports_transient_state_without_retrying(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_config(
-                Path(tmp), runtime_engine="sdk", runtime_recovery_grace_seconds=20
-            )
-            responses = iter(
-                [
-                    {"runtime_process_alive": True, "status": "connecting", "sdk_connected": False},
-                    {"runtime_process_alive": True, "status": "connecting", "sdk_connected": False},
-                    {
-                        "runtime_process_alive": True,
-                        "status": "running",
-                        "sdk_connected": True,
-                        "account_snapshot_healthy": True,
-                    },
-                ]
-            )
-            clock = [0.0]
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            calls = []
 
-            def runner(_command: list[str], _timeout: int):
+            def runner(command: list[str], _timeout: int):
+                calls.append(command)
                 return type(
                     "Result",
                     (),
-                    {"returncode": 0, "stdout": json.dumps(next(responses)), "stderr": ""},
+                    {
+                        "returncode": 0,
+                        "stdout": json.dumps(
+                            {
+                                "runtime_process_alive": True,
+                                "status": "connecting",
+                                "sdk_connected": False,
+                                "account_snapshot_healthy": True,
+                            }
+                        ),
+                        "stderr": "",
+                    },
                 )()
 
-            def sleep(seconds: float) -> None:
-                clock[0] += seconds
+            step = m15_runtime_status_step(config, runner)
 
-            step = m15_runtime_status_step(
-                config,
-                runner,
-                sleep=sleep,
-                monotonic=lambda: clock[0],
-            )
+            self.assertNotEqual(step["returncode"], 0)
+            self.assertEqual(len(calls), 1)
+            self.assertIn("sdk_runtime_not_ready:connecting", step["stderr_tail"])
 
-            self.assertEqual(step["returncode"], 0)
-            self.assertEqual(step["recovery_check_attempts"], 3)
-            self.assertTrue(step["recovered_within_grace"])
-
-    def test_sdk_runtime_status_waits_for_planned_market_data_circuit_retry(self) -> None:
+    def test_sdk_runtime_status_reports_fault_halted_without_retrying(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_config(
-                Path(tmp), runtime_engine="sdk", runtime_recovery_grace_seconds=20
-            )
-            responses = iter(
-                [
-                    {
-                        "runtime_process_alive": True,
-                        "status": "halted_market_data_circuit",
-                        "sdk_connected": False,
-                        "account_snapshot_healthy": True,
-                        "market_data_circuit_open": True,
-                        "market_data_retry_after_seconds": 300,
-                    },
-                    {
-                        "runtime_process_alive": True,
-                        "status": "running",
-                        "sdk_connected": True,
-                        "account_snapshot_healthy": True,
-                    },
-                ]
-            )
-            clock = [0.0]
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            calls = []
 
-            def runner(_command: list[str], _timeout: int):
+            def runner(command: list[str], _timeout: int):
+                calls.append(command)
                 return type(
                     "Result",
                     (),
-                    {"returncode": 0, "stdout": json.dumps(next(responses)), "stderr": ""},
+                    {
+                        "returncode": 0,
+                        "stdout": json.dumps(
+                            {
+                                "runtime_process_alive": True,
+                                "status": "fault_halted",
+                                "sdk_connected": False,
+                                "account_snapshot_healthy": True,
+                                "market_data_fault_halted": True,
+                            }
+                        ),
+                        "stderr": "",
+                    },
                 )()
 
-            def sleep(seconds: float) -> None:
-                clock[0] += seconds
+            step = m15_runtime_status_step(config, runner)
 
-            step = m15_runtime_status_step(
-                config,
-                runner,
-                sleep=sleep,
-                monotonic=lambda: clock[0],
-            )
-
-            self.assertEqual(step["returncode"], 0)
-            self.assertEqual(step["recovery_check_attempts"], 2)
-            self.assertTrue(step["recovered_within_grace"])
+            self.assertNotEqual(step["returncode"], 0)
+            self.assertEqual(len(calls), 1)
+            self.assertIn("sdk_runtime_not_ready:fault_halted", step["stderr_tail"])
 
     def test_watchdog_reports_logically_blocked_acceptance_as_needs_attention(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

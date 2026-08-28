@@ -174,7 +174,7 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
                 "waiting_for_marketdata_acceptance",
             )
 
-    def test_legacy_gate_status_remains_safe_waiting_during_migration(self) -> None:
+    def test_removed_legacy_gate_status_is_not_current_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)
             runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
@@ -198,7 +198,7 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
 
             self.assertEqual(
                 payload["acceptance_status"],
-                "armed_waiting_marketdata_acceptance",
+                "blocked_monday_acceptance",
             )
             self.assertFalse(payload["new_position_submission_enabled"])
 
