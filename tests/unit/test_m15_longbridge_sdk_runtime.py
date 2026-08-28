@@ -47,6 +47,7 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     effective_runtime_dispatch_enabled,
     is_orphaned_sdk_runtime_child,
     market_data_mode_qualifies_for_subscription_gate,
+    mark_runtime_operator_stopped,
     run_market_data_preflight,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
@@ -1067,6 +1068,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(
             runtime_requires_health_replacement(
                 {
+                    "status": "running",
                     "generated_at": datetime.now(UTC).isoformat(),
                     "account_snapshot_age_seconds": 181,
                 },
@@ -1079,12 +1081,47 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertFalse(
             runtime_requires_health_replacement(
                 {
+                    "status": "running",
                     "generated_at": datetime.now(UTC).isoformat(),
                     "account_snapshot_age_seconds": 8,
                 },
                 config,
             )
         )
+
+    def test_operator_stopped_runtime_never_latches_stale_health(self) -> None:
+        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
+        self.assertFalse(
+            runtime_requires_health_replacement(
+                {
+                    "status": "operator_stopped",
+                    "generated_at": "2026-08-20T00:00:00Z",
+                    "account_snapshot_age_seconds": 999,
+                },
+                config,
+            )
+        )
+
+    def test_operator_stop_marker_preserves_auditable_reason(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = replace(
+                load_config(),
+                output_dir=root,
+                runtime_status_path=root / "runtime-status.json",
+            )
+            config.runtime_status_path.write_text(
+                json.dumps({"status": "running", "run_id": "sdk-test"}),
+                encoding="utf-8",
+            )
+
+            payload = mark_runtime_operator_stopped(config)
+
+            self.assertEqual(payload["status"], "operator_stopped")
+            self.assertEqual(payload["reason"], "operator_requested_stop")
+            self.assertEqual(payload["run_id"], "sdk-test")
+            self.assertFalse(payload["sdk_connected"])
+            self.assertFalse(payload["dispatch_requested"])
 
     def test_fault_halted_runtime_requires_manual_replacement(self) -> None:
         config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
