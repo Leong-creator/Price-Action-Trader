@@ -192,6 +192,29 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         self.assertEqual(daily["source_mode"], "official_sdk_daily_context_cache")
         self.assertEqual(len(daily["rows"]), 6)
 
+    def test_heartbeat_carries_raw_reference_callback_activity(self) -> None:
+        FakeQuoteContext.emit_callbacks_during_subscribe = True
+
+        rows = self.run_worker(
+            stop_kind="heartbeat",
+            cached_daily_rows=[
+                {"symbol": symbol, "timeframe": "1d"}
+                for symbol in ("SPY", "QQQ", "AAPL")
+                for _index in range(2)
+            ],
+        )
+
+        heartbeat = next(row for row in rows if row["kind"] == "heartbeat")
+        activity = {
+            row["symbol"]: row for row in heartbeat["raw_reference_activity"]
+        }
+        self.assertEqual(set(activity), {"SPY.US", "QQQ.US"})
+        self.assertTrue(activity["SPY.US"]["received_at"].endswith("Z"))
+        self.assertIn(
+            activity["QQQ.US"]["source_mode"],
+            {"official_sdk_raw_quote_callback", "official_sdk_raw_trade_callback"},
+        )
+
     def test_incomplete_subscription_stops_before_snapshot(self) -> None:
         FakeQuoteContext.omit_subscription = True
         rows = self.run_worker(stop_kind="error")

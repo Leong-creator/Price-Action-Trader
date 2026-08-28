@@ -56,7 +56,6 @@ start_stack() {
   run_step "start M15 Longbridge SDK realtime runtime" \
     "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
     --daemon \
-    --dispatch \
     --config config/m15_longbridge_marketdata.production.json || failed=1
 
   run_step "start M15 background watchdog" \

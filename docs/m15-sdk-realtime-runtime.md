@@ -60,7 +60,7 @@
 ./.venv/bin/python scripts/run_m15_longbridge_sdk_runtime.py --check \
   --config config/m15_longbridge_marketdata.production.json
 
-./.venv/bin/python scripts/run_m15_longbridge_sdk_runtime.py --daemon --dispatch \
+./.venv/bin/python scripts/run_m15_longbridge_sdk_runtime.py --daemon \
   --config config/m15_longbridge_marketdata.production.json
 
 ./.venv/bin/python scripts/run_m15_opening_trade_readiness.py \
@@ -71,6 +71,7 @@
 ```
 
 自动启动只调用 `scripts/start_m15_trading_stack_after_boot.sh` 一次，不创建周期性Windows终端任务。
+自动启动固定为只读；只有完整交易日行情门禁通过并人工启用时，才单独使用 `--dispatch` 请求模拟账户派发。
 
 ## 验收
 
