@@ -2368,6 +2368,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 worker_ready_since = worker_last_progress
             elif kind == "daily_context":
                 rows = list(message.get("rows") or [])
+                daily_context_cache_reused = (
+                    str(message.get("source_mode") or "")
+                    == "official_sdk_daily_context_cache"
+                )
                 daily_failed = [
                     str(value) for value in (message.get("failures") or [])
                 ]

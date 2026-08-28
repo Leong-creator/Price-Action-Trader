@@ -107,13 +107,19 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         FakeQuoteContext.emit_callbacks_during_subscribe = False
         self.config = SimpleNamespace(
             quote_region="cn",
+            daily_context_path=Path("unused-daily-context.jsonl"),
             daily_context_deadline_seconds=10,
             daily_context_bars=2,
             sdk_subscribe_batch_size=2,
             bar_minutes=5,
         )
 
-    def run_worker(self, *, stop_kind: str = "ready") -> list[dict]:
+    def run_worker(
+        self,
+        *,
+        stop_kind: str = "ready",
+        cached_daily_rows: list[dict] | None = None,
+    ) -> list[dict]:
         stop_event = threading.Event()
         output = CapturingQueue(stop_event, stop_kind=stop_kind)
         sdk = fake_sdk_module()
@@ -124,6 +130,11 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             patch.object(transport, "load_config", return_value=self.config),
             patch.object(transport, "read_client_id", return_value="client-id"),
             patch.object(transport, "sdk_config_from_oauth", return_value=object()),
+            patch.object(
+                transport,
+                "load_valid_daily_context_cache",
+                return_value=list(cached_daily_rows or []),
+            ),
             patch.object(
                 transport,
                 "configured_symbols",
@@ -166,6 +177,21 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         error = next(row for row in rows if row["kind"] == "error")
         self.assertIn("official_sdk_quote_worker_failed:RuntimeError:request timeout", error["reason"])
 
+    def test_complete_daily_cache_skips_redundant_pull_requests(self) -> None:
+        cached = [
+            {"symbol": symbol, "timeframe": "1d"}
+            for symbol in ("SPY", "QQQ", "AAPL")
+            for _index in range(2)
+        ]
+
+        rows = self.run_worker(cached_daily_rows=cached)
+
+        context = FakeQuoteContext.instances[0]
+        self.assertFalse(any(event.startswith("daily:") for event in context.events))
+        daily = next(row for row in rows if row["kind"] == "daily_context")
+        self.assertEqual(daily["source_mode"], "official_sdk_daily_context_cache")
+        self.assertEqual(len(daily["rows"]), 6)
+
     def test_incomplete_subscription_stops_before_snapshot(self) -> None:
         FakeQuoteContext.omit_subscription = True
         rows = self.run_worker(stop_kind="error")
@@ -185,6 +211,7 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             patch.object(transport, "load_config", return_value=self.config),
             patch.object(transport, "read_client_id", return_value="client-id"),
             patch.object(transport, "sdk_config_from_oauth", return_value=object()),
+            patch.object(transport, "load_valid_daily_context_cache", return_value=[]),
             patch.object(transport, "configured_symbols", return_value=("SPY.US",)),
             patch.object(transport, "configured_trading_symbols", return_value=("SPY.US",)),
             patch.object(transport, "daily_candlestick_event_rows", return_value=[]),
