@@ -164,7 +164,7 @@ class LongbridgeDashboardTest(unittest.TestCase):
             "runtime_pid": os.getpid(),
             "runtime_engine": "sdk",
             "sdk_connected": True,
-            "market_data_mode": "sdk_snapshot_poll",
+            "market_data_mode": "official_sdk_subscription",
             "market_data_transport": "official_sdk_persistent_websocket",
             "complete_boundary_count": 12,
             "incomplete_boundary_count": 2,

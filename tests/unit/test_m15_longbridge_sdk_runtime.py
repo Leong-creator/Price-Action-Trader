@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import ast
-import hashlib
 import inspect
 import json
 import pickle
-import textwrap
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -23,9 +20,9 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     daily_context_is_complete, fresh_market_events, load_config,
     held_position_monitoring_symbols, new_held_position_monitoring_symbols,
     load_current_sdk_intraday_context,
-    load_valid_daily_context_cache, sdk_config_from_oauth, sdk_endpoint_overrides, sdk_object_to_dict, subscribe_private_trade_updates,
+    load_valid_daily_context_cache, official_sdk_endpoints, sdk_config_from_oauth, sdk_object_to_dict, subscribe_private_trade_updates,
     sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
-    subscribe_quote_and_trades, record_readonly_session, readonly_gate_passed,
+    record_readonly_session, readonly_gate_passed,
     market_event_is_tradable, trading_market_events,
     trading_universe_fingerprint,
     validate_formal_epoch_alignment,
@@ -41,7 +38,6 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     boundary_execution_client,
     build_live_daily_confirmation_rows,
     close_spawn_queue,
-    completed_postclose_refresh_dates,
     compact_hot_execution_rows,
     compact_hot_signal_rows,
     configured_market_data_mode,
@@ -54,14 +50,11 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     run_market_data_preflight,
     market_data_heartbeat_grace_elapsed,
     market_data_heartbeat_is_stale,
-    market_data_recovery_is_stable,
-    reference_silence_recovery_action,
     preserve_last_order_maintenance_action,
     opening_signal_outside_trading_universe,
-    quote_worker,
     quote_subscription_ready,
     quote_subscription_targets,
-    reconcile_position_monitoring_worker,
+    detect_position_monitoring_set_change,
     require_sdk_contract,
     request_runtime_shutdown,
     restore_pipeline_observability,
@@ -75,97 +68,87 @@ from scripts.run_m15_longbridge_sdk_runtime import (
     realtime_boundary_is_complete,
     realtime_boundary_integrity_state,
     realtime_boundary_is_trustworthy,
-    reconnect_delay_seconds,
     regular_session_open_grace_elapsed,
-    should_use_snapshot_fallback,
-    snapshot_poll_cycle_is_healthy,
     signals_allowed_by_entry_gate,
-    should_emit_reference_market_activity,
     start_runtime_daemon,
     trade_context_health_requires_rebuild,
     update_live_quote_session_state,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PRODUCTION_CONFIG_JSON = REPO_ROOT / "config" / "m15_longbridge_marketdata.production.json"
+
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
-    def test_production_transport_selects_longbridge_serve_worker(self) -> None:
+    def test_production_transport_selects_official_sdk_worker(self) -> None:
         config = load_config()
         self.assertEqual(
             configured_market_data_mode(config),
-            "longbridge_serve_subscription",
+            "official_sdk_subscription",
         )
         self.assertEqual(
             configured_quote_worker(config).__name__,
-            "longbridge_serve_quote_worker",
+            "official_sdk_quote_worker",
         )
         self.assertTrue(
             market_data_mode_qualifies_for_subscription_gate(
-                "longbridge_serve_subscription"
+                "official_sdk_subscription"
             )
         )
 
-    def test_preflight_uses_serve_transport_instead_of_sdk_quote(self) -> None:
-        config = load_config()
-        with (
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
-                return_value=False,
-            ),
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.probe_longbridge_serve_transport",
-                return_value={
-                    "market_data_mode": "longbridge_serve_subscription",
-                    "subscription_coverage": "3/3",
-                },
-            ) as serve_probe,
-        ):
-            result = run_market_data_preflight(config, SimpleNamespace(), object())
-
-        self.assertTrue(result["quote_ok"])
-        self.assertEqual(
-            result["quote_probe_source"],
-            "direct_longbridge_serve_preflight",
-        )
-        serve_probe.assert_called_once()
-
-    def test_preflight_fails_when_serve_authorization_or_initialize_fails(self) -> None:
-        config = load_config()
-        with (
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.runtime_owns_quote_connection",
-                return_value=False,
-            ),
-            patch(
-                "scripts.run_m15_longbridge_sdk_runtime.probe_longbridge_serve_transport",
-                side_effect=RuntimeError("authorization_required"),
-            ),
-        ):
-            result = run_market_data_preflight(config, SimpleNamespace(), object())
+    def test_preflight_defers_to_single_runtime_without_direct_probe(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = replace(
+                load_config(),
+                runtime_status_path=Path(directory) / "runtime-status.json",
+            )
+            result = run_market_data_preflight(config)
 
         self.assertFalse(result["quote_ok"])
-        self.assertIn("authorization_required", result["quote_error"])
+        self.assertFalse(result["quote_runtime_verified"])
+        self.assertEqual(result["quote_probe_source"], "deferred_to_single_runtime")
+        self.assertEqual(result["quote_error"], "")
+        self.assertEqual(
+            result["market_data_probe"],
+            {
+                "market_data_mode": "official_sdk_subscription",
+                "runtime_started": False,
+                "direct_probe_forbidden": True,
+            },
+        )
 
-    def test_reference_trade_activity_is_throttled_without_ignoring_trades(self) -> None:
-        last_emit = {}
-        self.assertTrue(
-            should_emit_reference_market_activity(
-                "SPY.US", now_monotonic=10.0, last_emit_by_symbol=last_emit
+    def test_preflight_reads_active_runtime_status_as_the_only_fact_source(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = replace(
+                load_config(),
+                runtime_status_path=Path(directory) / "runtime-status.json",
             )
-        )
-        self.assertFalse(
-            should_emit_reference_market_activity(
-                "SPY.US", now_monotonic=10.5, last_emit_by_symbol=last_emit
+            config.runtime_status_path.write_text(
+                json.dumps(
+                    {
+                        "runtime_pid": __import__("os").getpid(),
+                        "config_fingerprint": config_fingerprint(config),
+                        "sdk_connected": True,
+                        "market_data_transport": config.market_data_transport,
+                        "market_data_mode": configured_market_data_mode(config),
+                        "subscription_coverage": "147/147",
+                    }
+                ),
+                encoding="utf-8",
             )
-        )
-        self.assertTrue(
-            should_emit_reference_market_activity(
-                "SPY.US", now_monotonic=11.0, last_emit_by_symbol=last_emit
-            )
-        )
-        self.assertFalse(
-            should_emit_reference_market_activity(
-                "AAPL.US", now_monotonic=11.0, last_emit_by_symbol=last_emit
-            )
+
+            result = run_market_data_preflight(config)
+
+        self.assertTrue(result["quote_ok"])
+        self.assertTrue(result["quote_runtime_verified"])
+        self.assertEqual(result["quote_probe_source"], "active_runtime_status")
+        self.assertEqual(result["quote_error"], "")
+        self.assertEqual(
+            result["market_data_probe"],
+            {
+                "market_data_mode": "official_sdk_subscription",
+                "subscription_coverage": "147/147",
+            },
         )
 
     def test_live_quote_state_keeps_newer_push_when_snapshot_arrives_late(self) -> None:
@@ -183,7 +166,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 "volume": 100,
             },
             received_at=received_at,
-            source_mode="longbridge_serve_push",
+            source_mode="official_sdk_push",
         )
         retained = update_live_quote_session_state(
             state,
@@ -197,12 +180,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 "volume": 90,
             },
             received_at=received_at,
-            source_mode="longbridge_serve_initial_snapshot",
+            source_mode="official_sdk_initial_snapshot",
         )
 
         self.assertIs(retained, newer)
         self.assertEqual(state["SPY"]["close"], "501")
-        self.assertEqual(state["SPY"]["source_mode"], "longbridge_serve_push")
+        self.assertEqual(state["SPY"]["source_mode"], "official_sdk_push")
 
     def test_parent_applies_batched_quote_state_and_reference_heartbeat(self) -> None:
         state: dict[str, dict] = {}
@@ -227,7 +210,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                             "volume": 100,
                         },
                         "received_at": "2026-08-25T13:31:00Z",
-                        "source_mode": "longbridge_serve_push",
+                        "source_mode": "official_sdk_push",
                     },
                     {
                         "symbol": "AAPL.US",
@@ -240,7 +223,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                             "volume": 50,
                         },
                         "received_at": "2026-08-25T13:31:00Z",
-                        "source_mode": "longbridge_serve_push",
+                        "source_mode": "official_sdk_push",
                     },
                 ],
             },
@@ -257,15 +240,17 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["SPY"]["close"], "501")
         self.assertEqual(state["AAPL"]["close"], "225.5")
         self.assertEqual(last_push["SPY.US"], 123.0)
-        self.assertEqual(last_push_source["AAPL.US"], "longbridge_serve_push")
+        self.assertEqual(last_push_source["AAPL.US"], "official_sdk_push")
         self.assertEqual(first_live["SPY.US"], 123.0)
         self.assertEqual(last_live["SPY.US"], 123.0)
         self.assertNotIn("AAPL.US", first_live)
 
-    def test_quote_worker_reports_reference_trade_activity(self) -> None:
-        source = inspect.getsource(quote_worker)
+    def test_official_sdk_transport_reports_reference_trade_activity(self) -> None:
+        source = Path("scripts/m15_longbridge_sdk_quote_transport_lib.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('"kind": "market_activity"', source)
-        self.assertIn('"longbridge_sdk_trade_push"', source)
+        self.assertIn('"official_sdk_trade_push"', source)
 
     def test_runtime_keeps_account_refresh_independent_during_quote_subscription(self) -> None:
         source = inspect.getsource(__import__(
@@ -282,70 +267,75 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
     def test_default_runtime_uses_canonical_production_config(self) -> None:
         config = load_config()
-        self.assertTrue(str(config.config_path).endswith("m15_longbridge_sdk_runtime.json"))
+        payload = json.loads(
+            PRODUCTION_CONFIG_JSON.read_text(encoding="utf-8")
+        )
+        self.assertTrue(
+            str(config.config_path).endswith(
+                "m15_longbridge_marketdata.production.json"
+            )
+        )
         self.assertFalse(str(config.config_path).endswith(".contract_v1.json"))
-        self.assertEqual(config.subscription_deadline_seconds, 30)
-        self.assertEqual(config.subscription_progress_deadline_seconds, 90)
-        self.assertEqual(config.subscription_circuit_retry_seconds, 300)
-        self.assertEqual(config.subscription_batch_size, 500)
+        self.assertEqual(config.subscription_deadline_seconds, 45)
         self.assertEqual(
             config.market_data_transport,
-            "longbridge_serve_persistent_jsonrpc",
+            "official_sdk_persistent_websocket",
         )
-        self.assertEqual(config.longbridge_serve_batch_size, 500)
-        self.assertEqual(config.longbridge_serve_response_timeout_seconds, 30)
-        self.assertEqual(config.subscription_request_interval_seconds, 1.25)
-        self.assertEqual(config.quote_http_url, "https://openapi.longbridge.cn")
-        self.assertEqual(
-            config.quote_ws_url,
-            "wss://openapi-quote.longbridge.cn/v2",
-        )
+        self.assertEqual(config.sdk_subscribe_batch_size, 50)
+        self.assertEqual(config.quote_region, "cn")
+        self.assertEqual(config.trade_region, "global")
+        self.assertNotIn("quote_http_url", payload["oauth"])
+        self.assertNotIn("quote_ws_url", payload["oauth"])
+        for removed_key in (
+            "allow_snapshot_poll_fallback",
+            "reconnect_backoff_seconds",
+            "subscription_batch_size",
+            "subscription_retry_count",
+            "subscription_request_interval_seconds",
+            "subscription_circuit_retry_seconds",
+            "snapshot_poll_interval_seconds",
+        ):
+            self.assertNotIn(removed_key, payload["runtime"])
 
-    def test_serve_transport_binary_must_match_pinned_checksum(self) -> None:
-        with TemporaryDirectory() as tmp:
-            binary = Path(tmp) / "longbridge"
-            binary.write_bytes(b"pinned-serve-binary")
-            binary.chmod(0o700)
-            digest = hashlib.sha256(binary.read_bytes()).hexdigest()
-            config = replace(
-                load_config(),
-                longbridge_serve_binary=binary,
-                longbridge_serve_binary_sha256=digest,
+    def test_non_sdk_transport_is_rejected(self) -> None:
+        validate_market_data_transport_runtime(load_config())
+        with self.assertRaisesRegex(ValueError, "official SDK"):
+            validate_market_data_transport_runtime(
+                replace(load_config(), market_data_transport="removed_transport")
             )
-            validate_market_data_transport_runtime(config)
 
-            with self.assertRaisesRegex(ValueError, "checksum mismatch"):
-                validate_market_data_transport_runtime(
-                    replace(config, longbridge_serve_binary_sha256="0" * 64)
-                )
-
-    def test_runtime_subscription_circuit_recovers_without_parent_restart(self) -> None:
-        source = inspect.getsource(__import__(
-            "scripts.run_m15_longbridge_sdk_runtime",
-            fromlist=["run_watch"],
-        ).run_watch)
-        self.assertIn("config.subscription_progress_deadline_seconds", source)
-        self.assertIn("config.subscription_circuit_retry_seconds", source)
-        self.assertIn("sdk_subscription_circuit_cooldown_elapsed", source)
-        self.assertIn("account.resume_background_refresh()", source)
+    def test_runtime_market_data_faults_are_fail_stop_and_disable_dispatch(self) -> None:
+        source = Path("scripts/run_m15_longbridge_sdk_runtime.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('status="fault_halted"', source)
+        self.assertIn('"market_data_fault_halted": True', source)
+        self.assertIn('"automatic_market_data_retry_enabled": False', source)
+        self.assertIn('"snapshot_fallback_enabled": False', source)
+        self.assertIn('"new_position_submission_enabled": False', source)
+        self.assertIn('"dispatch_enabled": False', source)
+        self.assertIn('return halt_market_data(\n                    "market_data_worker_exited"', source)
         self.assertIn(
-            "not market_data_circuit_open\n                and not worker_ready",
+            'return halt_market_data(\n                    "market_data_subscription_deadline_exceeded"',
             source,
         )
-        self.assertGreaterEqual(source.count("account.resume_background_refresh()"), 6)
+        self.assertIn(
+            'return halt_market_data(\n                    "market_data_reader_error"',
+            source,
+        )
 
-    def test_runtime_cleans_owned_serve_orphans_before_every_worker_start(self) -> None:
+    def test_runtime_starts_exactly_one_quote_worker_without_recovery_loop(self) -> None:
         source = inspect.getsource(__import__(
             "scripts.run_m15_longbridge_sdk_runtime",
             fromlist=["run_watch"],
         ).run_watch)
-        cleanup = "cleanup_orphaned_longbridge_serve_processes()"
-        self.assertGreaterEqual(source.count(cleanup), 2)
-        self.assertIn("orphaned_serve_processes_cleaned.extend", source)
-        self.assertLess(source.index(cleanup), source.index("worker_target = ("))
+        self.assertEqual(source.count("worker = process_context.Process("), 1)
+        self.assertNotIn("reconnect_backoff", source)
+        self.assertNotIn("quote_snapshot_worker", source)
+        self.assertNotIn("next_worker_start", source)
 
     def test_production_runtime_uses_frozen_contract_v1_configs(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        config = load_config()
         self.assertTrue(str(config.router_config_path).endswith("m15_longbridge_realtime_signal_router.contract_v1.json"))
         self.assertTrue(str(config.execution_config_path).endswith("m15_longbridge_realtime_execution.paper_contract_v1.json"))
         self.assertTrue(str(config.position_manager_config_path).endswith("m15_longbridge_realtime_position_manager.contract_v1.json"))
@@ -368,9 +358,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             [entry, exit_signal],
         )
 
-    def test_reconnect_backoff_and_active_quote_silence(self) -> None:
-        schedule = (5, 15, 30, 60)
-        self.assertEqual([reconnect_delay_seconds(schedule, value) for value in range(1, 6)], [5, 15, 30, 60, 60])
+    def test_active_quote_silence_is_detected_without_reconnect_backoff(self) -> None:
         self.assertTrue(
             active_reference_quotes_are_stale(
                 {"SPY.US": 10, "QQQ.US": 20},
@@ -386,127 +374,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             )
         )
 
-    def test_recovery_attempts_reset_only_after_sustained_live_pushes(self) -> None:
-        self.assertFalse(
-            market_data_recovery_is_stable(
-                attempts=1,
-                worker_ready_since_monotonic=100.0,
-                now_monotonic=120.0,
-                last_push_by_symbol={"SPY.US": 119.0, "QQQ.US": 119.0},
-                first_live_push_by_symbol={"SPY.US": 101.0},
-                last_live_push_by_symbol={"SPY.US": 119.0},
-                stabilization_seconds=30.0,
-                complete_boundary_observed=False,
-            )
-        )
-        self.assertFalse(
-            market_data_recovery_is_stable(
-                attempts=1,
-                worker_ready_since_monotonic=100.0,
-                now_monotonic=131.0,
-                last_push_by_symbol={"SPY.US": 100.0, "QQQ.US": 100.0},
-                first_live_push_by_symbol={"SPY.US": 101.0},
-                last_live_push_by_symbol={"SPY.US": 130.0},
-                stabilization_seconds=30.0,
-                complete_boundary_observed=True,
-            )
-        )
-        self.assertTrue(
-            market_data_recovery_is_stable(
-                attempts=1,
-                worker_ready_since_monotonic=100.0,
-                now_monotonic=131.0,
-                last_push_by_symbol={"SPY.US": 130.0, "QQQ.US": 100.0},
-                first_live_push_by_symbol={"SPY.US": 101.0},
-                last_live_push_by_symbol={"SPY.US": 130.0},
-                stabilization_seconds=30.0,
-                complete_boundary_observed=True,
-            )
-        )
-
-        self.assertFalse(
-            market_data_recovery_is_stable(
-                attempts=1,
-                worker_ready_since_monotonic=100.0,
-                now_monotonic=131.0,
-                last_push_by_symbol={"SPY.US": 130.0},
-                first_live_push_by_symbol={"SPY.US": 129.0},
-                last_live_push_by_symbol={"SPY.US": 130.0},
-                stabilization_seconds=30.0,
-                complete_boundary_observed=True,
-            )
-        )
-
-    def test_reference_silence_is_exit_only_before_next_boundary(self) -> None:
-        self.assertEqual(
-            reference_silence_recovery_action(
-                references_are_stale=True,
-                silence_started_monotonic=100.0,
-                now_monotonic=140.0,
-                incomplete_boundary_count_at_silence=3,
-                current_incomplete_boundary_count=3,
-                restart_after_seconds=305.0,
-                recovery_boundary_required=True,
-            ),
-            "exit_only",
-        )
-
-    def test_reference_silence_restarts_after_incomplete_boundary(self) -> None:
-        self.assertEqual(
-            reference_silence_recovery_action(
-                references_are_stale=True,
-                silence_started_monotonic=100.0,
-                now_monotonic=140.0,
-                incomplete_boundary_count_at_silence=3,
-                current_incomplete_boundary_count=4,
-                restart_after_seconds=305.0,
-                recovery_boundary_required=True,
-            ),
-            "restart_required_after_incomplete_boundary",
-        )
-
-    def test_reference_silence_restarts_after_deadline_without_boundary(self) -> None:
-        self.assertEqual(
-            reference_silence_recovery_action(
-                references_are_stale=True,
-                silence_started_monotonic=100.0,
-                now_monotonic=405.001,
-                incomplete_boundary_count_at_silence=3,
-                current_incomplete_boundary_count=3,
-                restart_after_seconds=305.0,
-                recovery_boundary_required=True,
-            ),
-            "restart_required_after_deadline",
-        )
-
-    def test_fresh_reference_push_clears_exit_only_state(self) -> None:
-        self.assertEqual(
-            reference_silence_recovery_action(
-                references_are_stale=False,
-                silence_started_monotonic=100.0,
-                now_monotonic=140.0,
-                incomplete_boundary_count_at_silence=3,
-                current_incomplete_boundary_count=3,
-                restart_after_seconds=305.0,
-                recovery_boundary_required=True,
-            ),
-            "recovering_waiting_for_complete_boundary",
-        )
-
-    def test_fresh_reference_without_prior_silence_is_healthy(self) -> None:
-        self.assertEqual(
-            reference_silence_recovery_action(
-                references_are_stale=False,
-                silence_started_monotonic=0.0,
-                now_monotonic=140.0,
-                incomplete_boundary_count_at_silence=0,
-                current_incomplete_boundary_count=0,
-                restart_after_seconds=305.0,
-                recovery_boundary_required=False,
-            ),
-            "healthy",
-        )
-
     def test_market_activity_updates_reference_freshness(self) -> None:
         last_push: dict[str, float] = {}
         last_push_at: dict[str, str] = {}
@@ -517,7 +384,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             {
                 "symbol": "SPY.US",
                 "received_at": "2026-08-25T17:45:01Z",
-                "source_mode": "longbridge_serve_trade_push",
+                "source_mode": "official_sdk_trade_push",
             },
             last_push_by_symbol=last_push,
             last_push_at_by_symbol=last_push_at,
@@ -529,24 +396,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(last_push["SPY.US"], 123.0)
         self.assertEqual(first_live["SPY.US"], 123.0)
         self.assertEqual(last_live["SPY.US"], 123.0)
-        self.assertEqual(last_source["SPY.US"], "longbridge_serve_trade_push")
-
-    def test_exit_only_reference_silence_does_not_stop_worker(self) -> None:
-        source = inspect.getsource(__import__(
-            "scripts.run_m15_longbridge_sdk_runtime",
-            fromlist=["run_watch"],
-        ).run_watch)
-        silence_branch = source.split(
-            'if reference_market_data_state == "healthy":', 1
-        )[1].split(
-            "if worker_ready and market_data_recovery_is_stable", 1
-        )[0]
-        exit_only_branch = silence_branch.split(
-            'elif reference_market_data_state == "exit_only":', 1
-        )[1].split("else:", 1)[0]
-
-        self.assertNotIn("stop_spawned_process", exit_only_branch)
-        self.assertIn("stop_spawned_process", silence_branch)
+        self.assertEqual(last_source["SPY.US"], "official_sdk_trade_push")
 
     def test_reference_stale_has_specific_dispatch_block_reason(self) -> None:
         self.assertEqual(
@@ -561,18 +411,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 trading_daily_context_ready=True,
                 reference_market_data_stale=True,
             ),
-            "reference_market_data_stale_exit_only",
+            "reference_market_data_stale",
         )
-
-    def test_successful_subscription_receipt_does_not_clear_recovery_attempts(self) -> None:
-        source = inspect.getsource(__import__(
-            "scripts.run_m15_longbridge_sdk_runtime",
-            fromlist=["run_watch"],
-        ).run_watch)
-        ready_branch = source.split('elif kind == "ready":', 1)[1].split('elif kind == "daily_context":', 1)[0]
-
-        self.assertNotIn("attempts = 0", ready_branch)
-        self.assertIn("market_data_recovery_is_stable", source)
 
     def test_invalid_deployment_manifest_blocks_dispatch(self) -> None:
         self.assertFalse(
@@ -687,45 +527,31 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             ("NEWHOLD.US",),
         )
 
-    def test_runtime_restarts_only_worker_when_new_exit_only_holding_appears(self) -> None:
+    def test_runtime_halts_when_new_exit_only_holding_changes_subscription_set(self) -> None:
         config = load_config()
         snapshot = {"positions": [{"symbol": "NEWHOLD.US", "quantity": "1"}]}
-        worker = SimpleNamespace(pid=1234)
 
-        with patch(
-            "scripts.run_m15_longbridge_sdk_runtime.stop_spawned_process"
-        ) as stop_worker:
-            updated, additions, reason = reconcile_position_monitoring_worker(
-                config,
-                snapshot,
-                ("OLDHOLD.US",),
-                worker,
-            )
-
-        stop_worker.assert_called_once_with(worker, graceful=False)
+        updated, additions, reason = detect_position_monitoring_set_change(
+            config,
+            snapshot,
+            ("OLDHOLD.US",),
+        )
         self.assertEqual(updated, ("NEWHOLD.US", "OLDHOLD.US"))
         self.assertEqual(additions, ("NEWHOLD.US",))
         self.assertEqual(
             reason,
-            "position_monitoring_set_changed_restarting_quote_worker:NEWHOLD.US",
+            "position_monitoring_set_changed_diagnosis_required:NEWHOLD.US",
         )
 
-    def test_runtime_does_not_restart_when_monitoring_set_is_unchanged(self) -> None:
+    def test_runtime_does_not_halt_when_monitoring_set_is_unchanged(self) -> None:
         config = load_config()
         snapshot = {"positions": [{"symbol": "OLDHOLD.US", "quantity": "1"}]}
-        worker = SimpleNamespace(pid=1234)
 
-        with patch(
-            "scripts.run_m15_longbridge_sdk_runtime.stop_spawned_process"
-        ) as stop_worker:
-            updated, additions, reason = reconcile_position_monitoring_worker(
-                config,
-                snapshot,
-                ("OLDHOLD.US",),
-                worker,
-            )
-
-        stop_worker.assert_not_called()
+        updated, additions, reason = detect_position_monitoring_set_change(
+            config,
+            snapshot,
+            ("OLDHOLD.US",),
+        )
         self.assertEqual(updated, ("OLDHOLD.US",))
         self.assertEqual(additions, ())
         self.assertEqual(reason, "")
@@ -757,7 +583,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 trading_daily_context_ready=True,
                 position_monitoring_ready=False,
             ),
-            "position_monitoring_incomplete_exit_only",
+            "position_monitoring_incomplete",
         )
 
     def test_boundary_batch_mode_does_not_emit_previous_bar_early(self) -> None:
@@ -867,83 +693,27 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 account_snapshot_ready=True,
                 trading_daily_context_ready=True,
             ),
-            "market_data_recovering",
+            "market_data_fault_halted",
         )
 
-    def test_quote_worker_registers_both_callbacks_and_verifies_subscription(self) -> None:
-        tree = ast.parse(textwrap.dedent(inspect.getsource(quote_worker)))
-        called_methods = [
-            node.func.attr
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        ]
-
-        self.assertIn("subscriptions", called_methods)
-        self.assertIn("quote", called_methods)
-        self.assertEqual(called_methods.count("set_on_quote"), 1)
-        self.assertEqual(called_methods.count("set_on_trades"), 1)
-
-    def test_snapshot_fallback_requires_configured_subscription_failures(self) -> None:
-        self.assertFalse(should_use_snapshot_fallback(0, 1))
-        self.assertTrue(should_use_snapshot_fallback(1, 1))
-
-    def test_snapshot_poll_requires_complete_fast_cycles(self) -> None:
-        self.assertTrue(snapshot_poll_cycle_is_healthy(147, 147, 999, 1000))
-        self.assertFalse(snapshot_poll_cycle_is_healthy(146, 147, 100, 1000))
-        self.assertFalse(snapshot_poll_cycle_is_healthy(147, 147, 1001, 1000))
-
-    def test_snapshot_poll_interval_stays_within_realtime_acceptance_window(self) -> None:
-        config = load_config()
-
-        self.assertEqual(config.snapshot_poll_interval_seconds, 3)
-        self.assertEqual(config.snapshot_poll_min_successful_cycles, 1)
-        self.assertLess(
-            config.snapshot_poll_interval_seconds,
-            config.market_data_heartbeat_deadline_seconds,
+    def test_official_sdk_transport_subscribes_quote_and_trade_together(self) -> None:
+        source = Path("scripts/m15_longbridge_sdk_quote_transport_lib.py").read_text(
+            encoding="utf-8"
         )
+        self.assertIn("quote.subscribe(batch, [sdk.SubType.Quote, sdk.SubType.Trade])", source)
+        self.assertIn("quote.subscriptions()", source)
 
-    def test_snapshot_recovery_uses_short_heartbeat_grace(self) -> None:
-        source = inspect.getsource(
-            __import__(
-                "scripts.run_m15_longbridge_sdk_runtime",
-                fromlist=["run_watch"],
-            ).run_watch
+    def test_official_sdk_transport_verifies_subscription_before_initial_snapshot(self) -> None:
+        source = Path("scripts/m15_longbridge_sdk_quote_transport_lib.py").read_text(
+            encoding="utf-8"
         )
+        self.assertIn("initial_snapshot = list(quote.quote(targets))", source)
+        self.assertLess(source.index("quote.subscriptions()"), source.index("quote.quote(targets)"))
 
-        self.assertIn(
-            'if market_data_mode == "sdk_snapshot_poll"',
-            source,
-        )
-        self.assertIn(
-            "config.market_data_heartbeat_deadline_seconds",
-            source,
-        )
-        self.assertIn(
-            "if snapshot_fallback_active",
-            source,
-        )
-
-    def test_runtime_initializes_snapshot_builder_before_any_fallback_worker_start(self) -> None:
-        source = inspect.getsource(
-            __import__(
-                "scripts.run_m15_longbridge_sdk_runtime",
-                fromlist=["run_watch"],
-            ).run_watch
-        )
-
-        self.assertIn(
-            "if snapshot_fallback_active and snapshot_bar_builder is None:",
-            source,
-        )
-        self.assertLess(
-            source.index("if snapshot_fallback_active and snapshot_bar_builder is None:"),
-            source.index("worker_target = ("),
-        )
-
-    def test_snapshot_poll_never_counts_as_subscription_gate_evidence(self) -> None:
+    def test_only_official_sdk_subscription_counts_as_subscription_gate_evidence(self) -> None:
         self.assertTrue(
             market_data_mode_qualifies_for_subscription_gate(
-                "sdk_subscription"
+                "official_sdk_subscription"
             )
         )
         self.assertFalse(
@@ -997,25 +767,27 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "structurally_incomplete",
         )
 
-    def test_reference_exit_only_keeps_exit_client_on_complete_stale_boundary(self) -> None:
+    def test_untrustworthy_or_incomplete_boundary_never_gets_an_execution_client(self) -> None:
         primary_client = object()
-        exit_client = object()
         self.assertIs(
             boundary_execution_client(
                 candidate_client=primary_client,
-                exit_client=exit_client,
                 boundary_complete=True,
-                reference_exit_only=True,
-                trustworthy_boundary=False,
+                trustworthy_boundary=True,
             ),
-            exit_client,
+            primary_client,
         )
         self.assertIsNone(
             boundary_execution_client(
                 candidate_client=primary_client,
-                exit_client=exit_client,
+                boundary_complete=True,
+                trustworthy_boundary=False,
+            ),
+        )
+        self.assertIsNone(
+            boundary_execution_client(
+                candidate_client=primary_client,
                 boundary_complete=False,
-                reference_exit_only=True,
                 trustworthy_boundary=False,
             )
         )
@@ -1032,23 +804,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         heartbeat_stale = source.index("market_data_heartbeat_is_stale(")
         self.assertLess(drain, reader_error)
         self.assertLess(reader_error, heartbeat_stale)
-
-    def test_market_data_circuit_probe_preserves_failure_history(self) -> None:
-        source = inspect.getsource(
-            __import__(
-                "scripts.run_m15_longbridge_sdk_runtime",
-                fromlist=["run_watch"],
-            ).run_watch
-        )
-        cooldown = source.split(
-            "if (\n                market_data_circuit_open",
-            1,
-        )[1].split(
-            "if not market_data_circuit_open",
-            1,
-        )[0]
-        self.assertIn("maximum_consecutive_subscription_failures - 1", cooldown)
-        self.assertNotIn("attempts = 0", cooldown)
 
     def test_active_symbol_silence_waits_for_regular_open_grace(self) -> None:
         market_zone = ZoneInfo("America/New_York")
@@ -1093,7 +848,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         )
 
     def test_connecting_runtime_still_owns_the_only_quote_connection(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        config = load_config()
         status = {
             "runtime_pid": __import__("os").getpid(),
             "config_fingerprint": config_fingerprint(config),
@@ -1104,7 +859,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertTrue(runtime_owns_quote_connection(config, status))
 
     def test_regular_session_recovery_prioritizes_the_frozen_trading_universe(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
+        config = load_config()
 
         regular_session_targets = quote_subscription_targets(
             config,
@@ -1143,11 +898,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             self.assertEqual(last_result, {})
             self.assertEqual(last_event_at, "")
 
-    def test_production_daily_context_allows_transient_symbol_retries(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.json")
-
-        self.assertEqual(config.daily_context_retry_count, 5)
-
     def test_authorized_account_exit_waits_for_rth_then_submits_once(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1181,7 +931,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     self.submissions.append(dict(payload))
                     return {"submitted": True, "status": "submitted", "order_id": "LCID-EXIT-1"}
 
-            config = SimpleNamespace(
+            config = replace(
+                load_config(),
                 output_dir=root,
                 maximum_account_snapshot_age_seconds=45,
                 formal_test_epoch_id="formal-main",
@@ -1221,7 +972,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_daemon_does_not_spawn_when_another_config_holds_global_runtime_lock(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            config = SimpleNamespace(
+            config = replace(
+                load_config(),
                 output_dir=root / "alternate-output",
                 runtime_status_path=root / "alternate-status.json",
                 config_path=root / "alternate-config.json",
@@ -1252,11 +1004,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             self.assertEqual(result, 0)
             popen.assert_not_called()
 
-    def test_daemon_keeps_matching_dispatch_runtime_during_market_recovery(self) -> None:
+    def test_daemon_refuses_automatic_restart_after_fault_halt(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             current_pid = __import__("os").getpid()
-            config = SimpleNamespace(
+            config = replace(
+                load_config(),
                 output_dir=root,
                 runtime_status_path=root / "runtime-status.json",
                 config_path=root / "runtime-config.json",
@@ -1265,7 +1018,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             config.runtime_status_path.write_text(
                 json.dumps({
                     "generated_at": datetime.now(UTC).isoformat(),
-                    "status": "reconnecting_market_data_circuit",
+                    "status": "fault_halted",
                     "runtime_pid": current_pid,
                     "runtime_process_start_ticks": Path(f"/proc/{current_pid}/stat").read_text(encoding="utf-8").split()[21],
                     "config_fingerprint": "expected-fingerprint",
@@ -1300,9 +1053,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                     "scripts.run_m15_longbridge_sdk_runtime.subprocess.Popen"
                 ) as popen,
             ):
-                result = start_runtime_daemon(args, config)
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "m15_runtime_fault_latched_manual_diagnosis_required",
+                ):
+                    start_runtime_daemon(args, config)
 
-            self.assertEqual(result, 0)
             shutdown.assert_not_called()
             popen.assert_not_called()
 
@@ -1330,26 +1086,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             )
         )
 
-    def test_market_data_circuit_with_fresh_account_keeps_same_parent_runtime(self) -> None:
+    def test_fault_halted_runtime_requires_manual_replacement(self) -> None:
         config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
-        self.assertFalse(
+        self.assertTrue(
             runtime_requires_health_replacement(
                 {
-                    "generated_at": datetime.now(UTC).isoformat(),
-                    "account_snapshot_age_seconds": 8,
-                    "market_data_circuit_open": True,
-                    "market_data_retry_after_seconds": 240,
-                },
-                config,
-            )
-        )
-
-    def test_halted_market_data_runtime_with_fresh_account_keeps_parent(self) -> None:
-        config = SimpleNamespace(maximum_account_snapshot_age_seconds=45)
-        self.assertFalse(
-            runtime_requires_health_replacement(
-                {
-                    "status": "halted_market_data_circuit",
+                    "status": "fault_halted",
                     "generated_at": datetime.now(UTC).isoformat(),
                     "account_snapshot_age_seconds": 8,
                 },
@@ -1368,15 +1110,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 },
                 config,
             )
-        )
-
-    def test_postclose_restart_keeps_a_valid_current_session_daily_cache(self) -> None:
-        self.assertEqual(
-            completed_postclose_refresh_dates(
-                [{"symbol": "AAPL", "timeframe": "1d"}],
-                datetime(2026, 7, 20, 16, 10, tzinfo=ZoneInfo("America/New_York")),
-            ),
-            {"2026-07-20"},
         )
 
     def test_sdk_hot_path_does_not_dispatch_at_regular_session_close(self) -> None:
@@ -1399,18 +1132,10 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            config = SimpleNamespace(
-                market="US",
-                universe_path=None,
-                use_seed_universe=True,
-                symbol_limit=147,
-                trading_symbol_limit=147,
-                maximum_source_delivery_age_ms=2000,
+            config = replace(
+                load_config(),
                 market_events_path=root / "market.jsonl",
                 event_keep_lines=0,
-                router_config_path=Path("config/examples/m15_longbridge_realtime_signal_router.json"),
-                position_manager_config_path=Path("config/examples/m15_longbridge_realtime_position_manager.json"),
-                execution_config_path=Path("config/examples/m15_longbridge_realtime_execution.paper_orders_enabled.json"),
                 formal_test_marker_path=root / "formal.json",
                 formal_test_transition_enabled=False,
                 formal_test_epoch_id="formal-main",
@@ -1471,7 +1196,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "paper_simulated_only": True,
         }
         marker_path.write_text(json.dumps(marker), encoding="utf-8")
-        config = SimpleNamespace(
+        config = replace(
+            load_config(),
             formal_test_transition_enabled=True,
             formal_test_epoch_id="formal-main",
             formal_short_test_epoch_id="formal-short",
@@ -1540,6 +1266,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 [{
                     "symbol": "AAPL", "timeframe": "5m", "close": "201",
                     "received_at": "2026-07-16T14:00:00Z",
+                    "source_mode": "official_sdk_trade_push",
                 }],
                 now=datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC),
             )
@@ -1554,14 +1281,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         with TemporaryDirectory() as directory:
             config, _snapshot, account, client = self.pending_flatten_fixture(Path(directory))
             now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
-            run_pending_flatten_cycle(config, account, client, [], now=now)
-            state = run_pending_flatten_cycle(config, account, client, [], now=now + timedelta(seconds=15))
+            events = [{
+                "symbol": "AAPL", "timeframe": "5m", "close": "201",
+                "received_at": "2026-07-16T14:00:00Z",
+                "source_mode": "official_sdk_trade_push",
+            }]
+            run_pending_flatten_cycle(config, account, client, events, now=now)
+            state = run_pending_flatten_cycle(config, account, client, events, now=now + timedelta(seconds=15))
 
         self.assertEqual(len(client.submissions), 1)
         self.assertEqual(state["submitted_this_cycle"], 0)
         self.assertEqual(len(state["submissions"]), 1)
 
-    def test_pending_flatten_uses_one_fallback_only_for_fresh_explicit_reject(self) -> None:
+    def test_pending_flatten_stops_after_fresh_explicit_reject(self) -> None:
         with TemporaryDirectory() as directory:
             config, _snapshot, account, _client = self.pending_flatten_fixture(Path(directory))
 
@@ -1588,15 +1320,16 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             events = [{
                 "symbol": "AAPL", "timeframe": "5m", "close": "201",
                 "received_at": "2026-07-16T14:00:00Z",
+                "source_mode": "official_sdk_trade_push",
             }]
             state = run_pending_flatten_cycle(config, account, client, events, now=now)
             run_pending_flatten_cycle(config, account, client, events, now=now + timedelta(seconds=1))
 
-        self.assertEqual([row["order_type"] for row in client.submissions], ["market", "limit"])
-        self.assertEqual(client.submissions[0]["client_request_id"], client.submissions[1]["client_request_id"])
+        self.assertEqual([row["order_type"] for row in client.submissions], ["market"])
         attempt = next(iter(state["submissions"].values()))
-        self.assertTrue(attempt["fallback_attempted"])
-        self.assertEqual(attempt["order_id"], "LO-1")
+        self.assertEqual(attempt["status"], "explicit_reject_no_retry")
+        self.assertEqual(state["status"], "flatten_order_rejected_manual_diagnosis_required")
+        self.assertEqual(attempt["order_id"], "")
 
     def test_pending_flatten_unknown_account_blocks_without_submitting(self) -> None:
         with TemporaryDirectory() as directory:
@@ -1631,8 +1364,13 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
             client = FailingClient()
             now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
-            first = run_pending_flatten_cycle(config, account, client, [], now=now)
-            second = run_pending_flatten_cycle(config, account, client, [], now=now + timedelta(seconds=15))
+            events = [{
+                "symbol": "AAPL", "timeframe": "5m", "close": "201",
+                "received_at": "2026-07-16T14:00:00Z",
+                "source_mode": "official_sdk_trade_push",
+            }]
+            first = run_pending_flatten_cycle(config, account, client, events, now=now)
+            second = run_pending_flatten_cycle(config, account, client, events, now=now + timedelta(seconds=15))
 
         self.assertEqual(first["status"], "submission_state_unknown_waiting_reconciliation")
         self.assertEqual(client.calls, 1)
@@ -1642,7 +1380,12 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         with TemporaryDirectory() as directory:
             config, snapshot, account, client = self.pending_flatten_fixture(Path(directory))
             now = datetime(2026, 7, 16, 14, 0, 1, tzinfo=UTC)
-            run_pending_flatten_cycle(config, account, client, [], now=now)
+            events = [{
+                "symbol": "AAPL", "timeframe": "5m", "close": "201",
+                "received_at": "2026-07-16T14:00:00Z",
+                "source_mode": "official_sdk_trade_push",
+            }]
+            run_pending_flatten_cycle(config, account, client, events, now=now)
             snapshot["positions"] = []
             snapshot["open_orders"] = []
             snapshot["orders"] = [{"order_id": "MO-1", "status": "Filled"}]
@@ -1650,7 +1393,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 config,
                 account,
                 client,
-                [],
+                events,
                 now=now + timedelta(seconds=15),
             )
             marker = json.loads(config.formal_test_marker_path.read_text(encoding="utf-8"))
@@ -1766,7 +1509,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(state["test_started_at"], marker["test_started_at"])
 
     def test_default_runtime_config_freezes_production_to_147_symbols(self) -> None:
-        payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
+        payload = json.loads(PRODUCTION_CONFIG_JSON.read_text(encoding="utf-8"))
         universe = load_m15_universe("config/m15_us_liquid_universe_300.json")
 
         self.assertFalse(payload["market_data"]["use_seed_universe"])
@@ -1777,7 +1520,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(payload["market_data"]["symbol_limit"], 147)
         self.assertEqual(payload["market_data"]["trading_symbol_limit"], 147)
         self.assertIsNone(payload["market_data"]["trading_universe_path"])
-        self.assertFalse(payload["runtime"]["allow_snapshot_poll_fallback"])
         self.assertIn("BNY", universe)
         self.assertIn("MRSH", universe)
         self.assertNotIn("BK", universe)
@@ -1878,7 +1620,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             },
         )
         self.assertEqual(len(daily), 1)
-        self.assertEqual(daily[0]["source_mode"], "longbridge_sdk_live_daily_confirmation")
+        self.assertEqual(daily[0]["source_mode"], "official_sdk_live_daily_confirmation")
         self.assertTrue(daily[0]["current_session_confirmation"])
         self.assertEqual(
             {key: daily[0][key] for key in ("open", "high", "low", "close", "volume")},
@@ -1973,7 +1715,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(builder.on_quote("AAPL.US", {"timestamp": int(last.timestamp()), "last_done": "202", "current_volume": 20, "volume": 1020}, received_at=last), [])
         rows = builder.flush(datetime(2026, 7, 14, 13, 35, 1, tzinfo=UTC))
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_push")
+        self.assertEqual(rows[0]["source_mode"], "official_sdk_push")
         self.assertTrue(rows[0]["bar_final"])
         self.assertEqual(rows[0]["open"], "200")
         self.assertEqual(rows[0]["close"], "202")
@@ -2072,78 +1814,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "quote_total_volume_regressed",
         )
 
-    def test_sdk_snapshot_poll_builds_bar_from_cumulative_volume_deltas(self) -> None:
-        builder = FiveMinuteBarBuilder(minutes=5)
-        first = datetime(2026, 7, 28, 14, 31, tzinfo=UTC)
-        second = datetime(2026, 7, 28, 14, 32, tzinfo=UTC)
-
-        builder.on_snapshot(
-            "AAPL.US",
-            {
-                "timestamp": first,
-                "last_done": "200",
-                "volume": 1_000_000,
-            },
-            received_at=first,
-        )
-        builder.on_snapshot(
-            "AAPL.US",
-            {
-                "timestamp": second,
-                "last_done": "202",
-                "volume": 1_000_125,
-            },
-            received_at=second,
-        )
-        rows = builder.flush(datetime(2026, 7, 28, 14, 35, 1, tzinfo=UTC))
-
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_snapshot_poll")
-        self.assertEqual(rows[0]["open"], "200")
-        self.assertEqual(rows[0]["close"], "202")
-        self.assertEqual(rows[0]["volume"], "125")
-        self.assertEqual(builder.open_bar_count, 0)
-
-    def test_snapshot_poll_uses_poll_time_for_bar_bucket_when_last_trade_is_stale(self) -> None:
-        builder = FiveMinuteBarBuilder(minutes=5)
-        stale_trade_at = datetime(2026, 7, 28, 14, 10, tzinfo=UTC)
-        first_poll = datetime(2026, 7, 28, 14, 31, tzinfo=UTC)
-        second_poll = datetime(2026, 7, 28, 14, 32, tzinfo=UTC)
-
-        builder.on_snapshot(
-            "AAPL.US",
-            {"timestamp": stale_trade_at, "last_done": "200", "volume": 1_000_000},
-            received_at=first_poll,
-        )
-        builder.on_snapshot(
-            "AAPL.US",
-            {"timestamp": stale_trade_at, "last_done": "200", "volume": 1_000_000},
-            received_at=second_poll,
-        )
-        rows = builder.flush(datetime(2026, 7, 28, 14, 35, 1, tzinfo=UTC))
-
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["bar_open_at"], "2026-07-28T14:30:00Z")
-        self.assertEqual(rows[0]["volume"], "0")
-
-    def test_snapshot_poll_final_bar_uses_finalization_age_for_freshness(self) -> None:
-        row = {
-            "bar_final": True,
-            "source_mode": "longbridge_sdk_snapshot_poll",
-            "timeframe": "5m",
-            "received_at": "2026-07-28T14:35:01Z",
-            "source_delivery_age_ms": 120_000,
-        }
-
-        self.assertEqual(
-            fresh_market_events(
-                [row],
-                2_000,
-                now=datetime(2026, 7, 28, 14, 35, 2, tzinfo=UTC),
-            ),
-            [row],
-        )
-
     def test_sdk_restart_suppresses_the_first_partial_five_minute_bar(self) -> None:
         builder = FiveMinuteBarBuilder(
             complete_bar_open_not_before=datetime(2026, 7, 15, 13, 35, tzinfo=UTC),
@@ -2193,7 +1863,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "event_id": "sdk-5m|AAPL|2026-07-15T14:35:00Z",
             "timeframe": "5m",
             "bar_final": True,
-            "source_mode": "longbridge_sdk_push",
+            "source_mode": "official_sdk_push",
             "received_at": "2026-07-15T14:35:00Z",
             "source_delivery_age_ms": 120000,
         }]
@@ -2207,7 +1877,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "event_id": "sdk-5m|AAPL|2026-07-15T14:35:00Z",
             "timeframe": "5m",
             "bar_final": True,
-            "source_mode": "longbridge_sdk_push",
+            "source_mode": "official_sdk_push",
             "received_at": "2026-07-15T14:35:00Z",
             "source_delivery_age_ms": 120000,
         }]
@@ -2223,7 +1893,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 {
                     "event_id": f"sdk-5m|AAPL.US|2026-07-15T13:{minute:02d}:00Z",
                     "symbol": "AAPL", "timeframe": "5m", "bar_final": True,
-                    "source_mode": "longbridge_sdk_push",
+                    "source_mode": "official_sdk_push",
                     "event_time": f"2026-07-15T13:{minute:02d}:00Z",
                     "received_at": f"2026-07-15T13:{minute:02d}:01Z",
                 }
@@ -2242,116 +1912,18 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 "sdk-5m|AAPL.US|2026-07-15T13:40:00Z",
             ])
 
-    def test_subscribe_uses_the_installed_sdk_two_argument_contract(self) -> None:
-        class QuoteContext:
-            def __init__(self) -> None:
-                self.calls = []
-
-            def subscribe(self, symbols, subscription_types) -> None:
-                self.calls.append((symbols, subscription_types))
-
-        quote = QuoteContext()
-        subscribe_quote_and_trades(quote, ["AAPL.US"], ["Quote", "Trade"])
-        self.assertEqual(quote.calls, [(["AAPL.US"], ["Quote", "Trade"])])
-
-    def test_default_subscription_sends_a_large_universe_in_one_request(self) -> None:
-        class QuoteContext:
-            def __init__(self) -> None:
-                self.calls = []
-
-            def subscribe(self, symbols, subscription_types) -> None:
-                self.calls.append((symbols, subscription_types))
-
-        quote = QuoteContext()
-        symbols = [f"TEST{index}.US" for index in range(156)]
-        progress = []
-        subscribe_quote_and_trades(
-            quote,
-            symbols,
-            ["Quote", "Trade"],
-            progress_callback=lambda completed, total: progress.append((completed, total)),
-        )
-        self.assertEqual(quote.calls, [(symbols, ["Quote", "Trade"])])
-        self.assertEqual(progress, [(156, 156)])
-
-    def test_subscription_batches_large_universe_without_a_single_large_request(self) -> None:
-        class QuoteContext:
-            def __init__(self) -> None:
-                self.calls = []
-
-            def subscribe(self, symbols, subscription_types) -> None:
-                self.calls.append((symbols, subscription_types))
-
-        quote = QuoteContext()
-        progress = []
-        subscribe_quote_and_trades(
-            quote,
-            ["AAPL.US", "MSFT.US", "NVDA.US"],
-            ["Quote"],
-            batch_size=2,
-            progress_callback=lambda completed, total: progress.append((completed, total)),
-        )
-        self.assertEqual(quote.calls, [(["AAPL.US", "MSFT.US"], ["Quote"]), (["NVDA.US"], ["Quote"])])
-        self.assertEqual(progress, [(2, 3), (3, 3)])
-
-    def test_failed_batch_falls_back_to_single_symbols_without_stopping_healthy_symbols(self) -> None:
-        class QuoteContext:
-            def __init__(self) -> None:
-                self.calls = []
-
-            def subscribe(self, symbols, _subscription_types) -> None:
-                self.calls.append(symbols)
-                if symbols == ["AAPL.US", "BAD.US"] or symbols == ["BAD.US"]:
-                    raise RuntimeError("symbol unavailable")
-
-        quote = QuoteContext()
-        failures = subscribe_quote_and_trades(
-            quote,
-            ["AAPL.US", "BAD.US"],
-            ["Quote"],
-            batch_size=2,
-            retry_count=0,
-        )
-        self.assertEqual(failures, ["BAD.US"])
-        self.assertIn(["AAPL.US"], quote.calls)
-
-    def test_production_subscription_failure_defers_to_server_subscription_state(self) -> None:
-        class QuoteContext:
-            def __init__(self) -> None:
-                self.calls = []
-
-            def subscribe(self, symbols, _subscription_types) -> None:
-                self.calls.append(symbols)
-                raise RuntimeError("request timeout")
-
-        quote = QuoteContext()
-        symbols = ["AAPL.US", "MSFT.US", "NVDA.US"]
-        failures = subscribe_quote_and_trades(
-            quote,
-            symbols,
-            ["Quote", "Trade"],
-            retry_count=0,
-            diagnose_failed_symbols=False,
-        )
-        self.assertEqual(quote.calls, [symbols])
-        self.assertEqual(failures, [])
-
-    def test_runtime_disables_per_symbol_diagnosis_on_production_connection(self) -> None:
-        source = inspect.getsource(quote_worker)
-        self.assertIn("diagnose_failed_symbols=False", source)
-
     def test_sdk_region_endpoints_are_explicit(self) -> None:
         self.assertEqual(
-            sdk_endpoint_overrides("cn"),
+            official_sdk_endpoints("cn"),
             {
                 "http_url": "https://openapi.longbridge.cn",
                 "quote_ws_url": "wss://openapi-quote.longbridge.cn/v2",
                 "trade_ws_url": "wss://openapi-trade.longbridge.cn/v2",
             },
         )
-        self.assertEqual(sdk_endpoint_overrides("global")["http_url"], "https://openapi.longbridge.com")
+        self.assertEqual(official_sdk_endpoints("global")["http_url"], "https://openapi.longbridge.com")
         with self.assertRaisesRegex(ValueError, "unsupported_longbridge_sdk_region"):
-            sdk_endpoint_overrides("invalid")
+            official_sdk_endpoints("invalid")
 
     def test_sdk_config_and_private_push_keep_trade_websocket_optional(self) -> None:
         class Config:
@@ -3100,7 +2672,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
 
         rows = event_rows_to_daily("AAPL.US", [Candle()], datetime(2026, 7, 15, 13, 35, tzinfo=UTC))
         self.assertEqual(rows[0]["timeframe"], "1d")
-        self.assertEqual(rows[0]["source_mode"], "longbridge_sdk_daily_context")
+        self.assertEqual(rows[0]["source_mode"], "official_sdk_daily_context")
         self.assertTrue(rows[0]["local_simulation_ignored"])
 
     def test_daily_context_accepts_the_sdk_naive_datetime_timestamp(self) -> None:
@@ -3117,30 +2689,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         expected = datetime.fromtimestamp(Candle.timestamp.timestamp(), UTC).isoformat().replace("+00:00", "Z")
         self.assertEqual(rows[0]["event_time"], expected)
 
-    def test_daily_context_worker_messages_keep_the_batch_identity(self) -> None:
-        class Candle:
-            timestamp = 1784073600
-            open = high = low = close = "100"
-            volume = 1
-
-        class Quote:
-            def candlesticks(self, *_args): return [Candle()]
-
-        class Sdk:
-            class Period:
-                Day = "day"
-            class AdjustType:
-                NoAdjust = "no-adjust"
-
-        class Queue:
-            def __init__(self): self.items = []
-            def put_nowait(self, payload): self.items.append(payload)
-
-        queue = Queue()
-        from scripts.run_m15_longbridge_sdk_runtime import load_daily_context
-        load_daily_context(Quote(), Sdk(), ("AAPL.US",), 60, queue, task_id="daily-001")
-        self.assertEqual(queue.items[0]["task_id"], "daily-001")
-
     def test_installed_sdk_exposes_required_contexts(self) -> None:
         self.assertIsNotNone(require_sdk_contract())
 
@@ -3155,122 +2703,21 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(len(trading_symbols), 147)
         self.assertIn("PSKY.US", trading_symbols)
 
-    def test_expanded_trading_pool_requires_runtime_upgrade_gate(self) -> None:
+    def test_legacy_two_day_gate_key_is_rejected(self) -> None:
         payload = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(
-                encoding="utf-8"
-            )
+            PRODUCTION_CONFIG_JSON.read_text(encoding="utf-8")
         )
-        payload["market_data"]["trading_symbol_limit"] = 300
-        payload["market_data"]["trading_universe_path"] = "config/m15_us_liquid_universe_300.json"
-        payload["market_data"]["expansion_trade_pool_upgrade_gate"]["enabled"] = False
-        with TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "runtime.json"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-            with self.assertRaisesRegex(
-                ValueError,
-                "expanded trading universe requires a complete upgrade gate",
-            ):
-                load_config(path)
-
-    def test_expanded_readonly_config_is_isolated_and_dispatch_disabled(self) -> None:
-        default = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(encoding="utf-8"))
-        expanded = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(encoding="utf-8"))
-        runtime_config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
-        upgrade_gate = expanded["market_data"]["expansion_trade_pool_upgrade_gate"]
-
-        self.assertFalse(expanded["routing"]["paper_order_dispatch_enabled"])
-        self.assertTrue(expanded["runtime"]["complete_session_gate_enabled"])
-        self.assertEqual(expanded["runtime"]["required_complete_sessions"], 1)
-        self.assertFalse(runtime_config.paper_order_dispatch_enabled)
-        self.assertTrue(runtime_config.complete_session_gate_enabled)
-        self.assertEqual(runtime_config.required_complete_sessions, 1)
-        self.assertEqual(
-            runtime_config.market_data_transport,
-            "longbridge_serve_persistent_jsonrpc",
-        )
-        self.assertFalse(runtime_config.allow_snapshot_poll_fallback)
-        dispatch_requested = True
-        complete_session_gate_passed_now = True
-        self.assertFalse(
-            dispatch_requested
-            and runtime_config.paper_order_dispatch_enabled
-            and (
-                not runtime_config.complete_session_gate_enabled
-                or complete_session_gate_passed_now
-            )
-        )
-        self.assertFalse(expanded["market_data"]["use_seed_universe"])
-        self.assertEqual(expanded["market_data"]["universe_path"], "config/m15_us_liquid_universe_300.json")
-        self.assertEqual(expanded["market_data"]["symbol_limit"], 300)
-        self.assertEqual(expanded["market_data"]["trading_symbol_limit"], 147)
-        self.assertTrue(upgrade_gate["required_complete_session_gate_passed"])
-        self.assertTrue(upgrade_gate["required_complete_trading_daily_context"])
-        self.assertTrue(upgrade_gate["required_complete_subscribed_daily_context"])
-        self.assertEqual(upgrade_gate["required_subscription_coverage"], "300/300")
-        self.assertEqual(upgrade_gate["maximum_source_delivery_age_ms"], 2000)
-        self.assertEqual(upgrade_gate["target_trading_symbol_limit"], 300)
-        self.assertEqual(len(configured_trading_symbols(runtime_config)), 147)
-        self.assertNotEqual(expanded["outputs"]["output_dir"], default["outputs"]["output_dir"])
-        self.assertNotEqual(expanded["outputs"]["market_events"], default["outputs"]["market_events"])
-        self.assertNotEqual(expanded["outputs"]["runtime_status"], default["outputs"]["runtime_status"])
-        self.assertNotEqual(expanded["outputs"]["readonly_gate"], default["outputs"]["readonly_gate"])
-        self.assertNotEqual(expanded["market_data"]["daily_context"], default["market_data"]["daily_context"])
-        self.assertNotEqual(expanded["formal_test_transition"]["marker_path"], default["formal_test_transition"]["marker_path"])
-        self.assertNotEqual(
-            expanded["formal_test_transition"]["epoch_state_path"],
-            default["formal_test_transition"]["epoch_state_path"],
-        )
-
-    def test_complete_session_gate_new_key_takes_priority_over_legacy_key(self) -> None:
-        payload = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        payload["runtime"]["complete_session_gate_enabled"] = False
         payload["runtime"]["two_day_readonly_gate"] = True
         payload["runtime"]["required_complete_sessions"] = 3
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "runtime.json"
             path.write_text(json.dumps(payload), encoding="utf-8")
-            loaded = load_config(path)
-
-        self.assertFalse(loaded.complete_session_gate_enabled)
-        self.assertEqual(loaded.required_complete_sessions, 3)
-
-    def test_expanded_universe_file_keeps_declared_order_and_limit(self) -> None:
-        payload = json.loads(Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(encoding="utf-8"))
-        symbols = load_m15_universe(payload["market_data"]["universe_path"])
-        raw_symbols = json.loads(Path(payload["market_data"]["universe_path"]).read_text(encoding="utf-8"))["symbols"]
-        upgrade_gate = json.loads(Path(payload["market_data"]["universe_path"]).read_text(encoding="utf-8"))["trade_pool_upgrade_gate"]
-
-        self.assertEqual(len(symbols), 300)
-        self.assertEqual(payload["market_data"]["symbol_limit"], 300)
-        self.assertLessEqual(payload["market_data"]["symbol_limit"], len(symbols))
-        self.assertEqual(symbols[:5], tuple(raw_symbols[:5]))
-        self.assertEqual(symbols[-5:], tuple(raw_symbols[-5:]))
-        self.assertTrue(upgrade_gate["required_complete_session_gate_passed"])
-        self.assertEqual(upgrade_gate["required_subscription_coverage"], "300/300")
-        self.assertEqual(upgrade_gate["target_trading_symbol_limit"], 300)
-
-    def test_expanded_readonly_staging_keeps_original_147_trading_snapshot(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
-        symbols = configured_symbols(config)
-        trading_symbols = configured_trading_symbols(config)
-
-        self.assertEqual(len(symbols), 300)
-        self.assertEqual(len(trading_symbols), 147)
-        self.assertEqual(trading_symbols[0], "SPY.US")
-        self.assertEqual(trading_symbols[-1], "TSM.US")
-        self.assertEqual(symbols[0], "SPY.US")
-        self.assertEqual(symbols[-1], "SHW.US")
+            with self.assertRaisesRegex(ValueError, "removed market-data recovery keys"):
+                load_config(path)
 
     def test_reordering_production_universe_changes_fingerprint_and_is_detectable(self) -> None:
         source = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.json").read_text(
-                encoding="utf-8"
-            )
+            PRODUCTION_CONFIG_JSON.read_text(encoding="utf-8")
         )
         original_subscription = json.loads(
             Path("config/m15_us_liquid_universe_300.json").read_text(
@@ -3299,63 +2746,19 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
                 trading_universe_fingerprint(load_config()),
             )
 
-    def test_paper_dispatch_config_rejects_snapshot_fallback(self) -> None:
+    def test_paper_dispatch_config_rejects_removed_market_data_recovery_keys(self) -> None:
         payload = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.contract_v1.json").read_text(
-                encoding="utf-8"
-            )
+            PRODUCTION_CONFIG_JSON.read_text(encoding="utf-8")
         )
         payload["runtime"]["allow_snapshot_poll_fallback"] = True
         with TemporaryDirectory() as directory:
             path = Path(directory) / "runtime.json"
             path.write_text(json.dumps(payload), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "forbids snapshot fallback"):
+            with self.assertRaisesRegex(
+                ValueError,
+                "contains removed market-data recovery keys:allow_snapshot_poll_fallback",
+            ):
                 load_config(path)
-
-    def test_expansion_symbols_are_audited_but_never_routed_to_strategies(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
-        trading_symbol = configured_trading_symbols(config)[0]
-        readonly_symbol = configured_symbols(config)[-1]
-        rows = [
-            {"symbol": trading_symbol, "timeframe": "5m"},
-            {"symbol": readonly_symbol, "timeframe": "5m"},
-        ]
-
-        self.assertEqual(trading_market_events(config, rows), [rows[0]])
-        self.assertTrue(market_event_is_tradable(config, rows[0]))
-        self.assertFalse(market_event_is_tradable(config, rows[1]))
-
-    def test_expansion_daily_failures_do_not_block_complete_trading_context(self) -> None:
-        config = load_config("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json")
-        trading_symbols = configured_trading_symbols(config)
-        rows = [
-            {
-                "symbol": symbol.removesuffix(".US"),
-                "timeframe": "1d",
-                "event_time": f"2026-07-{(index % 28) + 1:02d}T20:00:00Z",
-            }
-            for symbol in trading_symbols
-            for index in range(config.daily_context_bars)
-        ]
-
-        self.assertTrue(
-            daily_context_covers_symbols(config, rows, trading_symbols, ["SHW.US"])
-        )
-        self.assertFalse(
-            daily_context_covers_symbols(config, rows, trading_symbols, [trading_symbols[0]])
-        )
-
-    def test_runtime_rejects_symbol_limit_larger_than_universe_file(self) -> None:
-        source = json.loads(
-            Path("config/examples/m15_longbridge_sdk_runtime.expanded_readonly.json").read_text(encoding="utf-8")
-        )
-        with TemporaryDirectory() as directory:
-            config_path = Path(directory) / "runtime.json"
-            source["market_data"]["symbol_limit"] = 301
-            config_path.write_text(json.dumps(source), encoding="utf-8")
-
-            with self.assertRaisesRegex(ValueError, "symbol_limit exceeds universe file length"):
-                load_config(config_path)
 
     def test_one_complete_market_session_is_required_before_dispatch(self) -> None:
         with TemporaryDirectory() as directory:

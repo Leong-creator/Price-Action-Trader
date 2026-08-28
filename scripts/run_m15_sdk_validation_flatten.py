@@ -32,8 +32,6 @@ from scripts.m15_sdk_validation_flatten_lib import (
 FLATTEN_CONFIRMATION_TIMEOUT_SECONDS = 75
 FLATTEN_CONFIRMATION_POLL_SECONDS = 2
 OPEN_ORDER_CANCEL_TIMEOUT_SECONDS = 30
-READ_RETRY_COUNT = 3
-READ_RETRY_DELAY_SECONDS = 1
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,41 +92,22 @@ def latest_prices(quote: Any, symbols: list[str]) -> dict[str, Decimal]:
     return prices
 
 
-def latest_prices_with_fallback(
-    quote: Any,
-    symbols: list[str],
-    *,
-    retry_count: int = READ_RETRY_COUNT,
-) -> tuple[dict[str, Decimal], list[str]]:
-    errors: list[str] = []
-    for attempt in range(1, retry_count + 1):
-        try:
-            return latest_prices(quote, symbols), errors
-        except Exception as exc:
-            errors.append(f"attempt={attempt}:{type(exc).__name__}:{exc}")
-            if attempt < retry_count:
-                time.sleep(READ_RETRY_DELAY_SECONDS)
-    # build_flatten_plan has a conservative cost-price fallback. A quote-only
-    # outage must not discard an otherwise verified paper-account close plan.
-    return {}, errors
+def verified_latest_prices(quote: Any, symbols: list[str]) -> dict[str, dict[str, Any]]:
+    requested = sorted({symbol.upper() for symbol in symbols if symbol})
+    prices = latest_prices(quote, requested)
+    missing = sorted(set(requested) - set(prices))
+    if missing:
+        raise RuntimeError(f"sdk_quote_missing_symbols:{','.join(missing)}")
+    return prices
 
 
-def refresh_account_with_retry(
-    provider: SdkAccountStateProvider,
-    *,
-    retry_count: int = READ_RETRY_COUNT,
-) -> tuple[dict[str, Any], list[str]]:
-    errors: list[str] = []
-    account: dict[str, Any] = {}
-    for attempt in range(1, retry_count + 1):
-        account = provider.refresh()
-        critical = list(account.get("critical_errors") or [])
-        if account.get("paper_account_verified") and not critical:
-            return account, errors
-        errors.append(f"attempt={attempt}:" + ",".join(critical or ["paper_account_not_verified"]))
-        if attempt < retry_count:
-            time.sleep(READ_RETRY_DELAY_SECONDS)
-    return account, errors
+def verified_account_snapshot(provider: SdkAccountStateProvider) -> dict[str, Any]:
+    account = provider.refresh()
+    critical = list(account.get("critical_errors") or [])
+    if not account.get("paper_account_verified") or critical:
+        detail = ",".join(critical or ["paper_account_not_verified"])
+        raise RuntimeError(f"paper_account_verification_failed:{detail}")
+    return account
 
 
 def account_snapshot_summary(account: dict[str, Any]) -> dict[str, Any]:
@@ -146,8 +125,8 @@ def account_snapshot_summary(account: dict[str, Any]) -> dict[str, Any]:
 
 def stop_trading_processes() -> list[dict[str, Any]]:
     commands = [
-        [sys.executable, "scripts/run_m15_background_watchdog.py", "--stop", "--config", "config/examples/m15_background_watchdog.json"],
-        [sys.executable, "scripts/run_m15_longbridge_sdk_runtime.py", "--stop", "--config", "config/examples/m15_longbridge_sdk_runtime.json"],
+        [sys.executable, "scripts/run_m15_background_watchdog.py", "--stop", "--config", "config/m15_background_watchdog.production.json"],
+        [sys.executable, "scripts/run_m15_longbridge_sdk_runtime.py", "--stop", "--config", "config/m15_longbridge_marketdata.production.json"],
     ]
     results: list[dict[str, Any]] = []
     for command in commands:
@@ -188,33 +167,9 @@ def submit_plan(sdk: Any, trade: Any, gate: SdkTradeRequestGate, plan: list[dict
             "outside_rth": outside_rth,
             "remark": f"m15-sdk-validation-flatten-{item['position_action']}"[:64],
         }
-        fallback_kwargs = {
-            **base_kwargs,
-            "order_type": sdk.OrderType.LO,
-            "submitted_price": Decimal(item["fallback_limit_price"]),
-        }
-        try:
-            response = gate.call(lambda: trade.submit_order(**base_kwargs))
-            order_id = str(getattr(response, "order_id", "") or "")
-            results.append({**item, "order_id": order_id, "status": "submitted" if order_id else "submit_unconfirmed_missing_order_id"})
-        except Exception as exc:
-            can_fallback = (
-                int(item.get("fallback_quote_age_ms", -1)) >= 0
-                and int(item.get("fallback_quote_age_ms", -1)) <= 2000
-            )
-            if not can_fallback:
-                raise
-            fallback = gate.call(lambda: trade.submit_order(**fallback_kwargs))
-            order_id = str(getattr(fallback, "order_id", "") or "")
-            results.append(
-                {
-                    **item,
-                    "order_id": order_id,
-                    "status": "submitted" if order_id else "submit_unconfirmed_missing_order_id",
-                    "fallback_used": True,
-                    "fallback_reason": str(exc)[:300],
-                }
-            )
+        response = gate.call(lambda: trade.submit_order(**base_kwargs))
+        order_id = str(getattr(response, "order_id", "") or "")
+        results.append({**item, "order_id": order_id, "status": "submitted" if order_id else "submit_unconfirmed_missing_order_id"})
     return results
 
 
@@ -341,17 +296,16 @@ def main() -> int:
         sdk, trade, portfolio, quote = sdk_contexts(config)
         gate = SdkTradeRequestGate()
         provider = SdkAccountStateProvider(trade, portfolio, request_gate=gate)
-        account, account_retry_errors = refresh_account_with_retry(provider)
+        account = verified_account_snapshot(provider)
         payload["account_channel"] = account.get("account_channel")
         payload["paper_account_verified"] = bool(account.get("paper_account_verified"))
-        payload["account_retry_errors"] = account_retry_errors
         payload["account_errors"] = list(account.get("errors") or [])
         payload.update(account_snapshot_summary(account))
         paper_account_verified = bool(account.get("paper_account_verified")) and not account.get("critical_errors")
         if not account.get("paper_account_verified") or account.get("critical_errors"):
             raise RuntimeError("paper_account_verification_failed")
         if not args.execute:
-            prices, quote_errors = latest_prices_with_fallback(
+            prices = verified_latest_prices(
                 quote,
                 [str(row.get("symbol") or "") for row in account.get("positions", []) if isinstance(row, dict)],
             )
@@ -360,8 +314,6 @@ def main() -> int:
                 "status": "dry_run_ready" if not blockers else "dry_run_blocked",
                 "plan": plan,
                 "blockers": blockers,
-                "quote_retry_errors": quote_errors,
-                "quote_fallback_used": bool(quote_errors),
             })
         else:
             payload["stopped_processes"] = stop_trading_processes()
@@ -369,8 +321,7 @@ def main() -> int:
             # M15 may have submitted an order between the first preflight
             # snapshot and its orderly shutdown. Re-read before canceling or
             # planning any close order so this cleanup never acts on stale state.
-            account, post_stop_retry_errors = refresh_account_with_retry(provider)
-            payload["post_stop_account_retry_errors"] = post_stop_retry_errors
+            account = verified_account_snapshot(provider)
             payload.update(account_snapshot_summary(account))
             if not account.get("paper_account_verified") or account.get("critical_errors"):
                 raise RuntimeError("paper_account_verification_failed_after_runtime_stop")
@@ -378,12 +329,10 @@ def main() -> int:
             payload["cancel_results"] = cancel_results
             if cancel_results:
                 account = wait_for_open_orders_cleared(provider)
-            prices, quote_errors = latest_prices_with_fallback(
+            prices = verified_latest_prices(
                 quote,
                 [str(row.get("symbol") or "") for row in account.get("positions", []) if isinstance(row, dict)],
             )
-            payload["quote_retry_errors"] = quote_errors
-            payload["quote_fallback_used"] = bool(quote_errors)
             plan, blockers = build_flatten_plan(account, prices)
             payload["planned_position_count"] = len(plan)
             payload["planned_symbols"] = [str(item.get("symbol") or "") for item in plan]

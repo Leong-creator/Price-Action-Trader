@@ -188,8 +188,8 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
         "M12-FTD-001-pullback-guard-confirm-1d": 5,
     }
     position["longbridge_position_manager"]["market_holidays"] = read_json(
-        ROOT / "config/examples/m12_47_session_supervisor.json"
-    ).get("market_holidays", [])
+        ROOT / "config/m15_longbridge_marketdata.production.json"
+    ).get("market_data", {}).get("market_holidays", [])
     position["longbridge_position_manager"]["test_epoch_id"] = long_epoch
     position["longbridge_position_manager"]["test_started_at"] = f"{epoch_date[:4]}-{epoch_date[4:6]}-{epoch_date[6:]}T13:30:00Z"
     position["longbridge_position_manager"]["paper_short_testing"] = {
@@ -197,32 +197,6 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
         "test_epoch_id": short_epoch,
         "runtime_ids": list(SHORT_RUNTIMES),
     }
-
-    runtime = read_json(ROOT / "config/examples/m15_longbridge_sdk_runtime.json")
-    runtime["title"] = "长桥SDK完整策略合同模拟账户运行层"
-    runtime["routing"]["router_config"] = "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json"
-    runtime["routing"]["execution_config"] = "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json"
-    runtime["routing"]["position_manager_config"] = "config/examples/m15_longbridge_realtime_position_manager.contract_v1.json"
-    runtime["formal_test_transition"]["test_epoch_id"] = long_epoch
-    runtime["formal_test_transition"]["short_test_epoch_id"] = short_epoch
-    runtime["formal_test_transition"]["activate_not_before"] = (
-        f"{epoch_date[:4]}-{epoch_date[4:6]}-{epoch_date[6:]}T13:30:00Z"
-    )
-
-    readiness = read_json(ROOT / "config/examples/m15_opening_trade_readiness.paper_orders_enabled.json")
-    readiness["inputs"]["sdk_runtime_config"] = "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
-    readiness["inputs"]["execution_config"] = (
-        "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json"
-    )
-
-    watchdog = read_json(ROOT / "config/examples/m15_background_watchdog.json")
-    watchdog["inputs"]["m15_sdk_runtime_config"] = "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
-    watchdog["inputs"]["readiness_config"] = (
-        "config/examples/m15_opening_trade_readiness.paper_contract_v1.json"
-    )
-    watchdog["inputs"]["m15_dashboard_config"] = (
-        "config/examples/m15_longbridge_dashboard.contract_v1.json"
-    )
 
     dashboard = read_json(ROOT / "config/examples/m15_longbridge_dashboard.json")
     dashboard["inputs"]["execution_config"] = (
@@ -233,9 +207,6 @@ def build_configs(epoch_date: str) -> dict[Path, dict[str, Any]]:
         ROOT / "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json": router,
         ROOT / "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json": execution,
         ROOT / "config/examples/m15_longbridge_realtime_position_manager.contract_v1.json": position,
-        ROOT / "config/examples/m15_longbridge_sdk_runtime.contract_v1.json": runtime,
-        ROOT / "config/examples/m15_opening_trade_readiness.paper_contract_v1.json": readiness,
-        ROOT / "config/examples/m15_background_watchdog.contract_v1.json": watchdog,
         ROOT / "config/examples/m15_longbridge_dashboard.contract_v1.json": dashboard,
     }
 

@@ -17,7 +17,7 @@ from scripts.m15_deployment_governance_lib import (
 class M15DeploymentGovernanceTest(unittest.TestCase):
     def test_default_manifest_covers_live_quote_transport(self) -> None:
         self.assertIn(
-            "scripts/m15_longbridge_serve_transport_lib.py",
+            "scripts/m15_longbridge_sdk_quote_transport_lib.py",
             DEFAULT_RUNTIME_FILES,
         )
 
@@ -28,7 +28,7 @@ class M15DeploymentGovernanceTest(unittest.TestCase):
                 "scripts/run_m15_deployment_gate.py",
                 "--verify",
                 "--config",
-                "config/examples/m15_longbridge_sdk_runtime.json",
+                "config/m15_longbridge_marketdata.production.json",
                 "--manifest",
                 "/tmp/nonexistent-m15-manifest.json",
             ],

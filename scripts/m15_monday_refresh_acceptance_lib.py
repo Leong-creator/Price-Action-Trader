@@ -118,19 +118,9 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         runtime.get("dispatch_requested") is True
         and runtime.get("dispatch_enabled") is False
         and str(runtime.get("dispatch_block_reason") or "")
-        in {"complete_market_session_gate", "two_day_readonly_gate"}
-        and int(
-            runtime.get(
-                "complete_sessions_passed",
-                runtime.get("readonly_sessions_passed") or 0,
-            )
-        )
-        < int(
-            runtime.get(
-                "complete_sessions_required",
-                runtime.get("readonly_sessions_required") or 1,
-            )
-        )
+        == "complete_market_session_gate"
+        and int(runtime.get("complete_sessions_passed") or 0)
+        < int(runtime.get("complete_sessions_required") or 1)
     )
     marketdata_gate = marketdata_gate_truth(runtime, readiness, runtime_artifact, readiness_artifact)
     formal_consistent = (
@@ -412,13 +402,9 @@ def marketdata_gate_truth(
     gate_block_reason = str(runtime.get("dispatch_block_reason") or "")
     readonly_waiting = (
         readiness_status == "waiting_for_marketdata_acceptance"
-        or gate_block_reason
-        in {"complete_market_session_gate", "two_day_readonly_gate"}
+        or gate_block_reason == "complete_market_session_gate"
     )
-    explicit_gate_passed = runtime.get(
-        "complete_session_gate_passed",
-        runtime.get("readonly_gate_passed"),
-    ) is True
+    explicit_gate_passed = runtime.get("complete_session_gate_passed") is True
     active_dispatch_proves_gate = bool(
         runtime.get("sdk_connected") is True
         and runtime.get("dispatch_enabled") is True

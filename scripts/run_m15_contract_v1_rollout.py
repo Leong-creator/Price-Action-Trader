@@ -17,7 +17,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import load_config
 from scripts.m15_strategy_contracts_lib import load_contracts, write_state_atomic
 
 
-DEFAULT_CONFIG = ROOT / "config/examples/m15_longbridge_sdk_runtime.contract_v1.json"
+DEFAULT_CONFIG = ROOT / "config/m15_longbridge_marketdata.production.json"
 
 
 def read_json(path: Path) -> dict[str, Any]:

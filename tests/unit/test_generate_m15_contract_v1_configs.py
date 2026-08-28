@@ -58,54 +58,13 @@ class ContractV1ConfigGenerationTest(unittest.TestCase):
             "config/m15_auxiliary_modules_contract_v1.json",
         )
 
-    def test_readiness_and_watchdog_follow_the_contract_runtime(self) -> None:
-        readiness = self.by_name["m15_opening_trade_readiness.paper_contract_v1.json"]
-        watchdog = self.by_name["m15_background_watchdog.contract_v1.json"]
-        self.assertEqual(
-            readiness["inputs"]["sdk_runtime_config"],
-            "config/examples/m15_longbridge_sdk_runtime.contract_v1.json",
-        )
-        self.assertEqual(
-            readiness["inputs"]["execution_config"],
-            "config/examples/m15_longbridge_realtime_execution.paper_contract_v1.json",
-        )
-        self.assertEqual(
-            watchdog["inputs"]["readiness_config"],
-            "config/examples/m15_opening_trade_readiness.paper_contract_v1.json",
-        )
-        runtime = self.by_name["m15_longbridge_sdk_runtime.contract_v1.json"]
-        self.assertEqual(
-            runtime["formal_test_transition"]["activate_not_before"],
-            "2026-08-06T13:30:00Z",
-        )
-
-    def test_compatibility_runtime_inherits_marketdata_safety_gate(self) -> None:
-        runtime = self.by_name["m15_longbridge_sdk_runtime.contract_v1.json"]
-        self.assertTrue(runtime["runtime"]["complete_session_gate_enabled"])
-        self.assertEqual(runtime["runtime"]["required_complete_sessions"], 1)
-        self.assertEqual(
-            runtime["runtime"]["market_data_transport"],
-            "longbridge_serve_persistent_jsonrpc",
-        )
-        self.assertEqual(
-            runtime["runtime"]["longbridge_serve_binary_sha256"],
-            "acfeefd6be07f871d03158054c79ad5a950af3a17fd89aca5c90563f448a04d8",
-        )
-        self.assertFalse(runtime["runtime"]["allow_snapshot_poll_fallback"])
-        self.assertEqual(
-            runtime["runtime"]["reconnect_backoff_schedule_seconds"],
-            [5, 15, 30, 60],
-        )
-        self.assertEqual(runtime["runtime"]["subscription_deadline_seconds"], 30)
-        self.assertEqual(runtime["runtime"]["subscription_progress_deadline_seconds"], 90)
-        self.assertEqual(runtime["runtime"]["subscription_circuit_retry_seconds"], 300)
-        self.assertEqual(runtime["runtime"]["subscription_batch_size"], 500)
-        self.assertEqual(runtime["runtime"]["maximum_consecutive_subscription_failures"], 3)
-        self.assertTrue(
-            runtime["outputs"]["readonly_gate"].endswith(
-                "m15_marketdata_integrity_gate_v1.json"
-            )
-        )
+    def test_generator_does_not_create_runtime_or_watchdog_compatibility_configs(self) -> None:
+        removed = {
+            "m15_longbridge_sdk_runtime.contract_v1.json",
+            "m15_opening_trade_readiness.paper_contract_v1.json",
+            "m15_background_watchdog.contract_v1.json",
+        }
+        self.assertTrue(removed.isdisjoint(self.by_name))
 
 
 if __name__ == "__main__":
