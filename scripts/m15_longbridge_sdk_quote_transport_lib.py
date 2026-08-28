@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import time
@@ -15,6 +16,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     daily_candlestick_event_rows,
     floor_bar_open,
     load_config,
+    load_valid_daily_context_cache,
     read_client_id,
     sdk_config_from_oauth,
     sdk_object_to_dict,
@@ -80,6 +82,7 @@ def official_sdk_quote_worker(
     """Own exactly one official SDK QuoteContext for all M15 market data."""
     config = load_config(config_path)
     try:
+        os.environ["LONGBRIDGE_PRINT_QUOTE_PACKAGES"] = "false"
         import longbridge.openapi as sdk
 
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
@@ -120,39 +123,56 @@ def official_sdk_quote_worker(
         )
         targets = list(dict.fromkeys(base_targets + monitoring_targets))
 
-        daily_rows: list[dict[str, Any]] = []
+        daily_rows = load_valid_daily_context_cache(
+            config.daily_context_path,
+            config,
+            datetime.now(UTC),
+        )
         daily_failures: list[str] = []
-        daily_deadline = time.monotonic() + config.daily_context_deadline_seconds
-        for index, symbol in enumerate(base_targets, start=1):
-            if time.monotonic() >= daily_deadline:
-                daily_failures.extend(base_targets[index - 1 :])
-                break
-            try:
-                candles = quote.candlesticks(
-                    symbol,
-                    sdk.Period.Day,
-                    config.daily_context_bars,
-                    sdk.AdjustType.NoAdjust,
-                    sdk.TradeSessions.Intraday,
-                )
-                rows = daily_candlestick_event_rows(
-                    symbol, candles, datetime.now(UTC)
-                )
-            except Exception:
-                rows = []
-            if len(rows) != config.daily_context_bars:
-                daily_failures.append(symbol)
-            else:
-                daily_rows.extend(rows)
+        daily_source_mode = "official_sdk_daily_context_cache"
+        if daily_rows:
             _emit(
                 queue_out,
                 {
                     "kind": "daily_context_progress",
-                    "completed": index - len(daily_failures),
-                    "processed": index,
+                    "completed": len(base_targets),
+                    "processed": len(base_targets),
                     "total": len(base_targets),
                 },
             )
+        else:
+            daily_source_mode = "official_sdk_daily_context"
+            daily_deadline = time.monotonic() + config.daily_context_deadline_seconds
+            for index, symbol in enumerate(base_targets, start=1):
+                if time.monotonic() >= daily_deadline:
+                    daily_failures.extend(base_targets[index - 1 :])
+                    break
+                try:
+                    candles = quote.candlesticks(
+                        symbol,
+                        sdk.Period.Day,
+                        config.daily_context_bars,
+                        sdk.AdjustType.NoAdjust,
+                        sdk.TradeSessions.Intraday,
+                    )
+                    rows = daily_candlestick_event_rows(
+                        symbol, candles, datetime.now(UTC)
+                    )
+                except Exception:
+                    rows = []
+                if len(rows) != config.daily_context_bars:
+                    daily_failures.append(symbol)
+                else:
+                    daily_rows.extend(rows)
+                _emit(
+                    queue_out,
+                    {
+                        "kind": "daily_context_progress",
+                        "completed": index - len(daily_failures),
+                        "processed": index,
+                        "total": len(base_targets),
+                    },
+                )
         if daily_failures:
             raise RuntimeError(
                 "official_sdk_daily_context_incomplete:"
@@ -164,7 +184,7 @@ def official_sdk_quote_worker(
                 "kind": "daily_context",
                 "rows": daily_rows,
                 "failures": [],
-                "source_mode": "official_sdk_daily_context",
+                "source_mode": daily_source_mode,
             },
             critical=True,
         ):
