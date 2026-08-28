@@ -141,6 +141,7 @@ def official_sdk_quote_worker(
             datetime.now(UTC),
         )
         daily_failures: list[str] = []
+        daily_deadline_exhausted: list[str] = []
         daily_source_mode = "official_sdk_daily_context_cache"
         if daily_rows:
             _emit(
@@ -157,7 +158,7 @@ def official_sdk_quote_worker(
             daily_deadline = time.monotonic() + config.daily_context_deadline_seconds
             for index, symbol in enumerate(base_targets, start=1):
                 if time.monotonic() >= daily_deadline:
-                    daily_failures.extend(base_targets[index - 1 :])
+                    daily_deadline_exhausted = list(base_targets[index - 1 :])
                     break
                 try:
                     candles = quote.candlesticks(
@@ -185,6 +186,11 @@ def official_sdk_quote_worker(
                         "total": len(base_targets),
                     },
                 )
+        if daily_deadline_exhausted:
+            raise RuntimeError(
+                "official_sdk_daily_context_deadline_exceeded:"
+                + ",".join(daily_deadline_exhausted)
+            )
         if daily_failures:
             raise RuntimeError(
                 "official_sdk_daily_context_incomplete:"
