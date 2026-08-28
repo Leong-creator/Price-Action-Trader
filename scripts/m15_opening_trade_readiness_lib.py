@@ -4,21 +4,15 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from scripts.m15_longbridge_realtime_execution_lib import SUMMARY_JSON as EXECUTION_SUMMARY_JSON
 from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config
 from scripts.m15_longbridge_realtime_execution_lib import parse_utc_datetime
 from scripts.m15_longbridge_realtime_execution_lib import read_jsonl as read_execution_jsonl
-from scripts.m15_longbridge_realtime_session_supervisor_lib import (
-    DEFAULT_CONFIG_PATH as DEFAULT_REALTIME_SUPERVISOR_CONFIG_PATH,
-    build_window_state,
-    load_config as load_realtime_supervisor_config,
-    pid_path as realtime_pid_path,
-    supervisor_health_issues,
-)
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import load_config as load_stale_order_cleanup_config
 from scripts.m15_longbridge_realtime_stale_order_cleanup_lib import stale_buy_open_orders
 from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_config_fingerprint
@@ -35,13 +29,9 @@ DEFAULT_DAILY_DIR = (
     / "m10_price_action_strategy_refresh"
     / "daily_observation"
 )
-DEFAULT_M12_DIR = DEFAULT_DAILY_DIR / "m12_29_current_day_scan_dashboard"
 DEFAULT_M15_REALTIME_DIR = DEFAULT_DAILY_DIR / "m15_longbridge_realtime_execution"
 DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_opening_trade_readiness"
-# M15 now runs only through the SDK paper runtime.  Keeping the retired CLI
-# readiness config as the implicit default lets an otherwise healthy runtime be
-# reported as dead whenever callers omit --config.
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_opening_trade_readiness.paper_orders_enabled.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "m15_opening_trade_readiness.production.json"
 READINESS_JSON = "m15_opening_trade_readiness.json"
 READINESS_MD = "m15_opening_trade_readiness.md"
 
@@ -49,11 +39,8 @@ READINESS_MD = "m15_opening_trade_readiness.md"
 @dataclass(frozen=True, slots=True)
 class OpeningTradeReadinessConfig:
     stage: str
-    m12_47_status_path: Path
-    realtime_supervisor_config_path: Path
     execution_config_path: Path
     realtime_account_state_path: Path
-    realtime_supervisor_status_path: Path
     realtime_runtime_engine: str
     sdk_runtime_config_path: Path
     sdk_runtime_status_path: Path
@@ -81,10 +68,6 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
     outputs = payload.get("outputs", {})
     return OpeningTradeReadinessConfig(
         stage=str(payload.get("stage", "M15.opening_trade_readiness")),
-        m12_47_status_path=resolve_repo_path(inputs.get("m12_47_status", DEFAULT_M12_DIR / "m12_47_session_supervisor_status.json")),
-        realtime_supervisor_config_path=resolve_repo_path(
-            inputs.get("realtime_supervisor_config", DEFAULT_REALTIME_SUPERVISOR_CONFIG_PATH)
-        ),
         execution_config_path=resolve_repo_path(
             inputs.get(
                 "execution_config",
@@ -94,12 +77,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
         realtime_account_state_path=resolve_repo_path(
             inputs.get("realtime_account_state", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_realtime_account_state.json")
         ),
-        realtime_supervisor_status_path=resolve_repo_path(
-            inputs.get("realtime_supervisor_status", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_realtime_session_supervisor.json")
-        ),
-        realtime_runtime_engine=str(inputs.get("realtime_runtime_engine", "cli")).strip().lower(),
+        realtime_runtime_engine=str(inputs.get("realtime_runtime_engine", "sdk")).strip().lower(),
         sdk_runtime_config_path=resolve_repo_path(
-            inputs.get("sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+            inputs.get(
+                "sdk_runtime_config",
+                ROOT / "config" / "m15_longbridge_marketdata.production.json",
+            )
         ),
         sdk_runtime_status_path=resolve_repo_path(
             inputs.get("sdk_runtime_status", DEFAULT_M15_REALTIME_DIR / "m15_longbridge_sdk_runtime.json")
@@ -108,10 +91,58 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> OpeningTradeReadiness
     )
 
 
-def informational_check_row(check: str, required_result: str, **extra: Any) -> dict[str, Any]:
-    row = check_row(check, required_result, "informational", **extra)
-    row["non_blocking"] = True
-    return row
+def build_sdk_window_state(sdk_config: Any, generated_at: str) -> dict[str, Any]:
+    utc_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")).astimezone(UTC)
+    market_zone = ZoneInfo(sdk_config.market_timezone)
+    market_dt = utc_dt.astimezone(market_zone)
+    open_hour, open_minute = (
+        int(value) for value in sdk_config.regular_session_start_time.split(":", 1)
+    )
+    close_hour, close_minute = (
+        int(value) for value in sdk_config.regular_session_end_time.split(":", 1)
+    )
+    regular_open = time(open_hour, open_minute)
+    regular_close = time(close_hour, close_minute)
+    holidays = set(sdk_config.market_holidays)
+
+    def trading_day(value: date) -> bool:
+        return value.weekday() < 5 and value.isoformat() not in holidays
+
+    def next_trading_day(value: date) -> date:
+        candidate = value + timedelta(days=1)
+        while not trading_day(candidate):
+            candidate += timedelta(days=1)
+        return candidate
+
+    if not trading_day(market_dt.date()):
+        phase = "non_trading_day"
+        plain = "非交易日等待"
+        next_session_date = next_trading_day(market_dt.date())
+    elif market_dt.time() < regular_open:
+        phase = "before_regular_session"
+        plain = "等待常规交易时段"
+        next_session_date = market_dt.date()
+    elif regular_open <= market_dt.time() <= regular_close:
+        phase = "regular_session"
+        plain = "美股常规交易时段"
+        next_session_date = market_dt.date()
+    else:
+        phase = "after_regular_session"
+        plain = "等待下一交易日"
+        next_session_date = next_trading_day(market_dt.date())
+    session_start = datetime.combine(next_session_date, regular_open, tzinfo=market_zone)
+    return {
+        "generated_at": utc_dt.isoformat().replace("+00:00", "Z"),
+        "market_phase": phase,
+        "market_status": plain,
+        "market_date": market_dt.date().isoformat(),
+        "session_started_at": session_start.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+        "session_should_run": phase == "regular_session",
+        "new_york_time": market_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "beijing_time": utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime(
+            "%Y-%m-%d %H:%M:%S %Z"
+        ),
+    }
 
 
 def run_m15_opening_trade_readiness(
@@ -125,36 +156,14 @@ def run_m15_opening_trade_readiness(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(config.output_dir / READINESS_JSON, payload)
     (config.output_dir / READINESS_MD).write_text(render_markdown(payload), encoding="utf-8")
-    if config.realtime_runtime_engine == "sdk" and config.output_dir.resolve() == DEFAULT_OUTPUT_DIR.resolve():
-        legacy_path = DEFAULT_M15_REALTIME_DIR / READINESS_JSON
-        write_json(
-            legacy_path,
-            {
-                "schema_version": "m15.opening-trade-readiness.legacy-pointer.v1",
-                "generated_at": generated_at,
-                "readiness_status": "superseded_use_canonical_sdk_readiness",
-                "canonical_path": project_path(config.output_dir / READINESS_JSON),
-                "trading_decision_allowed": False,
-                "plain_language_result": "此旧路径已停用；请读取 canonical_path 指向的 SDK 开盘验收。",
-            },
-        )
-        (DEFAULT_M15_REALTIME_DIR / READINESS_MD).write_text(
-            "# Superseded readiness path\n\n"
-            f"Use `{project_path(config.output_dir / READINESS_JSON)}`.\n",
-            encoding="utf-8",
-        )
     return payload
 
 
 def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> dict[str, Any]:
-    if config.realtime_runtime_engine not in {"cli", "sdk"}:
-        raise ValueError("M15 opening readiness runtime engine must be cli or sdk")
-    m12_status, m12_status_artifact = read_json_artifact(config.m12_47_status_path)
-    realtime_config = load_realtime_supervisor_config(config.realtime_supervisor_config_path)
-    sdk_config = None
-    if config.realtime_runtime_engine == "sdk":
-        from scripts.m15_longbridge_sdk_runtime_lib import load_config as load_sdk_runtime_config
-        sdk_config = load_sdk_runtime_config(config.sdk_runtime_config_path)
+    if config.realtime_runtime_engine != "sdk":
+        raise ValueError("M15 opening readiness only supports the SDK runtime")
+    from scripts.m15_longbridge_sdk_runtime_lib import load_config as load_sdk_runtime_config
+    sdk_config = load_sdk_runtime_config(config.sdk_runtime_config_path)
     execution_config_error = ""
     try:
         execution_config = load_execution_config(config.execution_config_path)
@@ -167,27 +176,18 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         read_json_artifact(execution_summary_path) if execution_summary_path is not None else ({}, missing_artifact(""))
     )
     account_state, account_state_artifact = read_json_artifact(config.realtime_account_state_path)
-    realtime_status_path = (
-        config.sdk_runtime_status_path if sdk_config is not None else config.realtime_supervisor_status_path
+    realtime_status, realtime_status_artifact = read_json_artifact(
+        config.sdk_runtime_status_path
     )
-    realtime_status, realtime_status_artifact = read_json_artifact(realtime_status_path)
-    window = build_window_state(realtime_config, generated_at=generated_at)
-    cleanup_config = load_stale_order_cleanup_config(realtime_config.stale_order_cleanup_config_path)
-    realtime_pid = read_pid(
-        sdk_config.output_dir / "m15_longbridge_sdk_runtime.pid" if sdk_config is not None else realtime_pid_path(realtime_config)
+    window = build_sdk_window_state(sdk_config, generated_at)
+    cleanup_config = load_stale_order_cleanup_config(
+        sdk_config.stale_order_cleanup_config_path
     )
+    realtime_pid = read_pid(sdk_config.output_dir / "m15_longbridge_sdk_runtime.pid")
     realtime_alive = bool(realtime_pid and process_alive(realtime_pid))
     realtime_status_generated_at = str(realtime_status.get("generated_at") or "")
     realtime_status_age_seconds = artifact_age_seconds(realtime_status_generated_at, generated_at)
-    m12_reported_alive = bool(m12_status.get("supervisor_process_alive", False))
-    try:
-        m12_pid = int(m12_status.get("supervisor_pid") or 0)
-    except (TypeError, ValueError):
-        m12_pid = 0
-    m12_alive = m12_reported_alive and (not m12_pid or process_alive(m12_pid))
-    linked_execution_config_path = (
-        sdk_config.execution_config_path if sdk_config is not None else realtime_config.execution_config_path
-    )
+    linked_execution_config_path = sdk_config.execution_config_path
     execution_config_linked = config.execution_config_path.resolve() == linked_execution_config_path.resolve()
     paper_orders_enabled = bool(execution_config and execution_config.execute_orders and execution_config.paper_trading_approval)
     runtime_dispatch_enabled = bool(realtime_status.get("dispatch_enabled", False))
@@ -216,20 +216,15 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     )
     runtime_dispatch_requested = bool(realtime_status.get("dispatch_requested", False))
     sdk_paper_channel_armed = bool(
-        sdk_config is not None
-        and sdk_config.paper_order_dispatch_enabled
+        sdk_config.paper_order_dispatch_enabled
         and runtime_dispatch_requested
         and paper_orders_enabled
     )
-    if sdk_config is not None:
-        effective_paper_orders_enabled = (
-            sdk_paper_channel_armed if pending_formal_flatten else runtime_dispatch_enabled
-        )
-    else:
-        effective_paper_orders_enabled = paper_orders_enabled
+    effective_paper_orders_enabled = (
+        sdk_paper_channel_armed if pending_formal_flatten else runtime_dispatch_enabled
+    )
     readonly_gate_waiting = bool(
-        sdk_config is not None
-        and sdk_config.complete_session_gate_enabled
+        sdk_config.complete_session_gate_enabled
         and realtime_status.get(
             "complete_session_gate_passed",
             realtime_status.get("readonly_gate_passed"),
@@ -240,7 +235,6 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "m15_account_state": account_state_artifact,
         "m15_runtime_status": realtime_status_artifact,
         "execution_config": execution_payload_artifact,
-        "execution_summary": execution_summary_artifact,
     }
     critical_artifacts_healthy = all(
         artifact.get("status") == "ok"
@@ -270,21 +264,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         and marketdata_gate["artifacts_healthy"]
     )
     paper_account_ready = paper_account_verified(account_state)
-    realtime_health_issues = (
-        sdk_runtime_health_issues(
-            realtime_status,
-            sdk_config,
-            realtime_alive,
-            generated_at=generated_at,
-            require_live_push=window["market_phase"] == "regular_session",
-        )
-        if sdk_config is not None
-        else supervisor_health_issues(
-            realtime_config,
-            realtime_status,
-            expected_pid=realtime_pid,
-            process_alive_now=realtime_alive,
-        )
+    realtime_health_issues = sdk_runtime_health_issues(
+        realtime_status,
+        sdk_config,
+        realtime_alive,
+        generated_at=generated_at,
+        require_live_push=window["market_phase"] == "regular_session",
     )
     stale_buy_orders = stale_buy_open_orders(
         cleanup_config,
@@ -292,19 +277,11 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         parse_utc_datetime(str(window["session_started_at"])),
         parse_utc_datetime(generated_at),
     )
-    cleanup_enabled = bool(sdk_config is not None or getattr(realtime_config, "run_stale_order_cleanup", False))
-    sdk_order_maintenance = realtime_status.get("order_maintenance", {}) if sdk_config is not None else {}
+    cleanup_enabled = True
+    sdk_order_maintenance = realtime_status.get("order_maintenance", {})
     sdk_order_maintenance = sdk_order_maintenance if isinstance(sdk_order_maintenance, dict) else {}
-    cleanup_status = (
-        str(sdk_order_maintenance.get("status") or "not_yet_run")
-        if sdk_config is not None
-        else str(realtime_status.get("stale_order_cleanup_status") or "")
-    )
-    cleanup_failed = (
-        cleanup_status in {"failed", "blocked"}
-        if sdk_config is not None
-        else int(realtime_status.get("stale_buy_open_order_cleanup_failed_count", 0) or 0) > 0
-    )
+    cleanup_status = str(sdk_order_maintenance.get("status") or "not_yet_run")
+    cleanup_failed = cleanup_status in {"failed", "blocked"}
     actual_runtime_ids = execution_summary.get("runtime_ids_seen_this_cycle", []) if isinstance(execution_summary, dict) else []
     recent_execution_inputs = build_recent_execution_inputs(execution_summary, execution_config)
     if not actual_runtime_ids:
@@ -326,11 +303,6 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         recent_execution_inputs = []
         execution_runtime_identity = {}
     checks = [
-        informational_check_row(
-            "m12_47_daemon_alive",
-            "M12.47 只作为本地 research/watch 面信息展示，不影响 readiness",
-            actual=f"artifact={m12_status_artifact['status']}, alive={m12_alive}",
-        ),
         check_row(
             "json_gate_artifacts_healthy",
             "所有关键 JSON 状态/门禁文件必须存在且可解析，缺失与损坏要明确区分",
@@ -354,8 +326,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "paper_orders_enabled",
             (
                 "已武装长桥模拟账户订单提交；当前 SDK 运行配置不启用额外只读门禁"
-                if sdk_config is not None
-                and not sdk_config.complete_session_gate_enabled
+                if not sdk_config.complete_session_gate_enabled
                 else "已武装长桥模拟账户订单提交；完整交易日行情验收完成前必须等待"
             ),
             "waiting" if readonly_gate_waiting and marketdata_gate["artifacts_healthy"] else ("pass" if effective_paper_orders_enabled else "fail"),
@@ -397,7 +368,7 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         check_row(
             "paper_only_boundaries",
             "禁止实盘和真实资金动作",
-            "pass" if paper_only_boundaries_ok(execution_payload, sdk_runtime_boundaries(sdk_config, realtime_config)) else "fail",
+            "pass" if paper_only_boundaries_ok(execution_payload, sdk_runtime_boundaries(sdk_config)) else "fail",
             actual=str(execution_payload.get("hard_boundaries", {})),
         ),
         check_row(
@@ -475,7 +446,6 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "paper_order_submission_enabled": effective_paper_orders_enabled,
         "new_position_submission_enabled": new_position_submission_enabled,
         "formal_test_transition": formal_transition,
-        "m12_47_daemon_alive": m12_alive,
         "m15_realtime_daemon_alive": realtime_alive,
         "m15_realtime_daemon_pid": realtime_pid or "",
         "m15_realtime_status_generated_at": realtime_status_generated_at,
@@ -491,7 +461,6 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
         "checks": checks,
         "runtime_whitelist": list(execution_config.allowed_runtime_ids) if execution_config else [],
         "input_artifacts": {
-            "m12_47_status": m12_status_artifact,
             "execution_config": execution_payload_artifact,
             "execution_summary": execution_summary_artifact,
             "realtime_account_state": account_state_artifact,
@@ -510,22 +479,12 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
             "local_simulation_as_order_source": False,
         },
         "input_refs": {
-            "m12_47_status": project_path(config.m12_47_status_path),
-            "realtime_supervisor_config": project_path(config.realtime_supervisor_config_path),
             "realtime_runtime_engine": config.realtime_runtime_engine,
             "sdk_runtime_config": project_path(config.sdk_runtime_config_path),
             "execution_config": project_path(config.execution_config_path),
             "execution_summary": project_path(execution_config.output_dir / EXECUTION_SUMMARY_JSON) if execution_config else "",
             "realtime_account_state": project_path(config.realtime_account_state_path),
-            "realtime_supervisor_status": (
-                "legacy_cli_not_used_by_sdk"
-                if sdk_config is not None
-                else project_path(config.realtime_supervisor_status_path)
-            ),
             "sdk_runtime_status": project_path(config.sdk_runtime_status_path),
-        },
-        "local_research_non_blocking": {
-            "m12_47_status_only": True,
         },
         "plain_language_result": plain_result(readiness_status, fail_count, waiting_count, window, marketdata_gate),
     }
@@ -602,9 +561,7 @@ def paper_only_boundaries_ok(execution_payload: dict[str, Any], supervisor_bound
     )
 
 
-def sdk_runtime_boundaries(sdk_config: Any, realtime_config: Any) -> dict[str, bool]:
-    if sdk_config is None:
-        return realtime_config.hard_boundaries
+def sdk_runtime_boundaries(sdk_config: Any) -> dict[str, bool]:
     return {
         "paper_simulated_only": bool(sdk_config.paper_trading_only),
         "live_execution": bool(sdk_config.live_execution),
@@ -644,22 +601,16 @@ def sdk_runtime_health_issues(
         issues.append("market_data_transport_config_drift")
     if status.get("account_order_transport") != "official_sdk_persistent_context":
         issues.append("account_order_transport_not_sdk")
-    expected_mode = (
-        "longbridge_serve_subscription"
-        if expected_transport == "longbridge_serve_persistent_jsonrpc"
-        else "sdk_subscription"
-    )
+    expected_mode = "official_sdk_subscription"
     if status.get("market_data_mode") != expected_mode:
         issues.append("market_data_mode_not_persistent_subscription")
-    if status.get("market_data_circuit_open") is True:
-        issues.append("sdk_market_data_circuit_open")
     try:
         quote_worker_generation = int(status.get("quote_worker_generation", 0) or 0)
     except (TypeError, ValueError):
         quote_worker_generation = -1
         issues.append("sdk_quote_worker_generation_invalid")
-    if quote_worker_generation > 3:
-        issues.append("sdk_quote_worker_reconnect_loop")
+    if quote_worker_generation != 1:
+        issues.append("official_market_data_connection_generation_not_one")
     if generated_at:
         status_age = artifact_age_seconds(str(status.get("generated_at") or ""), generated_at)
         if status_age is None or status_age > 45:
@@ -677,19 +628,17 @@ def sdk_runtime_health_issues(
             issues.append("sdk_reference_market_push_stale")
     if status.get("runtime_engine") not in {"", "sdk"}:
         issues.append("runtime_engine_not_sdk")
-    expected_fingerprint = sdk_config_fingerprint(sdk_config) if sdk_config is not None else ""
+    expected_fingerprint = sdk_config_fingerprint(sdk_config)
     if expected_fingerprint and str(status.get("config_fingerprint") or "") != expected_fingerprint:
         issues.append("sdk_config_fingerprint_drift")
     expected_trading_fingerprint = (
         sdk_trading_universe_fingerprint(sdk_config)
-        if sdk_config is not None
-        else ""
     )
     if expected_trading_fingerprint and str(
         status.get("trading_universe_fingerprint") or ""
     ) != expected_trading_fingerprint:
         issues.append("sdk_trading_universe_fingerprint_drift")
-    expected_count = len(sdk_configured_trading_symbols(sdk_config)) if sdk_config is not None else 0
+    expected_count = len(sdk_configured_trading_symbols(sdk_config))
     expected_coverage = f"{expected_count}/{expected_count}" if expected_count else ""
     actual_trading_coverage = str(
         status.get("trading_market_data_coverage")
@@ -700,14 +649,14 @@ def sdk_runtime_health_issues(
     if expected_coverage and actual_trading_coverage != expected_coverage:
         issues.append("sdk_trading_market_data_coverage_incomplete")
     trading_daily_ready = status.get("trading_daily_context_ready")
-    if trading_daily_ready is None and sdk_config is not None:
+    if trading_daily_ready is None:
         trading_daily_ready = sdk_daily_context_is_complete(
             sdk_config,
             str(status.get("daily_context_state") or ""),
             int(status.get("daily_context_row_count", 0) or 0),
             [str(value) for value in (status.get("daily_context_failed_symbols") or [])],
         )
-    if sdk_config is not None and trading_daily_ready is not True:
+    if trading_daily_ready is not True:
         issues.append("sdk_daily_context_incomplete")
     if status.get("account_snapshot_healthy") is not True:
         issues.append("sdk_account_snapshot_stale")
@@ -734,8 +683,8 @@ def reference_market_push_is_fresh(
             continue
         source = str(activity.get("source") or "")
         if not source or source in {
-            "longbridge_sdk_initial_snapshot",
-            "longbridge_serve_initial_snapshot",
+            "official_sdk_initial_snapshot",
+            "official_sdk_initial_snapshot",
         }:
             continue
         age = artifact_age_seconds(str(activity.get("at") or ""), generated_at)
@@ -813,7 +762,6 @@ def render_markdown(payload: dict[str, Any]) -> str:
         "",
         f"- Status: `{payload['readiness_status']}`",
         f"- Paper order submission enabled: `{payload['paper_order_submission_enabled']}`",
-        f"- M12.47 daemon alive: `{payload['m12_47_daemon_alive']}`",
         f"- M15 realtime daemon alive: `{payload['m15_realtime_daemon_alive']}`",
         f"- Paper account verified: `{payload['paper_account_verified']}`",
         f"- Actual runtimes seen: `{','.join(payload.get('actual_runtime_ids_seen', [])) or 'none'}`",
@@ -939,11 +887,8 @@ def render_artifact_statuses(rows: list[tuple[str, dict[str, Any]]]) -> str:
     )
 
 
-def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any | None) -> dict[str, Any]:
-    gate_enabled = bool(
-        sdk_config is not None
-        and getattr(sdk_config, "complete_session_gate_enabled", False)
-    )
+def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any) -> dict[str, Any]:
+    gate_enabled = bool(getattr(sdk_config, "complete_session_gate_enabled", False))
     if not status:
         return {
             "status": "missing",
@@ -998,7 +943,7 @@ def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any | None) -> dic
             or status.get("trading_subscription_coverage")
             or ""
         ),
-        "expected_trading_symbol_count": len(sdk_configured_trading_symbols(sdk_config)) if sdk_config is not None else 0,
+        "expected_trading_symbol_count": len(sdk_configured_trading_symbols(sdk_config)),
     }
 
 

@@ -1,6 +1,6 @@
 {
-  "stage": "M15.longbridge_sdk_runtime",
-  "title": "长桥 SDK 实时行情与纸面交易运行层",
+  "stage": "M15.longbridge_official_marketdata",
+  "title": "长桥官方单连接行情与模拟账户运行层",
   "outputs": {
     "output_dir": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution",
     "market_events": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_realtime_market_events.jsonl",
@@ -10,9 +10,7 @@
   "oauth": {
     "client_id_file": "~/.config/price-action-trader/longbridge_sdk_client_id",
     "quote_region": "cn",
-    "quote_http_url": "https://openapi.longbridge.cn",
-    "quote_ws_url": "wss://openapi-quote.longbridge.cn/v2",
-    "trade_region": "cn"
+    "trade_region": "global"
   },
   "market_data": {
     "market": "US",
@@ -21,24 +19,27 @@
     "symbol_limit": 147,
     "trading_symbol_limit": 147,
     "trading_universe_path": null,
+    "market_timezone": "America/New_York",
+    "regular_session_start_time": "09:30",
+    "regular_session_end_time": "16:00",
+    "market_holidays": [
+      "2026-01-01",
+      "2026-01-19",
+      "2026-02-16",
+      "2026-04-03",
+      "2026-05-25",
+      "2026-06-19",
+      "2026-07-03",
+      "2026-09-07",
+      "2026-11-26",
+      "2026-12-25"
+    ],
     "bar_minutes": 5,
     "maximum_source_delivery_age_ms": 2000,
     "event_keep_lines": 0,
     "daily_context": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl",
     "daily_context_bars": 60,
-    "daily_context_deadline_seconds": 75,
-    "daily_context_parallel_workers": 1,
-    "daily_context_batch_size": 10,
-    "daily_context_retry_count": 5,
-    "expansion_trade_pool_upgrade_gate": {
-      "enabled": false,
-      "required_complete_session_gate_passed": true,
-      "required_complete_trading_daily_context": true,
-      "required_complete_subscribed_daily_context": true,
-      "required_subscription_coverage": "300/300",
-      "maximum_source_delivery_age_ms": 2000,
-      "target_trading_symbol_limit": 300
-    }
+    "daily_context_deadline_seconds": 300
   },
   "routing": {
     "router_config": "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json",
@@ -49,33 +50,13 @@
     "paper_order_dispatch_enabled": true
   },
   "runtime": {
-    "market_data_transport": "longbridge_serve_persistent_jsonrpc",
-    "longbridge_serve_binary": "local_runtime/tools/longbridge-terminal-0.28.2/longbridge",
-    "longbridge_serve_binary_sha256": "acfeefd6be07f871d03158054c79ad5a950af3a17fd89aca5c90563f448a04d8",
-    "longbridge_serve_batch_size": 500,
-    "longbridge_serve_response_timeout_seconds": 30,
-    "allow_snapshot_poll_fallback": false,
+    "market_data_transport": "official_sdk_persistent_websocket",
+    "sdk_subscribe_batch_size": 50,
     "heartbeat_interval_seconds": 1,
-    "reconnect_backoff_seconds": 5,
-    "reconnect_backoff_schedule_seconds": [5, 15, 30, 60],
-    "subscription_batch_size": 500,
-    "subscription_retry_count": 2,
-    "subscription_request_interval_seconds": 1.25,
-    "subscription_retry_backoff_seconds": 2,
-    "subscription_deadline_seconds": 30,
-    "subscription_progress_deadline_seconds": 90,
-    "subscription_circuit_retry_seconds": 300,
-    "maximum_consecutive_subscription_failures": 3,
-    "snapshot_poll_interval_seconds": 3,
-    "subscription_failures_before_snapshot_fallback": 1,
-    "snapshot_poll_dispatch_max_elapsed_ms": 2500,
-    "snapshot_poll_min_successful_cycles": 1,
-    "market_data_heartbeat_deadline_seconds": 5,
-    "active_symbol_silence_seconds": 30,
-    "reference_silence_restart_seconds": 305,
+    "subscription_deadline_seconds": 45,
+    "market_data_stall_seconds": 30,
     "account_snapshot_interval_seconds": 15,
     "account_snapshot_refresh_deadline_seconds": 8,
-    "account_snapshot_circuit_retry_seconds": 15,
     "maximum_account_snapshot_age_seconds": 45,
     "complete_session_gate_enabled": true,
     "required_complete_sessions": 1,

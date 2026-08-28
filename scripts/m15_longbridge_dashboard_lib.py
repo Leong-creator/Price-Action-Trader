@@ -669,18 +669,10 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         entries_enabled = bool(runtime.get("dispatch_enabled") and runtime.get("dispatch_requested", True))
     if epoch_status != "active":
         entries_enabled = False
-    marketdata_gate_enforced = bool(
-        runtime.get(
-            "complete_session_gate_enabled",
-            runtime.get("two_day_readonly_gate", True),
-        )
-    )
+    marketdata_gate_enforced = bool(runtime.get("complete_session_gate_enabled", True))
     marketdata_gate_passed = bool(
         (not marketdata_gate_enforced)
-        or runtime.get(
-            "complete_session_gate_passed",
-            runtime.get("readonly_gate_passed"),
-        ) is True
+        or runtime.get("complete_session_gate_passed") is True
     )
 
     source_checks = {

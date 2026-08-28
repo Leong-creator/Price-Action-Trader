@@ -4,9 +4,8 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-KEEP_ALIVE=false
 if [[ "${1:-}" == "--keep-alive" ]]; then
-  KEEP_ALIVE=true
+  echo "--keep-alive is retired; this command now performs one hidden startup only."
 elif [[ $# -gt 0 ]]; then
   echo "Usage: $0 [--keep-alive]" >&2
   exit 2
@@ -58,12 +57,12 @@ start_stack() {
     "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
     --daemon \
     --dispatch \
-    --config config/examples/m15_longbridge_sdk_runtime.json || failed=1
+    --config config/m15_longbridge_marketdata.production.json || failed=1
 
   run_step "start M15 background watchdog" \
     "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
     --daemon \
-    --config config/examples/m15_background_watchdog.json || failed=1
+    --config config/m15_background_watchdog.production.json || failed=1
 
   run_step "start local postclose scheduler" \
     "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
@@ -73,21 +72,19 @@ start_stack() {
 }
 
 if ! start_stack; then
-  if [[ "$KEEP_ALIVE" == false ]]; then
-    exit 1
-  fi
-  echo "Initial stack start was incomplete; hidden keeper will retry in 60 seconds."
+  echo "Initial stack start failed; automatic retries are disabled."
+  exit 1
 fi
 
 run_step "check M15 Longbridge SDK realtime status" \
   "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
   --status \
-  --config config/examples/m15_longbridge_sdk_runtime.json
+  --config config/m15_longbridge_marketdata.production.json
 
 run_step "check M15 background watchdog status" \
   "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
   --status \
-  --config config/examples/m15_background_watchdog.json
+  --config config/m15_background_watchdog.production.json
 
 run_step "check local postclose scheduler status" \
   "$PYTHON_BIN" scripts/run_m12_m14_local_postclose_scheduler.py \
@@ -95,17 +92,3 @@ run_step "check local postclose scheduler status" \
   --config config/examples/m12_m14_local_postclose_scheduler.json
 
 echo "==== $(date -u +%Y-%m-%dT%H:%M:%SZ) M15 startup bootstrap done ===="
-
-if [[ "$KEEP_ALIVE" == true ]]; then
-  HEARTBEAT_FILE="$OUTPUT_DIR/m15_windows_hidden_keeper.heartbeat"
-  echo "Hidden Windows keeper is active; checking the stack internally every 60 seconds."
-  while true; do
-    date -u +%Y-%m-%dT%H:%M:%SZ >"$HEARTBEAT_FILE"
-    sleep 60
-    # Each daemon entrypoint is idempotent. Running it again only repairs a
-    # dead process or a configuration drift; it never creates an order itself.
-    if ! start_stack; then
-      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stack repair attempt failed; retry in 60 seconds."
-    fi
-  done
-fi

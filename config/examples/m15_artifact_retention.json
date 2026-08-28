@@ -46,7 +46,6 @@
     {
       "name": "m15_retired_cli_state_ledgers",
       "paths": [
-        "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_session_supervisor_ledger.jsonl",
         "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_equity_curve.jsonl",
         "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_longbridge_realtime_account_state_ledger.jsonl"
       ],

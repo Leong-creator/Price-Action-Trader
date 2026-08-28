@@ -9,17 +9,12 @@ from zoneinfo import ZoneInfo
 from scripts.m15_longbridge_realtime_execution_lib import (
     decimal,
     fmt_decimal,
-    fmt_money,
     is_short_position_row,
     stable_client_request_id,
 )
 
 NEW_YORK = ZoneInfo("America/New_York")
 ZERO = Decimal("0")
-LONG_SELL_DISCOUNT = Decimal("0.995")
-SHORT_BUY_PREMIUM = Decimal("1.005")
-LONG_COST_DISCOUNT = Decimal("0.95")
-SHORT_COST_PREMIUM = Decimal("1.05")
 SHORT_MARKERS = {"short", "sell_short", "sell", "bearish"}
 LONG_MARKERS = {"long", "buy", "buy_long", "bullish"}
 
@@ -151,7 +146,7 @@ def close_quantity(row: dict[str, Any], direction: str) -> Decimal:
     return min(held, available).to_integral_value(rounding=ROUND_FLOOR)
 
 
-def quote_price(row: dict[str, Any], latest_prices: dict[str, Any]) -> tuple[Decimal, str, int]:
+def quote_price(row: dict[str, Any], latest_prices: dict[str, Any]) -> tuple[Decimal, int]:
     symbol = str(row.get("symbol") or "").upper()
     quote_row = latest_prices.get(symbol)
     if isinstance(quote_row, dict):
@@ -161,12 +156,8 @@ def quote_price(row: dict[str, Any], latest_prices: dict[str, Any]) -> tuple[Dec
         live_price = decimal(quote_row)
         quote_age_ms = -1
     if live_price > ZERO:
-        return live_price, "sdk_quote", quote_age_ms
-    for key in ("market_price", "last_price", "current_price", "last_done", "price", "cost_price", "average_cost"):
-        value = decimal(row.get(key, "0"))
-        if value > ZERO:
-            return value, key, -1
-    return ZERO, "", -1
+        return live_price, quote_age_ms
+    return ZERO, -1
 
 
 def build_flatten_plan(account_state: dict[str, Any], latest_prices: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -181,7 +172,7 @@ def build_flatten_plan(account_state: dict[str, Any], latest_prices: dict[str, A
         symbol = str(row.get("symbol") or "").upper()
         direction = position_direction(row)
         quantity = close_quantity(row, direction)
-        price, price_source, quote_age_ms = quote_price(row, latest_prices)
+        price, quote_age_ms = quote_price(row, latest_prices)
         if not symbol:
             blockers.append("position_missing_symbol")
             continue
@@ -191,12 +182,13 @@ def build_flatten_plan(account_state: dict[str, Any], latest_prices: dict[str, A
         if quantity < Decimal("1"):
             blockers.append(f"position_quantity_not_available:{symbol}")
             continue
+        if price <= ZERO:
+            blockers.append(f"sdk_quote_missing:{symbol}")
+            continue
         if direction == "long":
-            limit_price = price * (LONG_COST_DISCOUNT if price_source in {"cost_price", "average_cost"} else LONG_SELL_DISCOUNT)
             side = "sell"
             action = "close_long"
         else:
-            limit_price = price * (SHORT_COST_PREMIUM if price_source in {"cost_price", "average_cost"} else SHORT_BUY_PREMIUM)
             side = "buy"
             action = "close_short"
         plan.append(
@@ -208,9 +200,9 @@ def build_flatten_plan(account_state: dict[str, Any], latest_prices: dict[str, A
                 "order_type": "market",
                 "quantity": fmt_decimal(quantity),
                 "limit_price": "",
-                "fallback_limit_price": fmt_money(limit_price),
-                "price_source": price_source,
-                "fallback_quote_age_ms": quote_age_ms,
+                "reference_price": fmt_decimal(price),
+                "reference_price_source": "official_sdk_quote",
+                "reference_quote_age_ms": quote_age_ms,
             }
         )
     return ([], blockers) if blockers else (plan, [])
@@ -225,6 +217,11 @@ def latest_flatten_prices(
     latest: dict[str, tuple[datetime, Decimal]] = {}
     for row in market_events:
         if str(row.get("timeframe") or "") != "5m":
+            continue
+        if str(row.get("source_mode") or "") not in {
+            "official_sdk_push",
+            "official_sdk_trade_push",
+        }:
             continue
         symbol = str(row.get("symbol") or "").upper()
         if symbol and "." not in symbol:

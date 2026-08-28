@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Persistent SDK market-data runtime for the isolated M15 paper chain.
+"""Persistent official Longbridge SDK runtime for M15 paper trading.
 
-The module intentionally keeps the existing JSONL market-event contract.  It
-does not read local simulation artifacts and it never falls back to CLI K-line
-polling for a new paper entry when the SDK connection is unavailable.
+One official SDK QuoteContext owns all market data. Account and order operations
+use separate SDK contexts. No local simulation artifact, polling fallback, or
+automatic quote reconnection can authorize a paper entry.
 """
 from __future__ import annotations
 
@@ -15,29 +15,28 @@ from dataclasses import dataclass, fields
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from pathlib import Path
-from time import monotonic, perf_counter, sleep
+from time import monotonic, perf_counter
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from scripts.m15_longbridge_realtime_execution_lib import DEFAULT_DAILY_DIR, longbridge_symbol, parse_utc_datetime, to_iso
-from scripts.m15_longbridge_realtime_market_event_ingestor_lib import US_LIQUID_SEED_V1
+from scripts.m12_liquid_universe_scanner_lib import US_LIQUID_SEED_V1
 from scripts.m15_universe_lib import load_m15_universe
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "m15_longbridge_marketdata.production.json"
 SUMMARY_JSON = "m15_longbridge_sdk_runtime.json"
 NEW_YORK = ZoneInfo("America/New_York")
 RUNTIME_CODE_PATHS = (
     ROOT / "scripts" / "m15_longbridge_sdk_runtime_lib.py",
     ROOT / "scripts" / "run_m15_longbridge_sdk_runtime.py",
-    ROOT / "scripts" / "m15_longbridge_serve_transport_lib.py",
+    ROOT / "scripts" / "m15_longbridge_sdk_quote_transport_lib.py",
     ROOT / "scripts" / "m15_longbridge_sdk_account_lib.py",
     ROOT / "scripts" / "m15_longbridge_sdk_account_worker_lib.py",
     ROOT / "scripts" / "m15_longbridge_fill_attribution_lib.py",
     ROOT / "scripts" / "m15_longbridge_realtime_signal_router_lib.py",
     ROOT / "scripts" / "m15_longbridge_realtime_execution_lib.py",
     ROOT / "scripts" / "m15_longbridge_realtime_position_manager_lib.py",
-    ROOT / "scripts" / "m15_longbridge_realtime_market_event_ingestor_lib.py",
     ROOT / "scripts" / "m12_liquid_universe_scanner_lib.py",
     ROOT / "scripts" / "m15_universe_lib.py",
 )
@@ -52,10 +51,12 @@ class SdkRuntimeConfig:
     readonly_gate_path: Path
     client_id_file: Path
     quote_region: str
-    quote_http_url: str
-    quote_ws_url: str
     trade_region: str
     market: str
+    market_timezone: str
+    regular_session_start_time: str
+    regular_session_end_time: str
+    market_holidays: tuple[str, ...]
     use_seed_universe: bool
     universe_path: Path | None
     symbol_limit: int
@@ -66,33 +67,12 @@ class SdkRuntimeConfig:
     daily_context_path: Path
     daily_context_bars: int
     daily_context_deadline_seconds: int
-    daily_context_parallel_workers: int
-    daily_context_batch_size: int
-    daily_context_retry_count: int
     heartbeat_interval_seconds: int
-    reconnect_backoff_seconds: int
-    reconnect_backoff_schedule_seconds: tuple[int, ...]
-    subscription_batch_size: int
-    subscription_retry_count: int
-    subscription_request_interval_seconds: float
-    subscription_retry_backoff_seconds: float
     subscription_deadline_seconds: int
-    subscription_progress_deadline_seconds: int
-    subscription_circuit_retry_seconds: int
-    maximum_consecutive_subscription_failures: int
     market_data_transport: str
-    longbridge_serve_binary: Path
-    longbridge_serve_binary_sha256: str
-    longbridge_serve_batch_size: int
-    longbridge_serve_response_timeout_seconds: int
-    snapshot_poll_interval_seconds: float
-    subscription_failures_before_snapshot_fallback: int
-    snapshot_poll_dispatch_max_elapsed_ms: int
-    snapshot_poll_min_successful_cycles: int
-    allow_snapshot_poll_fallback: bool
+    sdk_subscribe_batch_size: int
     market_data_heartbeat_deadline_seconds: int
     active_symbol_silence_seconds: int
-    reference_silence_restart_seconds: int
     account_snapshot_interval_seconds: int
     account_snapshot_refresh_deadline_seconds: int
     account_snapshot_circuit_retry_seconds: int
@@ -142,10 +122,18 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         readonly_gate_path=resolve_path(outputs.get("readonly_gate", "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_readonly_gate.json")),
         client_id_file=Path(str(oauth["client_id_file"])).expanduser(),
         quote_region=str(oauth.get("quote_region", "cn")),
-        quote_http_url=str(oauth.get("quote_http_url", "")).strip(),
-        quote_ws_url=str(oauth.get("quote_ws_url", "")).strip(),
-        trade_region=str(oauth.get("trade_region", "cn")),
+        trade_region=str(oauth.get("trade_region", "global")),
         market=str(market_data.get("market", "US")).upper(),
+        market_timezone=str(market_data.get("market_timezone", "America/New_York")),
+        regular_session_start_time=str(
+            market_data.get("regular_session_start_time", "09:30")
+        ),
+        regular_session_end_time=str(
+            market_data.get("regular_session_end_time", "16:00")
+        ),
+        market_holidays=tuple(
+            str(value) for value in market_data.get("market_holidays", [])
+        ),
         use_seed_universe=bool(market_data.get("use_seed_universe", True)),
         universe_path=(
             resolve_path(market_data["universe_path"])
@@ -160,84 +148,29 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         daily_context_path=resolve_path(market_data.get("daily_context", "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl")),
         daily_context_bars=int(market_data.get("daily_context_bars", 60)),
         daily_context_deadline_seconds=int(market_data.get("daily_context_deadline_seconds", 180)),
-        daily_context_parallel_workers=int(market_data.get("daily_context_parallel_workers", 3)),
-        daily_context_batch_size=int(market_data.get("daily_context_batch_size", 10)),
-        daily_context_retry_count=int(market_data.get("daily_context_retry_count", 5)),
         heartbeat_interval_seconds=int(runtime.get("heartbeat_interval_seconds", 5)),
-        reconnect_backoff_seconds=int(runtime.get("reconnect_backoff_seconds", 5)),
-        reconnect_backoff_schedule_seconds=tuple(
-            int(value)
-            for value in runtime.get("reconnect_backoff_schedule_seconds", [5, 15, 30, 60])
-        ),
-        subscription_batch_size=int(runtime.get("subscription_batch_size", 500)),
-        subscription_retry_count=int(runtime.get("subscription_retry_count", 2)),
-        subscription_request_interval_seconds=float(
-            runtime.get("subscription_request_interval_seconds", 1.25)
-        ),
-        subscription_retry_backoff_seconds=float(
-            runtime.get("subscription_retry_backoff_seconds", 2)
-        ),
         subscription_deadline_seconds=int(runtime.get("subscription_deadline_seconds", 20)),
-        subscription_progress_deadline_seconds=int(
-            runtime.get(
-                "subscription_progress_deadline_seconds",
-                runtime.get("subscription_deadline_seconds", 20),
-            )
-        ),
-        subscription_circuit_retry_seconds=int(
-            runtime.get("subscription_circuit_retry_seconds", 300)
-        ),
-        maximum_consecutive_subscription_failures=int(runtime.get("maximum_consecutive_subscription_failures", 3)),
         market_data_transport=str(
-            runtime.get("market_data_transport", "official_sdk_persistent_websocket")
-        ),
-        longbridge_serve_binary=resolve_path(
             runtime.get(
-                "longbridge_serve_binary",
-                "local_runtime/tools/longbridge-terminal-0.28.2/longbridge",
+                "market_data_transport",
+                "official_sdk_persistent_websocket",
             )
         ),
-        longbridge_serve_binary_sha256=str(
-            runtime.get("longbridge_serve_binary_sha256", "")
-        ).lower(),
-        longbridge_serve_batch_size=int(
-            runtime.get("longbridge_serve_batch_size", 500)
-        ),
-        longbridge_serve_response_timeout_seconds=int(
-            runtime.get("longbridge_serve_response_timeout_seconds", 30)
-        ),
-        snapshot_poll_interval_seconds=float(
-            runtime.get("snapshot_poll_interval_seconds", 1)
-        ),
-        subscription_failures_before_snapshot_fallback=int(
-            runtime.get("subscription_failures_before_snapshot_fallback", 1)
-        ),
-        snapshot_poll_dispatch_max_elapsed_ms=int(
-            runtime.get("snapshot_poll_dispatch_max_elapsed_ms", 1000)
-        ),
-        snapshot_poll_min_successful_cycles=int(
-            runtime.get("snapshot_poll_min_successful_cycles", 5)
-        ),
-        allow_snapshot_poll_fallback=bool(runtime.get("allow_snapshot_poll_fallback", False)),
+        sdk_subscribe_batch_size=int(runtime.get("sdk_subscribe_batch_size", 50)),
         market_data_heartbeat_deadline_seconds=int(
             runtime.get("market_data_heartbeat_deadline_seconds", 5)
         ),
         active_symbol_silence_seconds=int(
-            runtime.get("active_symbol_silence_seconds", 30)
-        ),
-        reference_silence_restart_seconds=int(
-            runtime.get("reference_silence_restart_seconds", 305)
+            runtime.get(
+                "market_data_stall_seconds",
+                runtime.get("active_symbol_silence_seconds", 30),
+            )
         ),
         account_snapshot_interval_seconds=int(runtime.get("account_snapshot_interval_seconds", 15)),
         account_snapshot_refresh_deadline_seconds=int(runtime.get("account_snapshot_refresh_deadline_seconds", 8)),
         account_snapshot_circuit_retry_seconds=int(runtime.get("account_snapshot_circuit_retry_seconds", 15)),
         maximum_account_snapshot_age_seconds=int(runtime.get("maximum_account_snapshot_age_seconds", 45)),
-        complete_session_gate_enabled=bool(
-            runtime.get(
-                "complete_session_gate_enabled",
-                runtime.get("two_day_readonly_gate", True),
-            )
-        ),
+        complete_session_gate_enabled=bool(runtime.get("complete_session_gate_enabled", True)),
         required_complete_sessions=int(
             runtime.get("required_complete_sessions", 1)
         ),
@@ -338,93 +271,41 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError("M15 SDK stale entry order TTL must be positive")
     if config.exit_order_reprice_seconds <= 0:
         raise ValueError("M15 SDK exit order reprice interval must be positive")
-    if config.subscription_batch_size <= 0 or config.subscription_batch_size > 500:
-        raise ValueError("M15 SDK subscription batch size must be between 1 and 500")
-    if not 0 <= config.subscription_request_interval_seconds <= 5:
-        raise ValueError("M15 SDK subscription request interval must be between 0 and 5 seconds")
-    if not 0 <= config.subscription_retry_backoff_seconds <= 10:
-        raise ValueError("M15 SDK subscription retry backoff must be between 0 and 10 seconds")
-    if config.subscription_retry_count < 0 or config.subscription_retry_count > 5:
-        raise ValueError("M15 SDK subscription retry count must be between 0 and 5")
     if config.subscription_deadline_seconds <= 0:
         raise ValueError("M15 SDK subscription deadline must be positive")
-    if config.subscription_progress_deadline_seconds < config.subscription_deadline_seconds:
+    if config.market_data_transport != "official_sdk_persistent_websocket":
         raise ValueError(
-            "M15 SDK subscription progress deadline must not be shorter than the steady deadline"
+            "M15 production market data only supports the official SDK WebSocket"
         )
-    if config.subscription_circuit_retry_seconds <= 0:
-        raise ValueError("M15 SDK subscription circuit retry must be positive")
-    if config.maximum_consecutive_subscription_failures <= 0:
-        raise ValueError("M15 SDK consecutive subscription failure limit must be positive")
-    if config.market_data_transport not in {
-        "official_sdk_persistent_websocket",
-        "longbridge_serve_persistent_jsonrpc",
-    }:
-        raise ValueError("M15 market data transport is unsupported")
-    if config.market_data_transport == "longbridge_serve_persistent_jsonrpc":
-        if not config.quote_http_url.startswith("https://"):
-            raise ValueError("M15 longbridge serve quote HTTP URL must use HTTPS")
-        if not config.quote_ws_url.startswith("wss://"):
-            raise ValueError("M15 longbridge serve quote WebSocket URL must use WSS")
-        if not 1 <= config.longbridge_serve_batch_size <= 500:
-            raise ValueError("M15 longbridge serve batch size must be between 1 and 500")
-        if not 5 <= config.longbridge_serve_response_timeout_seconds <= 60:
-            raise ValueError(
-                "M15 longbridge serve response timeout must be between 5 and 60 seconds"
-            )
-    if (
-        not config.reconnect_backoff_schedule_seconds
-        or any(value <= 0 for value in config.reconnect_backoff_schedule_seconds)
-    ):
-        raise ValueError("M15 SDK reconnect backoff schedule must contain positive seconds")
-    if not 0.5 <= config.snapshot_poll_interval_seconds <= 5:
-        raise ValueError("M15 SDK snapshot poll interval must be between 0.5 and 5 seconds")
-    if (
-        config.subscription_failures_before_snapshot_fallback <= 0
-        or config.subscription_failures_before_snapshot_fallback
-        > config.maximum_consecutive_subscription_failures
-    ):
+    if not 1 <= config.sdk_subscribe_batch_size <= 500:
+        raise ValueError("M15 official SDK subscribe batch must be between 1 and 500")
+    forbidden_runtime_keys = {
+        "allow_snapshot_poll_fallback",
+        "prefer_snapshot_poll",
+        "reconnect_backoff_seconds",
+        "reconnect_backoff_schedule_seconds",
+        "subscription_batch_size",
+        "subscription_retry_count",
+        "subscription_retry_backoff_seconds",
+        "subscription_request_interval_seconds",
+        "subscription_circuit_retry_seconds",
+        "maximum_consecutive_subscription_failures",
+        "reference_silence_restart_seconds",
+        "snapshot_poll_interval_seconds",
+        "two_day_readonly_gate",
+    }
+    configured_forbidden = sorted(forbidden_runtime_keys & set(runtime))
+    if configured_forbidden:
         raise ValueError(
-            "M15 SDK snapshot fallback threshold must be within the subscription failure limit"
-        )
-    if config.snapshot_poll_dispatch_max_elapsed_ms <= 0:
-        raise ValueError("M15 SDK snapshot poll dispatch latency limit must be positive")
-    if not 1 <= config.snapshot_poll_min_successful_cycles <= 30:
-        raise ValueError(
-            "M15 SDK snapshot poll validation cycles must be between 1 and 30"
-        )
-    if runtime.get("prefer_snapshot_poll") is True:
-        raise ValueError("M15 production runtime forbids prefer_snapshot_poll")
-    if config.paper_order_dispatch_enabled and config.allow_snapshot_poll_fallback:
-        raise ValueError("M15 paper dispatch runtime forbids snapshot fallback eligibility")
-    if (
-        config.market_data_heartbeat_deadline_seconds
-        <= config.snapshot_poll_interval_seconds
-    ):
-        raise ValueError(
-            "M15 SDK market data heartbeat deadline must exceed the snapshot interval"
+            "M15 production config contains removed market-data recovery keys:"
+            + ",".join(configured_forbidden)
         )
     if not 15 <= config.active_symbol_silence_seconds <= 120:
         raise ValueError("M15 SDK active symbol silence threshold must be between 15 and 120 seconds")
-    if not (
-        config.reference_silence_restart_seconds
-        > config.active_symbol_silence_seconds
-        and config.reference_silence_restart_seconds <= 600
-    ):
-        raise ValueError(
-            "M15 SDK reference silence restart threshold must be greater than "
-            "the exit-only threshold and no more than 600 seconds"
-        )
     if config.daily_context_bars < 2:
         raise ValueError("M15 SDK daily context needs at least two bars")
     if config.daily_context_deadline_seconds <= 0:
         raise ValueError("M15 SDK daily context deadline must be positive")
-    if config.daily_context_parallel_workers <= 0 or config.daily_context_parallel_workers > 4:
-        raise ValueError("M15 SDK daily context parallel workers must be between 1 and 4")
-    if config.daily_context_batch_size <= 0 or config.daily_context_batch_size > 25:
-        raise ValueError("M15 SDK daily context batch size must be between 1 and 25")
-    if config.daily_context_retry_count < 0 or config.daily_context_retry_count > 10:
-        raise ValueError("M15 SDK daily context retry count must be between 0 and 10")
     if config.account_snapshot_interval_seconds <= 0 or config.maximum_account_snapshot_age_seconds < config.account_snapshot_interval_seconds:
         raise ValueError("M15 SDK account snapshot timing is invalid")
     if config.account_snapshot_refresh_deadline_seconds <= 0:
@@ -446,21 +327,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
 
 
 def validate_market_data_transport_runtime(config: SdkRuntimeConfig) -> None:
-    """Validate local transport artifacts only when a runtime will start."""
-    if config.market_data_transport != "longbridge_serve_persistent_jsonrpc":
-        return
-    if not config.longbridge_serve_binary.is_file() or not os.access(
-        config.longbridge_serve_binary, os.X_OK
-    ):
-        raise ValueError("M15 longbridge serve binary is missing or not executable")
-    actual_binary_sha256 = hashlib.sha256(
-        config.longbridge_serve_binary.read_bytes()
-    ).hexdigest()
-    if (
-        not config.longbridge_serve_binary_sha256
-        or actual_binary_sha256 != config.longbridge_serve_binary_sha256
-    ):
-        raise ValueError("M15 longbridge serve binary checksum mismatch")
+    """Reject any production transport other than the unmodified official SDK."""
+    if config.market_data_transport != "official_sdk_persistent_websocket":
+        raise ValueError("M15 official SDK market-data transport is required")
 
 
 def validate_formal_epoch_alignment(config: SdkRuntimeConfig) -> None:
@@ -560,6 +429,55 @@ def trading_market_events(
         if not str(row.get("market_data_blocked_reason") or "")
         if f"{str(row.get('symbol') or '').upper().removesuffix(f'.{config.market}')}.{config.market}" in allowed
     ]
+
+
+def daily_candlestick_event_rows(
+    symbol: str,
+    candles: Any,
+    received_at: datetime,
+) -> list[dict[str, Any]]:
+    """Convert raw Longbridge candlesticks into the M15 daily event contract."""
+    result: list[dict[str, Any]] = []
+    for candle in candles if isinstance(candles, list) else []:
+        row = sdk_object_to_dict(candle)
+        timestamp = row.get("timestamp")
+        try:
+            if isinstance(timestamp, datetime):
+                source_at = datetime.fromtimestamp(timestamp.timestamp(), UTC)
+            elif isinstance(timestamp, str):
+                source_at = datetime.fromisoformat(
+                    timestamp.replace("Z", "+00:00")
+                ).astimezone(UTC)
+            else:
+                source_at = datetime.fromtimestamp(int(timestamp), UTC)
+        except (TypeError, ValueError, OSError):
+            continue
+        close = str(row.get("close") or row.get("last_done") or "0")
+        if close in {"", "0", "0.0"}:
+            continue
+        result.append(
+            {
+                "schema_version": "m15.realtime-market-event.v2",
+                "event_id": f"longbridge-serve-1d|{symbol}|{to_iso(source_at)}",
+                "symbol": symbol.replace(".US", ""),
+                "timeframe": "1d",
+                "event_time": to_iso(source_at),
+                "bar_open_at": to_iso(source_at),
+                "bar_close_at": to_iso(source_at),
+                "source_event_at": to_iso(source_at),
+                "received_at": to_iso(received_at),
+                "source_delivery_age_ms": 0,
+                "bar_final": True,
+                "source_mode": "official_sdk_daily_context",
+                "open": str(row.get("open") or close),
+                "high": str(row.get("high") or close),
+                "low": str(row.get("low") or close),
+                "close": close,
+                "volume": str(row.get("volume") or "0"),
+                "local_simulation_ignored": True,
+            }
+        )
+    return result
 
 
 def market_event_is_tradable(config: SdkRuntimeConfig, row: dict[str, Any]) -> bool:
@@ -815,7 +733,7 @@ def attach_next_bar_first_quotes(
 
 
 class FiveMinuteBarBuilder:
-    """Build final regular-session bars from SDK quote/trade pushes."""
+    """Build final regular-session bars from Longbridge serve pushes."""
 
     def __init__(
         self,
@@ -823,9 +741,9 @@ class FiveMinuteBarBuilder:
         *,
         complete_bar_open_not_before: datetime | None = None,
         boundary_batch_mode: bool = False,
-        push_source_mode: str = "longbridge_sdk_push",
-        no_trade_source_mode: str = "longbridge_sdk_no_trade_carry_forward",
-        event_id_prefix: str = "sdk-5m",
+        push_source_mode: str = "official_sdk_push",
+        no_trade_source_mode: str = "official_sdk_no_trade_carry_forward",
+        event_id_prefix: str = "official-sdk-5m",
     ) -> None:
         self.minutes = minutes
         self.complete_bar_open_not_before = (
@@ -840,7 +758,6 @@ class FiveMinuteBarBuilder:
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
         self._quote_total_volume: dict[str, int] = {}
         self._quote_last_source_at: dict[str, datetime] = {}
-        self._snapshot_total_volume: dict[str, int] = {}
         self._latest_quote_price: dict[str, Decimal] = {}
         self._latest_quote_at: dict[str, datetime] = {}
         self._emitted_boundaries: set[datetime] = set()
@@ -867,7 +784,7 @@ class FiveMinuteBarBuilder:
             received_at,
             price,
             volume,
-            source_mode="longbridge_sdk_push",
+            source_mode=self.push_source_mode,
             blocked_reason=blocked_reason,
         )
 
@@ -929,37 +846,6 @@ class FiveMinuteBarBuilder:
             rows.append(self._finalize(key, synthetic, emitted_at=now))
         self._emitted_boundaries.add(boundary_open)
         return rows
-
-    def on_snapshot(
-        self,
-        symbol: str,
-        payload: dict[str, Any],
-        *,
-        received_at: datetime,
-    ) -> list[dict[str, Any]]:
-        """Aggregate one SDK quote snapshot without treating total volume as an increment."""
-        source_at = unix_to_utc(payload.get("timestamp"), received_at)
-        price = decimal(payload.get("last_done"))
-        if price <= Decimal("0"):
-            return []
-        normalized_symbol = symbol.upper()
-        total_volume = max(0, int_like(payload.get("volume")))
-        previous_total = self._snapshot_total_volume.get(normalized_symbol)
-        self._snapshot_total_volume[normalized_symbol] = total_volume
-        volume_delta = (
-            max(0, total_volume - previous_total)
-            if previous_total is not None
-            else 0
-        )
-        return self._append(
-            symbol,
-            source_at,
-            received_at,
-            price,
-            volume_delta,
-            source_mode="longbridge_sdk_snapshot_poll",
-            bar_at=received_at,
-        )
 
     def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
@@ -1152,12 +1038,7 @@ def load_current_sdk_intraday_context(
         if received_at.astimezone(UTC) < session_start:
             continue
         if (
-            str(row.get("source_mode") or "")
-            not in {
-                "longbridge_sdk_push",
-                "longbridge_serve_push",
-                "longbridge_sdk_snapshot_poll",
-            }
+            str(row.get("source_mode") or "") != "official_sdk_push"
             or str(row.get("timeframe") or "") != "5m"
             or not bool(row.get("bar_final"))
             or str(row.get("market_data_blocked_reason") or "")
@@ -1193,12 +1074,7 @@ def fresh_market_events(
     for row in rows:
         is_final_sdk_bar = (
             bool(row.get("bar_final"))
-            and str(row.get("source_mode") or "")
-            in {
-                "longbridge_sdk_push",
-                "longbridge_serve_push",
-                "longbridge_sdk_snapshot_poll",
-            }
+            and str(row.get("source_mode") or "") == "official_sdk_push"
             and str(row.get("timeframe") or "") == "5m"
         )
         if is_final_sdk_bar:
@@ -1264,7 +1140,7 @@ def build_status(
     payload = {
         "stage": "M15.longbridge_sdk_runtime", "generated_at": to_iso(now), "status": status,
         "reason": reason, "sdk_connected": connected, "last_event_at": last_event_at,
-        "source_mode": "longbridge_sdk_push", "configured_symbol_count": len(configured_symbols(config)),
+        "source_mode": "official_sdk_push", "configured_symbol_count": len(configured_symbols(config)),
         "trading_symbol_count": len(configured_trading_symbols(config)),
         "trading_universe_path": (
             str(config.trading_universe_path)
@@ -1343,8 +1219,8 @@ def read_client_id(config: SdkRuntimeConfig) -> str:
     return value
 
 
-def sdk_endpoint_overrides(region: str) -> dict[str, str]:
-    """Return an explicit OpenAPI endpoint set for the configured region."""
+def official_sdk_endpoints(region: str) -> dict[str, str]:
+    """Map the configured account region to official SDK endpoint parameters."""
     normalized = region.strip().lower()
     if normalized == "cn":
         suffix = "cn"
@@ -1360,52 +1236,7 @@ def sdk_endpoint_overrides(region: str) -> dict[str, str]:
 
 
 def sdk_config_from_oauth(sdk: Any, oauth: Any, region: str) -> Any:
-    return sdk.Config.from_oauth(oauth, **sdk_endpoint_overrides(region))
-
-
-def subscribe_quote_and_trades(
-    quote_context: Any,
-    symbols: list[str],
-    subscription_types: list[Any],
-    *,
-    batch_size: int = 500,
-    retry_count: int = 2,
-    progress_callback: Callable[[int, int], None] | None = None,
-    request_interval_seconds: float = 0,
-    retry_backoff_seconds: float = 0,
-    diagnose_failed_symbols: bool = True,
-) -> list[str]:
-    """Subscribe in bounded requests and optionally isolate failed symbols."""
-    if batch_size <= 0:
-        raise ValueError("subscription batch size must be positive")
-    if retry_count < 0:
-        raise ValueError("subscription retry count cannot be negative")
-    if request_interval_seconds < 0 or retry_backoff_seconds < 0:
-        raise ValueError("subscription delays cannot be negative")
-    failed_symbols: list[str] = []
-    total_symbols = len(symbols)
-    for offset in range(0, len(symbols), batch_size):
-        batch = symbols[offset : offset + batch_size]
-        for attempt in range(retry_count + 1):
-            try:
-                quote_context.subscribe(batch, subscription_types)
-                break
-            except Exception:
-                if attempt == retry_count:
-                    if diagnose_failed_symbols:
-                        for symbol in batch:
-                            try:
-                                quote_context.subscribe([symbol], subscription_types)
-                            except Exception:
-                                failed_symbols.append(symbol)
-                elif retry_backoff_seconds:
-                    sleep(retry_backoff_seconds)
-                continue
-        if progress_callback is not None:
-            progress_callback(min(offset + len(batch), total_symbols), total_symbols)
-        if request_interval_seconds and offset + len(batch) < total_symbols:
-            sleep(request_interval_seconds)
-    return failed_symbols
+    return sdk.Config.from_oauth(oauth, **official_sdk_endpoints(region))
 
 
 def subscribe_private_trade_updates(trade_context: Any, sdk: Any, *, enabled: bool) -> bool:

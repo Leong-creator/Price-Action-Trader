@@ -23,7 +23,7 @@ DEFAULT_DAILY_DIR = (
     / "daily_observation"
 )
 DEFAULT_OUTPUT_DIR = DEFAULT_DAILY_DIR / "m15_background_watchdog"
-DEFAULT_CONFIG_PATH = ROOT / "config" / "examples" / "m15_background_watchdog.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / "m15_background_watchdog.production.json"
 SUMMARY_JSON = "m15_background_watchdog_status.json"
 REPORT_MD = "m15_background_watchdog_status.md"
 LEDGER_JSONL = "m15_background_watchdog_ledger.jsonl"
@@ -44,8 +44,6 @@ class BackgroundWatchdogConfig:
     command_timeout_seconds: int
     analytics_refresh_interval_seconds: int
     analytics_command_timeout_seconds: int
-    runtime_recovery_grace_seconds: int
-    m15_realtime_supervisor_config_path: Path
     m15_runtime_engine: str
     m15_sdk_runtime_config_path: Path
     m15_dashboard_config_path: Path
@@ -80,16 +78,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
         command_timeout_seconds=int(watchdog.get("command_timeout_seconds", 30)),
         analytics_refresh_interval_seconds=int(watchdog.get("analytics_refresh_interval_seconds", 300)),
         analytics_command_timeout_seconds=int(watchdog.get("analytics_command_timeout_seconds", 90)),
-        runtime_recovery_grace_seconds=int(watchdog.get("runtime_recovery_grace_seconds", 20)),
-        m15_realtime_supervisor_config_path=resolve_repo_path(
-            inputs.get(
-                "m15_realtime_supervisor_config",
-                ROOT / "config" / "examples" / "m15_longbridge_realtime_session_supervisor.paper_orders_enabled.json",
-            )
-        ),
-        m15_runtime_engine=str(inputs.get("m15_runtime_engine", "cli")).strip().lower(),
+        m15_runtime_engine=str(inputs.get("m15_runtime_engine", "sdk")).strip().lower(),
         m15_sdk_runtime_config_path=resolve_repo_path(
-            inputs.get("m15_sdk_runtime_config", ROOT / "config" / "examples" / "m15_longbridge_sdk_runtime.json")
+            inputs.get(
+                "m15_sdk_runtime_config",
+                ROOT / "config" / "m15_longbridge_marketdata.production.json",
+            )
         ),
         m15_dashboard_config_path=resolve_repo_path(
             inputs.get("m15_dashboard_config", "config/examples/m15_longbridge_dashboard.json")
@@ -126,10 +120,8 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog analytics refresh interval must be positive")
     if config.analytics_command_timeout_seconds <= 0:
         raise ValueError("M15 background watchdog analytics command timeout must be positive")
-    if config.runtime_recovery_grace_seconds < 0:
-        raise ValueError("M15 background watchdog runtime recovery grace cannot be negative")
-    if config.m15_runtime_engine not in {"cli", "sdk"}:
-        raise ValueError("M15 background watchdog runtime engine must be cli or sdk")
+    if config.m15_runtime_engine != "sdk":
+        raise ValueError("M15 background watchdog only observes the SDK runtime")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 background watchdog must stay paper/simulated only")
     for key in ("live_execution", "real_money_actions", "manual_m12_37_once", "margin_financing"):
@@ -150,7 +142,6 @@ def run_background_watchdog_once(
     previous = read_json(config.output_dir / SUMMARY_JSON)
     analytics_step = analytics_refresh_step(config, runner, generated_at, previous=previous)
     steps = [
-        m15_runtime_daemon_step(config, runner),
         m15_runtime_status_step(config, runner),
         analytics_step,
         pa002_milestone_refresh_step(
@@ -216,7 +207,6 @@ def run_background_watchdog_once(
         },
         "plain_language_result": plain_language_result(failed_steps, config.m15_runtime_engine),
         "refs": {
-            "m15_realtime_supervisor_config": project_path(config.m15_realtime_supervisor_config_path),
             "m15_runtime_engine": config.m15_runtime_engine,
             "m15_sdk_runtime_config": project_path(config.m15_sdk_runtime_config_path),
             "m15_account_state_config": project_path(config.m15_account_state_config_path),
@@ -287,6 +277,14 @@ def semantic_watchdog_failure(step_id: str, stdout: str) -> str:
             return f"sdk_runtime_not_ready:{payload.get('status') or 'unknown'}"
         if payload.get("account_snapshot_healthy") is not True:
             return "sdk_account_snapshot_not_healthy"
+        if payload.get("market_data_transport") != "official_sdk_persistent_websocket":
+            return "official_market_data_transport_not_active"
+        if payload.get("automatic_market_data_retry_enabled") is not False:
+            return "automatic_market_data_retry_must_remain_disabled"
+        if payload.get("snapshot_fallback_enabled") is not False:
+            return "snapshot_market_data_fallback_must_remain_disabled"
+        if int(payload.get("quote_subscription_worker_count") or 0) != 1:
+            return "official_market_data_connection_count_not_one"
     if step_id == "m15_opening_readiness":
         status_value = str(payload.get("readiness_status") or "")
         if status_value.startswith("blocked"):
@@ -330,99 +328,23 @@ def acceptance_is_expected_readonly_wait(payload: dict[str, Any]) -> bool:
     )
 
 
-def m15_runtime_daemon_step(config: BackgroundWatchdogConfig, runner: CommandRunner) -> dict[str, Any]:
-    if config.m15_runtime_engine == "sdk":
-        return run_step(
-            "m15_sdk_runtime_daemon",
-            "M15 长桥 SDK 实时运行层自愈拉起",
-            [
-                sys.executable,
-                "scripts/run_m15_longbridge_sdk_runtime.py",
-                "--daemon",
-                "--dispatch",
-                "--config",
-                project_path(config.m15_sdk_runtime_config_path),
-            ],
-            config,
-            runner,
-        )
-    return run_step(
-        "m15_realtime_daemon",
-        "M15 长桥实时守护器自愈拉起",
-        [
-            sys.executable,
-            "scripts/run_m15_longbridge_realtime_session_supervisor.py",
-            "--daemon",
-            "--replace-config-drift",
-            "--config",
-            project_path(config.m15_realtime_supervisor_config_path),
-        ],
-        config,
-        runner,
-    )
-
-
 def m15_runtime_status_step(
     config: BackgroundWatchdogConfig,
     runner: CommandRunner,
-    *,
-    sleep: Callable[[float], None] = time.sleep,
-    monotonic: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
-    if config.m15_runtime_engine == "sdk":
-        command = [
+    return run_step(
+        "m15_sdk_runtime_status",
+        "M15 长桥 SDK 实时运行层状态（只观察，不自动重启）",
+        [
             sys.executable,
             "scripts/run_m15_longbridge_sdk_runtime.py",
             "--status",
             "--config",
             project_path(config.m15_sdk_runtime_config_path),
-        ]
-        started_at = monotonic()
-        attempts = 0
-        while True:
-            step = run_step(
-                "m15_sdk_runtime_status",
-                "M15 长桥 SDK 实时运行层状态",
-                command,
-                config,
-                runner,
-            )
-            attempts += 1
-            if not sdk_runtime_step_is_transient_recovery(step):
-                step["recovery_check_attempts"] = attempts
-                step["recovered_within_grace"] = attempts > 1 and step["returncode"] == 0
-                return step
-            elapsed = monotonic() - started_at
-            if elapsed >= config.runtime_recovery_grace_seconds:
-                step["recovery_check_attempts"] = attempts
-                step["recovered_within_grace"] = False
-                step["recovery_grace_exhausted"] = True
-                return step
-            sleep(min(1.0, config.runtime_recovery_grace_seconds - elapsed))
-    return run_step(
-        "m15_realtime_status",
-        "M15 长桥实时守护器状态",
-        [
-            sys.executable,
-            "scripts/run_m15_longbridge_realtime_session_supervisor.py",
-            "--status",
-            "--config",
-            project_path(config.m15_realtime_supervisor_config_path),
         ],
         config,
         runner,
     )
-
-
-def sdk_runtime_step_is_transient_recovery(step: dict[str, Any]) -> bool:
-    if int(step.get("returncode", 0) or 0) != 3:
-        return False
-    reason = str(step.get("stderr_tail") or "")
-    return reason.startswith("sdk_runtime_not_ready:") and reason.split(":", 1)[1] in {
-        "connecting",
-        "reconnecting_market_data_circuit",
-        "halted_market_data_circuit",
-    }
 
 
 def assert_safe_watchdog_command(command: list[str]) -> None:
@@ -439,7 +361,6 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
     if any(token in joined for token in forbidden):
         raise ValueError(f"unsafe watchdog command blocked: {joined}")
     allowed_scripts = {
-        "scripts/run_m15_longbridge_realtime_session_supervisor.py",
         "scripts/run_m15_longbridge_realtime_account_state.py",
         "scripts/run_m15_opening_trade_readiness.py",
         "scripts/run_m15_longbridge_sdk_runtime.py",
@@ -462,11 +383,11 @@ def clean_text(value: str) -> str:
 
 
 def plain_language_result(failed_steps: list[dict[str, Any]], runtime_engine: str) -> str:
-    runtime_label = "M15 SDK 实时运行层" if runtime_engine == "sdk" else "M15 实时守护器"
+    runtime_label = "M15 SDK 实时运行层"
     if not failed_steps:
         return (
             f"后台看护已完成：{runtime_label}、账户快照慢路径和开盘验收已检查；"
-            "完整交易日行情门禁未通过时只会关闭新开仓，不会把已有持仓退出误判为可脱离实时行情；"
+            "行情故障时运行层会停止且不会被看护器自动重启；"
             "M12.47 仅保留本地 research 状态，不作为看护前置。"
         )
     failed_labels = "、".join(str(step["label"]) for step in failed_steps)
