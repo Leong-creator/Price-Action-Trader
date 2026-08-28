@@ -246,6 +246,18 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             next(row for row in output.rows if row["kind"] == "error")["reason"],
         )
 
+    def test_daily_context_deadline_names_unprocessed_symbols(self) -> None:
+        self.config.daily_context_deadline_seconds = 0
+
+        rows = self.run_worker(stop_kind="error")
+
+        error = next(row for row in rows if row["kind"] == "error")
+        self.assertIn(
+            "official_sdk_daily_context_deadline_exceeded:SPY.US,QQQ.US,AAPL.US",
+            error["reason"],
+        )
+        self.assertEqual(FakeQuoteContext.instances[0].subscribe_calls, [])
+
     def test_transport_has_no_cli_or_account_dependency(self) -> None:
         source = Path(transport.__file__).read_text(encoding="utf-8")
         self.assertNotIn("subprocess", source)

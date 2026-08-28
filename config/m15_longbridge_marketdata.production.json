@@ -39,7 +39,7 @@
     "event_keep_lines": 0,
     "daily_context": "reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_longbridge_realtime_execution/m15_sdk_daily_context.jsonl",
     "daily_context_bars": 60,
-    "daily_context_deadline_seconds": 300
+    "daily_context_deadline_seconds": 600
   },
   "routing": {
     "router_config": "config/examples/m15_longbridge_realtime_signal_router.contract_v1.json",

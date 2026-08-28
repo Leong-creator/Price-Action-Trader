@@ -285,6 +285,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertEqual(config.sdk_subscribe_batch_size, 50)
         self.assertEqual(config.quote_region, "cn")
         self.assertEqual(config.trade_region, "global")
+        self.assertEqual(config.daily_context_deadline_seconds, 600)
         self.assertNotIn("quote_http_url", payload["oauth"])
         self.assertNotIn("quote_ws_url", payload["oauth"])
         for removed_key in (
