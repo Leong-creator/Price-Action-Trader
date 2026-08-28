@@ -94,10 +94,10 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
                 self.assertEqual(start_daemon("ignored.json", config), 0)
             popen_mock.assert_not_called()
 
-    def test_startup_script_only_references_m15_and_local_postclose_scheduler(self) -> None:
+    def test_startup_script_keeps_m15_as_the_only_automatic_quote_owner(self) -> None:
         script = Path("scripts/start_m15_trading_stack_after_boot.sh").read_text(encoding="utf-8")
 
-        self.assertIn("run_m12_m14_local_postclose_scheduler.py", script)
+        self.assertNotIn("run_m12_m14_local_postclose_scheduler.py", script)
         self.assertIn("--config config/m15_longbridge_marketdata.production.json", script)
         self.assertIn("--config config/m15_background_watchdog.production.json", script)
         self.assertNotIn("m15_longbridge_sdk_runtime.contract_v1.json", script)
