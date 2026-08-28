@@ -1779,12 +1779,15 @@ def runtime_status_age_seconds(status: dict[str, Any], now: datetime | None = No
 
 def runtime_requires_health_replacement(status: dict[str, Any], config: Any) -> bool:
     """Identify terminal health states that require diagnosis, not replacement."""
-    if str(status.get("status") or "") in {
+    status_value = str(status.get("status") or "")
+    if status_value in {
         "fault_halted",
         "halted_account_snapshot_circuit",
         "blocked_sdk_prerequisite",
     }:
         return True
+    if status_value not in {"running", "connecting"}:
+        return False
     status_age = runtime_status_age_seconds(status)
     account_age = status.get("account_snapshot_age_seconds")
     try:
@@ -3371,6 +3374,29 @@ def _read_runtime_status(config: Any) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def mark_runtime_operator_stopped(config: Any) -> dict[str, Any]:
+    payload = _read_runtime_status(config)
+    payload.update(
+        {
+            "generated_at": to_iso(datetime.now(UTC)),
+            "status": "operator_stopped",
+            "reason": "operator_requested_stop",
+            "sdk_connected": False,
+            "runtime_process_alive": False,
+            "runtime_pid": "",
+            "dispatch_enabled": False,
+            "dispatch_requested": False,
+            "config_fingerprint": config_fingerprint(config),
+        }
+    )
+    config.runtime_status_path.parent.mkdir(parents=True, exist_ok=True)
+    config.runtime_status_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
 def main() -> int:
     args = parse_args()
     config = load_config(args.config)
@@ -3405,6 +3431,7 @@ def main() -> int:
                 print("SDK 实时运行层未能在安全超时内停止", file=sys.stderr)
                 return 2
         pid_path(config).unlink(missing_ok=True)
+        mark_runtime_operator_stopped(config)
         return 0
     try:
         validate_market_data_transport_runtime(config)
