@@ -189,6 +189,7 @@ def run_background_watchdog_once(
         ),
     ]
     failed_steps = [step for step in steps if step["returncode"] != 0]
+    waiting_steps = [step for step in steps if step.get("expected_wait") is True]
     payload = {
         "schema_version": "m15.background-watchdog.v1",
         "stage": config.stage,
@@ -196,6 +197,7 @@ def run_background_watchdog_once(
         "watchdog_status": "healthy" if not failed_steps else "needs_attention",
         "step_count": len(steps),
         "failed_step_count": len(failed_steps),
+        "waiting_step_count": len(waiting_steps),
         "steps": steps,
         "next_check_interval_seconds": config.check_interval_seconds,
         "paper_simulated_only": True,
@@ -205,7 +207,11 @@ def run_background_watchdog_once(
         "local_research_non_blocking": {
             "m12_47_managed_elsewhere": True,
         },
-        "plain_language_result": plain_language_result(failed_steps, config.m15_runtime_engine),
+        "plain_language_result": plain_language_result(
+            failed_steps,
+            config.m15_runtime_engine,
+            waiting_steps=waiting_steps,
+        ),
         "refs": {
             "m15_runtime_engine": config.m15_runtime_engine,
             "m15_sdk_runtime_config": project_path(config.m15_sdk_runtime_config_path),
@@ -237,13 +243,18 @@ def run_step(
     assert_safe_watchdog_command(command)
     effective_timeout = timeout_seconds or config.command_timeout_seconds
     started = time.perf_counter()
+    expected_wait = False
     try:
         completed = runner(command, effective_timeout)
         returncode = int(completed.returncode)
         stdout = str(completed.stdout or "")
         stderr = str(completed.stderr or "")
+        expected_wait = watchdog_step_is_expected_wait(step_id, stdout)
+        if expected_wait:
+            returncode = 0
+            stderr = ""
         semantic_failure = semantic_watchdog_failure(step_id, stdout) if returncode == 0 else ""
-        if semantic_failure:
+        if semantic_failure and not expected_wait:
             returncode = 3
             stderr = semantic_failure
     except subprocess.TimeoutExpired as exc:
@@ -259,6 +270,7 @@ def run_step(
         "command": printable_command(command),
         "stdout_tail": clean_text(stdout)[-800:],
         "stderr_tail": clean_text(stderr)[-800:],
+        "expected_wait": expected_wait,
     }
 
 
@@ -296,6 +308,16 @@ def semantic_watchdog_failure(step_id: str, stdout: str) -> str:
     return ""
 
 
+def watchdog_step_is_expected_wait(step_id: str, stdout: str) -> bool:
+    if step_id != "m15_monday_acceptance":
+        return False
+    try:
+        payload = json.loads(stdout)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return isinstance(payload, dict) and acceptance_is_expected_readonly_wait(payload)
+
+
 def acceptance_is_expected_readonly_wait(payload: dict[str, Any]) -> bool:
     checks = [row for row in payload.get("checks", []) if isinstance(row, dict)]
     marketdata_gate = payload.get("marketdata_integrity_gate")
@@ -317,14 +339,19 @@ def acceptance_is_expected_readonly_wait(payload: dict[str, Any]) -> bool:
     dispatch_wait = any(
         str(row.get("check") or "") == "paper_dispatch_armed"
         and "enabled=False" in str(row.get("actual") or "")
-        and "requested=True" in str(row.get("actual") or "")
+        for row in checks
+    )
+    readiness_wait = any(
+        str(row.get("check") or "") == "opening_readiness"
+        and str(row.get("actual") or "") == "waiting_for_marketdata_acceptance"
         for row in checks
     )
     return bool(
         artifacts_healthy
         and waiting_for_session
         and dispatch_wait
-        and failed <= {"paper_dispatch_armed"}
+        and readiness_wait
+        and failed <= {"paper_dispatch_armed", "opening_readiness"}
     )
 
 
@@ -382,8 +409,18 @@ def clean_text(value: str) -> str:
     return value.replace("\r", "").strip()
 
 
-def plain_language_result(failed_steps: list[dict[str, Any]], runtime_engine: str) -> str:
+def plain_language_result(
+    failed_steps: list[dict[str, Any]],
+    runtime_engine: str,
+    *,
+    waiting_steps: list[dict[str, Any]] | None = None,
+) -> str:
     runtime_label = "M15 SDK 实时运行层"
+    if not failed_steps and waiting_steps:
+        return (
+            f"后台看护已完成：{runtime_label}和账户状态正常；"
+            "当前仅等待完整交易日行情验收，模拟新开仓保持关闭。"
+        )
     if not failed_steps:
         return (
             f"后台看护已完成：{runtime_label}、账户快照慢路径和开盘验收已检查；"
