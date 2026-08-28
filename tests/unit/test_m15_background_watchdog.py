@@ -11,6 +11,7 @@ from scripts.m15_background_watchdog_lib import (
     analytics_refresh_due,
     load_config,
     run_background_watchdog_once,
+    run_step,
     m15_runtime_status_step,
     pa002_milestone_refresh_step,
     semantic_watchdog_failure,
@@ -39,6 +40,11 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
                     "status": "waiting_for_regular_session",
                     "actual": "等待下一交易日",
                 },
+                {
+                    "check": "opening_readiness",
+                    "status": "fail",
+                    "actual": "waiting_for_marketdata_acceptance",
+                },
             ],
         }
         self.assertTrue(acceptance_is_expected_readonly_wait(payload))
@@ -46,6 +52,50 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             semantic_watchdog_failure("m15_monday_acceptance", json.dumps(payload)),
             "",
         )
+
+    def test_nonzero_acceptance_wait_is_normalized_to_healthy_wait(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="sdk")
+            payload = {
+                "acceptance_status": "blocked_monday_acceptance",
+                "marketdata_integrity_gate": {
+                    "status": "blocked",
+                    "artifacts_healthy": True,
+                },
+                "checks": [
+                    {
+                        "check": "paper_dispatch_armed",
+                        "status": "fail",
+                        "actual": "enabled=False, requested=False",
+                    },
+                    {
+                        "check": "opening_readiness",
+                        "status": "fail",
+                        "actual": "waiting_for_marketdata_acceptance",
+                    },
+                    {
+                        "check": "regular_us_market_window",
+                        "status": "waiting_for_regular_session",
+                        "actual": "等待下一交易日",
+                    },
+                ],
+            }
+
+            step = run_step(
+                "m15_monday_acceptance",
+                "M15 SDK 周一综合验收",
+                ["python", "scripts/run_m15_monday_refresh_acceptance.py"],
+                config,
+                lambda _command, _timeout: type(
+                    "Result",
+                    (),
+                    {"returncode": 3, "stdout": json.dumps(payload), "stderr": "blocked"},
+                )(),
+            )
+
+            self.assertEqual(step["returncode"], 0)
+            self.assertTrue(step["expected_wait"])
+            self.assertEqual(step["stderr_tail"], "")
 
     def test_pa002_milestone_skips_when_fill_attribution_refresh_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
