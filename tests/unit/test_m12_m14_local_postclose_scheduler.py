@@ -108,6 +108,7 @@ class LocalPostcloseSchedulerTest(unittest.TestCase):
         self.assertIn("Removing stale startup lock", script)
         self.assertNotIn("run_m12_47_session_supervisor.py", script)
         self.assertNotIn("run_m12_37_intraday_auto_loop.py", script)
+        self.assertNotIn("--dispatch", script)
 
     def test_windows_hidden_launcher_uses_direct_wsl_exec(self) -> None:
         script = Path("scripts/install_m15_windows_startup_task.ps1").read_text(encoding="utf-8")

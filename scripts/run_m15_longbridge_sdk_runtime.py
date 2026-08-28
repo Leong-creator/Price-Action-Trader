@@ -2275,6 +2275,20 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                             symbol: last_push_at_by_symbol.get(symbol, "")
                             for symbol in ("SPY.US", "QQQ.US")
                         },
+                        "last_push_source": {
+                            symbol: last_push_source_by_symbol.get(symbol, "")
+                            for symbol in ("SPY.US", "QQQ.US")
+                        },
+                        "transport_raw_notification_count": (
+                            transport_raw_notification_count
+                        ),
+                        "transport_callback_queue_depth": transport_queue_depth,
+                        "transport_reader_errors": list(transport_reader_errors),
+                        "transport_resources": dict(transport_resources),
+                        "worker_heartbeat_age_seconds": round(
+                            reference_check_monotonic - worker_last_progress,
+                            3,
+                        ),
                     },
                 )
             reference_market_data_state = "healthy"

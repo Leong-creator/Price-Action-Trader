@@ -806,6 +806,18 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         self.assertLess(drain, reader_error)
         self.assertLess(reader_error, heartbeat_stale)
 
+    def test_reference_stall_fault_preserves_transport_diagnostics(self) -> None:
+        source = inspect.getsource(
+            __import__(
+                "scripts.run_m15_longbridge_sdk_runtime",
+                fromlist=["run_watch"],
+            ).run_watch
+        )
+        fault = source[source.index('"reference_market_data_stalled"') :]
+        self.assertIn('"transport_raw_notification_count"', fault)
+        self.assertIn('"transport_callback_queue_depth"', fault)
+        self.assertIn('"worker_heartbeat_age_seconds"', fault)
+
     def test_active_symbol_silence_waits_for_regular_open_grace(self) -> None:
         market_zone = ZoneInfo("America/New_York")
         self.assertFalse(

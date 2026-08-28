@@ -93,15 +93,27 @@ def official_sdk_quote_worker(
             queue.Queue(maxsize=CALLBACK_QUEUE_MAXSIZE)
         )
         callback_overflow = threading.Event()
+        reference_activity_lock = threading.Lock()
+        latest_reference_activity: dict[str, dict[str, str]] = {}
 
         def enqueue(kind: str, symbol: str, event: Any) -> None:
+            normalized_symbol = str(symbol).upper()
+            received_at = datetime.now(UTC)
+            if normalized_symbol in {"SPY.US", "QQQ.US"}:
+                with reference_activity_lock:
+                    latest_reference_activity[normalized_symbol] = {
+                        "kind": "market_activity",
+                        "symbol": normalized_symbol,
+                        "received_at": to_iso(received_at),
+                        "source_mode": f"official_sdk_raw_{kind}_callback",
+                    }
             try:
                 callback_events.put_nowait(
                     (
                         kind,
-                        str(symbol).upper(),
+                        normalized_symbol,
                         sdk_object_to_dict(event),
-                        datetime.now(UTC),
+                        received_at,
                     )
                 )
             except queue.Full:
@@ -333,6 +345,11 @@ def official_sdk_quote_worker(
             if completed:
                 _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True)
             if now_monotonic - last_heartbeat >= 1:
+                with reference_activity_lock:
+                    raw_reference_activity = [
+                        dict(latest_reference_activity[symbol])
+                        for symbol in sorted(latest_reference_activity)
+                    ]
                 _emit(
                     queue_out,
                     {
@@ -342,6 +359,7 @@ def official_sdk_quote_worker(
                         "transport_reader_errors": [],
                         "transport_resources": _resources(),
                         "raw_notification_count": raw_event_count,
+                        "raw_reference_activity": raw_reference_activity,
                     },
                 )
                 last_heartbeat = now_monotonic
