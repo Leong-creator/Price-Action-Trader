@@ -2885,6 +2885,25 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             next_session = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
             self.assertEqual(load_valid_daily_context_cache(path, config, next_session), [])
 
+    def test_holiday_cache_stays_valid_until_next_completed_session(self) -> None:
+        config = replace(load_config(), symbol_limit=1, daily_context_bars=2,
+                         market_holidays=("2026-09-07",))
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "daily.jsonl"
+            rows = [
+                {"symbol": "SPY", "timeframe": "1d", "event_time": "2026-09-03T20:00:00Z"},
+                {"symbol": "SPY", "timeframe": "1d", "event_time": "2026-09-04T20:00:00Z"},
+            ]
+            write_daily_context_cache(path, rows)
+            for stamp in ("2026-09-07T21:00:00+00:00", "2026-09-08T12:00:00+00:00"):
+                with self.subTest(stamp=stamp):
+                    self.assertEqual(load_valid_daily_context_cache(path, config, datetime.fromisoformat(stamp)), rows)
+            self.assertEqual(load_valid_daily_context_cache(
+                path, config, datetime(2026, 9, 8, 20, 10, tzinfo=UTC)), [])
+            write_daily_context_cache(path, rows[:-1])
+            self.assertEqual(load_valid_daily_context_cache(
+                path, config, datetime(2026, 9, 8, 12, 0, tzinfo=UTC)), [])
+
     def test_hot_state_compaction_keeps_current_decisions_and_broker_orders(self) -> None:
         execution_rows = [
             {

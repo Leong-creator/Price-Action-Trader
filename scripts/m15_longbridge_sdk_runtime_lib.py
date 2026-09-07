@@ -537,14 +537,14 @@ def daily_context_is_complete(
     return state == "complete" and not failed_symbols and row_count >= expected_rows
 
 
-def required_daily_context_date(now: datetime) -> str:
+def required_daily_context_date(now: datetime, market_holidays: tuple[str, ...] = ()) -> str:
     """Return the latest completed US session date needed by daily strategies."""
     local = now.astimezone(NEW_YORK)
     candidate = local.date()
-    if local.weekday() < 5 and (local.hour, local.minute) >= (16, 10):
+    if local.weekday() < 5 and candidate.isoformat() not in market_holidays and (local.hour, local.minute) >= (16, 10):
         return candidate.isoformat()
     candidate -= timedelta(days=1)
-    while candidate.weekday() >= 5:
+    while candidate.weekday() >= 5 or candidate.isoformat() in market_holidays:
         candidate -= timedelta(days=1)
     return candidate.isoformat()
 
@@ -566,7 +566,7 @@ def load_valid_daily_context_cache(path: Path, config: SdkRuntimeConfig, now: da
         return []
     if any(len(symbol_rows) != config.daily_context_bars for symbol_rows in grouped.values()):
         return []
-    required_date = required_daily_context_date(now)
+    required_date = required_daily_context_date(now, config.market_holidays)
     for symbol_rows in grouped.values():
         latest = max(str(row.get("event_time") or "") for row in symbol_rows)
         try:
