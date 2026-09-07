@@ -17,6 +17,8 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     floor_bar_open,
     load_config,
     load_valid_daily_context_cache,
+    required_daily_context_date,
+    NEW_YORK,
     read_client_id,
     sdk_config_from_oauth,
     sdk_object_to_dict,
@@ -27,6 +29,64 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
 CALLBACK_QUEUE_MAXSIZE = 250_000
 CALLBACK_DRAIN_BATCH = 10_000
 QUOTE_STATE_FLUSH_SECONDS = 0.25
+
+
+class DailyContextRefresh:
+    """Use the same context off-session without blocking callback draining."""
+
+    def __init__(self, config: Any, symbols: list[str], completed_date: str) -> None:
+        self.config = config
+        self.symbols = symbols
+        self.completed_date = completed_date
+        self.target_date = ""
+        self.rows: list[dict[str, Any]] = []
+        self.index = 0
+        self.deadline = 0.0
+        self.result: queue.Queue[Any] = queue.Queue(maxsize=1)
+
+    def _fetch(self, quote: Any, sdk: Any, now: datetime) -> None:
+        try:
+            rows: list[dict[str, Any]] = []
+            for symbol in self.symbols:
+                if time.monotonic() >= self.deadline:
+                    raise RuntimeError("official_sdk_daily_refresh_deadline_exceeded")
+                candles = quote.candlesticks(symbol, sdk.Period.Day, self.config.daily_context_bars,
+                                           sdk.AdjustType.NoAdjust, sdk.TradeSessions.Intraday)
+                current = daily_candlestick_event_rows(symbol, candles, now)
+                dates = [datetime.fromisoformat(row["event_time"].replace("Z", "+00:00")).astimezone(NEW_YORK).date().isoformat()
+                         for row in current]
+                if len(current) != self.config.daily_context_bars or not dates or max(dates) != self.target_date:
+                    raise RuntimeError(f"official_sdk_daily_refresh_incomplete:{symbol}:{self.target_date}")
+                rows.extend(current)
+            self.result.put_nowait(rows)
+        except BaseException as exc:
+            self.result.put_nowait(exc)
+
+    def step(self, quote: Any, sdk: Any, now: datetime) -> list[dict[str, Any]] | None:
+        required = required_daily_context_date(now, self.config.market_holidays)
+        local = now.astimezone(NEW_YORK)
+        regular = (local.weekday() < 5 and local.date().isoformat() not in self.config.market_holidays
+                   and (9, 30) <= (local.hour, local.minute) < (16, 0))
+        if required == self.completed_date and not self.target_date:
+            return None
+        if regular:
+            raise RuntimeError("official_sdk_daily_context_stale_at_market_open")
+        if not self.target_date:
+            self.target_date = required
+            self.deadline = time.monotonic() + self.config.daily_context_deadline_seconds
+            threading.Thread(target=self._fetch, args=(quote, sdk, now), daemon=True,
+                             name="official-sdk-daily-refresh").start()
+        if time.monotonic() >= self.deadline:
+            raise RuntimeError("official_sdk_daily_refresh_deadline_exceeded")
+        try:
+            completed = self.result.get_nowait()
+        except queue.Empty:
+            return None
+        if isinstance(completed, BaseException):
+            raise completed
+        self.completed_date = self.target_date
+        self.target_date, self.rows, self.index = "", [], 0
+        return completed
 
 
 def _emit(queue_out: Any, payload: dict[str, Any], *, critical: bool = False) -> bool:
@@ -40,12 +100,13 @@ def _emit(queue_out: Any, payload: dict[str, Any], *, critical: bool = False) ->
         return False
 
 
-def _subscription_symbols(rows: Any) -> set[str]:
+def _subscription_symbols(rows: Any, required_sub_types: tuple[Any, ...] = ()) -> set[str]:
     result: set[str] = set()
     for row in rows or []:
         value = row.get("symbol") if isinstance(row, dict) else getattr(row, "symbol", "")
         symbol = str(value or "").upper()
-        if symbol:
+        sub_types = row.get("sub_types", []) if isinstance(row, dict) else getattr(row, "sub_types", [])
+        if symbol and set(map(str, required_sub_types)) <= set(map(str, sub_types)):
             result.add(symbol)
     return result
 
@@ -135,6 +196,7 @@ def official_sdk_quote_worker(
         )
         targets = list(dict.fromkeys(base_targets + monitoring_targets))
 
+        initial_daily_required = required_daily_context_date(datetime.now(UTC), config.market_holidays)
         daily_rows = load_valid_daily_context_cache(
             config.daily_context_path,
             config,
@@ -221,7 +283,7 @@ def official_sdk_quote_worker(
                 },
             )
 
-        subscribed = _subscription_symbols(quote.subscriptions())
+        subscribed = _subscription_symbols(quote.subscriptions(), (sdk.SubType.Quote, sdk.SubType.Trade))
         missing_subscriptions = sorted(set(targets) - subscribed)
         if missing_subscriptions:
             raise RuntimeError(
@@ -241,6 +303,8 @@ def official_sdk_quote_worker(
             push_source_mode="official_sdk_push",
             no_trade_source_mode="official_sdk_no_trade_carry_forward",
             event_id_prefix="official-sdk-5m",
+            market_holidays=config.market_holidays,
+            boundary_settle_seconds=config.maximum_source_delivery_age_ms / 1000,
         )
         initial_quote_rows: list[dict[str, Any]] = []
         snapshot_received_at = datetime.now(UTC)
@@ -265,12 +329,13 @@ def official_sdk_quote_worker(
                 "official_sdk_initial_snapshot_incomplete:"
                 + ",".join(missing_snapshots)
             )
-        _emit(
+        if not _emit(
             queue_out,
             {"kind": "quote_state_batch", "rows": initial_quote_rows},
             critical=True,
-        )
-        _emit(
+        ):
+            raise RuntimeError("official_sdk_initial_snapshot_delivery_failed")
+        if not _emit(
             queue_out,
             {
                 "kind": "ready",
@@ -297,9 +362,13 @@ def official_sdk_quote_worker(
                 ),
             },
             critical=True,
-        )
+        ):
+            raise RuntimeError("official_sdk_ready_delivery_failed")
 
         pending_quotes: dict[str, dict[str, Any]] = {}
+        # Use the requirement at the actual fetch, not the later subscribe time:
+        # initialization can straddle the 16:10 completed-session transition.
+        daily_refresh = DailyContextRefresh(config, base_targets, initial_daily_required)
         last_quote_flush = 0.0
         last_heartbeat = 0.0
         last_reference_activity: dict[str, float] = {}
@@ -338,8 +407,8 @@ def official_sdk_quote_worker(
                         )
                         last_reference_activity[symbol] = now_monotonic
                 completed = builder.on_trade(symbol, payload, received_at=received_at)
-                if completed:
-                    _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True)
+                if completed and not _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True):
+                    raise RuntimeError("official_sdk_bar_delivery_failed")
 
             now_monotonic = time.monotonic()
             if pending_quotes and now_monotonic - last_quote_flush >= QUOTE_STATE_FLUSH_SECONDS:
@@ -347,9 +416,11 @@ def official_sdk_quote_worker(
                 if _emit(queue_out, {"kind": "quote_state_batch", "rows": rows}):
                     pending_quotes.clear()
                     last_quote_flush = now_monotonic
-            completed = builder.complete_boundary(targets, datetime.now(UTC))
-            if completed:
-                _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True)
+            # Drain received trades before sealing a boundary; otherwise a
+            # burst could turn an unprocessed symbol into a zero-volume bar.
+            completed = builder.complete_boundary(targets, datetime.now(UTC)) if callback_events.empty() else []
+            if completed and not _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True):
+                raise RuntimeError("official_sdk_bar_delivery_failed")
             if now_monotonic - last_heartbeat >= 1:
                 with reference_activity_lock:
                     raw_reference_activity = [
@@ -369,6 +440,14 @@ def official_sdk_quote_worker(
                     },
                 )
                 last_heartbeat = now_monotonic
+            refreshed_daily = daily_refresh.step(quote, sdk, datetime.now(UTC))
+            if refreshed_daily is not None and not _emit(
+                queue_out,
+                {"kind": "daily_context", "rows": refreshed_daily, "failures": [],
+                 "source_mode": "official_sdk_post_session_daily_context"},
+                critical=True,
+            ):
+                raise RuntimeError("official_sdk_daily_refresh_delivery_failed")
             stop_event.wait(0.05)
     except BaseException as exc:
         _emit(

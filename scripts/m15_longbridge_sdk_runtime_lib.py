@@ -733,7 +733,7 @@ def attach_next_bar_first_quotes(
 
 
 class FiveMinuteBarBuilder:
-    """Build final regular-session bars from Longbridge serve pushes."""
+    """Build final regular-session bars from official SDK trade pushes."""
 
     def __init__(
         self,
@@ -744,6 +744,8 @@ class FiveMinuteBarBuilder:
         push_source_mode: str = "official_sdk_push",
         no_trade_source_mode: str = "official_sdk_no_trade_carry_forward",
         event_id_prefix: str = "official-sdk-5m",
+        market_holidays: tuple[str, ...] = (),
+        boundary_settle_seconds: float = 0,
     ) -> None:
         self.minutes = minutes
         self.complete_bar_open_not_before = (
@@ -755,11 +757,14 @@ class FiveMinuteBarBuilder:
         self.push_source_mode = push_source_mode
         self.no_trade_source_mode = no_trade_source_mode
         self.event_id_prefix = event_id_prefix
+        self.market_holidays = frozenset(market_holidays)
+        self.boundary_settle_seconds = boundary_settle_seconds
         self._bars: dict[tuple[str, datetime], dict[str, Any]] = {}
         self._quote_total_volume: dict[str, int] = {}
         self._quote_last_source_at: dict[str, datetime] = {}
         self._latest_quote_price: dict[str, Decimal] = {}
         self._latest_quote_at: dict[str, datetime] = {}
+        self._prior_bar_quote: dict[str, tuple[datetime, Decimal]] = {}
         self._emitted_boundaries: set[datetime] = set()
 
     @property
@@ -797,8 +802,17 @@ class FiveMinuteBarBuilder:
         previous_source_at = self._latest_quote_at.get(normalized_symbol)
         if previous_source_at is not None and source_at < previous_source_at:
             return
+        if previous_source_at is not None and floor_bar_open(source_at, self.minutes) > floor_bar_open(previous_source_at, self.minutes):
+            self._prior_bar_quote[normalized_symbol] = (previous_source_at, self._latest_quote_price[normalized_symbol])
         self._latest_quote_price[normalized_symbol] = price
         self._latest_quote_at[normalized_symbol] = source_at
+
+    def _quote_before(self, symbol: str, boundary: datetime) -> tuple[datetime, Decimal] | None:
+        source_at = self._latest_quote_at.get(symbol)
+        if source_at is not None and source_at < boundary:
+            return source_at, self._latest_quote_price[symbol]
+        prior = self._prior_bar_quote.get(symbol)
+        return prior if prior is not None and prior[0] < boundary else None
 
     def complete_boundary(self, symbols: list[str] | tuple[str, ...], now: datetime) -> list[dict[str, Any]]:
         """Emit one complete boundary batch, marking no-trade rows non-tradable."""
@@ -807,6 +821,8 @@ class FiveMinuteBarBuilder:
         boundary_open = boundary_close - timedelta(minutes=self.minutes)
         if (
             boundary_open in self._emitted_boundaries
+            or (now_ny - boundary_close).total_seconds() < self.boundary_settle_seconds
+            or boundary_open.date().isoformat() in self.market_holidays
             or boundary_open.weekday() >= 5
             or boundary_open.hour < 9
             or (boundary_open.hour == 9 and boundary_open.minute < 30)
@@ -825,10 +841,10 @@ class FiveMinuteBarBuilder:
             if bar is not None:
                 rows.append(self._finalize(key, bar, emitted_at=now))
                 continue
-            price = self._latest_quote_price.get(normalized)
-            if price is None:
+            quote_before = self._quote_before(normalized, boundary_close)
+            if quote_before is None:
                 continue
-            source_at = self._latest_quote_at.get(normalized, now.astimezone(UTC))
+            source_at, price = quote_before
             synthetic = {
                 "symbol": normalized,
                 "bar_open_at": boundary_open,
@@ -850,7 +866,18 @@ class FiveMinuteBarBuilder:
     def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
         for trade in payload.get("trades", []) if isinstance(payload.get("trades"), list) else []:
+            session = str(trade.get("trade_session") or "").split(".")[-1].lower()
+            if session and session != "intraday":
+                continue
+            # Official SDK v4.5.0 quote/store.rs: regular US equities have
+            # price-forming, volume-only, and excluded sale conditions.
+            trade_type = str(trade.get("trade_type") or "")
+            price_forming = trade_type in {"", "A", "B", "D", "E", "F", "K", "S", "X", "1"}
+            if not price_forming and trade_type not in {"C", "G", "H", "I", "V", "W"}:
+                continue
             source_at = unix_to_utc(trade.get("timestamp"), received_at)
+            if source_at > received_at.astimezone(UTC) + timedelta(seconds=2):
+                raise ValueError("trade_timestamp_in_future")
             price = decimal(trade.get("price"))
             if price > Decimal("0"):
                 finished.extend(
@@ -861,6 +888,7 @@ class FiveMinuteBarBuilder:
                         price,
                         int_like(trade.get("volume")),
                         source_mode=self.push_source_mode,
+                        price_forming=price_forming,
                     )
                 )
         return finished
@@ -883,28 +911,42 @@ class FiveMinuteBarBuilder:
         source_mode: str,
         bar_at: datetime | None = None,
         blocked_reason: str = "",
+        price_forming: bool = True,
     ) -> list[dict[str, Any]]:
         bar_clock_ny = (bar_at or source_at).astimezone(NEW_YORK)
-        if bar_clock_ny.weekday() >= 5 or not (bar_clock_ny.hour > 9 or (bar_clock_ny.hour == 9 and bar_clock_ny.minute >= 30)) or bar_clock_ny.hour >= 16:
+        if bar_clock_ny.weekday() >= 5 or bar_clock_ny.date().isoformat() in self.market_holidays or not (bar_clock_ny.hour > 9 or (bar_clock_ny.hour == 9 and bar_clock_ny.minute >= 30)) or bar_clock_ny.hour >= 16:
             return []
         bar_open = floor_bar_open(bar_clock_ny, self.minutes)
         if self.complete_bar_open_not_before is not None and bar_open < self.complete_bar_open_not_before:
-            return self.flush(received_at)
+            return [] if self.boundary_batch_mode else self.flush(received_at)
+        if bar_open in self._emitted_boundaries:
+            raise ValueError("trade_after_bar_finalized")
         key = (symbol.upper(), bar_open)
         bar = self._bars.get(key)
         if bar is None:
             bar = {
                 "symbol": symbol.upper(), "bar_open_at": bar_open, "bar_close_at": bar_open + timedelta(minutes=self.minutes),
-                "open": price, "high": price, "low": price, "close": price, "volume": 0,
-                "source_event_at": source_at, "received_at": received_at,
+                "open": price if price_forming else None, "high": price if price_forming else None,
+                "low": price if price_forming else None, "close": price if price_forming else None, "volume": 0,
+                "source_event_at": source_at, "first_source_event_at": source_at, "received_at": received_at,
+                "last_price_event_at": source_at,
                 "source_mode": source_mode,
                 "market_data_blocked_reasons": set(),
             }
             self._bars[key] = bar
         else:
-            bar["high"] = max(bar["high"], price)
-            bar["low"] = min(bar["low"], price)
-            bar["close"] = price
+            if price_forming:
+                if bar["open"] is None:
+                    bar.update(open=price, high=price, low=price, close=price,
+                               first_source_event_at=source_at, last_price_event_at=source_at)
+                bar["high"] = max(bar["high"], price)
+                bar["low"] = min(bar["low"], price)
+                if source_at < bar["first_source_event_at"]:
+                    bar["open"] = price
+                    bar["first_source_event_at"] = source_at
+                if source_at >= bar["last_price_event_at"]:
+                    bar["close"] = price
+                    bar["last_price_event_at"] = source_at
             bar["source_event_at"] = max(bar["source_event_at"], source_at)
             bar["received_at"] = max(bar["received_at"], received_at)
         bar["volume"] += max(0, volume)
@@ -919,6 +961,14 @@ class FiveMinuteBarBuilder:
 
     def _finalize(self, key: tuple[str, datetime], bar: dict[str, Any], *, emitted_at: datetime) -> dict[str, Any]:
         self._bars.pop(key, None)
+        if bar["open"] is None:
+            quote_before = self._quote_before(key[0], bar["bar_close_at"])
+            if quote_before is None:
+                raise ValueError("no_price_forming_trade_or_quote")
+            source_at, price = quote_before
+            bar.update(open=price, high=price, low=price, close=price, source_mode=self.no_trade_source_mode)
+            bar["source_event_at"] = source_at
+            bar["market_data_blocked_reasons"].update({"no_trade_carry_forward", "no_price_forming_trade"})
         source_at = bar["source_event_at"]
         # A final bar is executable only once its interval has actually
         # closed. The last quote timestamp is source evidence, not delivery.
@@ -1685,7 +1735,7 @@ def sdk_object_to_dict(value: Any) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in (
         "symbol", "sub_types", "timestamp", "last_done", "current_volume", "volume", "trades", "price", "open",
-        "high", "low", "close", "turnover", "trade_session", "sequence",
+        "high", "low", "close", "turnover", "trade_session", "trade_type", "sequence",
     ):
         if hasattr(value, key):
             item = getattr(value, key)

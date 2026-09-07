@@ -31,6 +31,7 @@ class FakeQuoteContext:
     instances: list["FakeQuoteContext"] = []
     fail_subscribe = False
     omit_subscription = False
+    omit_trade_subscription = False
     emit_callbacks_during_subscribe = False
 
     def __init__(self, _config) -> None:
@@ -68,7 +69,8 @@ class FakeQuoteContext:
 
     def subscriptions(self):
         rows = self.subscribed[:-1] if self.omit_subscription else self.subscribed
-        return [SimpleNamespace(symbol=symbol) for symbol in rows]
+        types = ["quote"] if self.omit_trade_subscription else ["quote", "trade"]
+        return [SimpleNamespace(symbol=symbol, sub_types=types) for symbol in rows]
 
     def quote(self, symbols):
         self.events.append("snapshot")
@@ -104,6 +106,7 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         FakeQuoteContext.instances = []
         FakeQuoteContext.fail_subscribe = False
         FakeQuoteContext.omit_subscription = False
+        FakeQuoteContext.omit_trade_subscription = False
         FakeQuoteContext.emit_callbacks_during_subscribe = False
         self.config = SimpleNamespace(
             quote_region="cn",
@@ -112,6 +115,8 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             daily_context_bars=2,
             sdk_subscribe_batch_size=2,
             bar_minutes=5,
+            market_holidays=("2026-09-07",),
+            maximum_source_delivery_age_ms=2000,
         )
 
     def run_worker(
@@ -176,6 +181,12 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         self.assertEqual(len(context.subscribe_calls), 1)
         error = next(row for row in rows if row["kind"] == "error")
         self.assertIn("official_sdk_quote_worker_failed:RuntimeError:request timeout", error["reason"])
+
+    def test_quote_only_subscription_cannot_claim_trade_coverage(self) -> None:
+        FakeQuoteContext.omit_trade_subscription = True
+        rows = self.run_worker(stop_kind="error")
+        self.assertNotIn("snapshot", FakeQuoteContext.instances[0].events)
+        self.assertIn("official_sdk_subscription_incomplete", rows[-1]["reason"])
 
     def test_complete_daily_cache_skips_redundant_pull_requests(self) -> None:
         cached = [
@@ -264,6 +275,26 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         self.assertNotIn("longbridge serve", source)
         self.assertNotIn("TradeContext", source)
         self.assertNotIn("local_ledger", source)
+
+    def test_critical_messages_cannot_silently_disappear(self) -> None:
+        real_emit = transport._emit
+        for kind in ("daily_context", "quote_state_batch", "ready"):
+            with self.subTest(kind=kind):
+                def emit(output, payload, *, critical=False):
+                    if payload["kind"] == kind:
+                        return False
+                    return real_emit(output, payload, critical=critical)
+                with patch.object(transport, "_emit", side_effect=emit):
+                    rows = self.run_worker(stop_kind="error")
+                self.assertEqual(rows[-1]["kind"], "error")
+                self.assertIn("delivery_failed", rows[-1]["reason"])
+
+    def test_callback_overflow_stops_without_another_context(self) -> None:
+        FakeQuoteContext.emit_callbacks_during_subscribe = True
+        with patch.object(transport, "CALLBACK_QUEUE_MAXSIZE", 1):
+            rows = self.run_worker(stop_kind="error")
+        self.assertEqual(len(FakeQuoteContext.instances), 1)
+        self.assertIn("callback_queue_overflow", rows[-1]["reason"])
 
 
 if __name__ == "__main__":
