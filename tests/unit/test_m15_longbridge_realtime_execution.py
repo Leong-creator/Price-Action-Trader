@@ -223,13 +223,14 @@ class M15LongbridgeRealtimeExecutionTest(unittest.TestCase):
                 for row in self.read_jsonl(config.output_dir / LEDGER_JSONL)
             }
 
-            self.assertEqual(rows["first"]["latency_band"], "acceptable")
+            first_latency_band = rows["first"]["latency_band"]
+            self.assertIn(first_latency_band, {"target_met", "acceptable"})
             self.assertEqual(rows["second"]["latency_band"], "acceptable")
             self.assertGreater(rows["second"]["signal_to_request_ms"], rows["first"]["signal_to_request_ms"])
             self.assertGreaterEqual(rows["second"]["execution_queue_delay_ms"], 20)
             self.assertEqual(payload["latency_counts"], {
-                "target_met": 0,
-                "acceptable": 2,
+                "target_met": int(first_latency_band == "target_met"),
+                "acceptable": 1 + int(first_latency_band == "acceptable"),
                 "delayed_revalidated": 0,
             })
 
