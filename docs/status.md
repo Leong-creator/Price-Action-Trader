@@ -1,5 +1,14 @@
 # 项目状态
 
+## 2026-09-07 官方 Async 行情桥接器（独立待集成）
+
+- 新增 `OfficialAsyncQuoteBridge`：一个后台 asyncio loop、一次官方 `AsyncQuoteContext.create(config)`；同步调用方等待 Future，SDK I/O 在 loop 内 await，无同步 SDK fallback。
+- 请求超时或错误后实例永久失效、不重试；清理回调目标、取消请求、释放上下文引用并限时回收线程。官方未公开 native close 确认/禁止内部重连接口，该缺口明确保留。
+- `check_health()` 仅检查本地故障及 loop/线程存活，不发 SDK I/O；worker 集成后须每 loop 调用，以立即发现已记录的回调异常。
+- 本补丁只新增适配器、FakeAsyncSDK 离线测试及说明，未修改 worker/runtime，未建立真实行情或交易连接，未武装订单。集成与只读实机验证由主 agent 执行，仍需人工复核。
+- 用法、初始化/超时/关闭契约与官方依据见 `docs/m15-official-async-quote-bridge.md`。
+- 离线验证：18 项适配器测试及 132 项原有相关回归共 150 项通过；适配器禁 socket 连接连续 20 轮共 360 次通过，每轮线程数恢复基线。
+
 ## 2026-09-07 关机后巡查
 
 - 已保存旧运行状态并经人工确认恢复只读运行；147/147订阅、8820条日线、SDK模拟账户预检通过。9月7日美国劳动节休市，下一交易日为9月8日。
