@@ -757,6 +757,8 @@ class MarketSessionEvidence:
         local = now.astimezone(ZoneInfo(self.config.market_timezone))
         self.session_date = local.date().isoformat()
         self.boundaries: set[datetime] = set()
+        self.audited_boundaries: set[datetime] = set()
+        self.audit_failure = ""
         self.realtime_tradable_bar_count = 0
         self.no_trade_carry_forward_count = 0
         start_hour, start_minute = map(int, self.config.regular_session_start_time.split(":"))
@@ -832,12 +834,31 @@ class MarketSessionEvidence:
         self.no_trade_carry_forward_count += sum(bool(r.get("market_data_blocked_reason")) for r in selected)
         return "accepted"
 
+    def record_audit(self, rows: list[dict[str, Any]], result: dict[str, Any]) -> str:
+        if (
+            result.get("audit_status") != "written"
+            or result.get("audit_event_count") != len(rows)
+            or result.get("fresh_event_count", 0) + result.get("stale_event_count", 0) != len(rows)
+        ):
+            self.audit_failure = "realtime_bar_audit_failed"
+        elif result.get("stale_tradable_event_count", -1) != 0:
+            self.audit_failure = "realtime_bar_freshness_rejected"
+        else:
+            closes = {strict_event_datetime(row.get("event_time")) for row in rows}
+            if len(closes) != 1 or not closes <= self.boundaries:
+                self.audit_failure = "realtime_bar_audit_failed"
+            elif not self.audit_failure:
+                self.audited_boundaries.update(closes)
+        return self.audit_failure
+
     def complete(self, now: datetime, latency_samples: list[int], worker_generation: int) -> bool:
         return bool(
             self.expected
             and now.astimezone(ZoneInfo(self.config.market_timezone)).date().isoformat() == self.session_date
             and now >= self.expected[-1]
             and self.boundaries == set(self.expected)
+            and self.audited_boundaries == self.boundaries
+            and not self.audit_failure
             and self.realtime_tradable_bar_count + self.no_trade_carry_forward_count == len(self.symbols) * len(self.expected)
             and worker_generation == 1
             and len(latency_samples) >= len(self.expected)
@@ -1431,8 +1452,35 @@ def dispatch_completed_rows(
 ) -> dict[str, Any]:
     stage_started = time.perf_counter()
     rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {})
-    fresh = fresh_market_events(rows, config.maximum_source_delivery_age_ms)
-    append_market_events(config.market_events_path, fresh, config.event_keep_lines)
+    audit = {
+        "audit_status": "failed", "audit_event_count": 0,
+        "fresh_event_count": 0, "stale_event_count": 0,
+        "stale_tradable_event_count": 0,
+    }
+    try:
+        # Integrity evidence must survive even when delivery is too old for
+        # strategy use. No strategy or order work precedes the audit write.
+        append_market_events(config.market_events_path, rows, config.event_keep_lines)
+    except Exception as exc:
+        return {
+            **audit, "audit_error": f"{type(exc).__name__}:{exc}",
+            "audit_partial_write_possible": True,
+            "event_count": 0, "signal_count": 0,
+            "execution": {"status": "blocked_market_event_audit_failure", "submitted_count": 0},
+        }
+    fresh = fresh_market_events(rows, config.maximum_source_delivery_age_ms, now=datetime.now(UTC))
+    fresh_ids = {id(row) for row in fresh}
+    stale = [row for row in rows if id(row) not in fresh_ids]
+    audit.update({
+        "audit_status": "written", "audit_event_count": len(rows),
+        "fresh_event_count": len(fresh), "stale_event_count": len(stale),
+        "stale_tradable_event_count": sum(not row.get("market_data_blocked_reason") for row in stale),
+    })
+    if audit["stale_tradable_event_count"]:
+        return {
+            **audit, "event_count": 0, "signal_count": 0,
+            "execution": {"status": "blocked_stale_market_events", "submitted_count": 0},
+        }
     trading_fresh = trading_market_events(config, fresh)
     new_rows = market_context.append(trading_fresh)
     position_new_rows = (
@@ -1441,7 +1489,7 @@ def dispatch_completed_rows(
         else new_rows
     )
     if not new_rows and not position_new_rows:
-        return {"event_count": 0, "signal_count": 0, "execution": {}}
+        return {**audit, "event_count": 0, "signal_count": 0, "execution": {}}
     from scripts.m15_longbridge_realtime_signal_router_lib import load_config as load_router_config, run_realtime_signal_router
     from scripts.m15_longbridge_realtime_position_manager_lib import load_config as load_position_config, run_realtime_position_manager
     from scripts.m15_longbridge_realtime_execution_lib import load_config as load_execution_config, run_realtime_execution
@@ -1641,6 +1689,7 @@ def dispatch_completed_rows(
             "blocked_by_reason": {"not_us_regular_session": len(execution_signals)},
         }
     return {
+        **audit,
         "event_count": len(fresh),
         "trading_event_count": len(new_rows),
         "position_monitoring_event_count": max(
@@ -2302,6 +2351,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 "evidence_session_date": session_evidence.session_date if session_evidence is not None else "",
                 "complete_boundary_count": session_evidence.complete_boundary_count if session_evidence is not None else 0,
                 "boundary_times": [to_iso(close) for close in sorted(session_evidence.boundaries)] if session_evidence is not None else [],
+                "audited_boundary_count": len(session_evidence.audited_boundaries) if session_evidence is not None else 0,
+                "session_audit_failure": session_evidence.audit_failure if session_evidence is not None else "",
             },
         )
         stop_event.set()
@@ -2710,6 +2761,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         and trading_daily_context_ready
                     ),
                 )
+                audit_failure = session_evidence.record_audit(rows, last_result)
+                if audit_failure:
+                    return halt_market_data(
+                        audit_failure,
+                        details={"boundary": boundary_name, "pipeline_audit": last_result},
+                    )
                 current_market_date = (
                     datetime.now(NEW_YORK).date().isoformat()
                 )
@@ -3049,6 +3106,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "late_boundary_count": late_boundary_count,
                     "quote_worker_generation": worker_generation,
                     "boundary_times": [to_iso(close) for close in sorted(session_evidence.boundaries)],
+                    "audited_boundary_count": len(session_evidence.audited_boundaries),
                 }, required_complete_sessions=config.required_complete_sessions) if market_data_mode_qualifies_for_subscription_gate(
                     market_data_mode
                 ) else {
@@ -3219,6 +3277,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     },
                     "complete_boundary_count": complete_boundary_count,
                     "evidence_session_date": session_evidence.session_date if session_evidence is not None else "",
+                    "audited_boundary_count": len(session_evidence.audited_boundaries) if session_evidence is not None else 0,
+                    "session_audit_failure": session_evidence.audit_failure if session_evidence is not None else "",
                     "incomplete_boundary_count": incomplete_boundary_count,
                     "reference_stale_boundary_count": (
                         reference_stale_boundary_count

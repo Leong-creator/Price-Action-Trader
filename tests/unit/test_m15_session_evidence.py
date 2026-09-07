@@ -5,6 +5,7 @@ from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import json
 import queue
 import unittest
 from unittest.mock import MagicMock, patch
@@ -37,6 +38,12 @@ def bars(close: datetime, symbols: tuple[str, ...], *, carry: bool = False) -> l
         }
         for symbol in symbols
     ]
+
+
+def audit_success(rows: list[dict]) -> dict:
+    return {"audit_status": "written", "audit_event_count": len(rows),
+            "fresh_event_count": len(rows), "stale_event_count": 0,
+            "stale_tradable_event_count": 0}
 
 
 class CallbackEvidenceTest(unittest.TestCase):
@@ -115,6 +122,8 @@ class SessionEvidenceTest(unittest.TestCase):
             now = close + timedelta(seconds=1)
             self.assertEqual(evidence.advance(now), "")
             self.assertEqual(evidence.accept(bars(close, self.symbols), now), "accepted")
+            rows = bars(close, self.symbols)
+            self.assertEqual(evidence.record_audit(rows, audit_success(rows)), "")
 
     def test_holiday_then_full_day_then_next_full_day(self) -> None:
         evidence = self.evidence(at(7, 8, 0))
@@ -172,6 +181,8 @@ class SessionEvidenceTest(unittest.TestCase):
         for i in range(1, 79):
             close = at(8, 9, 30) + timedelta(minutes=5 * i)
             evidence.accept(bars(close, self.symbols, carry=True), close + timedelta(seconds=1))
+            rows = bars(close, self.symbols, carry=True)
+            evidence.record_audit(rows, audit_success(rows))
         self.assertEqual(evidence.no_trade_carry_forward_count, 11466)
         self.assertTrue(evidence.complete(at(8, 16, 1), [100] * 78, 1))
         for latency, generation in [([], 1), ([100] * 77, 1), ([1100] * 78, 1), ([100] * 78, 2)]:
@@ -216,10 +227,12 @@ class SessionEvidenceTest(unittest.TestCase):
 class WatchLoopTest(unittest.TestCase):
     """Run the real parent loop with no SDK, subprocess, order or broker I/O."""
 
-    def watch(self, start: datetime, events: list[tuple[datetime, dict | None]], *, dispatch: bool = False):
+    def watch(self, start: datetime, events: list[tuple[datetime, dict | None]], *, dispatch: bool = False,
+              audit_case: str | None = None):
         clock = [start]
         statuses, gates, dispatched = [], [], []
         config = runtime.load_config()
+        real_dispatch = runtime.dispatch_completed_rows
         symbols = runtime.configured_trading_symbols(config)
         daily_rows = [{"symbol": s.removesuffix(".US"), "timeframe": "1d",
                        "event_time": runtime.to_iso(at(4, 16, 0) - timedelta(days=i)),
@@ -266,7 +279,9 @@ class WatchLoopTest(unittest.TestCase):
 
         def process_rows(*args, **kwargs):
             dispatched.append((clock[0], args[1], kwargs["new_entry_submission_enabled"], args[4]))
-            return {"event_count": len(args[1])}
+            if audit_case is not None:
+                return real_dispatch(*args, **kwargs)
+            return {"event_count": len(args[1]), **audit_success(args[1])}
 
         with TemporaryDirectory() as directory, ExitStack() as stack:
             config = replace(config, output_dir=Path(directory),
@@ -300,6 +315,8 @@ class WatchLoopTest(unittest.TestCase):
             }
             for name, kwargs in mocks.items():
                 stack.enter_context(patch.object(runtime, name, **kwargs))
+            if audit_case == "write_failure":
+                stack.enter_context(patch.object(runtime, "append_market_events", side_effect=OSError("disk full")))
             stack.enter_context(patch.object(runtime, "datetime", Clock))
             stack.enter_context(patch.object(runtime.mp, "get_context", return_value=process_context))
             stack.enter_context(patch.object(runtime.signal, "signal"))
@@ -405,6 +422,99 @@ class WatchLoopTest(unittest.TestCase):
         self.assertFalse(dispatched[0][2])
         self.assertIsNotNone(dispatched[0][3])
         self.assertFalse(statuses[-1]["extra"]["dispatch_enabled"])
+
+    def test_real_dispatch_audit_failure_or_staleness_halts_parent(self) -> None:
+        symbols = runtime.configured_trading_symbols(runtime.load_config())
+        for case, reason in [("stale", "realtime_bar_freshness_rejected"),
+                             ("write_failure", "realtime_bar_audit_failed")]:
+            close = at(8, 9, 35)
+            rows = bars(close, symbols)
+            for row in rows:
+                row["received_at"] = runtime.to_iso(close + timedelta(seconds=2))
+            now = close + timedelta(seconds=4.5)
+            events = [(now, self.heartbeat(now)), (now, {"kind": "bars", "rows": rows})]
+            result, statuses, gates, _ = self.watch(at(8, 9, 29), events, dispatch=True, audit_case=case)
+            self.assertEqual(result, 4)
+            self.assertEqual(statuses[-1]["reason"], reason)
+            self.assertEqual(statuses[-1]["extra"]["audited_boundary_count"], 0)
+            self.assertEqual(statuses[-1]["extra"]["session_audit_failure"], reason)
+            self.assertEqual(statuses[-1]["extra"]["fault_details"]["pipeline_audit"]["execution"]["submitted_count"], 0)
+            self.assertEqual(gates, [])
+
+
+class AuditDispatchTest(unittest.TestCase):
+    def test_full_day_without_audit_acknowledgements_never_passes(self) -> None:
+        config = runtime.load_config()
+        symbols = runtime.configured_trading_symbols(config)
+        evidence = runtime.MarketSessionEvidence(config, at(8, 9, 29))
+        for i in range(1, 79):
+            close = at(8, 9, 30) + timedelta(minutes=5 * i)
+            evidence.accept(bars(close, symbols), close + timedelta(seconds=2))
+        self.assertEqual(evidence.complete_boundary_count, 78)
+        self.assertFalse(evidence.complete(at(8, 16, 1), [0] * 78, 1))
+
+    def test_two_second_seal_late_consume_is_audited_but_never_executed(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = replace(runtime.load_config(), market_events_path=Path(directory) / "events.jsonl")
+            symbols = runtime.configured_trading_symbols(config)
+            close = at(8, 9, 35)
+            rows = bars(close, symbols)
+            for row in rows:
+                row["received_at"] = runtime.to_iso(close + timedelta(seconds=2))
+            now = close + timedelta(seconds=4.5)
+            evidence = runtime.MarketSessionEvidence(config, at(8, 9, 29))
+            self.assertEqual(evidence.accept(rows, now), "accepted")
+            freshness_filter = runtime.fresh_market_events
+            with patch.object(runtime, "datetime") as clock, patch.object(
+                runtime, "fresh_market_events",
+                side_effect=lambda values, age, **kw: freshness_filter(values, age, now=now),
+            ):
+                clock.now.return_value = now
+                clock.fromisoformat.side_effect = datetime.fromisoformat
+                account, client = MagicMock(), MagicMock()
+                result = runtime.dispatch_completed_rows(config, rows, runtime.MarketEventContext(), account, client)
+            audited = [json.loads(line) for line in config.market_events_path.read_text().splitlines()]
+            self.assertEqual(len(audited), 147)
+            self.assertEqual({row["event_id"] for row in audited}, {row["event_id"] for row in rows})
+            self.assertEqual(result["audit_event_count"], 147)
+            self.assertEqual(result["fresh_event_count"], 0)
+            self.assertEqual(result["stale_event_count"], 147)
+            self.assertEqual(result["stale_tradable_event_count"], 147)
+            self.assertEqual(evidence.record_audit(rows, result), "realtime_bar_freshness_rejected")
+            self.assertFalse(evidence.complete(at(8, 16, 1), [0] * 78, 1))
+            self.assertEqual(account.mock_calls, [])
+            self.assertEqual(client.mock_calls, [])
+
+    def test_stale_volume_only_rows_are_audited_without_entry_eligibility(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = replace(runtime.load_config(), market_events_path=Path(directory) / "events.jsonl")
+            rows = bars(at(8, 9, 35), runtime.configured_trading_symbols(config), carry=True)
+            for row in rows:
+                row["market_data_blocked_reason"] = "no_price_forming_trade,no_trade_carry_forward"
+                row["source_delivery_age_ms"] = 300000
+            account, client = MagicMock(), MagicMock()
+            result = runtime.dispatch_completed_rows(config, rows, runtime.MarketEventContext(), account, client)
+            self.assertEqual(len(config.market_events_path.read_text().splitlines()), 147)
+            self.assertEqual(result["audit_event_count"], 147)
+            self.assertEqual(result["stale_event_count"], 147)
+            self.assertEqual(result["stale_tradable_event_count"], 0)
+            self.assertEqual(account.mock_calls, [])
+            self.assertEqual(client.mock_calls, [])
+
+    def test_audit_write_failure_prevents_strategy_and_gate(self) -> None:
+        config = runtime.load_config()
+        rows = bars(at(8, 9, 35), runtime.configured_trading_symbols(config))
+        evidence = runtime.MarketSessionEvidence(config, at(8, 9, 29))
+        evidence.accept(rows, at(8, 9, 35, 2))
+        account, client = MagicMock(), MagicMock()
+        with patch.object(runtime, "append_market_events", side_effect=OSError("disk full")):
+            result = runtime.dispatch_completed_rows(config, rows, runtime.MarketEventContext(), account, client)
+        self.assertEqual(result["audit_status"], "failed")
+        self.assertTrue(result["audit_partial_write_possible"])
+        self.assertEqual(evidence.record_audit(rows, result), "realtime_bar_audit_failed")
+        self.assertFalse(evidence.complete(at(8, 16, 1), [0] * 78, 1))
+        self.assertEqual(account.mock_calls, [])
+        self.assertEqual(client.mock_calls, [])
 
 
 if __name__ == "__main__":
