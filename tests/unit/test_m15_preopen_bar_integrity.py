@@ -42,6 +42,12 @@ class PreopenBarIntegrityTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "trade_timestamp_in_future"):
             self.trade(builder, "2026-09-08T13:40:00+00:00", "101", received=datetime(2026, 9, 8, 13, 31, tzinfo=UTC))
 
+    def test_invalid_trade_timestamp_is_not_replaced_by_current_time(self):
+        for stamp in (None, "invalid", ""):
+            with self.subTest(stamp=stamp), self.assertRaisesRegex(ValueError, "trade_timestamp_invalid"):
+                self.builder().on_trade("SPY.US", {"trades": [{"timestamp": stamp, "price": "100", "volume": 1}]},
+                                        received_at=datetime(2026, 9, 8, 13, 31, tzinfo=UTC))
+
     def test_official_trade_conditions_preserve_volume_without_price_spikes(self):
         builder = self.builder()
         at = datetime(2026, 9, 8, 13, 31, tzinfo=UTC)

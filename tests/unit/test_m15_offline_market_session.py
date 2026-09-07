@@ -87,8 +87,8 @@ class OfflineMarketSessionTest(unittest.TestCase):
         self.assertEqual(len(batches), 78)
         self.assertEqual(sum(map(len, batches)), 11466)
         for i, batch in enumerate(batches):
-            self.assertTrue(realtime_boundary_is_complete(batch, symbols))
             expected = opening + timedelta(minutes=(i + 1) * 5)
+            self.assertTrue(realtime_boundary_is_complete(batch, symbols, now=expected + timedelta(seconds=2.1)))
             for row in batch:
                 self.assertEqual(datetime.fromisoformat(row["event_time"].replace("Z", "+00:00")), expected)
                 self.assertEqual([row[k] for k in ("open", "high", "low", "close", "volume")], ["100", "102", "99", "101", "40"])

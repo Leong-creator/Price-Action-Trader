@@ -875,7 +875,10 @@ class FiveMinuteBarBuilder:
             price_forming = trade_type in {"", "A", "B", "D", "E", "F", "K", "S", "X", "1"}
             if not price_forming and trade_type not in {"C", "G", "H", "I", "V", "W"}:
                 continue
-            source_at = unix_to_utc(trade.get("timestamp"), received_at)
+            invalid_time = datetime.min.replace(tzinfo=UTC)
+            source_at = unix_to_utc(trade.get("timestamp"), invalid_time)
+            if source_at == invalid_time:
+                raise ValueError("trade_timestamp_invalid")
             if source_at > received_at.astimezone(UTC) + timedelta(seconds=2):
                 raise ValueError("trade_timestamp_in_future")
             price = decimal(trade.get("price"))
