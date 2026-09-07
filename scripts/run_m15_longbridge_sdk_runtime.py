@@ -45,6 +45,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     daily_context_row_count_for_symbols, fresh_market_events, load_config,
     held_position_monitoring_symbols, new_held_position_monitoring_symbols,
     read_client_id,
+    required_daily_context_date,
     load_current_sdk_intraday_context, load_formal_test_marker, readonly_gate_passed, record_readonly_session,
     market_event_is_tradable, trading_market_events,
     sdk_config_from_oauth, sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
@@ -391,7 +392,11 @@ def update_live_quote_session_state(
     if not blocked_reason and raw_volume in (None, ""):
         blocked_reason = "quote_total_volume_missing"
     volume = "0" if raw_volume in (None, "") else str(max(0, int(Decimal(str(raw_volume)))))
-    if previous is not None and not blocked_reason:
+    if (
+        previous is not None
+        and previous.get("session_date") == source_at.astimezone(NEW_YORK).date().isoformat()
+        and not blocked_reason
+    ):
         previous_volume = int(previous.get("volume") or 0)
         if int(volume) < previous_volume:
             blocked_reason = "quote_total_volume_regressed"
@@ -427,6 +432,7 @@ def apply_quote_state_worker_message(
     first_live_push_by_symbol: dict[str, float],
     last_live_push_by_symbol: dict[str, float],
     now_monotonic: float | None = None,
+    now: datetime | None = None,
 ) -> int:
     kind = str(message.get("kind") or "")
     quote_state_rows = (
@@ -436,14 +442,9 @@ def apply_quote_state_worker_message(
     )
     applied = 0
     for quote_state in quote_state_rows:
-        try:
-            quote_received_at = datetime.fromisoformat(
-                str(quote_state.get("received_at") or "").replace(
-                    "Z", "+00:00"
-                )
-            ).astimezone(UTC)
-        except (TypeError, ValueError):
-            quote_received_at = datetime.now(UTC)
+        quote_received_at = strict_event_datetime(quote_state.get("received_at"))
+        if quote_received_at is None:
+            continue
         update_live_quote_session_state(
             live_quote_session_state,
             str(quote_state.get("symbol") or ""),
@@ -453,30 +454,16 @@ def apply_quote_state_worker_message(
                 quote_state.get("source_mode") or "official_sdk_push"
             ),
         )
-        normalized_push_symbol = str(quote_state.get("symbol") or "").upper()
-        if not normalized_push_symbol:
-            continue
-        push_monotonic = (
-            time.monotonic() if now_monotonic is None else now_monotonic
+        apply_reference_market_activity_message(
+            quote_state,
+            last_push_by_symbol=last_push_by_symbol,
+            last_push_at_by_symbol=last_push_at_by_symbol,
+            last_push_source_by_symbol=last_push_source_by_symbol,
+            first_live_push_by_symbol=first_live_push_by_symbol,
+            last_live_push_by_symbol=last_live_push_by_symbol,
+            now_monotonic=now_monotonic,
+            now=now,
         )
-        last_push_by_symbol[normalized_push_symbol] = push_monotonic
-        last_push_at_by_symbol[normalized_push_symbol] = to_iso(quote_received_at)
-        push_source = str(
-            quote_state.get("source_mode") or "official_sdk_push"
-        )
-        last_push_source_by_symbol[normalized_push_symbol] = push_source
-        if (
-            normalized_push_symbol in {"SPY.US", "QQQ.US"}
-            and push_source
-            not in {
-                "official_sdk_initial_snapshot",
-                "official_sdk_initial_snapshot",
-            }
-        ):
-            first_live_push_by_symbol.setdefault(
-                normalized_push_symbol, push_monotonic
-            )
-            last_live_push_by_symbol[normalized_push_symbol] = push_monotonic
         applied += 1
     return applied
 
@@ -620,24 +607,31 @@ def apply_reference_market_activity_message(
     first_live_push_by_symbol: dict[str, float],
     last_live_push_by_symbol: dict[str, float],
     now_monotonic: float | None = None,
+    now: datetime | None = None,
 ) -> None:
-    try:
-        activity_received_at = datetime.fromisoformat(
-            str(message.get("received_at") or "").replace("Z", "+00:00")
-        ).astimezone(UTC)
-    except ValueError:
-        activity_received_at = datetime.now(UTC)
+    activity_received_at = strict_event_datetime(message.get("received_at"))
     normalized_symbol = str(message.get("symbol") or "").upper()
+    source = str(message.get("source_mode") or "official_sdk_trade_push")
+    checked_at = (now or datetime.now(UTC)).astimezone(UTC)
+    previous = strict_event_datetime(last_push_at_by_symbol.get(normalized_symbol))
+    if (
+        not normalized_symbol
+        or source == "official_sdk_initial_snapshot"
+        or activity_received_at is None
+        or activity_received_at > checked_at
+        or (previous is not None and activity_received_at <= previous)
+    ):
+        return
+    # A worker heartbeat may repeat the last callback indefinitely. Translate
+    # callback age to the monotonic clock; consuming a message is not activity.
     activity_monotonic = (
         float(now_monotonic)
         if now_monotonic is not None
         else time.monotonic()
-    )
+    ) - (checked_at - activity_received_at).total_seconds()
     last_push_by_symbol[normalized_symbol] = activity_monotonic
     last_push_at_by_symbol[normalized_symbol] = to_iso(activity_received_at)
-    last_push_source_by_symbol[normalized_symbol] = str(
-        message.get("source_mode") or "official_sdk_trade_push"
-    )
+    last_push_source_by_symbol[normalized_symbol] = source
     if normalized_symbol in {"SPY.US", "QQQ.US"}:
         first_live_push_by_symbol.setdefault(
             normalized_symbol,
@@ -681,9 +675,14 @@ def realtime_boundary_is_complete(
     expected_symbols: list[str] | tuple[str, ...],
     *,
     maximum_finalization_seconds: float = 5,
+    now: datetime | None = None,
 ) -> bool:
     expected = {symbol.upper().removesuffix(".US") for symbol in expected_symbols}
     if not expected or not rows:
+        return False
+    identities = [(str(row.get("symbol") or "").upper().removesuffix(".US"),
+                   str(row.get("event_time") or "")) for row in rows]
+    if len(identities) != len(set(identities)):
         return False
     expected_rows = [
         row
@@ -695,19 +694,155 @@ def realtime_boundary_is_complete(
         str(row.get("symbol") or "").upper().removesuffix(".US")
         for row in expected_rows
     }
-    if len(boundary_times) != 1 or actual != expected:
+    if len(boundary_times) != 1 or actual != expected or len(expected_rows) != len(expected):
         return False
     for row in expected_rows:
         if row.get("bar_final") is not True:
             return False
-        try:
-            boundary = datetime.fromisoformat(str(row["event_time"]).replace("Z", "+00:00"))
-            received = datetime.fromisoformat(str(row["received_at"]).replace("Z", "+00:00"))
-        except (KeyError, ValueError):
+        boundary = strict_event_datetime(row.get("event_time"))
+        received = strict_event_datetime(row.get("received_at"))
+        if boundary is None or received is None:
+            return False
+        checked_at = (now or datetime.now(UTC)).astimezone(UTC)
+        if not boundary <= received <= checked_at:
             return False
         if (received - boundary).total_seconds() > maximum_finalization_seconds:
             return False
     return True
+
+
+def strict_event_datetime(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else None
+
+
+def daily_context_is_current(
+    config: Any,
+    rows: list[dict[str, Any]],
+    symbols: tuple[str, ...],
+    failed_symbols: list[str],
+    now: datetime,
+) -> bool:
+    if not daily_context_covers_symbols(config, rows, symbols, failed_symbols):
+        return False
+    required = required_daily_context_date(now, config.market_holidays)
+    dates: dict[str, set[str]] = {symbol.upper().removesuffix(".US"): set() for symbol in symbols}
+    for row in rows:
+        symbol = str(row.get("symbol") or "").upper().removesuffix(".US")
+        if symbol not in dates or row.get("timeframe") != "1d":
+            continue
+        event_at = strict_event_datetime(row.get("event_time"))
+        if event_at is None:
+            return False
+        dates[symbol].add(event_at.astimezone(NEW_YORK).date().isoformat())
+    return all(len(values) >= config.daily_context_bars and max(values) == required for values in dates.values())
+
+
+class MarketSessionEvidence:
+    """In-memory evidence for one market date, independent of process lifetime."""
+
+    def __init__(
+        self, config: Any, now: datetime, *,
+        complete_bar_open_not_before: datetime | None = None,
+    ) -> None:
+        self.config = config
+        self.symbols = configured_trading_symbols(config)
+        self.not_before = (complete_bar_open_not_before or now).astimezone(UTC)
+        self._reset(now)
+
+    def _reset(self, now: datetime) -> None:
+        local = now.astimezone(ZoneInfo(self.config.market_timezone))
+        self.session_date = local.date().isoformat()
+        self.boundaries: set[datetime] = set()
+        self.realtime_tradable_bar_count = 0
+        self.no_trade_carry_forward_count = 0
+        start_hour, start_minute = map(int, self.config.regular_session_start_time.split(":"))
+        end_hour, end_minute = map(int, self.config.regular_session_end_time.split(":"))
+        start = local.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+        end = local.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
+        self.expected: tuple[datetime, ...] = ()
+        if configured_regular_session(self.config, start):
+            step = timedelta(minutes=self.config.bar_minutes)
+            self.expected = tuple(
+                (start + step * i).astimezone(UTC)
+                for i in range(1, int((end - start) / step) + 1)
+            )
+
+    @property
+    def complete_boundary_count(self) -> int:
+        return len(self.boundaries)
+
+    def missing_boundary(self, now: datetime) -> str:
+        for close in self.expected:
+            if close - timedelta(minutes=self.config.bar_minutes) < self.not_before:
+                continue
+            if close not in self.boundaries and now > close + timedelta(seconds=5):
+                return to_iso(close)
+        return ""
+
+    def advance(self, now: datetime) -> str:
+        missing = self.missing_boundary(now)
+        if missing:
+            return missing
+        if now.astimezone(ZoneInfo(self.config.market_timezone)).date().isoformat() != self.session_date:
+            self._reset(now)
+        return self.missing_boundary(now)
+
+    def accept(
+        self, rows: list[dict[str, Any]], now: datetime, *, reference_quotes_fresh: bool = True,
+    ) -> str:
+        expected_symbols = {s.upper().removesuffix(".US") for s in self.symbols}
+        selected = [r for r in rows if str(r.get("symbol") or "").upper().removesuffix(".US") in expected_symbols]
+        closes = {strict_event_datetime(r.get("event_time")) for r in selected}
+        if len(closes) != 1 or None in closes:
+            raise ValueError("invalid_boundary_timestamps")
+        close = next(iter(closes))
+        if close not in self.expected:
+            return "ignored"
+        if close - timedelta(minutes=self.config.bar_minutes) < self.not_before:
+            return "ignored"
+        if not realtime_boundary_is_complete(selected, self.symbols, now=now):
+            raise ValueError("invalid_boundary_rows")
+        if close in self.boundaries:
+            return "duplicate"
+        if not reference_quotes_fresh:
+            raise ValueError("reference_quotes_stale")
+        if now > close + timedelta(seconds=5):
+            raise ValueError("late_boundary_delivery")
+        missing = self.missing_boundary(now)
+        if missing:
+            raise ValueError("missing_boundary:" + missing)
+        for row in selected:
+            if (
+                row.get("timeframe") != "5m"
+                or strict_event_datetime(row.get("bar_open_at")) != close - timedelta(minutes=self.config.bar_minutes)
+                or strict_event_datetime(row.get("bar_close_at")) != close
+                or (row.get("source_mode"), row.get("market_data_blocked_reason") or "") not in {
+                    ("official_sdk_push", ""), ("official_sdk_trade_push", ""),
+                    ("official_sdk_no_trade_carry_forward", "no_trade_carry_forward"),
+                    ("official_sdk_no_trade_carry_forward", "no_price_forming_trade,no_trade_carry_forward"),
+                }
+            ):
+                raise ValueError("invalid_boundary_provenance")
+        self.boundaries.add(close)
+        self.realtime_tradable_bar_count += sum(not r.get("market_data_blocked_reason") for r in selected)
+        self.no_trade_carry_forward_count += sum(bool(r.get("market_data_blocked_reason")) for r in selected)
+        return "accepted"
+
+    def complete(self, now: datetime, latency_samples: list[int], worker_generation: int) -> bool:
+        return bool(
+            self.expected
+            and now.astimezone(ZoneInfo(self.config.market_timezone)).date().isoformat() == self.session_date
+            and now >= self.expected[-1]
+            and self.boundaries == set(self.expected)
+            and self.realtime_tradable_bar_count + self.no_trade_carry_forward_count == len(self.symbols) * len(self.expected)
+            and worker_generation == 1
+            and len(latency_samples) >= len(self.expected)
+            and summarize_latency_samples(latency_samples).get("p95_ms", 1001) <= 1000
+        )
 
 
 def realtime_boundary_is_trustworthy(
@@ -2005,6 +2140,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     daily_context_persisted = False
     observed_regular_sessions: set[str] = set()
     observed_expansion_sessions: set[str] = set()
+    session_evidence: MarketSessionEvidence | None = None
     deferred_messages: deque[dict[str, Any]] = deque()
     partial_bar_suppressed_until = ""
     last_subscription_failure_reason = ""
@@ -2090,6 +2226,28 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             else:
                 deferred_messages.append(pending)
 
+    def advance_session_evidence(now: datetime) -> str:
+        nonlocal complete_boundary_count, incomplete_boundary_count
+        nonlocal structural_incomplete_boundary_count, reference_stale_boundary_count
+        nonlocal late_boundary_count, realtime_tradable_bar_count, no_trade_carry_forward_count
+        nonlocal last_complete_boundary, last_incomplete_boundary, last_boundary_missing_symbols
+        nonlocal last_event_at, last_result
+        if session_evidence is None:
+            return ""
+        previous_date = session_evidence.session_date
+        missing = session_evidence.advance(now)
+        if missing:
+            return missing
+        if previous_date != session_evidence.session_date:
+            complete_boundary_count = incomplete_boundary_count = 0
+            structural_incomplete_boundary_count = reference_stale_boundary_count = 0
+            late_boundary_count = realtime_tradable_bar_count = no_trade_carry_forward_count = 0
+            last_complete_boundary = last_incomplete_boundary = last_event_at = ""
+            last_boundary_missing_symbols = []
+            last_result = {}
+            pipeline_latency_samples.clear()
+        return ""
+
     def halt_market_data(reason: str, *, details: dict[str, Any] | None = None) -> int:
         """Persist a terminal market-data fault and stop without recovery."""
         nonlocal worker_ready
@@ -2141,6 +2299,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     f"/{len(configured_trading_symbols(config))}"
                 ),
                 "fault_details": details or {},
+                "evidence_session_date": session_evidence.session_date if session_evidence is not None else "",
+                "complete_boundary_count": session_evidence.complete_boundary_count if session_evidence is not None else 0,
+                "boundary_times": [to_iso(close) for close in sorted(session_evidence.boundaries)] if session_evidence is not None else [],
             },
         )
         stop_event.set()
@@ -2380,6 +2541,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_subscription_failure_reason = ""
                 worker_last_progress = time.monotonic()
                 worker_ready_since = worker_last_progress
+                session_evidence = MarketSessionEvidence(
+                    config, datetime.now(UTC),
+                    complete_bar_open_not_before=strict_event_datetime(partial_bar_suppressed_until),
+                )
+                pipeline_latency_samples.clear()
+                last_event_at = ""
             elif kind == "daily_context":
                 rows = list(message.get("rows") or [])
                 daily_context_cache_reused = (
@@ -2425,24 +2592,32 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 write_daily_context_cache(config.daily_context_path, daily_rows)
                 daily_context_persisted = True
             elif kind == "bars" and worker_ready:
-                # Quotes arrive one symbol at a time at a bar boundary.  Give
-                # the queue a very short coalescing window, then evaluate all
-                # just-closed bars together once instead of rerunning every
-                # strategy for each of the 147 symbols.
+                # The SDK worker emits complete boundary batches. Never merge
+                # different closes, or count/dispatch a duplicate batch twice.
                 rows = list(message.get("rows") or [])
-                time.sleep(0.15)
-                while True:
-                    try:
-                        queued = message_queue.get_nowait()
-                    except queue.Empty:
-                        break
-                    if str(queued.get("kind") or "") == "bars":
-                        rows.extend(list(queued.get("rows") or []))
-                    else:
-                        deferred_messages.append(queued)
+                boundary_now = datetime.now(UTC)
+                missing_boundary = advance_session_evidence(boundary_now)
+                if missing_boundary:
+                    return halt_market_data("realtime_bar_boundary_deadline_exceeded", details={"boundary": missing_boundary})
+                reference_fresh_for_boundary = not active_reference_quotes_are_stale(
+                    last_push_by_symbol,
+                    now_monotonic=time.monotonic(),
+                    maximum_silence_seconds=config.active_symbol_silence_seconds,
+                )
+                try:
+                    disposition = session_evidence.accept(
+                        rows, boundary_now, reference_quotes_fresh=reference_fresh_for_boundary,
+                    )
+                except ValueError as exc:
+                    return halt_market_data("realtime_bar_boundary_untrustworthy", details={"validation_error": str(exc)})
+                if disposition != "accepted":
+                    continue
                 started = time.perf_counter()
-                trading_daily_context_ready = daily_context_covers_symbols(
+                trading_daily_context_covered = daily_context_covers_symbols(
                     config, daily_rows, configured_trading_symbols(config), daily_failed
+                )
+                trading_daily_context_ready = daily_context_is_current(
+                    config, daily_rows, configured_trading_symbols(config), daily_failed, boundary_now
                 )
                 active_client = (
                     paper_client
@@ -2451,7 +2626,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         if dispatch_requested and config.paper_order_dispatch_enabled
                         else None
                     )
-                ) if trading_daily_context_ready else None
+                ) if trading_daily_context_covered else None
                 if position_monitoring_failed:
                     active_client = (
                         flatten_client
@@ -2461,6 +2636,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 boundary_complete = realtime_boundary_is_complete(
                     rows,
                     configured_trading_symbols(config),
+                    now=boundary_now,
                 )
                 expected_boundary_symbols = {
                     symbol.upper().removesuffix(".US")
@@ -2475,11 +2651,6 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 last_boundary_missing_symbols = sorted(
                     expected_boundary_symbols - actual_boundary_symbols
                 )
-                reference_fresh_for_boundary = not active_reference_quotes_are_stale(
-                    last_push_by_symbol,
-                    now_monotonic=time.monotonic(),
-                    maximum_silence_seconds=config.active_symbol_silence_seconds,
-                )
                 trustworthy_boundary = realtime_boundary_is_trustworthy(
                     boundary_complete=boundary_complete,
                     reference_quotes_fresh=reference_fresh_for_boundary,
@@ -2489,7 +2660,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     reference_quotes_fresh=reference_fresh_for_boundary,
                 )
                 if trustworthy_boundary:
-                    complete_boundary_count += 1
+                    complete_boundary_count = session_evidence.complete_boundary_count
                     last_complete_boundary = boundary_name
                 else:
                     incomplete_boundary_count += 1
@@ -2509,19 +2680,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                             "reference_quotes_fresh": reference_fresh_for_boundary,
                         },
                     )
-                realtime_tradable_bar_count += sum(
-                    not bool(row.get("market_data_blocked_reason"))
-                    and str(row.get("symbol") or "").upper().removesuffix(".US")
-                    in expected_boundary_symbols
-                    for row in rows
-                )
-                no_trade_carry_forward_count += sum(
-                    "no_trade_carry_forward"
-                    in str(row.get("market_data_blocked_reason") or "")
-                    and str(row.get("symbol") or "").upper().removesuffix(".US")
-                    in expected_boundary_symbols
-                    for row in rows
-                )
+                realtime_tradable_bar_count = session_evidence.realtime_tradable_bar_count
+                no_trade_carry_forward_count = session_evidence.no_trade_carry_forward_count
                 active_client = boundary_execution_client(
                     candidate_client=active_client,
                     boundary_complete=boundary_complete,
@@ -2547,6 +2707,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     new_entry_submission_enabled=(
                         paper_client is not None
                         and not position_monitoring_failed
+                        and trading_daily_context_ready
                     ),
                 )
                 current_market_date = (
@@ -2641,6 +2802,12 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     details={
                         "worker_message": message,
                     },
+                )
+            missing_boundary = advance_session_evidence(datetime.now(UTC))
+            if worker_ready and missing_boundary:
+                return halt_market_data(
+                    "realtime_bar_boundary_deadline_exceeded",
+                    details={"boundary": missing_boundary, "maximum_finalization_seconds": 5},
                 )
             if time.monotonic() - last_compaction >= 60:
                 compact_market_events(config.market_events_path, config.event_keep_lines)
@@ -2833,25 +3000,26 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             daily_context_ready = daily_context_is_complete(
                 config, daily_context_state, len(daily_rows), daily_failed
             )
-            trading_daily_context_ready = daily_context_covers_symbols(
-                config, daily_rows, configured_trading_symbols(config), daily_failed
+            trading_daily_context_ready = daily_context_is_current(
+                config, daily_rows, configured_trading_symbols(config), daily_failed, datetime.now(UTC)
             )
             now_ny = datetime.now(NEW_YORK)
             session_date = now_ny.date().isoformat()
-            is_after_regular_session = now_ny.weekday() < 5 and (now_ny.hour >= 16)
-            expected_regular_boundaries = 78
+            is_after_regular_session = bool(
+                session_evidence is not None
+                and session_evidence.session_date == session_date
+                and session_evidence.expected
+                and now_ny >= session_evidence.expected[-1]
+            )
+            expected_regular_boundaries = len(session_evidence.expected) if session_evidence is not None else 0
             expected_regular_bars = (
                 len(configured_trading_symbols(config)) * expected_regular_boundaries
             )
             realtime_session_acceptance_ready = bool(
-                complete_boundary_count == expected_regular_boundaries
+                session_evidence is not None
+                and session_evidence.complete(now_ny, list(pipeline_latency_samples), worker_generation)
                 and incomplete_boundary_count == 0
                 and late_boundary_count == 0
-                and realtime_tradable_bar_count + no_trade_carry_forward_count
-                == expected_regular_bars
-                and worker_generation == 1
-                and int(summarize_latency_samples(list(pipeline_latency_samples)).get("p95_ms") or 0)
-                <= 1000
             )
             if (
                 config.complete_session_gate_enabled
@@ -2860,8 +3028,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and worker_ready
                 and daily_context_state == "complete"
                 and not daily_failed
-                and age is not None
-                and age <= config.maximum_account_snapshot_age_seconds
+                and trading_daily_context_ready
+                and account_snapshot_ready
                 and last_event_at
                 and realtime_session_acceptance_ready
             ):
@@ -2880,6 +3048,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "incomplete_boundary_count": incomplete_boundary_count,
                     "late_boundary_count": late_boundary_count,
                     "quote_worker_generation": worker_generation,
+                    "boundary_times": [to_iso(close) for close in sorted(session_evidence.boundaries)],
                 }, required_complete_sessions=config.required_complete_sessions) if market_data_mode_qualifies_for_subscription_gate(
                     market_data_mode
                 ) else {
@@ -2921,7 +3090,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             expansion_subscription_failed = sorted(
                 set(subscription_failed) - set(trading_subscription_failed)
             )
-            expansion_daily_ready = daily_context_ready
+            expansion_daily_ready = expansion_symbol_count > 0 and daily_context_ready and daily_context_is_current(
+                config, daily_rows, configured_symbols(config), daily_failed, now_ny
+            )
             expansion_p95_ms = int(latency_metrics.get("p95_ms") or 0)
             expansion_session_healthy = bool(
                 expansion_symbol_count > 0
@@ -2934,6 +3105,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and account_snapshot_ready
                 and last_event_at
                 and expansion_p95_ms <= 1000
+                and realtime_session_acceptance_ready
             )
             if (
                 is_after_regular_session
@@ -3046,6 +3218,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         for symbol in ("SPY.US", "QQQ.US")
                     },
                     "complete_boundary_count": complete_boundary_count,
+                    "evidence_session_date": session_evidence.session_date if session_evidence is not None else "",
                     "incomplete_boundary_count": incomplete_boundary_count,
                     "reference_stale_boundary_count": (
                         reference_stale_boundary_count
@@ -3116,6 +3289,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "daily_context_row_count": len(daily_rows), "daily_context_failed_symbols": daily_failed,
                     "daily_context_state": daily_context_state,
                     "trading_daily_context_ready": trading_daily_context_ready,
+                    "required_daily_context_date": required_daily_context_date(now_ny, config.market_holidays),
                     "trading_daily_context_row_count": daily_context_row_count_for_symbols(
                         config, daily_rows, configured_trading_symbols(config)
                     ),

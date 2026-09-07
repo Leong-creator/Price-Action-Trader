@@ -235,6 +235,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             first_live_push_by_symbol=first_live,
             last_live_push_by_symbol=last_live,
             now_monotonic=123.0,
+            # Callback freshness now uses receipt age, not parent consumption.
+            now=datetime(2026, 8, 25, 13, 31, tzinfo=UTC),
         )
 
         self.assertEqual(applied, 2)
@@ -394,6 +396,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             first_live_push_by_symbol=first_live,
             last_live_push_by_symbol=last_live,
             now_monotonic=123.0,
+            # Callback freshness now uses receipt age, not parent consumption.
+            now=datetime(2026, 8, 25, 17, 45, 1, tzinfo=UTC),
         )
         self.assertEqual(last_push["SPY.US"], 123.0)
         self.assertEqual(first_live["SPY.US"], 123.0)
