@@ -1,6 +1,5 @@
 """Offline SDK callback replay; never connects to a broker or writes live artifacts."""
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from time import perf_counter
 from types import SimpleNamespace
 import sys

@@ -91,6 +91,31 @@ class FakeQuoteContext:
 def fake_sdk_module() -> types.ModuleType:
     module = types.ModuleType("longbridge.openapi")
     module.QuoteContext = FakeQuoteContext
+    class FakeAsyncQuoteContext:
+        def __init__(self, config):
+            self.inner = FakeQuoteContext(config)
+
+        create = classmethod(lambda cls, config: cls(config))
+
+        def set_on_quote(self, callback):
+            self.inner.set_on_quote(callback)
+
+        def set_on_trades(self, callback):
+            self.inner.set_on_trades(callback)
+
+        async def candlesticks(self, *args):
+            return self.inner.candlesticks(*args)
+
+        async def subscribe(self, *args):
+            return self.inner.subscribe(*args)
+
+        async def subscriptions(self):
+            return self.inner.subscriptions()
+
+        async def quote(self, *args):
+            return self.inner.quote(*args)
+
+    module.AsyncQuoteContext = FakeAsyncQuoteContext
     module.OAuthBuilder = lambda _client_id: SimpleNamespace(
         build=lambda _callback: object()
     )
@@ -117,6 +142,7 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             bar_minutes=5,
             market_holidays=("2026-09-07",),
             maximum_source_delivery_age_ms=2000,
+            subscription_deadline_seconds=45,
         )
 
     def run_worker(
@@ -180,7 +206,8 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         context = FakeQuoteContext.instances[0]
         self.assertEqual(len(context.subscribe_calls), 1)
         error = next(row for row in rows if row["kind"] == "error")
-        self.assertIn("official_sdk_quote_worker_failed:RuntimeError:request timeout", error["reason"])
+        self.assertIn("official_sdk_quote_worker_failed:AsyncQuoteBridgeError:subscribe failed", error["reason"])
+        self.assertIn("request timeout", error["reason"])
 
     def test_quote_only_subscription_cannot_claim_trade_coverage(self) -> None:
         FakeQuoteContext.omit_trade_subscription = True

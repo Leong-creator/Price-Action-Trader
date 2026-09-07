@@ -140,15 +140,21 @@ def official_sdk_quote_worker(
     stop_event: Any,
     position_monitoring_symbols: tuple[str, ...] = (),
 ) -> None:
-    """Own exactly one official SDK QuoteContext for all M15 market data."""
+    """Own exactly one official SDK async quote context for all market data."""
     config = load_config(config_path)
+    quote = None
     try:
         os.environ["LONGBRIDGE_PRINT_QUOTE_PACKAGES"] = "false"
         import longbridge.openapi as sdk
 
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-        quote = sdk.QuoteContext(
-            sdk_config_from_oauth(sdk, oauth, config.quote_region)
+        from scripts.m15_official_async_quote_lib import OfficialAsyncQuoteBridge
+
+        quote = OfficialAsyncQuoteBridge(
+            sdk_config_from_oauth(sdk, oauth, config.quote_region),
+            sdk=sdk,
+            init_timeout=min(30, config.subscription_deadline_seconds),
+            request_timeout=config.subscription_deadline_seconds,
         )
         callback_events: queue.Queue[tuple[str, str, dict[str, Any], datetime]] = (
             queue.Queue(maxsize=CALLBACK_QUEUE_MAXSIZE)
@@ -339,6 +345,7 @@ def official_sdk_quote_worker(
             queue_out,
             {
                 "kind": "ready",
+                "sdk_quote_context_api": "AsyncQuoteContext",
                 "market_data_mode": "official_sdk_subscription",
                 "market_data_transport": "official_sdk_persistent_websocket",
                 "market_data_symbols": sorted(base_targets),
@@ -374,6 +381,7 @@ def official_sdk_quote_worker(
         last_reference_activity: dict[str, float] = {}
         raw_event_count = 0
         while not stop_event.is_set():
+            quote.check_health()
             if callback_overflow.is_set():
                 raise RuntimeError("official_sdk_callback_queue_overflow")
             processed = 0
@@ -458,3 +466,9 @@ def official_sdk_quote_worker(
             },
             critical=True,
         )
+    finally:
+        if quote is not None:
+            try:
+                quote.close()
+            except Exception as exc:
+                _emit(queue_out, {"kind": "error", "reason": f"official_sdk_quote_cleanup_failed:{type(exc).__name__}:{exc}"}, critical=True)

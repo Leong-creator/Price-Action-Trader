@@ -2194,6 +2194,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     partial_bar_suppressed_until = ""
     last_subscription_failure_reason = ""
     market_data_mode = configured_market_data_mode(config)
+    sdk_quote_context_api = "unknown"
     market_data_symbols: set[str] = set()
     market_data_failed: list[str] = []
     trading_market_data_failed: list[str] = []
@@ -2536,6 +2537,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             elif kind == "market_activity":
                 apply_market_activity_message(message)
             elif kind == "ready":
+                sdk_quote_context_api = str(message.get("sdk_quote_context_api") or "unknown")
                 transport_child_pid = 0
                 initial_snapshot_coverage = str(
                     message.get("initial_snapshot_coverage") or "0/0"
@@ -3240,6 +3242,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "quote_worker_generation": worker_generation,
                     "market_data_mode": market_data_mode,
                     "market_data_transport": config.market_data_transport,
+                    "sdk_quote_context_api": sdk_quote_context_api,
                     "account_order_transport": "official_sdk_persistent_context",
                     "source_mode": "official_sdk_push",
                     "automatic_market_data_retry_enabled": False,

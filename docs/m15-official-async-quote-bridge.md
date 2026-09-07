@@ -2,11 +2,12 @@
 
 ## Scope
 
-This isolated, unintegrated adapter owns one background Python asyncio loop and
+The integrated quote worker uses this adapter to own one background Python asyncio loop and
 calls `AsyncQuoteContext.create(config)` exactly once. It does not adopt an
 already-created synchronous context. Replace the worker's construction site;
-never construct both contexts. No worker/runtime or order behavior is changed
-by this patch. Integration requires manual review and read-only validation.
+never construct both contexts. The worker uses this single construction site,
+checks bridge health every loop and closes it in finally. Order permissions and
+strategy rules are unchanged. Read-only machine verification follows offline tests.
 
 ## Official SDK 4.5.0 Evidence
 
@@ -113,6 +114,7 @@ Verified on 2026-09-07: 18 adapter tests plus 132 existing quote/runtime tests
 passed (150 total). The adapter suite also passed 20 consecutive rounds (360
 executions) with `socket.socket.connect/connect_ex` patched to reject network
 access and thread counts returning to baseline after every round. No real SDK
-context was created. Worker integration and read-only machine validation are
-pending with the main agent; no user decision or additional permission is
-needed for this isolated component.
+context was created in those tests. Worker integration now includes the deployment
+manifest, subscription validation and full fake-session replay; see docs/status.md
+for the separate read-only machine verification result. High-risk integration
+remains explicitly subject to human review before enabling order dispatch.
