@@ -115,8 +115,7 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         and readiness_status == "armed_waiting_flatten_session"
     )
     readonly_gate_waiting = (
-        runtime.get("dispatch_requested") is True
-        and runtime.get("dispatch_enabled") is False
+        runtime.get("dispatch_enabled") is False
         and str(runtime.get("dispatch_block_reason") or "")
         == "complete_market_session_gate"
         and int(runtime.get("complete_sessions_passed") or 0)
@@ -195,7 +194,8 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
             "paper_dispatch_armed",
             "模拟账户下单通道已武装",
             runtime.get("dispatch_enabled") is True and runtime.get("dispatch_requested") is True,
-            (pending_flatten or readonly_gate_waiting) and runtime.get("dispatch_requested") is True and marketdata_gate["artifacts_healthy"],
+            (readonly_gate_waiting or (pending_flatten and runtime.get("dispatch_requested") is True))
+            and marketdata_gate["artifacts_healthy"],
             f"enabled={runtime.get('dispatch_enabled')}, requested={runtime.get('dispatch_requested')}",
             waiting_status=(
                 "waiting_for_marketdata_acceptance"
@@ -273,7 +273,11 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
     elif pending_flatten:
         status = "armed_waiting_flatten_session"
     elif readonly_gate_waiting:
-        status = "armed_waiting_marketdata_acceptance"
+        status = (
+            "armed_waiting_marketdata_acceptance"
+            if runtime.get("dispatch_requested") is True
+            else "readonly_waiting_marketdata_acceptance"
+        )
     elif session_should_run:
         status = "ready_regular_session"
     else:
@@ -349,7 +353,7 @@ def plain_result(status: str, fail_count: int, marketdata_gate: dict[str, Any]) 
         return "M15 SDK 模拟交易链路已武装；当前只是在等待美股常规交易时段。"
     if status == "armed_waiting_flatten_session":
         return "M15 SDK 清仓链路已武装；清仓确认完成前保持停止新开仓。"
-    if status == "armed_waiting_marketdata_acceptance":
+    if status in {"armed_waiting_marketdata_acceptance", "readonly_waiting_marketdata_acceptance"}:
         return f"M15 SDK 链路健康；{marketdata_gate.get('summary')}"
     return f"M15 SDK 周一验收被阻断：{fail_count} 个检查失败。"
 

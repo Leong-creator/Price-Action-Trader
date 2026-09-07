@@ -174,6 +174,26 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
                 "waiting_for_marketdata_acceptance",
             )
 
+    def test_readonly_start_waits_without_hiding_account_failure(self) -> None:
+        for healthy in (True, False):
+            with self.subTest(account_healthy=healthy), tempfile.TemporaryDirectory() as tmp:
+                config = self.make_fixture(Path(tmp), session_should_run=False, account_snapshot_healthy=healthy)
+                runtime = json.loads(config.sdk_runtime_status_path.read_text())
+                runtime.update(dispatch_enabled=False, dispatch_requested=False,
+                               dispatch_block_reason="complete_market_session_gate",
+                               complete_sessions_passed=0, complete_sessions_required=1)
+                config.sdk_runtime_status_path.write_text(json.dumps(runtime))
+                readiness = json.loads(config.opening_readiness_path.read_text())
+                readiness.update(readiness_status="waiting_for_marketdata_acceptance",
+                                 paper_order_submission_enabled=False, new_position_submission_enabled=False)
+                config.opening_readiness_path.write_text(json.dumps(readiness))
+                payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-09-07T03:00:00Z")
+                self.assertEqual(payload["acceptance_status"],
+                                 "readonly_waiting_marketdata_acceptance" if healthy else "blocked_monday_acceptance")
+                self.assertEqual(payload["fail_count"], 0 if healthy else 1)
+                self.assertFalse(payload["paper_order_submission_enabled"])
+                self.assertFalse(payload["new_position_submission_enabled"])
+
     def test_removed_legacy_gate_status_is_not_current_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_fixture(Path(tmp), session_should_run=False)
