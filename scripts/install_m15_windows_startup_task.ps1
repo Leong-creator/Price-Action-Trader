@@ -27,15 +27,16 @@ function Install-StartupFolderFallback {
     Remove-Item -Force -ErrorAction SilentlyContinue $legacyCmdPath, $legacyWatchdogPath, $launcherPath
     # Avoid nested shell quoting. The bootstrap resolves and enters its own
     # repository root, so WSL can execute it directly and invisibly.
-    $wslCommand = "$wslPath -d $Distro --exec bash $scriptPath --keep-alive"
+    $wslCommand = "`"$wslPath`" -d `"$Distro`" --exec bash `"$scriptPath`" --keep-alive"
     $escapedWslCommand = $wslCommand.Replace('"', '""')
     $vbs = @"
 Set shell = CreateObject("WScript.Shell")
-shell.Run "$escapedWslCommand", 0, False
+exitCode = shell.Run("$escapedWslCommand", 0, True)
+WScript.Quit exitCode
 "@
     Set-Content -Path $vbsPath -Value $vbs -Encoding ASCII
     Write-Output "Installed direct hidden startup-folder launcher: $vbsPath"
-    Write-Output "Fallback keeps one hidden WSL process attached after logon so the paper-trading stack remains alive without periodic windows."
+    Write-Output "Fallback waits for one hidden bootstrap and propagates its exit code; no automatic retry is installed."
 }
 
 function Install-WeekdayWakeFallback {
