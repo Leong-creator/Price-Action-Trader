@@ -3096,6 +3096,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and realtime_session_acceptance_ready
             ):
                 gate = record_readonly_session(config.readonly_gate_path, session_date, {
+                    "session_mode": "paper_order_validation" if paper_validation_authorized(config, now_ny) else "standard_integrity_acceptance",
                     "subscription_coverage": (
                         f"{len(configured_symbols(config))}/{len(configured_symbols(config))}"
                     ),
