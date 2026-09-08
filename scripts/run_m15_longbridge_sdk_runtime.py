@@ -1642,6 +1642,8 @@ def dispatch_completed_rows(
             signal_events_override=execution_signals,
             existing_ledger_override=execution_ledger_cache,
             emitted_ledger_rows=execution_rows_emitted,
+            live_clock=lambda: datetime.now(UTC),
+            submission_window=lambda request_at: configured_regular_session(config, request_at),
         )
         execution["hot_path_elapsed_ms"] = int(
             (time.perf_counter() - execution_started) * 1000
