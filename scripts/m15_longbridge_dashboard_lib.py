@@ -15,6 +15,7 @@ from scripts.m15_longbridge_fill_attribution_lib import (
     summarize_completed_trade_rows,
 )
 from scripts.m15_strategy_contracts_lib import load_contracts_cached
+from scripts.m15_paper_session_validation_lib import validation_status_current
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -674,7 +675,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         (not marketdata_gate_enforced)
         or runtime.get("complete_session_gate_passed") is True
     )
-    validation_active = bool(runtime.get("paper_validation_authorized") is True and runtime_fresh and runtime_process_alive)
+    validation_active = bool(validation_status_current(runtime, now) and runtime_fresh and runtime_process_alive)
 
     source_checks = {
         "sdk_runtime": runtime_artifact.get("status") == "ok" and runtime_process_alive and runtime_fresh and runtime.get("sdk_connected") is True,

@@ -2036,7 +2036,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     dispatch_enabled = bool(
         dispatch_requested
         and config.paper_order_dispatch_enabled
-        and entry_session_authorized(config, complete_session_gate_passed_now)
+        and entry_session_authorized(config, complete_session_gate_passed_now, datetime.now(UTC))
         and deployment_ready
     )
     execution_request_gate = SdkTradeRequestGate()

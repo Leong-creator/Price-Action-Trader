@@ -31,3 +31,19 @@ def entry_session_authorized(config, complete_session_passed, now=None):
         or complete_session_passed
         or paper_validation_authorized(config, now)
     )
+
+
+def validation_status_current(status, now=None):
+    """A cached approval is not valid across dates or beyond status freshness."""
+    try:
+        current = now or datetime.now(UTC)
+        if isinstance(current, str):
+            current = datetime.fromisoformat(current.replace("Z", "+00:00"))
+        generated = datetime.fromisoformat(str(status.get("generated_at") or "").replace("Z", "+00:00"))
+        if current.tzinfo is None or generated.tzinfo is None:
+            return False
+        return bool(status.get("paper_validation_authorized") is True
+                    and status.get("paper_validation_market_date") == current.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+                    and 0 <= (current - generated).total_seconds() <= 45)
+    except (ValueError, TypeError):
+        return False

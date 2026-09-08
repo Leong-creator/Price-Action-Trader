@@ -2,10 +2,13 @@ from dataclasses import replace
 from datetime import UTC, datetime
 import unittest
 from unittest.mock import patch
+from tempfile import TemporaryDirectory
+from pathlib import Path
+import json
 
 from scripts.m15_longbridge_sdk_runtime_lib import load_config
 from scripts.m15_paper_session_validation_lib import (
-    paper_validation_authorized, entry_session_authorized,
+    paper_validation_authorized, entry_session_authorized, validation_status_current,
 )
 from scripts.m15_opening_trade_readiness_lib import marketdata_gate_truth
 from scripts.run_m15_longbridge_sdk_runtime import effective_runtime_dispatch_enabled
@@ -35,13 +38,40 @@ class PaperSessionValidationTests(unittest.TestCase):
             self.assertFalse(paper_validation_authorized(replace(self.config, **changes), self.now))
 
     def test_full_session_evidence_not_overwritten(self):
-        status = {"paper_validation_authorized": True, "complete_session_gate_passed": False}
+        status = {"paper_validation_authorized": True, "complete_session_gate_passed": False,
+                  "paper_validation_market_date": "2026-09-08", "generated_at": self.now.isoformat()}
         with patch("scripts.m15_opening_trade_readiness_lib.paper_validation_authorized", return_value=True):
-            result = marketdata_gate_truth(status, self.config)
+            result = marketdata_gate_truth(status, self.config, self.now)
         self.assertTrue(result["gate_passed"])
         self.assertFalse(result["complete_session_passed"])
         self.assertEqual(result["status"], "paper_order_validation")
         self.assertFalse(status["complete_session_gate_passed"])
+
+    def test_missing_raw_safety_fields_rejected(self):
+        payload = json.loads(self.config.config_path.read_text())
+        for key in ("paper_trading_only", "live_execution", "real_money_actions", "market_data_transport"):
+            value = json.loads(json.dumps(payload))
+            value["runtime"].pop(key)
+            with TemporaryDirectory() as directory:
+                path = Path(directory) / "runtime.json"
+                path.write_text(json.dumps(value))
+                with self.assertRaisesRegex(ValueError, "explicit_paper_only"):
+                    load_config(path)
+
+    def test_stale_and_cross_date_status_not_authority(self):
+        status = dict(paper_validation_authorized=True, paper_validation_market_date="2026-09-08", generated_at=self.now.isoformat())
+        self.assertTrue(validation_status_current(status, self.now))
+        self.assertFalse(validation_status_current(status, "2026-09-08T14:00:46Z"))
+        self.assertFalse(validation_status_current(status, "2026-09-09T14:00:00Z"))
+        self.assertFalse(validation_status_current(dict(status, generated_at=""), self.now))
+
+    def test_dispatch_is_not_complete_session_evidence(self):
+        from scripts.m15_monday_refresh_acceptance_lib import marketdata_gate_truth as combined
+        result = combined(dict(sdk_connected=True, dispatch_enabled=True),
+                          dict(new_position_submission_enabled=True, readiness_status="ready_regular_session"),
+                          {"status": "ok"}, {"status": "ok"}, self.now)
+        self.assertFalse(result["gate_passed"])
+        self.assertFalse(result["complete_session_passed"])
 
     def test_expiry_does_not_grant_unproven_next_session(self):
         self.assertTrue(entry_session_authorized(self.config, False, self.now))

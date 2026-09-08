@@ -116,6 +116,13 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     runtime = payload.get("runtime", {})
     routing = payload.get("routing", {})
     transition = payload.get("formal_test_transition", {})
+    if runtime.get("paper_validation_approved") is True:
+        explicit = {"paper_trading_only": True, "live_execution": False,
+                    "real_money_actions": False, "market_data_transport": "official_sdk_persistent_websocket"}
+        if any(key not in runtime or type(runtime[key]) is not type(value) or runtime[key] != value
+               for key, value in explicit.items()):
+            raise ValueError("paper_validation_requires_explicit_paper_only_safety_fields")
+        datetime.strptime(str(runtime.get("paper_validation_market_date") or ""), "%Y-%m-%d")
     config = SdkRuntimeConfig(
         config_path=config_path,
         paper_validation_market_date=str(runtime.get("paper_validation_market_date") or ""),
