@@ -63,6 +63,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     required_daily_context_date,
     load_current_sdk_intraday_context, load_formal_test_marker, readonly_gate_passed, record_readonly_session,
     market_event_is_tradable, trading_market_events,
+    floor_bar_open, quote_for_bar_boundary,
     sdk_config_from_oauth, sdk_order_maintenance_actions, summarize_latency_samples, write_daily_context_cache,
     to_iso,
     unix_to_utc,
@@ -437,8 +438,17 @@ def update_live_quote_session_state(
     normalized_symbol = str(symbol or "").upper().removesuffix(".US")
     if not normalized_symbol:
         return None
-    source_at = unix_to_utc(payload.get("timestamp"), received_at)
     previous = state_by_symbol.get(normalized_symbol)
+    raw_timestamp = payload.get("timestamp")
+    if isinstance(raw_timestamp, (int, float)) and not isinstance(raw_timestamp, bool):
+        try:
+            source_at = datetime.fromtimestamp(raw_timestamp, UTC)
+        except (ValueError, OSError, OverflowError):
+            return previous
+    else:
+        source_at = strict_event_datetime(raw_timestamp)
+    if source_at is None or received_at.tzinfo is None or source_at > received_at:
+        return previous
     blocked_reason = ""
     if previous is not None:
         try:
@@ -482,6 +492,25 @@ def update_live_quote_session_state(
         "close": close,
         "volume": volume,
         "market_data_blocked_reason": blocked_reason,
+    }
+    # Two buckets retain the prior close separately from the next entry quote.
+    # Snapshots do not include this index, avoiding recursive state retention.
+    buckets = (
+        dict(previous.get("bar_quote_snapshots", {}))
+        if previous is not None and previous.get("session_date") == state["session_date"]
+        else {}
+    )
+    bucket_open = floor_bar_open(source_at, 5).astimezone(UTC)
+    bucket_key = to_iso(bucket_open)
+    if source_mode == "official_sdk_push" and source_at <= received_at:
+        bucket = dict(buckets.get(bucket_key, {}))
+        bucket.setdefault("first", dict(state))
+        bucket["last"] = dict(state)
+        buckets[bucket_key] = bucket
+    cutoff = to_iso(bucket_open - timedelta(minutes=5))
+    state["bar_quote_snapshots"] = {
+        key: value for key, value in buckets.items()
+        if cutoff <= key <= bucket_key
     }
     state_by_symbol[normalized_symbol] = state
     return state
@@ -1373,18 +1402,19 @@ def build_live_daily_confirmation_rows(
     live_quote_session_state: dict[str, dict[str, Any]] | None = None,
     active_five_minute_event_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Aggregate current-session SDK bars without promoting stale symbols.
+    """Use sealed quote OHLCV with a separate next-bar entry annotation.
 
-    Historical bars still provide the session OHLC context.  When active event
-    IDs are supplied, however, a symbol is actionable only if its latest bar
-    was completed in this dispatch.  A quiet or degraded quote feed therefore
-    cannot turn an older price into a fresh daily confirmation merely because
-    SPY or QQQ changed.
+    A symbol is actionable only when its latest five-minute bar is active in
+    this dispatch. Another symbol's activity cannot refresh an old signal.
     """
+    if generated_at.tzinfo is None:
+        return []
     session_date = generated_at.astimezone(NEW_YORK).date().isoformat()
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in market_events:
         if str(row.get("timeframe") or "") != "5m" or row.get("bar_final") is not True:
+            continue
+        if row.get("market_data_blocked_reason"):
             continue
         try:
             event_date = datetime.fromisoformat(
@@ -1402,7 +1432,7 @@ def build_live_daily_confirmation_rows(
     quote_state_by_symbol = live_quote_session_state or {}
     for symbol, rows in grouped.items():
         rows.sort(key=lambda row: str(row.get("event_time") or ""))
-        first, latest = rows[0], rows[-1]
+        latest = rows[-1]
         if (
             active_five_minute_event_ids is not None
             and str(latest.get("event_id") or "") not in active_five_minute_event_ids
@@ -1411,22 +1441,17 @@ def build_live_daily_confirmation_rows(
         quote_state = quote_state_by_symbol.get(symbol)
         if not quote_state or str(quote_state.get("market_data_blocked_reason") or ""):
             continue
-        try:
-            latest_event_time = str(latest.get("event_time") or "")
-            latest_bar_close_at = datetime.fromisoformat(
-                latest_event_time.replace("Z", "+00:00")
-            ).astimezone(UTC)
-            latest_bar_open_at = datetime.fromisoformat(
-                str(latest.get("bar_open_at") or "").replace("Z", "+00:00")
-            ).astimezone(UTC)
-            quote_source_at = datetime.fromisoformat(
-                str(quote_state.get("source_event_at") or "").replace("Z", "+00:00")
-            ).astimezone(UTC)
-        except ValueError:
+        latest_event_time = str(latest.get("event_time") or "")
+        latest_bar_close_at = strict_event_datetime(latest_event_time)
+        latest_bar_open_at = strict_event_datetime(latest.get("bar_open_at"))
+        if latest_bar_close_at is None or latest_bar_open_at is None:
             continue
-        if str(quote_state.get("session_date") or "") != session_date:
+        if latest.get("bar_close_at") and strict_event_datetime(latest["bar_close_at"]) != latest_bar_close_at:
             continue
-        if quote_source_at < latest_bar_open_at or quote_source_at > latest_bar_close_at:
+        if latest_bar_close_at > generated_at or latest_bar_open_at != latest_bar_close_at - timedelta(minutes=5):
+            continue
+        quote_state = quote_for_bar_boundary(quote_state, latest_bar_close_at, entry=False, now=generated_at)
+        if not quote_state or str(quote_state.get("session_date") or "") != session_date:
             continue
         open_price = Decimal(str(quote_state.get("open") or "0"))
         high = Decimal(str(quote_state.get("high") or "0"))
@@ -1516,7 +1541,7 @@ def dispatch_completed_rows(
     new_entry_submission_enabled: bool = True,
 ) -> dict[str, Any]:
     stage_started = time.perf_counter()
-    rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {})
+    rows = attach_next_bar_first_quotes(rows, live_quote_session_state or {}, now=datetime.now(UTC))
     audit = {
         "audit_status": "failed", "audit_event_count": 0,
         "fresh_event_count": 0, "stale_event_count": 0,

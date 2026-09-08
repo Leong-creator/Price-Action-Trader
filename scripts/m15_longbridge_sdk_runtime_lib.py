@@ -710,34 +710,73 @@ def floor_bar_open(value: datetime, minutes: int) -> datetime:
     return value.replace(minute=minute, second=0, microsecond=0)
 
 
+def quote_for_bar_boundary(
+    state: dict[str, Any], bar_close_at: datetime, *, entry: bool, now: datetime,
+) -> dict[str, Any]:
+    """Select a sealed-bar quote or next-bar entry without crossing roles."""
+    if state.get("market_data_blocked_reason") or bar_close_at.tzinfo is None or now.tzinfo is None:
+        return {}
+    bar_close_at = bar_close_at.astimezone(UTC)
+    bucket_open = bar_close_at if entry else bar_close_at - timedelta(minutes=5)
+    if "bar_quote_snapshots" in state:
+        bucket = state["bar_quote_snapshots"].get(to_iso(bucket_open), {})
+        quote = bucket.get("first" if entry else "last", {})
+    else:
+        quote = state
+    if not quote or quote.get("market_data_blocked_reason"):
+        return {}
+    if quote.get("source_mode", "official_sdk_push") != "official_sdk_push":
+        return {}
+    try:
+        source_at = datetime.fromisoformat(str(quote.get("source_event_at") or "").replace("Z", "+00:00"))
+        received_at = datetime.fromisoformat(str(quote.get("received_at") or "").replace("Z", "+00:00"))
+        if source_at.tzinfo is None or received_at.tzinfo is None or now.tzinfo is None:
+            return {}
+        if not bucket_open <= source_at < bucket_open + timedelta(minutes=5):
+            return {}
+        if source_at > received_at or received_at > now:
+            return {}
+        if source_at.astimezone(NEW_YORK).date() != bar_close_at.astimezone(NEW_YORK).date():
+            return {}
+    except (TypeError, ValueError):
+        return {}
+    return quote
+
+
 def attach_next_bar_first_quotes(
     rows: list[dict[str, Any]],
     live_quote_session_state: dict[str, dict[str, Any]],
+    *, now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Attach the quote closing a bar as the next bar's executable price."""
+    """Attach the first observed next-bar quote, not the sealed-bar snapshot."""
     enriched: list[dict[str, Any]] = []
+    checked_at = now or datetime.now(UTC)
     for source in rows:
         row = dict(source)
         if str(row.get("timeframe") or "") != "5m" or row.get("bar_final") is not True:
             enriched.append(row)
             continue
         symbol = str(row.get("symbol") or "").upper().replace(".US", "")
-        quote = live_quote_session_state.get(symbol) or live_quote_session_state.get(f"{symbol}.US") or {}
-        quote_at = str(quote.get("received_at") or quote.get("source_event_at") or "")
+        state = live_quote_session_state.get(symbol) or live_quote_session_state.get(f"{symbol}.US") or {}
+        for key in ("next_bar_first_quote_price", "next_bar_first_quote_at", "next_bar_entry_source"):
+            row.pop(key, None)
         try:
-            quote_price = Decimal(str(quote.get("last_done") or quote.get("close") or quote.get("price") or "0"))
             bar_close_at = datetime.fromisoformat(
                 str(row.get("bar_close_at") or row.get("event_time") or "").replace("Z", "+00:00")
-            ).astimezone(UTC)
-            quote_dt = datetime.fromisoformat(quote_at.replace("Z", "+00:00")).astimezone(UTC)
+            )
+            if bar_close_at.tzinfo is None or bar_close_at > checked_at:
+                enriched.append(row)
+                continue
+            quote = quote_for_bar_boundary(state, bar_close_at, entry=True, now=checked_at)
+            quote_price = Decimal(str(quote.get("last_done") or quote.get("close") or quote.get("price") or "0"))
         except (ArithmeticError, TypeError, ValueError):
             enriched.append(row)
             continue
-        if quote_price <= 0 or quote_dt < bar_close_at:
+        if not quote_price.is_finite() or quote_price <= 0:
             enriched.append(row)
             continue
         row["next_bar_first_quote_price"] = format(quote_price, "f")
-        row["next_bar_first_quote_at"] = to_iso(quote_dt)
+        row["next_bar_first_quote_at"] = str(quote["received_at"])
         row["next_bar_entry_source"] = "longbridge_sdk_first_quote_after_bar_close"
         enriched.append(row)
     return enriched
