@@ -45,12 +45,29 @@ class BoundedTradeRequestGate:
         self._clock = monotonic_clock
         self._calls: deque[float] = deque()
         self._lock = threading.Lock()
+        self._deadline: float | None = None
+        self._reserve_seconds = 2.0
+
+    def begin_cycle(self, deadline_monotonic: float, reserve_seconds: float = 2.0) -> None:
+        """Set one shared CPU/I/O deadline; a new cycle does not reset rate quota."""
+        if (not math.isfinite(deadline_monotonic) or not math.isfinite(reserve_seconds)
+                or reserve_seconds < 0):
+            raise ValueError("cycle deadline and reserve must be finite; reserve must be nonnegative")
+        if not self._lock.acquire(blocking=False):
+            raise TradeRequestNotSent("trade admission busy; cycle not started")
+        try:
+            self._deadline = deadline_monotonic
+            self._reserve_seconds = reserve_seconds
+        finally:
+            self._lock.release()
 
     def call(self, callback: Any) -> Any:
         if not self._lock.acquire(blocking=False):
             raise TradeRequestNotSent("trade admission busy; request not sent")
         try:
             now = self._clock()
+            if self._deadline is not None and now + self._reserve_seconds > self._deadline:
+                raise TradeRequestNotSent("trade cycle budget exhausted; request not sent")
             while self._calls and now - self._calls[0] >= self._window:
                 self._calls.popleft()
             if len(self._calls) >= self._max_calls:
@@ -68,6 +85,11 @@ class OfficialAsyncTradeBridge:
     operation. Blocking TradeContext methods and asyncio.to_thread are not used.
     SDK errors poison the instance. close() is explicit and idempotent.
     """
+
+    @property
+    def maximum_request_wait_seconds(self) -> float:
+        """Single SDK Future wait reservation; excludes admission and disk I/O."""
+        return self._request_timeout
 
     def __init__(self, config: Any, *, sdk: Any = None, init_timeout: float = 3.0,
                  request_timeout: float = 0.5, close_timeout: float = 1.0) -> None:

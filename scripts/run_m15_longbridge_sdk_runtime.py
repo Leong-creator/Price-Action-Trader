@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 from collections import deque
+from contextlib import ExitStack
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -36,7 +37,18 @@ from scripts.m15_longbridge_sdk_account_lib import (
     SdkAccountStateProvider,
     SdkTradeRequestGate,
 )
+from scripts.m15_official_async_trade_lib import (
+    AsyncTradeBridgeError,
+    BoundedTradeRequestGate,
+    OfficialAsyncTradeBridge,
+)
 from scripts.m15_deployment_governance_lib import verify_manifest
+from scripts.m15_runtime_boot_identity_lib import (
+    append_runtime_boot_audit,
+    classify_runtime_boot_state,
+    read_runtime_boot_identity,
+    runtime_fault_markers,
+)
 from scripts.m15_paper_session_validation_lib import (
     entry_session_authorized, paper_validation_authorized,
 )
@@ -113,7 +125,7 @@ def parse_args() -> argparse.Namespace:
 
 def require_sdk_contract() -> Any:
     import longbridge.openapi as lb
-    missing = [name for name in ("QuoteContext", "TradeContext", "PortfolioContext") if not getattr(lb, name, None)]
+    missing = [name for name in ("QuoteContext", "TradeContext", "AsyncTradeContext", "PortfolioContext") if not getattr(lb, name, None)]
     if missing:
         raise RuntimeError(f"sdk_contract_missing:{','.join(missing)}")
     return lb
@@ -135,32 +147,82 @@ def build_sdk_account_provider_for_worker(config_path: str) -> SdkAccountStatePr
 def build_sdk_trade_clients(
     config: Any,
     sdk: Any,
-    request_gate: SdkTradeRequestGate,
+    request_gate: BoundedTradeRequestGate,
     on_submission: Any,
     *,
     dispatch_enabled: bool,
 ) -> tuple[Any, SdkRealtimePaperClient | None, SdkRealtimePaperClient]:
     oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-    trade_context = sdk.TradeContext(
-        sdk_config_from_oauth(sdk, oauth, config.trade_region)
+    trade_context = OfficialAsyncTradeBridge(
+        sdk_config_from_oauth(sdk, oauth, config.trade_region),
+        sdk=sdk,
+        request_timeout=2.0,
     )
-    paper_client = (
-        SdkRealtimePaperClient(
+    try:
+        # Share the unknown-submission latch across entries and flatten exits.
+        flatten_client = SdkRealtimePaperClient(
             trade_context,
             sdk,
             request_gate=request_gate,
             on_submission=on_submission,
+            submission_journal_path=config.output_dir / "m15_sdk_submission_journal.jsonl",
         )
-        if dispatch_enabled
-        else None
-    )
-    flatten_client = SdkRealtimePaperClient(
-        trade_context,
-        sdk,
-        request_gate=request_gate,
-        on_submission=on_submission,
-    )
-    return trade_context, paper_client, flatten_client
+    except BaseException:
+        close_sdk_trade_client(trade_context)
+        raise
+    return trade_context, flatten_client if dispatch_enabled else None, flatten_client
+
+
+def close_sdk_trade_client(trade_context: Any) -> dict[str, Any]:
+    """Do not let trade cleanup prevent account/quote cleanup; report failures."""
+    try:
+        trade_context.close()
+    except Exception as exc:
+        error = f"trade_bridge_close_failed:{type(exc).__name__}:{exc}"
+        print(error, file=sys.stderr, flush=True)
+        return {"closed": False, "error": error}
+    return {"closed": True}
+
+
+def runtime_trade_health(trade_context: Any, client: Any, *, probe: bool = False) -> dict[str, Any]:
+    """A poisoned bridge is terminal for this run, including unknown writes."""
+    try:
+        trade_context.check_health()
+        journal_health = client.submission_journal_health()
+        if not journal_health["ok"]:
+            return journal_health
+        health = client.healthcheck() if probe else {"ok": True, "status": "trade_context_local_healthy"}
+        # healthcheck() converts SDK exceptions to data, so inspect the bridge
+        # again before accepting that data as a transient failure.
+        trade_context.check_health()
+        if client.trade_context_refresh_required:
+            raise AsyncTradeBridgeError(client.trade_context_refresh_reason)
+        return health
+    except AsyncTradeBridgeError as exc:
+        return {
+            "ok": False,
+            "status": "trade_context_fault_halted",
+            "fault_halted": True,
+            "trade_context_refresh_required": False,
+            "requires_manual_reconciliation": True,
+            "error": str(exc)[:500],
+        }
+
+
+def runtime_trade_observability(trade_context: Any, client: Any) -> dict[str, Any]:
+    """Report the actual adapter and durable gate, without broker I/O."""
+    journal_health = client.submission_journal_health()
+    deadline = getattr(trade_context, "maximum_request_wait_seconds", None)
+    return {
+        "api": "AsyncTradeContext" if isinstance(trade_context, OfficialAsyncTradeBridge) else "unverified_trade_context",
+        "adapter": type(trade_context).__name__,
+        "request_deadline_seconds": deadline if isinstance(deadline, (int, float)) else None,
+        "cycle_budget_seconds": 5.0,
+        "call_reserve_seconds": 2.0,
+        "submission_journal": journal_health if isinstance(journal_health, dict) else {
+            "ok": False, "error": "invalid_journal_health_response",
+        },
+    }
 
 
 def runtime_owns_quote_connection(config: Any, runtime_status: dict[str, Any]) -> bool:
@@ -1888,7 +1950,7 @@ def run_sdk_order_maintenance(
 
 def stop_spawned_process(process: mp.Process | None, *, graceful: bool) -> None:
     """Join spawned SDK workers before forcing termination as a last resort."""
-    if process is None:
+    if process is None or process.pid is None:
         return
     if graceful:
         process.join(timeout=2)
@@ -1900,11 +1962,40 @@ def stop_spawned_process(process: mp.Process | None, *, graceful: bool) -> None:
 def close_spawn_queue(queue_out: Any) -> None:
     """Release multiprocessing queue handles after all children have stopped."""
     close = getattr(queue_out, "close", None)
-    if callable(close):
-        close()
     join_thread = getattr(queue_out, "join_thread", None)
-    if callable(join_thread):
-        join_thread()
+    try:
+        if callable(close):
+            close()
+    finally:
+        if callable(join_thread):
+            join_thread()
+
+
+def cleanup_runtime_resources(
+    *, stop_event: Any, worker: Any, message_queue: Any,
+    execution_trade: Any, account: Any, previous_sigterm_handler: Any,
+) -> None:
+    """Attempt every cleanup; never replace an already propagating exception."""
+    original_error = sys.exc_info()[1]
+    errors: list[BaseException] = []
+    for name, cleanup in (
+        ("stop_event", stop_event.set),
+        ("quote_worker", lambda: stop_spawned_process(worker, graceful=True)),
+        ("message_queue", lambda: close_spawn_queue(message_queue)),
+        ("trade_context", lambda: close_sdk_trade_client(execution_trade)),
+        ("account", account.stop),
+        ("sigterm_handler", lambda: signal.signal(signal.SIGTERM, previous_sigterm_handler)),
+    ):
+        try:
+            cleanup()
+        except BaseException as exc:
+            errors.append(exc)
+            try:
+                print(f"runtime_cleanup_failed:{name}:{type(exc).__name__}:{exc}", file=sys.stderr, flush=True)
+            except (OSError, ValueError):
+                pass
+    if errors and original_error is None:
+        raise errors[0]
 
 
 def request_runtime_shutdown(
@@ -1912,10 +2003,13 @@ def request_runtime_shutdown(
     *,
     timeout_seconds: float = 15.0,
     force_timeout_seconds: float = 2.0,
+    expected_status: dict[str, Any] | None = None,
 ) -> bool:
     """Stop the SDK runtime after giving spawned SDK workers time to close."""
     if not process_alive(pid):
         return True
+    if expected_status is not None and not runtime_status_process_matches(pid, expected_status):
+        return False
     os.kill(pid, signal.SIGTERM)
     deadline = time.monotonic() + timeout_seconds
     while process_alive(pid) and time.monotonic() < deadline:
@@ -1923,6 +2017,8 @@ def request_runtime_shutdown(
     if not process_alive(pid):
         return True
     if not is_expected_sdk_runtime_process(pid):
+        return False
+    if expected_status is not None and not runtime_status_process_matches(pid, expected_status):
         return False
     try:
         process_group = os.getpgid(pid)
@@ -1934,6 +2030,8 @@ def request_runtime_shutdown(
         time.sleep(0.05)
     if not process_alive(pid):
         return True
+    if expected_status is not None and not runtime_status_process_matches(pid, expected_status):
+        return False
     try:
         os.killpg(process_group, signal.SIGKILL)
     except ProcessLookupError:
@@ -2008,19 +2106,88 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         owner_pid = read_pid(GLOBAL_QUOTE_SUBSCRIPTION_LOCK)
         print(f"M15 SDK 实时运行层已有单实例持有运行锁，PID={owner_pid or 'unknown'}。", flush=True)
         return 0
-    run_lock.seek(0)
-    run_lock.truncate()
-    run_lock.write(f"{os.getpid()}\n")
-    run_lock.flush()
-    pid_path(config).write_text(f"{os.getpid()}\n", encoding="utf-8")
+    claimed = False
+    boot_decision: dict[str, Any] | None = None
+    runtime_identity: dict[str, Any] = {}
+    try:
+        boot_decision = checked_runtime_boot_startup(config)
+        runtime_identity = {
+            **read_runtime_boot_identity(),
+            "run_id": f"sdk-{uuid.uuid4().hex[:12]}",
+            "runtime_pid": os.getpid(),
+            "runtime_started_at": to_iso(datetime.now(UTC)),
+            "runtime_process_start_ticks": process_start_ticks(os.getpid()),
+        }
+        claimed = True
+        run_lock.seek(0)
+        run_lock.truncate()
+        run_lock.write(f"{os.getpid()}\n")
+        run_lock.flush()
+        pid_path(config).write_text(f"{os.getpid()}\n", encoding="utf-8")
+        build_status(
+            config, status="connecting", reason="fresh_runtime_initialization",
+            extra={
+                **runtime_identity, "runtime_boot_recovery": boot_decision,
+                "dispatch_requested": bool(dispatch_requested), "dispatch_enabled": False,
+            },
+        )
+        # Before the loop takes ownership, partial initialization must unwind.
+        with ExitStack() as startup_cleanup:
+            return _run_watch_after_boot_check(
+                config, dispatch_requested=dispatch_requested,
+                runtime_identity=runtime_identity, boot_decision=boot_decision,
+                startup_cleanup=startup_cleanup,
+            )
+    except BaseException as exc:
+        if boot_decision is not None:
+            failure = {
+                "generated_at": to_iso(datetime.now(UTC)),
+                "status": "fault_halted",
+                "reason": f"runtime_initialization_or_execution_failed:{type(exc).__name__}:{exc}",
+                **runtime_identity, "runtime_boot_recovery": boot_decision,
+                "market_data_fault_halted": True, "sdk_connected": False,
+                "dispatch_requested": bool(dispatch_requested), "dispatch_enabled": False,
+            }
+            try:
+                write_json_atomic(
+                    config.output_dir / "m15_runtime_startup_failure.json", failure,
+                )
+            finally:
+                # Even if the diagnostic write fails, try to latch the fault.
+                # Old state was already audited before the first status write.
+                try:
+                    previous = _read_runtime_status_for_startup(config)
+                except (OSError, ValueError, RuntimeError) as read_error:
+                    previous = {"runtime_status_read_error": type(read_error).__name__}
+                if not runtime_fault_markers(previous):
+                    write_json_atomic(config.runtime_status_path, {**previous, **failure})
+        raise
+    finally:
+        try:
+            if claimed:
+                try:
+                    if read_pid(pid_path(config)) == os.getpid():
+                        pid_path(config).unlink(missing_ok=True)
+                finally:
+                    run_lock.seek(0)
+                    run_lock.truncate()
+                    run_lock.flush()
+        finally:
+            try:
+                fcntl.flock(run_lock.fileno(), fcntl.LOCK_UN)
+            finally:
+                run_lock.close()
+
+
+def _run_watch_after_boot_check(
+    config: Any, *, dispatch_requested: bool, runtime_identity: dict[str, Any],
+    boot_decision: dict[str, Any], startup_cleanup: ExitStack,
+) -> int:
+    run_id = runtime_identity["run_id"]
+    runtime_started_at = runtime_identity["runtime_started_at"]
+    runtime_process_start_ticks = runtime_identity["runtime_process_start_ticks"]
     orphaned_runtime_children_cleaned = cleanup_orphaned_sdk_runtime_children(config)
     sdk = require_sdk_contract()
-    run_id = f"sdk-{uuid.uuid4().hex[:12]}"
-    runtime_started_at = to_iso(datetime.now(UTC))
-    try:
-        runtime_process_start_ticks = Path("/proc/self/stat").read_text(encoding="utf-8").split()[21]
-    except (OSError, IndexError):
-        runtime_process_start_ticks = ""
     loaded_config_fingerprint = config_fingerprint(config)
     complete_session_gate_passed_now, complete_sessions_passed, complete_sessions_required = readonly_gate_passed(
         config.readonly_gate_path,
@@ -2039,7 +2206,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         and entry_session_authorized(config, complete_session_gate_passed_now, datetime.now(UTC))
         and deployment_ready
     )
-    execution_request_gate = SdkTradeRequestGate()
+    execution_request_gate = BoundedTradeRequestGate()
     from scripts.m15_longbridge_realtime_signal_router_lib import (
         load_config as load_router_config,
     )
@@ -2081,6 +2248,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         refresh_deadline_seconds=config.account_snapshot_refresh_deadline_seconds,
         circuit_retry_cooldown_seconds=config.account_snapshot_circuit_retry_seconds,
     )
+    startup_cleanup.callback(account.stop)
     # Read one trusted account snapshot for paper-account and held-position
     # discovery. Account refresh remains independent from quote startup so a
     # quote retry cannot make the account state stale.
@@ -2097,6 +2265,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         account.note_submission,
         dispatch_enabled=dispatch_enabled,
     )
+    startup_cleanup.callback(close_sdk_trade_client, execution_trade)
     now_ny = datetime.now(NEW_YORK)
     session_started_at = now_ny.replace(hour=9, minute=30, second=0, microsecond=0).astimezone(UTC)
     cached_intraday_rows = load_current_sdk_intraday_context(
@@ -2123,7 +2292,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     # a blocked subscribe call safely terminable by the parent.
     process_context = mp.get_context("spawn")
     message_queue: Any = process_context.Queue(maxsize=2048)
+    startup_cleanup.callback(close_spawn_queue, message_queue)
     stop_event: Any = process_context.Event()
+    startup_cleanup.callback(stop_event.set)
     worker: mp.Process | None = None
     worker_ready = False
     worker_started = 0.0
@@ -2316,6 +2487,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             oauth_client_id_present=True,
             subscription_failed_symbols=subscription_failed,
             extra={
+                **runtime_identity,
+                "runtime_boot_recovery": boot_decision,
                 "run_id": run_id,
                 "runtime_pid": os.getpid(),
                 "runtime_started_at": runtime_started_at,
@@ -2360,8 +2533,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         return 4
 
     signal.signal(signal.SIGTERM, stop_requested)
+    startup_cleanup.pop_all()
     try:
         while not shutdown_requested:
+            execution_request_gate.begin_cycle(time.monotonic() + 5, reserve_seconds=2.0)
             if worker is None and worker_generation == 0:
                 worker_ready = False
                 worker_started = time.monotonic()
@@ -2784,63 +2959,18 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     execution_ledger_cache,
                     market_date=current_market_date,
                 )
-                if paper_client is not None and paper_client.trade_context_refresh_required:
-                    refresh_started_at = datetime.now(UTC)
-                    refresh_reason = paper_client.trade_context_refresh_reason
-                    try:
-                        (
-                            execution_trade,
-                            candidate_paper_client,
-                            flatten_client,
-                        ) = build_sdk_trade_clients(
-                            config,
-                            sdk,
-                            execution_request_gate,
-                            account.note_submission,
-                            dispatch_enabled=True,
-                        )
-                        candidate_health = candidate_paper_client.healthcheck()
-                        if not bool(candidate_health.get("ok")):
-                            raise RuntimeError(
-                                str(
-                                    candidate_health.get("error")
-                                    or candidate_health.get("status")
-                                )
-                            )
-                        paper_client = candidate_paper_client
-                        trade_context_health = {
-                            **candidate_health,
-                            "status": "trade_context_rebuilt_and_healthy",
-                            "refresh_reason": refresh_reason,
-                            "refreshed_at": to_iso(datetime.now(UTC)),
-                        }
-                        last_trade_context_healthcheck = time.monotonic()
-                        next_trade_context_retry = 0.0
-                        last_result["trade_context_refresh"] = {
-                            "status": "refreshed_for_next_realtime_signal",
-                            "reason": refresh_reason,
-                            "refreshed_at": to_iso(datetime.now(UTC)),
-                            "old_signal_replayed": False,
-                        }
-                    except Exception as exc:
-                        paper_client = None
-                        trade_context_health = {
-                            "ok": False,
-                            "status": "trade_context_rebuild_failed",
-                            "refresh_reason": refresh_reason,
-                            "error": str(exc)[:500],
-                            "attempted_at": to_iso(refresh_started_at),
-                        }
-                        next_trade_context_retry = (
-                            time.monotonic() + TRADE_CONTEXT_RETRY_SECONDS
-                        )
-                        last_result["trade_context_refresh"] = {
-                            "status": "failed_new_entries_disabled",
-                            "reason": refresh_reason,
-                            "refresh_error": str(exc)[:500],
-                            "attempted_at": to_iso(refresh_started_at),
-                            "old_signal_replayed": False,
-                        }
+                local_trade_health = runtime_trade_health(execution_trade, flatten_client)
+                if local_trade_health.get("fault_halted"):
+                    paper_client = None
+                    trade_context_health = local_trade_health
+                    next_trade_context_retry = float("inf")
+                    last_result["trade_context_refresh"] = {
+                        **local_trade_health,
+                        "old_signal_replayed": False,
+                        "automatic_rebuild": False,
+                    }
+                elif local_trade_health.get("pending_reconciliation"):
+                    trade_context_health = local_trade_health
                 elapsed = int((time.perf_counter() - started) * 1000)
                 last_result["pipeline_elapsed_ms"] = elapsed
                 pipeline_latency_samples.append(elapsed)
@@ -2880,8 +3010,16 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and maintenance_now.second <= 2
             )
             monotonic_now = time.monotonic()
+            local_trade_health = runtime_trade_health(execution_trade, flatten_client)
+            if local_trade_health.get("fault_halted"):
+                paper_client = None
+                trade_context_health = local_trade_health
+                next_trade_context_retry = float("inf")
+            elif local_trade_health.get("pending_reconciliation"):
+                trade_context_health = local_trade_health
             healthcheck_due = (
                 dispatch_enabled
+                and not trade_context_health.get("fault_halted")
                 and not near_five_minute_boundary
                 and (
                     paper_client is None
@@ -2891,83 +3029,17 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and monotonic_now >= next_trade_context_retry
             )
             if healthcheck_due:
-                if paper_client is not None:
-                    trade_context_health = paper_client.healthcheck()
-                else:
-                    trade_context_health = {
-                        "ok": False,
-                        "status": "trade_context_missing",
-                        "trade_context_refresh_required": True,
-                    }
+                trade_context_health = runtime_trade_health(
+                    execution_trade, flatten_client, probe=True,
+                )
                 last_trade_context_healthcheck = monotonic_now
-                if not bool(trade_context_health.get("ok")):
-                    refresh_reason = str(
-                        trade_context_health.get("error")
-                        or trade_context_health.get("status")
-                        or "trade_context_healthcheck_failed"
-                    )
-                    if not trade_context_health_requires_rebuild(
-                        trade_context_health
-                    ):
-                        trade_context_health = {
-                            **trade_context_health,
-                            "ok": False,
-                            "status": "trade_context_transient_healthcheck_failed",
-                            "retry_after_seconds": TRADE_CONTEXT_RETRY_SECONDS,
-                        }
-                        # Keep the existing context, stop dispatch briefly, and
-                        # retry the harmless read without creating more SDK
-                        # contexts during a broker rate-limit window.
-                        last_trade_context_healthcheck = (
-                            monotonic_now
-                            - TRADE_CONTEXT_HEALTHCHECK_INTERVAL_SECONDS
-                        )
-                        next_trade_context_retry = (
-                            monotonic_now + TRADE_CONTEXT_RETRY_SECONDS
-                        )
-                        continue
-                    try:
-                        (
-                            candidate_trade,
-                            candidate_paper_client,
-                            candidate_flatten_client,
-                        ) = build_sdk_trade_clients(
-                            config,
-                            sdk,
-                            execution_request_gate,
-                            account.note_submission,
-                            dispatch_enabled=True,
-                        )
-                        candidate_health = candidate_paper_client.healthcheck()
-                        if not bool(candidate_health.get("ok")):
-                            raise RuntimeError(
-                                str(
-                                    candidate_health.get("error")
-                                    or candidate_health.get("status")
-                                )
-                            )
-                        execution_trade = candidate_trade
-                        paper_client = candidate_paper_client
-                        flatten_client = candidate_flatten_client
-                        trade_context_health = {
-                            **candidate_health,
-                            "status": "trade_context_rebuilt_and_healthy",
-                            "refresh_reason": refresh_reason,
-                            "refreshed_at": to_iso(maintenance_now),
-                        }
-                        next_trade_context_retry = 0.0
-                    except Exception as exc:
-                        paper_client = None
-                        trade_context_health = {
-                            "ok": False,
-                            "status": "trade_context_rebuild_failed",
-                            "refresh_reason": refresh_reason,
-                            "error": str(exc)[:500],
-                            "attempted_at": to_iso(maintenance_now),
-                        }
-                        next_trade_context_retry = (
-                            monotonic_now + TRADE_CONTEXT_RETRY_SECONDS
-                        )
+                if trade_context_health.get("fault_halted"):
+                    paper_client = None
+                    next_trade_context_retry = float("inf")
+                elif not bool(trade_context_health.get("ok")):
+                    # Local rate admission may reject a harmless read. Keep
+                    # the same bridge; never rebuild or replay a write here.
+                    next_trade_context_retry = monotonic_now + TRADE_CONTEXT_RETRY_SECONDS
             if dispatch_enabled and bool(trade_context_health.get("ok")):
                 flatten_transition = run_pending_flatten_cycle(
                     config,
@@ -3059,6 +3131,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 and snapshot.get("orders_ok") is True
                 and not snapshot.get("worker_circuit_open")
             )
+            if account_snapshot_ready and snapshot.get("account_channel") == "lb_papertrading":
+                if flatten_client.reconcile_submissions(snapshot):
+                    last_trade_context_healthcheck = 0.0
             daily_context_ready = daily_context_is_complete(
                 config, daily_context_state, len(daily_rows), daily_failed
             )
@@ -3128,24 +3203,15 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     and complete_session_gate_passed_now
                     and deployment_ready
                     and paper_client is None
+                    and not trade_context_health.get("fault_halted")
                 ):
-                    (
-                        execution_trade,
-                        paper_client,
-                        flatten_client,
-                    ) = build_sdk_trade_clients(
-                        config,
-                        sdk,
-                        execution_request_gate,
-                        account.note_submission,
-                        dispatch_enabled=True,
+                    trade_context_health = runtime_trade_health(
+                        execution_trade, flatten_client, probe=True,
                     )
-                    trade_context_health = paper_client.healthcheck()
-                    if not bool(trade_context_health.get("ok")):
-                        paper_client = None
-                        next_trade_context_retry = (
-                            time.monotonic() + TRADE_CONTEXT_RETRY_SECONDS
-                        )
+                    if bool(trade_context_health.get("ok")):
+                        paper_client = flatten_client
+                    elif trade_context_health.get("fault_halted"):
+                        next_trade_context_retry = float("inf")
                     dispatch_enabled = True
             latency_metrics = summarize_latency_samples(list(pipeline_latency_samples))
             expansion_symbol_count = (
@@ -3231,6 +3297,8 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 pipeline_metrics=latency_metrics,
                 subscription_failed_symbols=subscription_failed,
                 extra={
+                    **runtime_identity,
+                    "runtime_boot_recovery": boot_decision,
                     "run_id": run_id, "runtime_pid": os.getpid(), "quote_worker_pid": worker.pid if worker else "",
                     "runtime_started_at": runtime_started_at,
                     "runtime_process_start_ticks": runtime_process_start_ticks,
@@ -3397,6 +3465,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "dispatch_requested": dispatch_requested,
                     "trade_context_health": trade_context_health,
+                    "trade_execution": runtime_trade_observability(execution_trade, flatten_client),
                     "dispatch_block_reason": runtime_dispatch_block_reason(
                         paper_order_dispatch_enabled=config.paper_order_dispatch_enabled,
                         complete_session_gate_blocked=(
@@ -3449,18 +3518,11 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     except KeyboardInterrupt:
         return 0
     finally:
-        stop_event.set()
-        stop_spawned_process(worker, graceful=True)
-        close_spawn_queue(message_queue)
-        account.stop()
-        signal.signal(signal.SIGTERM, previous_sigterm_handler)
-        if read_pid(pid_path(config)) == os.getpid():
-            pid_path(config).unlink(missing_ok=True)
-        run_lock.seek(0)
-        run_lock.truncate()
-        run_lock.flush()
-        fcntl.flock(run_lock.fileno(), fcntl.LOCK_UN)
-        run_lock.close()
+        cleanup_runtime_resources(
+            stop_event=stop_event, worker=worker, message_queue=message_queue,
+            execution_trade=execution_trade, account=account,
+            previous_sigterm_handler=previous_sigterm_handler,
+        )
 
 
 def pid_path(config: Any) -> Path:
@@ -3485,19 +3547,26 @@ def process_alive(pid: int) -> bool:
 
 def process_start_ticks(pid: int) -> str:
     try:
-        return Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").split()[21]
+        return Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()[19]
     except (OSError, IndexError):
         return ""
 
 
 def runtime_status_process_matches(pid: int, payload: dict[str, Any]) -> bool:
+    identity = read_runtime_boot_identity()
+    expected_ticks = str(payload.get("runtime_process_start_ticks") or "")
     return bool(
         pid > 0
+        and identity.get("runtime_boot_id")
+        and not identity.get("runtime_boot_id_error")
+        and not payload.get("runtime_boot_id_error")
+        and payload.get("runtime_boot_id") == identity["runtime_boot_id"]
+        and payload.get("runtime_boot_id_source") == identity["runtime_boot_id_source"]
+        and expected_ticks.isdigit()
         and process_alive(pid)
         and is_expected_sdk_runtime_process(pid)
         and str(payload.get("runtime_pid") or "") == str(pid)
-        and str(payload.get("runtime_process_start_ticks") or "")
-        == process_start_ticks(pid)
+        and expected_ticks == process_start_ticks(pid)
         and str(payload.get("config_fingerprint") or "")
     )
 
@@ -3572,6 +3641,49 @@ def cleanup_orphaned_sdk_runtime_children(config: Any) -> list[int]:
     return cleaned
 
 
+def _read_runtime_status_for_startup(config: Any) -> dict[str, Any]:
+    try:
+        payload = json.loads(config.runtime_status_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    if not isinstance(payload, dict):
+        raise RuntimeError("m15_runtime_status_invalid_manual_diagnosis_required")
+    return payload
+
+
+def checked_runtime_boot_startup(config: Any) -> dict[str, Any]:
+    """Audit and check under the global start/run lock, before overwriting state."""
+    previous = _read_runtime_status_for_startup(config)
+    startup_state = dict(previous)
+    journal_path = config.output_dir / "m15_sdk_submission_journal.jsonl"
+    if journal_path.exists():
+        from scripts.m15_submission_journal_lib import SubmissionJournal, SubmissionJournalError, UNRESOLVED
+
+        try:
+            entries = SubmissionJournal(journal_path).snapshot()
+            count = sum(entry["outcome"] in UNRESOLVED for entry in entries.values())
+            journal_health = {"unresolved_submission_count": count, "pending_reconciliation": count > 0}
+        except (OSError, SubmissionJournalError) as exc:
+            journal_health = {"fault_halted": True, "requires_manual_reconciliation": True,
+                              "error": f"{type(exc).__name__}:{exc}"}
+        startup_state["startup_submission_journal"] = journal_health
+    decision = classify_runtime_boot_state(startup_state)
+    if "startup_submission_journal" in startup_state:
+        decision["startup_submission_journal"] = startup_state["startup_submission_journal"]
+    append_runtime_boot_audit(
+        config.output_dir / "m15_runtime_boot_audit.jsonl", decision, previous,
+    )
+    if decision["action"] == "manual_required":
+        raise RuntimeError(
+            "m15_runtime_fault_latched_manual_diagnosis_required:" + decision["reason"]
+        )
+    if decision["action"] == "no_boot_recovery" and previous and previous.get("status") not in {"stopped", "operator_stopped"}:
+        raise RuntimeError("m15_runtime_status_unrecognized_manual_diagnosis_required")
+    if not decision["allow_reinitialize"] and runtime_requires_health_replacement(previous, config):
+        raise RuntimeError("m15_runtime_fault_latched_manual_diagnosis_required")
+    return decision
+
+
 def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     GLOBAL_RUNTIME_START_LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -3583,14 +3695,9 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
         existing = lock_owner if lock_owner and process_alive(lock_owner) else read_pid(pid_path(config))
         status = _read_runtime_status(config)
         expected_fingerprint = config_fingerprint(config)
-        terminal_same_build = bool(
-            str(status.get("config_fingerprint") or "") == expected_fingerprint
-            and runtime_requires_health_replacement(status, config)
-        )
-        if terminal_same_build:
-            raise RuntimeError(
-                "m15_runtime_fault_latched_manual_diagnosis_required"
-            )
+        boot_decision = checked_runtime_boot_startup(config)
+        if boot_decision["allow_reinitialize"]:
+            existing = None
         if existing and process_alive(existing):
             if not is_expected_sdk_runtime_process(existing):
                 raise RuntimeError("sdk_runtime_pid_is_not_expected_process")
@@ -3605,6 +3712,11 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
                     f"PID={existing}；本次未启动第二个进程。"
                 )
                 return 0
+            if (
+                str(status.get("config_fingerprint") or "") != expected_fingerprint
+                or not runtime_status_process_matches(existing, status)
+            ):
+                raise RuntimeError("sdk_runtime_process_identity_mismatch_no_signal_sent")
             pid_path(config).write_text(f"{existing}\n", encoding="utf-8")
             same_invocation = bool(status.get("dispatch_requested", False)) == bool(args.dispatch)
             if (
@@ -3614,7 +3726,7 @@ def start_runtime_daemon(args: argparse.Namespace, config: Any) -> int:
             ):
                 print(f"SDK 实时运行层已在运行，PID={existing}")
                 return 0
-            if not request_runtime_shutdown(existing):
+            if not request_runtime_shutdown(existing, expected_status=status):
                 raise RuntimeError("sdk_runtime_shutdown_escalation_failed")
             pid_path(config).unlink(missing_ok=True)
         command = [sys.executable, str(Path(__file__).resolve()), "--watch", "--config", str(args.config)]
@@ -3699,7 +3811,33 @@ def main() -> int:
         require_sdk_contract()
         read_client_id(config)
     except Exception as exc:
-        build_status(config, status="blocked_sdk_prerequisite", reason=str(exc), sdk_installed=False, oauth_client_id_present=False)
+        # A failed CLI prerequisite probe must not erase an existing fault or
+        # rewrite a live/old runtime's boot identity with this launcher's boot.
+        GLOBAL_RUNTIME_START_LOCK.parent.mkdir(parents=True, exist_ok=True)
+        with GLOBAL_RUNTIME_START_LOCK.open("a+", encoding="utf-8") as start_lock:
+            fcntl.flock(start_lock.fileno(), fcntl.LOCK_EX)
+            error_run_lock = acquire_runtime_run_lock(config.output_dir)
+            try:
+                previous = _read_runtime_status_for_startup(config)
+                decision = classify_runtime_boot_state(previous)
+                decision["prerequisite_error"] = f"{type(exc).__name__}:{exc}"
+                append_runtime_boot_audit(
+                    config.output_dir / "m15_runtime_boot_audit.jsonl", decision, previous,
+                )
+                write_json_atomic(config.output_dir / "m15_runtime_prerequisite_error.json", {
+                    "generated_at": to_iso(datetime.now(UTC)),
+                    "status": "blocked_sdk_prerequisite", "reason": str(exc),
+                    "runtime_boot_recovery": decision, "dispatch_enabled": False,
+                })
+                if error_run_lock is not None and not runtime_fault_markers(previous):
+                    build_status(
+                        config, status="blocked_sdk_prerequisite", reason=str(exc),
+                        sdk_installed=False, oauth_client_id_present=False,
+                        extra={**read_runtime_boot_identity(), "dispatch_enabled": False},
+                    )
+            finally:
+                if error_run_lock is not None:
+                    error_run_lock.close()
         print(f"SDK runtime blocked: {exc}")
         return 2
     if args.check:

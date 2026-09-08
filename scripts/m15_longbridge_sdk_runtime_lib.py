@@ -1330,6 +1330,7 @@ class SdkRealtimePaperClient:
         *,
         request_gate: Any = None,
         on_submission: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
+        submission_journal_path: str | Path | None = None,
         short_capacity_cache_ttl_seconds: int = 900,
         short_capacity_failure_cache_ttl_seconds: int = 30,
         short_capacity_price_tolerance_pct: Decimal = Decimal("2"),
@@ -1350,14 +1351,38 @@ class SdkRealtimePaperClient:
         self._short_capacity_cache: dict[str, dict[str, Any]] = {}
         self.trade_context_refresh_required = False
         self.trade_context_refresh_reason = ""
-        # Single-flight submit and a session-local latch. Durable reconciliation
-        # remains the caller's responsibility; never invent a broker order ID.
+        # Production supplies a durable journal; tests/legacy callers can omit
+        # it. Never invent broker IDs to represent an unresolved write.
         import threading
 
         self._submission_lock = threading.RLock()
         self._submission_results: dict[str, dict[str, Any]] = {}
         self._unconfirmed_submission: dict[str, Any] | None = None
         self._unconfirmed_payload: dict[str, Any] | None = None
+        from scripts.m15_submission_journal_lib import SubmissionJournal
+
+        self._submission_journal = (
+            SubmissionJournal(submission_journal_path) if submission_journal_path is not None else None
+        )
+        self._journal_failure = ""
+
+    def submission_journal_health(self) -> dict[str, Any]:
+        from scripts.m15_submission_journal_lib import SubmissionJournalError, UNRESOLVED
+
+        if self._submission_journal is None:
+            return {"ok": True, "status": "submission_journal_not_configured"}
+        try:
+            if self._journal_failure:
+                raise SubmissionJournalError(self._journal_failure)
+            entries = self._submission_journal.snapshot()
+        except SubmissionJournalError as exc:
+            self._journal_failure = str(exc)
+            return {"ok": False, "status": "submission_journal_failed", "fault_halted": True,
+                    "requires_manual_reconciliation": True, "error": self._journal_failure}
+        count = sum(row["outcome"] in UNRESOLVED for row in entries.values())
+        return {"ok": count == 0,
+                "status": "submission_journal_pending_reconciliation" if count else "submission_journal_ready",
+                "pending_reconciliation": count > 0, "unresolved_submission_count": count}
 
     def healthcheck(self) -> dict[str, Any]:
         """Refresh OAuth on a harmless read before the next order is needed."""
@@ -1408,9 +1433,15 @@ class SdkRealtimePaperClient:
     def submit_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
         with self._submission_lock:
             key = str(order_payload.get("client_request_id") or order_payload.get("signal_id") or "")
-            if key and key in self._submission_results:
+            if self._journal_failure:
+                return dict(self._unconfirmed_submission or {
+                    "submitted": False, "status": "submit_blocked_submission_journal_failed",
+                    "order_id": "", "explicit_reject": False, "confirmation_required": True,
+                    "error": self._journal_failure,
+                })
+            if self._submission_journal is None and key and key in self._submission_results:
                 return dict(self._submission_results[key])
-            if self._unconfirmed_submission is not None:
+            if self._unconfirmed_submission is not None and key not in self._submission_results:
                 return {
                     "submitted": False,
                     "status": "submit_blocked_pending_reconciliation",
@@ -1460,21 +1491,55 @@ class SdkRealtimePaperClient:
             kwargs["submitted_price"] = decimal(order_payload.get("limit_price"))
         if order_type_name == "LIT":
             kwargs["trigger_price"] = decimal(order_payload.get("trigger_price"))
-        callback = lambda: self.trade_context.submit_order(**kwargs)
+        from scripts.m15_submission_journal_lib import SubmissionJournalBlocked, SubmissionJournalError
+
+        if self._submission_journal is not None:
+            try:
+                should_send, entry = self._submission_journal.begin(order_payload, kwargs["remark"])
+            except SubmissionJournalBlocked:
+                return {"submitted": False, "status": "submit_blocked_pending_reconciliation",
+                        "order_id": "", "explicit_reject": False, "confirmation_required": True}
+            except SubmissionJournalError as exc:
+                self._journal_failure = str(exc)
+                return {"submitted": False, "status": "submit_blocked_submission_journal_failed",
+                        "order_id": "", "explicit_reject": False, "confirmation_required": True,
+                        "error": self._journal_failure}
+            if not should_send:
+                result = self._submission_journal.response(entry)
+                if entry["outcome"] != "not_sent":
+                    self._record_submission(order_payload, result, key, persist=False)
+                return result
+        sdk_invoked = False
+
+        def callback():
+            nonlocal sdk_invoked
+            sdk_invoked = True
+            return self.trade_context.submit_order(**kwargs)
+
         try:
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
         except Exception as exc:
             from scripts.m15_official_async_trade_lib import TradeRequestNotSent
 
-            if isinstance(exc, TradeRequestNotSent):
-                return {
+            if isinstance(exc, TradeRequestNotSent) and not sdk_invoked:
+                result = {
                     "submitted": False,
                     "status": "submit_blocked_trade_admission",
                     "order_id": "",
                     "explicit_reject": False,
                     "confirmation_required": False,
+                    "sdk_request_sent": False,
                     "error": str(exc)[:500],
                 }
+                if self._submission_journal is not None:
+                    try:
+                        self._submission_journal.finish(key, outcome="not_sent")
+                    except SubmissionJournalError as journal_exc:
+                        self._journal_failure = str(journal_exc)
+                        result.update(status="submit_unconfirmed_missing_order_id", confirmation_required=True,
+                                      error=self._journal_failure)
+                        self._record_submission(order_payload, result, key, persist=False)
+                return result
             error = str(exc)[:500]
             refresh_required = is_oauth_refresh_failure(error)
             if refresh_required:
@@ -1484,19 +1549,20 @@ class SdkRealtimePaperClient:
                 "submitted": False,
                 "status": (
                     "submit_blocked_trade_context_refresh_required"
-                    if refresh_required
+                    if refresh_required and self._submission_journal is None
                     else "submit_unconfirmed_missing_order_id"
                 ),
                 "order_id": "",
                 # An exception is not evidence that the broker rejected a
                 # write. This also prevents the executor's market-exit fallback.
                 "explicit_reject": False,
-                "confirmation_required": not refresh_required,
+                "confirmation_required": not refresh_required or self._submission_journal is not None,
+                "sdk_request_sent": sdk_invoked,
                 "trade_context_refresh_required": refresh_required,
                 "error": error,
                 "response": {"error": error},
             }
-            if not refresh_required:
+            if not refresh_required or self._submission_journal is not None:
                 self._record_submission(order_payload, result, key)
             return result
         order_id = str(getattr(response, "order_id", "") or "")
@@ -1506,12 +1572,32 @@ class SdkRealtimePaperClient:
             "order_id": order_id,
             "explicit_reject": False,
             "confirmation_required": not bool(order_id),
+            "sdk_request_sent": True,
+            "submission_journal_reused": False,
+            "recovered_order": False,
             "response": {"order_id": order_id},
         }
         self._record_submission(order_payload, result, key)
         return result
 
-    def _record_submission(self, payload: dict[str, Any], result: dict[str, Any], key: str) -> None:
+    def _record_submission(self, payload: dict[str, Any], result: dict[str, Any], key: str, *, persist: bool = True) -> None:
+        from scripts.m15_submission_journal_lib import SubmissionJournalError
+
+        if persist and self._submission_journal is not None:
+            try:
+                self._submission_journal.finish(
+                    key, outcome="acknowledged" if result.get("order_id") else "unknown",
+                    order_id=str(result.get("order_id") or ""),
+                )
+            except SubmissionJournalError as exc:
+                self._journal_failure = str(exc)
+                # The acknowledgement could not be durably recorded. Do not
+                # report this request as confirmed or let subsequent writes run.
+                observed_order_id = str(result.get("order_id") or "")
+                result.update(submitted=False, status="submit_unconfirmed_missing_order_id",
+                              order_id="", confirmation_required=True, error=self._journal_failure,
+                              response={"order_id": ""}, submission_journal_failed=True,
+                              observed_broker_order_id=observed_order_id)
         if result.get("confirmation_required"):
             self._unconfirmed_submission = dict(result)
             self._unconfirmed_payload = dict(payload)
@@ -1541,6 +1627,27 @@ class SdkRealtimePaperClient:
         )
 
         with self._submission_lock:
+            if self._submission_journal is not None:
+                from scripts.m15_submission_journal_lib import SubmissionJournalError, UNRESOLVED
+
+                if self._journal_failure:
+                    return False
+                try:
+                    reconciled = self._submission_journal.reconcile(account_state)
+                    entries = self._submission_journal.snapshot()
+                except SubmissionJournalError as exc:
+                    self._journal_failure = str(exc)
+                    return False
+                for entry in reconciled:
+                    result = self._submission_journal.response(entry)
+                    self._record_submission(entry["payload"], result, entry["key"], persist=False)
+                    if result.get("submission_note_error"):
+                        self._journal_failure = "submission_journal_reconciliation_note_failed"
+                        return False
+                if reconciled and not any(row["outcome"] in UNRESOLVED for row in entries.values()):
+                    self._unconfirmed_submission = None
+                    self._unconfirmed_payload = None
+                return bool(reconciled)
             payload = self._unconfirmed_payload
             if payload is None:
                 return False
@@ -1574,11 +1681,13 @@ class SdkRealtimePaperClient:
         return self.request_gate.call(callback) if self.request_gate is not None else callback()
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
+        self._check_journal_write_allowed()
         callback = lambda: self.trade_context.cancel_order(str(order_id))
         self.request_gate.call(callback) if self.request_gate is not None else callback()
         return {"canceled": True, "status": "cancel_requested", "order_id": str(order_id)}
 
     def replace_order(self, order_id: str, quantity: Decimal, price: Decimal) -> dict[str, Any]:
+        self._check_journal_write_allowed()
         callback = lambda: self.trade_context.replace_order(
             str(order_id),
             decimal(quantity),
@@ -1592,6 +1701,13 @@ class SdkRealtimePaperClient:
             "quantity": fmt(decimal(quantity)),
             "price": fmt(decimal(price)),
         }
+
+    def _check_journal_write_allowed(self) -> None:
+        from scripts.m15_submission_journal_lib import SubmissionJournalBlocked
+
+        health = self.submission_journal_health()
+        if not health["ok"]:
+            raise SubmissionJournalBlocked(str(health["status"]))
 
     def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
         # The SDK reports borrowed-stock capacity for a Sell open-short request

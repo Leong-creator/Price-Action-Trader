@@ -95,6 +95,29 @@ class PaperOrderTimeoutTests(unittest.TestCase):
         finally:
             gate._lock.release()
 
+    def test_cycle_budget_is_shared_for_reads_writes_and_cpu_delay(self):
+        now = [0.0]
+        gate = BoundedTradeRequestGate(max_calls=2, monotonic_clock=lambda: now[0])
+        calls = []
+        gate.begin_cycle(5.0)
+        gate.call(lambda: calls.append("health"))
+        now[0] = 3.0
+        gate.call(lambda: calls.append("capacity"))
+        now[0] = 3.001
+        with patch("time.sleep", side_effect=AssertionError("must not sleep")):
+            with self.assertRaisesRegex(TradeRequestNotSent, "cycle budget"):
+                gate.call(lambda: calls.append("submit"))
+        self.assertEqual(calls, ["health", "capacity"])
+        gate.begin_cycle(8.001)
+        with self.assertRaisesRegex(TradeRequestNotSent, "rate budget"):
+            gate.call(lambda: calls.append("maintenance"))
+
+    def test_invalid_cycle_budget_rejected(self):
+        gate = BoundedTradeRequestGate()
+        for deadline, reserve in ((float("inf"), 2), (5, -1), (5, float("nan"))):
+            with self.subTest(deadline=deadline, reserve=reserve), self.assertRaises(ValueError):
+                gate.begin_cycle(deadline, reserve)
+
     def test_note_failure_preserves_ack_and_blocks_new_writes(self):
         trade = SimpleNamespace(submit_order=Mock(return_value=SimpleNamespace(order_id="mock-order")))
         client = SdkRealtimePaperClient(trade, SDK, on_submission=Mock(side_effect=OSError("disk full")))
@@ -168,6 +191,7 @@ class AsyncTradeBridgeTests(unittest.TestCase):
                     return SimpleNamespace(order_id="mock-order", cash_max_qty=2, margin_max_qty=3)
                 return operation
         bridge = self.bridge(Context())
+        self.assertEqual(bridge.maximum_request_wait_seconds, 0.05)
         client = SdkRealtimePaperClient(bridge, SDK)
         self.assertTrue(client.healthcheck()["ok"])
         self.assertTrue(client.submit_order(PAYLOAD)["submitted"])
@@ -233,6 +257,28 @@ class AsyncTradeBridgeTests(unittest.TestCase):
             OfficialAsyncTradeBridge(None, sdk=sdk)
         sdk.TradeContext.assert_not_called()
         self.assertEqual({t.ident for t in threading.enumerate()}, before)
+
+    def test_budget_admission_does_not_poison_or_rebuild_bridge(self):
+        calls = []
+        class Context:
+            async def today_orders(self):
+                calls.append("health")
+                return []
+        sdk = SimpleNamespace(AsyncTradeContext=SimpleNamespace(create=Mock(return_value=Context())))
+        bridge = OfficialAsyncTradeBridge(None, sdk=sdk, request_timeout=2.0)
+        self.addCleanup(bridge.close)
+        self.assertEqual(bridge.maximum_request_wait_seconds, 2.0)
+        now = [4.0]
+        gate = BoundedTradeRequestGate(monotonic_clock=lambda: now[0])
+        gate.begin_cycle(5.0, reserve_seconds=2.0)
+        client = SdkRealtimePaperClient(bridge, SDK, request_gate=gate)
+        self.assertFalse(client.healthcheck()["ok"])
+        bridge.check_health()
+        self.assertEqual(calls, [])
+        gate.begin_cycle(9.0)
+        self.assertTrue(client.healthcheck()["ok"])
+        self.assertEqual(calls, ["health"])
+        sdk.AsyncTradeContext.create.assert_called_once()
 
     def test_invalid_timeouts_fail_before_factory(self):
         for value in (0, -1, float("inf"), float("nan")):

@@ -228,7 +228,8 @@ class WatchLoopTest(unittest.TestCase):
     """Run the real parent loop with no SDK, subprocess, order or broker I/O."""
 
     def watch(self, start: datetime, events: list[tuple[datetime, dict | None]], *, dispatch: bool = False,
-              audit_case: str | None = None):
+              gate_passed: bool = False, validation_approved: bool = False,
+              flatten_blocks_new_entries: bool = True, audit_case: str | None = None):
         clock = [start]
         statuses, gates, dispatched = [], [], []
         config = runtime.load_config()
@@ -272,6 +273,13 @@ class WatchLoopTest(unittest.TestCase):
         paper = MagicMock()
         paper.trade_context_refresh_required = False
         paper.healthcheck.return_value = {"ok": True}
+        paper.submission_journal_health.return_value = {"ok": True, "unresolved_submission_count": 0}
+        trade_context = MagicMock()
+        trade_context.check_health.return_value = None
+        trade_context.maximum_request_wait_seconds = 2.0
+
+        def build_clients(*args, dispatch_enabled, **kwargs):
+            return trade_context, paper if dispatch_enabled else None, paper
 
         def record(path, day, evidence, **kwargs):
             gates.append({"session_date": day, **evidence})
@@ -288,19 +296,21 @@ class WatchLoopTest(unittest.TestCase):
                              runtime_status_path=Path(directory) / "status.json",
                              market_events_path=Path(directory) / "events.jsonl",
                              daily_context_path=Path(directory) / "daily.jsonl",
-                             readonly_gate_path=Path(directory) / "gate.json")
+                             readonly_gate_path=Path(directory) / "gate.json",
+                             paper_validation_approved=validation_approved,
+                             paper_validation_market_date="2026-09-08")
             mocks = {
                 "acquire_runtime_run_lock": {"return_value": MagicMock()},
                 "cleanup_orphaned_sdk_runtime_children": {"return_value": []},
                 "require_sdk_contract": {"return_value": object()},
                 "config_fingerprint": {"return_value": "offline"},
-                "readonly_gate_passed": {"return_value": (dispatch, int(dispatch), 1)},
+                "readonly_gate_passed": {"return_value": (gate_passed, int(gate_passed), 1)},
                 "verify_manifest": {"return_value": {"verified": True}},
                 "read_jsonl_tail_rows": {"return_value": []},
                 "SdkAccountProcessCoordinator": {"return_value": account},
                 "held_position_monitoring_symbols": {"return_value": ()},
                 "detect_position_monitoring_set_change": {"return_value": ((), (), "")},
-                "build_sdk_trade_clients": {"return_value": (None, paper if dispatch else None, paper if dispatch else None)},
+                "build_sdk_trade_clients": {"side_effect": build_clients},
                 "load_current_sdk_intraday_context": {"return_value": []},
                 "restore_pipeline_observability": {"return_value": ([], {}, "")},
                 "write_daily_context_cache": {},
@@ -311,10 +321,17 @@ class WatchLoopTest(unittest.TestCase):
                 "process_resource_snapshot": {"return_value": {}},
                 "load_formal_test_marker": {"return_value": {}},
                 "stop_spawned_process": {}, "close_spawn_queue": {},
-                "run_pending_flatten_cycle": {"return_value": {"blocks_new_entries": True}},
+                "run_pending_flatten_cycle": {"return_value": {"blocks_new_entries": flatten_blocks_new_entries}},
+                "run_authorized_account_exit_cycle": {"return_value": {"status": "inactive"}},
+                "run_sdk_order_maintenance": {"return_value": {"status": "no_actions"}},
             }
+            mocked = {}
             for name, kwargs in mocks.items():
-                stack.enter_context(patch.object(runtime, name, **kwargs))
+                mocked[name] = stack.enter_context(patch.object(runtime, name, **kwargs))
+            stack.enter_context(patch.object(runtime, "checked_runtime_boot_startup", create=True,
+                                             return_value={"action": "no_boot_recovery"}))
+            stack.enter_context(patch("scripts.m15_pa004_overcap_cleanup_lib.advance_cleanup_state",
+                                      return_value={"status": "inactive"}))
             if audit_case == "write_failure":
                 stack.enter_context(patch.object(runtime, "append_market_events", side_effect=OSError("disk full")))
             stack.enter_context(patch.object(runtime, "datetime", Clock))
@@ -326,6 +343,7 @@ class WatchLoopTest(unittest.TestCase):
             result = runtime.run_watch(config, dispatch_requested=dispatch)
         self.assertEqual(process_context.Process.call_count, 1)
         self.assertEqual(process_context.Process.return_value.start.call_count, 1)
+        self.assertEqual(mocked["build_sdk_trade_clients"].call_count, 1)
         return result, statuses, gates, dispatched
 
     @staticmethod
@@ -416,12 +434,105 @@ class WatchLoopTest(unittest.TestCase):
         self.assertEqual(gates, [])
 
     def test_stale_daily_context_disables_entry_but_keeps_exit_client(self) -> None:
-        result, statuses, _, dispatched = self.watch(at(9, 9, 29), self.day_events(9, stop=2), dispatch=True)
+        result, statuses, _, dispatched = self.watch(at(9, 9, 29), self.day_events(9, stop=2), dispatch=True, gate_passed=True)
         self.assertEqual(result, 0)
         self.assertEqual(len(dispatched), 1)
         self.assertFalse(dispatched[0][2])
         self.assertIsNotNone(dispatched[0][3])
         self.assertFalse(statuses[-1]["extra"]["dispatch_enabled"])
+
+    def test_validation_waits_for_first_complete_boundary_without_full_session_proof(self) -> None:
+        before = [(at(8, 9, 34, 59), self.heartbeat(at(8, 9, 34, 59)))]
+        for completed in (False, True):
+            with self.subTest(completed=completed):
+                events = before + (self.day_events(8, stop=2) if completed else [])
+                result, statuses, gates, dispatched = self.watch(
+                    at(8, 9, 29), events, dispatch=True, gate_passed=False,
+                    validation_approved=True, flatten_blocks_new_entries=False)
+                self.assertEqual(result, 0)
+                self.assertEqual(gates, [])
+                self.assertEqual(len(dispatched), int(completed))
+                self.assertTrue(statuses[-1]["extra"]["paper_validation_authorized"])
+                self.assertFalse(statuses[-1]["extra"]["complete_session_gate_passed"])
+                self.assertEqual(statuses[-1]["extra"]["complete_boundary_count"], int(completed))
+                if completed:
+                    self.assertEqual(dispatched[0][0], at(8, 9, 35, 2))
+                    self.assertTrue(dispatched[0][2])
+                    self.assertIsNotNone(dispatched[0][3])
+                    self.assertTrue(statuses[-1]["extra"]["dispatch_enabled"])
+
+    def test_validation_partial_first_boundary_never_dispatches(self) -> None:
+        result, statuses, gates, dispatched = self.watch(
+            at(8, 9, 31), self.day_events(8, stop=3), dispatch=True,
+            gate_passed=False, validation_approved=True, flatten_blocks_new_entries=False)
+        self.assertEqual(result, 0)
+        self.assertEqual(gates, [])
+        self.assertEqual(len(dispatched), 1)
+        self.assertEqual(dispatched[0][0], at(8, 9, 40, 2))
+        self.assertTrue(dispatched[0][2])
+        self.assertIsNotNone(dispatched[0][3])
+        self.assertEqual(statuses[-1]["extra"]["complete_boundary_count"], 1)
+        self.assertFalse(statuses[-1]["extra"]["complete_session_gate_passed"])
+
+    def test_validation_expiry_closes_entries_but_retains_exit_client(self) -> None:
+        midnight = at(9, 0, 0)
+        before_midnight = midnight - timedelta(seconds=1)
+        events = self.day_events(8, start=77)
+        events += [(before_midnight, self.heartbeat(before_midnight)), (midnight, self.heartbeat(midnight))]
+        events += self.refresh_daily(9) + self.day_events(9, stop=2)
+        result, statuses, gates, dispatched = self.watch(
+            at(8, 15, 49), events, dispatch=True, gate_passed=False,
+            validation_approved=True, flatten_blocks_new_entries=False)
+        self.assertEqual(result, 0)
+        self.assertEqual(gates, [])
+        self.assertEqual(len(dispatched), 3)
+        self.assertTrue(all(enabled for _, _, enabled, _ in dispatched[:-1]))
+        original_client = dispatched[0][3]
+        self.assertIsNotNone(original_client)
+        self.assertEqual(dispatched[-1][0], at(9, 9, 35, 2))
+        self.assertFalse(dispatched[-1][2])
+        self.assertTrue(all(client is original_client for _, _, _, client in dispatched))
+        before_midnight_states = [row["extra"] for row in statuses
+                                  if row.get("extra", {}).get("evidence_session_date") == "2026-09-08"]
+        self.assertTrue(before_midnight_states[-1]["paper_validation_authorized"])
+        midnight_states = [row["extra"] for row in statuses
+                           if row.get("extra", {}).get("evidence_session_date") == "2026-09-09"]
+        self.assertTrue(midnight_states)
+        self.assertTrue(all(not row["paper_validation_authorized"] for row in midnight_states))
+        self.assertTrue(all(not row["dispatch_enabled"] for row in midnight_states))
+        self.assertTrue(statuses[-1]["extra"]["trading_daily_context_ready"])
+        self.assertFalse(statuses[-1]["extra"]["complete_session_gate_passed"])
+
+    def test_validation_worker_fault_halts_without_new_context_or_later_dispatch(self) -> None:
+        failed_at = at(8, 9, 35, 3)
+        events = self.day_events(8, stop=2)
+        events += [(failed_at, {"kind": "error", "reason": "official_sdk_callback_failed"})]
+        events += self.day_events(8, start=2, stop=3)
+        result, statuses, gates, dispatched = self.watch(
+            at(8, 9, 29), events, dispatch=True, gate_passed=False,
+            validation_approved=True, flatten_blocks_new_entries=False)
+        self.assertEqual(result, 4)
+        self.assertEqual(gates, [])
+        self.assertEqual(len(dispatched), 1)
+        self.assertTrue(dispatched[0][2])
+        self.assertIsNotNone(dispatched[0][3])
+        self.assertEqual(statuses[-1]["status"], "fault_halted")
+        self.assertEqual(statuses[-1]["reason"], "official_sdk_callback_failed")
+        self.assertFalse(statuses[-1]["extra"]["dispatch_enabled"])
+
+    def test_validation_duplicate_boundary_does_not_replay_dispatch(self) -> None:
+        first = self.day_events(8, stop=2)
+        events = first + first + self.day_events(8, start=2, stop=3)
+        result, statuses, gates, dispatched = self.watch(
+            at(8, 9, 29), events, dispatch=True, gate_passed=False,
+            validation_approved=True, flatten_blocks_new_entries=False)
+        self.assertEqual(result, 0)
+        self.assertEqual(gates, [])
+        self.assertEqual([when for when, _, _, _ in dispatched], [at(8, 9, 35, 2), at(8, 9, 40, 2)])
+        self.assertTrue(all(enabled and client is not None for _, _, enabled, client in dispatched))
+        self.assertEqual(statuses[-1]["extra"]["complete_boundary_count"], 2)
+        self.assertEqual(statuses[-1]["extra"]["audited_boundary_count"], 2)
+        self.assertFalse(statuses[-1]["extra"]["complete_session_gate_passed"])
 
     def test_real_dispatch_audit_failure_or_staleness_halts_parent(self) -> None:
         symbols = runtime.configured_trading_symbols(runtime.load_config())
@@ -433,7 +544,7 @@ class WatchLoopTest(unittest.TestCase):
                 row["received_at"] = runtime.to_iso(close + timedelta(seconds=2))
             now = close + timedelta(seconds=4.5)
             events = [(now, self.heartbeat(now)), (now, {"kind": "bars", "rows": rows})]
-            result, statuses, gates, _ = self.watch(at(8, 9, 29), events, dispatch=True, audit_case=case)
+            result, statuses, gates, _ = self.watch(at(8, 9, 29), events, dispatch=True, gate_passed=True, audit_case=case)
             self.assertEqual(result, 4)
             self.assertEqual(statuses[-1]["reason"], reason)
             self.assertEqual(statuses[-1]["extra"]["audited_boundary_count"], 0)

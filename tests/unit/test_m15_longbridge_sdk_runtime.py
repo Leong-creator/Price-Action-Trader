@@ -258,8 +258,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_runtime_keeps_account_refresh_independent_during_quote_subscription(self) -> None:
         source = inspect.getsource(__import__(
             "scripts.run_m15_longbridge_sdk_runtime",
-            fromlist=["run_watch"],
-        ).run_watch)
+            fromlist=["_run_watch_after_boot_check"],
+        )._run_watch_after_boot_check)
         self.assertIn("account.start(background_refresh=True)", source)
         self.assertNotIn("account.pause_background_refresh()", source)
         self.assertIn("account.resume_background_refresh()", source)
@@ -331,8 +331,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
     def test_runtime_starts_exactly_one_quote_worker_without_recovery_loop(self) -> None:
         source = inspect.getsource(__import__(
             "scripts.run_m15_longbridge_sdk_runtime",
-            fromlist=["run_watch"],
-        ).run_watch)
+            fromlist=["_run_watch_after_boot_check"],
+        )._run_watch_after_boot_check)
         self.assertEqual(source.count("worker = process_context.Process("), 1)
         self.assertNotIn("reconnect_backoff", source)
         self.assertNotIn("quote_snapshot_worker", source)
@@ -802,8 +802,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         source = inspect.getsource(
             __import__(
                 "scripts.run_m15_longbridge_sdk_runtime",
-                fromlist=["run_watch"],
-            ).run_watch
+                fromlist=["_run_watch_after_boot_check"],
+            )._run_watch_after_boot_check
         )
         drain = source.index("drain_pending_worker_health_messages()")
         reader_error = source.index("if worker_ready and transport_reader_errors:")
@@ -815,8 +815,8 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
         source = inspect.getsource(
             __import__(
                 "scripts.run_m15_longbridge_sdk_runtime",
-                fromlist=["run_watch"],
-            ).run_watch
+                fromlist=["_run_watch_after_boot_check"],
+            )._run_watch_after_boot_check
         )
         fault = source[source.index('"reference_market_data_stalled"') :]
         self.assertIn('"transport_raw_notification_count"', fault)

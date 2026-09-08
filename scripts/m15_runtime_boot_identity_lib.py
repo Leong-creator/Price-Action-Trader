@@ -138,6 +138,37 @@ def runtime_fault_markers(status: dict[str, Any]) -> list[str]:
     if value.startswith(("fault", "blocked", "halted_account")) or "accountcircuit" in value or "account_circuit" in value:
         markers.append(f"status:{value}")
     markers.extend(key for key in FAULT_FLAGS if status.get(key))
+    active_flags = set(FAULT_FLAGS) | {
+        "fault_halted", "requires_manual_reconciliation", "pending_reconciliation",
+        "confirmation_required", "sdk_pending_confirmation", "pending_confirmation",
+        "unresolved_submission_count", "pending_confirmation_count",
+        "unconfirmed_submission", "unknown_submission",
+    }
+
+    def inspect(value: Any, path: str = "") -> None:
+        if isinstance(value, dict):
+            state = str(value.get("status") or "").lower()
+            if path and any(token in state for token in (
+                "fault_halted", "pending_reconciliation", "submission_state_unknown",
+                "submit_unconfirmed", "submission_journal_failed",
+            )):
+                markers.append(f"{path}.status:{state}")
+            if value.get("submission_journal_outcome") in {"intent", "unknown"}:
+                markers.append(f"{path + '.' if path else ''}submission_journal_outcome")
+            for key, child in value.items():
+                # Prior boot decisions are evidence, not the current fault state.
+                if key in {"runtime_boot_recovery", "previous_runtime_status"}:
+                    continue
+                child_path = f"{path}.{key}" if path else key
+                if key in active_flags and child and child_path not in markers:
+                    markers.append(child_path)
+                if isinstance(child, (dict, list)):
+                    inspect(child, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                inspect(child, f"{path}[{index}]")
+
+    inspect(status)
     return markers
 
 
