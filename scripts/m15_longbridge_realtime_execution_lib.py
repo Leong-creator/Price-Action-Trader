@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation, ROUND_FLOOR
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from scripts.m15_strategy_contracts_lib import load_contracts_cached
@@ -692,10 +692,12 @@ def run_realtime_execution(
     account_state_override: dict[str, Any] | None = None,
     existing_ledger_override: list[dict[str, Any]] | None = None,
     emitted_ledger_rows: list[dict[str, Any]] | None = None,
+    live_clock: Callable[[], datetime] | None = None,
+    submission_window: Callable[[datetime], bool] | None = None,
 ) -> dict[str, Any]:
     config = config or load_config()
     execution_cycle_started_monotonic = time.monotonic()
-    now = parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC)
+    now = live_clock() if live_clock is not None else (parse_utc_datetime(generated_at) if generated_at else datetime.now(UTC))
     generated_at_iso = to_iso(now)
     session_started_at = resolve_session_started_at(config.session_started_at, now)
     execution_run_id = build_execution_run_id(config, now)
@@ -823,7 +825,7 @@ def run_realtime_execution(
             signal=event,
             account_state=account_state,
             epoch_state=epoch_state,
-            generated_at=now,
+            generated_at=live_clock() if live_clock is not None else now,
             session_started_at=session_started_at,
             execution_run_id=execution_run_id,
             session_run_id=session_run_id,
@@ -876,7 +878,7 @@ def run_realtime_execution(
         broker_request_started_at: datetime | None = None
         broker_request_started_monotonic = 0.0
         if ready_for_submission and config.execute_orders:
-            broker_request_started_at = datetime.now(UTC)
+            broker_request_started_at = live_clock() if live_clock is not None else datetime.now(UTC)
             broker_request_started_monotonic = time.monotonic()
             execution_queue_delay_ms = max(
                 0,
@@ -884,6 +886,10 @@ def run_realtime_execution(
             )
             initial_latency_ms = int_decimal(row.get("latency_ms", 0))
             signal_to_request_ms = initial_latency_ms + execution_queue_delay_ms
+            if live_clock is not None:
+                signal_created_at = parse_signal_time(event.get("created_at") or event.get("generated_at") or event.get("signal_time"))
+                if signal_created_at is not None:
+                    signal_to_request_ms = latency_millis(signal_created_at, broker_request_started_at)
             row["broker_request_started_at"] = to_iso(broker_request_started_at)
             row["execution_queue_delay_ms"] = execution_queue_delay_ms
             row["signal_to_request_ms"] = signal_to_request_ms
@@ -898,6 +904,25 @@ def run_realtime_execution(
                     "blocked_delayed_signal_requires_realtime_rebuild"
                 ]
                 row["realtime_decision_status"] = "blocked_execution_queue_latency_requires_rebuild"
+                ready_for_submission = False
+            if live_clock is not None:
+                expires_at = parse_signal_time(event.get("expires_at") or event.get("valid_until") or event.get("signal_expires_at"))
+                if expires_at is not None and broker_request_started_at > expires_at:
+                    row["blockers"] = list(row.get("blockers", [])) + ["blocked_realtime_signal_expired_at_request"]
+                    row["realtime_decision_status"] = "blocked_realtime_signal_expired_at_request"
+                    ready_for_submission = False
+                snapshot_at = parse_signal_time(account_state.get("generated_at"))
+                snapshot_age = (broker_request_started_at - snapshot_at).total_seconds() if snapshot_at else None
+                row["account_state_age_seconds_at_request"] = snapshot_age
+                if snapshot_age is None or snapshot_age < 0 or (
+                    config.max_account_state_age_seconds > 0 and snapshot_age > config.max_account_state_age_seconds
+                ):
+                    row["blockers"] = list(row.get("blockers", [])) + ["blocked_account_state_stale_at_request"]
+                    row["realtime_decision_status"] = "blocked_account_state_stale_at_request"
+                    ready_for_submission = False
+            if submission_window is not None and not submission_window(broker_request_started_at):
+                row["blockers"] = list(row.get("blockers", [])) + ["blocked_outside_regular_session_at_request"]
+                row["realtime_decision_status"] = "blocked_outside_regular_session_at_request"
                 ready_for_submission = False
 
         if ready_for_submission:
@@ -1533,6 +1558,16 @@ def evaluate_signal_event(
         blockers.append("blocked_fee_profit_requires_confluence")
     if (opening_long or opening_short) and reward_r < minimum_reward_r:
         blockers.append("blocked_reward_r_below_minimum")
+    # Age checks precede any short-capacity I/O, not just order submission.
+    if signal_expires_at and generated_at > signal_expires_at:
+        blockers.append("blocked_realtime_signal_expired")
+    if latency_ms is not None and latency_ms > config.latency_acceptable_ms:
+        if age_limit_seconds > 0 and latency_ms > age_limit_seconds * 1000:
+            blockers.append("blocked_delayed_signal_age_over_limit")
+        if current_price <= ZERO or limit_price <= ZERO:
+            blockers.append("blocked_delayed_signal_missing_revalidation_price")
+        if not bool(signal.get("realtime_rebuilt_from_delayed_signal")):
+            blockers.append("blocked_delayed_signal_requires_realtime_rebuild")
     if opening_short and not blockers and config.execute_orders:
         capacity_provider = getattr(broker_client, "max_short_quantity", None)
         if not callable(capacity_provider):
@@ -1555,15 +1590,6 @@ def evaluate_signal_event(
             elif broker_max_quantity < quantity:
                 short_capacity_blocker_class = "insufficient"
                 blockers.append("blocked_short_capacity_insufficient")
-    if signal_expires_at and generated_at > signal_expires_at:
-        blockers.append("blocked_realtime_signal_expired")
-    if latency_ms is not None and latency_ms > config.latency_acceptable_ms:
-        if age_limit_seconds > 0 and latency_ms > age_limit_seconds * 1000:
-            blockers.append("blocked_delayed_signal_age_over_limit")
-        if current_price <= ZERO or limit_price <= ZERO:
-            blockers.append("blocked_delayed_signal_missing_revalidation_price")
-        if not bool(signal.get("realtime_rebuilt_from_delayed_signal")):
-            blockers.append("blocked_delayed_signal_requires_realtime_rebuild")
 
     status = "ready"
     if blockers:

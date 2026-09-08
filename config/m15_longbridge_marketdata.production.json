@@ -59,6 +59,8 @@
     "account_snapshot_refresh_deadline_seconds": 8,
     "maximum_account_snapshot_age_seconds": 45,
     "complete_session_gate_enabled": true,
+    "paper_validation_market_date": "2026-09-08",
+    "paper_validation_approved": true,
     "required_complete_sessions": 1,
     "paper_trading_only": true,
     "live_execution": false,

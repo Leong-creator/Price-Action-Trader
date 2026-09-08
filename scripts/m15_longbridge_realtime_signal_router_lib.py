@@ -671,7 +671,7 @@ def run_realtime_signal_router(
         if market_events_override is not None
         else read_jsonl_tail(config.market_events_path, config.max_market_event_rows_per_hot_run)
     )
-    market_events = realtime_relevant_market_events(raw_market_events, session_started_at)
+    market_events = realtime_relevant_market_events(raw_market_events, session_started_at, generated_at=now)
     existing_signal_events = (
         []
         if existing_signal_ids_override is not None
@@ -1057,7 +1057,9 @@ def update_short_signal_diagnostics(
     return payload
 
 
-def realtime_relevant_market_events(rows: list[dict[str, Any]], session_started_at: str) -> list[dict[str, Any]]:
+def realtime_relevant_market_events(
+    rows: list[dict[str, Any]], session_started_at: str, *, generated_at: datetime | None = None,
+) -> list[dict[str, Any]]:
     """Return bounded market events relevant to the realtime hot path.
 
     The router needs a small historical K-line context for price-action
@@ -1076,11 +1078,18 @@ def realtime_relevant_market_events(rows: list[dict[str, Any]], session_started_
     keep_ids: set[int] = set()
     grouped: dict[tuple[str, str], list[tuple[int, dict[str, Any]]]] = defaultdict(list)
     for idx, row in enumerate(rows):
-        if event_intents(row):
-            keep_ids.add(idx)
         event_dt = market_event_received_at(row)
         symbol = str(row.get("symbol") or "").upper()
         timeframe = str(row.get("timeframe") or "")
+        if timeframe == "1d":
+            try:
+                event_dt = parse_utc_datetime(str(row.get("event_time") or ""))
+            except ValueError:
+                continue
+            if generated_at is not None and event_dt > generated_at:
+                continue
+        if event_intents(row):
+            keep_ids.add(idx)
         key = (symbol, timeframe)
         if symbol and timeframe:
             grouped[key].append((idx, row))
@@ -1090,6 +1099,16 @@ def realtime_relevant_market_events(rows: list[dict[str, Any]], session_started_
                 current_keys.add(key)
     for key in current_keys:
         group_rows = grouped.get(key, [])
+        if key[1] == "1d":
+            # Initialization time is not a daily bar's market time. The SDK
+            # cache can appear twice (historical + rolling runtime context).
+            history = {}
+            for idx, row in group_rows:
+                stamp = parse_utc_datetime(str(row["event_time"]))
+                if stamp < session_started_dt and not event_intents(row):
+                    history[stamp] = idx
+            keep_ids.update(history[stamp] for stamp in sorted(history)[-60:])
+            continue
         group_rows.sort(key=lambda item: market_event_sort_key(item[1]))
         for idx, _row in group_rows[-20:]:
             keep_ids.add(idx)

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from scripts.m15_paper_session_validation_lib import validation_status_current
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,7 +122,7 @@ def build_acceptance(config: MondayRefreshAcceptanceConfig, generated_at: str) -
         and int(runtime.get("complete_sessions_passed") or 0)
         < int(runtime.get("complete_sessions_required") or 1)
     )
-    marketdata_gate = marketdata_gate_truth(runtime, readiness, runtime_artifact, readiness_artifact)
+    marketdata_gate = marketdata_gate_truth(runtime, readiness, runtime_artifact, readiness_artifact, generated_at)
     formal_consistent = (
         formal_active
         and str(formal_epoch.get("test_epoch_id") or "")
@@ -398,6 +399,7 @@ def marketdata_gate_truth(
     readiness: dict[str, Any],
     runtime_artifact: dict[str, Any],
     readiness_artifact: dict[str, Any],
+    now=None,
 ) -> dict[str, Any]:
     artifacts_healthy = runtime_artifact.get("status") == "ok" and readiness_artifact.get("status") == "ok"
     complete_boundary_count = safe_int(runtime.get("complete_boundary_count"))
@@ -409,19 +411,8 @@ def marketdata_gate_truth(
         or gate_block_reason == "complete_market_session_gate"
     )
     explicit_gate_passed = runtime.get("complete_session_gate_passed") is True
-    active_dispatch_proves_gate = bool(
-        runtime.get("sdk_connected") is True
-        and runtime.get("dispatch_enabled") is True
-        and readiness.get("new_position_submission_enabled") is True
-        and readiness_status
-        in {
-            "armed_waiting_regular_session",
-            "ready_for_regular_session",
-            "ready_for_longbridge_paper_orders",
-            "ready_regular_session",
-        }
-    )
-    gate_passed = explicit_gate_passed or active_dispatch_proves_gate
+    validation = bool(validation_status_current(runtime, now) and readiness.get("marketdata_integrity_gate", {}).get("paper_validation_authorized") is True)
+    gate_passed = explicit_gate_passed or validation
     if not artifacts_healthy:
         summary = (
             f"行情门禁工件异常：runtime={runtime_artifact.get('status')}，readiness={readiness_artifact.get('status')}；"
@@ -438,13 +429,17 @@ def marketdata_gate_truth(
             "summary": summary,
         }
     return {
-        "status": "passed" if gate_passed else "blocked",
+        "status": "paper_order_validation" if validation and not explicit_gate_passed else ("passed" if gate_passed else "blocked"),
+        "complete_session_passed": explicit_gate_passed,
+        "paper_validation_authorized": validation,
         "artifacts_healthy": True,
         "gate_passed": gate_passed,
         "waiting": readonly_waiting,
         "complete_boundary_count": complete_boundary_count,
         "realtime_tradable_bar_count": realtime_tradable_bar_count,
         "summary": (
+            "用户授权当日模拟订单联调；完整交易日验收仍未通过，不作为稳定性证明。"
+            if validation and not explicit_gate_passed else
             f"完整交易日行情门禁未通过，完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}；"
             "关闭新开仓，已有持仓退出仍需要实时行情。"
             if not gate_passed

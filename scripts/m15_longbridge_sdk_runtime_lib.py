@@ -98,6 +98,8 @@ class SdkRuntimeConfig:
     formal_test_marker_path: Path
     formal_test_epoch_state_path: Path
     trading_universe_path: Path | None = None
+    paper_validation_market_date: str = ""
+    paper_validation_approved: bool = False
 
 
 def resolve_path(value: str | Path) -> Path:
@@ -114,8 +116,17 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     runtime = payload.get("runtime", {})
     routing = payload.get("routing", {})
     transition = payload.get("formal_test_transition", {})
+    if runtime.get("paper_validation_approved") is True:
+        explicit = {"paper_trading_only": True, "live_execution": False,
+                    "real_money_actions": False, "market_data_transport": "official_sdk_persistent_websocket"}
+        if any(key not in runtime or type(runtime[key]) is not type(value) or runtime[key] != value
+               for key, value in explicit.items()):
+            raise ValueError("paper_validation_requires_explicit_paper_only_safety_fields")
+        datetime.strptime(str(runtime.get("paper_validation_market_date") or ""), "%Y-%m-%d")
     config = SdkRuntimeConfig(
         config_path=config_path,
+        paper_validation_market_date=str(runtime.get("paper_validation_market_date") or ""),
+        paper_validation_approved=runtime.get("paper_validation_approved") is True,
         output_dir=resolve_path(outputs["output_dir"]),
         market_events_path=resolve_path(outputs["market_events"]),
         runtime_status_path=resolve_path(outputs["runtime_status"]),
@@ -699,34 +710,73 @@ def floor_bar_open(value: datetime, minutes: int) -> datetime:
     return value.replace(minute=minute, second=0, microsecond=0)
 
 
+def quote_for_bar_boundary(
+    state: dict[str, Any], bar_close_at: datetime, *, entry: bool, now: datetime,
+) -> dict[str, Any]:
+    """Select a sealed-bar quote or next-bar entry without crossing roles."""
+    if state.get("market_data_blocked_reason") or bar_close_at.tzinfo is None or now.tzinfo is None:
+        return {}
+    bar_close_at = bar_close_at.astimezone(UTC)
+    bucket_open = bar_close_at if entry else bar_close_at - timedelta(minutes=5)
+    if "bar_quote_snapshots" in state:
+        bucket = state["bar_quote_snapshots"].get(to_iso(bucket_open), {})
+        quote = bucket.get("first" if entry else "last", {})
+    else:
+        quote = state
+    if not quote or quote.get("market_data_blocked_reason"):
+        return {}
+    if quote.get("source_mode", "official_sdk_push") != "official_sdk_push":
+        return {}
+    try:
+        source_at = datetime.fromisoformat(str(quote.get("source_event_at") or "").replace("Z", "+00:00"))
+        received_at = datetime.fromisoformat(str(quote.get("received_at") or "").replace("Z", "+00:00"))
+        if source_at.tzinfo is None or received_at.tzinfo is None or now.tzinfo is None:
+            return {}
+        if not bucket_open <= source_at < bucket_open + timedelta(minutes=5):
+            return {}
+        if source_at > received_at or received_at > now:
+            return {}
+        if source_at.astimezone(NEW_YORK).date() != bar_close_at.astimezone(NEW_YORK).date():
+            return {}
+    except (TypeError, ValueError):
+        return {}
+    return quote
+
+
 def attach_next_bar_first_quotes(
     rows: list[dict[str, Any]],
     live_quote_session_state: dict[str, dict[str, Any]],
+    *, now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Attach the quote closing a bar as the next bar's executable price."""
+    """Attach the first observed next-bar quote, not the sealed-bar snapshot."""
     enriched: list[dict[str, Any]] = []
+    checked_at = now or datetime.now(UTC)
     for source in rows:
         row = dict(source)
         if str(row.get("timeframe") or "") != "5m" or row.get("bar_final") is not True:
             enriched.append(row)
             continue
         symbol = str(row.get("symbol") or "").upper().replace(".US", "")
-        quote = live_quote_session_state.get(symbol) or live_quote_session_state.get(f"{symbol}.US") or {}
-        quote_at = str(quote.get("received_at") or quote.get("source_event_at") or "")
+        state = live_quote_session_state.get(symbol) or live_quote_session_state.get(f"{symbol}.US") or {}
+        for key in ("next_bar_first_quote_price", "next_bar_first_quote_at", "next_bar_entry_source"):
+            row.pop(key, None)
         try:
-            quote_price = Decimal(str(quote.get("last_done") or quote.get("close") or quote.get("price") or "0"))
             bar_close_at = datetime.fromisoformat(
                 str(row.get("bar_close_at") or row.get("event_time") or "").replace("Z", "+00:00")
-            ).astimezone(UTC)
-            quote_dt = datetime.fromisoformat(quote_at.replace("Z", "+00:00")).astimezone(UTC)
+            )
+            if bar_close_at.tzinfo is None or bar_close_at > checked_at:
+                enriched.append(row)
+                continue
+            quote = quote_for_bar_boundary(state, bar_close_at, entry=True, now=checked_at)
+            quote_price = Decimal(str(quote.get("last_done") or quote.get("close") or quote.get("price") or "0"))
         except (ArithmeticError, TypeError, ValueError):
             enriched.append(row)
             continue
-        if quote_price <= 0 or quote_dt < bar_close_at:
+        if not quote_price.is_finite() or quote_price <= 0:
             enriched.append(row)
             continue
         row["next_bar_first_quote_price"] = format(quote_price, "f")
-        row["next_bar_first_quote_at"] = to_iso(quote_dt)
+        row["next_bar_first_quote_at"] = str(quote["received_at"])
         row["next_bar_entry_source"] = "longbridge_sdk_first_quote_after_bar_close"
         enriched.append(row)
     return enriched
@@ -1319,6 +1369,7 @@ class SdkRealtimePaperClient:
         *,
         request_gate: Any = None,
         on_submission: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
+        submission_journal_path: str | Path | None = None,
         short_capacity_cache_ttl_seconds: int = 900,
         short_capacity_failure_cache_ttl_seconds: int = 30,
         short_capacity_price_tolerance_pct: Decimal = Decimal("2"),
@@ -1339,6 +1390,38 @@ class SdkRealtimePaperClient:
         self._short_capacity_cache: dict[str, dict[str, Any]] = {}
         self.trade_context_refresh_required = False
         self.trade_context_refresh_reason = ""
+        # Production supplies a durable journal; tests/legacy callers can omit
+        # it. Never invent broker IDs to represent an unresolved write.
+        import threading
+
+        self._submission_lock = threading.RLock()
+        self._submission_results: dict[str, dict[str, Any]] = {}
+        self._unconfirmed_submission: dict[str, Any] | None = None
+        self._unconfirmed_payload: dict[str, Any] | None = None
+        from scripts.m15_submission_journal_lib import SubmissionJournal
+
+        self._submission_journal = (
+            SubmissionJournal(submission_journal_path) if submission_journal_path is not None else None
+        )
+        self._journal_failure = ""
+
+    def submission_journal_health(self) -> dict[str, Any]:
+        from scripts.m15_submission_journal_lib import SubmissionJournalError, UNRESOLVED
+
+        if self._submission_journal is None:
+            return {"ok": True, "status": "submission_journal_not_configured"}
+        try:
+            if self._journal_failure:
+                raise SubmissionJournalError(self._journal_failure)
+            entries = self._submission_journal.snapshot()
+        except SubmissionJournalError as exc:
+            self._journal_failure = str(exc)
+            return {"ok": False, "status": "submission_journal_failed", "fault_halted": True,
+                    "requires_manual_reconciliation": True, "error": self._journal_failure}
+        count = sum(row["outcome"] in UNRESOLVED for row in entries.values())
+        return {"ok": count == 0,
+                "status": "submission_journal_pending_reconciliation" if count else "submission_journal_ready",
+                "pending_reconciliation": count > 0, "unresolved_submission_count": count}
 
     def healthcheck(self) -> dict[str, Any]:
         """Refresh OAuth on a harmless read before the next order is needed."""
@@ -1387,6 +1470,27 @@ class SdkRealtimePaperClient:
         }
 
     def submit_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
+        with self._submission_lock:
+            key = str(order_payload.get("client_request_id") or order_payload.get("signal_id") or "")
+            if self._journal_failure:
+                return dict(self._unconfirmed_submission or {
+                    "submitted": False, "status": "submit_blocked_submission_journal_failed",
+                    "order_id": "", "explicit_reject": False, "confirmation_required": True,
+                    "error": self._journal_failure,
+                })
+            if self._submission_journal is None and key and key in self._submission_results:
+                return dict(self._submission_results[key])
+            if self._unconfirmed_submission is not None and key not in self._submission_results:
+                return {
+                    "submitted": False,
+                    "status": "submit_blocked_pending_reconciliation",
+                    "order_id": "",
+                    "explicit_reject": False,
+                    "confirmation_required": True,
+                }
+            return self._submit_order_once(order_payload, key)
+
+    def _submit_order_once(self, order_payload: dict[str, Any], key: str) -> dict[str, Any]:
         if self.trade_context_refresh_required:
             return {
                 "submitted": False,
@@ -1426,45 +1530,203 @@ class SdkRealtimePaperClient:
             kwargs["submitted_price"] = decimal(order_payload.get("limit_price"))
         if order_type_name == "LIT":
             kwargs["trigger_price"] = decimal(order_payload.get("trigger_price"))
-        callback = lambda: self.trade_context.submit_order(**kwargs)
+        from scripts.m15_submission_journal_lib import SubmissionJournalBlocked, SubmissionJournalError
+
+        if self._submission_journal is not None:
+            try:
+                should_send, entry = self._submission_journal.begin(order_payload, kwargs["remark"])
+            except SubmissionJournalBlocked:
+                return {"submitted": False, "status": "submit_blocked_pending_reconciliation",
+                        "order_id": "", "explicit_reject": False, "confirmation_required": True}
+            except SubmissionJournalError as exc:
+                self._journal_failure = str(exc)
+                return {"submitted": False, "status": "submit_blocked_submission_journal_failed",
+                        "order_id": "", "explicit_reject": False, "confirmation_required": True,
+                        "error": self._journal_failure}
+            if not should_send:
+                result = self._submission_journal.response(entry)
+                if entry["outcome"] != "not_sent":
+                    self._record_submission(order_payload, result, key, persist=False)
+                return result
+        sdk_invoked = False
+
+        def callback():
+            nonlocal sdk_invoked
+            sdk_invoked = True
+            return self.trade_context.submit_order(**kwargs)
+
         try:
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
         except Exception as exc:
+            from scripts.m15_official_async_trade_lib import TradeRequestNotSent
+
+            if isinstance(exc, TradeRequestNotSent) and not sdk_invoked:
+                result = {
+                    "submitted": False,
+                    "status": "submit_blocked_trade_admission",
+                    "order_id": "",
+                    "explicit_reject": False,
+                    "confirmation_required": False,
+                    "sdk_request_sent": False,
+                    "error": str(exc)[:500],
+                }
+                if self._submission_journal is not None:
+                    try:
+                        self._submission_journal.finish(key, outcome="not_sent")
+                    except SubmissionJournalError as journal_exc:
+                        self._journal_failure = str(journal_exc)
+                        result.update(status="submit_unconfirmed_missing_order_id", confirmation_required=True,
+                                      error=self._journal_failure)
+                        self._record_submission(order_payload, result, key, persist=False)
+                return result
             error = str(exc)[:500]
             refresh_required = is_oauth_refresh_failure(error)
             if refresh_required:
                 self.trade_context_refresh_required = True
                 self.trade_context_refresh_reason = error
-            return {
+            result = {
                 "submitted": False,
                 "status": (
                     "submit_blocked_trade_context_refresh_required"
-                    if refresh_required
-                    else "submit_rejected_without_order_id"
+                    if refresh_required and self._submission_journal is None
+                    else "submit_unconfirmed_missing_order_id"
                 ),
                 "order_id": "",
-                "explicit_reject": not refresh_required,
+                # An exception is not evidence that the broker rejected a
+                # write. This also prevents the executor's market-exit fallback.
+                "explicit_reject": False,
+                "confirmation_required": not refresh_required or self._submission_journal is not None,
+                "sdk_request_sent": sdk_invoked,
                 "trade_context_refresh_required": refresh_required,
                 "error": error,
                 "response": {"error": error},
             }
+            if not refresh_required or self._submission_journal is not None:
+                self._record_submission(order_payload, result, key)
+            return result
         order_id = str(getattr(response, "order_id", "") or "")
         result = {
             "submitted": bool(order_id),
             "status": "submitted" if order_id else "submit_unconfirmed_missing_order_id",
             "order_id": order_id,
+            "explicit_reject": False,
+            "confirmation_required": not bool(order_id),
+            "sdk_request_sent": True,
+            "submission_journal_reused": False,
+            "recovered_order": False,
             "response": {"order_id": order_id},
         }
-        if result["submitted"] and self.on_submission is not None:
-            self.on_submission(order_payload, result)
+        self._record_submission(order_payload, result, key)
         return result
 
+    def _record_submission(self, payload: dict[str, Any], result: dict[str, Any], key: str, *, persist: bool = True) -> None:
+        from scripts.m15_submission_journal_lib import SubmissionJournalError
+
+        if persist and self._submission_journal is not None:
+            try:
+                self._submission_journal.finish(
+                    key, outcome="acknowledged" if result.get("order_id") else "unknown",
+                    order_id=str(result.get("order_id") or ""),
+                )
+            except SubmissionJournalError as exc:
+                self._journal_failure = str(exc)
+                # The acknowledgement could not be durably recorded. Do not
+                # report this request as confirmed or let subsequent writes run.
+                observed_order_id = str(result.get("order_id") or "")
+                result.update(submitted=False, status="submit_unconfirmed_missing_order_id",
+                              order_id="", confirmation_required=True, error=self._journal_failure,
+                              response={"order_id": ""}, submission_journal_failed=True,
+                              observed_broker_order_id=observed_order_id)
+        if result.get("confirmation_required"):
+            self._unconfirmed_submission = dict(result)
+            self._unconfirmed_payload = dict(payload)
+        if key:
+            self._submission_results[key] = dict(result)
+        if self.on_submission is not None:
+            try:
+                self.on_submission(payload, result)
+            except Exception as exc:
+                # Preserve the broker outcome even if local bookkeeping fails.
+                self._unconfirmed_submission = dict(result)
+                self._unconfirmed_payload = dict(payload)
+                result["submission_note_error"] = str(exc)[:500]
+                result["reconciliation_required"] = True
+                if key:
+                    self._submission_results[key] = dict(result)
+
+    def reconcile_submissions(self, account_state: dict[str, Any]) -> bool:
+        """Release the local latch only on unique broker evidence, never age.
+
+        Feed the verified, fresh account snapshot from the existing coordinator.
+        Reuse the executor's exact PAT-RT matching, without fake pending orders.
+        A poisoned async bridge still requires explicit replacement by its owner.
+        """
+        from scripts.m15_longbridge_realtime_execution_lib import (
+            exact_account_orders_by_signal_id,
+        )
+
+        with self._submission_lock:
+            if self._submission_journal is not None:
+                from scripts.m15_submission_journal_lib import SubmissionJournalError, UNRESOLVED
+
+                if self._journal_failure:
+                    return False
+                try:
+                    reconciled = self._submission_journal.reconcile(account_state)
+                    entries = self._submission_journal.snapshot()
+                except SubmissionJournalError as exc:
+                    self._journal_failure = str(exc)
+                    return False
+                for entry in reconciled:
+                    result = self._submission_journal.response(entry)
+                    self._record_submission(entry["payload"], result, entry["key"], persist=False)
+                    if result.get("submission_note_error"):
+                        self._journal_failure = "submission_journal_reconciliation_note_failed"
+                        return False
+                if reconciled and not any(row["outcome"] in UNRESOLVED for row in entries.values()):
+                    self._unconfirmed_submission = None
+                    self._unconfirmed_payload = None
+                return bool(reconciled)
+            payload = self._unconfirmed_payload
+            if payload is None:
+                return False
+            signal_id = str(payload.get("signal_id") or "")
+            order = exact_account_orders_by_signal_id(account_state).get(signal_id)
+            order_id = str(order.get("order_id") or order.get("id") or "") if order else ""
+            if not order_id:
+                return False
+            result = {
+                "submitted": True,
+                "status": "submitted",
+                "order_id": order_id,
+                "explicit_reject": False,
+                "confirmation_required": False,
+                "response": {"order_id": order_id, "matched_order": dict(order)},
+            }
+            if self.on_submission is not None:
+                try:
+                    self.on_submission(payload, result)
+                except Exception:
+                    return False
+            key = str(payload.get("client_request_id") or signal_id)
+            if key:
+                self._submission_results[key] = result
+            self._unconfirmed_submission = None
+            self._unconfirmed_payload = None
+            return True
+
+    def order_detail(self, order_id: str) -> Any:
+        callback = lambda: self.trade_context.order_detail(str(order_id))
+        return self.request_gate.call(callback) if self.request_gate is not None else callback()
+
     def cancel_order(self, order_id: str) -> dict[str, Any]:
+        self._check_journal_write_allowed()
         callback = lambda: self.trade_context.cancel_order(str(order_id))
         self.request_gate.call(callback) if self.request_gate is not None else callback()
         return {"canceled": True, "status": "cancel_requested", "order_id": str(order_id)}
 
     def replace_order(self, order_id: str, quantity: Decimal, price: Decimal) -> dict[str, Any]:
+        self._check_journal_write_allowed()
         callback = lambda: self.trade_context.replace_order(
             str(order_id),
             decimal(quantity),
@@ -1478,6 +1740,13 @@ class SdkRealtimePaperClient:
             "quantity": fmt(decimal(quantity)),
             "price": fmt(decimal(price)),
         }
+
+    def _check_journal_write_allowed(self) -> None:
+        from scripts.m15_submission_journal_lib import SubmissionJournalBlocked
+
+        health = self.submission_journal_health()
+        if not health["ok"]:
+            raise SubmissionJournalBlocked(str(health["status"]))
 
     def max_short_quantity(self, symbol: str, limit_price: Decimal) -> dict[str, Any]:
         # The SDK reports borrowed-stock capacity for a Sell open-short request

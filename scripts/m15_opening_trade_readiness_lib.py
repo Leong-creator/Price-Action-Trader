@@ -19,6 +19,7 @@ from scripts.m15_longbridge_sdk_runtime_lib import config_fingerprint as sdk_con
 from scripts.m15_longbridge_sdk_runtime_lib import configured_trading_symbols as sdk_configured_trading_symbols
 from scripts.m15_longbridge_sdk_runtime_lib import daily_context_is_complete as sdk_daily_context_is_complete
 from scripts.m15_longbridge_sdk_runtime_lib import trading_universe_fingerprint as sdk_trading_universe_fingerprint
+from scripts.m15_paper_session_validation_lib import paper_validation_authorized, validation_status_current
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -225,12 +226,13 @@ def build_readiness(config: OpeningTradeReadinessConfig, generated_at: str) -> d
     )
     readonly_gate_waiting = bool(
         sdk_config.complete_session_gate_enabled
+        and not (paper_validation_authorized(sdk_config, generated_at) and validation_status_current(realtime_status, generated_at))
         and realtime_status.get(
             "complete_session_gate_passed",
             realtime_status.get("readonly_gate_passed"),
         ) is not True
     )
-    marketdata_gate = marketdata_gate_truth(realtime_status, sdk_config)
+    marketdata_gate = marketdata_gate_truth(realtime_status, sdk_config, generated_at)
     critical_artifacts = {
         "m15_account_state": account_state_artifact,
         "m15_runtime_status": realtime_status_artifact,
@@ -887,7 +889,7 @@ def render_artifact_statuses(rows: list[tuple[str, dict[str, Any]]]) -> str:
     )
 
 
-def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any) -> dict[str, Any]:
+def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any, now=None) -> dict[str, Any]:
     gate_enabled = bool(getattr(sdk_config, "complete_session_gate_enabled", False))
     if not status:
         return {
@@ -908,15 +910,20 @@ def marketdata_gate_truth(status: dict[str, Any], sdk_config: Any) -> dict[str, 
             status.get("readonly_gate_passed"),
         ) is True
     )
-    status_name = "not_required" if not gate_enabled else ("passed" if complete_session_passed else "blocked")
+    validation = bool(paper_validation_authorized(sdk_config, now) and validation_status_current(status, now))
+    status_name = "paper_order_validation" if validation and not complete_session_passed else ("not_required" if not gate_enabled else ("passed" if complete_session_passed else "blocked"))
     return {
         "status": status_name,
         "artifacts_healthy": True,
-        "gate_passed": complete_session_passed,
+        "gate_passed": complete_session_passed or validation,
+        "complete_session_passed": complete_session_passed,
+        "paper_validation_authorized": validation,
         "enforced": gate_enabled,
         "complete_boundary_count": complete_boundary_count,
         "realtime_tradable_bar_count": realtime_tradable_bar_count,
         "summary": (
+            "用户授权当日模拟订单联调；逐根行情与全部风控仍强制检查，完整交易日证据尚未通过。"
+            if validation and not complete_session_passed else
             f"完整交易日行情门禁未通过={not complete_session_passed}，完整边界 {complete_boundary_count}，"
             f"实时 K 线 {realtime_tradable_bar_count}；关闭新开仓，已有持仓退出仍需要实时行情。"
             if gate_enabled and not complete_session_passed

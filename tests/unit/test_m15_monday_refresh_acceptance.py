@@ -35,7 +35,9 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
 
     def test_sdk_chain_is_armed_while_waiting_for_regular_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_fixture(Path(tmp), session_should_run=False)
+            config = self.make_fixture(
+                Path(tmp), session_should_run=False, complete_session_gate_passed=True,
+            )
 
             payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-18T09:00:00Z")
 
@@ -48,17 +50,55 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
 
     def test_sdk_chain_is_ready_during_regular_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_fixture(Path(tmp), session_should_run=True)
+            config = self.make_fixture(
+                Path(tmp), session_should_run=True, complete_session_gate_passed=True,
+            )
 
             payload = run_m15_monday_refresh_acceptance(config, generated_at="2026-07-20T13:31:00Z")
 
             self.assertEqual(payload["acceptance_status"], "ready_regular_session")
             self.assertEqual(payload["fail_count"], 0)
             self.assertEqual(payload["waiting_count"], 0)
+            gate = payload["marketdata_integrity_gate"]
+            self.assertTrue(gate["complete_session_passed"])
+            self.assertFalse(gate["paper_validation_authorized"])
+            self.assertEqual(gate["complete_boundary_count"], 78)
+            self.assertEqual(gate["realtime_tradable_bar_count"], 11466)
+
+    def test_dispatch_and_counts_cannot_substitute_for_explicit_full_session_gate(self) -> None:
+        for gate_flag in (None, False):
+            with self.subTest(gate_flag=gate_flag), tempfile.TemporaryDirectory() as tmp:
+                config = self.make_fixture(Path(tmp), session_should_run=True)
+                runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
+                if gate_flag is not None:
+                    runtime.update(
+                        complete_session_gate_passed=gate_flag,
+                        complete_sessions_passed=1,
+                        complete_sessions_required=1,
+                        complete_boundary_count=78,
+                        realtime_tradable_bar_count=11466,
+                    )
+                config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+                payload = run_m15_monday_refresh_acceptance(
+                    config, generated_at="2026-07-20T13:31:00Z",
+                )
+
+                self.assertTrue(runtime["dispatch_enabled"])
+                self.assertTrue(runtime["dispatch_requested"])
+                self.assertEqual(payload["acceptance_status"], "blocked_monday_acceptance")
+                self.assertFalse(payload["new_position_submission_enabled"])
+                gate = payload["marketdata_integrity_gate"]
+                self.assertFalse(gate["gate_passed"])
+                self.assertFalse(gate["complete_session_passed"])
+                checks = {row["check"]: row for row in payload["checks"]}
+                self.assertEqual(checks["marketdata_integrity_gate"]["status"], "fail")
 
     def test_sdk_chain_accepts_canonical_paper_order_ready_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_fixture(Path(tmp), session_should_run=True)
+            config = self.make_fixture(
+                Path(tmp), session_should_run=True, complete_session_gate_passed=True,
+            )
             readiness = json.loads(config.opening_readiness_path.read_text(encoding="utf-8"))
             readiness["readiness_status"] = "ready_for_longbridge_paper_orders"
             config.opening_readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
@@ -243,7 +283,9 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
 
     def test_watchdog_previous_result_does_not_create_acceptance_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_fixture(Path(tmp), session_should_run=True)
+            config = self.make_fixture(
+                Path(tmp), session_should_run=True, complete_session_gate_passed=True,
+            )
             config.watchdog_status_path.write_text(
                 json.dumps({"watchdog_status": "needs_attention"}),
                 encoding="utf-8",
@@ -272,7 +314,9 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
 
     def test_zero_second_account_snapshot_is_fresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_fixture(Path(tmp), session_should_run=False)
+            config = self.make_fixture(
+                Path(tmp), session_should_run=False, complete_session_gate_passed=True,
+            )
             runtime = json.loads(config.sdk_runtime_status_path.read_text(encoding="utf-8"))
             runtime["account_snapshot_age_seconds"] = 0
             config.sdk_runtime_status_path.write_text(json.dumps(runtime), encoding="utf-8")
@@ -285,7 +329,9 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
 
     def test_temporarily_unavailable_dashboard_statistics_do_not_block_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            config = self.make_fixture(Path(tmp), session_should_run=False)
+            config = self.make_fixture(
+                Path(tmp), session_should_run=False, complete_session_gate_passed=True,
+            )
             config.dashboard_path.write_text(
                 json.dumps(
                     {
@@ -340,6 +386,7 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
         session_should_run: bool,
         account_snapshot_healthy: bool = True,
         paper_account_verified: bool = True,
+        complete_session_gate_passed: bool = False,
     ) -> MondayRefreshAcceptanceConfig:
         runtime = root / "runtime.json"
         readiness = root / "readiness.json"
@@ -364,6 +411,13 @@ class M15MondayRefreshAcceptanceTest(unittest.TestCase):
                     "account_snapshot_age_seconds": 1 if account_snapshot_healthy else 90,
                     "dispatch_enabled": True,
                     "dispatch_requested": True,
+                    **({
+                        "complete_session_gate_passed": True,
+                        "complete_sessions_passed": 1,
+                        "complete_sessions_required": 1,
+                        "complete_boundary_count": 78,
+                        "realtime_tradable_bar_count": 11466,
+                    } if complete_session_gate_passed else {}),
                 }
             ),
             encoding="utf-8",
