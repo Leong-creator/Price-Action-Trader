@@ -2,8 +2,11 @@
 """Refresh M15 reporting artifacts from Longbridge SDK data only."""
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import logging
+import math
 import os
 from pathlib import Path
 import time
@@ -42,6 +45,136 @@ MAX_ACCOUNT_SNAPSHOT_AGE_SECONDS = 45
 MIN_RUNTIME_STATUS_AGE_SECONDS = 15
 NEW_YORK = ZoneInfo("America/New_York")
 T = TypeVar("T")
+LOGGER = logging.getLogger(__name__)
+
+
+class OfficialAsyncAnalyticsReader:
+    """One caller-owned loop for bounded, read-only official SDK history.
+
+    No quote context, subscriptions, worker thread, retry or synchronous SDK
+    fallback. The synchronous entry point must run outside an asyncio loop.
+    Native transport closure cannot be acknowledged by SDK 4.5.0.
+    """
+
+    def __init__(
+        self, sdk: Any, runtime_config: Any, *, request_timeout: float = 10.0,
+        total_timeout: float = 40.0, close_timeout: float = 1.0,
+    ) -> None:
+        for value in (request_timeout, total_timeout, close_timeout):
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError("analytics timeouts must be finite and positive")
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError("sdk_analytics_requires_synchronous_caller")
+        self._sdk = sdk
+        self._runtime_config = runtime_config
+        self._request_timeout = request_timeout
+        self._deadline = time.monotonic() + total_timeout
+        self._close_timeout = close_timeout
+        self._loop = asyncio.new_event_loop()
+        self._config: Any = None
+        self._trade: Any = None
+        self._failure: str | None = None
+        self._closed = False
+
+    async def _dispatch(self, method: str, kwargs: dict[str, Any]) -> Any:
+        if self._config is None:
+            oauth = await self._sdk.OAuthBuilder(
+                read_client_id(self._runtime_config)
+            ).build_async(lambda _url: None)
+            self._config = sdk_config_from_oauth(
+                self._sdk, oauth, self._runtime_config.trade_region,
+            )
+        if self._trade is None:
+            self._trade = self._sdk.AsyncTradeContext.create(self._config)
+            positions = sdk_plain(await self._trade.stock_positions())
+            channels = {
+                str(row.get("account_channel") or "")
+                for row in positions.get("channels", [])
+                if isinstance(row, dict)
+            } if isinstance(positions, dict) else set()
+            if channels != {"lb_papertrading"}:
+                raise RuntimeError("sdk_analytics_requires_verified_paper_account")
+        return await getattr(self._trade, method)(**kwargs)
+
+    async def _bounded_read(self, method: str, kwargs: dict[str, Any], timeout: float) -> Any:
+        task = asyncio.create_task(self._dispatch(method, kwargs))
+        done, _ = await asyncio.wait({task}, timeout=timeout)
+        if not done:
+            task.cancel()
+            raise TimeoutError(f"sdk_analytics_{method}_timeout")
+        return task.result()
+
+    def _read(self, method: str, **kwargs: Any) -> Any:
+        if self._closed or self._failure is not None:
+            raise RuntimeError(self._failure or "sdk_analytics_reader_closed")
+        if method not in {"history_orders", "history_executions"}:
+            raise ValueError("sdk_analytics_read_only_method_required")
+        started = time.monotonic()
+        try:
+            timeout = min(self._request_timeout, self._deadline - started)
+            if timeout <= 0:
+                raise TimeoutError("sdk_analytics_total_deadline_exceeded")
+            result = self._loop.run_until_complete(self._bounded_read(method, kwargs, timeout))
+            if time.monotonic() - started >= timeout:
+                raise TimeoutError(f"sdk_analytics_{method}_late_result")
+            if not isinstance(result, list):
+                raise RuntimeError(f"sdk_analytics_{method}_invalid_response")
+            # The Python SDK exposes rows only, not the HTTP has_more flag.
+            # A saturated response is not evidence of a complete refresh.
+            if len(result) >= 1000:
+                raise RuntimeError(f"sdk_analytics_{method}_possibly_truncated")
+        except BaseException as exc:
+            self._failure = f"sdk_analytics_{method}_failed:{type(exc).__name__}"
+            LOGGER.error("%s elapsed_seconds=%.3f", self._failure, time.monotonic() - started)
+            raise
+        LOGGER.info("sdk_analytics_%s_ok elapsed_seconds=%.3f", method, time.monotonic() - started)
+        return result
+
+    def history_orders(self, *, start_at: datetime, end_at: datetime) -> Any:
+        return self._read("history_orders", start_at=start_at, end_at=end_at)
+
+    def history_executions(self, *, start_at: datetime, end_at: datetime) -> Any:
+        return self._read("history_executions", start_at=start_at, end_at=end_at)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+
+        async def drain() -> bool:
+            tasks = asyncio.all_tasks() - {asyncio.current_task()}
+            for task in tasks:
+                task.cancel()
+            if not tasks:
+                return True
+            done, pending = await asyncio.wait(tasks, timeout=self._close_timeout)
+            for task in done:
+                if not task.cancelled():
+                    task.exception()
+            return not pending
+
+        try:
+            if not self._loop.run_until_complete(drain()):
+                raise TimeoutError("sdk_analytics_cancellation_cleanup_timeout")
+        finally:
+            self._trade = self._config = None
+            self._loop.close()
+
+    def __enter__(self) -> OfficialAsyncAnalyticsReader:
+        return self
+
+    def __exit__(self, _type: Any, error: Any, _traceback: Any) -> None:
+        try:
+            self.close()
+        except Exception as cleanup_error:
+            if error is None:
+                raise
+            LOGGER.error("sdk_analytics_cleanup_failed:%s", type(cleanup_error).__name__)
+            error.add_note(f"analytics cleanup failed: {type(cleanup_error).__name__}")
 
 
 def decimal_value(value: Any) -> Decimal:
@@ -281,22 +414,22 @@ def refresh_order_and_execution_history(
     cached_executions: list[dict[str, Any]],
     account_state: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], Any, str]:
-    """Refresh broker history with a two-day overlap after bootstrap."""
+    """Refresh both histories once; never rebuild or publish cache on failure.
+
+    build_trade remains an unused compatibility argument for existing callers.
+    Production supplies OfficialAsyncAnalyticsReader, not a synchronous SDK.
+    """
     if cached_orders or cached_executions:
         incremental_start = incremental_history_start(
             start_at,
             generated_at,
             cached_row_count=max(len(cached_orders), len(cached_executions)),
         )
-        recent_order_rows, trade = read_with_timeout_recovery(
-            trade,
-            build_trade,
-            lambda context: context.history_orders(start_at=incremental_start, end_at=generated_at),
+        recent_order_rows = trade.history_orders(
+            start_at=incremental_start, end_at=generated_at,
         )
-        recent_execution_rows, trade = read_with_timeout_recovery(
-            trade,
-            build_trade,
-            lambda context: context.history_executions(start_at=incremental_start, end_at=generated_at),
+        recent_execution_rows = trade.history_executions(
+            start_at=incremental_start, end_at=generated_at,
         )
         orders = merge_history_rows(
             cached_orders,
@@ -321,16 +454,8 @@ def refresh_order_and_execution_history(
             normalizer=normalize_execution,
         )
         return orders, executions, trade, "trusted_cache_plus_two_day_sdk_incremental_and_fresh_snapshot"
-    order_rows, trade = read_with_timeout_recovery(
-        trade,
-        build_trade,
-        lambda context: context.history_orders(start_at=start_at, end_at=generated_at),
-    )
-    execution_rows, trade = read_with_timeout_recovery(
-        trade,
-        build_trade,
-        lambda context: context.history_executions(start_at=start_at, end_at=generated_at),
-    )
+    order_rows = trade.history_orders(start_at=start_at, end_at=generated_at)
+    execution_rows = trade.history_executions(start_at=start_at, end_at=generated_at)
     return (
         [normalize_order(row) for row in order_rows],
         [normalize_execution(row) for row in execution_rows],
@@ -590,56 +715,45 @@ def run_sdk_analytics(
 ) -> dict[str, Any]:
     import longbridge.openapi as sdk
 
+    started = time.monotonic()
     generated_at = generated_at or datetime.now(UTC)
     runtime_config = load_sdk_config(sdk_runtime_config_path)
     account_config = load_account_config(account_config_path)
     require_live_sdk_runtime(runtime_config, generated_at)
     account_state = read_json(account_config.account_state_path)
     require_fresh_paper_account(account_state, generated_at)
-    oauth = sdk.OAuthBuilder(read_client_id(runtime_config)).build(lambda _url: None)
-    def build_trade() -> Any:
-        return sdk.TradeContext(sdk_config_from_oauth(sdk, oauth, runtime_config.trade_region))
-
-    def build_portfolio() -> Any:
-        return sdk.PortfolioContext(sdk_config_from_oauth(sdk, oauth, runtime_config.trade_region))
-
-    trade = build_trade()
-    portfolio = build_portfolio()
     start_at = datetime.fromisoformat(account_config.historical_order_start_date).replace(tzinfo=UTC)
     trusted_history = read_json(account_config.output_dir / TRUSTED_ORDER_HISTORY_JSON)
     cached_orders = [dict(row) for row in trusted_history.get("historical_orders", []) if isinstance(row, dict)]
     cached_executions = [dict(row) for row in trusted_history.get("historical_executions", []) if isinstance(row, dict)]
-    orders, executions, trade, history_refresh_mode = refresh_order_and_execution_history(
-        trade,
-        build_trade,
-        start_at=start_at,
-        generated_at=generated_at,
-        cached_orders=cached_orders,
-        cached_executions=cached_executions,
-        account_state=account_state,
-    )
+    with OfficialAsyncAnalyticsReader(sdk, runtime_config) as reader:
+        orders, executions, _, history_refresh_mode = refresh_order_and_execution_history(
+            reader,
+            lambda: reader,
+            start_at=start_at,
+            generated_at=generated_at,
+            cached_orders=cached_orders,
+            cached_executions=cached_executions,
+            account_state=account_state,
+        )
+        portfolio_config = reader._config
+    # SDK 4.5.0 has no async profit_analysis_by_market binding. Preserve the
+    # original portfolio API/formula; history deadlines do not cover this I/O.
+    portfolio = sdk.PortfolioContext(portfolio_config)
     market_date, cumulative_end_date = market_profit_query_dates(generated_at)
-    profit_response, portfolio = read_with_timeout_recovery(
-        portfolio,
-        build_portfolio,
-        lambda context: context.profit_analysis_by_market(
-            page=1,
-            size=100,
-            market="US",
-            start=start_at.date().isoformat(),
-            end=cumulative_end_date,
-        ),
+    profit_response = portfolio.profit_analysis_by_market(
+        page=1,
+        size=100,
+        market="US",
+        start=start_at.date().isoformat(),
+        end=cumulative_end_date,
     )
-    daily_profit_response, portfolio = read_with_timeout_recovery(
-        portfolio,
-        build_portfolio,
-        lambda context: context.profit_analysis_by_market(
-            page=1,
-            size=100,
-            market="US",
-            start=market_date,
-            end=market_date,
-        ),
+    daily_profit_response = portfolio.profit_analysis_by_market(
+        page=1,
+        size=100,
+        market="US",
+        start=market_date,
+        end=market_date,
     )
     profit = sdk_plain(profit_response)
     daily_profit = sdk_plain(daily_profit_response)
@@ -664,6 +778,10 @@ def run_sdk_analytics(
         daily_execution_rows,
         quote_rows,
     )
+    # A snapshot fresh at entry may have expired during history/portfolio I/O.
+    completed_at = generated_at + timedelta(seconds=time.monotonic() - started)
+    require_live_sdk_runtime(runtime_config, completed_at)
+    require_fresh_paper_account(account_state, completed_at)
     return write_sdk_analytics_outputs(
         account_config_path=account_config_path,
         generated_at=generated_at,
