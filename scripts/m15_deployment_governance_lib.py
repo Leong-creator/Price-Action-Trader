@@ -21,6 +21,7 @@ DEFAULT_RUNTIME_FILES = (
     "scripts/run_m15_longbridge_sdk_runtime.py",
     "scripts/m15_longbridge_sdk_quote_transport_lib.py",
     "scripts/m15_official_async_quote_lib.py",
+    "scripts/m15_paper_session_validation_lib.py",
     "scripts/m15_longbridge_sdk_runtime_lib.py",
     "scripts/m15_longbridge_sdk_account_lib.py",
     "scripts/m15_longbridge_realtime_signal_router_lib.py",

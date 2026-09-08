@@ -53,9 +53,13 @@ run_step() {
 
 start_stack() {
   local failed=0
+  local dispatch_args=()
+  if "$PYTHON_BIN" -c 'from scripts.m15_longbridge_sdk_runtime_lib import load_config; from scripts.m15_paper_session_validation_lib import paper_validation_authorized; raise SystemExit(0 if paper_validation_authorized(load_config("config/m15_longbridge_marketdata.production.json")) else 1)'; then
+    dispatch_args=(--dispatch)
+  fi
   run_step "start M15 Longbridge SDK realtime runtime" \
     "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
-    --daemon \
+    --daemon "${dispatch_args[@]}" \
     --config config/m15_longbridge_marketdata.production.json || failed=1
 
   run_step "start M15 background watchdog" \

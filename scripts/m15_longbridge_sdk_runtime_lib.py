@@ -98,6 +98,8 @@ class SdkRuntimeConfig:
     formal_test_marker_path: Path
     formal_test_epoch_state_path: Path
     trading_universe_path: Path | None = None
+    paper_validation_market_date: str = ""
+    paper_validation_approved: bool = False
 
 
 def resolve_path(value: str | Path) -> Path:
@@ -116,6 +118,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
     transition = payload.get("formal_test_transition", {})
     config = SdkRuntimeConfig(
         config_path=config_path,
+        paper_validation_market_date=str(runtime.get("paper_validation_market_date") or ""),
+        paper_validation_approved=runtime.get("paper_validation_approved") is True,
         output_dir=resolve_path(outputs["output_dir"]),
         market_events_path=resolve_path(outputs["market_events"]),
         runtime_status_path=resolve_path(outputs["runtime_status"]),

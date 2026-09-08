@@ -37,6 +37,9 @@ from scripts.m15_longbridge_sdk_account_lib import (
     SdkTradeRequestGate,
 )
 from scripts.m15_deployment_governance_lib import verify_manifest
+from scripts.m15_paper_session_validation_lib import (
+    entry_session_authorized, paper_validation_authorized,
+)
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, MarketEventContext, SdkRealtimePaperClient,
     append_market_events, attach_next_bar_first_quotes, build_status, compact_market_events, config_fingerprint, configured_symbols,
@@ -2033,10 +2036,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     dispatch_enabled = bool(
         dispatch_requested
         and config.paper_order_dispatch_enabled
-        and (
-            not config.complete_session_gate_enabled
-            or complete_session_gate_passed_now
-        )
+        and entry_session_authorized(config, complete_session_gate_passed_now)
         and deployment_ready
     )
     execution_request_gate = SdkTradeRequestGate()
@@ -2759,6 +2759,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     fill_attribution_state_cache=fill_attribution_state_cache,
                     new_entry_submission_enabled=(
                         paper_client is not None
+                        and entry_session_authorized(config, complete_session_gate_passed_now, boundary_now)
+                        and bool(trade_context_health.get("ok"))
+                        and deployment_ready
                         and not position_monitoring_failed
                         and trading_daily_context_ready
                     ),
@@ -3378,7 +3381,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     ),
                     "reference_market_data_state": reference_market_data_state,
                     "dispatch_enabled": effective_runtime_dispatch_enabled(
-                        dispatch_requested=dispatch_enabled,
+                        dispatch_requested=(dispatch_enabled and entry_session_authorized(config, complete_session_gate_passed_now, now_ny)),
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
                         market_data_ready=(
@@ -3396,8 +3399,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     "dispatch_block_reason": runtime_dispatch_block_reason(
                         paper_order_dispatch_enabled=config.paper_order_dispatch_enabled,
                         complete_session_gate_blocked=(
-                            config.complete_session_gate_enabled
-                            and not complete_session_gate_passed_now
+                            not entry_session_authorized(config, complete_session_gate_passed_now, now_ny)
                         ),
                         paper_client_ready=paper_client is not None,
                         trade_context_ready=bool(trade_context_health.get("ok")),
@@ -3418,6 +3420,9 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                         config.complete_session_gate_enabled
                     ),
                     "complete_session_gate_path": str(config.readonly_gate_path),
+                    "paper_validation_authorized": paper_validation_authorized(config, now_ny),
+                    "paper_validation_market_date": config.paper_validation_market_date,
+                    "paper_validation_mode": "date_scoped_order_validation" if paper_validation_authorized(config, now_ny) else "disabled",
                     "complete_sessions_passed": complete_sessions_passed,
                     "complete_sessions_required": complete_sessions_required,
                     "complete_session_gate_passed": (

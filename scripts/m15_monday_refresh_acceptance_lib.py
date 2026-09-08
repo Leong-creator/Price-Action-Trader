@@ -421,7 +421,8 @@ def marketdata_gate_truth(
             "ready_regular_session",
         }
     )
-    gate_passed = explicit_gate_passed or active_dispatch_proves_gate
+    validation = bool(runtime.get("paper_validation_authorized") is True and readiness.get("marketdata_integrity_gate", {}).get("paper_validation_authorized") is True)
+    gate_passed = explicit_gate_passed or active_dispatch_proves_gate or validation
     if not artifacts_healthy:
         summary = (
             f"行情门禁工件异常：runtime={runtime_artifact.get('status')}，readiness={readiness_artifact.get('status')}；"
@@ -438,13 +439,17 @@ def marketdata_gate_truth(
             "summary": summary,
         }
     return {
-        "status": "passed" if gate_passed else "blocked",
+        "status": "paper_order_validation" if validation and not explicit_gate_passed else ("passed" if gate_passed else "blocked"),
+        "complete_session_passed": explicit_gate_passed,
+        "paper_validation_authorized": validation,
         "artifacts_healthy": True,
         "gate_passed": gate_passed,
         "waiting": readonly_waiting,
         "complete_boundary_count": complete_boundary_count,
         "realtime_tradable_bar_count": realtime_tradable_bar_count,
         "summary": (
+            "用户授权当日模拟订单联调；完整交易日验收仍未通过，不作为稳定性证明。"
+            if validation and not explicit_gate_passed else
             f"完整交易日行情门禁未通过，完整边界 {complete_boundary_count}，实时 K 线 {realtime_tradable_bar_count}；"
             "关闭新开仓，已有持仓退出仍需要实时行情。"
             if not gate_passed

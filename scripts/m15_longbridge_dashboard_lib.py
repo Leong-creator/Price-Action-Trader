@@ -674,6 +674,7 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
         (not marketdata_gate_enforced)
         or runtime.get("complete_session_gate_passed") is True
     )
+    validation_active = bool(runtime.get("paper_validation_authorized") is True and runtime_fresh and runtime_process_alive)
 
     source_checks = {
         "sdk_runtime": runtime_artifact.get("status") == "ok" and runtime_process_alive and runtime_fresh and runtime.get("sdk_connected") is True,
@@ -786,10 +787,11 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
             "status": (
                 runtime_artifact.get("status")
                 if runtime_artifact.get("status") != "ok"
-                else ("passed" if marketdata_gate_passed else "blocked")
+                else ("paper_order_validation" if validation_active and not marketdata_gate_passed else ("passed" if marketdata_gate_passed else "blocked"))
             ),
             "artifacts_healthy": runtime_artifact.get("status") == "ok",
             "gate_passed": marketdata_gate_passed,
+            "paper_validation_authorized": validation_active,
             "new_position_submission_enabled": entries_enabled,
             "complete_boundary_count": int(runtime.get("complete_boundary_count") or 0),
             "realtime_tradable_bar_count": int(runtime.get("realtime_tradable_bar_count") or 0),
@@ -798,6 +800,8 @@ def build_dashboard(config: dict[str, Any], generated_at: str | None = None) -> 
                 f"实时 K 线 {int(runtime.get('realtime_tradable_bar_count') or 0)}；关闭新开仓，已有持仓退出仍需要实时行情。"
                 if runtime_artifact.get("status") != "ok"
                 else (
+                    "用户授权当日模拟订单联调；完整行情验收尚未通过，逐根行情和风控仍强制执行。"
+                    if validation_active and not marketdata_gate_passed else
                     f"完整交易日行情门禁未通过，完整边界 {int(runtime.get('complete_boundary_count') or 0)}，"
                     f"实时 K 线 {int(runtime.get('realtime_tradable_bar_count') or 0)}；关闭新开仓，已有持仓退出仍需要实时行情。"
                     if not marketdata_gate_passed
