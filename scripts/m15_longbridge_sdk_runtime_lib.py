@@ -1350,6 +1350,14 @@ class SdkRealtimePaperClient:
         self._short_capacity_cache: dict[str, dict[str, Any]] = {}
         self.trade_context_refresh_required = False
         self.trade_context_refresh_reason = ""
+        # Single-flight submit and a session-local latch. Durable reconciliation
+        # remains the caller's responsibility; never invent a broker order ID.
+        import threading
+
+        self._submission_lock = threading.RLock()
+        self._submission_results: dict[str, dict[str, Any]] = {}
+        self._unconfirmed_submission: dict[str, Any] | None = None
+        self._unconfirmed_payload: dict[str, Any] | None = None
 
     def healthcheck(self) -> dict[str, Any]:
         """Refresh OAuth on a harmless read before the next order is needed."""
@@ -1398,6 +1406,21 @@ class SdkRealtimePaperClient:
         }
 
     def submit_order(self, order_payload: dict[str, Any]) -> dict[str, Any]:
+        with self._submission_lock:
+            key = str(order_payload.get("client_request_id") or order_payload.get("signal_id") or "")
+            if key and key in self._submission_results:
+                return dict(self._submission_results[key])
+            if self._unconfirmed_submission is not None:
+                return {
+                    "submitted": False,
+                    "status": "submit_blocked_pending_reconciliation",
+                    "order_id": "",
+                    "explicit_reject": False,
+                    "confirmation_required": True,
+                }
+            return self._submit_order_once(order_payload, key)
+
+    def _submit_order_once(self, order_payload: dict[str, Any], key: str) -> dict[str, Any]:
         if self.trade_context_refresh_required:
             return {
                 "submitted": False,
@@ -1441,34 +1464,114 @@ class SdkRealtimePaperClient:
         try:
             response = self.request_gate.call(callback) if self.request_gate is not None else callback()
         except Exception as exc:
+            from scripts.m15_official_async_trade_lib import TradeRequestNotSent
+
+            if isinstance(exc, TradeRequestNotSent):
+                return {
+                    "submitted": False,
+                    "status": "submit_blocked_trade_admission",
+                    "order_id": "",
+                    "explicit_reject": False,
+                    "confirmation_required": False,
+                    "error": str(exc)[:500],
+                }
             error = str(exc)[:500]
             refresh_required = is_oauth_refresh_failure(error)
             if refresh_required:
                 self.trade_context_refresh_required = True
                 self.trade_context_refresh_reason = error
-            return {
+            result = {
                 "submitted": False,
                 "status": (
                     "submit_blocked_trade_context_refresh_required"
                     if refresh_required
-                    else "submit_rejected_without_order_id"
+                    else "submit_unconfirmed_missing_order_id"
                 ),
                 "order_id": "",
-                "explicit_reject": not refresh_required,
+                # An exception is not evidence that the broker rejected a
+                # write. This also prevents the executor's market-exit fallback.
+                "explicit_reject": False,
+                "confirmation_required": not refresh_required,
                 "trade_context_refresh_required": refresh_required,
                 "error": error,
                 "response": {"error": error},
             }
+            if not refresh_required:
+                self._record_submission(order_payload, result, key)
+            return result
         order_id = str(getattr(response, "order_id", "") or "")
         result = {
             "submitted": bool(order_id),
             "status": "submitted" if order_id else "submit_unconfirmed_missing_order_id",
             "order_id": order_id,
+            "explicit_reject": False,
+            "confirmation_required": not bool(order_id),
             "response": {"order_id": order_id},
         }
-        if result["submitted"] and self.on_submission is not None:
-            self.on_submission(order_payload, result)
+        self._record_submission(order_payload, result, key)
         return result
+
+    def _record_submission(self, payload: dict[str, Any], result: dict[str, Any], key: str) -> None:
+        if result.get("confirmation_required"):
+            self._unconfirmed_submission = dict(result)
+            self._unconfirmed_payload = dict(payload)
+        if key:
+            self._submission_results[key] = dict(result)
+        if self.on_submission is not None:
+            try:
+                self.on_submission(payload, result)
+            except Exception as exc:
+                # Preserve the broker outcome even if local bookkeeping fails.
+                self._unconfirmed_submission = dict(result)
+                self._unconfirmed_payload = dict(payload)
+                result["submission_note_error"] = str(exc)[:500]
+                result["reconciliation_required"] = True
+                if key:
+                    self._submission_results[key] = dict(result)
+
+    def reconcile_submissions(self, account_state: dict[str, Any]) -> bool:
+        """Release the local latch only on unique broker evidence, never age.
+
+        Feed the verified, fresh account snapshot from the existing coordinator.
+        Reuse the executor's exact PAT-RT matching, without fake pending orders.
+        A poisoned async bridge still requires explicit replacement by its owner.
+        """
+        from scripts.m15_longbridge_realtime_execution_lib import (
+            exact_account_orders_by_signal_id,
+        )
+
+        with self._submission_lock:
+            payload = self._unconfirmed_payload
+            if payload is None:
+                return False
+            signal_id = str(payload.get("signal_id") or "")
+            order = exact_account_orders_by_signal_id(account_state).get(signal_id)
+            order_id = str(order.get("order_id") or order.get("id") or "") if order else ""
+            if not order_id:
+                return False
+            result = {
+                "submitted": True,
+                "status": "submitted",
+                "order_id": order_id,
+                "explicit_reject": False,
+                "confirmation_required": False,
+                "response": {"order_id": order_id, "matched_order": dict(order)},
+            }
+            if self.on_submission is not None:
+                try:
+                    self.on_submission(payload, result)
+                except Exception:
+                    return False
+            key = str(payload.get("client_request_id") or signal_id)
+            if key:
+                self._submission_results[key] = result
+            self._unconfirmed_submission = None
+            self._unconfirmed_payload = None
+            return True
+
+    def order_detail(self, order_id: str) -> Any:
+        callback = lambda: self.trade_context.order_detail(str(order_id))
+        return self.request_gate.call(callback) if self.request_gate is not None else callback()
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
         callback = lambda: self.trade_context.cancel_order(str(order_id))
