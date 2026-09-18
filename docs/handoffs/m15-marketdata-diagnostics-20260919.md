@@ -50,3 +50,12 @@ next_recommended_action: integrate provenance dependency, independent review, ma
 needs_user_decision: false
 user_decision_needed: null
 ```
+
+## 追加：独立审查整改与 pipeline 模式
+
+- 两种串行模式：默认 raw-sdk；pipeline 必须 --production-universe，只调用原 quote worker，不调用 run_watch 或任何账户/策略/订单客户端。
+- 父进程墙钟监督解决同步 OAuth/factory 阻塞无法被 asyncio 取消的问题；phase.json 记录卡点。
+- 子进程继承同一行情锁 FD（DupFd），并设置 Linux 父死亡 SIGKILL 和父 PID 竞态复核，阻止父进程被杀后残留无锁行情连接。
+- pipeline 复用现有 MarketSessionEvidence 及参考新鲜度规则，独立保存消息/K线计数；所有输出重定向外部目录，不写生产故障/缓存/验收文件。
+- 49 项最终聚焦测试通过，包括原生同步创建永久阻塞、父关闭锁FD仍互斥、父 SIGKILL 后子进程退出、纯行情零账户构造，以及隔离真实进程的 boot 测试。
+- 待 root 集成：deployment DEFAULT_RUNTIME_FILES 加入 m15_marketdata_diagnostics_lib.py 和 run_m15_longbridge_quote_diagnostic.py；环境实现为其他代理负责，未交叉修改。
