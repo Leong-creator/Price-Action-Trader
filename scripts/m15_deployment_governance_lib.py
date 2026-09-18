@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from scripts.m15_sdk_provenance_lib import verify_environment
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST_PATH = ROOT / "reports" / "runtime" / "m15_deployment_manifest.json"
@@ -18,6 +20,11 @@ ALLOWED_DEVELOPMENT_BRANCH = re.compile(
     r"|codex/(?:feature|fix|chore|refactor|test|docs|integration)-[A-Za-z0-9._-]+)$"
 )
 DEFAULT_RUNTIME_FILES = (
+    "scripts/m15_sdk_provenance_lib.py",
+    "scripts/m15_deployment_governance_lib.py",
+    "scripts/run_m15_sdk_provenance.py",
+    "scripts/start_m15_trading_stack_after_boot.sh",
+    "config/m15_official_sdk_artifact.json",
     "scripts/run_m15_longbridge_sdk_runtime.py",
     "scripts/m15_longbridge_sdk_quote_transport_lib.py",
     "scripts/m15_official_async_quote_lib.py",
@@ -130,10 +137,14 @@ def issue_manifest(
     missing_sources = [relative_path(path, root) for path in source_paths if not path.is_file()]
     if missing_sources:
         errors.append("runtime_source_missing")
+    sdk_environment = verify_environment(root)
+    if not sdk_environment["verified"]:
+        errors.extend(sdk_environment["issues"])
     if errors:
         raise ValueError(",".join(errors))
     payload = {
-        "schema_version": "m15.deployment-manifest.v1",
+        "schema_version": "m15.deployment-manifest.v2",
+        "sdk_environment": sdk_environment["environment"],
         "issued_at": generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "repo_root": str(root.resolve()),
         "branch": state.branch,
@@ -190,6 +201,13 @@ def verify_manifest(
     elif payload and payload.get("config_sha256") != sha256_file(config):
         issues.append("deployment_config_drift")
     runtime_files = payload.get("runtime_files", {}) if payload else {}
+    sdk_environment = verify_environment(root)
+    if not sdk_environment["verified"]:
+        issues.extend(sdk_environment["issues"])
+    elif payload.get("sdk_environment") != sdk_environment["environment"]:
+        issues.append("deployment_sdk_environment_drift")
+    if payload and payload.get("schema_version") != "m15.deployment-manifest.v2":
+        issues.append("deployment_manifest_schema_unsupported")
     if payload and not isinstance(runtime_files, dict):
         issues.append("deployment_runtime_files_invalid")
         runtime_files = {}

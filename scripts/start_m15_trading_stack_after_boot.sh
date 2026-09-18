@@ -4,18 +4,22 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ "${1:-}" == "--keep-alive" ]]; then
-  echo "--keep-alive is retired; this command now performs one hidden startup only."
-elif [[ $# -gt 0 ]]; then
-  echo "Usage: $0 [--keep-alive]" >&2
+if [[ $# -gt 0 ]]; then
+  echo "Usage: $0" >&2
   exit 2
 fi
 
 OUTPUT_DIR="reports/strategy_lab/m10_price_action_strategy_refresh/daily_observation/m15_startup"
 LOG_FILE="$OUTPUT_DIR/m15_startup_bootstrap.log"
-LOCK_DIR="$OUTPUT_DIR/startup.lock"
+LOCK_FILE="$OUTPUT_DIR/startup.flock"
 
 mkdir -p "$OUTPUT_DIR"
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Another startup bootstrap holds the lock; exit."
+  exit 0
+fi
 
 if [[ -f "$LOG_FILE" ]] && [[ "$(wc -c < "$LOG_FILE")" -gt 5242880 ]]; then
   mv "$LOG_FILE" "$LOG_FILE.$(date -u +%Y%m%dT%H%M%SZ).old"
@@ -25,41 +29,28 @@ exec >>"$LOG_FILE" 2>&1
 
 echo "==== $(date -u +%Y-%m-%dT%H:%M:%SZ) M15 startup bootstrap ===="
 
-if [[ -d "$LOCK_DIR" ]]; then
-  LOCK_PID="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
-  if [[ "$LOCK_PID" =~ ^[0-9]+$ ]] && kill -0 "$LOCK_PID" 2>/dev/null; then
-    echo "Another startup bootstrap is already running with PID $LOCK_PID; exit."
-    exit 0
-  fi
-  echo "Removing stale startup lock from PID ${LOCK_PID:-unknown}."
-  rm -rf "$LOCK_DIR"
-fi
-mkdir "$LOCK_DIR"
-printf '%s\n' "$$" >"$LOCK_DIR/pid"
-trap 'rm -rf "$LOCK_DIR" 2>/dev/null || true' EXIT
-
-PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
+PYTHON_BIN="$ROOT_DIR/.venv-m15/bin/python"
 if [[ ! -x "$PYTHON_BIN" ]]; then
   echo "Project virtualenv Python is unavailable: $PYTHON_BIN"
   exit 1
 fi
 
+# This gate is offline and runs before OAuth, market data or account contexts.
+"$PYTHON_BIN" scripts/run_m15_sdk_provenance.py --verify
+
 run_step() {
   local label="$1"
   shift
   echo "-- $label"
-  "$@"
+  # Daemon descendants must not inherit the bootstrap lock after it exits.
+  "$@" 9>&-
 }
 
 start_stack() {
   local failed=0
-  local dispatch_args=()
-  if "$PYTHON_BIN" -c 'from scripts.m15_longbridge_sdk_runtime_lib import load_config; from scripts.m15_paper_session_validation_lib import paper_validation_authorized; raise SystemExit(0 if paper_validation_authorized(load_config("config/m15_longbridge_marketdata.production.json")) else 1)'; then
-    dispatch_args=(--dispatch)
-  fi
   run_step "start M15 Longbridge SDK realtime runtime" \
     "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
-    --daemon "${dispatch_args[@]}" \
+    --daemon \
     --config config/m15_longbridge_marketdata.production.json || failed=1
 
   run_step "start M15 background watchdog" \
