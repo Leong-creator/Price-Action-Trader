@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.m15_marketdata_diagnostics_lib import (
     PipelineDiagnostics, acquire_quote_owner_lock, append_diagnostic_snapshot,
-    assert_no_legacy_quote_processes,
+    assert_no_legacy_quote_processes, safe_exception_evidence,
 )
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, configured_symbols, load_config, read_client_id,
@@ -93,7 +93,8 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
         for offset in range(0, len(symbols), batch):
             current_symbols = symbols[offset:offset + batch]
             active_batch = {"batch_offset": offset, "batch_size": len(current_symbols),
-                "total_symbols": len(symbols), "sub_types": ["Quote", "Trade"],
+                "total_symbols": len(symbols), "batch_symbols": current_symbols,
+                "sub_types": ["Quote", "Trade"],
                 "request_timeout_seconds": max(0.001, min(config.subscription_deadline_seconds,
                                                            deadline - time.monotonic()))}
             active_batch_started = time.monotonic()
@@ -129,18 +130,19 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
             await asyncio.sleep(0.05)
         result["status"] = "operator_stopped" if stop.is_set() else "duration_completed"
     except Exception as exc:
-        # Exception types are sufficient here; credential-bearing SDK errors are not echoed.
-        category = "request_timeout" if isinstance(exc, TimeoutError) else "sdk_or_runtime_error"
-        result.update(status="failed", error_type=type(exc).__name__, error_category=category)
+        safe_error = safe_exception_evidence(exc)
+        category = safe_error["error_category"]
+        result.update(status="failed", error_type=type(exc).__name__, error_category=category,
+                      safe_error=safe_error)
         if active_batch is not None:
             outcome = {**active_batch, "outcome": "failed", "error_category": category,
-                       "error_type": type(exc).__name__,
+                       "error_type": type(exc).__name__, "safe_error": safe_error,
                        "elapsed_seconds": round(time.monotonic() - active_batch_started, 3)}
             result["subscription_batches"].append(outcome)
             stage("subscribe", **outcome)
         else:
             stage(str(result.get("stage", "unknown")), outcome="failed", error_category=category,
-                  error_type=type(exc).__name__)
+                  error_type=type(exc).__name__, safe_error=safe_error)
     finally:
         quote = None  # SDK has no public close; process exit is the cleanup boundary.
         result.update(finished_at=datetime.now(UTC).isoformat(),
@@ -221,7 +223,8 @@ async def supervise_raw(config_path: str, symbols: list[str], duration: float, o
         elapsed_seconds=round(time.monotonic() - started, 3),
         finished_at=datetime.now(UTC).isoformat(), last_phase=phase)
     if timed_out:
-        result.update(status="failed", reason="diagnostic_wall_clock_deadline_exceeded")
+        result.update(status="failed", reason="diagnostic_wall_clock_deadline_exceeded",
+                      supervisor_safe_error=safe_exception_evidence(TimeoutError()))
     elif stop.is_set():
         result.update(status="operator_stopped")
     elif child.exitcode != 0 or "status" not in result:
@@ -248,6 +251,7 @@ class PipelineProbeEvidence:
         self.first_push: dict[str, float] = {}
         self.last_live: dict[str, float] = {}
         self.latest_diagnostics: dict[str, Any] = {}
+        self.worker_safe_error: dict[str, Any] = {}
         self.message_counts: dict[str, int] = {}
         self.bar_count = 0
 
@@ -255,6 +259,7 @@ class PipelineProbeEvidence:
         kind = str(message.get("kind", "unknown"))
         self.message_counts[kind] = self.message_counts.get(kind, 0) + 1
         if kind == "error":
+            self.worker_safe_error = dict(message.get("safe_error") or {})
             self.latest_diagnostics = message.get("pipeline_diagnostics") or self.latest_diagnostics
             raise RuntimeError("quote_worker_reported_failure")
         if kind == "ready":
@@ -348,7 +353,8 @@ async def collect_pipeline(config: Any, config_path: str, duration: float, outpu
         result["status"] = "operator_stopped" if stop.is_set() else "duration_completed"
     except Exception as exc:
         result.update(status="failed", error_type=type(exc).__name__,
-                      reason=str(exc) if isinstance(exc, (RuntimeError, ValueError)) else "pipeline_probe_error")
+                      reason=str(exc) if isinstance(exc, (RuntimeError, ValueError)) else "pipeline_probe_error",
+                      safe_error=evidence.worker_safe_error or safe_exception_evidence(exc))
     finally:
         child_stop.set()
         forced = False

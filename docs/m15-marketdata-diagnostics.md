@@ -17,7 +17,7 @@
   --output-dir /tmp/pat-quote-diagnostic-unique
 ```
 
-默认 `--mode raw-sdk` 直接观察 SDK 回调。全生产池使用 `--production-universe` 替换 `--symbols`。原始小池、原始147只、处理链路三次探针串行运行；输出目录必须新建或为空，位于工作区和生产输出目录之外。采样时限为 1 至 86400 秒，包含初始化时间。父进程按墙钟监督，即使子进程 SDK/OAuth 同步函数阻塞也会在采样时限加5秒后停止；清理自己的子进程另有有界等待。`phase.json` 保存卡住的阶段，不泄露SDK敏感异常。raw-sdk 单请求等待时间与配置 `subscription_deadline_seconds` 一致（当前45秒），同时不得超过总剩余时间；`phases.jsonl` 和 summary 逐批记录订阅 offset/size、等待限时、成功/失败及耗时，错误仅记录类别与类型，不输出SDK异常正文。先完成环境来源校验，再持有原有跨工作区唯一行情锁并检查旧运行进程；发现占用或孤儿子进程立即拒绝，不杀死他人连接。正式 runtime 同样拒绝遗留孤儿，自己的子进程仍在原 finally 流程回收。
+默认 `--mode raw-sdk` 直接观察 SDK 回调。全生产池使用 `--production-universe` 替换 `--symbols`。原始小池、原始147只、处理链路三次探针串行运行；输出目录必须新建或为空，位于工作区和生产输出目录之外。采样时限为 1 至 86400 秒，包含初始化时间。父进程按墙钟监督，即使子进程 SDK/OAuth 同步函数阻塞也会在采样时限加5秒后停止；清理自己的子进程另有有界等待。`phase.json` 保存卡住的阶段，不泄露SDK敏感异常。raw-sdk 单请求等待时间与配置 `subscription_deadline_seconds` 一致（当前45秒），同时不得超过总剩余时间；`phases.jsonl` 和 summary 逐批记录订阅 offset/size、等待限时、成功/失败及耗时，错误保留数值供应商 code、固定 kind、类型、分类和最多8层安全因果链，不输出SDK异常正文或 trace_id；code未知而按关键词归类时明确标为启发式，不能据此断言根因。每批同时保存本次请求的公开证券代码列表。先完成环境来源校验，再持有原有跨工作区唯一行情锁并检查旧运行进程；发现占用或孤儿子进程立即拒绝，不杀死他人连接。正式 runtime 同样拒绝遗留孤儿，自己的子进程仍在原 finally 流程回收。
 
 raw-sdk 探针的子进程直接创建一个官方 `AsyncQuoteContext`，只订阅 Quote/Trade 和检查覆盖。所有模式均不访问账户、订单或生产故障文件，不重试。
 
@@ -35,3 +35,5 @@ raw-sdk 探针的子进程直接创建一个官方 `AsyncQuoteContext`，只订�
 - 出队增长而预期边界无 K 线：检查聚合和交易时段；不自行补造真实实时数据。
 
 官方内部重连不可观测不是额外行情合格证明要求；按连续性、及时性、完整性验收。项目仍不自动重试、切换来源或恢复交易。
+
+错误分类依据：[官方订阅错误码](https://open.longbridge.com/docs/quote/subscribe/subscribe)中的301606限频、301605订阅数量限制，以及[报价错误码](https://open.longbridge.com/docs/quote/pull/candlestick)中的301604无权限。保留未知数值code供支持人员核对，不猜测其含义。

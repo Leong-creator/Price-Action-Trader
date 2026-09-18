@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from scripts.m15_marketdata_diagnostics_lib import (
-    PipelineDiagnostics, acquire_quote_owner_lock, assert_no_legacy_quote_processes,
+    PipelineDiagnostics, acquire_quote_owner_lock, assert_no_legacy_quote_processes, safe_exception_evidence,
 )
 from scripts import run_m15_longbridge_quote_diagnostic as diagnostic
 from scripts import run_m15_longbridge_sdk_runtime as runtime
@@ -141,6 +141,37 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
             self.assertFalse(result["account_access"])
             self.assertTrue((Path(directory) / "summary.json").exists())
 
+    def test_safe_vendor_codes_categories_and_bounded_cause_without_secret(self):
+        class VendorError(Exception):
+            def __init__(self, code, message="secret-token-must-not-appear"):
+                self.code = code
+                self.kind = "ErrorKind.OpenApi"
+                self.message = message
+                self.trace_id = "private-trace-must-not-appear"
+        for code, category in [(301604, "permission_denied"), (301606, "rate_limited"),
+                               (301605, "subscription_limit"), (999999, "sdk_or_runtime_error")]:
+            with self.subTest(code=code):
+                vendor = VendorError(code)
+                wrapper = RuntimeError("outer-secret-must-not-appear")
+                wrapper.__cause__ = vendor
+                safe = safe_exception_evidence(wrapper)
+                self.assertEqual(safe["causal_chain"][1]["error_code"], code)
+                self.assertEqual(safe["error_category"], category)
+                self.assertEqual(safe["causal_chain"][1]["error_kind"], "OpenApi")
+                self.assertNotIn("must-not-appear", json.dumps(safe))
+        timeout = safe_exception_evidence(VendorError(None, "request timed out token=secret"))
+        self.assertEqual(timeout["error_category"], "request_timeout")
+        self.assertEqual(timeout["classification_basis"], "message_keyword_not_root_cause")
+        self.assertIsNone(timeout["error_code"])
+        malformed = VendorError("token-secret")
+        malformed.kind = "bearer-secret"
+        malformed.__cause__ = malformed
+        safe = safe_exception_evidence(malformed)
+        self.assertEqual(len(safe["causal_chain"]), 1)
+        self.assertIsNone(safe["error_kind"])
+        self.assertIsNone(safe["error_code"])
+        self.assertNotIn("secret", json.dumps(safe))
+
     def test_batch_failure_records_offset_and_uses_production_timeout_without_secret(self):
         class Quote:
             @classmethod
@@ -172,6 +203,7 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
             batches = result["subscription_batches"]
             self.assertEqual([row["batch_offset"] for row in batches], [0, 2])
             self.assertEqual([row["batch_size"] for row in batches], [2, 1])
+            self.assertEqual(batches[1]["batch_symbols"], ["AAPL.US"])
             self.assertEqual([row["outcome"] for row in batches], ["success", "failed"])
             self.assertEqual(batches[1]["error_category"], "request_timeout")
             self.assertEqual(result["stage"], "subscribe")
