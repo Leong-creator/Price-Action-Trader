@@ -23,6 +23,8 @@ DEFAULT_RUNTIME_FILES = (
     "scripts/m15_sdk_provenance_lib.py",
     "scripts/m15_deployment_governance_lib.py",
     "scripts/run_m15_sdk_provenance.py",
+    "scripts/m15_marketdata_diagnostics_lib.py",
+    "scripts/run_m15_longbridge_quote_diagnostic.py",
     "scripts/start_m15_trading_stack_after_boot.sh",
     "config/m15_official_sdk_artifact.json",
     "scripts/run_m15_longbridge_sdk_runtime.py",
