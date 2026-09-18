@@ -69,11 +69,16 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
     result = {"mode": "isolated_raw_sdk_diagnostic", "symbols": symbols,
               "started_at": datetime.now(UTC).isoformat(), "duration_limit_seconds": duration,
               "account_access": False, "order_access": False, "production_acceptance": False,
-              "bar_formation": "not_assessed_raw_callback_probe", "status": "collecting"}
-    def stage(name: str) -> None:
+              "bar_formation": "not_assessed_raw_callback_probe", "status": "collecting",
+              "subscription_batches": []}
+    active_batch: dict[str, Any] | None = None
+    active_batch_started = 0.0
+    def stage(name: str, **details: Any) -> None:
         result["stage"] = name
-        (output / "phase.json").write_text(json.dumps({"stage": name,
-            "at": datetime.now(UTC).isoformat(), "process_id": os.getpid()}) + "\n", encoding="utf-8")
+        phase = {"stage": name, "at": datetime.now(UTC).isoformat(),
+                 "process_id": os.getpid(), **details}
+        (output / "phase.json").write_text(json.dumps(phase) + "\n", encoding="utf-8")
+        append_diagnostic_snapshot(output / "phases.jsonl", phase)
     try:
         stage("oauth_build")
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
@@ -83,11 +88,22 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
         quote.set_on_trades(lambda symbol, event: callback("trade", symbol, event))
         sub_types = [sdk.SubType.Quote, sdk.SubType.Trade]
         async def request(awaitable):
-            return await asyncio.wait_for(awaitable, timeout=max(0.001, min(30, deadline - time.monotonic())))
+            return await asyncio.wait_for(awaitable, timeout=max(0.001, min(config.subscription_deadline_seconds, deadline - time.monotonic())))
         batch = config.sdk_subscribe_batch_size
-        stage("subscribe")
         for offset in range(0, len(symbols), batch):
-            await request(quote.subscribe(symbols[offset:offset + batch], sub_types))
+            current_symbols = symbols[offset:offset + batch]
+            active_batch = {"batch_offset": offset, "batch_size": len(current_symbols),
+                "total_symbols": len(symbols), "sub_types": ["Quote", "Trade"],
+                "request_timeout_seconds": max(0.001, min(config.subscription_deadline_seconds,
+                                                           deadline - time.monotonic()))}
+            active_batch_started = time.monotonic()
+            stage("subscribe", outcome="started", **active_batch)
+            await request(quote.subscribe(current_symbols, sub_types))
+            outcome = {**active_batch, "outcome": "success",
+                       "elapsed_seconds": round(time.monotonic() - active_batch_started, 3)}
+            result["subscription_batches"].append(outcome)
+            stage("subscribe", **outcome)
+            active_batch = None
         stage("subscriptions_verify")
         actual = _subscription_symbols(await request(quote.subscriptions()), tuple(sub_types))
         result["missing_subscriptions"] = sorted(set(symbols) - actual)
@@ -114,7 +130,17 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
         result["status"] = "operator_stopped" if stop.is_set() else "duration_completed"
     except Exception as exc:
         # Exception types are sufficient here; credential-bearing SDK errors are not echoed.
-        result.update(status="failed", error_type=type(exc).__name__)
+        category = "request_timeout" if isinstance(exc, TimeoutError) else "sdk_or_runtime_error"
+        result.update(status="failed", error_type=type(exc).__name__, error_category=category)
+        if active_batch is not None:
+            outcome = {**active_batch, "outcome": "failed", "error_category": category,
+                       "error_type": type(exc).__name__,
+                       "elapsed_seconds": round(time.monotonic() - active_batch_started, 3)}
+            result["subscription_batches"].append(outcome)
+            stage("subscribe", **outcome)
+        else:
+            stage(str(result.get("stage", "unknown")), outcome="failed", error_category=category,
+                  error_type=type(exc).__name__)
     finally:
         quote = None  # SDK has no public close; process exit is the cleanup boundary.
         result.update(finished_at=datetime.now(UTC).isoformat(),
