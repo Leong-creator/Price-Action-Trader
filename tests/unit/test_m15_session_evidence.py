@@ -301,6 +301,7 @@ class WatchLoopTest(unittest.TestCase):
                              paper_validation_market_date="2026-09-08")
             mocks = {
                 "acquire_runtime_run_lock": {"return_value": MagicMock()},
+                "assert_no_legacy_quote_processes": {"return_value": None},
                 "cleanup_orphaned_sdk_runtime_children": {"return_value": []},
                 "require_sdk_contract": {"return_value": object()},
                 "config_fingerprint": {"return_value": "offline"},
