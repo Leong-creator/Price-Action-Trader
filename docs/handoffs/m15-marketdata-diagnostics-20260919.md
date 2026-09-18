@@ -59,3 +59,11 @@ user_decision_needed: null
 - pipeline 复用现有 MarketSessionEvidence 及参考新鲜度规则，独立保存消息/K线计数；所有输出重定向外部目录，不写生产故障/缓存/验收文件。
 - 49 项最终聚焦测试通过，包括原生同步创建永久阻塞、父关闭锁FD仍互斥、父 SIGKILL 后子进程退出、纯行情零账户构造，以及隔离真实进程的 boot 测试。
 - 待 root 集成：deployment DEFAULT_RUNTIME_FILES 加入 m15_marketdata_diagnostics_lib.py 和 run_m15_longbridge_quote_diagnostic.py；环境实现为其他代理负责，未交叉修改。
+
+## 追加：原始探针订阅证据精度
+
+- raw-sdk 原先固定30秒请求等待，与正式45秒配置不等价；统一使用配置 subscription_deadline_seconds，且仍受总剩余时间与父进程墙钟监督限制。生产配置未修改。
+- 每批记录 offset、size、total、sub_types、timeout、outcome、elapsed，独立 phases.jsonl；phase.json 标记当前或刚失败的一批。
+- SDK错误正文不落盘，仅保存错误类型和 request_timeout/sdk_or_runtime_error 分类。
+- 最终50项聚焦测试通过，新增首批成功/后批超时、45秒一致性及敏感异常正文不泄露验证。
+- 未执行任何真实行情连接。官方文档500证券/单连接/10req每秒/并发5限制不能解释50一批为违规；SDK未改HEAD源码first_push=true，但本机旧源码工作树有补丁，不能用其内容当官方依据或重新编译部署。

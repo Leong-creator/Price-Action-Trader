@@ -125,18 +125,58 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
         sdk = SimpleNamespace(AsyncQuoteContext=Quote,
             OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()),
             SubType=SimpleNamespace(Quote="quote", Trade="trade"))
-        config = SimpleNamespace(quote_region="cn", sdk_subscribe_batch_size=50)
+        config = SimpleNamespace(quote_region="cn", sdk_subscribe_batch_size=50, subscription_deadline_seconds=45)
         with tempfile.TemporaryDirectory() as directory, \
              patch.object(diagnostic, "read_client_id", return_value="not-a-secret"), \
              patch.object(diagnostic, "sdk_config_from_oauth", return_value=object()):
             result = asyncio.run(diagnostic.collect(config, ["SPY.US"], 0.02,
                 Path(directory), sdk, asyncio.Event()))
             self.assertEqual(calls, ["create", "subscribe"])
+            self.assertEqual(result["subscription_batches"][0]["batch_offset"], 0)
+            self.assertEqual(result["subscription_batches"][0]["batch_size"], 1)
+            self.assertEqual(result["subscription_batches"][0]["outcome"], "success")
             self.assertFalse(result["production_acceptance"])
             self.assertEqual(result["status"], "duration_completed")
             self.assertEqual(result["diagnostics"]["stages"]["dequeued:SPY.US:quote"]["count"], 1)
             self.assertFalse(result["account_access"])
             self.assertTrue((Path(directory) / "summary.json").exists())
+
+    def test_batch_failure_records_offset_and_uses_production_timeout_without_secret(self):
+        class Quote:
+            @classmethod
+            def create(cls, config):
+                return cls()
+            def set_on_quote(self, handler):
+                pass
+            def set_on_trades(self, handler):
+                pass
+            async def subscribe(self, symbols, types):
+                if symbols == ["AAPL.US"]:
+                    raise TimeoutError("credential=DO_NOT_SAVE_SDK_MESSAGE")
+        sdk = SimpleNamespace(AsyncQuoteContext=Quote,
+            OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()),
+            SubType=SimpleNamespace(Quote="quote", Trade="trade"))
+        config = SimpleNamespace(quote_region="cn", sdk_subscribe_batch_size=2,
+                                 subscription_deadline_seconds=45)
+        observed_timeouts = []
+        async def request(awaitable, timeout):
+            observed_timeouts.append(timeout)
+            return await awaitable
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(diagnostic, "read_client_id", return_value="test"), \
+             patch.object(diagnostic, "sdk_config_from_oauth", return_value=object()), \
+             patch.object(diagnostic.asyncio, "wait_for", side_effect=request):
+            result = asyncio.run(diagnostic.collect(config, ["SPY.US", "QQQ.US", "AAPL.US"],
+                120, Path(directory), sdk, asyncio.Event()))
+            self.assertEqual(observed_timeouts, [45, 45])
+            batches = result["subscription_batches"]
+            self.assertEqual([row["batch_offset"] for row in batches], [0, 2])
+            self.assertEqual([row["batch_size"] for row in batches], [2, 1])
+            self.assertEqual([row["outcome"] for row in batches], ["success", "failed"])
+            self.assertEqual(batches[1]["error_category"], "request_timeout")
+            self.assertEqual(result["stage"], "subscribe")
+            for path in Path(directory).iterdir():
+                self.assertNotIn("DO_NOT_SAVE_SDK_MESSAGE", path.read_text())
 
     def test_child_keeps_same_lock_when_parent_descriptor_closes(self):
         with tempfile.TemporaryDirectory() as directory:
