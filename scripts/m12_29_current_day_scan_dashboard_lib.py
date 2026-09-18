@@ -87,6 +87,7 @@ M15_PAPER_CONNECTION_CHECK_DIR = "m15_longbridge_paper_connection_check"
 M15_LONGBRIDGE_QUALITY_POLICY_STARTED_AT = "2026-06-09T03:15:00Z"
 M15_ACCOUNT_STATE_STALE_AFTER_SECONDS = 300
 M15_SUBMITTER_STATE_STALE_AFTER_SECONDS = 300
+M15_SDK_RUNTIME_STALE_AFTER_SECONDS = 30
 MONEY = Decimal("0.01")
 PERCENT = Decimal("0.01")
 ZERO = Decimal("0")
@@ -3975,8 +3976,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     fast_queue_path = daily_dir / M15_FAST_SIGNAL_QUEUE_DIR / "m15_longbridge_fast_signal_queue.json"
     realtime_account_state_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_account_state.json"
     realtime_account_state_summary_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_account_state_summary.json"
-    realtime_supervisor_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_session_supervisor.json"
-    realtime_ingestor_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_market_event_ingestor.json"
+    sdk_runtime_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_sdk_runtime.json"
     realtime_router_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_signal_router.json"
     realtime_position_manager_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_position_manager.json"
     realtime_path = daily_dir / M15_REALTIME_EXECUTION_DIR / "m15_longbridge_realtime_execution.json"
@@ -3995,8 +3995,8 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     submitter = load_optional_json(submitter_path)
     submission_ledger = read_jsonl(submission_ledger_path)
     fast_queue = load_optional_json(fast_queue_path)
-    realtime_supervisor = load_optional_json(realtime_supervisor_path)
-    realtime_ingestor = load_optional_json(realtime_ingestor_path)
+    sdk_runtime = load_optional_json(sdk_runtime_path)
+    sdk_view = m15_sdk_runtime_dashboard_state(sdk_runtime)
     realtime_router = load_optional_json(realtime_router_path)
     realtime_position_manager = load_optional_json(realtime_position_manager_path)
     realtime = load_optional_json(realtime_path)
@@ -4021,16 +4021,13 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     queue_scan_date = str(fast_queue.get("scan_date") or "")
     panel_market_date = datetime.now(UTC).astimezone(ZoneInfo("America/New_York")).date().isoformat()
     queue_stale_for_panel = bool(queue_market_date and queue_market_date != panel_market_date)
-    submitter_market_window = submitter.get("market_window", {}) if isinstance(submitter.get("market_window"), dict) else {}
-    realtime_market_window = realtime_supervisor.get("window", {}) if isinstance(realtime_supervisor.get("window"), dict) else {}
-    market_window = realtime_market_window if realtime_market_window else submitter_market_window
-    market_status = str(market_window.get("market_status") or "")
-    realtime_waiting_window = m15_waiting_market_window(realtime_supervisor, market_status)
+    # Retired supervisor files must not refresh old account/execution snapshots.
+    market_window = market_session_status(datetime.now(UTC).isoformat())
+    market_status = market_window["status"]
     account_state_stale = m15_artifact_stale_for_market(
         account_state,
         "",
         max_age_seconds=M15_ACCOUNT_STATE_STALE_AFTER_SECONDS,
-        allow_audit_snapshot=realtime_waiting_window,
     )
     submitter_stale = m15_artifact_stale_for_market(
         submitter,
@@ -4041,36 +4038,21 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         realtime,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
-        allow_audit_snapshot=realtime_waiting_window,
-    )
-    realtime_supervisor_stale = m15_artifact_stale_for_market(
-        realtime_supervisor,
-        "",
-        max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
     )
     realtime_router_stale = m15_artifact_stale_for_market(
         realtime_router,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
-        allow_audit_snapshot=realtime_waiting_window,
-    )
-    realtime_ingestor_stale = m15_artifact_stale_for_market(
-        realtime_ingestor,
-        "",
-        max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
-        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_account_state_stale = m15_artifact_stale_for_market(
         realtime_account_state if realtime_account_state else {},
         "",
         max_age_seconds=M15_ACCOUNT_STATE_STALE_AFTER_SECONDS,
-        allow_audit_snapshot=realtime_waiting_window,
     )
     realtime_position_manager_stale = m15_artifact_stale_for_market(
         realtime_position_manager,
         "",
         max_age_seconds=M15_SUBMITTER_STATE_STALE_AFTER_SECONDS,
-        allow_audit_snapshot=realtime_waiting_window,
     )
     if realtime_account_state:
         account_state_stale = realtime_account_state_stale
@@ -4096,7 +4078,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_chain_state_available = bool(
         realtime_account_state
         or realtime_account_state_summary
-        or realtime_supervisor
+        or sdk_runtime
         or realtime
     )
     legacy_submit_status = "submitter_state_stale_waiting_refresh" if submitter_stale else str(submitter.get("submission_status") or "")
@@ -4104,7 +4086,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         submit_status = str(
             realtime.get("submission_status")
             or realtime.get("execution_status")
-            or realtime_supervisor.get("supervisor_status")
+            or sdk_runtime.get("status")
             or realtime_account_state_summary.get("account_status")
             or "realtime_account_state_only"
         )
@@ -4121,9 +4103,6 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     realtime_submitted_count = 0 if realtime_stale else int_like(realtime.get("submitted_count", 0))
     realtime_market_event_count = 0 if realtime_router_stale else int_like(realtime_router.get("market_event_count", 0))
     realtime_router_new_signal_count = 0 if realtime_router_stale else int_like(realtime_router.get("new_signal_event_count", 0))
-    realtime_ingestor_new_event_count = 0 if realtime_ingestor_stale else int_like(realtime_ingestor.get("new_market_event_count", 0))
-    realtime_ingestor_total_event_count = 0 if realtime_ingestor_stale else int_like(realtime_ingestor.get("market_event_total_count", 0))
-    realtime_ingestor_deferred_count = 0 if realtime_ingestor_stale else int_like(realtime_ingestor.get("deferred_count", 0))
     realtime_account_status = str(realtime_account_state_summary.get("account_status") or "")
     realtime_exit_signal_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("new_exit_signal_event_count", 0))
     realtime_managed_position_count = 0 if realtime_position_manager_stale else int_like(realtime_position_manager.get("managed_position_count", 0))
@@ -4287,7 +4266,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
             "unconfirmed_submission_count": unconfirmed_count,
             "status_counts": status_counts,
         }
-    data_available = bool(account_state or submitter or fast_queue or realtime_supervisor or realtime_ingestor or realtime_router or realtime_position_manager or realtime or connection)
+    data_available = bool(account_state or submitter or fast_queue or sdk_runtime or realtime_router or realtime_position_manager or realtime or connection)
     account_label = "模拟账户已连接" if paper_detected else "等待模拟账户确认" if auth_ok else "等待授权或状态文件"
     top_metric = (
         f"{account_label} / 账户状态待刷新"
@@ -4303,15 +4282,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
     elif not paper_detected:
         plain_language = "长桥账户尚未被确认成模拟账户，所以看板只显示状态，不允许提交。"
     elif realtime_available:
-        if realtime_waiting_window:
-            if submitted_count > 0:
-                plain_language = (
-                    f"长桥模拟账户已连接；当前不是美股常规交易时段，账户状态已只读刷新。"
-                    f"上一交易窗口确认提交 {submitted_count} 笔模拟订单，本地模拟没有参与下单判断；等待下一交易日自动运行。"
-                )
-            else:
-                plain_language = "长桥模拟账户已连接；当前不是美股常规交易时段，账户状态已只读刷新，交易循环等待下一交易日自动运行。"
-        elif submitted_count > 0:
+        if submitted_count > 0:
             plain_language = f"长桥模拟账户已连接，实时链路今日已确认提交 {submitted_count} 笔模拟订单；本地模拟没有参与下单判断。"
         elif attempted_count > 0:
             plain_language = (
@@ -4336,11 +4307,15 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         plain_language += f" 队列阻断：{', '.join(str(item) for item in queue_blockers)}。"
     if submitter_stale and not realtime_available:
         plain_language += " 提交器状态来自旧交易日，等待只读刷新。"
+    if not sdk_view["current"]:
+        plain_language = sdk_view["label"] + "。" + sdk_view["note"] + " 实时链路状态尚未刷新，账户与订单数字仅供独立审计，不代表行情或自动交易正常。"
+        if account_state_stale:
+            plain_language += "账户记录来自旧交易日或已经过期，等待只读刷新。"
     panel_last_refreshed_at = str(
         realtime_account_state.get("generated_at")
         or realtime_account_state_summary.get("generated_at")
         or active_pnl_reconciliation.get("generated_at")
-        or realtime_supervisor.get("generated_at")
+        or sdk_runtime.get("generated_at")
         or account_state.get("generated_at")
         or ""
     )
@@ -4469,14 +4444,14 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
             ),
         },
         {
-            "label": "实时守护器",
-            "value": realtime_supervisor_status_label(realtime_supervisor, realtime_supervisor_stale),
-            "note": str(realtime_supervisor.get("plain_language_result") or "实时守护器尚未生成；常规交易时段才会按顺序拉起行情、信号和执行链路。"),
+            "label": "SDK运行状态",
+            "value": sdk_view["label"],
+            "note": sdk_view["note"],
         },
         {
             "label": "实时执行链路",
-            "value": realtime_execution_status_label(realtime, realtime_stale),
-            "note": str(realtime.get("plain_language_result") or "实时链路尚未生成；等待长桥实时行情触发新信号。"),
+            "value": realtime_execution_status_label(realtime, realtime_stale) if sdk_view["current"] else sdk_view["label"],
+            "note": str(realtime.get("plain_language_result") or "等待长桥实时行情触发新信号。") if sdk_view["current"] else "执行统计仅为历史记录；" + sdk_view["note"],
         },
         {
             "label": "旧提交器状态",
@@ -4485,13 +4460,13 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         },
         {
             "label": "实时行情采集",
-            "value": realtime_ingestor_status_label(realtime_ingestor, realtime_ingestor_stale),
-            "note": str(realtime_ingestor.get("plain_language_result") or "实时行情采集器尚未生成；下游不会从本地模拟账本补信号。"),
+            "value": sdk_view["label"],
+            "note": sdk_view["note"],
         },
         {
             "label": "实时信号生成",
-            "value": realtime_router_status_label(realtime_router, realtime_router_stale),
-            "note": str(realtime_router.get("plain_language_result") or "实时信号路由器尚未生成；当前不会从旧队列下单。"),
+            "value": realtime_router_status_label(realtime_router, realtime_router_stale) if sdk_view["current"] else sdk_view["label"],
+            "note": str(realtime_router.get("plain_language_result") or "等待实时信号。") if sdk_view["current"] else "信号统计仅为历史记录；" + sdk_view["note"],
         },
         {
             "label": "实时账户状态",
@@ -4501,7 +4476,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         {
             "label": "实时持仓退出",
             "value": "过期" if realtime_position_manager_stale else f"{realtime_managed_position_count}系统管理 / {realtime_exit_only_position_count}只接管退出 / {realtime_unmanaged_position_count}未接管退出",
-            "note": realtime_position_manager_note,
+            "note": realtime_position_manager_note + ("" if sdk_view["current"] else " 持仓统计仅为历史记录，当前自动退出监控未确认。"),
         },
         {"label": "市场窗口", "value": market_status_label(market_status), "note": str(market_window.get("new_york_time") or "暂无")},
         {"label": "接口读取", "value": health_label(auth_ok, assets_ok, positions_ok, orders_ok), "note": "认证、资产、持仓、挂单状态只读检查。"},
@@ -4569,7 +4544,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
                 + m15_blocker_reason_summary(realtime_blocker_input)
             ),
         },
-        {"label": "行情事件", "value": str(realtime_market_event_count), "note": f"采集器新增 {realtime_ingestor_new_event_count} / 累计 {realtime_ingestor_total_event_count} / 延期 {realtime_ingestor_deferred_count}"},
+        {"label": "行情事件", "value": str(realtime_market_event_count), "note": sdk_view["metrics_note"]},
         {"label": "实时信号", "value": str(realtime_signal_count), "note": f"输入 {realtime_input_signal_count}，跳过已处理 {realtime_skipped_processed_count}，通过 {realtime_ready_count}，阻断 {realtime_blocked_count}，目标内 {realtime_latency_counts.get('target_met', 0)}"},
         {
             "label": "轻量质量排序",
@@ -4782,15 +4757,16 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
         "raw_unmanaged_position_symbols": raw_realtime_unmanaged_symbols,
         "account_state_stale": account_state_stale,
         "submitter_state_stale": submitter_stale,
-        "realtime_session_supervisor_state_stale": realtime_supervisor_stale,
-        "realtime_market_ingestor_state_stale": realtime_ingestor_stale,
+        "sdk_runtime_state_stale": sdk_view["stale"],
+        "sdk_runtime_status": str(sdk_runtime.get("status") or "unknown"),
+        "sdk_runtime_reason": str(sdk_runtime.get("reason") or ""),
         "realtime_signal_router_state_stale": realtime_router_stale,
         "realtime_account_state_stale": realtime_account_state_stale,
         "realtime_position_manager_state_stale": realtime_position_manager_stale,
         "realtime_execution_state_stale": realtime_stale,
         "fast_queue_state_stale": queue_stale_for_panel,
         "submission_status": submit_status,
-        "realtime_execution_status": str(realtime.get("plain_language_result") or ""),
+        "realtime_execution_status": str(realtime.get("plain_language_result") or "") if sdk_view["current"] else sdk_view["label"],
         "fast_queue_status": queue_status,
         "new_open_signal_count": str(realtime_signal_count if realtime_available else new_signal_count),
         "input_signal_event_count": str(realtime_input_signal_count),
@@ -4810,8 +4786,7 @@ def build_longbridge_paper_dashboard_view(config: M1229Config) -> dict[str, Any]
             "realtime_account_state_summary": project_path(realtime_account_state_summary_path) if realtime_account_state_summary_path.exists() else "",
             "paper_order_submitter": project_path(submitter_path) if submitter_path.exists() else "",
             "paper_submission_ledger": project_path(submission_ledger_path) if submission_ledger_path.exists() else "",
-            "realtime_session_supervisor": project_path(realtime_supervisor_path) if realtime_supervisor_path.exists() else "",
-            "realtime_market_event_ingestor": project_path(realtime_ingestor_path) if realtime_ingestor_path.exists() else "",
+            "sdk_runtime": project_path(sdk_runtime_path) if sdk_runtime_path.exists() else "",
             "realtime_signal_router": project_path(realtime_router_path) if realtime_router_path.exists() else "",
             "realtime_position_manager": project_path(realtime_position_manager_path) if realtime_position_manager_path.exists() else "",
             "realtime_execution": project_path(realtime_path) if realtime_path.exists() else "",
@@ -4864,17 +4839,6 @@ def m15_artifact_stale_for_market(
         return False
     age_seconds = m15_generated_age_seconds(payload)
     return bool(age_seconds is None or age_seconds > max_age_seconds)
-
-
-def m15_waiting_market_window(supervisor: dict[str, Any], market_status: str) -> bool:
-    supervisor_status = str(supervisor.get("supervisor_status") or "")
-    normalized = market_status.strip().lower()
-    return supervisor_status == "waiting_market_window" or normalized in {
-        "等待下一交易日",
-        "非交易日等待",
-        "waiting_market_window",
-        "non_trading_day",
-    }
 
 
 def m15_generated_market_date(payload: dict[str, Any]) -> str:
@@ -6768,31 +6732,49 @@ def realtime_execution_status_label(realtime: dict[str, Any], stale: bool) -> st
     return "实时链路已就绪"
 
 
-def realtime_supervisor_status_label(supervisor: dict[str, Any], stale: bool) -> str:
-    if not supervisor:
-        return "实时守护器未启动"
-    if stale:
-        return "实时守护器状态待刷新"
-    status = str(supervisor.get("supervisor_status") or "")
-    labels = {
-        "cycle_completed": "实时守护器已完成本轮",
-        "waiting_market_window": "等待交易窗口",
-        "cycle_failed": "实时守护器本轮失败",
-        "failure_breaker_tripped": "实时守护器已熔断",
-    }
-    return labels.get(status, "实时守护器已就绪")
-
-
-def realtime_ingestor_status_label(ingestor: dict[str, Any], stale: bool) -> str:
-    if not ingestor:
-        return "实时行情未采集"
-    if stale:
-        return "实时行情状态待刷新"
-    if int_like(ingestor.get("new_market_event_count", 0)) > 0:
-        return "已采集新行情事件"
-    if int_like(ingestor.get("deferred_count", 0)) > 0:
-        return "行情读取延期"
-    return "行情采集已就绪"
+def m15_sdk_runtime_dashboard_state(runtime: dict[str, Any]) -> dict[str, Any]:
+    """Display recorded SDK state, never infer health from retired artifacts."""
+    age = m15_generated_age_seconds(runtime)
+    stale = age is None or age > M15_SDK_RUNTIME_STALE_AFTER_SECONDS
+    try:
+        generated = datetime.fromisoformat(str(runtime.get("generated_at") or "").replace("Z", "+00:00"))
+        if generated.tzinfo is None or generated > datetime.now(UTC):
+            stale = True
+    except ValueError:
+        stale = True
+    status = str(runtime.get("status") or "unknown")
+    reason = str(runtime.get("reason") or "")
+    current = False
+    if status == "fault_halted":
+        label = "行情故障已停止"
+    elif status in {"stopped", "operator_stopped"}:
+        label = "行情已停止"
+    elif status.startswith("blocked"):
+        label = "行情启动被阻断"
+    elif not runtime:
+        label = "行情状态未知（未生成SDK记录）"
+    elif stale:
+        label = "行情状态未知（SDK记录已过期）"
+    elif status == "connecting":
+        label = "SDK正在连接，行情尚未就绪"
+    elif (status == "running" and runtime.get("sdk_connected") is True
+          and runtime.get("reference_market_data_state") == "healthy"):
+        label = "SDK报告行情更新"
+        current = True
+    else:
+        label = "行情状态未知（尚未确认推送正常）"
+    note = f"SDK记录时间：{runtime.get('generated_at') or '未知'}；原因：{reason or '未记录'}。"
+    if stale and runtime:
+        note += "记录已过期，不代表当前仍在运行。"
+    note += "本页只展示已记录状态，不发起连接或恢复交易。"
+    metrics = []
+    for key, title in (("market_data_raw_notification_count", "已处理通知"),
+                       ("complete_boundary_count", "完整边界"),
+                       ("realtime_tradable_bar_count", "可交易K线")):
+        value = runtime.get(key)
+        metrics.append(f"{title} {value if value is not None else '未知'}")
+    return {"label": label, "note": note, "stale": stale, "current": current,
+            "metrics_note": "SDK记录：" + " / ".join(metrics)}
 
 
 def realtime_router_status_label(router: dict[str, Any], stale: bool) -> str:
