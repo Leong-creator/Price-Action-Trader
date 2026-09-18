@@ -2,8 +2,11 @@ from contextlib import ExitStack
 import hashlib
 import importlib.machinery
 import json
+import os
+import shutil
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -26,9 +29,10 @@ class SdkProvenanceTests(unittest.TestCase):
         self.python.write_bytes(b"fixture-interpreter")
         self.filename = "longbridge-4.5.0-cp312-cp312-linux_x86_64.whl"
         self.wheel = self.root / self.filename
-        self.module_name = "longbridge/openapi" + importlib.machinery.EXTENSION_SUFFIXES[0]
+        self.module_name = "longbridge/longbridge" + importlib.machinery.EXTENSION_SUFFIXES[0]
         self.contents = {"longbridge/__init__.py": b"# fixture; must never import\nraise RuntimeError('imported')\n",
                          self.module_name: b"official-native-fixture",
+                         "longbridge/openapi.py": b"",
                          "longbridge/openapi.pyi": b"# fixture types",
                          "longbridge-4.5.0.dist-info/METADATA": b"Name: longbridge\nVersion: 4.5.0\n"}
         with zipfile.ZipFile(self.wheel, "w") as archive:
@@ -47,7 +51,8 @@ class SdkProvenanceTests(unittest.TestCase):
         stack.enter_context(patch.object(sys, "prefix", str(self.env)))
         stack.enter_context(patch.object(sys, "executable", str(self.python)))
         stack.enter_context(patch.object(sys, "path", [str(self.site), *sys.path]))
-        stack.enter_context(patch.dict(sys.modules, {"longbridge": None, "longbridge.openapi": None}))
+        stack.enter_context(patch.dict(sys.modules, {"longbridge": None, "longbridge.longbridge": None,
+                                                   "longbridge.openapi": None}))
         stack.enter_context(patch.dict("os.environ", {}, clear=True))
         stack.enter_context(patch.object(provenance.importlib.metadata, "distribution",
             return_value=SimpleNamespace(version="4.5.0", locate_file=lambda name: self.site / name)))
@@ -118,6 +123,27 @@ class SdkProvenanceTests(unittest.TestCase):
         with patch.dict("os.environ", {"LD_PRELOAD": "/tmp/override.so"}):
             self.assertIn("sdk_legacy_process_injection", str(self.check()["issues"]))
 
+    def test_official_native_alias_layout_before_after_import(self):
+        before = self.issue()
+        api = SimpleNamespace()
+        native = SimpleNamespace(__file__=str(self.site / self.module_name), openapi=api)
+        package = SimpleNamespace(__file__=str(self.site / "longbridge/__init__.py"), openapi=api)
+        with patch.dict(sys.modules, {"longbridge": package, "longbridge.longbridge": native,
+                                     "longbridge.openapi": api}):
+            after = self.check()
+            self.assertTrue(after["verified"], after)
+            self.assertEqual(before, after["environment"])
+            self.assertEqual(after["environment"]["module_path"], str(self.site / self.module_name))
+
+    def test_alias_substitution_is_rejected_even_without_a_file(self):
+        self.issue()
+        api = SimpleNamespace()
+        native = SimpleNamespace(__file__=str(self.site / self.module_name), openapi=api)
+        package = SimpleNamespace(__file__=str(self.site / "longbridge/__init__.py"), openapi=api)
+        with patch.dict(sys.modules, {"longbridge": package, "longbridge.longbridge": native,
+                                     "longbridge.openapi": SimpleNamespace()}):
+            self.assertIn("sdk_loaded_alias_shadowed", str(self.check()["issues"]))
+
     def test_missing_trust_anchor_fails_closed(self):
         self.issue()
         self.anchor.unlink()
@@ -129,6 +155,85 @@ class SdkProvenanceTests(unittest.TestCase):
         self.anchor.write_text(json.dumps(anchor))
         with self.assertRaisesRegex(ValueError, "sdk_trusted_artifact_invalid"):
             self.issue()
+
+
+class RealOfficialWheelCompatibilityTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get("M15_OFFICIAL_TEST_ROOT") and os.environ.get("M15_OFFICIAL_TEST_WHEEL"),
+                         "Set explicit official environment/wheel paths for offline compatibility check")
+    def test_real_official_wheel_before_and_after_sdk_import(self):
+        root = Path(os.environ["M15_OFFICIAL_TEST_ROOT"]).resolve()
+        wheel = Path(os.environ["M15_OFFICIAL_TEST_WHEEL"]).resolve()
+        code = '''
+import importlib.util, json, pathlib, socket, sys
+socket.socket = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("network forbidden"))
+spec = importlib.util.spec_from_file_location("provenance_under_test", sys.argv[1])
+p = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(p)
+root, wheel = pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+# Read the independently reviewed anchor supplied to this test, without writing
+# either production receipts or any SDK installation files.
+original_anchor = p.trusted_artifact
+p.trusted_artifact = lambda ignored: original_anchor(pathlib.Path(sys.argv[4]))
+original_digest = p.digest
+p.digest = lambda path: original_digest(pathlib.Path(sys.argv[4]) / p.TRUST_PATH) if path == root / p.TRUST_PATH else original_digest(path)
+before = p.inspect_environment(wheel, root)
+import longbridge
+from longbridge import openapi
+after = p.inspect_environment(wheel, root)
+assert before == after
+assert openapi is sys.modules["longbridge.longbridge"].openapi
+assert before["module_path"].endswith(".so")
+assert "/longbridge/longbridge." in before["module_path"]
+assert not getattr(openapi, "__file__", None)
+print(json.dumps({"verified": True, "module_path": after["module_path"], "same_before_after_import": True}))
+'''
+        result = subprocess.run([str(root / ".venv-m15/bin/python"), "-B", "-c", code,
+                                 str(Path(provenance.__file__).resolve()), str(root), str(wheel),
+                                 str(Path(__file__).resolve().parents[2])],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["same_before_after_import"])
+
+    @unittest.skipUnless(os.environ.get("M15_OFFICIAL_TEST_ROOT") and os.environ.get("M15_OFFICIAL_TEST_WHEEL"),
+                         "Set explicit official environment/wheel paths for offline compatibility check")
+    def test_real_official_native_tampering_in_disposable_environment(self):
+        official_root = Path(os.environ["M15_OFFICIAL_TEST_ROOT"]).resolve()
+        wheel = Path(os.environ["M15_OFFICIAL_TEST_WHEEL"]).resolve()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            env = root / ".venv-m15"
+            subprocess.run([str(official_root / ".venv-m15/bin/python"), "-m", "venv",
+                            "--without-pip", str(env)], check=True, capture_output=True, timeout=30)
+            python = env / "bin/python"
+            site = Path(subprocess.check_output([str(python), "-c",
+                        "import sysconfig; print(sysconfig.get_path('purelib'))"], text=True).strip())
+            with zipfile.ZipFile(wheel) as archive:
+                archive.extractall(site)
+            (root / provenance.TRUST_PATH).parent.mkdir()
+            shutil.copyfile(Path(__file__).resolve().parents[2] / provenance.TRUST_PATH,
+                            root / provenance.TRUST_PATH)
+            code = '''
+import importlib.util, pathlib, socket, sys
+socket.socket = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("network forbidden"))
+spec = importlib.util.spec_from_file_location("provenance_under_test", sys.argv[1])
+p = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(p)
+root, wheel = pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+receipt = p.issue_environment_receipt(wheel, root)
+assert p.verify_environment(root)["verified"]
+# Native extension is not imported/mapped; mutate only this temporary copy.
+with pathlib.Path(receipt["module_path"]).open("r+b") as binary:
+    byte = binary.read(1)
+    binary.seek(0)
+    binary.write(bytes([byte[0] ^ 1]))
+result = p.verify_environment(root)
+assert not result["verified"] and "sdk_installed_file_mismatch" in str(result["issues"]), result
+print("official-native-tamper-rejected")
+'''
+            result = subprocess.run([str(python), "-B", "-c", code, str(Path(provenance.__file__).resolve()),
+                                     str(root), str(wheel)], capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("official-native-tamper-rejected", result.stdout)
 
 
 if __name__ == "__main__":
