@@ -9,6 +9,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from scripts.m15_marketdata_diagnostics_lib import (
+    PipelineDiagnostics, append_diagnostic_snapshot,
+)
+
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder,
     configured_symbols,
@@ -143,6 +147,9 @@ def official_sdk_quote_worker(
     """Own exactly one official SDK async quote context for all market data."""
     config = load_config(config_path)
     quote = None
+    diagnostics = PipelineDiagnostics()
+    diagnostic_path = (Path(config.output_dir) / "m15_quote_pipeline_diagnostics.jsonl"
+                       if hasattr(config, "output_dir") else None)
     try:
         os.environ["LONGBRIDGE_PRINT_QUOTE_PACKAGES"] = "false"
         import longbridge.openapi as sdk
@@ -166,6 +173,7 @@ def official_sdk_quote_worker(
         def enqueue(kind: str, symbol: str, event: Any) -> None:
             normalized_symbol = str(symbol).upper()
             received_at = datetime.now(UTC)
+            diagnostics.record("raw_callback", normalized_symbol, kind)
             if normalized_symbol in {"SPY.US", "QQQ.US"}:
                 with reference_activity_lock:
                     latest_reference_activity[normalized_symbol] = {
@@ -175,16 +183,23 @@ def official_sdk_quote_worker(
                         "source_mode": f"official_sdk_raw_{kind}_callback",
                     }
             try:
+                payload = sdk_object_to_dict(event)
+                diagnostics.record("normalized", normalized_symbol, kind)
                 callback_events.put_nowait(
                     (
                         kind,
                         normalized_symbol,
-                        sdk_object_to_dict(event),
+                        payload,
                         received_at,
                     )
                 )
+                diagnostics.record("enqueued", normalized_symbol, kind)
             except queue.Full:
+                diagnostics.record("queue_overflow", normalized_symbol, kind)
                 callback_overflow.set()
+            except Exception:
+                diagnostics.record("normalization_error", normalized_symbol, kind)
+                raise
 
         # The SDK requires handlers to be registered before subscription. The
         # callbacks do no strategy work, file I/O, account access, or orders.
@@ -378,6 +393,7 @@ def official_sdk_quote_worker(
         daily_refresh = DailyContextRefresh(config, base_targets, initial_daily_required)
         last_quote_flush = 0.0
         last_heartbeat = 0.0
+        last_diagnostic_audit = 0.0
         last_reference_activity: dict[str, float] = {}
         raw_event_count = 0
         while not stop_event.is_set():
@@ -390,6 +406,7 @@ def official_sdk_quote_worker(
                     kind, symbol, payload, received_at = callback_events.get_nowait()
                 except queue.Empty:
                     break
+                diagnostics.record("dequeued", symbol, kind)
                 raw_event_count += 1
                 processed += 1
                 if kind == "quote":
@@ -415,6 +432,8 @@ def official_sdk_quote_worker(
                         )
                         last_reference_activity[symbol] = now_monotonic
                 completed = builder.on_trade(symbol, payload, received_at=received_at)
+                for bar in completed:
+                    diagnostics.record("bar_formed", str(bar.get("symbol", "")), "trade")
                 if completed and not _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True):
                     raise RuntimeError("official_sdk_bar_delivery_failed")
 
@@ -427,9 +446,15 @@ def official_sdk_quote_worker(
             # Drain received trades before sealing a boundary; otherwise a
             # burst could turn an unprocessed symbol into a zero-volume bar.
             completed = builder.complete_boundary(targets, datetime.now(UTC)) if callback_events.empty() else []
+            for bar in completed:
+                diagnostics.record("bar_formed", str(bar.get("symbol", "")), "boundary")
             if completed and not _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True):
                 raise RuntimeError("official_sdk_bar_delivery_failed")
             if now_monotonic - last_heartbeat >= 1:
+                diagnostic_snapshot = diagnostics.snapshot(drain_samples=True)
+                if diagnostic_path is not None and now_monotonic - last_diagnostic_audit >= 30:
+                    append_diagnostic_snapshot(diagnostic_path, diagnostic_snapshot)
+                    last_diagnostic_audit = now_monotonic
                 with reference_activity_lock:
                     raw_reference_activity = [
                         dict(latest_reference_activity[symbol])
@@ -441,7 +466,9 @@ def official_sdk_quote_worker(
                         "kind": "heartbeat",
                         "at": to_iso(datetime.now(UTC)),
                         "transport_queue_depth": callback_events.qsize(),
-                        "transport_reader_errors": [],
+                        "transport_reader_errors": None,
+                        "transport_reader_state": "unknown",
+                        "pipeline_diagnostics": diagnostic_snapshot,
                         "transport_resources": _resources(),
                         "raw_notification_count": raw_event_count,
                         "raw_reference_activity": raw_reference_activity,
@@ -463,10 +490,16 @@ def official_sdk_quote_worker(
             {
                 "kind": "error",
                 "reason": f"official_sdk_quote_worker_failed:{type(exc).__name__}:{exc}",
+                "pipeline_diagnostics": diagnostics.snapshot(),
             },
             critical=True,
         )
     finally:
+        if diagnostic_path is not None:
+            try:
+                append_diagnostic_snapshot(diagnostic_path, diagnostics.snapshot(drain_samples=True))
+            except OSError:
+                pass  # The error message still carries the last in-memory evidence.
         if quote is not None:
             try:
                 quote.close()

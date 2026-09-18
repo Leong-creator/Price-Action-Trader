@@ -28,9 +28,11 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-VENV_PYTHON = ROOT / ".venv" / "bin" / "python"
+VENV_PYTHON = ROOT / ".venv-m15" / "bin" / "python"
 if VENV_PYTHON.exists() and Path(sys.prefix).resolve() != VENV_PYTHON.parent.parent.resolve():
     os.execve(str(VENV_PYTHON), [str(VENV_PYTHON), str(Path(__file__).resolve()), *sys.argv[1:]], os.environ)
+
+from scripts.m15_marketdata_diagnostics_lib import assert_no_legacy_quote_processes
 
 from scripts.m15_longbridge_sdk_account_lib import (
     SdkAccountProcessCoordinator,
@@ -122,6 +124,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--status", action="store_true")
     parser.add_argument("--stop", action="store_true")
     return parser.parse_args()
+
+
+def require_sdk_environment() -> dict[str, Any]:
+    from scripts.m15_sdk_provenance_lib import verify_environment
+    provenance = verify_environment(ROOT)
+    if not provenance["verified"]:
+        raise RuntimeError("sdk_environment_provenance_failed:" + ",".join(provenance["issues"]))
+    return provenance
 
 
 def require_sdk_contract() -> Any:
@@ -2213,7 +2223,8 @@ def _run_watch_after_boot_check(
     run_id = runtime_identity["run_id"]
     runtime_started_at = runtime_identity["runtime_started_at"]
     runtime_process_start_ticks = runtime_identity["runtime_process_start_ticks"]
-    orphaned_runtime_children_cleaned = cleanup_orphaned_sdk_runtime_children(config)
+    assert_no_legacy_quote_processes()
+    orphaned_runtime_children_cleaned: list[int] = []
     sdk = require_sdk_contract()
     loaded_config_fingerprint = config_fingerprint(config)
     complete_session_gate_passed_now, complete_sessions_passed, complete_sessions_required = readonly_gate_passed(
@@ -2374,7 +2385,8 @@ def _run_watch_after_boot_check(
     position_monitoring_failed: list[str] = []
     transport_child_pid = 0
     transport_queue_depth = 0
-    transport_reader_errors: list[str] = []
+    transport_reader_errors: list[str] | None = None
+    pipeline_diagnostics: dict[str, Any] = {}
     transport_resources: dict[str, int] = {}
     transport_coalesced_quote_pending_count = 0
     transport_coalesced_quote_replacement_count = 0
@@ -2408,7 +2420,7 @@ def _run_watch_after_boot_check(
     def apply_transport_heartbeat_message(message: dict[str, Any]) -> None:
         nonlocal worker_last_progress
         nonlocal transport_queue_depth
-        nonlocal transport_reader_errors
+        nonlocal transport_reader_errors, pipeline_diagnostics
         nonlocal transport_resources
         nonlocal transport_coalesced_quote_pending_count
         nonlocal transport_coalesced_quote_replacement_count
@@ -2417,10 +2429,9 @@ def _run_watch_after_boot_check(
         transport_queue_depth = int(
             message.get("transport_queue_depth") or 0
         )
-        transport_reader_errors = [
-            str(value)
-            for value in message.get("transport_reader_errors") or []
-        ]
+        errors = message.get("transport_reader_errors")
+        transport_reader_errors = [str(value) for value in errors] if isinstance(errors, list) else None
+        pipeline_diagnostics = dict(message.get("pipeline_diagnostics") or {})
         transport_resources = {
             str(key): int(value)
             for key, value in dict(
@@ -2501,6 +2512,7 @@ def _run_watch_after_boot_check(
         nonlocal worker_ready
         nonlocal last_subscription_failure_reason
         nonlocal last_market_data_worker_error
+        last_known_status = read_json_object(config.runtime_status_path)
         worker_ready = False
         last_subscription_failure_reason = reason
         last_market_data_worker_error = reason
@@ -2549,6 +2561,11 @@ def _run_watch_after_boot_check(
                     f"/{len(configured_trading_symbols(config))}"
                 ),
                 "fault_details": details or {},
+                "pipeline_diagnostics": pipeline_diagnostics,
+                "native_reader_state": "unknown",
+                "sdk_internal_reconnect_state": "unknown",
+                "last_known_status_snapshot": last_known_status,
+                "last_known_status_snapshot_at": last_known_status.get("generated_at", ""),
                 "evidence_session_date": session_evidence.session_date if session_evidence is not None else "",
                 "complete_boundary_count": session_evidence.complete_boundary_count if session_evidence is not None else 0,
                 "boundary_times": [to_iso(close) for close in sorted(session_evidence.boundaries)] if session_evidence is not None else [],
@@ -2570,7 +2587,7 @@ def _run_watch_after_boot_check(
                 worker_last_progress = worker_started
                 transport_child_pid = 0
                 transport_queue_depth = 0
-                transport_reader_errors = []
+                transport_reader_errors = None
                 transport_resources = {}
                 transport_coalesced_quote_pending_count = 0
                 transport_coalesced_quote_replacement_count = 0
@@ -2698,7 +2715,8 @@ def _run_watch_after_boot_check(
                             transport_raw_notification_count
                         ),
                         "transport_callback_queue_depth": transport_queue_depth,
-                        "transport_reader_errors": list(transport_reader_errors),
+                        "transport_reader_errors": transport_reader_errors,
+                        "pipeline_diagnostics": pipeline_diagnostics,
                         "transport_resources": dict(transport_resources),
                         "worker_heartbeat_age_seconds": round(
                             reference_check_monotonic - worker_last_progress,
@@ -3016,6 +3034,7 @@ def _run_watch_after_boot_check(
             elif kind == "heartbeat":
                 apply_transport_heartbeat_message(message)
             elif kind == "error":
+                pipeline_diagnostics = dict(message.get("pipeline_diagnostics") or pipeline_diagnostics)
                 return halt_market_data(
                     str(message.get("reason") or "market_data_worker_failed"),
                     details={
@@ -3349,6 +3368,9 @@ def _run_watch_after_boot_check(
                     "market_data_transport_child_pid": transport_child_pid,
                     "market_data_transport_queue_depth": transport_queue_depth,
                     "market_data_transport_reader_errors": transport_reader_errors,
+                    "native_reader_state": "unknown",
+                    "sdk_internal_reconnect_state": "unknown",
+                    "pipeline_diagnostics": pipeline_diagnostics,
                     "market_data_transport_resources": transport_resources,
                     "market_data_coalesced_quote_pending_count": (
                         transport_coalesced_quote_pending_count
@@ -3816,12 +3838,10 @@ def main() -> int:
         if not alive:
             if pid and not process_alive(pid):
                 pid_path(config).unlink(missing_ok=True)
-            payload.update({
-                "status": "stopped",
-                "sdk_connected": False,
-                "dispatch_enabled": False,
-                "reason": "runtime_process_not_alive",
-            })
+            payload.update({"sdk_connected": False, "dispatch_enabled": False,
+                            "process_status": "stopped", "process_reason": "runtime_process_not_alive"})
+            if not runtime_fault_markers(payload):
+                payload.update(status="stopped", reason="runtime_process_not_alive")
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
     if args.stop:
@@ -3835,6 +3855,7 @@ def main() -> int:
         return 0
     try:
         validate_market_data_transport_runtime(config)
+        require_sdk_environment()
         require_sdk_contract()
         read_client_id(config)
     except Exception as exc:

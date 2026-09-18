@@ -200,6 +200,16 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         self.assertEqual(ready["market_data_mode"], "official_sdk_subscription")
         self.assertEqual(ready["initial_snapshot_coverage"], "3/3")
 
+    def test_callback_failure_preserves_raw_entry_evidence(self) -> None:
+        FakeQuoteContext.emit_callbacks_during_subscribe = True
+        with patch.object(transport, "sdk_object_to_dict", side_effect=ValueError("bad_event")):
+            rows = self.run_worker(stop_kind="error")
+        error = next(row for row in rows if row["kind"] == "error")
+        stages = error["pipeline_diagnostics"]["stages"]
+        self.assertEqual(stages["raw_callback:SPY.US:quote"]["count"], 1)
+        self.assertEqual(stages["normalization_error:SPY.US:quote"]["count"], 1)
+        self.assertNotIn("enqueued:SPY.US:quote", stages)
+
     def test_subscription_failure_stops_without_retry(self) -> None:
         FakeQuoteContext.fail_subscribe = True
         rows = self.run_worker(stop_kind="error")
