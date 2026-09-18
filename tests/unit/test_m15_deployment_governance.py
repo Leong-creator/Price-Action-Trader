@@ -4,6 +4,7 @@ import json
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from scripts.m15_deployment_governance_lib import (
@@ -44,6 +45,13 @@ class M15DeploymentGovernanceTest(unittest.TestCase):
         subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
 
     def fixture(self) -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
+        # Governance tests isolate its provenance contract; artifact/binary
+        # tampering is exercised by test_m15_sdk_provenance with real ZIP files.
+        provenance = patch("scripts.m15_deployment_governance_lib.verify_environment",
+                           return_value={"verified": True, "issues": [],
+                                         "environment": {"wheel_sha256": "fixture", "module_sha256": "fixture"}})
+        self.environment_check = provenance.start()
+        self.addCleanup(provenance.stop)
         tmp = tempfile.TemporaryDirectory()
         root = Path(tmp.name) / "repo"
         root.mkdir()
@@ -98,3 +106,22 @@ class M15DeploymentGovernanceTest(unittest.TestCase):
         (root / "scripts" / "runtime.py").write_text("print('changed')\n", encoding="utf-8")
         result = verify_manifest(config, manifest_path=manifest, root=root)
         self.assertIn("deployment_source_drift:scripts/runtime.py", result["issues"])
+
+    def test_sdk_drift_blocks_manifest_issue_and_verification(self):
+        tmp, root, config = self.fixture()
+        self.addCleanup(tmp.cleanup)
+        manifest = root / "reports/runtime/manifest.json"
+        issue_manifest(config, manifest_path=manifest, runtime_files=["scripts/runtime.py"], root=root)
+        self.environment_check.return_value = {"verified": False,
+            "issues": ["sdk_installed_file_mismatch:longbridge/openapi.so"], "environment": {}}
+        with self.assertRaisesRegex(ValueError, "sdk_installed_file_mismatch"):
+            issue_manifest(config, manifest_path=manifest, runtime_files=["scripts/runtime.py"], root=root)
+        self.assertFalse(verify_manifest(config, manifest_path=manifest, root=root)["verified"])
+
+    def test_reissued_environment_does_not_silently_revalidate_manifest(self):
+        tmp, root, config = self.fixture()
+        self.addCleanup(tmp.cleanup)
+        manifest = root / "reports/runtime/manifest.json"
+        issue_manifest(config, manifest_path=manifest, runtime_files=["scripts/runtime.py"], root=root)
+        self.environment_check.return_value = {"verified": True, "issues": [], "environment": {"module_sha256": "changed"}}
+        self.assertIn("deployment_sdk_environment_drift", verify_manifest(config, manifest_path=manifest, root=root)["issues"])

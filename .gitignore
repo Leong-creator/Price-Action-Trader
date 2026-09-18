@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .venv/
+.venv-m15/
 .DS_Store
 logs/*
 local_data/
