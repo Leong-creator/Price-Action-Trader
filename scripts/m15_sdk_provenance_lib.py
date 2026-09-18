@@ -75,16 +75,28 @@ def inspect_environment(wheel: Path, root: Path = ROOT) -> dict[str, Any]:
     locations = list(spec.submodule_search_locations or []) if spec else []
     if len(locations) != 1 or Path(locations[0]).resolve() != package:
         raise ValueError("sdk_import_shadowed")
-    module = importlib.machinery.PathFinder.find_spec("longbridge.openapi", locations)
-    if module is None or not module.origin:
+    # Official 4.5.0 exports a PyO3 submodule through __init__.py:
+    # from .longbridge import openapi; sys.modules['longbridge.openapi'] = openapi.
+    # openapi.py is a placeholder; the alias itself has no __file__/__spec__.
+    module = importlib.machinery.PathFinder.find_spec("longbridge.longbridge", locations)
+    if (module is None or not module.origin
+            or not isinstance(module.loader, importlib.machinery.ExtensionFileLoader)):
         raise ValueError("sdk_native_module_missing")
     module_path = Path(module.origin).resolve()
-    for name in ("longbridge", "longbridge.openapi"):
+    for name in ("longbridge", "longbridge.longbridge"):
         loaded = sys.modules.get(name)
         if loaded is not None:
             expected = Path(spec.origin).resolve() if name == "longbridge" else module_path
             if Path(getattr(loaded, "__file__", "")).resolve() != expected:
                 raise ValueError("sdk_loaded_module_shadowed")
+    loaded_package = sys.modules.get("longbridge")
+    loaded_native = sys.modules.get("longbridge.longbridge")
+    loaded_alias = sys.modules.get("longbridge.openapi")
+    if loaded_alias is not None or loaded_native is not None or loaded_package is not None:
+        native_api = getattr(loaded_native, "openapi", None)
+        if (native_api is None or loaded_alias is not native_api
+                or getattr(loaded_package, "openapi", None) is not native_api):
+            raise ValueError("sdk_loaded_alias_shadowed")
     files: dict[str, str] = {}
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()

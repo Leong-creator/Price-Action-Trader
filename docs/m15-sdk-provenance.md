@@ -21,6 +21,11 @@ wheel、`PYTHON_BIN` 环境覆盖均不再具有正式入口资格。
 解释器二进制和环境路径；本地补丁标记、额外包文件、导入路径遮蔽、旧 DNS
 注入环境均拒绝。receipt 不是信任锚，修改其摘要不能绕过官方 wheel 对比。
 
+4.5.0 的真实原生模块是 `longbridge.longbridge`，`longbridge.openapi` 是它导出的
+Python 别名，没有独立 `__file__`；核验原生 `.so` 的路径/摘要，并在 SDK 已导入时
+检查包导出、原生导出和 `sys.modules` 三处别名对象一致，不把 `openapi.py` 占位文件
+误当原生模块。导入前后核验结果必须一致。
+
 部署清单升级到 `m15.deployment-manifest.v2`，包含环境完整记录。旧清单拒绝；
 切换解释器、wheel、模块或信任记录后需要重新核验并重新签发清单。运行层及
 诊断入口在任何券商访问前调用 `verify_environment()`；返回 `verified=false`
@@ -37,6 +42,10 @@ VBS进入启动脚本；注册成功后清理同名旧 Startup 目录入口，�
 python3 -m unittest tests.unit.test_m15_sdk_provenance tests.unit.test_m15_deployment_governance tests.unit.test_m15_canonical_startup -v
 bash -n scripts/start_m15_trading_stack_after_boot.sh
 ```
+
+真实官方 wheel 兼容测试可显式提供 `M15_OFFICIAL_TEST_ROOT`（含 `.venv-m15` 的项目）
+和 `M15_OFFICIAL_TEST_WHEEL`（持久 wheel 路径）后运行同一测试。它只离线导入SDK，
+不创建上下文；原生篡改验证在另建的临时环境完成，不修改正式安装或receipt。
 
 风险边界：这是本地环境一致性与官方制品来源检查，不是抵御拥有本机写权限
 攻击者的远程证明；运行中的同进程恶意内存修改不在本检查范围。正式启动器、
