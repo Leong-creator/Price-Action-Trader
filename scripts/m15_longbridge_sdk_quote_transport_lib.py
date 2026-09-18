@@ -143,12 +143,15 @@ def official_sdk_quote_worker(
     queue_out: Any,
     stop_event: Any,
     position_monitoring_symbols: tuple[str, ...] = (),
+    diagnostic_output_dir: str | None = None,
 ) -> None:
     """Own exactly one official SDK async quote context for all market data."""
     config = load_config(config_path)
     quote = None
     diagnostics = PipelineDiagnostics()
-    diagnostic_path = (Path(config.output_dir) / "m15_quote_pipeline_diagnostics.jsonl"
+    diagnostic_path = (Path(diagnostic_output_dir) / "m15_quote_pipeline_diagnostics.jsonl"
+                       if diagnostic_output_dir is not None else
+                       Path(config.output_dir) / "m15_quote_pipeline_diagnostics.jsonl"
                        if hasattr(config, "output_dir") else None)
     try:
         os.environ["LONGBRIDGE_PRINT_QUOTE_PACKAGES"] = "false"

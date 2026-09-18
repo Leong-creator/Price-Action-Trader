@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import asyncio
 import json
 import math
+import multiprocessing as mp
+from multiprocessing.reduction import DupFd
 import os
 import queue
 import signal
@@ -67,8 +70,14 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
               "started_at": datetime.now(UTC).isoformat(), "duration_limit_seconds": duration,
               "account_access": False, "order_access": False, "production_acceptance": False,
               "bar_formation": "not_assessed_raw_callback_probe", "status": "collecting"}
+    def stage(name: str) -> None:
+        result["stage"] = name
+        (output / "phase.json").write_text(json.dumps({"stage": name,
+            "at": datetime.now(UTC).isoformat(), "process_id": os.getpid()}) + "\n", encoding="utf-8")
     try:
+        stage("oauth_build")
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
+        stage("context_create")
         quote = sdk.AsyncQuoteContext.create(sdk_config_from_oauth(sdk, oauth, config.quote_region))
         quote.set_on_quote(lambda symbol, event: callback("quote", symbol, event))
         quote.set_on_trades(lambda symbol, event: callback("trade", symbol, event))
@@ -76,13 +85,16 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
         async def request(awaitable):
             return await asyncio.wait_for(awaitable, timeout=max(0.001, min(30, deadline - time.monotonic())))
         batch = config.sdk_subscribe_batch_size
+        stage("subscribe")
         for offset in range(0, len(symbols), batch):
             await request(quote.subscribe(symbols[offset:offset + batch], sub_types))
+        stage("subscriptions_verify")
         actual = _subscription_symbols(await request(quote.subscriptions()), tuple(sub_types))
         result["missing_subscriptions"] = sorted(set(symbols) - actual)
         if result["missing_subscriptions"]:
             raise RuntimeError("subscription_coverage_incomplete")
         result["subscription_coverage"] = f"{len(symbols)}/{len(symbols)}"
+        stage("collecting_callbacks")
         last_audit = 0.0
         while time.monotonic() < deadline and not stop.is_set():
             if not errors.empty():
@@ -114,9 +126,243 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
     return result
 
 
+def _supervised_entry(target: Any, args: tuple, shared_lock: Any, expected_parent: int) -> None:
+    """Keep ownership through native teardown, including abrupt parent death on Linux."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(1, signal.SIGKILL, 0, 0, 0) != 0:  # PR_SET_PDEATHSIG
+        raise RuntimeError("diagnostic_parent_death_guard_unavailable")
+    if os.getppid() != expected_parent:
+        raise RuntimeError("diagnostic_parent_already_exited")
+    descriptor = shared_lock.detach() if shared_lock is not None else None
+    try:
+        if os.getppid() != expected_parent:
+            raise RuntimeError("diagnostic_parent_exited_during_lock_transfer")
+        target(*args)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _raw_probe_worker(config_path: str, symbols: list[str], duration: float, output_dir: str) -> None:
+    import longbridge.openapi as sdk
+    config = load_config(config_path)
+    async def run():
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(signum, stop.set)
+        return await collect(config, symbols, duration, Path(output_dir), sdk, stop)
+    asyncio.run(run())
+
+
+async def supervise_raw(config_path: str, symbols: list[str], duration: float, output: Path,
+                        stop: asyncio.Event, *, worker_target=_raw_probe_worker,
+                        owner_fd: int | None = None) -> dict[str, Any]:
+    """Wall-clock parent stays responsive even if the native factory blocks the child loop."""
+    context = mp.get_context("spawn")
+    child = context.Process(target=_supervised_entry,
+        args=(worker_target, (config_path, symbols, duration, str(output)),
+              DupFd(owner_fd) if owner_fd is not None else None, os.getpid()), daemon=True)
+    started = time.monotonic()
+    child.start()
+    timed_out = False
+    forced = False
+    try:
+        while child.is_alive() and not stop.is_set():
+            if time.monotonic() - started > duration + 5:
+                timed_out = True
+                break
+            await asyncio.sleep(0.05)
+    finally:
+        if child.is_alive():
+            forced = True
+            child.terminate()
+            child.join(timeout=1)
+        if child.is_alive():
+            child.kill()
+        child.join(timeout=5)
+    try:
+        result = json.loads((output / "summary.json").read_text())
+    except (OSError, ValueError):
+        result = {"mode": "isolated_raw_sdk_diagnostic", "account_access": False,
+            "order_access": False, "production_acceptance": False}
+    try:
+        phase = json.loads((output / "phase.json").read_text())
+    except (OSError, ValueError):
+        phase = {"stage": "child_startup"}
+    result.update(worker_pid=child.pid, worker_exitcode=child.exitcode,
+        worker_process_exited=not child.is_alive(), worker_forced_cleanup=forced,
+        elapsed_seconds=round(time.monotonic() - started, 3),
+        finished_at=datetime.now(UTC).isoformat(), last_phase=phase)
+    if timed_out:
+        result.update(status="failed", reason="diagnostic_wall_clock_deadline_exceeded")
+    elif stop.is_set():
+        result.update(status="operator_stopped")
+    elif child.exitcode != 0 or "status" not in result:
+        result.update(status="failed", reason="diagnostic_worker_exited_without_completion")
+    if child.is_alive():
+        result.update(status="failed", reason="diagnostic_worker_cleanup_failed")
+    (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
+class PipelineProbeEvidence:
+    """Reuse production boundary rules without initializing its runtime/clients."""
+
+    def __init__(self, config: Any) -> None:
+        from scripts import run_m15_longbridge_sdk_runtime as rules
+        self.rules = rules
+        self.config = config
+        self.session = None
+        self.ready_since = 0.0
+        self.last_progress = time.monotonic()
+        self.last_push: dict[str, float] = {}
+        self.last_push_at: dict[str, str] = {}
+        self.last_source: dict[str, str] = {}
+        self.first_push: dict[str, float] = {}
+        self.last_live: dict[str, float] = {}
+        self.latest_diagnostics: dict[str, Any] = {}
+        self.message_counts: dict[str, int] = {}
+        self.bar_count = 0
+
+    def consume(self, message: dict[str, Any], now: datetime) -> None:
+        kind = str(message.get("kind", "unknown"))
+        self.message_counts[kind] = self.message_counts.get(kind, 0) + 1
+        if kind == "error":
+            self.latest_diagnostics = message.get("pipeline_diagnostics") or self.latest_diagnostics
+            raise RuntimeError("quote_worker_reported_failure")
+        if kind == "ready":
+            self.ready_since = time.monotonic()
+            self.last_progress = self.ready_since
+            self.session = self.rules.MarketSessionEvidence(self.config, now,
+                complete_bar_open_not_before=self.rules.strict_event_datetime(
+                    message.get("partial_bar_suppressed_until")))
+        if kind == "heartbeat":
+            self.last_progress = time.monotonic()
+            self.latest_diagnostics = dict(message.get("pipeline_diagnostics") or {})
+        activities = message.get("raw_reference_activity") or []
+        if kind == "market_activity":
+            activities = [message]
+        for activity in activities:
+            self.rules.apply_reference_market_activity_message(activity,
+                last_push_by_symbol=self.last_push, last_push_at_by_symbol=self.last_push_at,
+                last_push_source_by_symbol=self.last_source, first_live_push_by_symbol=self.first_push,
+                last_live_push_by_symbol=self.last_live, now=now)
+        if kind == "bars":
+            if self.session is None:
+                raise RuntimeError("bars_before_ready")
+            rows = list(message.get("rows") or [])
+            fresh = not self.rules.active_reference_quotes_are_stale(self.last_push,
+                now_monotonic=time.monotonic(), maximum_silence_seconds=self.config.active_symbol_silence_seconds)
+            disposition = self.session.accept(rows, now, reference_quotes_fresh=fresh)
+            if disposition == "duplicate":
+                raise RuntimeError("duplicate_boundary")
+            if disposition == "accepted":
+                self.bar_count += len(rows)
+
+    def check_deadlines(self, now: datetime) -> None:
+        if self.session is None:
+            return
+        missing = self.session.advance(now)
+        if missing:
+            raise RuntimeError("realtime_bar_boundary_deadline_exceeded:" + missing)
+        monotonic = time.monotonic()
+        if (self.rules.market_data_heartbeat_grace_elapsed(self.ready_since, monotonic,
+                self.config.subscription_deadline_seconds)
+            and self.rules.market_data_heartbeat_is_stale(self.last_progress, monotonic,
+                self.config.market_data_heartbeat_deadline_seconds)):
+            raise RuntimeError("market_data_heartbeat_deadline_exceeded")
+        if (self.rules.configured_regular_session(self.config, now)
+            and self.rules.regular_session_open_grace_elapsed(now, self.config.active_symbol_silence_seconds)
+            and self.rules.market_data_heartbeat_grace_elapsed(self.ready_since, monotonic,
+                self.config.active_symbol_silence_seconds)
+            and self.rules.active_reference_quotes_are_stale(self.last_push,
+                now_monotonic=monotonic, maximum_silence_seconds=self.config.active_symbol_silence_seconds)):
+            raise RuntimeError("reference_market_data_stalled")
+
+
+async def collect_pipeline(config: Any, config_path: str, duration: float, output: Path,
+                           stop: asyncio.Event, *, owner_fd: int | None = None) -> dict[str, Any]:
+    from scripts.m15_longbridge_sdk_quote_transport_lib import official_sdk_quote_worker
+    context = mp.get_context("spawn")
+    messages = context.Queue(maxsize=4096)
+    child_stop = context.Event()
+    child = context.Process(target=_supervised_entry,
+        args=(official_sdk_quote_worker, (config_path, messages, child_stop, (), str(output)),
+              DupFd(owner_fd) if owner_fd is not None else None, os.getpid()), daemon=True)
+    evidence = PipelineProbeEvidence(config)
+    result: dict[str, Any] = {"mode": "isolated_pipeline_diagnostic",
+        "started_at": datetime.now(UTC).isoformat(), "duration_limit_seconds": duration,
+        "account_access": False, "order_access": False, "strategy_access": False,
+        "production_acceptance": False, "status": "collecting"}
+    started = time.monotonic()
+    child_started = False
+    try:
+        child.start()
+        child_started = True
+        result["worker_pid"] = child.pid
+        while time.monotonic() - started < duration and not stop.is_set():
+            # Drain first; enqueued reference activities must not be hidden by heartbeat checks.
+            for _ in range(4096):
+                try:
+                    message = messages.get_nowait()
+                except queue.Empty:
+                    break
+                # Raw worker errors may contain vendor details. Save only their type/category;
+                # diagnostics include timing and stages, never credential-bearing strings.
+                audit = dict(message)
+                if audit.get("kind") == "error":
+                    audit["reason"] = str(audit.get("reason", "")).split(":", 2)[:2]
+                append_diagnostic_snapshot(output / "worker_messages.jsonl", audit)
+                evidence.consume(message, datetime.now(UTC))
+            evidence.check_deadlines(datetime.now(UTC))
+            if not child.is_alive():
+                raise RuntimeError("quote_worker_exited")
+            await asyncio.sleep(0.05)
+        result["status"] = "operator_stopped" if stop.is_set() else "duration_completed"
+    except Exception as exc:
+        result.update(status="failed", error_type=type(exc).__name__,
+                      reason=str(exc) if isinstance(exc, (RuntimeError, ValueError)) else "pipeline_probe_error")
+    finally:
+        child_stop.set()
+        forced = False
+        if child_started:
+            # A worker can be waiting on a full pipe. Continue draining while it exits.
+            deadline = time.monotonic() + 5
+            while child.is_alive() and time.monotonic() < deadline:
+                try:
+                    message = messages.get(timeout=0.05)
+                    if message.get("kind") != "error":
+                        append_diagnostic_snapshot(output / "shutdown_messages.jsonl", message)
+                except queue.Empty:
+                    pass
+                child.join(timeout=0.01)
+            if child.is_alive():
+                forced = True
+                child.terminate()
+                child.join(timeout=5)
+            if child.is_alive():
+                child.kill()
+                child.join(timeout=5)
+            result.update(worker_exitcode=child.exitcode, worker_process_exited=not child.is_alive(),
+                          worker_forced_cleanup=forced)
+            if child.is_alive():
+                result.update(status="failed", reason="quote_worker_cleanup_failed")
+        messages.cancel_join_thread()
+        messages.close()
+        result.update(finished_at=datetime.now(UTC).isoformat(),
+            elapsed_seconds=round(time.monotonic() - started, 3),
+            message_counts=evidence.message_counts, realtime_bar_count=evidence.bar_count,
+            complete_boundary_count=evidence.session.complete_boundary_count if evidence.session else 0,
+            diagnostics=evidence.latest_diagnostics)
+        (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
+    parser.add_argument("--mode", choices=("raw-sdk", "pipeline"), default="raw-sdk")
     universe = parser.add_mutually_exclusive_group(required=True)
     universe.add_argument("--symbols", help="Comma separated symbols, e.g. SPY.US,QQQ.US")
     universe.add_argument("--production-universe", action="store_true")
@@ -125,6 +371,8 @@ def main() -> int:
     args = parser.parse_args()
     if not math.isfinite(args.duration_seconds) or not 1 <= args.duration_seconds <= 86400:
         parser.error("duration must be finite, between 1 and 86400 seconds")
+    if args.mode == "pipeline" and not args.production_universe:
+        parser.error("pipeline mode requires --production-universe to keep production bar semantics")
     config = load_config(args.config)
     symbols = list(configured_symbols(config)) if args.production_universe else list(dict.fromkeys(
         value.strip().upper() for value in args.symbols.split(",") if value.strip()))
@@ -144,7 +392,6 @@ def main() -> int:
         owner.write(f"{os.getpid()}\n")
         owner.flush()
         os.environ["LONGBRIDGE_PRINT_QUOTE_PACKAGES"] = "false"
-        import longbridge.openapi as sdk
         output.mkdir(parents=True, exist_ok=True)
         (output / "environment.json").write_text(json.dumps(verification, indent=2) + "\n")
         async def run():
@@ -153,8 +400,11 @@ def main() -> int:
             for signum in (signal.SIGINT, signal.SIGTERM):
                 loop.add_signal_handler(signum, stop.set)
             try:
-                return await asyncio.wait_for(collect(config, symbols, args.duration_seconds, output, sdk, stop),
-                                              timeout=args.duration_seconds + 5)
+                if args.mode == "pipeline":
+                    return await collect_pipeline(config, str(Path(args.config).resolve()),
+                                                  args.duration_seconds, output, stop, owner_fd=owner.fileno())
+                return await supervise_raw(str(Path(args.config).resolve()), symbols,
+                                           args.duration_seconds, output, stop, owner_fd=owner.fileno())
             finally:
                 for signum in (signal.SIGINT, signal.SIGTERM):
                     loop.remove_signal_handler(signum)
