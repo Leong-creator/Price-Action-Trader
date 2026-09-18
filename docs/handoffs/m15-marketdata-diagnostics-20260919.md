@@ -67,3 +67,12 @@ user_decision_needed: null
 - SDK错误正文不落盘，仅保存错误类型和 request_timeout/sdk_or_runtime_error 分类。
 - 最终50项聚焦测试通过，新增首批成功/后批超时、45秒一致性及敏感异常正文不泄露验证。
 - 未执行任何真实行情连接。官方文档500证券/单连接/10req每秒/并发5限制不能解释50一批为违规；SDK未改HEAD源码first_push=true，但本机旧源码工作树有补丁，不能用其内容当官方依据或重新编译部署。
+
+## 追加：安全供应商错误与具体标的
+
+- 原始探针每批新增 batch_symbols，失败保留 OpenApiException 数值 code、固定 kind、category、classification_basis 和有界 causal_chain。
+- 不保存异常正文、trace_id 或任意属性字符串；codeNone且关键词分类标注为启发式，不冒充权限/限频根因证据。
+- worker新增 safe_error，pipeline父进程保留；父墙钟超时单列supervisor_safe_error，不覆盖子进程已经保存的供应商原因。
+- 新增安全字段、因果循环、secret正文/trace注入不泄露测试；仍未建立任何真实行情连接。
+
+- 本追加51项聚焦测试通过；独立review亦51项通过，分类来源引用已核正。

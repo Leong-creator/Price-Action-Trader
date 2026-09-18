@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.m15_marketdata_diagnostics_lib import (
-    PipelineDiagnostics, append_diagnostic_snapshot,
+    PipelineDiagnostics, append_diagnostic_snapshot, safe_exception_evidence,
 )
 
 from scripts.m15_longbridge_sdk_runtime_lib import (
@@ -494,6 +494,7 @@ def official_sdk_quote_worker(
                 "kind": "error",
                 "reason": f"official_sdk_quote_worker_failed:{type(exc).__name__}:{exc}",
                 "pipeline_diagnostics": diagnostics.snapshot(),
+                "safe_error": safe_exception_evidence(exc),
             },
             critical=True,
         )

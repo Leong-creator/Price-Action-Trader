@@ -95,3 +95,50 @@ def assert_no_legacy_quote_processes(proc_root: Path = Path("/proc")) -> None:
             continue
     if owners:
         raise RuntimeError("existing_quote_processes:" + ",".join(map(str, sorted(owners))))
+
+
+def safe_exception_evidence(exc: BaseException) -> dict[str, Any]:
+    """Preserve SDK codes and bounded causal types without message/trace/token text.
+
+    Quote code mappings: https://open.longbridge.com/docs/quote/subscribe/subscribe
+    Permission code: https://open.longbridge.com/docs/quote/pull/candlestick
+    Keyword classification is explicitly heuristic; original text is never returned.
+    """
+    code_categories = {301600: "invalid_request", 301602: "server_error",
+        301603: "no_quote", 301604: "permission_denied", 301605: "subscription_limit",
+        301606: "rate_limited"}
+    chain: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and len(chain) < 8 and id(current) not in seen:
+        seen.add(id(current))
+        raw_code = getattr(current, "code", None)
+        code = raw_code if type(raw_code) is int else None
+        kind_text = str(getattr(current, "kind", ""))
+        kind = {"Http": "Http", "ErrorKind.Http": "Http", "OpenApi": "OpenApi",
+                "ErrorKind.OpenApi": "OpenApi", "Other": "Other", "ErrorKind.Other": "Other"}.get(kind_text)
+        category, basis = "sdk_or_runtime_error", "unknown"
+        if isinstance(current, TimeoutError):
+            category, basis = "request_timeout", "exception_type"
+        elif code in code_categories:
+            category, basis = code_categories[code], "documented_quote_code"
+        elif kind == "Http" and code in {401, 403, 408, 429, 504}:
+            category = {401: "authentication_failed", 403: "permission_denied", 408: "request_timeout",
+                        429: "rate_limited", 504: "request_timeout"}[code]
+            basis = "http_status_code"
+        else:
+            message = getattr(current, "message", "")
+            if isinstance(message, str):
+                lowered = message[:4096].lower()
+                if any(token in lowered for token in ("timeout", "timed out", "超时")):
+                    category, basis = "request_timeout", "message_keyword_not_root_cause"
+                elif any(token in lowered for token in ("rate limit", "too many requests", "限频")):
+                    category, basis = "rate_limited", "message_keyword_not_root_cause"
+                elif any(token in lowered for token in ("permission", "no access", "无权限")):
+                    category, basis = "permission_denied", "message_keyword_not_root_cause"
+        chain.append({"error_type": type(current).__name__, "error_code": code,
+            "error_kind": kind, "error_category": category, "classification_basis": basis})
+        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
+    selected = next((row for row in chain if row["error_category"] != "sdk_or_runtime_error"),
+                    next((row for row in chain if row["error_code"] is not None), chain[0]))
+    return {**selected, "outer_error_type": type(exc).__name__, "causal_chain": chain}
