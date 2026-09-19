@@ -9,7 +9,7 @@
 - 独立样例执行命令形态为 `<verified-python> -I source.py`，外部排他锁与60秒总期限，逐次确认子进程退出；SDK单请求保留默认，不加项目重试。示例进程不导入项目scripts，不访问账户、订单、日线、K线或策略。
 - 采用官方 `Config.from_oauth(oauth)` 默认，未显式覆盖region或endpoint。最后日志显示SDK默认选择 `openapi-quote.longbridge.cn`。这不表示项目账户/历史工具所有helper也零手工端点。
 - 官方示例只替换认证占位（标准库读取，私密内容不公开）及symbols；Quote+Trade、初始化后查询为官方公开接口扩展，明确不是原示例全文。
-- 全程串行使用同一147只生产集合，不扩容。2026-09-19为周六，Quote首推不能证明交易时段连续性；Trade 0不作休市故障证据。
+- 全部实验串行；首项使用SPY/QQQ，其余使用同一147只生产集合，不扩容。2026-09-19为周六，Quote首推不能证明交易时段连续性；Trade 0不作休市故障证据。
 
 官方用法依据：[快速开始](https://open.longbridge.com/docs/getting-started)、[行情概览](https://open.longbridge.com/docs/quote/overview)、[订阅](https://open.longbridge.com/zh-CN/docs/quote/subscribe/subscribe)。订阅文档上限500，当前147只一次足够；不凭经验额外分批，也不把500称为已实测容量。
 
