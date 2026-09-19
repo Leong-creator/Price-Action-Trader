@@ -1,0 +1,264 @@
+{
+  "schema_version": "official-longbridge-baseline.v1",
+  "sdk_version": "4.5.0",
+  "wheel_sha256": "5387db07db2d29dd52ff6abcd5e888f1442cd0581ad38dc5e51182a0a9cd8daa",
+  "official_sources": [
+    "https://raw.githubusercontent.com/longbridge/openapi/v4.5.0/examples/python/subscribe_quote_async.py",
+    "https://raw.githubusercontent.com/longbridge/openapi/v4.5.0/examples/python/subscribe_quote.py"
+  ],
+  "method": "Standalone samples, official defaults, project imports absent, single sequential connection, external 60-second process deadline. Durations include 10-second sample sleep when completed.",
+  "market_session": "2026-09-19_weekend_closed",
+  "cases": [
+    {
+      "case": "default-two-quote",
+      "started_at": "2026-09-19T09:30:19.366618+00:00",
+      "finished_at": "2026-09-19T09:30:30.422418+00:00",
+      "elapsed_seconds": 11.056,
+      "source_sha256": "3dba1f8d797d9307090474ba480ec80f142e7db88247979788e72de5731c34ae",
+      "status": "completed",
+      "child_exitcode": 0,
+      "child_exited": true,
+      "quote_callbacks": 2,
+      "quote_symbols_seen": 2,
+      "trade_callbacks": 0,
+      "stage": "sample_completed",
+      "error_category": null,
+      "sdk_region_override": null,
+      "continuous_realtime_pass": false
+    },
+    {
+      "case": "default-147-quote",
+      "started_at": "2026-09-19T09:31:18.399631+00:00",
+      "finished_at": "2026-09-19T09:31:49.029474+00:00",
+      "elapsed_seconds": 30.63,
+      "source_sha256": "065d5ff0fe9d6b9e228b56d8a6277701a184eb70a57413d7d2fa51dfeb6c2bb1",
+      "status": "failed",
+      "child_exitcode": 1,
+      "child_exited": true,
+      "quote_callbacks": 0,
+      "quote_symbols_seen": 0,
+      "trade_callbacks": 0,
+      "stage": "subscribe",
+      "error_category": "request_timeout",
+      "sdk_region_override": null,
+      "continuous_realtime_pass": false
+    },
+    {
+      "case": "default-147-quote-sync",
+      "started_at": "2026-09-19T09:34:05.545066+00:00",
+      "finished_at": "2026-09-19T09:34:16.349258+00:00",
+      "elapsed_seconds": 10.804,
+      "source_sha256": "2d1bbf45496b3f876b3d608ff2c0f3f4bfad9500333541154d1bd92bc0605694",
+      "status": "completed",
+      "child_exitcode": 0,
+      "child_exited": true,
+      "quote_callbacks": 147,
+      "quote_symbols_seen": 147,
+      "trade_callbacks": 0,
+      "stage": "sample_completed",
+      "error_category": null,
+      "sdk_region_override": null,
+      "continuous_realtime_pass": false
+    },
+    {
+      "case": "default-147-quote-async-control",
+      "started_at": "2026-09-19T09:35:33.460364+00:00",
+      "finished_at": "2026-09-19T09:36:04.189966+00:00",
+      "elapsed_seconds": 30.73,
+      "source_sha256": "065d5ff0fe9d6b9e228b56d8a6277701a184eb70a57413d7d2fa51dfeb6c2bb1",
+      "status": "failed",
+      "child_exitcode": 1,
+      "child_exited": true,
+      "quote_callbacks": 0,
+      "quote_symbols_seen": 0,
+      "trade_callbacks": 0,
+      "stage": "subscribe",
+      "error_category": "request_timeout",
+      "sdk_region_override": null,
+      "continuous_realtime_pass": false
+    },
+    {
+      "case": "default-147-quote-trade-sync",
+      "started_at": "2026-09-19T09:37:22.951927+00:00",
+      "finished_at": "2026-09-19T09:37:33.856217+00:00",
+      "elapsed_seconds": 10.904,
+      "source_sha256": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+      "status": "completed",
+      "child_exitcode": 0,
+      "child_exited": true,
+      "quote_callbacks": 147,
+      "quote_symbols_seen": 147,
+      "trade_callbacks": 0,
+      "stage": "sample_completed",
+      "error_category": null,
+      "sdk_region_override": null,
+      "continuous_realtime_pass": false
+    },
+    {
+      "case": "default-147-quote-async-sync-callback",
+      "started_at": "2026-09-19T09:38:05.790799+00:00",
+      "finished_at": "2026-09-19T09:38:36.422893+00:00",
+      "elapsed_seconds": 30.632,
+      "source_sha256": "83fb42115b57951440f05581a817730a54a77249753e678308f0fc5e516cf07d",
+      "status": "failed",
+      "child_exitcode": 1,
+      "child_exited": true,
+      "quote_callbacks": 0,
+      "quote_symbols_seen": 0,
+      "trade_callbacks": 0,
+      "stage": "subscribe",
+      "error_category": "request_timeout",
+      "sdk_region_override": null,
+      "continuous_realtime_pass": false
+    },
+    {
+      "started_at": "2026-09-19T09:42:18.055779+00:00",
+      "finished_at": "2026-09-19T09:42:29.060335+00:00",
+      "elapsed_seconds": 11.005,
+      "source_sha256": "3b5ba295cf9570b0f4f4a1482ba7f43003f9962fbf50c011ffc29e174357aa5f",
+      "status": "completed",
+      "child_exitcode": 0,
+      "child_exited": true,
+      "sdk_region_override": null,
+      "case": "default-147-sync-initialization-queries",
+      "stage": "sample_completed",
+      "error_category": null,
+      "quote_callback_repr_count": 147,
+      "trade_callback_repr_count": 0,
+      "subscription_records_with_quote_and_trade": 147,
+      "subscription_unique_symbols": 147,
+      "missing_subscriptions": [],
+      "snapshot_count": 147,
+      "stderr_bytes": 0,
+      "stdout_print_interleaving_observed": true,
+      "quote_symbol_attribution": "not_counted_due_to_print_interleaving",
+      "continuous_realtime_pass": false
+    },
+    {
+      "status": "failed",
+      "elapsed_seconds": 30.831,
+      "child_exited": true,
+      "error_category": "request_timeout",
+      "failure_stage": "subscribe",
+      "quote_callback_count": 0,
+      "trade_callback_count": 0,
+      "native_push_event_count": 0,
+      "official_log_bytes": 9895,
+      "quote_hosts": [
+        "openapi-quote.longbridge.cn"
+      ],
+      "numeric_limits": {
+        "subscribe_limit": [
+          500
+        ],
+        "history_candlestick_limit": [
+          400
+        ]
+      },
+      "safe_timeline": [
+        {
+          "at": "2026-09-19T10:05:46.246759Z",
+          "events": [
+            "creating quote context"
+          ],
+          "message_type": null,
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.247561Z",
+          "events": [
+            "quote context created"
+          ],
+          "message_type": null,
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.568761Z",
+          "events": [
+            "connecting to quote server"
+          ],
+          "message_type": null,
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.722493Z",
+          "events": [
+            "ws request"
+          ],
+          "message_type": "AuthRequest",
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.935078Z",
+          "events": [
+            "ws response"
+          ],
+          "message_type": null,
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.935113Z",
+          "events": [
+            "ws request"
+          ],
+          "message_type": "UserQuoteProfileRequest",
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.979768Z",
+          "events": [
+            "ws response"
+          ],
+          "message_type": "UserQuoteProfileResponse",
+          "command": null
+        },
+        {
+          "at": "2026-09-19T10:05:46.979897Z",
+          "events": [
+            "ws request"
+          ],
+          "message_type": "SubscribeRequest",
+          "command": null
+        }
+      ],
+      "request_log_is_not_wire_send_confirmation": true,
+      "no_response_log_does_not_prove_server_silence": true,
+      "production_acceptance": false,
+      "case": "default-147-sync-official-logging-008",
+      "source_sha256": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+      "source_derived_request_boundary": {
+        "sdk_error": "RequestTimeout",
+        "passed_local_rate_limiter": true,
+        "enqueued_to_sdk_internal_request_channel": true,
+        "wire_send_confirmed": false,
+        "remote_server_received_confirmed": false,
+        "unresolved_layers": [
+          "SDK internal send/receive/response dispatch",
+          "network path",
+          "remote service"
+        ],
+        "subscribe_rate_limit": {
+          "command": 6,
+          "limit": 10,
+          "burst": 5,
+          "tokens_per_request": 1
+        },
+        "sources": [
+          "https://github.com/longbridge/openapi/blob/v4.5.0/rust/crates/wsclient/src/client.rs#L357",
+          "https://github.com/longbridge/openapi/blob/v4.5.0/rust/crates/wsclient/src/error.rs#L38"
+        ]
+      }
+    }
+  ],
+  "interpretation": {
+    "sdk_internal_root_cause": "not_proven",
+    "synchronous_entry_candidate": "not_resolved: final project probe and official same-source logging probe failed after earlier successes",
+    "asynchronous_path": "three 147-symbol failures; experiments stopped",
+    "real_full_sessions_passed": 0,
+    "september_8_same_root_cause": "not_proven",
+    "native_logging": "auth/profile responses observed; SubscribeRequest logged but no successful response or push event observed; wire send and remote-server fault not proven",
+    "current_blocker": "official SDK request completion after local rate limiter and internal send-queue admission"
+  },
+  "private_archive": "/home/hgl/project-archives/Price-Action-Trader/20260919-official-baseline",
+  "account_and_order_methods_invoked_by_samples": false
+}
