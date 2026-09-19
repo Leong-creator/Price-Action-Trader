@@ -1,0 +1,185 @@
+{
+  "schema": "m15.official-request-observation.v1",
+  "case": "case009",
+  "source_sha256": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+  "source_unchanged": true,
+  "sdk_version": "4.5.0",
+  "started_at": "2026-09-19T11:20:26.813383+00:00",
+  "finished_at": "2026-09-19T11:20:57.847208+00:00",
+  "elapsed_seconds": 31.034,
+  "status": "failed",
+  "failure_stage": "subscribe",
+  "error_category": "request_timeout",
+  "child_exited": true,
+  "child_exitcode": 1,
+  "quote_callbacks": 0,
+  "trade_callbacks": 0,
+  "observation_count": 155,
+  "ss_statuses": {
+    "ok": 155
+  },
+  "safe_sdk_timeline": [
+    {
+      "at": "2026-09-19T11:20:26.846509Z",
+      "events": [
+        "creating quote context"
+      ],
+      "message_types": []
+    },
+    {
+      "at": "2026-09-19T11:20:26.847298Z",
+      "events": [
+        "quote context created"
+      ],
+      "message_types": []
+    },
+    {
+      "at": "2026-09-19T11:20:27.165758Z",
+      "events": [
+        "connecting to quote server"
+      ],
+      "message_types": []
+    },
+    {
+      "at": "2026-09-19T11:20:27.420564Z",
+      "events": [
+        "ws request"
+      ],
+      "message_types": [
+        "AuthRequest"
+      ]
+    },
+    {
+      "at": "2026-09-19T11:20:27.624094Z",
+      "events": [
+        "ws response"
+      ],
+      "message_types": [
+        "AuthResponse"
+      ]
+    },
+    {
+      "at": "2026-09-19T11:20:27.624134Z",
+      "events": [
+        "ws request"
+      ],
+      "message_types": [
+        "UserQuoteProfileRequest"
+      ]
+    },
+    {
+      "at": "2026-09-19T11:20:27.674697Z",
+      "events": [
+        "ws response"
+      ],
+      "message_types": [
+        "UserQuoteProfileResponse"
+      ]
+    },
+    {
+      "at": "2026-09-19T11:20:27.674889Z",
+      "events": [
+        "ws request"
+      ],
+      "message_types": [
+        "SubscribeRequest"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "connection_label": "A",
+      "peer_port": 10808,
+      "samples": 76,
+      "first_at": "2026-09-19T11:20:27.015258+00:00",
+      "last_at": "2026-09-19T11:20:42.030900+00:00",
+      "counter_changes": [
+        {
+          "at": "2026-09-19T11:20:27.015258+00:00",
+          "bytes_sent": "342",
+          "bytes_acked": "343",
+          "bytes_received": "39",
+          "recv_q": 0,
+          "send_q": 0
+        },
+        {
+          "at": "2026-09-19T11:20:27.215468+00:00",
+          "bytes_sent": "2070",
+          "bytes_acked": "2071",
+          "bytes_received": "6150",
+          "recv_q": 0,
+          "send_q": 0
+        }
+      ],
+      "queue_peaks": {
+        "recv": 0,
+        "send": 0
+      },
+      "retrans_fields_present": []
+    },
+    {
+      "connection_label": "B",
+      "peer_port": 443,
+      "samples": 152,
+      "first_at": "2026-09-19T11:20:27.415766+00:00",
+      "last_at": "2026-09-19T11:20:57.646507+00:00",
+      "counter_changes": [
+        {
+          "at": "2026-09-19T11:20:27.415766+00:00",
+          "bytes_sent": "575",
+          "bytes_acked": "576",
+          "bytes_received": "5505",
+          "recv_q": 0,
+          "send_q": 0
+        },
+        {
+          "at": "2026-09-19T11:20:27.616032+00:00",
+          "bytes_sent": "689",
+          "bytes_acked": "690",
+          "bytes_received": "5786",
+          "recv_q": 0,
+          "send_q": 0
+        },
+        {
+          "at": "2026-09-19T11:20:27.816247+00:00",
+          "bytes_sent": "1985",
+          "bytes_acked": "1986",
+          "bytes_received": "6637",
+          "recv_q": 0,
+          "send_q": 0
+        }
+      ],
+      "queue_peaks": {
+        "recv": 0,
+        "send": 0
+      },
+      "retrans_fields_present": []
+    }
+  ],
+  "sampling_interval_target_seconds": 0.2,
+  "stable_443_tail_samples": 150,
+  "stable_443_tail_seconds": 29.83026,
+  "threads_last": {
+    "futex_wait": 21,
+    "event_wait": 2
+  },
+  "limitations": [
+    "Sample timestamps are sampling start, not packet timestamps.",
+    "Authentication/profile/subscribe share a sampling interval; byte increments cannot be assigned wholly to subscribe.",
+    "TCP acknowledgement does not prove command6 reached the application service.",
+    "Missing retrans/unacked fields are unknown, not zero.",
+    "Futex waiting is not proof of GIL or SDK deadlock.",
+    "Core does not consume queued pushes while awaiting subscribe completion."
+  ],
+  "protected_states_unchanged": 5,
+  "quote_lock_available_after": true,
+  "deployment": false,
+  "accepted_complete_sessions": 0,
+  "evidence_sha256": {
+    "source.py": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+    "run_result.json": "0f794b775a51d0d12d615f24b0e4110f9c26c03598e24793997a4d83ac86cab5",
+    "observations.jsonl": "6acb195d7f4c755fc9a1ac66914c9ca8de5b93d34a557c3254eda77ce06751ca",
+    "safe-log-summary.json": "3982c36799bde2e3b1dd657c3121adb439d6a32da83b91cf855be0bbf373340a",
+    "safe-system-summary.json": "2eafb7a59166961eacaf0f33c4444514158d2cdcd4c46023a81b0156b4549d4c"
+  }
+}
