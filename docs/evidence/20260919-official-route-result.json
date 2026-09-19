@@ -1,0 +1,208 @@
+{
+  "as_of": "2026-09-19",
+  "decision": "stop_longbridge_connection_experiments_pending_alternative_source_access",
+  "supplier_feedback_authorized": false,
+  "independent_cases_total": 11,
+  "project_probes_total": 3,
+  "production_deployed": false,
+  "full_sessions_passed": 0,
+  "alternative_source_connected": false,
+  "cases": [
+    {
+      "case": "case010-official-sync147-hk",
+      "sdk_version": "4.5.0",
+      "sdk_region_override": "hk",
+      "sdk_official_log_host": "openapi-quote.longbridge.com",
+      "started_at": "2026-09-19T14:03:44.512174+00:00",
+      "finished_at": "2026-09-19T14:03:50.719820+00:00",
+      "elapsed_seconds": 6.208,
+      "status": "failed",
+      "child_exitcode": 1,
+      "child_exited": true,
+      "source_sha256": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+      "source_unchanged": true,
+      "error_category": "connect_timeout",
+      "failure_stage": "connect_inside_subscribe_before_authentication_and_subscribe_protocol_request",
+      "python_exception_call_site": "ctx.subscribe",
+      "public_subscribe_called": true,
+      "subscribe_protocol_request_logged": false,
+      "quote_callback_repr_count": 0,
+      "trade_callback_repr_count": 0,
+      "protocol_log_counts": {
+        "AuthRequest": 0,
+        "AuthResponse": 0,
+        "UserQuoteProfileRequest": 0,
+        "UserQuoteProfileResponse": 0,
+        "SubscribeRequest": 0
+      },
+      "timeline": [
+        {
+          "at": "2026-09-19T14:03:44.545189Z",
+          "events": [
+            "creating quote context"
+          ],
+          "message_types": []
+        },
+        {
+          "at": "2026-09-19T14:03:44.545895Z",
+          "events": [
+            "quote context created"
+          ],
+          "message_types": []
+        },
+        {
+          "at": "2026-09-19T14:03:45.648693Z",
+          "events": [
+            "connecting to quote server"
+          ],
+          "message_types": []
+        }
+      ],
+      "production_acceptance": false,
+      "real_full_sessions_passed": 0,
+      "evidence_hashes": {
+        "source.py": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+        "inputs.json": "425f0160ecbb98f92c66b60fa4c6e89ffcbe024bced450580a5d54c62dab37a4",
+        "run_result.json": "3bf25c0d2291daea61ce1784f496ba6cbb25ea0aa8f44ad6b6d4d80bd466e97e",
+        "safe-summary.json": "bee187357a2a7a14011ffe4b1cc23dad96cb6c2d6095d2ebc479fb7d5f1a032c",
+        "observations.jsonl": "04b1f6ef387922b6e108ad586acdc9369b73e36c4e6e7642e4b91d85f757b2fa"
+      },
+      "protected_states_unchanged": true,
+      "postflight_sha256": "f57fcc9db3e63f2bea5dba611156039fa8b78840f950db5faaa306ee6841ddcb"
+    },
+    {
+      "case": "case011-official-sync147-v5-default",
+      "sdk_version": "5.0.0",
+      "sdk_region_override": null,
+      "sdk_official_log_host": "openapi-quote.longbridge.cn",
+      "started_at": "2026-09-19T14:06:57.174556+00:00",
+      "finished_at": "2026-09-19T14:07:28.007162+00:00",
+      "elapsed_seconds": 30.833,
+      "status": "failed",
+      "child_exitcode": 1,
+      "child_exited": true,
+      "source_sha256": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+      "source_unchanged": true,
+      "error_category": "request_timeout",
+      "failure_stage": "subscription_request_completion_after_authentication_and_profile",
+      "python_exception_call_site": "ctx.subscribe",
+      "public_subscribe_called": true,
+      "subscribe_protocol_request_logged": true,
+      "quote_callback_repr_count": 0,
+      "trade_callback_repr_count": 0,
+      "protocol_log_counts": {
+        "AuthRequest": 1,
+        "AuthResponse": 1,
+        "UserQuoteProfileRequest": 1,
+        "UserQuoteProfileResponse": 1,
+        "SubscribeRequest": 1
+      },
+      "timeline": [
+        {
+          "at": "2026-09-19T14:06:57.210509Z",
+          "events": [
+            "creating quote context"
+          ],
+          "message_types": []
+        },
+        {
+          "at": "2026-09-19T14:06:57.211428Z",
+          "events": [
+            "quote context created"
+          ],
+          "message_types": []
+        },
+        {
+          "at": "2026-09-19T14:06:57.552785Z",
+          "events": [
+            "connecting to quote server"
+          ],
+          "message_types": []
+        },
+        {
+          "at": "2026-09-19T14:06:57.734725Z",
+          "events": [
+            "quote server connected"
+          ],
+          "message_types": []
+        },
+        {
+          "at": "2026-09-19T14:06:57.734765Z",
+          "events": [
+            "ws request"
+          ],
+          "message_types": [
+            "AuthRequest"
+          ]
+        },
+        {
+          "at": "2026-09-19T14:06:57.931965Z",
+          "events": [
+            "ws response"
+          ],
+          "message_types": [
+            "AuthResponse"
+          ]
+        },
+        {
+          "at": "2026-09-19T14:06:57.931993Z",
+          "events": [
+            "ws request"
+          ],
+          "message_types": [
+            "UserQuoteProfileRequest"
+          ]
+        },
+        {
+          "at": "2026-09-19T14:06:57.977360Z",
+          "events": [
+            "ws response"
+          ],
+          "message_types": [
+            "UserQuoteProfileResponse"
+          ]
+        },
+        {
+          "at": "2026-09-19T14:06:57.977477Z",
+          "events": [
+            "ws request"
+          ],
+          "message_types": [
+            "SubscribeRequest"
+          ]
+        }
+      ],
+      "production_acceptance": false,
+      "real_full_sessions_passed": 0,
+      "evidence_hashes": {
+        "source.py": "22b624aafead9302158d16dcfa5cb31cde32b081a44de9b5a7eb9639382243e5",
+        "inputs.json": "28a1a4513b7ca15c7ababf44a7699597c1ccd7270d2f0d6bfe44449cbbda5e29",
+        "run_result.json": "81072a2c96d8ad12068f5f912d16d134732da3c700a27ab9f7f5059a32ab6263",
+        "safe-summary.json": "20670390bb61f072c02ce72c84f0bd907b097a94ccba070779899f4b4895a3ba",
+        "observations.jsonl": "9c48620946a26ff21f149a8d918505162b49db2ec107a128960bcb5e646db4e6"
+      },
+      "protected_states_unchanged": true,
+      "postflight_sha256": "ae0ab0fc2635dc198998a8016229cfba4dbe7461a7f48fe4da36ffd99a59bcac"
+    }
+  ],
+  "current_release_provenance": {
+    "version": "5.0.0",
+    "wheel_sha256": "c6cc5745fd1babc81e8c8ea09b4f278e7b4827ffbbb0eb7119986867f126a247",
+    "native_sha256": "22bc719f08c6361eb0cf3d849b3fedef2e6ce2466b25e4170eb63847b8278be2",
+    "package_files_byte_verified": 5
+  },
+  "limits": [
+    "does_not_prove_vendor_fault",
+    "does_not_prove_same_root_cause_as_20260908",
+    "does_not_establish_all_official_options_are_impossible",
+    "tcp_ack_does_not_prove_subscribe_response",
+    "existing_package_market_coverage_not_yet_confirmed",
+    "no_new_SIP_requirement"
+  ],
+  "temporary_current_release_environment": {
+    "active": false,
+    "archived_verified_members": 1157,
+    "archive_sha256": "01f46a53f640285f7881469e182fb86ec341f2573510436560f1b75782d9f894",
+    "removal": "individual_verified_files_and_links_then_empty_directories"
+  }
+}
