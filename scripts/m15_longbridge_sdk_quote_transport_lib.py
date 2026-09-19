@@ -7,7 +7,7 @@ import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from scripts.m15_marketdata_diagnostics_lib import (
     PipelineDiagnostics, append_diagnostic_snapshot, safe_exception_evidence,
@@ -24,7 +24,6 @@ from scripts.m15_longbridge_sdk_runtime_lib import (
     required_daily_context_date,
     NEW_YORK,
     read_client_id,
-    sdk_config_from_oauth,
     sdk_object_to_dict,
     to_iso,
 )
@@ -35,62 +34,64 @@ CALLBACK_DRAIN_BATCH = 10_000
 QUOTE_STATE_FLUSH_SECONDS = 0.25
 
 
-class DailyContextRefresh:
-    """Use the same context off-session without blocking callback draining."""
+def reject_quote_endpoint_overrides() -> None:
+    """Use official Config defaults; reject inherited endpoint/region overrides by name only."""
+    rejected = sorted(name for name, value in os.environ.items() if value != ""
+        and name.startswith(("LONGBRIDGE_", "LONGPORT_"))
+        and (name.endswith("URL") or name.endswith("REGION")))
+    if rejected:
+        raise RuntimeError("official_quote_endpoint_override_rejected:" + ",".join(rejected))
 
-    def __init__(self, config: Any, symbols: list[str], completed_date: str) -> None:
+
+def validate_single_subscription_symbols(symbols: list[str]) -> None:
+    if not 1 <= len(symbols) <= 500:
+        raise RuntimeError(f"official_sdk_subscription_target_count_out_of_range:{len(symbols)}")
+
+
+class DailyContextRefresh:
+    """Sequential off-session refresh on the sole context; parent supervises blocking SDK I/O."""
+
+    def __init__(self, config: Any, symbols: list[str], completed_date: str,
+                 on_stage: Callable[[str], None] | None = None) -> None:
         self.config = config
         self.symbols = symbols
         self.completed_date = completed_date
         self.target_date = ""
-        self.rows: list[dict[str, Any]] = []
-        self.index = 0
         self.deadline = 0.0
-        self.result: queue.Queue[Any] = queue.Queue(maxsize=1)
-
-    def _fetch(self, quote: Any, sdk: Any, now: datetime) -> None:
-        try:
-            rows: list[dict[str, Any]] = []
-            for symbol in self.symbols:
-                if time.monotonic() >= self.deadline:
-                    raise RuntimeError("official_sdk_daily_refresh_deadline_exceeded")
-                candles = quote.candlesticks(symbol, sdk.Period.Day, self.config.daily_context_bars,
-                                           sdk.AdjustType.NoAdjust, sdk.TradeSessions.Intraday)
-                current = daily_candlestick_event_rows(symbol, candles, now)
-                dates = [datetime.fromisoformat(row["event_time"].replace("Z", "+00:00")).astimezone(NEW_YORK).date().isoformat()
-                         for row in current]
-                if len(current) != self.config.daily_context_bars or not dates or max(dates) != self.target_date:
-                    raise RuntimeError(f"official_sdk_daily_refresh_incomplete:{symbol}:{self.target_date}")
-                rows.extend(current)
-            self.result.put_nowait(rows)
-        except BaseException as exc:
-            self.result.put_nowait(exc)
+        self.on_stage = on_stage
 
     def step(self, quote: Any, sdk: Any, now: datetime) -> list[dict[str, Any]] | None:
+        if self.target_date:
+            raise RuntimeError("official_sdk_daily_refresh_failed_no_retry")
         required = required_daily_context_date(now, self.config.market_holidays)
         local = now.astimezone(NEW_YORK)
         regular = (local.weekday() < 5 and local.date().isoformat() not in self.config.market_holidays
                    and (9, 30) <= (local.hour, local.minute) < (16, 0))
-        if required == self.completed_date and not self.target_date:
+        if required == self.completed_date:
             return None
         if regular:
             raise RuntimeError("official_sdk_daily_context_stale_at_market_open")
-        if not self.target_date:
-            self.target_date = required
-            self.deadline = time.monotonic() + self.config.daily_context_deadline_seconds
-            threading.Thread(target=self._fetch, args=(quote, sdk, now), daemon=True,
-                             name="official-sdk-daily-refresh").start()
-        if time.monotonic() >= self.deadline:
-            raise RuntimeError("official_sdk_daily_refresh_deadline_exceeded")
-        try:
-            completed = self.result.get_nowait()
-        except queue.Empty:
-            return None
-        if isinstance(completed, BaseException):
-            raise completed
+        self.target_date = required
+        self.deadline = time.monotonic() + self.config.daily_context_deadline_seconds
+        if self.on_stage is not None:
+            self.on_stage("daily_refresh")
+        rows: list[dict[str, Any]] = []
+        for symbol in self.symbols:
+            if time.monotonic() >= self.deadline:
+                raise RuntimeError("official_sdk_daily_refresh_deadline_exceeded")
+            candles = quote.candlesticks(symbol, sdk.Period.Day, self.config.daily_context_bars,
+                                        sdk.AdjustType.NoAdjust, sdk.TradeSessions.Intraday)
+            if time.monotonic() >= self.deadline:
+                raise RuntimeError("official_sdk_daily_refresh_deadline_exceeded")
+            current = daily_candlestick_event_rows(symbol, candles, now)
+            dates = [datetime.fromisoformat(row["event_time"].replace("Z", "+00:00")).astimezone(NEW_YORK).date().isoformat()
+                     for row in current]
+            if len(current) != self.config.daily_context_bars or not dates or max(dates) != self.target_date:
+                raise RuntimeError(f"official_sdk_daily_refresh_incomplete:{symbol}:{self.target_date}")
+            rows.extend(current)
         self.completed_date = self.target_date
-        self.target_date, self.rows, self.index = "", [], 0
-        return completed
+        self.target_date = ""
+        return rows
 
 
 def _emit(queue_out: Any, payload: dict[str, Any], *, critical: bool = False) -> bool:
@@ -144,8 +145,9 @@ def official_sdk_quote_worker(
     stop_event: Any,
     position_monitoring_symbols: tuple[str, ...] = (),
     diagnostic_output_dir: str | None = None,
+    stage_ack: Any | None = None,
 ) -> None:
-    """Own exactly one official SDK async quote context for all market data."""
+    """Own one official synchronous QuoteContext; the parent bounds native blocking calls."""
     config = load_config(config_path)
     quote = None
     diagnostics = PipelineDiagnostics()
@@ -153,23 +155,47 @@ def official_sdk_quote_worker(
                        if diagnostic_output_dir is not None else
                        Path(config.output_dir) / "m15_quote_pipeline_diagnostics.jsonl"
                        if hasattr(config, "output_dir") else None)
+    current_stage = ""
+    def emit_stage(phase: str) -> None:
+        nonlocal current_stage
+        if phase == current_stage:
+            return
+        started_monotonic = time.monotonic()
+        if stage_ack is not None:
+            stage_ack.clear()
+        if not _emit(queue_out, {"kind": "sdk_stage", "phase": phase,
+            "started_monotonic": started_monotonic, "started_at": to_iso(datetime.now(UTC))}, critical=True):
+            raise RuntimeError("official_sdk_stage_delivery_failed")
+        if stage_ack is not None and not stage_ack.wait(timeout=min(5, config.subscription_deadline_seconds)):
+            raise RuntimeError("official_sdk_stage_ack_timeout:" + phase)
+        current_stage = phase
     try:
+        reject_quote_endpoint_overrides()
+        base_targets = list(configured_symbols(config))
+        trading_targets = set(configured_trading_symbols(config))
+        monitoring_targets = sorted(
+            {
+                str(symbol).upper()
+                for symbol in position_monitoring_symbols
+                if str(symbol).upper() not in set(base_targets)
+            }
+        )
+        targets = list(dict.fromkeys(base_targets + monitoring_targets))
+
+        validate_single_subscription_symbols(targets)
+        emit_stage("initializing")
         os.environ["LONGBRIDGE_PRINT_QUOTE_PACKAGES"] = "false"
         import longbridge.openapi as sdk
 
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
-        from scripts.m15_official_async_quote_lib import OfficialAsyncQuoteBridge
-
-        quote = OfficialAsyncQuoteBridge(
-            sdk_config_from_oauth(sdk, oauth, config.quote_region),
-            sdk=sdk,
-            init_timeout=min(30, config.subscription_deadline_seconds),
-            request_timeout=config.subscription_deadline_seconds,
-        )
+        sdk_config = sdk.Config.from_oauth(oauth)
+        reject_quote_endpoint_overrides()  # Config may load a dotenv file into the environment.
+        quote = sdk.QuoteContext(sdk_config)
         callback_events: queue.Queue[tuple[str, str, dict[str, Any], datetime]] = (
             queue.Queue(maxsize=CALLBACK_QUEUE_MAXSIZE)
         )
         callback_overflow = threading.Event()
+        callback_errors: queue.Queue[Exception] = queue.Queue(maxsize=1)
         reference_activity_lock = threading.Lock()
         latest_reference_activity: dict[str, dict[str, str]] = {}
 
@@ -200,26 +226,28 @@ def official_sdk_quote_worker(
             except queue.Full:
                 diagnostics.record("queue_overflow", normalized_symbol, kind)
                 callback_overflow.set()
-            except Exception:
+            except Exception as exc:
                 diagnostics.record("normalization_error", normalized_symbol, kind)
-                raise
+                try:
+                    callback_errors.put_nowait(exc)
+                except queue.Full:
+                    pass
+
+        def check_callbacks() -> None:
+            if callback_overflow.is_set():
+                raise RuntimeError("official_sdk_callback_queue_overflow")
+            try:
+                error = callback_errors.get_nowait()
+            except queue.Empty:
+                return
+            raise RuntimeError("official_sdk_callback_failed") from error
 
         # The SDK requires handlers to be registered before subscription. The
         # callbacks do no strategy work, file I/O, account access, or orders.
         quote.set_on_quote(lambda symbol, event: enqueue("quote", symbol, event))
         quote.set_on_trades(lambda symbol, event: enqueue("trade", symbol, event))
 
-        base_targets = list(configured_symbols(config))
-        trading_targets = set(configured_trading_symbols(config))
-        monitoring_targets = sorted(
-            {
-                str(symbol).upper()
-                for symbol in position_monitoring_symbols
-                if str(symbol).upper() not in set(base_targets)
-            }
-        )
-        targets = list(dict.fromkeys(base_targets + monitoring_targets))
-
+        emit_stage("daily_context")
         initial_daily_required = required_daily_context_date(datetime.now(UTC), config.market_holidays)
         daily_rows = load_valid_daily_context_cache(
             config.daily_context_path,
@@ -254,11 +282,15 @@ def official_sdk_quote_worker(
                         sdk.AdjustType.NoAdjust,
                         sdk.TradeSessions.Intraday,
                     )
+                    if time.monotonic() >= daily_deadline:
+                        daily_deadline_exhausted = list(base_targets[index - 1 :])
+                        break
+                    check_callbacks()
                     rows = daily_candlestick_event_rows(
                         symbol, candles, datetime.now(UTC)
                     )
-                except Exception:
-                    rows = []
+                except Exception as exc:
+                    raise RuntimeError(f"official_sdk_daily_context_request_failed:{symbol}") from exc
                 if len(rows) != config.daily_context_bars:
                     daily_failures.append(symbol)
                 else:
@@ -294,18 +326,11 @@ def official_sdk_quote_worker(
         ):
             raise RuntimeError("official_sdk_daily_context_delivery_failed")
 
-        subscribe_batch_size = config.sdk_subscribe_batch_size
-        for offset in range(0, len(targets), subscribe_batch_size):
-            batch = targets[offset : offset + subscribe_batch_size]
-            quote.subscribe(batch, [sdk.SubType.Quote, sdk.SubType.Trade])
-            _emit(
-                queue_out,
-                {
-                    "kind": "subscription_progress",
-                    "completed": min(offset + len(batch), len(targets)),
-                    "total": len(targets),
-                },
-            )
+        check_callbacks()
+        emit_stage("subscribing")
+        quote.subscribe(targets, [sdk.SubType.Quote, sdk.SubType.Trade])
+        check_callbacks()
+        _emit(queue_out, {"kind": "subscription_progress", "completed": len(targets), "total": len(targets)})
 
         subscribed = _subscription_symbols(quote.subscriptions(), (sdk.SubType.Quote, sdk.SubType.Trade))
         missing_subscriptions = sorted(set(targets) - subscribed)
@@ -315,7 +340,10 @@ def official_sdk_quote_worker(
                 + ",".join(missing_subscriptions)
             )
 
+        check_callbacks()
+        emit_stage("initial_snapshot")
         initial_snapshot = list(quote.quote(targets))
+        check_callbacks()
         initial_snapshot_symbols: set[str] = set()
         builder = FiveMinuteBarBuilder(
             config.bar_minutes,
@@ -363,7 +391,8 @@ def official_sdk_quote_worker(
             queue_out,
             {
                 "kind": "ready",
-                "sdk_quote_context_api": "AsyncQuoteContext",
+                "sdk_quote_context_api": "QuoteContext",
+                "sdk_config_source": "Config.from_oauth_defaults",
                 "market_data_mode": "official_sdk_subscription",
                 "market_data_transport": "official_sdk_persistent_websocket",
                 "market_data_symbols": sorted(base_targets),
@@ -390,19 +419,18 @@ def official_sdk_quote_worker(
         ):
             raise RuntimeError("official_sdk_ready_delivery_failed")
 
+        emit_stage("streaming")
         pending_quotes: dict[str, dict[str, Any]] = {}
         # Use the requirement at the actual fetch, not the later subscribe time:
         # initialization can straddle the 16:10 completed-session transition.
-        daily_refresh = DailyContextRefresh(config, base_targets, initial_daily_required)
+        daily_refresh = DailyContextRefresh(config, base_targets, initial_daily_required, on_stage=emit_stage)
         last_quote_flush = 0.0
         last_heartbeat = 0.0
         last_diagnostic_audit = 0.0
         last_reference_activity: dict[str, float] = {}
         raw_event_count = 0
         while not stop_event.is_set():
-            quote.check_health()
-            if callback_overflow.is_set():
-                raise RuntimeError("official_sdk_callback_queue_overflow")
+            check_callbacks()
             processed = 0
             while processed < CALLBACK_DRAIN_BATCH:
                 try:
@@ -479,6 +507,7 @@ def official_sdk_quote_worker(
                 )
                 last_heartbeat = now_monotonic
             refreshed_daily = daily_refresh.step(quote, sdk, datetime.now(UTC))
+            check_callbacks()
             if refreshed_daily is not None and not _emit(
                 queue_out,
                 {"kind": "daily_context", "rows": refreshed_daily, "failures": [],
@@ -486,6 +515,8 @@ def official_sdk_quote_worker(
                 critical=True,
             ):
                 raise RuntimeError("official_sdk_daily_refresh_delivery_failed")
+            if refreshed_daily is not None:
+                emit_stage("streaming")
             stop_event.wait(0.05)
     except BaseException as exc:
         _emit(
@@ -504,8 +535,5 @@ def official_sdk_quote_worker(
                 append_diagnostic_snapshot(diagnostic_path, diagnostics.snapshot(drain_samples=True))
             except OSError:
                 pass  # The error message still carries the last in-memory evidence.
-        if quote is not None:
-            try:
-                quote.close()
-            except Exception as exc:
-                _emit(queue_out, {"kind": "error", "reason": f"official_sdk_quote_cleanup_failed:{type(exc).__name__}:{exc}"}, critical=True)
+        # Official SDK exposes no native close acknowledgement; only process exit proves teardown.
+        quote = None

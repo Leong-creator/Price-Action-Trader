@@ -25,14 +25,12 @@ from scripts import run_m15_longbridge_sdk_runtime as runtime
 
 def blocking_sdk_factory_probe(config_path, symbols, duration, output_dir):
     class Quote:
-        @classmethod
-        def create(cls, config):
+        def __init__(self, config):
             time.sleep(60)  # Simulates a native synchronous factory blocking its event loop.
-    sdk = SimpleNamespace(AsyncQuoteContext=Quote,
+    sdk = SimpleNamespace(QuoteContext=Quote, Config=SimpleNamespace(from_oauth=lambda oauth: oauth),
         OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()))
     config = SimpleNamespace(quote_region="cn")
-    with patch.object(diagnostic, "read_client_id", return_value="test"), \
-         patch.object(diagnostic, "sdk_config_from_oauth", return_value=object()):
+    with patch.object(diagnostic, "read_client_id", return_value="test"):
         asyncio.run(diagnostic.collect(config, symbols, duration, Path(output_dir), sdk, asyncio.Event()))
 
 
@@ -109,26 +107,23 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
     def test_probe_has_one_context_and_no_account_or_bar_acceptance(self):
         calls = []
         class Quote:
-            @classmethod
-            def create(cls, config):
+            def __init__(self, config):
                 calls.append("create")
-                return cls()
             def set_on_quote(self, handler):
                 self.callback = handler
             def set_on_trades(self, handler):
                 pass
-            async def subscribe(self, symbols, types):
+            def subscribe(self, symbols, types):
                 calls.append("subscribe")
                 self.callback("SPY.US", {"last_done": "500"})
-            async def subscriptions(self):
+            def subscriptions(self):
                 return [{"symbol": "SPY.US", "sub_types": ["quote", "trade"]}]
-        sdk = SimpleNamespace(AsyncQuoteContext=Quote,
+        sdk = SimpleNamespace(QuoteContext=Quote, Config=SimpleNamespace(from_oauth=lambda oauth: oauth),
             OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()),
             SubType=SimpleNamespace(Quote="quote", Trade="trade"))
-        config = SimpleNamespace(quote_region="cn", sdk_subscribe_batch_size=50, subscription_deadline_seconds=45)
+        config = SimpleNamespace(quote_region="cn", subscription_deadline_seconds=45)
         with tempfile.TemporaryDirectory() as directory, \
-             patch.object(diagnostic, "read_client_id", return_value="not-a-secret"), \
-             patch.object(diagnostic, "sdk_config_from_oauth", return_value=object()):
+             patch.object(diagnostic, "read_client_id", return_value="not-a-secret"):
             result = asyncio.run(diagnostic.collect(config, ["SPY.US"], 0.02,
                 Path(directory), sdk, asyncio.Event()))
             self.assertEqual(calls, ["create", "subscribe"])
@@ -140,6 +135,64 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
             self.assertEqual(result["diagnostics"]["stages"]["dequeued:SPY.US:quote"]["count"], 1)
             self.assertFalse(result["account_access"])
             self.assertTrue((Path(directory) / "summary.json").exists())
+
+    def test_raw_probe_rejects_endpoint_override_before_oauth_and_marks_project_scope(self):
+        builder = MagicMock()
+        sdk = SimpleNamespace(OAuthBuilder=builder)
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.dict(os.environ, {"LONGPORT_REGION": "secret-region"}):
+            result = asyncio.run(diagnostic.collect(SimpleNamespace(), ["SPY.US"], 1,
+                Path(directory), sdk, asyncio.Event()))
+            builder.assert_not_called()
+            self.assertEqual(result["status"], "failed")
+            self.assertFalse(result["independent_official_example"])
+            self.assertEqual(result["sdk_quote_context_api"], "QuoteContext")
+            self.assertNotIn("secret-region", json.dumps(result))
+
+    def test_raw_single_request_147_and_501_limit(self):
+        calls = []
+        class Quote:
+            def __init__(self, config):
+                pass
+            def set_on_quote(self, handler):
+                pass
+            def set_on_trades(self, handler):
+                pass
+            def subscribe(self, symbols, subtypes):
+                calls.append(list(symbols))
+                self.symbols = symbols
+            def subscriptions(self):
+                return [{"symbol": symbol, "sub_types": ["quote", "trade"]} for symbol in self.symbols]
+        sdk = SimpleNamespace(QuoteContext=Quote, Config=SimpleNamespace(from_oauth=lambda oauth: oauth),
+            OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()),
+            SubType=SimpleNamespace(Quote="quote", Trade="trade"))
+        symbols = [f"S{index}.US" for index in range(147)]
+        with tempfile.TemporaryDirectory() as directory, patch.object(diagnostic, "read_client_id", return_value="test"):
+            result = asyncio.run(diagnostic.collect(SimpleNamespace(), symbols, 0.01,
+                Path(directory), sdk, asyncio.Event()))
+            self.assertEqual(calls, [symbols])
+            self.assertEqual(result["subscription_coverage"], "147/147")
+            self.assertEqual(len(result["subscription_batches"]), 1)
+        with tempfile.TemporaryDirectory() as directory:
+            result = asyncio.run(diagnostic.collect(SimpleNamespace(), [f"S{i}.US" for i in range(501)], 0.01,
+                Path(directory), sdk, asyncio.Event()))
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(calls, [symbols])
+
+    def test_raw_rechecks_dotenv_after_config_before_quote_context(self):
+        constructor = MagicMock()
+        def from_oauth(_oauth):
+            os.environ["LONGBRIDGE_REGION"] = "secret-dotenv-region"
+            return object()
+        sdk = SimpleNamespace(QuoteContext=constructor, Config=SimpleNamespace(from_oauth=from_oauth),
+            OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()))
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}), \
+             patch.object(diagnostic, "read_client_id", return_value="test"):
+            result = asyncio.run(diagnostic.collect(SimpleNamespace(), ["SPY.US"], 0.01,
+                Path(directory), sdk, asyncio.Event()))
+            constructor.assert_not_called()
+            self.assertEqual(result["status"], "failed")
+            self.assertNotIn("secret-dotenv-region", json.dumps(result))
 
     def test_safe_vendor_codes_categories_and_bounded_cause_without_secret(self):
         class VendorError(Exception):
@@ -172,40 +225,33 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
         self.assertIsNone(safe["error_code"])
         self.assertNotIn("secret", json.dumps(safe))
 
-    def test_batch_failure_records_offset_and_uses_production_timeout_without_secret(self):
+    def test_batch_failure_records_offset_and_keeps_native_request_policy_without_secret(self):
         class Quote:
-            @classmethod
-            def create(cls, config):
-                return cls()
+            def __init__(self, config):
+                pass
             def set_on_quote(self, handler):
                 pass
             def set_on_trades(self, handler):
                 pass
-            async def subscribe(self, symbols, types):
-                if symbols == ["AAPL.US"]:
+            def subscribe(self, symbols, types):
+                if symbols == ["SPY.US", "QQQ.US", "AAPL.US"]:
                     raise TimeoutError("credential=DO_NOT_SAVE_SDK_MESSAGE")
-        sdk = SimpleNamespace(AsyncQuoteContext=Quote,
+        sdk = SimpleNamespace(QuoteContext=Quote, Config=SimpleNamespace(from_oauth=lambda oauth: oauth),
             OAuthBuilder=lambda _: SimpleNamespace(build=lambda _: object()),
             SubType=SimpleNamespace(Quote="quote", Trade="trade"))
-        config = SimpleNamespace(quote_region="cn", sdk_subscribe_batch_size=2,
-                                 subscription_deadline_seconds=45)
-        observed_timeouts = []
-        async def request(awaitable, timeout):
-            observed_timeouts.append(timeout)
-            return await awaitable
+        config = SimpleNamespace(quote_region="cn", subscription_deadline_seconds=45)
         with tempfile.TemporaryDirectory() as directory, \
-             patch.object(diagnostic, "read_client_id", return_value="test"), \
-             patch.object(diagnostic, "sdk_config_from_oauth", return_value=object()), \
-             patch.object(diagnostic.asyncio, "wait_for", side_effect=request):
+             patch.object(diagnostic, "read_client_id", return_value="test"):
             result = asyncio.run(diagnostic.collect(config, ["SPY.US", "QQQ.US", "AAPL.US"],
                 120, Path(directory), sdk, asyncio.Event()))
-            self.assertEqual(observed_timeouts, [45, 45])
+            self.assertIsNone(result["subscription_batches"][0]["request_timeout_seconds"])
+            self.assertEqual(result["subscription_batches"][0]["native_request_timeout"], "sdk_default")
             batches = result["subscription_batches"]
-            self.assertEqual([row["batch_offset"] for row in batches], [0, 2])
-            self.assertEqual([row["batch_size"] for row in batches], [2, 1])
-            self.assertEqual(batches[1]["batch_symbols"], ["AAPL.US"])
-            self.assertEqual([row["outcome"] for row in batches], ["success", "failed"])
-            self.assertEqual(batches[1]["error_category"], "request_timeout")
+            self.assertEqual([row["batch_offset"] for row in batches], [0])
+            self.assertEqual([row["batch_size"] for row in batches], [3])
+            self.assertEqual(batches[0]["batch_symbols"], ["SPY.US", "QQQ.US", "AAPL.US"])
+            self.assertEqual([row["outcome"] for row in batches], ["failed"])
+            self.assertEqual(batches[0]["error_category"], "request_timeout")
             self.assertEqual(result["stage"], "subscribe")
             for path in Path(directory).iterdir():
                 self.assertNotIn("DO_NOT_SAVE_SDK_MESSAGE", path.read_text())
@@ -327,7 +373,8 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
             call = context.Process.call_args.kwargs
             self.assertIs(call["target"], diagnostic._supervised_entry)
             self.assertIs(call["args"][0], official_sdk_quote_worker)
-            self.assertEqual(call["args"][1][-1], directory)
+            self.assertEqual(call["args"][1][-2], directory)
+            self.assertIs(call["args"][1][-1], child_stop)
             self.assertFalse(result["production_acceptance"])
             account.assert_not_called()
             orders.assert_not_called()

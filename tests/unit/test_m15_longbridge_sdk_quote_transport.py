@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import queue
+import os
 import sys
 import threading
 import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from scripts import m15_longbridge_sdk_quote_transport_lib as transport
 
@@ -35,11 +36,13 @@ class FakeQuoteContext:
     emit_callbacks_during_subscribe = False
 
     def __init__(self, _config) -> None:
+        self.received_config = _config
         self.events: list[str] = []
         self.quote_callback = None
         self.trade_callback = None
         self.subscribed: list[str] = []
         self.subscribe_calls: list[list[str]] = []
+        self.subscribe_types: list[list[str]] = []
         self.__class__.instances.append(self)
 
     def set_on_quote(self, callback) -> None:
@@ -57,6 +60,7 @@ class FakeQuoteContext:
     def subscribe(self, symbols, _sub_types) -> None:
         self.events.append("subscribe")
         self.subscribe_calls.append(list(symbols))
+        self.subscribe_types.append(list(_sub_types))
         if self.quote_callback is None or self.trade_callback is None:
             raise AssertionError("callbacks_must_be_registered_before_subscription")
         if self.fail_subscribe:
@@ -68,6 +72,7 @@ class FakeQuoteContext:
                 self.trade_callback(symbol, {"symbol": symbol, "price": "1", "volume": 1})
 
     def subscriptions(self):
+        self.events.append("subscriptions")
         rows = self.subscribed[:-1] if self.omit_subscription else self.subscribed
         types = ["quote"] if self.omit_trade_subscription else ["quote", "trade"]
         return [SimpleNamespace(symbol=symbol, sub_types=types) for symbol in rows]
@@ -91,31 +96,7 @@ class FakeQuoteContext:
 def fake_sdk_module() -> types.ModuleType:
     module = types.ModuleType("longbridge.openapi")
     module.QuoteContext = FakeQuoteContext
-    class FakeAsyncQuoteContext:
-        def __init__(self, config):
-            self.inner = FakeQuoteContext(config)
-
-        create = classmethod(lambda cls, config: cls(config))
-
-        def set_on_quote(self, callback):
-            self.inner.set_on_quote(callback)
-
-        def set_on_trades(self, callback):
-            self.inner.set_on_trades(callback)
-
-        async def candlesticks(self, *args):
-            return self.inner.candlesticks(*args)
-
-        async def subscribe(self, *args):
-            return self.inner.subscribe(*args)
-
-        async def subscriptions(self):
-            return self.inner.subscriptions()
-
-        async def quote(self, *args):
-            return self.inner.quote(*args)
-
-    module.AsyncQuoteContext = FakeAsyncQuoteContext
+    module.Config = SimpleNamespace(from_oauth=lambda oauth: {"official_defaults": True, "oauth": oauth})
     module.OAuthBuilder = lambda _client_id: SimpleNamespace(
         build=lambda _callback: object()
     )
@@ -138,7 +119,6 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             daily_context_path=Path("unused-daily-context.jsonl"),
             daily_context_deadline_seconds=10,
             daily_context_bars=2,
-            sdk_subscribe_batch_size=2,
             bar_minutes=5,
             market_holidays=("2026-09-07",),
             maximum_source_delivery_age_ms=2000,
@@ -150,6 +130,8 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         *,
         stop_kind: str = "ready",
         cached_daily_rows: list[dict] | None = None,
+        stage_ack=None,
+        symbols: tuple[str, ...] | None = None,
     ) -> list[dict]:
         stop_event = threading.Event()
         output = CapturingQueue(stop_event, stop_kind=stop_kind)
@@ -160,7 +142,6 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             patch.dict(sys.modules, {"longbridge": longbridge, "longbridge.openapi": sdk}),
             patch.object(transport, "load_config", return_value=self.config),
             patch.object(transport, "read_client_id", return_value="client-id"),
-            patch.object(transport, "sdk_config_from_oauth", return_value=object()),
             patch.object(
                 transport,
                 "load_valid_daily_context_cache",
@@ -169,12 +150,12 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             patch.object(
                 transport,
                 "configured_symbols",
-                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+                return_value=symbols or ("SPY.US", "QQQ.US", "AAPL.US"),
             ),
             patch.object(
                 transport,
                 "configured_trading_symbols",
-                return_value=("SPY.US", "QQQ.US", "AAPL.US"),
+                return_value=symbols or ("SPY.US", "QQQ.US", "AAPL.US"),
             ),
             patch.object(
                 transport,
@@ -185,20 +166,108 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
                 ],
             ),
         ):
-            transport.official_sdk_quote_worker("config.json", output, stop_event)
+            transport.official_sdk_quote_worker("config.json", output, stop_event, stage_ack=stage_ack)
         return output.rows
 
-    def test_one_context_registers_callbacks_before_batched_subscription(self) -> None:
+    def test_one_context_registers_callbacks_before_single_subscription(self) -> None:
         rows = self.run_worker()
         self.assertEqual(len(FakeQuoteContext.instances), 1)
         context = FakeQuoteContext.instances[0]
         self.assertLess(context.events.index("set_quote_callback"), context.events.index("subscribe"))
         self.assertLess(context.events.index("set_trade_callback"), context.events.index("subscribe"))
-        self.assertEqual(context.subscribe_calls, [["SPY.US", "QQQ.US"], ["AAPL.US"]])
-        self.assertLess(context.events.index("subscribe"), context.events.index("snapshot"))
+        self.assertEqual(context.subscribe_calls, [["SPY.US", "QQQ.US", "AAPL.US"]])
+        self.assertEqual(context.subscribe_types, [["quote", "trade"]])
+        self.assertEqual(context.events.count("subscriptions"), 1)
+        self.assertLess(context.events.index("subscribe"), context.events.index("subscriptions"))
+        self.assertLess(context.events.index("subscriptions"), context.events.index("snapshot"))
         ready = next(row for row in rows if row["kind"] == "ready")
         self.assertEqual(ready["market_data_mode"], "official_sdk_subscription")
         self.assertEqual(ready["initial_snapshot_coverage"], "3/3")
+
+    def test_official_config_defaults_and_single_stage_transition_evidence(self) -> None:
+        rows = self.run_worker()
+        self.assertTrue(FakeQuoteContext.instances[0].received_config["official_defaults"])
+        stages = [row for row in rows if row["kind"] == "sdk_stage"]
+        self.assertEqual([row["phase"] for row in stages], [
+            "initializing", "daily_context", "subscribing", "initial_snapshot", "streaming"])
+        clocks = [row["started_monotonic"] for row in stages]
+        self.assertEqual(clocks, sorted(clocks))
+        self.assertTrue(all(value > 0 for value in clocks))
+        ready = next(row for row in rows if row["kind"] == "ready")
+        self.assertEqual(ready["sdk_quote_context_api"], "QuoteContext")
+        self.assertEqual(ready["sdk_config_source"], "Config.from_oauth_defaults")
+
+    def test_endpoint_overrides_are_rejected_before_context_without_values(self) -> None:
+        for name in ("LONGBRIDGE_REGION", "LONGBRIDGE_QUOTE_WS_URL", "LONGPORT_HTTP_URL", "LONGPORT_REGION"):
+            with self.subTest(name=name), patch.dict(os.environ, {name: "secret-endpoint-value"}):
+                rows = self.run_worker(stop_kind="error")
+                error = next(row for row in rows if row["kind"] == "error")
+                self.assertIn(name, error["reason"])
+                self.assertNotIn("secret-endpoint-value", str(rows))
+                self.assertEqual(FakeQuoteContext.instances, [])
+                self.assertFalse(any(row["kind"] == "ready" for row in rows))
+
+    def test_whitespace_endpoint_override_is_not_treated_as_official_default(self) -> None:
+        with patch.dict(os.environ, {"LONGBRIDGE_HTTP_URL": " "}):
+            with self.assertRaisesRegex(RuntimeError, "LONGBRIDGE_HTTP_URL"):
+                transport.reject_quote_endpoint_overrides()
+
+    def test_proxy_environment_is_not_mutated(self) -> None:
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://localhost:1234"}):
+            self.run_worker()
+            self.assertEqual(os.environ["HTTPS_PROXY"], "http://localhost:1234")
+
+    def test_unacknowledged_stage_stops_before_any_native_context(self) -> None:
+        ack = Mock()
+        ack.wait.return_value = False
+        rows = self.run_worker(stop_kind="error", stage_ack=ack)
+        self.assertEqual(FakeQuoteContext.instances, [])
+        ack.clear.assert_called_once()
+        ack.wait.assert_called_once_with(timeout=5)
+        error = next(row for row in rows if row["kind"] == "error")
+        self.assertIn("stage_ack_timeout:initializing", error["reason"])
+
+    def test_daily_sdk_error_stops_immediately_without_more_requests(self) -> None:
+        with patch.object(FakeQuoteContext, "candlesticks", side_effect=TimeoutError("sdk timeout")) as fetch:
+            rows = self.run_worker(stop_kind="error")
+        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(FakeQuoteContext.instances[0].subscribe_calls, [])
+        error = next(row for row in rows if row["kind"] == "error")
+        self.assertIn("daily_context_request_failed:SPY.US", error["reason"])
+        self.assertEqual(error["safe_error"]["error_category"], "request_timeout")
+
+    def test_147_symbols_use_one_request_and_verify_complete_coverage(self) -> None:
+        symbols = tuple(f"S{index}.US" for index in range(147))
+        rows = self.run_worker(symbols=symbols)
+        context = FakeQuoteContext.instances[0]
+        self.assertEqual(context.subscribe_calls, [list(symbols)])
+        self.assertEqual(context.subscribe_types, [["quote", "trade"]])
+        self.assertEqual(context.events.count("subscriptions"), 1)
+        self.assertLess(context.events.index("subscribe"), context.events.index("subscriptions"))
+        self.assertLess(context.events.index("subscriptions"), context.events.index("snapshot"))
+        ready = next(row for row in rows if row["kind"] == "ready")
+        self.assertEqual(len(ready["subscribed_symbols"]), 147)
+        self.assertEqual(ready["initial_snapshot_coverage"], "147/147")
+        self.assertEqual([row["completed"] for row in rows if row["kind"] == "subscription_progress"], [147])
+
+    def test_501_symbols_are_rejected_before_context_without_partial_subscriptions(self) -> None:
+        rows = self.run_worker(symbols=tuple(f"S{index}.US" for index in range(501)), stop_kind="error")
+        self.assertEqual(FakeQuoteContext.instances, [])
+        error = next(row for row in rows if row["kind"] == "error")
+        self.assertIn("target_count_out_of_range:501", error["reason"])
+
+    def test_config_loaded_dotenv_override_rejected_before_quote_context(self) -> None:
+        sdk = fake_sdk_module()
+        def from_oauth(_oauth):
+            os.environ["LONGPORT_QUOTE_WS_URL"] = "secret-dotenv-endpoint"
+            return object()
+        sdk.Config.from_oauth = from_oauth
+        with patch.dict(os.environ, {}), patch(__name__ + ".fake_sdk_module", return_value=sdk):
+            rows = self.run_worker(stop_kind="error")
+        self.assertEqual(FakeQuoteContext.instances, [])
+        error = next(row for row in rows if row["kind"] == "error")
+        self.assertIn("LONGPORT_QUOTE_WS_URL", error["reason"])
+        self.assertNotIn("secret-dotenv-endpoint", str(rows))
 
     def test_callback_failure_preserves_raw_entry_evidence(self) -> None:
         FakeQuoteContext.emit_callbacks_during_subscribe = True
@@ -216,7 +285,7 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
         context = FakeQuoteContext.instances[0]
         self.assertEqual(len(context.subscribe_calls), 1)
         error = next(row for row in rows if row["kind"] == "error")
-        self.assertIn("official_sdk_quote_worker_failed:AsyncQuoteBridgeError:subscribe failed", error["reason"])
+        self.assertIn("official_sdk_quote_worker_failed:RuntimeError:request timeout", error["reason"])
         self.assertIn("request timeout", error["reason"])
 
     def test_quote_only_subscription_cannot_claim_trade_coverage(self) -> None:
@@ -281,7 +350,6 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
             patch.dict(sys.modules, {"longbridge": longbridge, "longbridge.openapi": sdk}),
             patch.object(transport, "load_config", return_value=self.config),
             patch.object(transport, "read_client_id", return_value="client-id"),
-            patch.object(transport, "sdk_config_from_oauth", return_value=object()),
             patch.object(transport, "load_valid_daily_context_cache", return_value=[]),
             patch.object(transport, "configured_symbols", return_value=("SPY.US",)),
             patch.object(transport, "configured_trading_symbols", return_value=("SPY.US",)),

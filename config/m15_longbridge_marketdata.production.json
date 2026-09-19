@@ -51,7 +51,6 @@
   },
   "runtime": {
     "market_data_transport": "official_sdk_persistent_websocket",
-    "sdk_subscribe_batch_size": 50,
     "heartbeat_interval_seconds": 1,
     "subscription_deadline_seconds": 45,
     "market_data_stall_seconds": 30,

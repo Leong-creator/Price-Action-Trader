@@ -29,7 +29,6 @@ DEFAULT_RUNTIME_FILES = (
     "config/m15_official_sdk_artifact.json",
     "scripts/run_m15_longbridge_sdk_runtime.py",
     "scripts/m15_longbridge_sdk_quote_transport_lib.py",
-    "scripts/m15_official_async_quote_lib.py",
     "scripts/m15_official_async_trade_lib.py",
     "scripts/m15_submission_journal_lib.py",
     "scripts/m15_paper_session_validation_lib.py",

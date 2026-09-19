@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from scripts.m15_longbridge_realtime_execution_lib import response_order_id
 from scripts.m15_longbridge_sdk_runtime_lib import (
     FiveMinuteBarBuilder, MarketEventContext, SdkRealtimePaperClient, append_market_events, compact_market_events,
-    config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
+    build_status, config_fingerprint, configured_symbols, configured_trading_symbols, daily_context_covers_symbols,
     daily_context_is_complete, fresh_market_events, load_config,
     held_position_monitoring_symbols, new_held_position_monitoring_symbols,
     load_current_sdk_intraday_context,
@@ -81,6 +81,16 @@ PRODUCTION_CONFIG_JSON = REPO_ROOT / "config" / "m15_longbridge_marketdata.produ
 
 
 class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
+    def test_status_distinguishes_default_quote_configuration_from_observed_endpoint(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = replace(load_config(), runtime_status_path=Path(directory) / "status.json")
+            payload = build_status(config, status="connecting")
+            self.assertEqual(payload["quote_region"], "sdk_default")
+            self.assertEqual(payload["sdk_config_source"], "Config.from_oauth_defaults")
+            self.assertEqual(payload["quote_endpoint"], "unknown")
+            self.assertEqual(payload["auxiliary_quote_region"], config.quote_region)
+            self.assertEqual(config.quote_region, "cn")
+
     def test_production_transport_selects_official_sdk_worker(self) -> None:
         config = load_config()
         self.assertEqual(
@@ -284,7 +294,7 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             config.market_data_transport,
             "official_sdk_persistent_websocket",
         )
-        self.assertEqual(config.sdk_subscribe_batch_size, 50)
+        self.assertFalse(hasattr(config, "sdk_subscribe_batch_size"))
         self.assertEqual(config.quote_region, "cn")
         self.assertEqual(config.trade_region, "global")
         self.assertEqual(config.daily_context_deadline_seconds, 600)
@@ -294,12 +304,22 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             "allow_snapshot_poll_fallback",
             "reconnect_backoff_seconds",
             "subscription_batch_size",
+            "sdk_subscribe_batch_size",
             "subscription_retry_count",
             "subscription_request_interval_seconds",
             "subscription_circuit_retry_seconds",
             "snapshot_poll_interval_seconds",
         ):
             self.assertNotIn(removed_key, payload["runtime"])
+
+    def test_removed_sdk_batch_setting_is_rejected_instead_of_silently_ignored(self) -> None:
+        payload = json.loads(PRODUCTION_CONFIG_JSON.read_text(encoding="utf-8"))
+        payload["runtime"]["sdk_subscribe_batch_size"] = 2
+        with TemporaryDirectory() as directory:
+            config_path = Path(directory) / "legacy.json"
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "sdk_subscribe_batch_size"):
+                load_config(config_path)
 
     def test_non_sdk_transport_is_rejected(self) -> None:
         validate_market_data_transport_runtime(load_config())
@@ -701,13 +721,6 @@ class M15LongbridgeSdkRuntimeTest(unittest.TestCase):
             ),
             "market_data_fault_halted",
         )
-
-    def test_official_sdk_transport_subscribes_quote_and_trade_together(self) -> None:
-        source = Path("scripts/m15_longbridge_sdk_quote_transport_lib.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("quote.subscribe(batch, [sdk.SubType.Quote, sdk.SubType.Trade])", source)
-        self.assertIn("quote.subscriptions()", source)
 
     def test_official_sdk_transport_verifies_subscription_before_initial_snapshot(self) -> None:
         source = Path("scripts/m15_longbridge_sdk_quote_transport_lib.py").read_text(

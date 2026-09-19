@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import fcntl
 import hashlib
 import json
+import math
 import multiprocessing as mp
 import os
 import queue
@@ -21,6 +23,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from functools import partial
+from multiprocessing.reduction import DupFd
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -29,7 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 VENV_PYTHON = ROOT / ".venv-m15" / "bin" / "python"
-if VENV_PYTHON.exists() and Path(sys.prefix).resolve() != VENV_PYTHON.parent.parent.resolve():
+if (__name__ == "__main__" and VENV_PYTHON.exists()
+        and Path(sys.prefix).resolve() != VENV_PYTHON.parent.parent.resolve()):
     os.execve(str(VENV_PYTHON), [str(VENV_PYTHON), str(Path(__file__).resolve()), *sys.argv[1:]], os.environ)
 
 from scripts.m15_marketdata_diagnostics_lib import assert_no_legacy_quote_processes
@@ -1985,15 +1989,131 @@ def run_sdk_order_maintenance(
     return summary
 
 
+class WorkerTerminationError(RuntimeError):
+    """A worker is still alive after all bounded shutdown attempts."""
+
+
+_UNREAPED_WORKER_RESOURCES: list[tuple[Any, Any]] = []
+
+
+class QuoteWorkerStageDeadline:
+    """Absolute phase deadlines; progress and duplicate notifications cannot renew them."""
+
+    TRANSITIONS = {
+        "initializing": {"daily_context"},
+        "daily_context": {"subscribing"},
+        "subscribing": {"initial_snapshot"},
+        "initial_snapshot": {"streaming"},
+        "streaming": {"daily_refresh"},
+        "daily_refresh": {"streaming"},
+    }
+
+    def __init__(self, config: Any, started: float) -> None:
+        self.config = config
+        self.phase = "initializing"
+        self.started = started
+        self.failure: dict[str, Any] | None = None
+
+    def consume(self, message: dict[str, Any], now: float) -> None:
+        if message.get("kind") != "sdk_stage":
+            return
+        if self.failure is not None:
+            return
+        phase = str(message.get("phase") or "")
+        if phase == self.phase:
+            return
+        if phase not in self.TRANSITIONS[self.phase]:
+            raise ValueError(f"invalid_sdk_stage_transition:{self.phase}:{phase}")
+        started = float(message.get("started_monotonic", now))
+        if not math.isfinite(started) or started < self.started or started > now:
+            raise ValueError("invalid_sdk_stage_start_time")
+        self.failure = self.overdue(started)
+        if self.failure is not None:
+            return
+        self.phase, self.started = phase, started
+
+    def overdue(self, now: float) -> dict[str, Any] | None:
+        if self.failure is not None:
+            return self.failure
+        if self.phase == "streaming":
+            return None
+        limit = (self.config.daily_context_deadline_seconds
+                 if self.phase in {"daily_context", "daily_refresh"}
+                 else self.config.subscription_deadline_seconds)
+        if now - self.started <= limit:
+            return None
+        return {"phase": self.phase, "deadline_seconds": limit,
+                "elapsed_seconds": round(now - self.started, 3)}
+
+    def acknowledge_ready(self, now: float) -> None:
+        # Streaming/refresh notices may already have been drained ahead of ready.
+        # Keep their child timestamps so a pending refresh is not deemed stale.
+        if self.phase not in {"streaming", "daily_refresh"}:
+            self.phase, self.started = "streaming", now
+
+
+def quote_worker_heartbeat_required(stage: QuoteWorkerStageDeadline | None, config: Any, now: datetime) -> bool:
+    """Only an off-session synchronous refresh may pause the worker heartbeat."""
+    return not (stage is not None and stage.phase == "daily_refresh"
+                and not configured_regular_session(config, now))
+
+
+def _restore_quote_worker_lock(duplicate: Any) -> int:
+    return duplicate.detach()
+
+
+class QuoteWorkerLock:
+    def __init__(self, descriptor: int) -> None:
+        self.descriptor = descriptor
+
+    def __reduce__(self) -> Any:
+        # Duplicate during spawn pickling, not before Process.start(). This uses
+        # spawn's inherited-fd path rather than a resource-sharer-held lock copy.
+        return _restore_quote_worker_lock, (DupFd(self.descriptor),)
+
+
+def quote_worker_with_owned_lock(
+    target: Any, args: tuple[Any, ...], owner: int | None, expected_parent: int,
+) -> None:
+    """Keep the same flock alive if the parent exits before this native worker."""
+    try:
+        # The descriptor was inherited by spawn before this entry point. A dead
+        # parent must never leave a native quote connection running unattended.
+        if os.getppid() != expected_parent:
+            raise RuntimeError("quote_worker_parent_already_exited")
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(1, signal.SIGKILL, 0, 0, 0) != 0:  # PR_SET_PDEATHSIG
+            raise RuntimeError("quote_worker_parent_death_guard_unavailable")
+        if os.getppid() != expected_parent:
+            raise RuntimeError("quote_worker_parent_exited_during_guard_setup")
+        target(*args)
+    finally:
+        if owner is not None:
+            # Never LOCK_UN: the parent and child share one open file description.
+            os.close(owner)
+
+
 def stop_spawned_process(process: mp.Process | None, *, graceful: bool) -> None:
-    """Join spawned SDK workers before forcing termination as a last resort."""
+    """Bounded shutdown, including a final exit check after SIGKILL."""
     if process is None or process.pid is None:
         return
     if graceful:
         process.join(timeout=2)
+    termination_error: OSError | None = None
     if process.is_alive():
-        process.terminate()
+        try:
+            process.terminate()
+        except OSError as exc:
+            termination_error = exc
     process.join(timeout=2)
+    if process.is_alive():
+        try:
+            process.kill()
+        except OSError as exc:
+            termination_error = exc
+        process.join(timeout=2)
+    if process.is_alive():
+        raise WorkerTerminationError(f"sdk_worker_cleanup_failed:pid={process.pid}") from termination_error
 
 
 def close_spawn_queue(queue_out: Any) -> None:
@@ -2011,10 +2131,12 @@ def close_spawn_queue(queue_out: Any) -> None:
 def cleanup_runtime_resources(
     *, stop_event: Any, worker: Any, message_queue: Any,
     execution_trade: Any, account: Any, previous_sigterm_handler: Any,
+    resource_state: dict[str, Any] | None = None,
 ) -> None:
     """Attempt every cleanup; never replace an already propagating exception."""
     original_error = sys.exc_info()[1]
     errors: list[BaseException] = []
+    worker_unreaped = False
     for name, cleanup in (
         ("stop_event", stop_event.set),
         ("quote_worker", lambda: stop_spawned_process(worker, graceful=True)),
@@ -2023,9 +2145,18 @@ def cleanup_runtime_resources(
         ("account", account.stop),
         ("sigterm_handler", lambda: signal.signal(signal.SIGTERM, previous_sigterm_handler)),
     ):
+        if name == "message_queue" and worker_unreaped:
+            # A live child still owns this channel. Do not claim completed cleanup.
+            _UNREAPED_WORKER_RESOURCES.append((worker, message_queue))
+            continue
         try:
             cleanup()
         except BaseException as exc:
+            if name == "quote_worker" and isinstance(exc, WorkerTerminationError):
+                worker_unreaped = True
+                if resource_state is not None:
+                    resource_state["quote_worker_cleanup_failed"] = True
+                    resource_state["unreaped_quote_worker_pid"] = worker.pid
             errors.append(exc)
             try:
                 print(f"runtime_cleanup_failed:{name}:{type(exc).__name__}:{exc}", file=sys.stderr, flush=True)
@@ -2146,6 +2277,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
     claimed = False
     boot_decision: dict[str, Any] | None = None
     runtime_identity: dict[str, Any] = {}
+    resource_state: dict[str, Any] = {}
     try:
         boot_decision = checked_runtime_boot_startup(config)
         runtime_identity = {
@@ -2154,6 +2286,10 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
             "runtime_pid": os.getpid(),
             "runtime_started_at": to_iso(datetime.now(UTC)),
             "runtime_process_start_ticks": process_start_ticks(os.getpid()),
+            "quote_region": "sdk_default",
+            "sdk_config_source": "Config.from_oauth_defaults",
+            "quote_endpoint": "unknown",
+            "auxiliary_quote_region": config.quote_region,
         }
         claimed = True
         run_lock.seek(0)
@@ -2174,6 +2310,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 config, dispatch_requested=dispatch_requested,
                 runtime_identity=runtime_identity, boot_decision=boot_decision,
                 startup_cleanup=startup_cleanup,
+                quote_owner_fd=run_lock.fileno(), resource_state=resource_state,
             )
     except BaseException as exc:
         if boot_decision is not None:
@@ -2184,6 +2321,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                 **runtime_identity, "runtime_boot_recovery": boot_decision,
                 "market_data_fault_halted": True, "sdk_connected": False,
                 "dispatch_requested": bool(dispatch_requested), "dispatch_enabled": False,
+                **resource_state,
             }
             try:
                 write_json_atomic(
@@ -2201,7 +2339,7 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
         raise
     finally:
         try:
-            if claimed:
+            if claimed and not resource_state.get("quote_worker_cleanup_failed"):
                 try:
                     if read_pid(pid_path(config)) == os.getpid():
                         pid_path(config).unlink(missing_ok=True)
@@ -2210,15 +2348,14 @@ def run_watch(config: Any, *, dispatch_requested: bool) -> int:
                     run_lock.truncate()
                     run_lock.flush()
         finally:
-            try:
-                fcntl.flock(run_lock.fileno(), fcntl.LOCK_UN)
-            finally:
-                run_lock.close()
+            # Close only our copy: a surviving quote worker must retain the flock.
+            run_lock.close()
 
 
 def _run_watch_after_boot_check(
     config: Any, *, dispatch_requested: bool, runtime_identity: dict[str, Any],
     boot_decision: dict[str, Any], startup_cleanup: ExitStack,
+    quote_owner_fd: int | None = None, resource_state: dict[str, Any] | None = None,
 ) -> int:
     run_id = runtime_identity["run_id"]
     runtime_started_at = runtime_identity["runtime_started_at"]
@@ -2332,6 +2469,7 @@ def _run_watch_after_boot_check(
     message_queue: Any = process_context.Queue(maxsize=2048)
     startup_cleanup.callback(close_spawn_queue, message_queue)
     stop_event: Any = process_context.Event()
+    stage_ack: Any = process_context.Event()
     startup_cleanup.callback(stop_event.set)
     worker: mp.Process | None = None
     worker_ready = False
@@ -2339,6 +2477,7 @@ def _run_watch_after_boot_check(
     worker_last_progress = 0.0
     worker_ready_since = 0.0
     worker_generation = 0
+    stage_deadline: QuoteWorkerStageDeadline | None = None
     last_push_by_symbol: dict[str, float] = {}
     first_live_push_by_symbol: dict[str, float] = {}
     last_live_push_by_symbol: dict[str, float] = {}
@@ -2405,6 +2544,7 @@ def _run_watch_after_boot_check(
     last_subscription_failure_reason = ""
     market_data_mode = configured_market_data_mode(config)
     sdk_quote_context_api = "unknown"
+    sdk_config_source = "Config.from_oauth_defaults"
     market_data_symbols: set[str] = set()
     market_data_failed: list[str] = []
     trading_market_data_failed: list[str] = []
@@ -2468,7 +2608,11 @@ def _run_watch_after_boot_check(
             except queue.Empty:
                 return
             pending_kind = str(pending.get("kind") or "")
-            if pending_kind == "heartbeat":
+            if pending_kind == "sdk_stage" and stage_deadline is not None:
+                stage_deadline.consume(pending, time.monotonic())
+                if stage_deadline.overdue(time.monotonic()) is None:
+                    stage_ack.set()
+            elif pending_kind == "heartbeat":
                 apply_transport_heartbeat_message(pending)
             elif pending_kind in {"quote_state", "quote_state_batch"}:
                 apply_quote_state_worker_message(
@@ -2534,6 +2678,9 @@ def _run_watch_after_boot_check(
                 "runtime_process_start_ticks": runtime_process_start_ticks,
                 "runtime_command_line": " ".join(sys.argv),
                 "runtime_engine": "sdk",
+                "sdk_quote_context_api": sdk_quote_context_api,
+                "sdk_config_source": sdk_config_source,
+                "quote_region": "sdk_default",
                 "market_data_mode": "official_sdk_subscription",
                 "market_data_transport": config.market_data_transport,
                 "market_data_fault_halted": True,
@@ -2584,6 +2731,7 @@ def _run_watch_after_boot_check(
             if worker is None and worker_generation == 0:
                 worker_ready = False
                 worker_started = time.monotonic()
+                stage_deadline = QuoteWorkerStageDeadline(config, worker_started)
                 worker_last_progress = worker_started
                 transport_child_pid = 0
                 transport_queue_depth = 0
@@ -2607,12 +2755,13 @@ def _run_watch_after_boot_check(
                     quote_subscription_targets(config, datetime.now(UTC))
                 )
                 worker = process_context.Process(
-                    target=configured_quote_worker(config),
+                    target=quote_worker_with_owned_lock,
                     args=(
-                        str(config.config_path),
-                        message_queue,
-                        stop_event,
-                        position_monitoring_symbols,
+                        configured_quote_worker(config),
+                        (str(config.config_path), message_queue, stop_event,
+                         position_monitoring_symbols, None, stage_ack),
+                        QuoteWorkerLock(quote_owner_fd) if quote_owner_fd is not None else None,
+                        os.getpid(),
                     ),
                     daemon=True,
                 )
@@ -2651,8 +2800,13 @@ def _run_watch_after_boot_check(
                         ),
                     },
                 )
-            if worker_ready:
+            try:
                 drain_pending_worker_health_messages()
+            except (ValueError, TypeError) as exc:
+                return halt_market_data("market_data_invalid_sdk_stage", details={"error": str(exc)})
+            phase_overdue = stage_deadline.overdue(time.monotonic()) if stage_deadline else None
+            if phase_overdue is not None:
+                return halt_market_data("market_data_sdk_stage_deadline_exceeded", details=phase_overdue)
             if worker_ready and transport_reader_errors:
                 return halt_market_data(
                     "market_data_reader_error",
@@ -2660,6 +2814,7 @@ def _run_watch_after_boot_check(
                 )
             if (
                 worker_ready
+                and quote_worker_heartbeat_required(stage_deadline, config, datetime.now(UTC))
                 and market_data_heartbeat_grace_elapsed(
                     worker_ready_since,
                     time.monotonic(),
@@ -2730,7 +2885,14 @@ def _run_watch_after_boot_check(
             except queue.Empty:
                 message = {"kind": "idle"}
             kind = str(message.get("kind") or "")
-            if kind == "subscription_progress":
+            if kind == "sdk_stage" and stage_deadline is not None:
+                try:
+                    stage_deadline.consume(message, time.monotonic())
+                    if stage_deadline.overdue(time.monotonic()) is None:
+                        stage_ack.set()
+                except (ValueError, TypeError) as exc:
+                    return halt_market_data("market_data_invalid_sdk_stage", details={"error": str(exc)})
+            elif kind == "subscription_progress":
                 worker_last_progress = time.monotonic()
                 subscription_progress_completed = int(message.get("completed") or 0)
                 subscription_progress_total = int(
@@ -2758,6 +2920,7 @@ def _run_watch_after_boot_check(
                 apply_market_activity_message(message)
             elif kind == "ready":
                 sdk_quote_context_api = str(message.get("sdk_quote_context_api") or "unknown")
+                sdk_config_source = str(message.get("sdk_config_source") or "unknown")
                 transport_child_pid = 0
                 initial_snapshot_coverage = str(
                     message.get("initial_snapshot_coverage") or "0/0"
@@ -2814,6 +2977,10 @@ def _run_watch_after_boot_check(
                 last_subscription_failure_reason = ""
                 worker_last_progress = time.monotonic()
                 worker_ready_since = worker_last_progress
+                # Validated ready is itself the completion acknowledgement for
+                # startup, including workers which omit redundant stage notices.
+                if stage_deadline is not None:
+                    stage_deadline.acknowledge_ready(worker_last_progress)
                 session_evidence = MarketSessionEvidence(
                     config, datetime.now(UTC),
                     complete_bar_open_not_before=strict_event_datetime(partial_bar_suppressed_until),
@@ -3361,6 +3528,9 @@ def _run_watch_after_boot_check(
                     "market_data_mode": market_data_mode,
                     "market_data_transport": config.market_data_transport,
                     "sdk_quote_context_api": sdk_quote_context_api,
+                    "sdk_config_source": sdk_config_source,
+                    "quote_region": "sdk_default",
+                    "auxiliary_quote_region": config.quote_region,
                     "account_order_transport": "official_sdk_persistent_context",
                     "source_mode": "official_sdk_push",
                     "automatic_market_data_retry_enabled": False,
@@ -3571,6 +3741,7 @@ def _run_watch_after_boot_check(
             stop_event=stop_event, worker=worker, message_queue=message_queue,
             execution_trade=execution_trade, account=account,
             previous_sigterm_handler=previous_sigterm_handler,
+            resource_state=resource_state,
         )
 
 

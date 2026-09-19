@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded read-only raw SDK probe. Never reads accounts or writes production state."""
+"""Bounded project quote diagnostics; not an independent official example or trading runner."""
 from __future__ import annotations
 
 import argparse
@@ -28,9 +28,11 @@ from scripts.m15_marketdata_diagnostics_lib import (
 )
 from scripts.m15_longbridge_sdk_runtime_lib import (
     DEFAULT_CONFIG_PATH, configured_symbols, load_config, read_client_id,
-    sdk_config_from_oauth, sdk_object_to_dict,
+    sdk_object_to_dict,
 )
-from scripts.m15_longbridge_sdk_quote_transport_lib import _subscription_symbols
+from scripts.m15_longbridge_sdk_quote_transport_lib import (
+    _subscription_symbols, reject_quote_endpoint_overrides, validate_single_subscription_symbols,
+)
 
 
 def validate_output_dir(path: Path, production_dir: Path) -> Path:
@@ -70,7 +72,9 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
               "started_at": datetime.now(UTC).isoformat(), "duration_limit_seconds": duration,
               "account_access": False, "order_access": False, "production_acceptance": False,
               "bar_formation": "not_assessed_raw_callback_probe", "status": "collecting",
-              "subscription_batches": []}
+              "subscription_batches": [], "sdk_quote_context_api": "QuoteContext",
+              "sdk_config_source": "Config.from_oauth_defaults",
+              "independent_official_example": False}
     active_batch: dict[str, Any] | None = None
     active_batch_started = 0.0
     def stage(name: str, **details: Any) -> None:
@@ -80,33 +84,36 @@ async def collect(config: Any, symbols: list[str], duration: float, output: Path
         (output / "phase.json").write_text(json.dumps(phase) + "\n", encoding="utf-8")
         append_diagnostic_snapshot(output / "phases.jsonl", phase)
     try:
+        reject_quote_endpoint_overrides()
+        validate_single_subscription_symbols(symbols)
         stage("oauth_build")
         oauth = sdk.OAuthBuilder(read_client_id(config)).build(lambda _url: None)
         stage("context_create")
-        quote = sdk.AsyncQuoteContext.create(sdk_config_from_oauth(sdk, oauth, config.quote_region))
+        sdk_config = sdk.Config.from_oauth(oauth)
+        reject_quote_endpoint_overrides()  # Official Config may load dotenv overrides.
+        quote = sdk.QuoteContext(sdk_config)
         quote.set_on_quote(lambda symbol, event: callback("quote", symbol, event))
         quote.set_on_trades(lambda symbol, event: callback("trade", symbol, event))
         sub_types = [sdk.SubType.Quote, sdk.SubType.Trade]
-        async def request(awaitable):
-            return await asyncio.wait_for(awaitable, timeout=max(0.001, min(config.subscription_deadline_seconds, deadline - time.monotonic())))
-        batch = config.sdk_subscribe_batch_size
-        for offset in range(0, len(symbols), batch):
-            current_symbols = symbols[offset:offset + batch]
-            active_batch = {"batch_offset": offset, "batch_size": len(current_symbols),
-                "total_symbols": len(symbols), "batch_symbols": current_symbols,
-                "sub_types": ["Quote", "Trade"],
-                "request_timeout_seconds": max(0.001, min(config.subscription_deadline_seconds,
-                                                           deadline - time.monotonic()))}
-            active_batch_started = time.monotonic()
-            stage("subscribe", outcome="started", **active_batch)
-            await request(quote.subscribe(current_symbols, sub_types))
-            outcome = {**active_batch, "outcome": "success",
-                       "elapsed_seconds": round(time.monotonic() - active_batch_started, 3)}
-            result["subscription_batches"].append(outcome)
-            stage("subscribe", **outcome)
-            active_batch = None
+        # Keep the historical subscription_batches report shape; there is now exactly one request.
+        active_batch = {"batch_offset": 0, "batch_size": len(symbols),
+            "total_symbols": len(symbols), "batch_symbols": symbols,
+            "sub_types": ["Quote", "Trade"], "request_timeout_seconds": None,
+            "native_request_timeout": "sdk_default", "external_total_duration_seconds": duration}
+        active_batch_started = time.monotonic()
+        stage("subscribe", outcome="started", **active_batch)
+        if time.monotonic() >= deadline:
+            raise TimeoutError("diagnostic_total_deadline_exceeded")
+        quote.subscribe(symbols, sub_types)
+        if not errors.empty():
+            raise RuntimeError("callback_failure:" + errors.get_nowait())
+        outcome = {**active_batch, "outcome": "success",
+                   "elapsed_seconds": round(time.monotonic() - active_batch_started, 3)}
+        result["subscription_batches"].append(outcome)
+        stage("subscribe", **outcome)
+        active_batch = None
         stage("subscriptions_verify")
-        actual = _subscription_symbols(await request(quote.subscriptions()), tuple(sub_types))
+        actual = _subscription_symbols(quote.subscriptions(), tuple(sub_types))
         result["missing_subscriptions"] = sorted(set(symbols) - actual)
         if result["missing_subscriptions"]:
             raise RuntimeError("subscription_coverage_incomplete")
@@ -242,6 +249,7 @@ class PipelineProbeEvidence:
         from scripts import run_m15_longbridge_sdk_runtime as rules
         self.rules = rules
         self.config = config
+        self.stage_deadline = rules.QuoteWorkerStageDeadline(config, time.monotonic())
         self.session = None
         self.ready_since = 0.0
         self.last_progress = time.monotonic()
@@ -257,6 +265,7 @@ class PipelineProbeEvidence:
 
     def consume(self, message: dict[str, Any], now: datetime) -> None:
         kind = str(message.get("kind", "unknown"))
+        self.stage_deadline.consume(message, time.monotonic())
         self.message_counts[kind] = self.message_counts.get(kind, 0) + 1
         if kind == "error":
             self.worker_safe_error = dict(message.get("safe_error") or {})
@@ -292,11 +301,16 @@ class PipelineProbeEvidence:
                 self.bar_count += len(rows)
 
     def check_deadlines(self, now: datetime) -> None:
+        overdue = self.stage_deadline.overdue(time.monotonic())
+        if overdue:
+            raise RuntimeError("sdk_stage_deadline_exceeded:" + str(overdue["phase"]))
         if self.session is None:
             return
         missing = self.session.advance(now)
         if missing:
             raise RuntimeError("realtime_bar_boundary_deadline_exceeded:" + missing)
+        if self.stage_deadline.phase != "streaming":
+            return
         monotonic = time.monotonic()
         if (self.rules.market_data_heartbeat_grace_elapsed(self.ready_since, monotonic,
                 self.config.subscription_deadline_seconds)
@@ -318,8 +332,9 @@ async def collect_pipeline(config: Any, config_path: str, duration: float, outpu
     context = mp.get_context("spawn")
     messages = context.Queue(maxsize=4096)
     child_stop = context.Event()
+    stage_ack = context.Event()
     child = context.Process(target=_supervised_entry,
-        args=(official_sdk_quote_worker, (config_path, messages, child_stop, (), str(output)),
+        args=(official_sdk_quote_worker, (config_path, messages, child_stop, (), str(output), stage_ack),
               DupFd(owner_fd) if owner_fd is not None else None, os.getpid()), daemon=True)
     evidence = PipelineProbeEvidence(config)
     result: dict[str, Any] = {"mode": "isolated_pipeline_diagnostic",
@@ -346,6 +361,11 @@ async def collect_pipeline(config: Any, config_path: str, duration: float, outpu
                     audit["reason"] = str(audit.get("reason", "")).split(":", 2)[:2]
                 append_diagnostic_snapshot(output / "worker_messages.jsonl", audit)
                 evidence.consume(message, datetime.now(UTC))
+                if message.get("kind") == "sdk_stage":
+                    # consume validated the phase and fixed its absolute deadline before allowing SDK I/O.
+                    if evidence.stage_deadline.overdue(time.monotonic()):
+                        raise RuntimeError("sdk_stage_deadline_exceeded_before_ack")
+                    stage_ack.set()
             evidence.check_deadlines(datetime.now(UTC))
             if not child.is_alive():
                 raise RuntimeError("quote_worker_exited")
