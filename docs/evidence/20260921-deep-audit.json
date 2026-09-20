@@ -23,7 +23,6 @@
     }
   ],
   "real_sdk_connections": 0,
-  "formal_deployment_reissued": false,
   "formal_production_remains_stopped": true,
   "original_credentials_unchanged": true,
   "schema": 1,
@@ -76,6 +75,12 @@
   ],
   "full_sessions_passed": 0,
   "other_task_changes_preserved": true,
-  "formal_deployment_blocker": "concurrent_m16_workspace_not_clean",
-  "evidence_directory": "/home/hgl/project-archives/Price-Action-Trader/20260921-deep-audit"
+  "formal_deployment_blocker": null,
+  "evidence_directory": "/home/hgl/project-archives/Price-Action-Trader/20260921-deep-audit",
+  "concurrent_task_stopped_by_user": true,
+  "paused_research_checkpoint": "919cce6",
+  "paused_research_file_count": 12,
+  "paused_research_archive_verified": true,
+  "formal_manifest_not_reissued_during_concurrent_task": false,
+  "final_source_verification_record": "/home/hgl/project-archives/Price-Action-Trader/20260921-deep-audit/closeout.json"
 }
