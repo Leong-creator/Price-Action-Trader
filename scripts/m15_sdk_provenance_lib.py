@@ -41,9 +41,9 @@ def trusted_artifact(root: Path = ROOT) -> dict[str, Any]:
     url = urlsplit(str(anchor.get("source_url", "")))
     filename = str(anchor.get("filename", ""))
     if (anchor.get("schema_version") != "m15.official-sdk-artifact.v1"
-            or anchor.get("version") != "4.5.0"
+            or anchor.get("version") != "5.0.0"
             or not re.fullmatch(r"[0-9a-f]{64}", str(anchor.get("sha256", "")))
-            or not filename.startswith("longbridge-4.5.0-") or not filename.endswith(".whl")
+            or not filename.startswith("longbridge-5.0.0-") or not filename.endswith(".whl")
             or Path(filename).name != filename
             or url.scheme != "https" or url.netloc != "files.pythonhosted.org"
             or PurePosixPath(url.path).name != filename or url.query or url.fragment):
@@ -75,7 +75,7 @@ def inspect_environment(wheel: Path, root: Path = ROOT) -> dict[str, Any]:
     locations = list(spec.submodule_search_locations or []) if spec else []
     if len(locations) != 1 or Path(locations[0]).resolve() != package:
         raise ValueError("sdk_import_shadowed")
-    # Official 4.5.0 exports a PyO3 submodule through __init__.py:
+    # Official 5.0.0 exports a PyO3 submodule through __init__.py:
     # from .longbridge import openapi; sys.modules['longbridge.openapi'] = openapi.
     # openapi.py is a placeholder; the alias itself has no __file__/__spec__.
     module = importlib.machinery.PathFinder.find_spec("longbridge.longbridge", locations)

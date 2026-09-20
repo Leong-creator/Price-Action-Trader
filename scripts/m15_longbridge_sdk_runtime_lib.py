@@ -2019,10 +2019,16 @@ def sdk_object_to_dict(value: Any) -> dict[str, Any]:
 
 
 def sdk_plain_value(value: Any) -> Any:
-    """Convert nested PyO3 enum values before crossing process boundaries."""
+    """Normalise SDK values before crossing process boundaries."""
     if value is None or type(value) in (str, int, float, bool):
         return value
-    if isinstance(value, (Decimal, datetime)):
+    if isinstance(value, datetime):
+        # The official Python SDK constructs timestamps with
+        # datetime.fromtimestamp(epoch, None): naive LOCAL wall time. Convert
+        # on the receiving host before IPC, not by relabelling it as UTC.
+        # Aware SDK datetimes take the same path and retain their instant.
+        return value.astimezone(UTC)
+    if isinstance(value, Decimal):
         return value
     if isinstance(value, dict):
         return {str(key): sdk_plain_value(item) for key, item in value.items()}

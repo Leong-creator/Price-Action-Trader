@@ -8,6 +8,7 @@ import threading
 import time
 from collections import deque
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -47,18 +48,34 @@ class PipelineDiagnostics:
             return result
 
 
+def diagnostic_json_value(value: Any) -> Any:
+    """Serialize an audit copy; never replace the live worker message's values."""
+    if isinstance(value, datetime):
+        # SDK naive datetimes describe this host's local time.
+        return value.astimezone(UTC).isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    raise TypeError("unsupported_diagnostic_value:" + type(value).__name__)
+
+
 def append_diagnostic_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
     """Caller must run outside callbacks. Failure must not silently hide evidence."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(snapshot, sort_keys=True) + "\n")
+        stream.write(json.dumps(snapshot, sort_keys=True, default=diagnostic_json_value) + "\n")
 
 
-def acquire_quote_owner_lock(path: Path | None = None):
+def acquire_quote_owner_lock(path: Path | None = None, *, inherited_fd: int | None = None):
     """Process lifetime lock shared by production worker and isolated probe."""
     path = path or Path.home() / ".cache/price-action-trader/m15_sdk_quote_subscription.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
-    stream = path.open("a+", encoding="utf-8")
+    if inherited_fd is None:
+        stream = path.open("a+", encoding="utf-8")
+    else:
+        actual, expected = os.fstat(inherited_fd), path.stat()
+        if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
+            raise RuntimeError("incorrect_inherited_quote_lock")
+        stream = os.fdopen(os.dup(inherited_fd), "a+", encoding="utf-8")
     try:
         fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BaseException:

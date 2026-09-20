@@ -27,14 +27,14 @@ class SdkProvenanceTests(unittest.TestCase):
         self.python = self.env / "bin/python"
         self.python.parent.mkdir()
         self.python.write_bytes(b"fixture-interpreter")
-        self.filename = "longbridge-4.5.0-cp312-cp312-linux_x86_64.whl"
+        self.filename = "longbridge-5.0.0-cp312-cp312-linux_x86_64.whl"
         self.wheel = self.root / self.filename
         self.module_name = "longbridge/longbridge" + importlib.machinery.EXTENSION_SUFFIXES[0]
         self.contents = {"longbridge/__init__.py": b"# fixture; must never import\nraise RuntimeError('imported')\n",
                          self.module_name: b"official-native-fixture",
                          "longbridge/openapi.py": b"",
                          "longbridge/openapi.pyi": b"# fixture types",
-                         "longbridge-4.5.0.dist-info/METADATA": b"Name: longbridge\nVersion: 4.5.0\n"}
+                         "longbridge-5.0.0.dist-info/METADATA": b"Name: longbridge\nVersion: 5.0.0\n"}
         with zipfile.ZipFile(self.wheel, "w") as archive:
             for name, content in self.contents.items():
                 archive.writestr(name, content)
@@ -44,7 +44,7 @@ class SdkProvenanceTests(unittest.TestCase):
         self.anchor = self.root / provenance.TRUST_PATH
         self.anchor.parent.mkdir()
         self.anchor.write_text(json.dumps({"schema_version": "m15.official-sdk-artifact.v1",
-            "version": "4.5.0", "filename": self.filename, "sha256": provenance.digest(self.wheel),
+            "version": "5.0.0", "filename": self.filename, "sha256": provenance.digest(self.wheel),
             "source_url": "https://files.pythonhosted.org/packages/fixture/" + self.filename}))
         stack = ExitStack()
         self.addCleanup(stack.close)
@@ -55,7 +55,7 @@ class SdkProvenanceTests(unittest.TestCase):
                                                    "longbridge.openapi": None}))
         stack.enter_context(patch.dict("os.environ", {}, clear=True))
         stack.enter_context(patch.object(provenance.importlib.metadata, "distribution",
-            return_value=SimpleNamespace(version="4.5.0", locate_file=lambda name: self.site / name)))
+            return_value=SimpleNamespace(version="5.0.0", locate_file=lambda name: self.site / name)))
 
     def issue(self):
         return provenance.issue_environment_receipt(self.wheel, self.root)

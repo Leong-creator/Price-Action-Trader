@@ -11,7 +11,7 @@ wheel、`PYTHON_BIN` 环境覆盖均不再具有正式入口资格。
 在已安装纯净官方 wheel 的正式解释器下执行（将路径替换为实际保留的 wheel）：
 
 ```bash
-.venv-m15/bin/python scripts/run_m15_sdk_provenance.py --wheel /absolute/path/longbridge-4.5.0-cp312-cp312-manylinux_2_39_x86_64.whl
+.venv-m15/bin/python scripts/run_m15_sdk_provenance.py --wheel /absolute/path/longbridge-5.0.0-cp312-cp312-manylinux_2_39_x86_64.whl
 .venv-m15/bin/python scripts/run_m15_sdk_provenance.py --verify
 ```
 
@@ -21,7 +21,7 @@ wheel、`PYTHON_BIN` 环境覆盖均不再具有正式入口资格。
 解释器二进制和环境路径；本地补丁标记、额外包文件、导入路径遮蔽、旧 DNS
 注入环境均拒绝。receipt 不是信任锚，修改其摘要不能绕过官方 wheel 对比。
 
-4.5.0 的真实原生模块是 `longbridge.longbridge`，`longbridge.openapi` 是它导出的
+5.0.0 的真实原生模块是 `longbridge.longbridge`，`longbridge.openapi` 是它导出的
 Python 别名，没有独立 `__file__`；核验原生 `.so` 的路径/摘要，并在 SDK 已导入时
 检查包导出、原生导出和 `sys.modules` 三处别名对象一致，不把 `openapi.py` 占位文件
 误当原生模块。导入前后核验结果必须一致。

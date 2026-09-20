@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+from contextlib import contextmanager
+from dataclasses import replace
+from collections import Counter
 import asyncio
 import json
 import math
@@ -178,6 +181,29 @@ def _supervised_entry(target: Any, args: tuple, shared_lock: Any, expected_paren
             os.close(descriptor)
 
 
+@contextmanager
+def quote_only_sdk_guard(sdk: Any):
+    """Account/order context constructors are forbidden in this diagnostic process."""
+    names = ("TradeContext", "AsyncTradeContext", "PortfolioContext", "AsyncPortfolioContext")
+    saved = {name: getattr(sdk, name) for name in names if hasattr(sdk, name)}
+    def forbidden(*args, **kwargs):
+        raise RuntimeError("diagnostic_account_or_order_access_forbidden")
+    try:
+        for name in saved:
+            setattr(sdk, name, forbidden)
+        yield
+    finally:
+        for name, value in saved.items():
+            setattr(sdk, name, value)
+
+
+def _quote_only_pipeline_worker(*args):
+    import longbridge.openapi as sdk
+    from scripts.m15_longbridge_sdk_quote_transport_lib import official_sdk_quote_worker
+    with quote_only_sdk_guard(sdk):
+        official_sdk_quote_worker(*args)
+
+
 def _raw_probe_worker(config_path: str, symbols: list[str], duration: float, output_dir: str) -> None:
     import longbridge.openapi as sdk
     config = load_config(config_path)
@@ -242,10 +268,115 @@ async def supervise_raw(config_path: str, symbols: list[str], duration: float, o
     return result
 
 
+class DiagnosticStrategyPipeline:
+    """Real quote-state helpers and signal router, without account or execution flow."""
+
+    def __init__(self, config: Any, rules: Any, output: Path) -> None:
+        from scripts import m15_longbridge_realtime_signal_router_lib as router
+        self.config, self.rules, self.router = config, rules, router
+        self.output = output / "strategy"
+        original = router.load_config(config.router_config_path)
+        self.router_config = replace(original, output_dir=self.output,
+            market_events_path=self.output / "market_events.jsonl",
+            signal_events_path=self.output / "signal_events.jsonl")
+        self.context = rules.MarketEventContext(maximum_rows=len(configured_symbols(config)) * config.daily_context_bars + 4096)
+        self.quote_state: dict[str, dict[str, Any]] = {}
+        self.daily_rows: list[dict[str, Any]] = []
+        self.daily_source = "not_received"
+        self.signal_ids: set[str] = set()
+        self.evaluations = 0
+        self.last_result: dict[str, Any] = {}
+
+    def consume_inputs(self, message: dict[str, Any], now: datetime, evidence: Any) -> None:
+        if message.get("kind") == "daily_context":
+            self.daily_rows = list(message.get("rows") or [])
+            self.daily_source = str(message.get("source_mode") or "unknown")
+        if message.get("kind") in {"quote_state", "quote_state_batch"}:
+            self.rules.apply_quote_state_worker_message(message,
+                live_quote_session_state=self.quote_state,
+                last_push_by_symbol=evidence.last_push, last_push_at_by_symbol=evidence.last_push_at,
+                last_push_source_by_symbol=evidence.last_source, first_live_push_by_symbol=evidence.first_push,
+                last_live_push_by_symbol=evidence.last_live, now=now)
+
+    def runtime_context_report(self, market_rows: list[dict[str, Any]], emitted: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        reports = []
+        for runtime_id in self.router_config.allowed_runtime_ids:
+            contract_path = self.router_config.strategy_contracts_dir / (runtime_id + ".json")
+            contract = json.loads(contract_path.read_text())
+            timeframe = str(contract.get("timeframe") or "")
+            rules = contract.get("entry_rules") or {}
+            declared = max((int(rules[key]) for key in ("range_lookback_bars", "lookback_bars", "opening_range_bars")
+                            if type(rules.get(key)) is int), default=0)
+            counts = Counter(str(row.get("symbol") or "").upper().removesuffix(".US")
+                             for row in market_rows if row.get("timeframe") == timeframe)
+            expected = [symbol.removesuffix(".US") for symbol in configured_symbols(self.config)]
+            insufficient = [symbol for symbol in expected if counts[symbol] < max(1, declared)]
+            signals = sum(row.get("runtime_id") == runtime_id for row in emitted)
+            reports.append({"runtime_id": runtime_id, "timeframe": timeframe,
+                "declared_lookback_bars": declared or None,
+                "observed_rows_min": min((counts[symbol] for symbol in expected), default=0),
+                "symbols_missing_declared_context": insufficient,
+                "input_status": "insufficient_declared_context" if insufficient else "declared_count_present_other_conditions_still_apply",
+                "decision": "signal_observed_not_dispatched" if signals else "original_router_no_qualified_signal",
+                "signal_count": signals, "full_acceptance": False})
+        return reports
+
+    def evaluate(self, rows: list[dict[str, Any]], now: datetime) -> None:
+        rules = self.rules
+        annotated = rules.attach_next_bar_first_quotes(rows, self.quote_state, now=now)
+        fresh = rules.fresh_market_events(annotated, self.config.maximum_source_delivery_age_ms, now=now)
+        if any(not row.get("market_data_blocked_reason") and row not in fresh for row in annotated):
+            raise RuntimeError("diagnostic_stale_strategy_bar")
+        new_rows = self.context.append(rules.trading_market_events(self.config, fresh))
+        active_ids = {str(row.get("event_id") or "") for row in new_rows}
+        live_daily = rules.build_live_daily_confirmation_rows(self.context.rows(), generated_at=now,
+            live_quote_session_state=self.quote_state, active_five_minute_event_ids=active_ids)
+        active_ids.update(str(row.get("event_id") or "") for row in live_daily)
+        historical = rules.historical_daily_context_before_session(self.daily_rows, generated_at=now)
+        market_rows = historical + self.context.rows() + live_daily
+        emitted: list[dict[str, Any]] = []
+        summary = self.router.run_realtime_signal_router(self.router_config, generated_at=now.isoformat(),
+            market_events_override=market_rows, active_market_event_ids=active_ids,
+            emitted_signal_events=emitted, existing_signal_ids_override=self.signal_ids)
+        self.signal_ids.update(str(row.get("signal_id") or "") for row in emitted)
+        self.evaluations += 1
+        counts = Counter((str(row.get("symbol") or ""), str(row.get("timeframe") or "")) for row in market_rows)
+        self.last_result = {"evaluated_at": now.isoformat(), "boundary_times": sorted({str(row.get("event_time") or "") for row in rows}),
+            "historical_daily_rows": len(historical), "live_daily_rows": len(live_daily),
+            "five_minute_rows": len(self.context.rows()), "quote_state_symbol_count": len(self.quote_state),
+            "active_event_count": len(active_ids), "signal_count": len(emitted),
+            "allowed_runtime_ids": list(self.router_config.allowed_runtime_ids),
+            "blocked_by_reason": summary.get("blocked_by_reason", {}),
+            "runtime_context": self.runtime_context_report(market_rows, emitted),
+            "short_detector_diagnostics": summary.get("paper_short_diagnostics", {}),
+            "decision": "signals_observed_not_dispatched" if emitted else "original_router_returned_no_qualified_signal",
+            "input_rows_by_symbol_timeframe": {symbol+":"+period: count for (symbol, period), count in sorted(counts.items())},
+            "context_limit": "only_observed_intraday_bars_no_backfilled_opening_range",
+            "full_strategy_acceptance": False, "order_access": False}
+        append_diagnostic_snapshot(self.output / "boundary_decisions.jsonl", self.last_result)
+        append_diagnostic_snapshot(self.output / "router_history.jsonl", summary)
+
+    def summary(self) -> dict[str, Any]:
+        target_count = len(configured_symbols(self.config))
+        complete_inputs = (len(self.quote_state) >= target_count and
+                           len(self.daily_rows) == target_count * self.config.daily_context_bars)
+        return {"strategy_evaluation_count": self.evaluations,
+            "quote_state_symbol_count": len(self.quote_state), "daily_context_row_count": len(self.daily_rows),
+            "daily_context_source": self.daily_source,
+            "strategy_input_coverage_observed": complete_inputs,
+            "strategy_status": "judgments_recorded_partial_intraday_context" if self.evaluations else "not_evaluated_no_accepted_boundary",
+            "strategy_full_acceptance": False,
+            "strategy_contract_inputs_status": (
+                "insufficient_declared_context" if any(row["input_status"] == "insufficient_declared_context"
+                    for row in self.last_result.get("runtime_context", []))
+                else "full_contract_inputs_not_proven_by_short_window"),
+            "last_strategy_result": self.last_result}
+
+
 class PipelineProbeEvidence:
     """Reuse production boundary rules without initializing its runtime/clients."""
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: Any, output: Path | None = None) -> None:
         from scripts import run_m15_longbridge_sdk_runtime as rules
         self.rules = rules
         self.config = config
@@ -262,11 +393,14 @@ class PipelineProbeEvidence:
         self.worker_safe_error: dict[str, Any] = {}
         self.message_counts: dict[str, int] = {}
         self.bar_count = 0
+        self.strategy = DiagnosticStrategyPipeline(config, rules, output) if output is not None else None
 
     def consume(self, message: dict[str, Any], now: datetime) -> None:
         kind = str(message.get("kind", "unknown"))
         self.stage_deadline.consume(message, time.monotonic())
         self.message_counts[kind] = self.message_counts.get(kind, 0) + 1
+        if self.strategy is not None:
+            self.strategy.consume_inputs(message, now, self)
         if kind == "error":
             self.worker_safe_error = dict(message.get("safe_error") or {})
             self.latest_diagnostics = message.get("pipeline_diagnostics") or self.latest_diagnostics
@@ -299,6 +433,8 @@ class PipelineProbeEvidence:
                 raise RuntimeError("duplicate_boundary")
             if disposition == "accepted":
                 self.bar_count += len(rows)
+                if self.strategy is not None:
+                    self.strategy.evaluate(rows, now)
 
     def check_deadlines(self, now: datetime) -> None:
         overdue = self.stage_deadline.overdue(time.monotonic())
@@ -326,28 +462,32 @@ class PipelineProbeEvidence:
             raise RuntimeError("reference_market_data_stalled")
 
 
-async def collect_pipeline(config: Any, config_path: str, duration: float, output: Path,
-                           stop: asyncio.Event, *, owner_fd: int | None = None) -> dict[str, Any]:
+async def _collect_pipeline(config: Any, config_path: str, duration: float, output: Path,
+                           stop: asyncio.Event, *, owner_fd: int | None = None,
+                           window_end: datetime | None = None) -> dict[str, Any]:
     from scripts.m15_longbridge_sdk_quote_transport_lib import official_sdk_quote_worker
     context = mp.get_context("spawn")
     messages = context.Queue(maxsize=4096)
     child_stop = context.Event()
     stage_ack = context.Event()
     child = context.Process(target=_supervised_entry,
-        args=(official_sdk_quote_worker, (config_path, messages, child_stop, (), str(output), stage_ack),
+        args=(_quote_only_pipeline_worker, (config_path, messages, child_stop, (), str(output), stage_ack),
               DupFd(owner_fd) if owner_fd is not None else None, os.getpid()), daemon=True)
-    evidence = PipelineProbeEvidence(config)
+    evidence = PipelineProbeEvidence(config, output)
     result: dict[str, Any] = {"mode": "isolated_pipeline_diagnostic",
         "started_at": datetime.now(UTC).isoformat(), "duration_limit_seconds": duration,
-        "account_access": False, "order_access": False, "strategy_access": False,
+        "account_access": False, "order_access": False, "strategy_access": True,
         "production_acceptance": False, "status": "collecting"}
     started = time.monotonic()
+    deadline = started + min(duration, max(0, (window_end - datetime.now(UTC)).total_seconds())) if window_end else started + duration
     child_started = False
     try:
+        if window_end is not None:
+            validate_market_window("2026-09-21T13:50:00Z", "2026-09-21T13:51:00Z", window_end.isoformat())
         child.start()
         child_started = True
         result["worker_pid"] = child.pid
-        while time.monotonic() - started < duration and not stop.is_set():
+        while time.monotonic() < deadline and not stop.is_set():
             # Drain first; enqueued reference activities must not be hidden by heartbeat checks.
             for _ in range(4096):
                 try:
@@ -406,14 +546,78 @@ async def collect_pipeline(config: Any, config_path: str, duration: float, outpu
             elapsed_seconds=round(time.monotonic() - started, 3),
             message_counts=evidence.message_counts, realtime_bar_count=evidence.bar_count,
             complete_boundary_count=evidence.session.complete_boundary_count if evidence.session else 0,
-            diagnostics=evidence.latest_diagnostics)
+            diagnostics=evidence.latest_diagnostics,
+            window_end_utc=window_end.isoformat() if window_end else None,
+            **(evidence.strategy.summary() if evidence.strategy else {}))
+        result.update(pipeline_observation_flags(result, evidence))
+        if result["status"] == "duration_completed" and not result["bounded_pipeline_observed"]:
+            result.update(status="incomplete", reason="insufficient_observed_pipeline_inputs_or_boundaries")
         (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
+
+
+def pipeline_observation_flags(result: dict[str, Any], evidence: Any) -> dict[str, Any]:
+    stages = evidence.latest_diagnostics.get("stages", {})
+    def count(stage, kind):
+        return sum(int(row.get("count", 0)) for row in stages.values()
+                   if row.get("stage") == stage and row.get("kind") == kind)
+    raw_trades, dequeued_trades = count("raw_callback", "trade"), count("dequeued", "trade")
+    traded_bars = evidence.session.realtime_tradable_bar_count if evidence.session else 0
+    carried_bars = evidence.session.no_trade_carry_forward_count if evidence.session else 0
+    observed = bool(result["status"] == "duration_completed"
+        and result.get("worker_process_exited") and result.get("worker_exitcode") == 0
+        and not result.get("worker_forced_cleanup")
+        and result.get("strategy_input_coverage_observed") and evidence.bar_count
+        and result.get("strategy_evaluation_count") and raw_trades > 0 and dequeued_trades > 0 and traded_bars > 0)
+    return {"bounded_pipeline_observed": observed, "raw_quote_callback_count": count("raw_callback", "quote"),
+        "raw_trade_callback_count": raw_trades, "dequeued_trade_count": dequeued_trades,
+        "traded_bar_count": traded_bars, "no_trade_carry_forward_bar_count": carried_bars,
+        "full_session_acceptance": False}
+
+
+async def collect_pipeline(config: Any, config_path: str, duration: float, output: Path,
+                           stop: asyncio.Event, *, owner_fd: int | None = None,
+                           window_end: datetime | None = None) -> dict[str, Any]:
+    import longbridge.openapi as sdk
+    with quote_only_sdk_guard(sdk):
+        return await _collect_pipeline(config, config_path, duration, output, stop,
+                                       owner_fd=owner_fd, window_end=window_end)
+
+
+def validate_pipeline_paths(config: Any, output: Path) -> None:
+    # Diagnostic config must explicitly relocate every potentially mutable runtime path.
+    paths = (config.output_dir, config.market_events_path, config.runtime_status_path,
+             config.readonly_gate_path, config.daily_context_path)
+    for path in paths:
+        resolved = Path(path).expanduser().resolve()
+        if resolved == ROOT or ROOT in resolved.parents:
+            raise ValueError("pipeline_config_must_use_external_paths")
+    if config.paper_order_dispatch_enabled:
+        raise ValueError("pipeline_config_must_disable_dispatch")
+
+
+def validate_market_window(start: str | None, latest: str | None, end: str | None, *, now: datetime | None = None) -> datetime | None:
+    if not any((start, latest, end)):
+        return None
+    if not all((start, latest, end)):
+        raise ValueError("all_market_window_fields_required")
+    values = [datetime.fromisoformat(value.replace("Z", "+00:00")) for value in (start, latest, end)]
+    if any(value.tzinfo is None for value in values):
+        raise ValueError("market_window_timezone_required")
+    beginning, latest_start, ending = values
+    expected = [datetime(2026, 9, 21, 13, minute, tzinfo=UTC) for minute in (50, 51)] + [datetime(2026, 9, 21, 14, 20, tzinfo=UTC)]
+    if values != expected or not beginning <= (now or datetime.now(UTC)) <= latest_start:
+        raise ValueError("outside_authorized_market_window")
+    return ending
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
+    parser.add_argument("--quote-lock-fd", type=int)
+    parser.add_argument("--window-start-utc")
+    parser.add_argument("--latest-start-utc")
+    parser.add_argument("--window-end-utc")
     parser.add_argument("--mode", choices=("raw-sdk", "pipeline"), default="raw-sdk")
     universe = parser.add_mutually_exclusive_group(required=True)
     universe.add_argument("--symbols", help="Comma separated symbols, e.g. SPY.US,QQQ.US")
@@ -425,20 +629,26 @@ def main() -> int:
         parser.error("duration must be finite, between 1 and 86400 seconds")
     if args.mode == "pipeline" and not args.production_universe:
         parser.error("pipeline mode requires --production-universe to keep production bar semantics")
+    window_end = validate_market_window(args.window_start_utc, args.latest_start_utc, args.window_end_utc)
     config = load_config(args.config)
     symbols = list(configured_symbols(config)) if args.production_universe else list(dict.fromkeys(
         value.strip().upper() for value in args.symbols.split(",") if value.strip()))
     if not symbols or any(symbol not in configured_symbols(config) for symbol in symbols):
         parser.error("symbols must be in the configured production universe")
     output = validate_output_dir(args.output_dir, config.output_dir)
+    if args.mode == "pipeline":
+        validate_pipeline_paths(config, output)
+    elif window_end is not None:
+        parser.error("scheduled_market_window_requires_pipeline_mode")
     from scripts.m15_sdk_provenance_lib import verify_environment
     verification = verify_environment(ROOT)
     if not verification["verified"]:
         print(json.dumps({"status": "blocked_environment_provenance", "issues": verification["issues"]}))
         return 2
-    owner = acquire_quote_owner_lock()
+    owner = acquire_quote_owner_lock(inherited_fd=args.quote_lock_fd)
     try:
         assert_no_legacy_quote_processes()
+        validate_market_window(args.window_start_utc, args.latest_start_utc, args.window_end_utc)
         owner.seek(0)
         owner.truncate()
         owner.write(f"{os.getpid()}\n")
@@ -454,7 +664,7 @@ def main() -> int:
             try:
                 if args.mode == "pipeline":
                     return await collect_pipeline(config, str(Path(args.config).resolve()),
-                                                  args.duration_seconds, output, stop, owner_fd=owner.fileno())
+                                                  args.duration_seconds, output, stop, owner_fd=owner.fileno(), window_end=window_end)
                 return await supervise_raw(str(Path(args.config).resolve()), symbols,
                                            args.duration_seconds, output, stop, owner_fd=owner.fileno())
             finally:
@@ -463,7 +673,7 @@ def main() -> int:
         result = asyncio.run(run())
         print(json.dumps({"status": result["status"], "output_dir": str(output),
                           "production_acceptance": False}))
-        return 0 if result["status"] != "failed" else 4
+        return 0 if result["status"] == "duration_completed" else 4
     finally:
         owner.close()
 

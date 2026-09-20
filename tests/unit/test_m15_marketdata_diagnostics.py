@@ -372,7 +372,7 @@ class MarketdataDiagnosticsTest(unittest.TestCase):
                 Path(directory), asyncio.Event()))
             call = context.Process.call_args.kwargs
             self.assertIs(call["target"], diagnostic._supervised_entry)
-            self.assertIs(call["args"][0], official_sdk_quote_worker)
+            self.assertIs(call["args"][0], diagnostic._quote_only_pipeline_worker)
             self.assertEqual(call["args"][1][-2], directory)
             self.assertIs(call["args"][1][-1], child_stop)
             self.assertFalse(result["production_acceptance"])
