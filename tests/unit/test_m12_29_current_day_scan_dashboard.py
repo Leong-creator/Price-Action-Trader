@@ -45,6 +45,7 @@ from scripts.m12_29_current_day_scan_dashboard_lib import (
     is_longbridge_non_degraded_freshness_notice,
     market_session_status,
     m15_apply_longbridge_reconciliation_to_account_pnl,
+    m15_sdk_runtime_dashboard_state,
     m15_longbridge_closed_trade_quality_summary,
     m15_longbridge_equity_curve_summary,
     m15_longbridge_account_pnl_summary,
@@ -933,14 +934,16 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (realtime_dir / "m15_longbridge_realtime_market_event_ingestor.json").write_text(
+            (realtime_dir / "m15_longbridge_sdk_runtime.json").write_text(
                 json.dumps(
                     {
                         "generated_at": fresh_generated_at,
-                        "new_market_event_count": 2,
-                        "market_event_total_count": 12,
-                        "deferred_count": 0,
-                        "plain_language_result": "长桥只读行情采集器新增 2 条实时行情事件；没有读取本地模拟账本。",
+                        "status": "running",
+                        "sdk_connected": True,
+                        "reference_market_data_state": "healthy",
+                        "market_data_raw_notification_count": 12,
+                        "complete_boundary_count": 2,
+                        "realtime_tradable_bar_count": 294,
                     },
                     ensure_ascii=False,
                 ),
@@ -1042,11 +1045,11 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertEqual(pnl_cards_by_label["持仓浮动"]["value"], "269.87")
         self.assertNotIn("长桥总盈亏", panel_json)
         self.assertIn("项目按 10000 USD 模型控制仓位", panel_json)
-        self.assertIn("长桥实时链路本轮已完成", panel_json)
-        self.assertIn("长桥只读行情采集器新增 2 条实时行情事件", panel_json)
+        self.assertNotIn("长桥实时链路本轮已完成", panel_json)
+        self.assertIn("SDK报告行情更新", panel_json)
         self.assertIn("实时信号路由器从 2 条行情事件生成 1 条长桥实时信号", panel_json)
         self.assertIn("长桥模拟账户已连接", panel["plain_language_result"])
-        self.assertIn("实时守护器", html)
+        self.assertIn("SDK运行状态", html)
         self.assertIn("实时行情采集", html)
         self.assertIn("实时信号生成", html)
         self.assertIn("实时链路", html)
@@ -1064,6 +1067,61 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertIn('content="no-store, no-cache, must-revalidate"', html)
         self.assertIn("dashboard_reload", html)
         self.assertNotIn("order_id", panel_json)
+
+    def test_sdk_fault_overrides_retired_healthy_files_and_fresh_execution(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            realtime_dir = root / "m15_longbridge_realtime_execution"
+            realtime_dir.mkdir()
+            now = datetime.now(UTC).isoformat()
+            for name in ("m15_longbridge_realtime_session_supervisor.json",
+                         "m15_longbridge_realtime_market_event_ingestor.json"):
+                (realtime_dir / name).write_text(json.dumps({
+                    "generated_at": now, "supervisor_status": "cycle_completed",
+                    "new_market_event_count": 999,
+                    "plain_language_result": "obsolete_healthy_claim",
+                }))
+            (realtime_dir / "m15_longbridge_realtime_execution.json").write_text(json.dumps({
+                "generated_at": now, "ready_order_count": 5,
+                "plain_language_result": "old_execution_healthy_claim",
+            }))
+            runtime_path = realtime_dir / "m15_longbridge_sdk_runtime.json"
+            runtime_path.write_text(json.dumps({
+                "generated_at": "2026-09-08T13:30:30Z", "status": "fault_halted",
+                "reason": "reference_market_data_stalled", "complete_boundary_count": 0,
+            }))
+            with patch("socket.socket.connect", side_effect=AssertionError("network forbidden")):
+                panel = build_longbridge_paper_dashboard_view(replace(load_config(), output_dir=root / "m12_29"))
+            rows = {row["label"]: row for row in panel["status_rows"]}
+            for title in ("SDK运行状态", "实时行情采集", "实时执行链路", "实时信号生成"):
+                self.assertEqual(rows[title]["value"], "行情故障已停止")
+            self.assertIn("reference_market_data_stalled", panel["plain_language_result"])
+            self.assertNotIn("obsolete_healthy_claim", json.dumps(panel))
+            self.assertNotIn("old_execution_healthy_claim", json.dumps(rows, ensure_ascii=False))
+            self.assertNotIn("realtime_market_event_ingestor", panel["refs"])
+            self.assertTrue(panel["refs"]["sdk_runtime"].endswith("m15_longbridge_sdk_runtime.json"))
+            runtime_path.unlink()
+            panel = build_longbridge_paper_dashboard_view(replace(load_config(), output_dir=root / "m12_29"))
+            self.assertIn("行情状态未知", panel["plain_language_result"])
+            self.assertTrue(panel["sdk_runtime_state_stale"])
+
+    def test_sdk_dashboard_missing_stale_stopped_and_unknown_never_claim_healthy(self):
+        now = datetime.now(UTC)
+        healthy = {"status": "running", "sdk_connected": True,
+                   "reference_market_data_state": "healthy", "generated_at": now.isoformat()}
+        self.assertTrue(m15_sdk_runtime_dashboard_state(healthy)["current"])
+        for payload in ({}, {**healthy, "generated_at": (now - timedelta(seconds=31)).isoformat()},
+                        {**healthy, "generated_at": (now + timedelta(seconds=30)).isoformat()},
+                        {**healthy, "generated_at": "invalid"},
+                        {**healthy, "reference_market_data_state": "unknown"},
+                        {**healthy, "status": "operator_stopped"},
+                        {**healthy, "status": "blocked_sdk_prerequisite"},
+                        {**healthy, "status": "connecting"}):
+            with self.subTest(payload=payload):
+                view = m15_sdk_runtime_dashboard_state(payload)
+                self.assertFalse(view["current"])
+                self.assertNotEqual(view["label"], "SDK报告行情更新")
+                self.assertIn("未知", view["metrics_note"])
 
     def test_longbridge_panel_includes_trade_quality_metrics(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1253,7 +1311,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertTrue(panel["refs"]["realtime_account_state"])
         self.assertTrue(panel["refs"]["paper_account_state"])
 
-    def test_longbridge_panel_keeps_realtime_snapshot_while_waiting_next_session(self):
+    def test_longbridge_panel_retired_supervisor_cannot_refresh_old_snapshots(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             output_dir = root / "m12_29"
@@ -1351,20 +1409,15 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
                 mocked_datetime.fromisoformat = datetime.fromisoformat
                 panel = build_longbridge_paper_dashboard_view(config)
 
-        self.assertFalse(panel["account_state_stale"])
-        self.assertFalse(panel["realtime_execution_state_stale"])
-        self.assertEqual(panel["top_metric"], "模拟账户已连接 / 9持仓 / 5挂单")
-        self.assertEqual(panel["position_row_count"], "9")
-        self.assertEqual(panel["open_order_count"], "5")
-        self.assertEqual(panel["skipped_previously_processed_signal_count"], "609")
-        self.assertEqual(panel["generated_at"], old_generated_at)
+        self.assertTrue(panel["account_state_stale"])
+        self.assertTrue(panel["realtime_execution_state_stale"])
+        self.assertEqual(panel["position_row_count"], "状态未刷新")
+        self.assertEqual(panel["open_order_count"], "状态未刷新")
+        self.assertEqual(panel["skipped_previously_processed_signal_count"], "0")
         self.assertEqual(panel["account_state_generated_at"], old_generated_at)
-        self.assertIn("账户状态已只读刷新", panel["plain_language_result"])
-        self.assertIn("等待下一交易日自动运行", panel["plain_language_result"])
-        self.assertIn("长桥面板刷新时间", json.dumps(panel["status_rows"], ensure_ascii=False))
-        self.assertNotIn("累计提交 4", panel["plain_language_result"])
-        self.assertNotIn("实时链路本轮已提交", panel["plain_language_result"])
-        self.assertIn("7系统管理 / 2只接管退出 / 0未接管退出", json.dumps(panel["status_rows"], ensure_ascii=False))
+        self.assertIn("行情状态未知", panel["plain_language_result"])
+        self.assertNotIn("等待下一交易日自动运行", panel["plain_language_result"])
+        self.assertNotIn("realtime_session_supervisor", panel["refs"])
 
     def test_longbridge_panel_does_not_show_legacy_submitter_blocker_when_realtime_is_available(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1462,7 +1515,7 @@ class M1229CurrentDayScanDashboardTest(unittest.TestCase):
         self.assertNotIn("not_us_regular_session", panel["plain_language_result"])
         self.assertNotIn("提交器状态来自旧交易日", panel["plain_language_result"])
         self.assertNotEqual(panel["submission_status"], "submitter_state_stale_waiting_refresh")
-        self.assertEqual(status_by_label["市场窗口"]["value"], "美股常规交易时段")
+        self.assertEqual(status_by_label["市场窗口"]["value"], market_session_status(fresh_generated_at)["status"])
 
     def test_m15_submission_counts_treats_missing_order_id_as_unconfirmed_request(self):
         rows = [

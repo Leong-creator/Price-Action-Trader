@@ -70,7 +70,6 @@ class SdkRuntimeConfig:
     heartbeat_interval_seconds: int
     subscription_deadline_seconds: int
     market_data_transport: str
-    sdk_subscribe_batch_size: int
     market_data_heartbeat_deadline_seconds: int
     active_symbol_silence_seconds: int
     account_snapshot_interval_seconds: int
@@ -167,7 +166,6 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
                 "official_sdk_persistent_websocket",
             )
         ),
-        sdk_subscribe_batch_size=int(runtime.get("sdk_subscribe_batch_size", 50)),
         market_data_heartbeat_deadline_seconds=int(
             runtime.get("market_data_heartbeat_deadline_seconds", 5)
         ),
@@ -288,14 +286,13 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> SdkRuntimeConfig:
         raise ValueError(
             "M15 production market data only supports the official SDK WebSocket"
         )
-    if not 1 <= config.sdk_subscribe_batch_size <= 500:
-        raise ValueError("M15 official SDK subscribe batch must be between 1 and 500")
     forbidden_runtime_keys = {
         "allow_snapshot_poll_fallback",
         "prefer_snapshot_poll",
         "reconnect_backoff_seconds",
         "reconnect_backoff_schedule_seconds",
         "subscription_batch_size",
+        "sdk_subscribe_batch_size",
         "subscription_retry_count",
         "subscription_retry_backoff_seconds",
         "subscription_request_interval_seconds",
@@ -1261,7 +1258,10 @@ def build_status(
         "router_config": str(config.router_config_path),
         "execution_config": str(config.execution_config_path),
         "paper_order_dispatch_enabled": config.paper_order_dispatch_enabled,
-        "quote_region": config.quote_region,
+        "quote_region": "sdk_default",
+        "sdk_config_source": "Config.from_oauth_defaults",
+        "quote_endpoint": "unknown",
+        "auxiliary_quote_region": config.quote_region,
         "trade_region": config.trade_region,
         "trade_private_push_enabled": config.enable_trade_private_push,
         "runtime_engine": "sdk",

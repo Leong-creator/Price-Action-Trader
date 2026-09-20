@@ -2,6 +2,7 @@
 from datetime import UTC, datetime, timedelta
 from time import perf_counter
 from types import SimpleNamespace
+from tempfile import TemporaryDirectory
 import sys
 import types
 import unittest
@@ -73,13 +74,13 @@ class OfflineMarketSessionTest(unittest.TestCase):
         output = Output()
         cached = [{"symbol": s.removesuffix(".US"), "timeframe": "1d"} for s in symbols for _ in range(60)]
         started = perf_counter()
-        with (patch.dict(sys.modules, {"longbridge": module, "longbridge.openapi": sdk}),
+        with (TemporaryDirectory() as diagnostic_directory,
+              patch.dict(sys.modules, {"longbridge": module, "longbridge.openapi": sdk}),
               patch.object(transport, "load_config", return_value=config),
               patch.object(transport, "read_client_id", return_value="offline"),
-              patch.object(transport, "sdk_config_from_oauth", return_value=object()),
               patch.object(transport, "load_valid_daily_context_cache", return_value=cached),
               patch.object(transport, "datetime", Clock)):
-            transport.official_sdk_quote_worker("offline-only", output, Stop())
+            transport.official_sdk_quote_worker("offline-only", output, Stop(), diagnostic_output_dir=diagnostic_directory)
         self.assertFalse([m for m in output.rows if m["kind"] == "error"])
         batches = [m["rows"] for m in output.rows if m["kind"] == "bars"]
         self.assertEqual(len(FakeQuoteContext.instances), 1)

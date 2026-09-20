@@ -45,6 +45,8 @@ class BootRuntimeIntegrationTest(unittest.TestCase):
         collect = boot.collect_runtime_process_evidence
         self.stack.enter_context(patch.object(boot, "collect_runtime_process_evidence",
                                              side_effect=lambda previous: collect(previous, proc_root=self.proc)))
+        self.stack.enter_context(patch.object(runtime, "assert_no_legacy_quote_processes"))
+        self.stack.enter_context(patch.object(runtime, "require_sdk_environment", return_value={"verified": True}))
         self.sdk = self.stack.enter_context(patch.object(runtime, "require_sdk_contract", side_effect=RuntimeError("offline_sdk_sentinel")))
         self.orphans = self.stack.enter_context(patch.object(runtime, "cleanup_orphaned_sdk_runtime_children", return_value=[]))
         self.popen = self.stack.enter_context(patch.object(runtime.subprocess, "Popen", return_value=SimpleNamespace(pid=987654)))
