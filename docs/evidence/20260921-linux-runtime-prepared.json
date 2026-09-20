@@ -1,0 +1,61 @@
+{
+  "schema": "m15.linux-runtime-repair-prepared.v1",
+  "date": "2026-09-21",
+  "implementation_commit": "6313ea9",
+  "official_sdk": "5.0.0",
+  "python": "3.12.3",
+  "preferred_runtime": "WSL/Linux",
+  "verified_wheel_sha256": "c6cc5745fd1babc81e8c8ea09b4f278e7b4827ffbbb0eb7119986867f126a247",
+  "offline_validation": {
+    "integrated_tests": 814,
+    "integrated_passed": 814,
+    "integrated_skipped": 0,
+    "runner_tests": 17,
+    "runner_passed": 17,
+    "governance_tests": 8,
+    "governance_passed": 8,
+    "independent_review": "no_blocking_findings",
+    "real_sdk_contexts_created": 0,
+    "protected_states_unchanged": true
+  },
+  "manifest": {
+    "path": "/home/hgl/project-archives/Price-Action-Trader/20260921-linux-runtime-test/manifest.json",
+    "sha256": "f0d6f27feb65febf261ee2dfb7f695065d65db0b8b0a90fd5287e4e996de3528",
+    "integrity_file_count": 405
+  },
+  "task": {
+    "task_name": "PAT-Linux-Pipeline-Diagnostic-20260921-Once",
+    "state": "Ready",
+    "start_boundary": "2026-09-21T21:50:00+08:00",
+    "end_boundary": "2026-09-21T21:51:00",
+    "next_run": "2026-09-21T21:50:00.0000000+08:00",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "restart_count": 0,
+    "start_when_available": false,
+    "execution_time_limit": "PT35M",
+    "manifest_sha256": "f0d6f27feb65febf261ee2dfb7f695065d65db0b8b0a90fd5287e4e996de3528",
+    "action_verified": true,
+    "production_restart": false,
+    "order_enabled": false
+  },
+  "test_window_beijing": "2026-09-21 21:50-22:20",
+  "earlier_windows_window_beijing": "2026-09-21 21:25-21:45",
+  "windows_exit_must_be_verified": true,
+  "real_market_test_status": "awaiting_scheduled_window",
+  "full_live_sessions_passed": 0,
+  "production_account_daemon_started": false,
+  "orders_authorized": false,
+  "failure_lock_cleared": false,
+  "subscription_timeout_root_cause": "unproven",
+  "offline_evidence_directory": "/home/hgl/project-archives/Price-Action-Trader/20260921-linux-runtime-test/qa-20260920T173528Z-393398",
+  "old_candidate_cleanup": {
+    "completed": true,
+    "unlinked_archived_files": 1077,
+    "empty_directories_removed": 132,
+    "ordinary_worktree_remove": true,
+    "remote_exact_sha_lease_used": true,
+    "archive_directory": "/home/hgl/project-archives/Price-Action-Trader/20260921-linux-runtime-review/old-candidate-retirement",
+    "historical_m7_retained": true
+  }
+}

@@ -45,3 +45,15 @@ Linux保留现有147股票、60根日线要求、策略合同、五分钟聚合�
 当前尚未到真实窗口，本轮新增SDK实连0、完整日0。原五份故障/订单防重状态与原认证保持，未解除故障、未启动正式账户程序、未恢复生产自动启动或交易。账户共享工具保留，没有为了清理行情而删除仍用的账户功能。最终真实结论读取case013和case014证据后再作出，不能用离线通过替代盘中证明。
 
 高风险运行路径已标记人工复核；独立审查通过后只部署本轮授权的无账户/订单诊断入口。实现交接见[时间字段](../handoffs/m15-sdk-timestamp-20260921.md)与[实际pipeline](../handoffs/m15-linux-pipeline-20260921.md)。
+
+## 调度与主线登记
+
+修复提交6313ea9已合入并推送main。`PAT-Linux-Pipeline-Diagnostic-20260921-Once`已实际注册并读回Ready，开始北京时间21:50、最晚21:51，有限权限当前登录用户，35分钟调度上限；程序本身在22:20结束，另留有界退出清理。RestartCount=0、StartWhenAvailable=false、重复触发IgnoreNew。原Windows任务未修改。清单SHA256为`f0d6f27feb65febf261ee2dfb7f695065d65db0b8b0a90fd5287e4e996de3528`，不绑定会随文档更新变化的HEAD，而绑定405项实际代码/配置/官方环境文件。
+
+[可核对的准备记录](../evidence/20260921-linux-runtime-prepared.json)保存测试与任务读回结果。真实窗口后的Linux输出位于`/home/hgl/project-archives/Price-Action-Trader/20260921-linux-runtime-test/evidence/`，外部执行结果为该目录上一级`run-once-result.json`；程序未运行前这些结果不存在。Windows结果仍在原case013外部目录。任何故障、强制退出或策略历史不足都须保留原原因，不能重新登记同条件自动重试。
+
+## 工作区收尾
+
+旧candidate的1077项ignored文件已按校验清单逐项移除，132个空目录仅用rmdir清除，再通过普通git worktree remove移除旧工作区。实时核对main已包含ab21734，远端分支仍为预期SHA后用精确租约删除远端，再用git branch -d删除本地；保留M7历史分支。执行结果在外部`old-candidate-retirement/cleanup-result.json`，未使用整目录强制清空，原资料和旧运行证据仅保留在验证通过的离线归档。
+
+本轮任务分支在最终文档合入后收尾，日常只保留主工作区、main和历史M7分支。正式部署清单仅用于代码/环境来源校验，不提供行情整场资格或订单授权；旧清单已先离线保存，新清单在最终干净已推送main上签发。
