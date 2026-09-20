@@ -1,0 +1,86 @@
+{
+  "recorded_at": "2026-09-20T17:12:23.716285+00:00",
+  "stage": "prepared_scheduled_not_live_tested",
+  "case": "case013-windows-opening-continuity",
+  "manifest_sha256": "45fdd6cfbaa7dd4933fb27a36a485157d382bf87ca2cfc1779e639f1f4313943",
+  "task": {
+    "task_name": "PAT-Official-Quote-Continuity-20260921-Once",
+    "state": "Ready",
+    "start_boundary": "2026-09-21T21:25:00+08:00",
+    "end_boundary": "2026-09-21T21:26:00",
+    "next_run": "2026-09-21T21:25:00.0000000+08:00",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "restart_count": 0,
+    "start_when_available": false,
+    "execution_time_limit": "PT25M",
+    "delete_expired_after": "PT1H",
+    "manifest_sha256": "45fdd6cfbaa7dd4933fb27a36a485157d382bf87ca2cfc1779e639f1f4313943",
+    "action_verified": true,
+    "production_restart": false,
+    "order_enabled": false
+  },
+  "tests": {
+    "all_passed": true,
+    "unique_test_count": 86,
+    "results": [
+      {
+        "test": "test_controller.py",
+        "platform": "Windows",
+        "returncode": 0,
+        "tests": 10,
+        "test_source_sha256": "7f179032c2cec6a796b83d01e5bebbe8289c7b52bc312c6dbe53f10bb1af0586"
+      },
+      {
+        "test": "test_watchdog.py",
+        "platform": "Windows",
+        "returncode": 0,
+        "tests": 14,
+        "test_source_sha256": "45d7589826a3511f89daca62504f9cbed8f95dd4b23903c998a7f13f05668f34"
+      },
+      {
+        "test": "test_health.py",
+        "platform": "Windows",
+        "returncode": 0,
+        "tests": 24,
+        "test_source_sha256": "bee7229f2997584073c39c6418af3cf468e880f9c781d7a2df6ff1237f7db1ef"
+      },
+      {
+        "test": "test_guardian.py",
+        "platform": "Linux",
+        "returncode": 0,
+        "tests": 18,
+        "test_source_sha256": "16a88c192ee51186cdf59ce1d63b5d76be03fcc8d2424549ab6cad9a24b1d8d5"
+      },
+      {
+        "test": "test_run_once.py",
+        "platform": "Linux",
+        "returncode": 0,
+        "tests": 20,
+        "test_source_sha256": "68c0d402cd294dece810b05f08fd6637b4b06635c47d5a7d5e837bffd52924c9"
+      }
+    ],
+    "real_sdk_connections": 0,
+    "production_acceptance": false
+  },
+  "source_sha256": "d411c95eca09c5c29f9165a071b7823db7dce29bb8d09ba082054d767923f08a",
+  "health_sha256": "24381d901cf6f47ee017bc0f930f1ebf6985174f3a63f3a13828ab57e322fcd7",
+  "runner_sha256": "cd3ca114bc96276f105fc71286a3b293ed6a74b7e4f9ad51b755cc6ab2391e9f",
+  "official_sdk_version": "5.0.0",
+  "official_package_files_verified": 5,
+  "production_state_hashes_unchanged": true,
+  "temporary_credentials_copied": false,
+  "real_sdk_connections_this_preparation": 0,
+  "real_full_sessions_passed": 0,
+  "production_acceptance": false,
+  "strategy_validation_performed": false,
+  "reference_flow_scope": [
+    "SPY.US Quote",
+    "SPY.US Trade",
+    "QQQ.US Quote",
+    "QQQ.US Trade"
+  ],
+  "other_symbols_scope": "fresh regular-session event coverage; not per-symbol dual-stream continuous completeness",
+  "windows_private_evidence_duplicates_cleanup": "pending after actual run; credentials use separate verified automatic cleanup",
+  "private_evidence_root": "/home/hgl/project-archives/Price-Action-Trader/20260921-windows-continuity"
+}
