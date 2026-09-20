@@ -1,5 +1,9 @@
 # 当前架构
 
+## 测试观测边界更新（2026-09-21）
+
+两项串行诊断架构保持。Windows接收队列采用有限批次检查点避免已入队数据被误报断流；窗口覆盖按接收时间封口，检查尾段不含后续落盘时间。WSL父循环与外壳受UTC及单调双期限约束；退出尾队列错误不被exit0掩盖，尾部K线不回填策略。诊断日线资格复用正式daily_context_is_current，再进入原router；所有策略、聚合与账户边界保持。详情见[测试前巡查](decisions/20260921-pretest-audit.md)。
+
 ## 当前修补路径：WSL/Linux主项目实链路诊断（2026-09-21）
 
 `一次定时触发 → Linux外部runner/全局锁/Windows退出核验 → 主项目 .venv-m15 官方5.0.0 → 唯一同步QuoteContext/默认Config/147只一次Quote+Trade → SDK本机时间转aware UTC → 原有界队列/五分钟聚合 → 原父进程报价状态/日线与日内上下文 → 原策略router → 外部诊断证据`

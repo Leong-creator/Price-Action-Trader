@@ -1,0 +1,73 @@
+{
+  "schema": "m15.pretest-audit.v1",
+  "date": "2026-09-21",
+  "base_commit": "965b782",
+  "offline_unique_tests_passed": 121,
+  "independent_review": "passed_no_unresolved_blockers",
+  "scale_test": {
+    "symbols": 147,
+    "synthetic_daily_rows": 8820,
+    "synthetic_five_minute_rows": 441,
+    "boundaries": 3,
+    "router_evaluations": 3,
+    "formal_daily_context_gate": "passed",
+    "elapsed_seconds": 0.539,
+    "real_data": false
+  },
+  "tasks": [
+    {
+      "task_name": "PAT-Official-Quote-Continuity-20260921-Once",
+      "state": "Ready",
+      "manifest_sha256": "efb3d5bc0faaad2e5055e82c9c947946b4f97ef0cde657e2882561e7c59be22b",
+      "start_boundary": "2026-09-21T21:25:00+08:00",
+      "end_boundary": "2026-09-21T21:26:00",
+      "next_run": "2026-09-21T21:25:00.0000000+08:00",
+      "restart_count": 0,
+      "start_when_available": false,
+      "execution_time_limit": "PT25M",
+      "run_level": "Limited",
+      "logon_type": "Interactive",
+      "action_verified": true,
+      "settings_and_window_unchanged": true,
+      "order_enabled": false
+    },
+    {
+      "task_name": "PAT-Linux-Pipeline-Diagnostic-20260921-Once",
+      "state": "Ready",
+      "manifest_sha256": "86b317744db4489d7b88072f9c4abb397363470fdbe2b06f127102f025b36bdf",
+      "start_boundary": "2026-09-21T21:50:00+08:00",
+      "end_boundary": "2026-09-21T21:51:00",
+      "next_run": "2026-09-21T21:50:00.0000000+08:00",
+      "restart_count": 0,
+      "start_when_available": false,
+      "execution_time_limit": "PT35M",
+      "run_level": "Limited",
+      "logon_type": "Interactive",
+      "action_verified": true,
+      "settings_and_window_unchanged": true,
+      "order_enabled": false
+    }
+  ],
+  "early_entry_smoke_tests": {
+    "windows": {
+      "exit_code": 4,
+      "sdk_started": false,
+      "reason": "outside_launch_window"
+    },
+    "linux": {
+      "exit_code": 4,
+      "sdk_started": false,
+      "reason": "outside_launch_window"
+    }
+  },
+  "protected_states_unchanged": true,
+  "original_credentials_unchanged": true,
+  "real_sdk_connections_this_turn": 0,
+  "full_live_sessions_passed": 0,
+  "windows_time_service": {
+    "ntp_synchronized": false,
+    "approximate_https_midpoint_offset_seconds": 0.286,
+    "precision_limit": "HTTP Date has one-second precision and is not authenticated NTP"
+  },
+  "private_evidence_directory": "/home/hgl/project-archives/Price-Action-Trader/20260921-pretest-audit"
+}

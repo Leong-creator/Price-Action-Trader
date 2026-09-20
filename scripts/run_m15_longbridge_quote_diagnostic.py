@@ -283,6 +283,8 @@ class DiagnosticStrategyPipeline:
         self.quote_state: dict[str, dict[str, Any]] = {}
         self.daily_rows: list[dict[str, Any]] = []
         self.daily_source = "not_received"
+        self.daily_failures: list[str] = []
+        self.daily_validation: dict[str, Any] = {"status": "not_received"}
         self.signal_ids: set[str] = set()
         self.evaluations = 0
         self.last_result: dict[str, Any] = {}
@@ -291,12 +293,37 @@ class DiagnosticStrategyPipeline:
         if message.get("kind") == "daily_context":
             self.daily_rows = list(message.get("rows") or [])
             self.daily_source = str(message.get("source_mode") or "unknown")
+            self.daily_failures = list(message.get("failures") or [])
+            self.require_current_daily_context(now)
         if message.get("kind") in {"quote_state", "quote_state_batch"}:
             self.rules.apply_quote_state_worker_message(message,
                 live_quote_session_state=self.quote_state,
                 last_push_by_symbol=evidence.last_push, last_push_at_by_symbol=evidence.last_push_at,
                 last_push_source_by_symbol=evidence.last_source, first_live_push_by_symbol=evidence.first_push,
                 last_live_push_by_symbol=evidence.last_live, now=now)
+
+    def require_current_daily_context(self, now: datetime) -> None:
+        symbols = tuple(configured_symbols(self.config))
+        # Reuse the formal gate, including per-symbol distinct dates and latest completed day.
+        current = self.rules.daily_context_is_current(self.config, self.daily_rows,
+            symbols, self.daily_failures, now)
+        dates: dict[str, set[str]] = {symbol.removesuffix(".US"): set() for symbol in symbols}
+        for row in self.daily_rows:
+            symbol = str(row.get("symbol") or "").upper().removesuffix(".US")
+            parsed = self.rules.strict_event_datetime(row.get("event_time"))
+            if symbol in dates and row.get("timeframe") == "1d" and parsed is not None:
+                dates[symbol].add(parsed.astimezone(self.rules.NEW_YORK).date().isoformat())
+        self.daily_validation = {
+            "status": "passed" if current else "failed",
+            "gate": "formal_daily_context_is_current",
+            "required_completed_session": self.rules.required_daily_context_date(now, self.config.market_holidays),
+            "required_distinct_dates_per_symbol": self.config.daily_context_bars,
+            "row_count": len(self.daily_rows), "reported_failed_symbols": self.daily_failures,
+            "symbols": {symbol: {"distinct_date_count": len(values),
+                                  "latest_date": max(values) if values else None}
+                        for symbol, values in sorted(dates.items())}}
+        if not current:
+            raise RuntimeError("diagnostic_daily_context_not_current_or_complete")
 
     def runtime_context_report(self, market_rows: list[dict[str, Any]], emitted: list[dict[str, Any]]) -> list[dict[str, Any]]:
         reports = []
@@ -322,6 +349,7 @@ class DiagnosticStrategyPipeline:
         return reports
 
     def evaluate(self, rows: list[dict[str, Any]], now: datetime) -> None:
+        self.require_current_daily_context(now)
         rules = self.rules
         annotated = rules.attach_next_bar_first_quotes(rows, self.quote_state, now=now)
         fresh = rules.fresh_market_events(annotated, self.config.maximum_source_delivery_age_ms, now=now)
@@ -358,11 +386,13 @@ class DiagnosticStrategyPipeline:
 
     def summary(self) -> dict[str, Any]:
         target_count = len(configured_symbols(self.config))
-        complete_inputs = (len(self.quote_state) >= target_count and
-                           len(self.daily_rows) == target_count * self.config.daily_context_bars)
+        complete_inputs = (self.daily_validation.get("status") == "passed"
+                           and len(self.quote_state) >= target_count
+                           and len(self.daily_rows) == target_count * self.config.daily_context_bars)
         return {"strategy_evaluation_count": self.evaluations,
             "quote_state_symbol_count": len(self.quote_state), "daily_context_row_count": len(self.daily_rows),
             "daily_context_source": self.daily_source,
+            "daily_context_validation": self.daily_validation,
             "strategy_input_coverage_observed": complete_inputs,
             "strategy_status": "judgments_recorded_partial_intraday_context" if self.evaluations else "not_evaluated_no_accepted_boundary",
             "strategy_full_acceptance": False,
@@ -462,6 +492,27 @@ class PipelineProbeEvidence:
             raise RuntimeError("reference_market_data_stalled")
 
 
+class PipelineObservationClock:
+    """Both UTC and monotonic limits apply; suspend/clock jumps invalidate observation."""
+
+    def __init__(self, duration: float, window_end: datetime | None) -> None:
+        self.started_utc = datetime.now(UTC)
+        self.started_monotonic = time.monotonic()
+        self.window_end = window_end
+        self.deadline = self.started_monotonic + min(duration,
+            max(0, (window_end - self.started_utc).total_seconds()) if window_end else duration)
+
+    def can_observe(self) -> bool:
+        utc_now, monotonic_now = datetime.now(UTC), time.monotonic()
+        wall_elapsed = (utc_now - self.started_utc).total_seconds()
+        monotonic_elapsed = monotonic_now - self.started_monotonic
+        # Small clock slews are tolerated; sleep/resume or a material wall-clock jump is not.
+        if abs(wall_elapsed - monotonic_elapsed) > 2.0:
+            raise RuntimeError("diagnostic_clock_discontinuity")
+        return (monotonic_now < self.deadline
+                and (self.window_end is None or utc_now < self.window_end))
+
+
 async def _collect_pipeline(config: Any, config_path: str, duration: float, output: Path,
                            stop: asyncio.Event, *, owner_fd: int | None = None,
                            window_end: datetime | None = None) -> dict[str, Any]:
@@ -479,33 +530,44 @@ async def _collect_pipeline(config: Any, config_path: str, duration: float, outp
         "account_access": False, "order_access": False, "strategy_access": True,
         "production_acceptance": False, "status": "collecting"}
     started = time.monotonic()
-    deadline = started + min(duration, max(0, (window_end - datetime.now(UTC)).total_seconds())) if window_end else started + duration
+    observation_clock = PipelineObservationClock(duration, window_end)
     child_started = False
+    pending_shutdown_message = None
     try:
         if window_end is not None:
             validate_market_window("2026-09-21T13:50:00Z", "2026-09-21T13:51:00Z", window_end.isoformat())
         child.start()
         child_started = True
         result["worker_pid"] = child.pid
-        while time.monotonic() < deadline and not stop.is_set():
-            # Drain first; enqueued reference activities must not be hidden by heartbeat checks.
+        while not stop.is_set() and observation_clock.can_observe():
+            # Check both clocks before every dequeue/audit/consumer; a batch may straddle the cutoff.
             for _ in range(4096):
+                if stop.is_set() or not observation_clock.can_observe():
+                    break
                 try:
                     message = messages.get_nowait()
+                    pending_shutdown_message = message
                 except queue.Empty:
                     break
                 # Raw worker errors may contain vendor details. Save only their type/category;
                 # diagnostics include timing and stages, never credential-bearing strings.
+                if stop.is_set() or not observation_clock.can_observe():
+                    break
                 audit = dict(message)
                 if audit.get("kind") == "error":
                     audit["reason"] = str(audit.get("reason", "")).split(":", 2)[:2]
                 append_diagnostic_snapshot(output / "worker_messages.jsonl", audit)
+                if stop.is_set() or not observation_clock.can_observe():
+                    break
                 evidence.consume(message, datetime.now(UTC))
                 if message.get("kind") == "sdk_stage":
                     # consume validated the phase and fixed its absolute deadline before allowing SDK I/O.
                     if evidence.stage_deadline.overdue(time.monotonic()):
                         raise RuntimeError("sdk_stage_deadline_exceeded_before_ack")
                     stage_ack.set()
+                pending_shutdown_message = None
+            if stop.is_set() or not observation_clock.can_observe():
+                break
             evidence.check_deadlines(datetime.now(UTC))
             if not child.is_alive():
                 raise RuntimeError("quote_worker_exited")
@@ -518,14 +580,27 @@ async def _collect_pipeline(config: Any, config_path: str, duration: float, outp
     finally:
         child_stop.set()
         forced = False
+        def record_shutdown(message):
+            if message.get("kind") == "error":
+                error = {"kind": "error", "reason": str(message.get("reason", "")).split(":", 2)[:2],
+                         "safe_error": dict(message.get("safe_error") or {})}
+                result.setdefault("shutdown_errors", []).append(error)
+                if result.get("status") != "failed":
+                    result.update(status="failed", reason="quote_worker_shutdown_reported_failure",
+                                  safe_error=error["safe_error"])
+                append_diagnostic_snapshot(output / "shutdown_messages.jsonl", error)
+            else:
+                # Shutdown bars are evidence only, never accepted or sent to the strategy.
+                append_diagnostic_snapshot(output / "shutdown_messages.jsonl", message)
+        if pending_shutdown_message is not None:
+            record_shutdown(pending_shutdown_message)
         if child_started:
             # A worker can be waiting on a full pipe. Continue draining while it exits.
             deadline = time.monotonic() + 5
             while child.is_alive() and time.monotonic() < deadline:
                 try:
                     message = messages.get(timeout=0.05)
-                    if message.get("kind") != "error":
-                        append_diagnostic_snapshot(output / "shutdown_messages.jsonl", message)
+                    record_shutdown(message)
                 except queue.Empty:
                     pass
                 child.join(timeout=0.01)
@@ -536,12 +611,26 @@ async def _collect_pipeline(config: Any, config_path: str, duration: float, outp
             if child.is_alive():
                 child.kill()
                 child.join(timeout=5)
+            # A child may have already exited 0 after catching a failure and enqueueing its error.
+            # Its final queue must still be inspected even when the is_alive loop never ran.
+            if not child.is_alive():
+                for _ in range(4096):
+                    try:
+                        record_shutdown(messages.get_nowait())
+                    except queue.Empty:
+                        break
             result.update(worker_exitcode=child.exitcode, worker_process_exited=not child.is_alive(),
                           worker_forced_cleanup=forced)
             if child.is_alive():
                 result.update(status="failed", reason="quote_worker_cleanup_failed")
         messages.cancel_join_thread()
         messages.close()
+        try:
+            observation_clock.can_observe()  # Also detect a suspend during exit confirmation.
+        except RuntimeError as exc:
+            result["shutdown_clock_error"] = str(exc)
+            if result.get("status") != "failed":
+                result.update(status="failed", reason=str(exc), safe_error=safe_exception_evidence(exc))
         result.update(finished_at=datetime.now(UTC).isoformat(),
             elapsed_seconds=round(time.monotonic() - started, 3),
             message_counts=evidence.message_counts, realtime_bar_count=evidence.bar_count,

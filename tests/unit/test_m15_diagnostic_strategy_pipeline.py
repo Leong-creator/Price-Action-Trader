@@ -112,6 +112,148 @@ class DiagnosticStrategyPipelineTests(unittest.TestCase):
         result["status"]="failed"
         self.assertFalse(diagnostic.pipeline_observation_flags(result,evidence)["bounded_pipeline_observed"])
 
+    def test_observation_clock_rejects_suspend_and_backward_jump(self):
+        wall = [datetime(2026, 9, 21, 13, 50, tzinfo=UTC)]
+        mono = [100.0]
+        class Clock(datetime):
+            @classmethod
+            def now(cls, tz=None): return wall[0]
+        with patch.object(diagnostic, "datetime", Clock), patch.object(diagnostic, "time", SimpleNamespace(monotonic=lambda:mono[0])):
+            clock = diagnostic.PipelineObservationClock(1800, datetime(2026,9,21,14,20,tzinfo=UTC))
+            wall[0] += timedelta(minutes=40)
+            mono[0] += 1
+            with self.assertRaisesRegex(RuntimeError, "clock_discontinuity"):
+                clock.can_observe()
+            wall[0] = datetime(2026,9,21,13,49,tzinfo=UTC)
+            with self.assertRaisesRegex(RuntimeError, "clock_discontinuity"):
+                clock.can_observe()
+
+    def test_utc_boundary_is_strict_even_if_monotonic_is_slightly_behind(self):
+        wall = [datetime(2026,9,21,13,50,tzinfo=UTC)]; mono=[100.0]
+        class Clock(datetime):
+            @classmethod
+            def now(cls,tz=None): return wall[0]
+        with patch.object(diagnostic,"datetime",Clock), patch.object(diagnostic,"time",SimpleNamespace(monotonic=lambda:mono[0])):
+            clock=diagnostic.PipelineObservationClock(1800,datetime(2026,9,21,14,20,tzinfo=UTC))
+            wall[0]+=timedelta(minutes=30); mono[0]+=1799.9
+            self.assertFalse(clock.can_observe())
+
+    def _collector_shutdown_fixture(self, *, shutdown_error=False, primary_error=False, suspend_on_dequeue=False, suspend_on_shutdown=False):
+        # Positive earlier evidence must not mask a shutdown failure or resumed late input.
+        stages={"raw":{"stage":"raw_callback","kind":"trade","count":9},
+                "dequeued":{"stage":"dequeued","kind":"trade","count":9}}
+        evidence=SimpleNamespace(latest_diagnostics={"stages":stages}, message_counts={}, bar_count=147,
+            worker_safe_error={}, session=SimpleNamespace(complete_boundary_count=1,realtime_tradable_bar_count=147,no_trade_carry_forward_count=0),
+            strategy=SimpleNamespace(summary=lambda:{"strategy_input_coverage_observed":True,"strategy_evaluation_count":1}))
+        consumed=[]
+        def consume(message, now):
+            consumed.append(message)
+            if primary_error: raise RuntimeError("primary_failure_preserved")
+        evidence.consume=consume; evidence.check_deadlines=lambda now:None
+        wall=[datetime(2026,9,21,13,50,tzinfo=UTC)]; mono=[100.0]
+        class Clock(datetime):
+            @classmethod
+            def now(cls,tz=None): return wall[0]
+        class Messages(queue.Queue):
+            def get_nowait(inner):
+                message=super(Messages,inner).get_nowait()
+                if suspend_on_dequeue and not child_stop.is_set(): wall[0]+=timedelta(minutes=40)
+                return message
+        messages=Messages(); messages.cancel_join_thread=lambda:None; messages.close=lambda:None
+        if primary_error or suspend_on_dequeue: messages.put({"kind":"bars","rows":[]})
+        class Stop(threading.Event):
+            def set(inner):
+                super(Stop,inner).set()
+                if suspend_on_shutdown: wall[0]+=timedelta(minutes=40)
+                if shutdown_error:
+                    messages.put({"kind":"error","reason":"official_sdk_quote_worker_failed:RuntimeError:PRIVATE-SHOULD-NOT-LEAK",
+                                  "safe_error":{"error_category":"request_timeout","error_type":"RuntimeError"}})
+        child_stop=Stop()
+        child=SimpleNamespace(pid=123,exitcode=0,start=lambda:None,is_alive=lambda:not child_stop.is_set(),
+            join=lambda timeout:None,terminate=child_stop.set,kill=child_stop.set)
+        context=SimpleNamespace(Queue=lambda **kwargs:messages,Event=lambda:child_stop,Process=lambda **kwargs:child)
+        async def advance(_seconds):
+            wall[0]+=timedelta(seconds=1); mono[0]+=1
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(diagnostic,"PipelineProbeEvidence",return_value=evidence), \
+                patch.object(diagnostic.mp,"get_context",return_value=context), \
+                patch.object(diagnostic,"datetime",Clock), \
+                patch.object(diagnostic,"time",SimpleNamespace(monotonic=lambda:mono[0])), \
+                patch.object(diagnostic.asyncio,"sleep",side_effect=advance):
+            output=Path(directory)
+            result=asyncio.run(diagnostic._collect_pipeline(SimpleNamespace(),"unused",0.5,output,asyncio.Event()))
+            audit=(output/"worker_messages.jsonl").read_text() if (output/"worker_messages.jsonl").exists() else ""
+            shutdown=(output/"shutdown_messages.jsonl").read_text() if (output/"shutdown_messages.jsonl").exists() else ""
+        return result,consumed,audit,shutdown
+
+    def test_exited_zero_worker_with_shutdown_error_cannot_pass_previous_good_evidence(self):
+        result,_,_,shutdown=self._collector_shutdown_fixture(shutdown_error=True)
+        self.assertEqual(result["worker_exitcode"],0)
+        self.assertEqual(result["status"],"failed")
+        self.assertEqual(result["reason"],"quote_worker_shutdown_reported_failure")
+        self.assertFalse(result["bounded_pipeline_observed"])
+        self.assertEqual(result["shutdown_errors"][0]["safe_error"]["error_category"],"request_timeout")
+        self.assertNotIn("PRIVATE-SHOULD-NOT-LEAK",shutdown)
+
+    def test_primary_failure_survives_additional_shutdown_error(self):
+        result,_,_,_=self._collector_shutdown_fixture(primary_error=True,shutdown_error=True)
+        self.assertEqual(result["reason"],"primary_failure_preserved")
+        self.assertEqual(result["status"],"failed")
+        self.assertIn("shutdown_errors",result)
+
+    def test_suspend_after_dequeue_does_not_audit_or_consume_late_input(self):
+        result,consumed,audit,shutdown=self._collector_shutdown_fixture(suspend_on_dequeue=True)
+        self.assertEqual(result["reason"],"diagnostic_clock_discontinuity")
+        self.assertFalse(result["bounded_pipeline_observed"])
+        self.assertEqual(consumed,[])
+        self.assertEqual(audit,"")
+        self.assertIn('"kind": "bars"',shutdown)  # Evidence only, never a strategy invocation.
+
+    def test_suspend_during_cleanup_cannot_turn_into_successful_observation(self):
+        result,_,_,_=self._collector_shutdown_fixture(suspend_on_shutdown=True)
+        self.assertEqual(result["status"],"failed")
+        self.assertEqual(result["reason"],"diagnostic_clock_discontinuity")
+        self.assertFalse(result["bounded_pipeline_observed"])
+
+    def test_normal_cutoff_with_confirmed_worker_exit_keeps_observation_semantics(self):
+        result,consumed,_,_=self._collector_shutdown_fixture()
+        self.assertEqual(result["status"],"duration_completed")
+        self.assertTrue(result["bounded_pipeline_observed"])
+        self.assertFalse(result["full_session_acceptance"])
+        self.assertEqual(consumed,[])
+
+    def test_formal_daily_gate_rejects_duplicate_stale_partial_and_short_inputs_before_router(self):
+        symbols=("SPY.US", "QQQ.US")
+        now=datetime(2026,9,21,13,50,tzinfo=UTC)
+        def make_rows(latest, count=60):
+            return [{"symbol":symbol.removesuffix(".US"), "timeframe":"1d",
+                     "event_time":(latest-timedelta(days=index)).isoformat()}
+                    for symbol in symbols for index in range(count)]
+        complete=make_rows(datetime(2026,9,18,20,tzinfo=UTC))
+        duplicate=[dict(row, event_time="2026-09-18T20:00:00+00:00") for row in complete]
+        stale=make_rows(datetime(2026,9,17,20,tzinfo=UTC))
+        partial=make_rows(datetime(2026,9,21,13,30,tzinfo=UTC))
+        short=make_rows(datetime(2026,9,18,20,tzinfo=UTC),59)
+        for label, rows in (("duplicate",duplicate),("stale",stale),("partial",partial),("short",short)):
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as directory, \
+                    patch.object(diagnostic,"configured_symbols",return_value=symbols):
+                strategy=diagnostic.DiagnosticStrategyPipeline(runtime.load_config(),runtime,Path(directory))
+                with patch.object(strategy.router,"run_realtime_signal_router",side_effect=AssertionError("router must remain blocked")):
+                    with self.assertRaisesRegex(RuntimeError,"daily_context_not_current_or_complete"):
+                        strategy.consume_inputs({"kind":"daily_context","rows":rows,"failures":[]},now,None)
+                    with self.assertRaisesRegex(RuntimeError,"daily_context_not_current_or_complete"):
+                        strategy.evaluate([],now)
+                summary=strategy.summary()
+                self.assertFalse(summary["strategy_input_coverage_observed"])
+                self.assertEqual(summary["daily_context_validation"]["status"],"failed")
+                self.assertEqual(summary["daily_context_validation"]["required_completed_session"],"2026-09-18")
+                self.assertEqual(strategy.evaluations,0)
+        with tempfile.TemporaryDirectory() as directory, patch.object(diagnostic,"configured_symbols",return_value=symbols):
+            strategy=diagnostic.DiagnosticStrategyPipeline(runtime.load_config(),runtime,Path(directory))
+            strategy.consume_inputs({"kind":"daily_context","rows":complete,"failures":[]},now,None)
+            self.assertEqual(strategy.daily_validation["status"],"passed")
+            self.assertEqual(strategy.daily_validation["symbols"]["SPY"]["distinct_date_count"],60)
+
     def test_fake_sdk_real_worker_ipc_parent_state_bar_builder_and_original_router(self):
         """Only SDK inputs are fake; worker, serialization, parent helpers and router are real."""
         import longbridge.openapi as sdk
