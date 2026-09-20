@@ -1,0 +1,81 @@
+{
+  "both_manifests_verified": true,
+  "windows_both_copies_verified": true,
+  "official_artifacts_verified": true,
+  "linux_integrity_files": 405,
+  "credential_expiry_covers_end_plus_hour": true,
+  "protected_states_unchanged": true,
+  "connection_lock_idle": true,
+  "no_active_fences": true,
+  "windows_diagnostic_idle": true,
+  "early_launch_refusals": [
+    {
+      "case": "20260921-windows-continuity",
+      "exitcode": 4,
+      "sdk_started": false,
+      "error": "outside_launch_window"
+    },
+    {
+      "case": "20260921-linux-runtime-test",
+      "exitcode": 4,
+      "sdk_started": false,
+      "error": "outside_launch_window"
+    }
+  ],
+  "real_sdk_connections": 0,
+  "formal_deployment_reissued": false,
+  "formal_production_remains_stopped": true,
+  "original_credentials_unchanged": true,
+  "schema": 1,
+  "source_commit": "76bcc179da76c73f214ff91ed2f74c12f2f4975f",
+  "source_merged_and_pushed_main": true,
+  "repo_tests": 224,
+  "repo_tests_skipped": 0,
+  "windows_wrapper_tests": 31,
+  "linux_wrapper_tests": 23,
+  "windows_lifecycle_combinations": 6,
+  "publication_tool_tests": 6,
+  "independent_review": "passed",
+  "scale": {
+    "symbols": 147,
+    "daily_rows": 8820,
+    "five_minute_rows": 441,
+    "boundaries": 3,
+    "router_evaluations": 3,
+    "synthetic_only": true
+  },
+  "tasks": [
+    {
+      "name": "PAT-Official-Quote-Continuity-20260921-Once",
+      "state": "Ready",
+      "start": "2026-09-21T21:25:00+08:00",
+      "end": "2026-09-21T21:26:00",
+      "next_run": "2026-09-21T21:25:00.0000000+08:00",
+      "restart_count": 0,
+      "start_when_available": false,
+      "execution_limit": "PT25M",
+      "run_level": "Limited",
+      "logon_type": "Interactive",
+      "multiple_instances": "IgnoreNew",
+      "manifest_sha256": "2dd123e79b30931fdfe16ff9f7c084042c1ebc45efefdb3f23ed32124a40b11c"
+    },
+    {
+      "name": "PAT-Linux-Pipeline-Diagnostic-20260921-Once",
+      "state": "Ready",
+      "start": "2026-09-21T21:50:00+08:00",
+      "end": "2026-09-21T21:51:00",
+      "next_run": "2026-09-21T21:50:00.0000000+08:00",
+      "restart_count": 0,
+      "start_when_available": false,
+      "execution_limit": "PT35M",
+      "run_level": "Limited",
+      "logon_type": "Interactive",
+      "multiple_instances": "IgnoreNew",
+      "manifest_sha256": "d9265c60c30423b76ad45c0fdf90428a4840f9678bee3f02d267a8ef59b1e015"
+    }
+  ],
+  "full_sessions_passed": 0,
+  "other_task_changes_preserved": true,
+  "formal_deployment_blocker": "concurrent_m16_workspace_not_clean",
+  "evidence_directory": "/home/hgl/project-archives/Price-Action-Trader/20260921-deep-audit"
+}
