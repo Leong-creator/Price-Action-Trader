@@ -580,6 +580,18 @@ async def _collect_pipeline(config: Any, config_path: str, duration: float, outp
     finally:
         child_stop.set()
         forced = False
+        def record_evidence_write_failure(phase, exc):
+            # Keep bounded, non-sensitive failure evidence in memory. Storage errors
+            # must never interrupt process reaping or replace the original fault.
+            failures = result.setdefault("evidence_write_failures", {})
+            previous = failures.get(phase, {})
+            failures[phase] = {"count": previous.get("count", 0) + 1,
+                               "error_type": type(exc).__name__}
+            if result.get("status") != "failed":
+                result.update(status="failed", reason="diagnostic_evidence_write_failed",
+                              error_type=type(exc).__name__)
+            result["bounded_pipeline_observed"] = False
+
         def record_shutdown(message):
             if message.get("kind") == "error":
                 error = {"kind": "error", "reason": str(message.get("reason", "")).split(":", 2)[:2],
@@ -588,10 +600,14 @@ async def _collect_pipeline(config: Any, config_path: str, duration: float, outp
                 if result.get("status") != "failed":
                     result.update(status="failed", reason="quote_worker_shutdown_reported_failure",
                                   safe_error=error["safe_error"])
-                append_diagnostic_snapshot(output / "shutdown_messages.jsonl", error)
+                audit = error
             else:
                 # Shutdown bars are evidence only, never accepted or sent to the strategy.
-                append_diagnostic_snapshot(output / "shutdown_messages.jsonl", message)
+                audit = message
+            try:
+                append_diagnostic_snapshot(output / "shutdown_messages.jsonl", audit)
+            except Exception as exc:
+                record_evidence_write_failure("shutdown_messages", exc)
         if pending_shutdown_message is not None:
             record_shutdown(pending_shutdown_message)
         if child_started:
@@ -641,7 +657,12 @@ async def _collect_pipeline(config: Any, config_path: str, duration: float, outp
         result.update(pipeline_observation_flags(result, evidence))
         if result["status"] == "duration_completed" and not result["bounded_pipeline_observed"]:
             result.update(status="incomplete", reason="insufficient_observed_pipeline_inputs_or_boundaries")
-        (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        try:
+            (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        except Exception as exc:
+            # Cleanup is already confirmed. Return failure so the CLI cannot emit
+            # success when its final evidence could not be persisted.
+            record_evidence_write_failure("summary", exc)
     return result
 
 

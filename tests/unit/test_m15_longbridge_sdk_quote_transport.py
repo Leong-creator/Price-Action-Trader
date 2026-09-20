@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+from datetime import UTC, datetime, timedelta
 import os
 import sys
 import threading
@@ -393,6 +394,130 @@ class OfficialSdkQuoteTransportTest(unittest.TestCase):
                     rows = self.run_worker(stop_kind="error")
                 self.assertEqual(rows[-1]["kind"], "error")
                 self.assertIn("delivery_failed", rows[-1]["reason"])
+
+    @staticmethod
+    def trade_payload(source_at, **overrides):
+        return {"trades": [{"timestamp": source_at, "price": "100", "volume": 5,
+                            "trade_session": "Intraday", "trade_type": "", **overrides}]}
+
+    def test_trade_delivery_2000_ms_is_accepted(self) -> None:
+        source = datetime(2026, 9, 21, 14, 1, tzinfo=UTC)
+        builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True)
+        builder.on_trade("SPY.US", self.trade_payload(source), received_at=source+timedelta(milliseconds=2000),
+                         maximum_source_delivery_age_ms=2000)
+        self.assertEqual(builder.open_bar_count, 1)
+
+    def test_trade_delivery_2001_ms_and_same_bucket_239_seconds_rejected(self) -> None:
+        source = datetime(2026, 9, 21, 14, 1, tzinfo=UTC)
+        for age in (2001, 239000):
+            with self.subTest(age_ms=age):
+                builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True)
+                with self.assertRaisesRegex(ValueError, "trade_source_delivery_age_exceeded"):
+                    builder.on_trade("SPY.US", self.trade_payload(source), received_at=source+timedelta(milliseconds=age),
+                                     maximum_source_delivery_age_ms=2000)
+                self.assertEqual(builder.open_bar_count, 0)
+
+    def test_timely_early_trade_still_finalizes_normally(self) -> None:
+        from scripts.m15_longbridge_sdk_runtime_lib import fresh_market_events
+        source = datetime(2026, 9, 21, 14, 1, tzinfo=UTC)
+        finalized = datetime(2026, 9, 21, 14, 5, 2, tzinfo=UTC)
+        builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True)
+        builder.on_trade("SPY.US", self.trade_payload(source), received_at=source,
+                         maximum_source_delivery_age_ms=2000, processed_at=source+timedelta(seconds=1))
+        bars = builder.complete_boundary(["SPY.US"], finalized)
+        self.assertEqual(len(bars), 1)
+        self.assertEqual(bars[0]["close"], "100")
+        self.assertEqual(bars[0]["market_data_blocked_reason"], "")
+        self.assertEqual(fresh_market_events(bars, 2000, now=finalized+timedelta(milliseconds=100)), bars)
+
+    def test_delivery_check_ignores_non_actionable_trades(self) -> None:
+        received = datetime(2026, 9, 21, 14, 4, tzinfo=UTC)
+        cases = [
+            (datetime(2026, 9, 21, 14, 1, tzinfo=UTC), {"trade_session": "Pre"}, None, ()),
+            (datetime(2026, 9, 21, 14, 1, tzinfo=UTC), {"trade_type": "M"}, None, ()),
+            (datetime(2026, 9, 21, 13, 0, tzinfo=UTC), {}, None, ()),
+            (datetime(2026, 9, 20, 14, 1, tzinfo=UTC), {}, None, ()),
+            (datetime(2026, 9, 21, 14, 1, tzinfo=UTC), {}, None, ("2026-09-21",)),
+            (datetime(2026, 9, 21, 14, 1, tzinfo=UTC), {}, datetime(2026, 9, 21, 14, 5, tzinfo=UTC), ()),
+        ]
+        for source, changes, not_before, holidays in cases:
+            with self.subTest(source=source, changes=changes, not_before=not_before, holidays=holidays):
+                builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True,
+                    complete_bar_open_not_before=not_before, market_holidays=holidays)
+                self.assertEqual(builder.on_trade("SPY.US", self.trade_payload(source, **changes),
+                    received_at=received, maximum_source_delivery_age_ms=2000,
+                    processed_at=received+timedelta(seconds=300)), [])
+                self.assertEqual(builder.open_bar_count, 0)
+
+    def test_stale_volume_only_trade_is_rejected(self) -> None:
+        source = datetime(2026, 9, 21, 14, 1, tzinfo=UTC)
+        builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True)
+        with self.assertRaisesRegex(ValueError, "trade_source_delivery_age_exceeded"):
+            builder.on_trade("SPY.US", self.trade_payload(source, trade_type="I"),
+                received_at=source+timedelta(seconds=3), maximum_source_delivery_age_ms=2000)
+        self.assertEqual(builder.open_bar_count, 0)
+
+    def test_trade_delivery_and_queue_each_allow_2000_ms(self) -> None:
+        source = datetime(2026, 9, 21, 14, 1, tzinfo=UTC)
+        received = source+timedelta(milliseconds=2000)
+        builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True)
+        builder.on_trade("SPY.US", self.trade_payload(source), received_at=received,
+            maximum_source_delivery_age_ms=2000, processed_at=received+timedelta(milliseconds=2000))
+        self.assertEqual(builder.open_bar_count, 1)
+
+    def test_trade_processing_2001_ms_rejected_before_bar_update(self) -> None:
+        source = datetime(2026, 9, 21, 14, 1, tzinfo=UTC)
+        builder = transport.FiveMinuteBarBuilder(boundary_batch_mode=True)
+        with self.assertRaisesRegex(ValueError, "trade_processing_backlog"):
+            builder.on_trade("SPY.US", self.trade_payload(source), received_at=source,
+                maximum_source_delivery_age_ms=2000, processed_at=source+timedelta(milliseconds=2001))
+        self.assertEqual(builder.open_bar_count, 0)
+
+    def test_worker_propagates_242_second_queue_backlog_without_bars(self) -> None:
+        class Clock(datetime):
+            current = datetime(2026, 9, 21, 14, 5, 2, tzinfo=UTC)
+            @classmethod
+            def now(cls, tz=None):
+                return cls.current.astimezone(tz) if tz else cls.current.replace(tzinfo=None)
+        real_emit = transport._emit
+        def emit(output, payload, **kwargs):
+            result = real_emit(output, payload, **kwargs)
+            if payload.get("kind") == "ready":
+                Clock.current = datetime(2026, 9, 21, 14, 11, tzinfo=UTC)
+                FakeQuoteContext.instances[0].trade_callback("SPY.US", self.trade_payload(Clock.current))
+                Clock.current = datetime(2026, 9, 21, 14, 15, 2, tzinfo=UTC)
+            return result
+        with patch.object(transport, "datetime", Clock), patch.object(transport, "_emit", side_effect=emit):
+            rows = self.run_worker(stop_kind="error")
+        self.assertEqual(len(FakeQuoteContext.instances), 1)
+        self.assertEqual(rows[-1]["kind"], "error")
+        self.assertIn("trade_processing_backlog", rows[-1]["reason"])
+        self.assertNotIn("trade_source_delivery_age_exceeded", rows[-1]["reason"])
+        self.assertFalse(any(row["kind"] == "bars" for row in rows))
+        self.assertIn("pipeline_diagnostics", rows[-1])
+
+    def test_worker_propagates_late_trade_error_without_bars_or_retry(self) -> None:
+        class Clock(datetime):
+            current = datetime(2026, 9, 21, 14, 5, 2, tzinfo=UTC)
+            @classmethod
+            def now(cls, tz=None):
+                return cls.current.astimezone(tz) if tz else cls.current.replace(tzinfo=None)
+        real_emit = transport._emit
+        def emit(output, payload, **kwargs):
+            result = real_emit(output, payload, **kwargs)
+            if payload.get("kind") == "ready":
+                Clock.current = datetime(2026, 9, 21, 14, 14, 59, tzinfo=UTC)
+                FakeQuoteContext.instances[0].trade_callback("SPY.US",
+                    self.trade_payload(datetime(2026, 9, 21, 14, 11, tzinfo=UTC)))
+            return result
+        with patch.object(transport, "datetime", Clock), patch.object(transport, "_emit", side_effect=emit):
+            rows = self.run_worker(stop_kind="error")
+        self.assertEqual(len(FakeQuoteContext.instances), 1)
+        self.assertEqual(FakeQuoteContext.instances[0].subscribe_calls, [["SPY.US", "QQQ.US", "AAPL.US"]])
+        self.assertEqual(rows[-1]["kind"], "error")
+        self.assertIn("trade_source_delivery_age_exceeded", rows[-1]["reason"])
+        self.assertFalse(any(row["kind"] == "bars" for row in rows))
+        self.assertIn("pipeline_diagnostics", rows[-1])
 
     def test_callback_overflow_stops_without_another_context(self) -> None:
         FakeQuoteContext.emit_callbacks_during_subscribe = True

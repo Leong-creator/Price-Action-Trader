@@ -462,7 +462,11 @@ def official_sdk_quote_worker(
                             },
                         )
                         last_reference_activity[symbol] = now_monotonic
-                completed = builder.on_trade(symbol, payload, received_at=received_at)
+                completed = builder.on_trade(
+                    symbol, payload, received_at=received_at,
+                    maximum_source_delivery_age_ms=config.maximum_source_delivery_age_ms,
+                    processed_at=datetime.now(UTC),
+                )
                 for bar in completed:
                     diagnostics.record("bar_formed", str(bar.get("symbol", "")), "trade")
                 if completed and not _emit(queue_out, {"kind": "bars", "rows": completed}, critical=True):

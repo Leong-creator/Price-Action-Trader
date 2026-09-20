@@ -910,7 +910,9 @@ class FiveMinuteBarBuilder:
         self._emitted_boundaries.add(boundary_open)
         return rows
 
-    def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime) -> list[dict[str, Any]]:
+    def on_trade(self, symbol: str, payload: dict[str, Any], *, received_at: datetime,
+                 maximum_source_delivery_age_ms: int | None = None,
+                 processed_at: datetime | None = None) -> list[dict[str, Any]]:
         finished: list[dict[str, Any]] = []
         for trade in payload.get("trades", []) if isinstance(payload.get("trades"), list) else []:
             session = str(trade.get("trade_session") or "").split(".")[-1].lower()
@@ -939,6 +941,8 @@ class FiveMinuteBarBuilder:
                         int_like(trade.get("volume")),
                         source_mode=self.push_source_mode,
                         price_forming=price_forming,
+                        maximum_source_delivery_age_ms=maximum_source_delivery_age_ms,
+                        processed_at=processed_at,
                     )
                 )
         return finished
@@ -962,6 +966,8 @@ class FiveMinuteBarBuilder:
         bar_at: datetime | None = None,
         blocked_reason: str = "",
         price_forming: bool = True,
+        maximum_source_delivery_age_ms: int | None = None,
+        processed_at: datetime | None = None,
     ) -> list[dict[str, Any]]:
         bar_clock_ny = (bar_at or source_at).astimezone(NEW_YORK)
         if bar_clock_ny.weekday() >= 5 or bar_clock_ny.date().isoformat() in self.market_holidays or not (bar_clock_ny.hour > 9 or (bar_clock_ny.hour == 9 and bar_clock_ny.minute >= 30)) or bar_clock_ny.hour >= 16:
@@ -971,6 +977,20 @@ class FiveMinuteBarBuilder:
             return [] if self.boundary_batch_mode else self.flush(received_at)
         if bar_open in self._emitted_boundaries:
             raise ValueError("trade_after_bar_finalized")
+        # Trade timestamp is execution time; received_at was captured on callback
+        # entry. Validate this delivery before aggregation discards that latency.
+        # Session/type/partial-bar exclusions above remain non-actionable, and
+        # Quote latest-price timestamps intentionally never use this check.
+        if (maximum_source_delivery_age_ms is not None
+                and received_at.astimezone(UTC) - source_at.astimezone(UTC)
+                > timedelta(milliseconds=maximum_source_delivery_age_ms)):
+            raise ValueError("trade_source_delivery_age_exceeded")
+        # Receipt and processing are different stages. A timely callback left
+        # queued too long must not become fresh merely by finalizing its bar.
+        if (maximum_source_delivery_age_ms is not None and processed_at is not None
+                and processed_at.astimezone(UTC) - received_at.astimezone(UTC)
+                > timedelta(milliseconds=maximum_source_delivery_age_ms)):
+            raise ValueError("trade_processing_backlog")
         key = (symbol.upper(), bar_open)
         bar = self._bars.get(key)
         if bar is None:

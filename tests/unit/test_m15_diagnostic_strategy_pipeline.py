@@ -222,6 +222,101 @@ class DiagnosticStrategyPipelineTests(unittest.TestCase):
         self.assertFalse(result["full_session_acceptance"])
         self.assertEqual(consumed,[])
 
+    def _collector_storage_failure_fixture(self, *, initial_audit_failure=False,
+            shutdown_audit_failure=False, summary_failure=False, primary_failure=False,
+            already_exited=False):
+        calls = []
+        stages = {"raw": {"stage":"raw_callback", "kind":"trade", "count":9},
+                  "dequeued": {"stage":"dequeued", "kind":"trade", "count":9}}
+        evidence = SimpleNamespace(latest_diagnostics={"stages":stages}, message_counts={},
+            bar_count=147, worker_safe_error={},
+            session=SimpleNamespace(complete_boundary_count=1,realtime_tradable_bar_count=147,no_trade_carry_forward_count=0),
+            strategy=SimpleNamespace(summary=lambda:{"strategy_input_coverage_observed":True,"strategy_evaluation_count":1}),
+            check_deadlines=lambda now:None)
+        def consume(message, now):
+            if primary_failure:
+                raise RuntimeError("original_market_failure")
+        evidence.consume = consume
+        messages = queue.Queue()
+        messages.cancel_join_thread = lambda:calls.append("cancel_join_thread")
+        messages.close = lambda:calls.append("queue_close")
+        if initial_audit_failure or primary_failure:
+            messages.put({"kind":"heartbeat"})
+        alive = [True]
+        class Stop(threading.Event):
+            def set(inner):
+                super(Stop, inner).set()
+                messages.put({"kind":"heartbeat"})
+                if already_exited:
+                    alive[0] = False
+        child_stop = Stop()
+        def join(timeout):
+            calls.append("join")
+            alive[0] = False
+        child = SimpleNamespace(pid=123,exitcode=0,start=lambda:None,
+            is_alive=lambda:alive[0],join=join,terminate=lambda:calls.append("terminate"),
+            kill=lambda:calls.append("kill"))
+        context = SimpleNamespace(Queue=lambda **kwargs:messages,Event=lambda:child_stop,
+                                  Process=lambda **kwargs:child)
+        wall=[datetime(2026,9,21,13,50,tzinfo=UTC)]; mono=[100.0]
+        class Clock(datetime):
+            @classmethod
+            def now(cls,tz=None): return wall[0]
+        async def advance(_seconds):
+            wall[0]+=timedelta(seconds=1); mono[0]+=1
+        original_append = diagnostic.append_diagnostic_snapshot
+        def append(path, value):
+            if ((initial_audit_failure and path.name == "worker_messages.jsonl")
+                    or (shutdown_audit_failure and path.name == "shutdown_messages.jsonl")):
+                raise OSError("PRIVATE injected storage failure")
+            return original_append(path, value)
+        original_write = Path.write_text
+        def write(path, *args, **kwargs):
+            if summary_failure and path.name == "summary.json":
+                raise OSError("PRIVATE injected storage failure")
+            return original_write(path, *args, **kwargs)
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(diagnostic,"PipelineProbeEvidence",return_value=evidence), \
+                patch.object(diagnostic.mp,"get_context",return_value=context), \
+                patch.object(diagnostic,"datetime",Clock), \
+                patch.object(diagnostic,"time",SimpleNamespace(monotonic=lambda:mono[0])), \
+                patch.object(diagnostic.asyncio,"sleep",side_effect=advance), \
+                patch.object(diagnostic,"append_diagnostic_snapshot",side_effect=append), \
+                patch.object(Path,"write_text",new=write):
+            result=asyncio.run(diagnostic._collect_pipeline(SimpleNamespace(),"unused",0.5,Path(directory),asyncio.Event()))
+        self.assertFalse(alive[0])
+        self.assertIn("queue_close",calls)
+        self.assertTrue(result["worker_process_exited"])
+        self.assertEqual(result["status"],"failed")
+        self.assertFalse(result["bounded_pipeline_observed"])
+        self.assertNotIn("PRIVATE",json.dumps(result))
+        return result,calls
+
+    def test_initial_and_shutdown_audit_failure_still_reap_child(self):
+        result,calls=self._collector_storage_failure_fixture(initial_audit_failure=True,shutdown_audit_failure=True)
+        self.assertIn("join",calls)
+        self.assertEqual(result["reason"],"pipeline_probe_error")
+        self.assertGreaterEqual(result["evidence_write_failures"]["shutdown_messages"]["count"],1)
+
+    def test_shutdown_audit_failure_blocks_observation_for_live_or_exited_child(self):
+        for already_exited in (False,True):
+            with self.subTest(already_exited=already_exited):
+                result,calls=self._collector_storage_failure_fixture(shutdown_audit_failure=True,already_exited=already_exited)
+                self.assertEqual(result["reason"],"diagnostic_evidence_write_failed")
+                if not already_exited:
+                    self.assertIn("join",calls)
+
+    def test_shutdown_storage_failure_does_not_replace_original_fault(self):
+        result,_=self._collector_storage_failure_fixture(primary_failure=True,shutdown_audit_failure=True)
+        self.assertEqual(result["reason"],"original_market_failure")
+        self.assertIn("shutdown_messages",result["evidence_write_failures"])
+
+    def test_summary_write_failure_returns_failure_after_confirmed_cleanup(self):
+        result,calls=self._collector_storage_failure_fixture(summary_failure=True)
+        self.assertIn("join",calls)
+        self.assertEqual(result["reason"],"diagnostic_evidence_write_failed")
+        self.assertEqual(result["evidence_write_failures"]["summary"],{"count":1,"error_type":"OSError"})
+
     def test_formal_daily_gate_rejects_duplicate_stale_partial_and_short_inputs_before_router(self):
         symbols=("SPY.US", "QQQ.US")
         now=datetime(2026,9,21,13,50,tzinfo=UTC)
@@ -264,6 +359,33 @@ class DiagnosticStrategyPipelineTests(unittest.TestCase):
             def now(cls,tz=None):
                 return clock[0].astimezone(tz) if tz is not None else clock[0].astimezone().replace(tzinfo=None)
         instances=[]
+        import time as real_time
+        origin=clock[0]
+        started_monotonic=real_time.monotonic()
+        def monotonic():
+            return started_monotonic+(clock[0]-origin).total_seconds()
+        fixture_time=SimpleNamespace(**{name:getattr(real_time,name) for name in dir(real_time) if not name.startswith('__')})
+        fixture_time.monotonic=monotonic
+        def feed(moment):
+            clock[0]=moment
+            quote=instances[0]
+            volume=200+int((moment-origin).total_seconds())
+            for symbol in symbols:
+                quote.on_quote(symbol,{'timestamp':moment.astimezone().replace(tzinfo=None),
+                    'last_done':Decimal('100'),'open':Decimal('100'),'high':Decimal('101'),'low':Decimal('99'),'volume':volume})
+                quote.on_trade(symbol,{'trades':[{'timestamp':moment.astimezone().replace(tzinfo=None),
+                    'price':Decimal('100'),'volume':1,'trade_type':'','trade_session':'Intraday'}]})
+        class DrivenStop(threading.Event):
+            def wait(self, timeout=None):
+                if self.is_set(): return True
+                # Called by the actual worker only after it drained this callback batch.
+                # Never move the clock while captured callbacks are waiting in its queue.
+                now=clock[0]
+                boundary=now.replace(minute=now.minute-now.minute%5,second=0,microsecond=0)
+                seal=boundary+timedelta(seconds=2)
+                if seal<=now: seal+=timedelta(minutes=5)
+                feed(min(now+timedelta(seconds=20),seal))
+                return False
         class Quote:
             def __init__(self, config): instances.append(self)
             def set_on_quote(self, callback): self.on_quote=callback
@@ -292,11 +414,13 @@ class DiagnosticStrategyPipelineTests(unittest.TestCase):
             stack.enter_context(patch.object(transport,'load_config',return_value=config))
             stack.enter_context(patch.object(transport,'read_client_id',return_value='offline-client'))
             stack.enter_context(patch.object(transport,'datetime',Clock))
+            for module in (transport,runtime,diagnostic):
+                stack.enter_context(patch.object(module,'time',fixture_time))
             stack.enter_context(patch.object(sdk,'QuoteContext',Quote))
             stack.enter_context(patch.object(sdk,'OAuthBuilder',lambda _:SimpleNamespace(build=lambda _:object())))
             stack.enter_context(patch.object(sdk,'Config',SimpleNamespace(from_oauth=lambda _:object())))
             evidence=diagnostic.PipelineProbeEvidence(config,output)
-            stop=threading.Event()
+            stop=DrivenStop()
             ipc=mp.get_context('spawn').Queue(maxsize=64)
             self.addCleanup(ipc.join_thread)
             self.addCleanup(ipc.close)
@@ -309,15 +433,7 @@ class DiagnosticStrategyPipelineTests(unittest.TestCase):
                     append_diagnostic_snapshot(output/'worker_messages.jsonl',received)
                     evidence.consume(received,clock[0])
                     if received['kind']=='ready':
-                        quote=instances[0]
-                        for moment in (datetime(2026,9,21,13,55,1,tzinfo=UTC),datetime(2026,9,21,14,0,1,tzinfo=UTC)):
-                            clock[0]=moment
-                            for symbol in symbols:
-                                quote.on_quote(symbol,{'timestamp':moment.astimezone().replace(tzinfo=None),
-                                    'last_done':Decimal('100'),'open':Decimal('100'),'high':Decimal('101'),'low':Decimal('99'),'volume':200})
-                                quote.on_trade(symbol,{'trades':[{'timestamp':moment.astimezone().replace(tzinfo=None),
-                                    'price':Decimal('100'),'volume':1,'trade_type':'','trade_session':'Intraday'}]})
-                        clock[0]=datetime(2026,9,21,14,0,3,tzinfo=UTC)
+                        feed(clock[0]+timedelta(seconds=1))
                     if received['kind'] in ('bars','error'): stop.set()
                 put_nowait=put
             stack.enter_context(patch.object(socket,'create_connection',side_effect=AssertionError('network forbidden')))
