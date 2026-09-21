@@ -1,0 +1,300 @@
+{
+  "case": "case019-windows-intraday",
+  "actual_runtime_seconds": 1.303,
+  "clock": {
+    "reception_allowed": true,
+    "quality_passed": true,
+    "quality_reason": null,
+    "received_for_diagnosis_only": false,
+    "maximum_clock_bound_seconds": 0.5,
+    "samples": [
+      {
+        "host": "time.windows.com",
+        "valid": true,
+        "stratum": 4,
+        "leap": 0,
+        "t1": 1790004721.6107595,
+        "t2": 1790004721.988552,
+        "t3": 1790004721.9885535,
+        "t4": 1790004722.3840604,
+        "monotonic_elapsed": 0.7733524999930523,
+        "offset_seconds": -0.008857131004333496,
+        "roundtrip_seconds": 0.7732994556427002
+      },
+      {
+        "host": "time.cloudflare.com",
+        "valid": true,
+        "stratum": 3,
+        "leap": 0,
+        "t1": 1790004722.6050332,
+        "t2": 1790004723.014073,
+        "t3": 1790004723.0141144,
+        "t4": 1790004723.3007932,
+        "monotonic_elapsed": 0.6958052999689244,
+        "offset_seconds": 0.0611804723739624,
+        "roundtrip_seconds": 0.69571852684021
+      }
+    ]
+  },
+  "subscribed": true,
+  "subscription_succeeded_at": "2026-09-21T15:32:06.200345+00:00",
+  "stop_reason": "source_delivery_late",
+  "watchdog_reason": "sample_reported_failure",
+  "processed_events": [
+    {
+      "record_type": "market_event",
+      "kind": "quote",
+      "symbol": "SPY.US",
+      "received_at": "2026-09-21T15:32:06.244834+00:00",
+      "processed_at": "2026-09-21T15:32:06.316475+00:00",
+      "queue_delay_ms": 71.653,
+      "regular_session": true,
+      "event_at": "2026-09-21T15:32:05+00:00",
+      "classification": "fresh_regular_event",
+      "timestamp_interpretation": "official_sdk_local_naive_to_utc",
+      "source_delivery_age_ms": 1244.834
+    },
+    {
+      "record_type": "market_event",
+      "kind": "quote",
+      "symbol": "QQQ.US",
+      "received_at": "2026-09-21T15:32:06.244934+00:00",
+      "processed_at": "2026-09-21T15:32:06.316731+00:00",
+      "queue_delay_ms": 71.803,
+      "regular_session": true,
+      "event_at": "2026-09-21T15:32:05+00:00",
+      "classification": "fresh_regular_event",
+      "timestamp_interpretation": "official_sdk_local_naive_to_utc",
+      "source_delivery_age_ms": 1244.934
+    },
+    {
+      "record_type": "market_event",
+      "kind": "quote",
+      "symbol": "IWM.US",
+      "received_at": "2026-09-21T15:32:06.244949+00:00",
+      "processed_at": "2026-09-21T15:32:06.316812+00:00",
+      "queue_delay_ms": 71.868,
+      "regular_session": true,
+      "event_at": "2026-09-21T15:32:05+00:00",
+      "classification": "fresh_regular_event",
+      "timestamp_interpretation": "official_sdk_local_naive_to_utc",
+      "source_delivery_age_ms": 1244.949
+    },
+    {
+      "record_type": "market_event",
+      "kind": "quote",
+      "symbol": "DIA.US",
+      "received_at": "2026-09-21T15:32:06.244959+00:00",
+      "processed_at": "2026-09-21T15:32:06.316855+00:00",
+      "queue_delay_ms": 71.901,
+      "regular_session": true,
+      "event_at": "2026-09-21T15:32:04+00:00",
+      "classification": "source_delivery_late",
+      "timestamp_interpretation": "official_sdk_local_naive_to_utc",
+      "source_delivery_age_ms": 2244.959
+    }
+  ],
+  "maximum_queue_depth": 338,
+  "queue_depth_at_stop": 334,
+  "maximum_queue_delay_ms": 71.901,
+  "health_read_diagnostics": {
+    "health_deadline_seconds": 5,
+    "health_read_errors_total": 0,
+    "health_read_errors_consecutive": 0,
+    "health_read_errors_max_consecutive": 0,
+    "first_health_read_error": null,
+    "last_health_read_error": null,
+    "last_good_health_monotonic": 285420.0200058,
+    "last_good_health_read_at_monotonic": 285420.0374712,
+    "streaming_phase_started_monotonic": null
+  },
+  "file_io_diagnostics": {
+    "replace_errors_total": 0,
+    "replace_recoveries_total": 0,
+    "replace_failures_total": 0,
+    "last_replace_error": null
+  },
+  "postflight": {
+    "quote_processes_idle": true,
+    "quote_lock_available": true,
+    "fences_absent": true,
+    "original_credentials_unchanged": true,
+    "protected_states_unchanged": true,
+    "windows_credential_roots_absent": true,
+    "case019_files_unchanged": true
+  },
+  "diagnostic_window_passed": false,
+  "full_sessions_passed": 0,
+  "quote_timestamp_semantics_source": "https://open.longbridge.com/zh-HK/docs/quote/push/quote",
+  "first_push_semantics_source": "https://open.longbridge.com/zh-HK/docs/quote/subscribe/subscribe",
+  "archive": "/home/hgl/project-archives/Price-Action-Trader/20260921-windows-intraday",
+  "independent_live_review": {
+    "case": "case019-windows-intraday",
+    "status": "independent_readonly_result_verified",
+    "sdk_connections_by_reviewer": 0,
+    "inputs_modified": false,
+    "controller_status": "watchdog_fault",
+    "watchdog_reason": "sample_reported_failure",
+    "sampler_reason": "source_delivery_late",
+    "started_at": "2026-09-21T15:32:05.043200+00:00",
+    "finished_at": "2026-09-21T15:32:06.346124+00:00",
+    "elapsed_seconds": 1.303,
+    "subscribed": true,
+    "subscribed_at": "2026-09-21T15:32:06.200345+00:00",
+    "processed_events": 4,
+    "processed_kind_counts": {
+      "quote": 4
+    },
+    "trigger_event": {
+      "record_type": "market_event",
+      "kind": "quote",
+      "symbol": "DIA.US",
+      "received_at": "2026-09-21T15:32:06.244959+00:00",
+      "processed_at": "2026-09-21T15:32:06.316855+00:00",
+      "queue_delay_ms": 71.901,
+      "regular_session": true,
+      "event_at": "2026-09-21T15:32:04+00:00",
+      "classification": "source_delivery_late",
+      "timestamp_interpretation": "official_sdk_local_naive_to_utc",
+      "source_delivery_age_ms": 2244.959
+    },
+    "remaining_callback_queue": 334,
+    "maximum_callback_queue": 338,
+    "maximum_queue_delay_ms": 71.901,
+    "native_parsed": {
+      "quote_pushes": 203,
+      "quote_symbols": 147,
+      "quote_sequence_zero": 147,
+      "trade_push_packets": 56,
+      "trade_symbols": 56,
+      "individual_trades": 135,
+      "time_ranges": {
+        "quote": [
+          "2026-09-21T15:32:06.200298Z",
+          "2026-09-21T15:32:06.246527Z"
+        ],
+        "trade": [
+          "2026-09-21T15:32:06.245789Z",
+          "2026-09-21T15:32:06.246520Z"
+        ]
+      },
+      "native_event_rows_match_processed_plus_remaining_queue": true
+    },
+    "health_read_errors": 0,
+    "writer_diagnostics": {
+      "replace_errors_total": 0,
+      "replace_recoveries_total": 0,
+      "replace_failures_total": 0,
+      "last_replace_error": null
+    },
+    "clock_quality_passed": true,
+    "clock_conservative_bounds": [
+      0.3955068588256836,
+      0.4090397357940674
+    ],
+    "exit_verified": true,
+    "job_active_processes": 0,
+    "credentials_cleaned": true,
+    "protected_states_unchanged": true,
+    "original_credentials_unchanged": true,
+    "full_sessions_passed": 0,
+    "conclusion": "147-symbol subscription succeeded and SDK parsed Quote plus Trade. Local sampler stopped on first DIA quote whose last-trade timestamp predates subscription. This is not evidence of network delay or feed silence; unprocessed callbacks must not be called unreceived. No completed five-minute window.",
+    "sources": [
+      "https://open.longbridge.com/zh-HK/docs/quote/push/quote",
+      "https://open.longbridge.com/zh-HK/docs/quote/subscribe/subscribe"
+    ],
+    "evidence_sha256": {
+      "run_result.json": "999e95eb1a805f88928dae18c7518b5a76bf5c3c52f175760f59514eb2b00c95",
+      "summary.json": "eb9793ff6e83be3742aca745cbfcdac4408a677ac4b95ec855db3cd02a99ca14",
+      "health.json": "eb228922dce80aa649b73ae4a5f549b5569558e274a938fecd63324cfd389d25",
+      "stages.jsonl": "49edec0b95a8950e58d477af154f9ca7bb9a516ba8d4d21737433e82ecd5ee65",
+      "events.ndjson": "8d11177b047c44b4aa33cda7dd7389c34c80140b3f6e7ea526f079a10c2fbd20",
+      "sdk-logs/quote/2026-09-21.log": "e166b7bb26763ebe61ea72b5ebde099222dae7bfd7a2540100b2ffb07b206fd3"
+    },
+    "independent_postflight_file_checks": {
+      "current_five_protected_hashes_match": true,
+      "current_original_credential_hashes_match": true,
+      "temporary_credential_targets_absent": true
+    }
+  },
+  "snapshot_fix": {
+    "freeze": {
+      "status": "offline_candidate_frozen",
+      "tests": 59,
+      "sdk_connections": 0,
+      "files": {
+        "health.py": "59466bbd10ea42a69b2a14926250abf065edb952d24488c1e5962c91cbcf425f",
+        "test_health.py": "48e76bd13327fa7a3ed514522342042f9a4ae52f3c342025d8ba8027a00ad0a2",
+        "test_quote_snapshot.py": "077c01ed0e3a30f657d21a22854ce736f4cd4ffdaf028490d28e9e0445ff75f4",
+        "continuity_sample.py": "6e77c7c27087754dc55c8c7a10092ba00394c5390881d1f59b1e01ceb50a2c93",
+        "run-spec.json": "f97198c3576304c0c7712e89f757843870d9fc95976928c68832217fd8c7fac4"
+      },
+      "unchanged_fixtures": {
+        "continuity_sample.py": true,
+        "run-spec.json": true
+      },
+      "boundaries": [
+        "first observed Quote per symbol, not protocol first-push flag",
+        "only existing regular-session same-session age guard changed",
+        "no freshness, no liveness credit for initial old snapshot",
+        "no deployment or connection"
+      ]
+    },
+    "independent_review": {
+      "task_id": "case019-first-quote-snapshot-candidate-review",
+      "role": "reviewer",
+      "status": "success",
+      "findings": [],
+      "files_changed": [
+        "independent-snapshot-tests.log",
+        "independent-snapshot-review.json"
+      ],
+      "sdk_connections": 0,
+      "implementation_modified": false,
+      "candidate_deployed": false,
+      "candidate_sha256": {
+        "health.py": "59466bbd10ea42a69b2a14926250abf065edb952d24488c1e5962c91cbcf425f",
+        "test_health.py": "48e76bd13327fa7a3ed514522342042f9a4ae52f3c342025d8ba8027a00ad0a2",
+        "test_quote_snapshot.py": "077c01ed0e3a30f657d21a22854ce736f4cd4ffdaf028490d28e9e0445ff75f4",
+        "continuity_sample.py": "6e77c7c27087754dc55c8c7a10092ba00394c5390881d1f59b1e01ceb50a2c93",
+        "run-spec.json": "f97198c3576304c0c7712e89f757843870d9fc95976928c68832217fd8c7fac4"
+      },
+      "tests_independently_rerun": 10,
+      "tests_passed": 10,
+      "author_full_suite_reported": 59,
+      "approved_scope": [
+        "First observed per-symbol Quote with last-trade time no later than subscription and older than 2s is classified but not freshness/liveness credit.",
+        "Initial ordering baseline retained.",
+        "Later old quotes and unconfirmed-subscription quotes remain rejected with quote_last_trade_not_fresh.",
+        "Trade age, future timestamp, backlog and four reference silence guards unchanged."
+      ],
+      "limits": [
+        "Classification is based on first observation; no protocol first-push flag exposed to this classifier.",
+        "This is not a general proof that subsequent old Quote timestamps represent network delay.",
+        "Replayed DIA case demonstrates local semantic correction only; no new live acceptance.",
+        "A regression-order unit test intentionally moves receipt timestamp backward to isolate baseline validation; not a realistic continuity replay."
+      ],
+      "next_recommended_action": "Parent may select this reviewed candidate for a separately authorized future case; leave original case019 evidence and all prior acceptance results intact.",
+      "needs_user_decision": false
+    },
+    "deployment": {
+      "files_verified": true,
+      "actual_september22_spec_valid": true,
+      "case019_not_changed": true,
+      "official_sdk_not_changed": true,
+      "task": {
+        "task_name": "PAT-Official-Quote-Continuity-20260922-Once",
+        "state": "Ready",
+        "next_run": "2026-09-22T21:25:00.0000000+08:00",
+        "manifest_sha256": "f427aa97282b7bc0764435b846398901abbff153db8e05bc81f3f4ff5f7a39b3",
+        "restart_count": 0,
+        "start_when_available": false,
+        "start_boundary": "2026-09-22T21:25:00+08:00",
+        "end_boundary": "2026-09-22T21:26:00",
+        "logon_type": "Interactive",
+        "run_level": "Limited",
+        "multiple_instances": "IgnoreNew"
+      }
+    }
+  }
+}
