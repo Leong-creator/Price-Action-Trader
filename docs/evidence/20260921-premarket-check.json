@@ -1,0 +1,63 @@
+{
+  "case": "case015-windows-premarket-check",
+  "status": "premarket_data_received_clock_quality_unresolved",
+  "observation_seconds": 30.007,
+  "quote_events": 409,
+  "trade_events": 722,
+  "quote_symbols": 147,
+  "trade_symbols": 51,
+  "fresh_events": 283,
+  "future_timestamp_events": 712,
+  "old_initial_quote_events": 136,
+  "max_future_ms": 829.398,
+  "ntp_read_only": {
+    "platform": "native_windows",
+    "read_only": true,
+    "samples": [
+      {
+        "host": "time.windows.com",
+        "valid": true,
+        "stratum": 4,
+        "leap": 0,
+        "offset_seconds": 1.309303641319275,
+        "roundtrip_seconds": 0.6349766254425049,
+        "checked_unix": 1789980932.5427287
+      },
+      {
+        "host": "time.cloudflare.com",
+        "valid": true,
+        "stratum": 3,
+        "leap": 0,
+        "offset_seconds": 1.3085321187973022,
+        "roundtrip_seconds": 0.5829184055328369,
+        "checked_unix": 1789980933.3313692
+      }
+    ]
+  },
+  "postflight": {
+    "official_inputs_and_protected_states_unchanged": true,
+    "quote_processes_idle": true,
+    "quote_lock_idle": true,
+    "listed_fences_absent": true,
+    "tonight_not_consumed": true,
+    "tasks": [
+      {
+        "name": "PAT-Official-Quote-Continuity-20260921-Once",
+        "ready": true,
+        "xml_unchanged_after_line_ending_normalization": true
+      },
+      {
+        "name": "PAT-Linux-Pipeline-Diagnostic-20260921-Once",
+        "ready": true,
+        "xml_unchanged_after_line_ending_normalization": true
+      }
+    ],
+    "actual_windows_fence_absent": true,
+    "original_credentials_unchanged": true
+  },
+  "full_session_passed": false,
+  "production_restored": false,
+  "orders_enabled": false,
+  "system_clock_changed": false,
+  "external_archive": "/home/hgl/project-archives/Price-Action-Trader/20260921-premarket-check"
+}
