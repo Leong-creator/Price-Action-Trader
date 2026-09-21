@@ -1,0 +1,331 @@
+{
+  "case": "case018-windows-opening-continuity",
+  "stage": "scheduled_user_synced_clock_bound_unproven_live_not_started",
+  "deployment": {
+    "manifest_sha256": "04cffb85d17e451b408ed6e33e5813e11e92850488f97af28a1e7b13d5845b95",
+    "files_and_environment_verified": true,
+    "protected_states_unchanged": true,
+    "credentials_planned_only": 2,
+    "credential_copy_started": false,
+    "clock_admin_result_present": false,
+    "sdk_connections": 0
+  },
+  "task": {
+    "task_name": "PAT-Official-Quote-Continuity-20260922-Once",
+    "state": "Ready",
+    "start_boundary": "2026-09-22T21:25:00+08:00",
+    "end_boundary": "2026-09-22T21:26:00",
+    "next_run": "2026-09-22T21:25:00.0000000+08:00",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "restart_count": 0,
+    "start_when_available": false,
+    "execution_time_limit": "PT25M",
+    "delete_expired_after": "PT1H",
+    "manifest_sha256": "04cffb85d17e451b408ed6e33e5813e11e92850488f97af28a1e7b13d5845b95",
+    "action_verified": true,
+    "production_restart": false,
+    "order_enabled": false
+  },
+  "review": {
+    "task_id": "case018-monitor-independent-review",
+    "role": "reviewer",
+    "branch_or_worktree": "/home/hgl/project-archives/Price-Action-Trader/20260922-windows-continuity",
+    "objective": "Independent review of monitor reader/writer repair and launch-clock gate",
+    "status": "success",
+    "files_changed": [
+      "test_monitor_review.py",
+      "independent-monitor-review.json",
+      "independent-old-failure-scope.json",
+      "independent-review-handoff.json",
+      "independent-*.log"
+    ],
+    "interfaces_changed": [],
+    "commands_run": [
+      "python3 -B -m unittest test_monitor_review test_watchdog test_health -q",
+      "python3 -B -m unittest test_clock_preflight test_run_once -q"
+    ],
+    "tests_run": {
+      "independent_reader_writer": 13,
+      "final_reviewer_monitor_combination": 80,
+      "mock_clock_and_wrapper": 37,
+      "failures": 0,
+      "author_native_windows_watchdog": 25,
+      "author_native_windows_health": 42,
+      "author_native_windows_job": 10,
+      "native_windows_reviewer_tests_run": false
+    },
+    "assumptions": [
+      "Only final frozen hashes covered; task registration, manifest signing, real clock state and OAuth handled independently by root."
+    ],
+    "risks": [
+      "Synthetic read/write failures demonstrate resilience, not the exact unrecorded cause of historical invalid_health_record.",
+      "Live opening window and full-session acceptance remain unproven.",
+      "Persistent IO faults still fail closed; no broad guarantee against Windows file contention."
+    ],
+    "qa_focus": [
+      "read/parse failure does not renew 5-second last-valid timestamp budget",
+      "re-reading same valid snapshot does not renew budget",
+      "identity/status/schema/nonfinite/backward records fail immediately",
+      "writer retries only Windows sharing/access errors using identical tmp bytes, 250ms and 26 attempts maximum",
+      "nonsharing writer errors propagate immediately",
+      "safe error metadata excludes raw exception message/path",
+      "two independent NTP estimates each require abs(offset)+RTT/2<=0.5s before credential planning/copy or run-start record",
+      "clock gate changes no market-data timestamp or health limits"
+    ],
+    "rollback_notes": "No runtime implementation, credential, task, manifest, or historical evidence modified by reviewer.",
+    "next_recommended_action": "Root may bind frozen hashes into new case018 preparation subject to independent task/credential/clock prerequisites; no old-case retry or market acceptance inferred.",
+    "needs_user_decision": false,
+    "user_decision_needed": null
+  },
+  "native_file_comparison": {
+    "purpose": "No-SDK native Windows filesystem comparison; does not establish old case013 cause",
+    "source_sha256": "6e77c7c27087754dc55c8c7a10092ba00394c5390881d1f59b1e01ceb50a2c93",
+    "controller_sha256": "68a2609f29d96821a6d42b94b8f46146b08f5ec41e96f5b79345022cae4abfa0",
+    "results": [
+      {
+        "native_windows": true,
+        "sdk_connected": false,
+        "seconds_requested": 3.0,
+        "reader": "legacy",
+        "writer": "original",
+        "readers": 1,
+        "read_delay": 0.01,
+        "writer_diagnostics": null,
+        "counts": {
+          "write_ok": 566,
+          "read_ok": 154,
+          "write_error": 272,
+          "read_error": 6
+        },
+        "safe_errors": [
+          {
+            "operation": "write_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": 5
+          },
+          {
+            "operation": "write_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": 5
+          },
+          {
+            "operation": "write_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": 5
+          },
+          {
+            "operation": "write_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": 5
+          },
+          {
+            "operation": "read_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": null
+          },
+          {
+            "operation": "read_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": null
+          },
+          {
+            "operation": "read_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": null
+          },
+          {
+            "operation": "read_error",
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": null
+          }
+        ],
+        "finished_utc": "2026-09-21T15:08:15.491743+00:00"
+      },
+      {
+        "native_windows": true,
+        "sdk_connected": false,
+        "seconds_requested": 3.0,
+        "reader": "reviewed",
+        "writer": "bounded",
+        "readers": 1,
+        "read_delay": 0.01,
+        "writer_diagnostics": {
+          "replace_errors_total": 147,
+          "replace_recoveries_total": 137,
+          "replace_failures_total": 0,
+          "last_replace_error": {
+            "error_type": "PermissionError",
+            "errno": 13,
+            "winerror": 5,
+            "attempt": 1
+          }
+        },
+        "counts": {
+          "write_ok": 397,
+          "read_ok": 145,
+          "write_error": 0,
+          "read_error": 0
+        },
+        "safe_errors": [],
+        "finished_utc": "2026-09-21T15:08:18.733503+00:00"
+      }
+    ]
+  },
+  "oauth": {
+    "installed": true,
+    "same_client": true,
+    "new_expires_at_utc": "2026-10-05T15:04:20+00:00",
+    "new_cache_sha256": "c8708853d0fd44d3f1df3c40b8e475acb45d8525adbca5a999233c844e038ae7",
+    "old_cache_preserved_as_evidence": true,
+    "new_task_transfer_sha256": "9d94e6607e386173a70674b7361a77f3e6948b6c4d65e5cb74ef04c97d4cf965",
+    "quote_connections": 0,
+    "account_or_order_calls": 0
+  },
+  "archive": "/home/hgl/project-archives/Price-Action-Trader/20260922-windows-continuity",
+  "new_sdk_quote_connections": 0,
+  "full_sessions_passed": 0,
+  "wsl_next_test_scheduled": false,
+  "production_restored": false,
+  "clock": {
+    "clock-after-user-sync-windows.json": {
+      "platform": "win32",
+      "read_only": true,
+      "samples": [
+        {
+          "host": "time.windows.com",
+          "valid": true,
+          "stratum": 4,
+          "leap": 0,
+          "t1": 1790003720.1137793,
+          "t2": 1790003721.1129842,
+          "t3": 1790003721.1129866,
+          "t4": 1790003721.477864,
+          "monotonic_elapsed": 1.364085300010629,
+          "offset_seconds": 0.31716370582580566,
+          "roundtrip_seconds": 1.3640823364257812
+        },
+        {
+          "host": "time.cloudflare.com",
+          "valid": true,
+          "stratum": 3,
+          "leap": 0,
+          "t1": 1790003721.4789488,
+          "t2": 1790003721.8591647,
+          "t3": 1790003721.8592114,
+          "t4": 1790003722.2348802,
+          "monotonic_elapsed": 0.7559312999946997,
+          "offset_seconds": 0.0022735595703125,
+          "roundtrip_seconds": 0.7558846473693848
+        }
+      ]
+    },
+    "clock-after-user-sync-wsl.json": {
+      "platform": "linux",
+      "read_only": true,
+      "samples": [
+        {
+          "host": "time.windows.com",
+          "valid": true,
+          "stratum": 4,
+          "leap": 0,
+          "t1": 1790003720.1142995,
+          "t2": 1790003720.5828748,
+          "t3": 1790003720.5828757,
+          "t4": 1790003720.9987333,
+          "monotonic_elapsed": 0.884434062987566,
+          "offset_seconds": 0.026358842849731445,
+          "roundtrip_seconds": 0.8844327926635742
+        },
+        {
+          "host": "time.cloudflare.com",
+          "valid": true,
+          "stratum": 3,
+          "leap": 0,
+          "t1": 1790003721.002776,
+          "t2": 1790003721.3827424,
+          "t3": 1790003721.3828077,
+          "t4": 1790003721.7445235,
+          "monotonic_elapsed": 0.7417482690070756,
+          "offset_seconds": 0.009125351905822754,
+          "roundtrip_seconds": 0.7416822910308838
+        }
+      ]
+    },
+    "clock-after-user-sync-confirmation.json": {
+      "query": {
+        "platform": "win32",
+        "read_only": true,
+        "samples": [
+          {
+            "host": "time.windows.com",
+            "valid": true,
+            "stratum": 4,
+            "leap": 0,
+            "t1": 1790003759.3933501,
+            "t2": 1790003760.4358845,
+            "t3": 1790003760.4358854,
+            "t4": 1790003760.8474169,
+            "monotonic_elapsed": 1.4540674000163563,
+            "offset_seconds": 0.31550145149230957,
+            "roundtrip_seconds": 1.4540657997131348
+          },
+          {
+            "host": "time.cloudflare.com",
+            "valid": true,
+            "stratum": 3,
+            "leap": 0,
+            "t1": 1790003760.8487267,
+            "t2": 1790003762.2059565,
+            "t3": 1790003762.2060199,
+            "t4": 1790003762.5368006,
+            "monotonic_elapsed": 1.6880742000066675,
+            "offset_seconds": 0.5132244825363159,
+            "roundtrip_seconds": 1.6880104541778564
+          }
+        ]
+      },
+      "gate": {
+        "passed": false,
+        "reason": "clock_alignment_unproven"
+      },
+      "previous_sample_retained": "clock-after-user-sync-windows.json",
+      "reason_for_recheck": "first Windows Microsoft sample RTT 1.364s could not establish clock bound; Cloudflare and both Linux estimates near zero"
+    },
+    "clock-config-after-user-sync.json": {
+      "type": "NTP",
+      "ntp_server": "time.windows.com,0x9",
+      "admin_result_present": false
+    },
+    "clock-service-after-user-sync.json": {
+      "exit_code": 0,
+      "status": "Leap 指示符: 0(无警告)\n层次: 5 (次引用 - 与(S)NTP 同步)\n精度: -23 (每刻度 119.209ns)\n根延迟: 0.2907382s\n根分散: 8.0076946s\n引用 ID: 0xA83DD74A (源 IP:  168.61.215.74)\n上次成功同步时间: 2026/9/21 23:13:33\n源: time.windows.com,0x9 \n轮询间隔: 10 (1024s)\n\n"
+    }
+  },
+  "entry_dry_run": {
+    "result": {
+      "status": "refused",
+      "sdk_started": false,
+      "exit_verified": false,
+      "credentials_cleaned": false,
+      "protected_states_unchanged": null,
+      "original_credentials_unchanged": null,
+      "production_acceptance": false,
+      "diagnostic_window_passed": false,
+      "error": "outside_launch_window"
+    },
+    "exit_code": 4,
+    "processes_idle": true,
+    "fences_absent": true,
+    "lock_available": true,
+    "case_not_consumed": true
+  }
+}
