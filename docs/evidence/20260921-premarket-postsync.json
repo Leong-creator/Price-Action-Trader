@@ -1,0 +1,176 @@
+{
+  "started_at": "2026-09-21T09:05:25.030804+00:00",
+  "finished_at": "2026-09-21T09:05:55.745889+00:00",
+  "subscription_returned_at": "2026-09-21T09:05:25.719202+00:00",
+  "observation_completed": true,
+  "observation_seconds": 30.014,
+  "unprocessed_tail_events": 0,
+  "total": {
+    "count": 1143,
+    "symbols": 147,
+    "fresh": 1002,
+    "future": 0,
+    "older_than_2s": 141,
+    "min_ms": 393.11,
+    "median_ms": 1093.224,
+    "max_ms": 3925761.088
+  },
+  "quote": {
+    "count": 409,
+    "symbols": 147,
+    "fresh": 268,
+    "future": 0,
+    "older_than_2s": 141,
+    "min_ms": 393.551,
+    "median_ms": 1294.0149999999999,
+    "max_ms": 3925761.088
+  },
+  "trade": {
+    "count": 734,
+    "symbols": 45,
+    "fresh": 734,
+    "future": 0,
+    "older_than_2s": 0,
+    "min_ms": 393.11,
+    "median_ms": 994.662,
+    "max_ms": 1600.703
+  },
+  "subsequent_quote": {
+    "count": 262,
+    "symbols": 45,
+    "fresh": 262,
+    "future": 0,
+    "older_than_2s": 0,
+    "min_ms": 393.551,
+    "median_ms": 994.205,
+    "max_ms": 1600.788
+  },
+  "session_counts": {
+    "Pre": 1143
+  },
+  "references": {
+    "SPY.US": {
+      "quote": {
+        "count": 2,
+        "symbols": 1,
+        "fresh": 1,
+        "future": 0,
+        "older_than_2s": 1,
+        "min_ms": 1293.53,
+        "median_ms": 16027.115999999998,
+        "max_ms": 30760.701999999997
+      },
+      "trade": {
+        "count": 1,
+        "symbols": 1,
+        "fresh": 1,
+        "future": 0,
+        "older_than_2s": 0,
+        "min_ms": 1293.498,
+        "median_ms": 1293.498,
+        "max_ms": 1293.498
+      }
+    },
+    "QQQ.US": {
+      "quote": {
+        "count": 1,
+        "symbols": 1,
+        "fresh": 0,
+        "future": 0,
+        "older_than_2s": 1,
+        "min_ms": 13760.878999999999,
+        "median_ms": 13760.878999999999,
+        "max_ms": 13760.878999999999
+      },
+      "trade": {
+        "count": 0,
+        "symbols": 0,
+        "fresh": 0,
+        "future": 0,
+        "older_than_2s": 0,
+        "min_ms": null,
+        "median_ms": null,
+        "max_ms": null
+      }
+    }
+  },
+  "full_session_passed": false,
+  "clock_windows": {
+    "platform": "win32",
+    "read_only": true,
+    "samples": [
+      {
+        "host": "time.windows.com",
+        "valid": true,
+        "stratum": 4,
+        "leap": 0,
+        "t1": 1789981427.4509974,
+        "t2": 1789981427.775526,
+        "t3": 1789981427.775527,
+        "t4": 1789981428.0686648,
+        "monotonic_elapsed": 0.6176672999863513,
+        "offset_seconds": 0.01569545269012451,
+        "roundtrip_seconds": 0.617666482925415
+      },
+      {
+        "host": "time.cloudflare.com",
+        "valid": true,
+        "stratum": 3,
+        "leap": 0,
+        "t1": 1789981428.2649944,
+        "t2": 1789981428.5708928,
+        "t3": 1789981428.57098,
+        "t4": 1789981428.8406875,
+        "monotonic_elapsed": 0.5756925999885425,
+        "offset_seconds": 0.01809549331665039,
+        "roundtrip_seconds": 0.5756058692932129
+      }
+    ]
+  },
+  "clock_wsl": {
+    "platform": "linux",
+    "read_only": true,
+    "samples": [
+      {
+        "host": "time.windows.com",
+        "valid": true,
+        "stratum": 4,
+        "leap": 0,
+        "t1": 1789981428.8798375,
+        "t2": 1789981429.202775,
+        "t3": 1789981429.2027764,
+        "t4": 1789981429.4938176,
+        "monotonic_elapsed": 0.6139802010147832,
+        "offset_seconds": 0.015948176383972168,
+        "roundtrip_seconds": 0.6139786243438721
+      },
+      {
+        "host": "time.cloudflare.com",
+        "valid": true,
+        "stratum": 3,
+        "leap": 0,
+        "t1": 1789981429.509064,
+        "t2": 1789981429.81715,
+        "t3": 1789981429.8172364,
+        "t4": 1789981430.089573,
+        "monotonic_elapsed": 0.58051014598459,
+        "offset_seconds": 0.017874836921691895,
+        "roundtrip_seconds": 0.5804226398468018
+      }
+    ]
+  },
+  "postflight": {
+    "official_inputs_and_protected_states_unchanged": true,
+    "original_credentials_unchanged": true,
+    "quote_processes_idle": true,
+    "quote_lock_idle": true,
+    "fences_absent": true,
+    "tonight_manifests_unchanged": true,
+    "tonight_tasks_unchanged_and_ready": true,
+    "tonight_not_consumed": true
+  },
+  "source_unchanged_from_case015": true,
+  "external_archive": "/home/hgl/project-archives/Price-Action-Trader/20260921-premarket-postsync",
+  "system_time_changed_by_this_test": false,
+  "production_restored": false
+}
