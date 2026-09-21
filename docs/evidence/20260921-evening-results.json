@@ -1,0 +1,83 @@
+{
+  "date": "2026-09-21",
+  "windows": {
+    "started_at": "2026-09-21T13:25:03.103895+00:00",
+    "finished_at": "2026-09-21T13:26:16.362253+00:00",
+    "elapsed_seconds": 73.258,
+    "status": "failed",
+    "watchdog_reason": "invalid_health_record",
+    "subscription_succeeded_at": "2026-09-21T13:25:04.117332+00:00",
+    "quote_events": 2097,
+    "quote_symbols": 147,
+    "trade_events": 5073,
+    "trade_symbols": 107,
+    "last_event_received_at": "2026-09-21T13:26:16.161798+00:00",
+    "reached_regular_open": false,
+    "data_stall_proven": false,
+    "health_read_error_subtype": "not_recorded",
+    "exit_verified": true,
+    "credentials_cleaned": true,
+    "all_inputs_unchanged": true,
+    "last_event_to_controller_finish_seconds": 0.200455,
+    "controller_status": "watchdog_fault",
+    "premarket_source_time_difference": {
+      "negative_age_events": 2258,
+      "negative_quote_events": 637,
+      "negative_trade_events": 1621,
+      "maximum_source_ahead_ms": 438.832,
+      "within_0_to_2000_ms_events": 4791,
+      "older_than_2000_ms_events": 121,
+      "older_events_all_first_quote": true,
+      "subsequent_quote_older_than_2000ms": 0,
+      "trade_older_than_2000ms": 0,
+      "cause": "unproven",
+      "direct_cause_of_invalid_health_record": false,
+      "existing_future_tolerance_changed": false,
+      "not_network_latency_measurement": true,
+      "regular_session_acceptance": false
+    }
+  },
+  "wsl": {
+    "started_at": "2026-09-21T13:50:01.315176+00:00",
+    "finished_at": "2026-09-21T13:50:36.530981+00:00",
+    "elapsed_seconds": 35.216,
+    "status": "failed",
+    "last_worker_stage": "daily_context",
+    "error_category": "request_timeout",
+    "realtime_subscription_reached": false,
+    "daily_context_row_count": 0,
+    "quote_state_symbol_count": 0,
+    "realtime_bar_count": 0,
+    "strategy_evaluation_count": 0,
+    "exit_verified": true
+  },
+  "postflight": {
+    "processes_idle": true,
+    "lock_idle": true,
+    "fences_absent": true,
+    "original_credentials_unchanged": true,
+    "temporary_windows_credentials_absent": true,
+    "protected_states_unchanged": true,
+    "linux_405_fixed_files_unchanged": true,
+    "orders_enabled": false
+  },
+  "task_readback": [
+    {
+      "name": "PAT-Official-Quote-Continuity-20260921-Once",
+      "present": false
+    },
+    {
+      "name": "PAT-Linux-Pipeline-Diagnostic-20260921-Once",
+      "present": true,
+      "state": "Ready",
+      "last_run": "09/21/2026 21:50:00",
+      "last_result": 4,
+      "next_run": "",
+      "missed_runs": 0
+    }
+  ],
+  "full_sessions_passed": 0,
+  "production_restored": false,
+  "new_sdk_connections_during_review": 0,
+  "archive": "/home/hgl/project-archives/Price-Action-Trader/20260921-evening-results"
+}
