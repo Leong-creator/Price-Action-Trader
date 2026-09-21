@@ -1,0 +1,128 @@
+{
+  "case": "case017-wsl-premarket-check",
+  "platform": "WSL/Linux",
+  "source_identical_to_windows_case016": true,
+  "symbol_count_requested": 147,
+  "subscribed": false,
+  "observation_completed": false,
+  "recorded_event_count": 0,
+  "raw_callback_count": "unknown_from_observer_summary",
+  "error_type": "OpenApiException",
+  "reason": "request_timeout",
+  "stages": [
+    {
+      "stage": "initializing",
+      "at": "2026-09-21T09:25:21.450915+00:00"
+    },
+    {
+      "stage": "subscribing",
+      "at": "2026-09-21T09:25:21.460085+00:00",
+      "symbol_count": 147
+    },
+    {
+      "stage": "failed",
+      "at": "2026-09-21T09:25:52.385286+00:00",
+      "error_type": "OpenApiException"
+    }
+  ],
+  "subscribe_to_error_seconds": 30.925201,
+  "runtime_result": {
+    "status": "failed",
+    "sdk_started": true,
+    "exit_verified": true,
+    "credentials_copied": false,
+    "production_acceptance": false,
+    "full_session_passed": false,
+    "child_exitcode": 2,
+    "child_exited": true,
+    "process_group_empty": true,
+    "external_deadline_respected": true,
+    "protected_states_unchanged": true,
+    "original_credentials_unchanged": true,
+    "source_unchanged": true,
+    "pinned_inputs_unchanged": true,
+    "tonight_manifests_unchanged": true
+  },
+  "clock": {
+    "platform": "linux",
+    "read_only": true,
+    "samples": [
+      {
+        "host": "time.windows.com",
+        "valid": true,
+        "stratum": 4,
+        "leap": 0,
+        "t1": 1789982355.3298814,
+        "t2": 1789982355.7063408,
+        "t3": 1789982355.7063417,
+        "t4": 1789982355.9481897,
+        "monotonic_elapsed": 0.6183083659852855,
+        "offset_seconds": 0.06730568408966064,
+        "roundtrip_seconds": 0.61830735206604
+      },
+      {
+        "host": "time.cloudflare.com",
+        "valid": true,
+        "stratum": 3,
+        "leap": 0,
+        "t1": 1789982356.1546156,
+        "t2": 1789982356.5148015,
+        "t3": 1789982356.5148416,
+        "t4": 1789982356.7266912,
+        "monotonic_elapsed": 0.5720769650069997,
+        "offset_seconds": 0.07416808605194092,
+        "roundtrip_seconds": 0.572035551071167
+      }
+    ]
+  },
+  "postflight": {
+    "official_inputs_and_protected_states_unchanged": true,
+    "quote_processes_idle": true,
+    "quote_lock_idle": true,
+    "fences_absent": true,
+    "tonight_manifests_unchanged": true,
+    "tonight_tasks_unchanged_and_ready": true,
+    "tonight_not_consumed": true
+  },
+  "full_session_passed": false,
+  "production_restored": false,
+  "external_archive": "/home/hgl/project-archives/Price-Action-Trader/20260921-wsl-premarket-check",
+  "sdk_log_stage_evidence": {
+    "native_log_sha256": "6ba8a0a5c0cb57aa90bd68f576289a2215008d8c7c1d0177f7e5e2047fad05bc",
+    "native_log_lines": 16,
+    "timeline": [
+      {
+        "line": 9,
+        "at": "2026-09-21T09:25:22.329737Z",
+        "event": "auth_response"
+      },
+      {
+        "line": 11,
+        "at": "2026-09-21T09:25:22.381993Z",
+        "event": "quote_profile_response",
+        "subscribe_limit": 500,
+        "us_lv1_package_observed": true
+      },
+      {
+        "line": 13,
+        "at": "2026-09-21T09:25:22.382283Z",
+        "event": "subscribe_request_logged",
+        "requested_symbol_count": 147
+      },
+      {
+        "line": 14,
+        "at": "2026-09-21T09:25:52.384578Z",
+        "event": "sdk_parsed_quote_push",
+        "symbol": "SPY.US"
+      }
+    ],
+    "sdk_parsed_quote_push_count": 1,
+    "sdk_parsed_trade_push_count": 0,
+    "subscribe_response_observed_in_log": false,
+    "python_callback_count": "unknown",
+    "observer_recorded_event_count": 0,
+    "subscribe_call_returned_normally": false,
+    "native_request_to_quote_push_seconds": 30.002295,
+    "scope": "Observed SDK log categories only; no network-send confirmation or internal root-cause claim"
+  }
+}
