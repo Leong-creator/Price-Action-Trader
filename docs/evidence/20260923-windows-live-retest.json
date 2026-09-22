@@ -1,0 +1,298 @@
+{
+  "case": "case020-windows-intraday",
+  "market_date": "2026-09-22",
+  "beijing_date": "2026-09-23",
+  "window_beijing": "01:12-01:17",
+  "subscription_succeeded_at": "2026-09-22T17:12:06.405972+00:00",
+  "sampler_observed_at": "2026-09-22T17:17:00.011968+00:00",
+  "controller_elapsed_seconds": 294.749,
+  "reception_window_passed": true,
+  "overall_diagnostic_window_passed": false,
+  "regular_event_count": 165908,
+  "fresh_regular_symbol_count": 147,
+  "reference_flows": {
+    "SPY.US": {
+      "quote": {
+        "last_fresh_received_at": "2026-09-22T17:16:59.681947+00:00",
+        "last_fresh_event_at": "2026-09-22T17:16:59+00:00",
+        "last_fresh_received_monotonic": 378109.6710598,
+        "max_gap_seconds": 4.785512399976142,
+        "fresh_event_count": 277,
+        "currently_silent_seconds": 0.3180593000142835
+      },
+      "trade": {
+        "last_fresh_received_at": "2026-09-22T17:16:59.680946+00:00",
+        "last_fresh_event_at": "2026-09-22T17:16:59+00:00",
+        "last_fresh_received_monotonic": 378109.6700589,
+        "max_gap_seconds": 4.798901300004218,
+        "fresh_event_count": 278,
+        "currently_silent_seconds": 0.31906020001042634
+      }
+    },
+    "QQQ.US": {
+      "quote": {
+        "last_fresh_received_at": "2026-09-22T17:16:59.681871+00:00",
+        "last_fresh_event_at": "2026-09-22T17:16:59+00:00",
+        "last_fresh_received_monotonic": 378109.6709838,
+        "max_gap_seconds": 2.4050817000097595,
+        "fresh_event_count": 279,
+        "currently_silent_seconds": 0.3181353000109084
+      },
+      "trade": {
+        "last_fresh_received_at": "2026-09-22T17:16:59.680824+00:00",
+        "last_fresh_event_at": "2026-09-22T17:16:59+00:00",
+        "last_fresh_received_monotonic": 378109.6699382,
+        "max_gap_seconds": 2.405901800026186,
+        "fresh_event_count": 280,
+        "currently_silent_seconds": 0.3191809000563808
+      }
+    }
+  },
+  "maximum_queue_depth": 647,
+  "maximum_queue_delay_ms": 120.241,
+  "ending_queue_depth": 0,
+  "health_read_diagnostics": {
+    "health_deadline_seconds": 5,
+    "health_read_errors_total": 0,
+    "health_read_errors_consecutive": 0,
+    "health_read_errors_max_consecutive": 0,
+    "first_health_read_error": null,
+    "last_health_read_error": null,
+    "last_good_health_monotonic": 378109.3104156,
+    "last_good_health_read_at_monotonic": 378109.9275661,
+    "streaming_phase_started_monotonic": null
+  },
+  "writer_diagnostics": {
+    "replace_errors_total": 0,
+    "replace_recoveries_total": 0,
+    "replace_failures_total": 0,
+    "last_replace_error": null
+  },
+  "clock_assessment": {
+    "reception_allowed": true,
+    "quality_passed": false,
+    "quality_reason": "clock_alignment_unproven",
+    "received_for_diagnosis_only": true,
+    "maximum_clock_bound_seconds": 0.5,
+    "samples": [
+      {
+        "host": "time.windows.com",
+        "valid": true,
+        "stratum": 4,
+        "leap": 0,
+        "t1": 1790097121.5006533,
+        "t2": 1790097121.7498565,
+        "t3": 1790097121.749858,
+        "t4": 1790097122.1415582,
+        "monotonic_elapsed": 0.6409053999814205,
+        "offset_seconds": -0.07124853134155273,
+        "roundtrip_seconds": 0.6409034729003906
+      },
+      {
+        "host": "time.cloudflare.com",
+        "valid": true,
+        "stratum": 3,
+        "leap": 0,
+        "t1": 1790097122.344161,
+        "t2": 1790097123.0258555,
+        "t3": 1790097123.0259223,
+        "t4": 1790097123.3886845,
+        "monotonic_elapsed": 1.0445244000293314,
+        "offset_seconds": 0.15946614742279053,
+        "roundtrip_seconds": 1.0444567203521729
+      }
+    ]
+  },
+  "postflight": {
+    "quote_processes_idle": true,
+    "quote_lock_available": true,
+    "fences_absent": true,
+    "original_credentials_unchanged": true,
+    "protected_states_unchanged": true,
+    "windows_credential_roots_absent": true
+  },
+  "deployment": {
+    "manifest_sha256": "30abfd384d9154a45195e8d3ae834bc7ceee7155524db9fe881249f49a079dbb",
+    "inputs_verified": true,
+    "protected_states_unchanged": true,
+    "actual_market_date": "2026-09-22",
+    "windows_date": "2026-09-23",
+    "quote_processes_idle": true,
+    "credentials_planned_not_copied": true,
+    "sdk_started": false
+  },
+  "previous_scheduled_result": {
+    "refusal_1790083503502751225_671824.json": {
+      "sha256": "8371d94eae55bb4b2cc2988963c71a33795795f202a542aacfbf7763ce53d0b5",
+      "value": {
+        "status": "refused",
+        "sdk_started": false,
+        "exit_verified": false,
+        "credentials_cleaned": false,
+        "protected_states_unchanged": null,
+        "original_credentials_unchanged": null,
+        "production_acceptance": false,
+        "diagnostic_window_passed": false,
+        "error": "RuntimeError"
+      }
+    },
+    "launch-clock-check.json": {
+      "sha256": "93b04c15920af50792f81a8198162293ec20dc1ce36f93c350f531e670f34d08",
+      "value": {
+        "platform": "win32",
+        "read_only": true,
+        "samples": [
+          {
+            "host": "time.windows.com",
+            "valid": true,
+            "stratum": 4,
+            "leap": 0,
+            "t1": 1790083501.75114,
+            "t2": 1790083502.7449794,
+            "t3": 1790083502.7449803,
+            "t4": 1790083502.489806,
+            "monotonic_elapsed": 0.7386663999641314,
+            "offset_seconds": 0.6245068311691284,
+            "roundtrip_seconds": 0.7386648654937744
+          },
+          {
+            "host": "time.cloudflare.com",
+            "valid": true,
+            "stratum": 3,
+            "leap": 0,
+            "t1": 1790083502.7636478,
+            "t2": 1790083503.781518,
+            "t3": 1790083503.7815795,
+            "t4": 1790083503.490806,
+            "monotonic_elapsed": 0.7271583000547253,
+            "offset_seconds": 0.6543217897415161,
+            "roundtrip_seconds": 0.7270967960357666
+          }
+        ]
+      }
+    }
+  },
+  "full_sessions_passed": 0,
+  "strategy_validation_performed": false,
+  "kline_validation_performed": false,
+  "archive": "/home/hgl/project-archives/Price-Action-Trader/20260923-windows-intraday",
+  "independent_live_review": {
+    "case": "case020-windows-intraday",
+    "status": "independent_completed_archive_analysis",
+    "sdk_connections_by_reviewer": 0,
+    "inputs_modified": false,
+    "outer_status": "observed_not_passed",
+    "reception_window_passed": true,
+    "overall_diagnostic_window_passed": false,
+    "clock_quality_passed": false,
+    "sampler_local_criteria_passed": true,
+    "full_sessions_passed": 0,
+    "processed_event_count": 165908,
+    "regular_count_matches_summary": true,
+    "kind_counts": {
+      "quote": 44655,
+      "trade": 121253
+    },
+    "classifications": {
+      "fresh_regular_event": 53805,
+      "initial_quote_last_trade_old": 54,
+      "same_timestamp_does_not_renew_liveness": 112048,
+      "out_of_order_trade_no_liveness_credit": 1
+    },
+    "symbol_coverage": {
+      "quote": 147,
+      "trade": 147
+    },
+    "fresh_symbol_coverage": {
+      "quote": 147,
+      "trade": 147
+    },
+    "fresh_symbol_union": 147,
+    "expected_symbol_set_matches": true,
+    "initial_old_quote_count": 54,
+    "initial_old_quote_all_timestamp_before_subscription": true,
+    "first_received_at": "2026-09-22T17:12:06.444571+00:00",
+    "last_received_at": "2026-09-22T17:16:59.982789+00:00",
+    "first_to_last_received_seconds": 293.538218,
+    "subscription_to_cutoff_seconds": 293.594028,
+    "controller_elapsed_seconds": 294.749,
+    "planned_window_seconds": 300.0,
+    "events_received_at_or_after_cutoff": 0,
+    "last_received_to_cutoff_seconds": 0.017211,
+    "summary_after_cutoff_seconds": 0.011968,
+    "maximum_queue_delay_ms_recomputed": 120.241,
+    "maximum_queue_depth": 647,
+    "final_queue_depth": 0,
+    "reference_flows": {
+      "SPY.US:quote": {
+        "fresh_events_recomputed": 277,
+        "fresh_count_matches_summary": true,
+        "maximum_gap_from_utc_seconds": 4.785511,
+        "summary_monotonic_maximum_gap_seconds": 4.785512399976142,
+        "tail_to_cutoff_seconds": 0.318053,
+        "last_received_at": "2026-09-22T17:16:59.681947+00:00",
+        "all_gaps_below_30": true
+      },
+      "QQQ.US:quote": {
+        "fresh_events_recomputed": 279,
+        "fresh_count_matches_summary": true,
+        "maximum_gap_from_utc_seconds": 2.405082,
+        "summary_monotonic_maximum_gap_seconds": 2.4050817000097595,
+        "tail_to_cutoff_seconds": 0.318129,
+        "last_received_at": "2026-09-22T17:16:59.681871+00:00",
+        "all_gaps_below_30": true
+      },
+      "QQQ.US:trade": {
+        "fresh_events_recomputed": 280,
+        "fresh_count_matches_summary": true,
+        "maximum_gap_from_utc_seconds": 2.405901,
+        "summary_monotonic_maximum_gap_seconds": 2.405901800026186,
+        "tail_to_cutoff_seconds": 0.319176,
+        "last_received_at": "2026-09-22T17:16:59.680824+00:00",
+        "all_gaps_below_30": true
+      },
+      "SPY.US:trade": {
+        "fresh_events_recomputed": 278,
+        "fresh_count_matches_summary": true,
+        "maximum_gap_from_utc_seconds": 4.798901,
+        "summary_monotonic_maximum_gap_seconds": 4.798901300004218,
+        "tail_to_cutoff_seconds": 0.319054,
+        "last_received_at": "2026-09-22T17:16:59.680946+00:00",
+        "all_gaps_below_30": true
+      }
+    },
+    "health_read_errors": 0,
+    "writer_diagnostics": {
+      "replace_errors_total": 0,
+      "replace_recoveries_total": 0,
+      "replace_failures_total": 0,
+      "last_replace_error": null
+    },
+    "event_age_descriptive_only": {
+      "buckets": {
+        "zero_to_2000": 165854,
+        "above_2000": 54
+      },
+      "min_ms": 478.835,
+      "max_ms": 10445.075,
+      "not_network_latency": true,
+      "clock_quality_unproven": true
+    },
+    "lifecycle": {
+      "exit_verified": true,
+      "credentials_cleaned": true,
+      "protected_states_unchanged": true,
+      "original_credentials_unchanged": true
+    },
+    "job_active_processes": 0,
+    "child_exitcode": 0,
+    "all_inputs_unchanged": true,
+    "evidence_sha256": {
+      "events.ndjson": "fe3d54cb1a9580f59645f3627ba3b230b5dfcecfde91c990fcd610e2bd559e7a",
+      "summary.json": "9adb206a28f44ffcec3448ec575428d5a3d3b111488b2f48e2bc5e7fa809e3b3",
+      "run_result.json": "cde5bc085c8332666b00bc98d2e154f57cf949ac38bf074749cae6c5892c4ca8",
+      "stages.jsonl": "e971c1c51168f825bd8303d4b2423a8d6141013bd90bb13e783a2394673460c2"
+    },
+    "conclusion": "Actual reception continued through the fixed cutoff and meets the frozen local stream criteria, including 147 fresh-symbol coverage and four reference flows. Overall diagnosis remains not passed because launch clock quality was unproven. Duration includes initialization; not five full minutes after subscription, no K-line/strategy or full-session validation."
+  }
+}

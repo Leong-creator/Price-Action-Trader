@@ -1,5 +1,13 @@
 # 当前执行规则
 
+## case020结果口径
+
+本次采样接收检查通过，但clock quality未过，整体仍observed_not_passed。不得只取summary局部diagnostic_window_passed=True宣称整体验收通过；不因接收完整而追溯降低时间前提。54条旧首报价保留原时刻、未计fresh或续静默，重复时间记录也不续期。一个短窗不替代K线、策略及完整日验证，Windows结果不替代WSL验收。详见[本次记录](decisions/20260923-windows-live-retest.md)。
+
+## case020追加只读实连授权
+
+本次使用用户当前“现在实连继续测试”的授权，在UTC9月22日17:12—17:17执行case020；北京时间已过午夜不改变美股交易日。复用已审case019外壳与首推修复helper，至少一个合法时钟样本才允许诊断接收、双源质量不足使总验收不通过；原行情/队列/静默门槛保持，不恢复生产或订单。连接前再次查排他和文件，结果按接收、处理、时间与退出分层报告。
+
 ## 首条旧报价分类修复交付
 
 明晚case018使用已审新helper：仅每股票首次Quote、最后成交不晚于订阅且超过既有新鲜度，分类initial_quote_last_trade_old，保留排序基线，不计fresh、不续参考流，不因此单条终止。之后旧Quote仍停止但原因quote_last_trade_not_fresh；Trade超龄、未来、倒退、队列和30秒静默规则保持。总验收不因离线测试或首推覆盖通过而升级；case019实测失败证据原样保存。见[实测与修复](decisions/20260921-intraday-retest.md)。
