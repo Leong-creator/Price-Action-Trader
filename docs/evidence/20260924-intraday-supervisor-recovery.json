@@ -1,5 +1,5 @@
 {
-  "schema": "m15.intraday-supervisor-recovery.preparation.v1",
+  "schema": "m15.intraday-supervisor-recovery.result.v1",
   "preflight": {
     "manifest_sha256": "fc1e34a56e8a94c043830359c184069ebb11b0f6a9113674c3f6ce953aae1384",
     "linux_and_windows_bindings_verified": true,
@@ -34,7 +34,8 @@
     "manifest_sha256": "fc1e34a56e8a94c043830359c184069ebb11b0f6a9113674c3f6ce953aae1384",
     "action_verified": true,
     "production_restart": false,
-    "order_enabled": false
+    "order_enabled": false,
+    "snapshot_scope": "prelaunch_readback_not_current_runtime_state"
   },
   "distinct_offline_tests": 116,
   "real_lifecycle_smoke": {
@@ -55,7 +56,114 @@
     "new_sdk_connections": 0,
     "replay_is_not_live_acceptance": true
   },
-  "case023_real_result": "not_observed_yet",
+  "case023_real_result": {
+    "window_start_utc": "2026-09-24T15:15:00+00:00",
+    "window_end_utc": "2026-09-24T16:00:05+00:00",
+    "current_runtime_state": "stopped_after_scheduled_window",
+    "raw_stream": {
+      "run_id": "bf18675a-a9f9-4ddb-b3dc-dc208cbe8309",
+      "strict_sequence_and_identity_valid": true,
+      "terminal_end_seen": true,
+      "last_sequence": 1061591,
+      "message_counts": {
+        "stage": 5,
+        "daily_context": 147,
+        "heartbeat": 2725,
+        "subscribed": 1,
+        "initial_snapshot": 1,
+        "ready": 1,
+        "quote": 503675,
+        "watermark": 51356,
+        "trade": 503679,
+        "end": 1
+      },
+      "symbol_counts": {
+        "quote": 147,
+        "trade": 147
+      },
+      "trade_records": 1840919,
+      "first_callback": "2026-09-24T15:15:40.258006+00:00",
+      "last_callback": "2026-09-24T16:00:04.998017+00:00",
+      "callback_span_seconds": 2664.740011,
+      "reference_callback_max_gaps_seconds": {
+        "quote:SPY.US": 1.502871,
+        "quote:QQQ.US": 0.615546,
+        "trade:SPY.US": 1.502864,
+        "trade:QQQ.US": 0.617126
+      },
+      "maximum_trade_source_age_seconds": 2.426486,
+      "maximum_callback_to_wire_emission_seconds": 0.094601,
+      "scope": "recorded_windows_source_not_independent_UTC_certification",
+      "new_sdk_connections": 0
+    },
+    "processed_trade_count": 1840693,
+    "ignored_tail_events": 134,
+    "complete_boundaries": 8,
+    "expected_complete_boundaries": 8,
+    "classified_bar_count": 1176,
+    "realtime_tradable_bar_count": 1175,
+    "strategy_evaluation_count": 8,
+    "daily_context_rows": 8820,
+    "signal_records": [
+      {
+        "signal_id": "m15rt-dd3dc693378e1dc5",
+        "created_at": "2026-09-24T15:35:00.209110Z",
+        "symbol": "PLTR",
+        "runtime_id": "M12-FTD-001-pullback-guard-confirm-1d",
+        "source_market_event_id": "sdk-1d-live|PLTR|2026-09-24|2026-09-24T15:35:00Z"
+      },
+      {
+        "signal_id": "m15rt-0ab5de789136dd70",
+        "created_at": "2026-09-24T15:55:00.494867Z",
+        "symbol": "PLTR",
+        "runtime_id": "M12-FTD-001-pullback-guard-confirm-1d",
+        "source_market_event_id": "sdk-1d-live|PLTR|2026-09-24|2026-09-24T15:55:00Z"
+      },
+      {
+        "signal_id": "m15rt-919c89d95628fe97",
+        "created_at": "2026-09-24T16:00:00.481218Z",
+        "symbol": "PLTR",
+        "runtime_id": "M12-FTD-001-pullback-guard-confirm-1d",
+        "source_market_event_id": "sdk-1d-live|PLTR|2026-09-24|2026-09-24T16:00:00Z"
+      }
+    ],
+    "signal_scope": "same_symbol_and_runtime_at_three_live_boundaries_not_independent_trades",
+    "bounded_pipeline_passed": true,
+    "reception_window_passed": true,
+    "clock_quality_passed": false,
+    "clock_quality_reason": "clock_alignment_unproven",
+    "diagnostic_window_passed": false,
+    "overall_status": "observed_not_passed",
+    "exit_verified": true,
+    "credentials_cleaned": true,
+    "original_credentials_unchanged": true,
+    "protected_states_unchanged": true,
+    "guardian_status": "completed",
+    "job_active_processes": 0,
+    "child_exitcode": 0,
+    "consumer_exitcode": 0,
+    "daemon_exitcode": 4,
+    "daemon_termination_requested": false,
+    "full_session_acceptance": false,
+    "strategy_full_acceptance": false,
+    "account_access": false,
+    "order_access": false,
+    "full_trading_days_passed": 0,
+    "wsl_direct_sdk_accepted": false,
+    "independent_final_review": {
+      "status": "success_review_completed",
+      "path": "/home/hgl/project-archives/Price-Action-Trader/20260924-intraday-recovery/review/final-window-independent-review.json",
+      "sha256": "af8df51e760929f15a8a6d4df0c4120401840a991f223d34f7a8b7ccd10471d7",
+      "frozen_bindings_checked": 459,
+      "frozen_bindings_match": true,
+      "global_lock_available": true,
+      "both_fences_absent": true,
+      "credential_copies_and_private_roots_absent": true,
+      "matching_processes_absent": true
+    },
+    "windows_private_evidence_duplicate_cleanup_pending": true,
+    "ignored_tail_events_scope": "processed_after_window_deadline_not_necessarily_received_after_deadline"
+  },
   "production_restored": false,
   "orders_enabled": false,
   "archive": "/home/hgl/project-archives/Price-Action-Trader/20260924-intraday-recovery"
