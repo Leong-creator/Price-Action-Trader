@@ -1,5 +1,9 @@
 # 当前执行规则
 
+## 9月24日开盘测试授权与边界
+
+用户要求确保今晚准时测试，落实case021固定21:25—21:45窗口及21:26最晚启动。所有入口绑定新清单、官方文件、独立认证归属及原保护状态；重复触发IgnoreNew、迟到拒绝、不自动补跑/重试。采用已审case020接收/时钟分开判定：原始授时证据先存、至少一合法样本才接收，双源时间不达标总验收False，不能据局部summary升级。开盘前校时复查不改行情阈值，不解锁生产/订单。见[实施与准备核验](decisions/20260924-opening-readiness.md)。
+
 ## case020结果口径
 
 本次采样接收检查通过，但clock quality未过，整体仍observed_not_passed。不得只取summary局部diagnostic_window_passed=True宣称整体验收通过；不因接收完整而追溯降低时间前提。54条旧首报价保留原时刻、未计fresh或续静默，重复时间记录也不续期。一个短窗不替代K线、策略及完整日验证，Windows结果不替代WSL验收。详见[本次记录](decisions/20260923-windows-live-retest.md)。

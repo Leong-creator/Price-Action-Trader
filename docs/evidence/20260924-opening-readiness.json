@@ -1,0 +1,238 @@
+{
+  "task-readback.json": {
+    "wake_to_run": true,
+    "disallow_start_on_battery": false,
+    "stop_on_battery": false,
+    "run_only_if_idle": false,
+    "run_only_if_network": false,
+    "multiple_instances": "IgnoreNew",
+    "task_name": "PAT-Official-Quote-Continuity-20260924-Once",
+    "state": "Ready",
+    "start_boundary": "2026-09-24T21:25:00+08:00",
+    "end_boundary": "2026-09-24T21:26:00",
+    "next_run": "2026-09-24T21:25:00.0000000+08:00",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "restart_count": 0,
+    "start_when_available": false,
+    "execution_time_limit": "PT25M",
+    "delete_expired_after": "PT1H",
+    "manifest_sha256": "a3b59cd6bbedc5f1932cd3ccbfc4223c8ab0b4710ea5f790eeed16bff98ba70c",
+    "action_verified": true,
+    "production_restart": false,
+    "order_enabled": false
+  },
+  "deployment-check.json": {
+    "manifest_sha256": "a3b59cd6bbedc5f1932cd3ccbfc4223c8ab0b4710ea5f790eeed16bff98ba70c",
+    "files_environment_verified": true,
+    "protected_states_unchanged": true,
+    "credential_expiry_covers_end_plus_one_hour": true,
+    "credential_files_planned": 2,
+    "credentials_copied": false,
+    "quote_processes_idle": true,
+    "global_lock_available": true,
+    "fences_absent": true,
+    "actual_date_valid": "2026-09-24",
+    "sdk_started": false
+  },
+  "windows-action-smoke.json": {
+    "action_shape": "Windows wsl.exe --distribution Ubuntu --user hgl --exec python3 -I -B",
+    "exit_code": 4,
+    "result": {
+      "status": "refused",
+      "sdk_started": false,
+      "exit_verified": false,
+      "credentials_cleaned": false,
+      "protected_states_unchanged": null,
+      "original_credentials_unchanged": null,
+      "production_acceptance": false,
+      "diagnostic_window_passed": false,
+      "error": "outside_launch_window"
+    },
+    "case_not_consumed": true
+  },
+  "preparation-clock.json": {
+    "query": {
+      "platform": "win32",
+      "read_only": true,
+      "samples": [
+        {
+          "host": "time.windows.com",
+          "valid": true,
+          "stratum": 4,
+          "leap": 0,
+          "t1": 1790252970.3738458,
+          "t2": 1790252971.6349392,
+          "t3": 1790252971.6349401,
+          "t4": 1790252971.0066957,
+          "monotonic_elapsed": 0.6328497999929823,
+          "offset_seconds": 0.9446688890457153,
+          "roundtrip_seconds": 0.6328489780426025
+        },
+        {
+          "host": "time.cloudflare.com",
+          "valid": true,
+          "stratum": 3,
+          "leap": 0,
+          "t1": 1790252971.261153,
+          "t2": 1790252972.5868578,
+          "t3": 1790252972.587041,
+          "t4": 1790252971.9371269,
+          "monotonic_elapsed": 0.6759735999949044,
+          "offset_seconds": 0.987809419631958,
+          "roundtrip_seconds": 0.6757907867431641
+        }
+      ]
+    },
+    "assessment": {
+      "reception_allowed": true,
+      "quality_passed": false,
+      "quality_reason": "clock_alignment_unproven",
+      "received_for_diagnosis_only": true,
+      "maximum_clock_bound_seconds": 0.5,
+      "samples": [
+        {
+          "host": "time.windows.com",
+          "valid": true,
+          "stratum": 4,
+          "leap": 0,
+          "t1": 1790252970.3738458,
+          "t2": 1790252971.6349392,
+          "t3": 1790252971.6349401,
+          "t4": 1790252971.0066957,
+          "monotonic_elapsed": 0.6328497999929823,
+          "offset_seconds": 0.9446688890457153,
+          "roundtrip_seconds": 0.6328489780426025
+        },
+        {
+          "host": "time.cloudflare.com",
+          "valid": true,
+          "stratum": 3,
+          "leap": 0,
+          "t1": 1790252971.261153,
+          "t2": 1790252972.5868578,
+          "t3": 1790252972.587041,
+          "t4": 1790252971.9371269,
+          "monotonic_elapsed": 0.6759735999949044,
+          "offset_seconds": 0.987809419631958,
+          "roundtrip_seconds": 0.6757907867431641
+        }
+      ]
+    }
+  },
+  "host-preflight.json": {
+    "power_query_ok": true,
+    "ac_line_status": 1,
+    "battery_percent": -1,
+    "sleep": {
+      "exit_code": 0,
+      "output": "电源方案 GUID: 3c2a1244-3fcd-4a91-af2e-dd6171534670  (Lenovo 默认)\r\n  子组 GUID: 238c9fa8-0aad-41ed-83f4-97be242c8f20  (睡眠)\r\n    GUID 别名: SUB_SLEEP\r\n    电源设置 GUID: 29f6c1db-86da-48c5-9fdb-f2b67b1f44da  (在此时间后睡眠)\r\n      GUID 别名: STANDBYIDLE\r\n      最小可能的设置: 0x00000000\r\n      最大可能的设置: 0xffffffff\r\n      可能的设置增量: 0x00000001\r\n      可能的设置单位: 秒\r\n    当前交流电源设置索引: 0x00000000\r\n    当前直流电源设置索引: 0x000005dc\r\n\r\n    电源设置 GUID: 94ac6d29-73ce-41a6-809f-6363ba21b47e  (允许混合睡眠)\r\n      GUID 别名: HYBRIDSLEEP\r\n      可能的设置索引: 000\r\n      可能的设置友好名称: 关闭\r\n      可能的设置索引: 001\r\n      可能的设置友好名称: 开启\r\n    当前交流电源设置索引: 0x00000001\r\n    当前直流电源设置索引: 0x00000001\r\n\r\n    电源设置 GUID: 9d7815a6-7ee4-497e-8888-515a05f02364  (在此时间后休眠)\r\n      GUID 别名: HIBERNATEIDLE\r\n      最小可能的设置: 0x00000000\r\n      最大可能的设置: 0xffffffff\r\n      可能的设置增量: 0x00000001\r\n      可能的设置单位: 秒\r\n    当前交流电源设置索引: 0x00000000\r\n    当前直流电源设置索引: 0x00000000\r\n\r\n    电源设置 GUID: bd3b718a-0680-4d9d-8ab2-e1d2b4ac806d  (允许使用唤醒定时器)\r\n      GUID 别名: RTCWAKE\r\n      可能的设置索引: 000\r\n      可能的设置友好名称: 禁用\r\n      可能的设置索引: 001\r\n      可能的设置友好名称: 启用\r\n      可能的设置索引: 002\r\n      可能的设置友好名称: 仅限重要的唤醒计算器\r\n    当前交流电源设置索引: 0x00000001\r\n    当前直流电源设置索引: 0x00000000\r\n\r\n"
+    },
+    "time": {
+      "exit_code": 0,
+      "output": "Leap 指示符: 3(未同步)\n层次: 0 (未指定)\n精度: -23 (每刻度 119.209ns)\n根延迟: 0.7747914s\n根分散: 9.1689561s\n引用 ID: 0x00000000 (未指定)\n上次成功同步时间: 2026/9/24 13:31:45\n源: time.windows.com,0x9 \n轮询间隔: 10 (1024s)\n\n"
+    }
+  },
+  "interactive-session.json": {
+    "interactive_user": "LEONG\\hegua",
+    "explorer_sessions": [
+      {
+        "Id": 11884,
+        "SessionId": 1
+      }
+    ],
+    "timezone": "China Standard Time",
+    "checked_at": "2026-09-24T20:32:12.9196619+08:00"
+  },
+  "case": "case021-windows-opening",
+  "new_sdk_connections": 0,
+  "full_sessions_passed": 0,
+  "scope": "opening_quote_trade_continuity_only",
+  "strategy_or_kline_test": false,
+  "wrapper_tests_passed": 65,
+  "independent_review": {
+    "task_id": "case021-opening-readiness-independent-review",
+    "role": "reviewer",
+    "branch_or_worktree": "/home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening",
+    "objective": "Read-only review of opening-window adaptation, actual spec and deployment/task evidence",
+    "status": "success",
+    "files_changed": [
+      "independent-readiness-review.json"
+    ],
+    "interfaces_changed": [],
+    "commands_run": [
+      "Read frozen differences against case020",
+      "Parse actual run-spec with pure standard-library helper",
+      "Recompute 35 binding hashes",
+      "Read actual task, host, preparation clock and action smoke evidence"
+    ],
+    "tests_run": [
+      "Actual spec accepted; one microsecond before/after launch window rejected; no SDK import",
+      "No broad test suite rerun"
+    ],
+    "manifest_sha256": "a3b59cd6bbedc5f1932cd3ccbfc4223c8ab0b4710ea5f790eeed16bff98ba70c",
+    "binding_checks": 35,
+    "binding_checks_passed": 35,
+    "market_date": "2026-09-24",
+    "window_utc": [
+      "2026-09-24T13:25:00+00:00",
+      "2026-09-24T13:26:00+00:00",
+      "2026-09-24T13:45:00+00:00"
+    ],
+    "subscription_deadline_utc": "2026-09-24T13:30:00+00:00",
+    "task_readback": {
+      "wake_to_run": true,
+      "disallow_start_on_battery": false,
+      "stop_on_battery": false,
+      "run_only_if_idle": false,
+      "run_only_if_network": false,
+      "multiple_instances": "IgnoreNew",
+      "task_name": "PAT-Official-Quote-Continuity-20260924-Once",
+      "state": "Ready",
+      "start_boundary": "2026-09-24T21:25:00+08:00",
+      "end_boundary": "2026-09-24T21:26:00",
+      "next_run": "2026-09-24T21:25:00.0000000+08:00",
+      "logon_type": "Interactive",
+      "run_level": "Limited",
+      "restart_count": 0,
+      "start_when_available": false,
+      "execution_time_limit": "PT25M",
+      "delete_expired_after": "PT1H",
+      "manifest_sha256": "a3b59cd6bbedc5f1932cd3ccbfc4223c8ab0b4710ea5f790eeed16bff98ba70c",
+      "action_verified": true,
+      "production_restart": false,
+      "order_enabled": false
+    },
+    "action_smoke_readonly_refusal": true,
+    "host_ac_connected": true,
+    "host_ac_sleep_and_hibernate_disabled": true,
+    "clock_quality_currently_passed": false,
+    "windows_time_service_reported_unsynchronized": true,
+    "preparation_clock_bounds": [
+      1.2610933780670166,
+      1.32570481300354
+    ],
+    "assumptions": [
+      "Root owns current process/lock/fence and credential preflight; deployment evidence reports idle/unchanged and auth planned only."
+    ],
+    "risks": [
+      "Scheduled Ready does not guarantee machine remains powered, connected or user logged in at trigger.",
+      "Current Windows Time status is unsynchronized and NTP quality fails; launch rechecks and keeps overall quality false if uncertainty persists.",
+      "No live opening or full-session result exists for case021."
+    ],
+    "qa_focus": [
+      "Opening subscription limit returned to actual 13:30 open",
+      "1200s window and 1210s child allowance",
+      "Previously reviewed helper/sample/clock byte-identical",
+      "No retry, catchup, idle/network/battery blocking and correct Tonight NextRun",
+      "Time quality remains distinct from diagnostic reception"
+    ],
+    "rollback_notes": [
+      "No runtime, task, credential or clock changes by reviewer; old case evidence untouched."
+    ],
+    "next_recommended_action": "Preserve user login and powered-on connectivity, recheck launch prerequisites once at authorized trigger, consume one-shot actual results without treating prepared state as market-data pass.",
+    "needs_user_decision": false,
+    "user_decision_needed": null,
+    "sdk_connections_by_reviewer": 0
+  }
+}
