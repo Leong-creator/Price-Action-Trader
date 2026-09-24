@@ -1,0 +1,404 @@
+{
+  "clock-service-investigation.json": {
+    "checked_at": "2026-09-24T20:41:16.0485198+08:00",
+    "params": {
+      "Type": "NTP",
+      "NtpServer": "time.windows.com,0x9"
+    },
+    "client": {
+      "ResolvePeerBackoffMaxTimes": 7,
+      "SpecialPollInterval": 32768,
+      "ResolvePeerBackoffMinutes": 15,
+      "Enabled": 1
+    },
+    "config": {
+      "MinPollInterval": 10,
+      "MaxNegPhaseCorrection": 54000,
+      "MaxPollInterval": 15,
+      "MaxPosPhaseCorrection": 54000
+    },
+    "service": {
+      "State": "Running",
+      "StartMode": "Auto"
+    },
+    "events": [
+      {
+        "TimeCreated": "/Date(1790253572889)/",
+        "Id": 37,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序 NtpClient 正在从 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->40.119.6.228:123) 接收有效的时间数据。"
+      },
+      {
+        "TimeCreated": "/Date(1790227907448)/",
+        "Id": 35,
+        "LevelDisplayName": "信息",
+        "Message": "时间服务正在使用引用 ID 为 3825628968 的时间源 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->40.119.6.228:123) 同步系统时间。当前本地层次编号为 5。"
+      },
+      {
+        "TimeCreated": "/Date(1790227905952)/",
+        "Id": 37,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序 NtpClient 正在从 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->40.119.6.228:123) 接收有效的时间数据。"
+      },
+      {
+        "TimeCreated": "/Date(1790195137576)/",
+        "Id": 37,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序 NtpClient 正在从 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->168.61.215.74:123) 接收有效的时间数据。"
+      },
+      {
+        "TimeCreated": "/Date(1790162369043)/",
+        "Id": 35,
+        "LevelDisplayName": "信息",
+        "Message": "时间服务正在使用引用 ID 为 1255620008 的时间源 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->168.61.215.74:123) 同步系统时间。当前本地层次编号为 5。"
+      },
+      {
+        "TimeCreated": "/Date(1790162369028)/",
+        "Id": 37,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序 NtpClient 正在从 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->168.61.215.74:123) 接收有效的时间数据。"
+      },
+      {
+        "TimeCreated": "/Date(1790150736859)/",
+        "Id": 158,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序“VMICTimeProvider”指示，当前的硬件和运行环境不受支持并且已停止。对于非 HyperV 来宾环境中的 VMICTimeProvider，这是正常现象。对于当前操作环境中的当前提供程序，这可能也是正常现象。"
+      },
+      {
+        "TimeCreated": "/Date(1790149712848)/",
+        "Id": 158,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序“VMICTimeProvider”指示，当前的硬件和运行环境不受支持并且已停止。对于非 HyperV 来宾环境中的 VMICTimeProvider，这是正常现象。对于当前操作环境中的当前提供程序，这可能也是正常现象。"
+      },
+      {
+        "TimeCreated": "/Date(1790148688842)/",
+        "Id": 158,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序“VMICTimeProvider”指示，当前的硬件和运行环境不受支持并且已停止。对于非 HyperV 来宾环境中的 VMICTimeProvider，这是正常现象。对于当前操作环境中的当前提供程序，这可能也是正常现象。"
+      },
+      {
+        "TimeCreated": "/Date(1790147664826)/",
+        "Id": 158,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序“VMICTimeProvider”指示，当前的硬件和运行环境不受支持并且已停止。对于非 HyperV 来宾环境中的 VMICTimeProvider，这是正常现象。对于当前操作环境中的当前提供程序，这可能也是正常现象。"
+      },
+      {
+        "TimeCreated": "/Date(1790146624811)/",
+        "Id": 158,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序“VMICTimeProvider”指示，当前的硬件和运行环境不受支持并且已停止。对于非 HyperV 来宾环境中的 VMICTimeProvider，这是正常现象。对于当前操作环境中的当前提供程序，这可能也是正常现象。"
+      },
+      {
+        "TimeCreated": "/Date(1790129650585)/",
+        "Id": 35,
+        "LevelDisplayName": "信息",
+        "Message": "时间服务正在使用引用 ID 为 3825628968 的时间源 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->40.119.6.228:123) 同步系统时间。当前本地层次编号为 5。"
+      },
+      {
+        "TimeCreated": "/Date(1790129633623)/",
+        "Id": 37,
+        "LevelDisplayName": "信息",
+        "Message": "时间提供程序 NtpClient 正在从 time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123->40.119.6.228:123) 接收有效的时间数据。"
+      }
+    ]
+  },
+  "clock-admin-result.json": {
+    "started_at": "2026-09-24T20:43:38.4100106+08:00",
+    "before_type": "NTP",
+    "before_ntp_server": "time.windows.com,0x9",
+    "success": true,
+    "commands": [
+      {
+        "output": "成功地执行了命令。",
+        "operation": "config",
+        "exit_code": 0
+      },
+      {
+        "output": "将 resync 命令发送到本地计算机\n成功地执行了命令。",
+        "operation": "resync",
+        "exit_code": 0
+      }
+    ],
+    "after_type": "NTP",
+    "after_ntp_server": "time.windows.com,0x8",
+    "finished_at": "2026-09-24T20:43:40.4725876+08:00"
+  },
+  "clock-config-after.json": {
+    "server": "time.windows.com,0x8",
+    "type": "NTP"
+  },
+  "clock-after-admin.json": {
+    "query": {
+      "platform": "win32",
+      "read_only": true,
+      "samples": [
+        {
+          "host": "time.windows.com",
+          "valid": true,
+          "stratum": 4,
+          "leap": 0,
+          "t1": 1790253877.847681,
+          "t2": 1790253878.2243018,
+          "t3": 1790253878.2243032,
+          "t4": 1790253878.604596,
+          "monotonic_elapsed": 0.7569151000061538,
+          "offset_seconds": -0.001835942268371582,
+          "roundtrip_seconds": 0.756913423538208
+        },
+        {
+          "host": "time.cloudflare.com",
+          "valid": true,
+          "stratum": 3,
+          "leap": 0,
+          "t1": 1790253878.6053102,
+          "t2": 1790253878.9932003,
+          "t3": 1790253878.9932399,
+          "t4": 1790253879.3531802,
+          "monotonic_elapsed": 0.7478702000080375,
+          "offset_seconds": 0.013974905014038086,
+          "roundtrip_seconds": 0.7478303909301758
+        }
+      ]
+    },
+    "assessment": {
+      "reception_allowed": true,
+      "quality_passed": true,
+      "quality_reason": null,
+      "received_for_diagnosis_only": false,
+      "maximum_clock_bound_seconds": 0.5,
+      "samples": [
+        {
+          "host": "time.windows.com",
+          "valid": true,
+          "stratum": 4,
+          "leap": 0,
+          "t1": 1790253877.847681,
+          "t2": 1790253878.2243018,
+          "t3": 1790253878.2243032,
+          "t4": 1790253878.604596,
+          "monotonic_elapsed": 0.7569151000061538,
+          "offset_seconds": -0.001835942268371582,
+          "roundtrip_seconds": 0.756913423538208
+        },
+        {
+          "host": "time.cloudflare.com",
+          "valid": true,
+          "stratum": 3,
+          "leap": 0,
+          "t1": 1790253878.6053102,
+          "t2": 1790253878.9932003,
+          "t3": 1790253878.9932399,
+          "t4": 1790253879.3531802,
+          "monotonic_elapsed": 0.7478702000080375,
+          "offset_seconds": 0.013974905014038086,
+          "roundtrip_seconds": 0.7478303909301758
+        }
+      ]
+    }
+  },
+  "clock-status-after.json": {
+    "exit_code": 0,
+    "status": "Leap 指示符: 0(无警告)\n层次: 5 (次引用 - 与(S)NTP 同步)\n精度: -23 (每刻度 119.209ns)\n根延迟: 0.2275529s\n根分散: 8.0404166s\n引用 ID: 0x287706E4 (源 IP:  40.119.6.228)\n上次成功同步时间: 2026/9/24 20:43:40\n源: time.windows.com,0x8 \n轮询间隔: 10 (1024s)\n\n相位偏移: -0.2702588s\nClockRate: 0.0156250s\n计算机状态: 1 (等候)\n时间源标志:0 (无)\n服务器角色: 0 (无)\n上次同步错误: 0 (成功地执行了命令。)\n上次成功同步时间后的时间: 84.0440656s\n\n"
+  },
+  "startup-audit.json": {
+    "tasks": [
+      {
+        "name": "PAT-Official-Quote-Continuity-20260924-Once",
+        "state": "Ready",
+        "next": "2026-09-24T21:25:00.0000000+08:00",
+        "action": "C:\\Windows\\System32\\wsl.exe",
+        "arguments": "--distribution Ubuntu --user hgl --exec /usr/bin/python3 -I -B /home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening/run_once.py --manifest /home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening/manifest.json --manifest-sha256 a3b59cd6bbedc5f1932cd3ccbfc4223c8ab0b4710ea5f790eeed16bff98ba70c"
+      }
+    ],
+    "project_autoruns": []
+  },
+  "deployment-final.json": {
+    "task": {
+      "task_name": "PAT-Official-Quote-Continuity-20260924-Once",
+      "state": "Ready",
+      "next_run": "2026-09-24T21:25:00.0000000+08:00",
+      "manifest_sha256": "b3db8da40e570ea252aa5f93db16693466a062cebdab2716fec11638d760ae00",
+      "restart_count": 0,
+      "start_when_available": false,
+      "start_boundary": "2026-09-24T21:25:00+08:00",
+      "end_boundary": "2026-09-24T21:26:00",
+      "logon_type": "Interactive",
+      "run_level": "Limited",
+      "multiple_instances": "IgnoreNew",
+      "wake_to_run": true,
+      "run_only_if_idle": false,
+      "run_only_if_network": false,
+      "disallow_start_on_battery": false,
+      "stop_on_battery": false
+    },
+    "files_verified": true,
+    "protected_states_unchanged": true,
+    "credential_expiry_verified": true,
+    "actual_spec_verified": true,
+    "windows_action_smoke": {
+      "status": "refused",
+      "sdk_started": false,
+      "exit_verified": false,
+      "credentials_cleaned": false,
+      "protected_states_unchanged": null,
+      "original_credentials_unchanged": null,
+      "production_acceptance": false,
+      "diagnostic_window_passed": false,
+      "error": "outside_launch_window"
+    },
+    "sdk_connections": 0
+  },
+  "independent-review.json": {
+    "task_id": "case021-preopen-independent-review",
+    "role": "reviewer",
+    "objective": "Read-only lifecycle, diagnostics and Quote duplicate review",
+    "status": "success",
+    "files_changed": [
+      "independent-review.json"
+    ],
+    "interfaces_changed": false,
+    "input_sha256": {
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening/run_once.py": "2f08b94a35333c625d9223bb8b5172c4af6ac4e583293fdc99a1a6d03dbe974c",
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening/guardian.py": "58693e2d5609d9ccb6b4c173caedcb5de7aca91224d89c5d586dfa90b688f66e",
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening/controller.py": "152f9813b7ab7c9825b54e360192760373114c9bb671790295cf704fa351af3d",
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-windows-opening/clock_preflight.py": "5fd3a1171d299440191d6a5d20eff2d08aeaf10c863eb815b911aea55e753fd7",
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-preopen-audit/quote-candidate/health.py": "6e0ce1684381969734a3916c7f9ce2c3862b51b2830bdb8439497e4b655fc5ee",
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-preopen-audit/runner-candidate/run_once.py": "10fcf884714d3dd7e64df681084668c6345bbd33b9885f8a6e099163d92837d8",
+      "/home/hgl/project-archives/Price-Action-Trader/20260924-preopen-audit/runner-candidate/test_run_once.py": "170237bf212539f8de607e6a481c45fca81c0e27f16ed59af802b2a452904825"
+    },
+    "findings": [
+      {
+        "severity": "P2",
+        "topic": "clock_failure_reason_lost",
+        "reproduced_with_fake_only": true,
+        "input_reasons": [
+          "clock_no_valid_sample",
+          "clock_query_failed",
+          "clock_sample_hosts_mismatch"
+        ],
+        "observed_error": "RuntimeError",
+        "sdk_started": false,
+        "fix_owner": "root",
+        "status": "minimal_candidate_independently_reviewed_pass",
+        "scope": "Safe reason/phase added for clock preflight only; unknown messages remain redacted."
+      },
+      {
+        "severity": "nonblocking_defense_in_depth",
+        "topic": "guardian_absolute_wall_end_not_rechecked",
+        "fake_wall_seconds_after_end": 600,
+        "fake_monotonic_elapsed_seconds": 1,
+        "guardian_accepted_completed_and_verified_exit": true,
+        "limits": "Does not prove actual controller UTC deadline or wrapper summary cutoff can be bypassed. Actual controller has end+10 UTC check and wrapper validates summary end+25. No actual process or SDK started."
+      }
+    ],
+    "quote_candidate": {
+      "review_passed": true,
+      "offline_tests": 68,
+      "failures": 0,
+      "seconds": 0.176,
+      "only_change": "Classify identical Quote timestamp after future/queue checks and before old event-age refusal. No freshness or reference liveness renewal. Trade gates unchanged.",
+      "deployment_review_pending": true,
+      "final_health_sha256": "6e0ce1684381969734a3916c7f9ce2c3862b51b2830bdb8439497e4b655fc5ee",
+      "native_tests_author_evidence": 68,
+      "final_delta_review": "Quote-specific short-circuit preserves all original Trade steps."
+    },
+    "lifecycle_review": {
+      "unknown_exit_retains_fences_and_credentials": true,
+      "confirmed_exit_required_before_owned_credential_cleanup": true,
+      "unknown_credential_identity_not_deleted": true,
+      "clock_quality_false_cannot_yield_overall_pass": true,
+      "no_new_confirmed_safety_bypass": true
+    },
+    "commands_run": [
+      "read-only source inspection",
+      "pure fake runner failure comparison",
+      "pure fake guardian wall-clock jump comparison",
+      "python3 -B -m unittest test_health test_quote_snapshot test_opening_duplicate -q"
+    ],
+    "tests_run": {
+      "sdk_connections": 0,
+      "real_credentials_accessed": false,
+      "tasks_changed": false,
+      "system_clock_changed": false
+    },
+    "assumptions": [
+      "Current verified task, controller and wrapper remain final backstops; no broad availability guarantee is asserted."
+    ],
+    "risks": [
+      "Final candidate hashes and deployment still need review after root integrates minimal patches."
+    ],
+    "qa_focus": [
+      "Safe phase/error code logging without arbitrary exception strings",
+      "Actual case021 manifest byte identity after replacement"
+    ],
+    "rollback_notes": "No implementation or scheduled task was changed by reviewer.",
+    "next_recommended_action": "Parent may deploy both reviewed candidates together and rebind manifest/task after preserving original byte snapshots; deployment identity still needs readback.",
+    "needs_user_decision": false,
+    "user_decision_needed": null,
+    "runner_candidate": {
+      "review_passed": true,
+      "independent_offline_tests": 36,
+      "failures": 0,
+      "seconds": 0.444,
+      "safe_whitelist_matches_current_clock_module": true,
+      "unknown_exception_and_timeout_command_payload_not_exposed": true
+    }
+  },
+  "quote_fix_freeze": {
+    "files_sha256": {
+      "health.py": "6e0ce1684381969734a3916c7f9ce2c3862b51b2830bdb8439497e4b655fc5ee",
+      "continuity_sample.py": "6e77c7c27087754dc55c8c7a10092ba00394c5390881d1f59b1e01ceb50a2c93",
+      "production-config.json": "44a0a5a8bfe6756996fd43b529f7776291935ae405256e4a5da76f7bcad3ab31",
+      "run-spec.json": "f97198c3576304c0c7712e89f757843870d9fc95976928c68832217fd8c7fac4",
+      "opening-run-spec.json": "85c37803973f69eb3b898ea7f94b45ea940309b01fbcb703cace2bd953d4f70b",
+      "case018-run-spec.json": "f59c836146f9c2d279b6415fa5c6d5c87c899b77163d62176cf08107e778ec8b",
+      "test_health.py": "d65f4547ceac5360cea38e63dda8ae3d791ca6f3aae6f5b90f48789cee235b27",
+      "test_quote_snapshot.py": "94d27ac76d8baf975d11bbf7fc00bb1e4506a200a9d0c9a99e4bc54d14d4da78",
+      "test_opening_duplicate.py": "bef4afc667a6dfa398dcfc7aaeb8bf7957ad48045e616fe958bfdecb53add2f9"
+    },
+    "linux_tests": 68,
+    "windows_tests": 68,
+    "live_sdk_connections": 0,
+    "deployed": false
+  },
+  "runner_tests": 36,
+  "new_sdk_connections": 0,
+  "full_sessions_passed": 0,
+  "final_independent_review": {
+    "task_id": "case021-final-deployment-and-doc-review",
+    "status": "success",
+    "blocking_findings": [],
+    "manifest_sha256": "b3db8da40e570ea252aa5f93db16693466a062cebdab2716fec11638d760ae00",
+    "deployment": {
+      "independently_rehashed_bindings": 31,
+      "all_matched": true,
+      "scope": "2 manifest copies; 10 case source/config copies; 7 official environment files; 4 runner files; 2 base interpreter files; 5 protected states; 1 credential-transfer manifest hash only",
+      "health_final_sha256": "6e0ce1684381969734a3916c7f9ce2c3862b51b2830bdb8439497e4b655fc5ee",
+      "runner_final_sha256": "10fcf884714d3dd7e64df681084668c6345bbd33b9885f8a6e099163d92837d8",
+      "task_readback_manifest_matches": true,
+      "next_run_beijing": "2026-09-24T21:25:00+08:00",
+      "latest_start_beijing": "2026-09-24T21:26:00+08:00",
+      "observation_end_beijing": "2026-09-24T21:45:00+08:00",
+      "task_settings": "Interactive Limited; IgnoreNew; no retry/catchup; existing readback reviewed, no task commands executed",
+      "smoke": "Recorded outside_launch_window, sdk_started=false; not rerun",
+      "production_source_deployment_manifest_not_locked": true,
+      "production_source_manifest_scope": "Inspected every manifest.files, artifacts, runner.integrity_files, base_integrity_files and protected_states member. Only five fixed protected runtime state files are hashed from reports; no production source deployment manifest or Git HEAD is bound by case021. Updating that separate source manifest after factual-doc commit does not change these declared case bindings."
+    },
+    "clock": {
+      "admin_result_success": true,
+      "same_server_flag_change": "0x9 -> 0x8",
+      "last_successful_sync_local": "2026-09-24 20:43:40",
+      "independently_recomputed_uncertainty_bounds_seconds": [
+        0.3802926540374756,
+        0.387890100479126
+      ],
+      "both_within_existing_0_5_second_gate": true,
+      "scope": "Current configuration/status and one bounded query passed. No guarantee of future or permanent clock stability; launch will check again."
+    },
+    "risks": [
+      "Guardian outer absolute UTC recheck remains a documented nonblocking defense-in-depth gap; inner controller and final summary deadlines remain.",
+      "Live opening quality and credentials/process cleanup require actual result inspection after the scheduled window."
+    ],
+    "snapshot_note": "Full private review preserves hashes of six documents before this additive review summary; earlier review and startup/candidate records above are historical snapshots."
+  }
+}
